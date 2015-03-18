@@ -1,30 +1,24 @@
-.TH mfstools "1" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.TH mfstools "1" "March 2015" "MooseFS 3.0.11-1" "This is part of MooseFS"
 .SH NAME
 mfstools \- perform MooseFS\-specific operations
 .SH SYNOPSIS
 .B mfsgetgoal
 [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
 .PP
-.B mfsrgetgoal
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
-.PP
 .B mfssetgoal
-[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB+\fP|\fB-\fP]N \fIOBJECT\fP...
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIGOAL\fP[\fB+\fP|\fB-\fP]|\fILABELS\fP|\fB-K\fP \fIKEEP_LABELS\fP [\fB-C\fP \fICREATE_LABELS\fP] [\fB-A\fP \fIARCHIVE_LABELS\fP \fB-d\fP \fIARCHIVE_DELAY\fP] \fIOBJECT\fP...
 .PP
-.B mfsrsetgoal
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB+\fP|\fB-\fP]N \fIOBJECT\fP...
+.B mfscopygoal
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
 .PP
 .B mfsgettrashtime
 [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
 .PP
-.B mfsrgettrashtime
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
-.PP
 .B mfssettrashtime
-[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB+\fP|\fB-\fP]SECONDS \fIOBJECT\fP...
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISECONDS\fP[\fB+\fP|\fB-\fP] \fIOBJECT\fP...
 .PP
-.B mfsrsettrashtime
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB+\fP|\fB-\fP]SECONDS \fIOBJECT\fP...
+.B mfscopytrashtime
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
 .PP
 .B mfsgeteattr
 [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
@@ -34,6 +28,9 @@ mfstools \- perform MooseFS\-specific operations
 .PP
 .B mfsdeleattr
 [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fB-f\fP \fIATTRNAME\fP [\fB-f\fP \fIATTRNAME\fP ...] \fIOBJECT\fP...
+.PP
+.B mfscopyeattr
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
 .PP
 .B mfscheckfile
 \fIFILE\fP...
@@ -58,13 +55,16 @@ mfstools \- perform MooseFS\-specific operations
 \fIDIRECTORY\fP...
 .PP
 .B mfssetquota
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-i\fP|\fB-I\fP \fIinodes\fP] 
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-p\fP \fIgrace_period\fP] [\fB-i\fP|\fB-I\fP \fIinodes\fP] 
 [\fB-l\fP|\fB-L\fP \fIlength\fP] [\fB-s\fP|\fB-S\fP \fIsize\fP] [\fB-r\fP|\fB-R\fP \fIrealsize\fP]
 \fIDIRECTORY\fP...
 .PP
 .B mfsdelquota
 [\fB-a\fP|\fB-A\fP|\fB-i\fP|\fB-I\fP|\fB-l\fP|\fB-L\fP|\fB-s\fP|\fB-S\fP|\fB-r\fP|\fB-R\fP]
 [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fB-f\fP \fIDIRECTORY\fP...
+.PP
+.B mfscopyquota
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_DIRECTORY\fP \fIDESTINATION_DIRECTORY\fP
 .PP
 .B mfsfilepaths
 \fIOBJECT\fP|\fIINODE\fP...
@@ -79,15 +79,14 @@ unadvised).
 given file, but for every given directory additionally prints current
 \fIgoal\fP value of all contained objects (files and directories).
 \fBmfssetgoal\fP changes current \fIgoal\fP value of given object(s). If new
-value is specified in \fB+\fP\fIN\fP form, \fIgoal\fP value is increased to
-\fIN\fP for objects with lower \fIgoal\fP value and unchanged for the rest.
-Similarly, if new value is specified as \fB\-\fP\fIN\fP, \fIgoal\fP value is
-decreased to \fIN\fP for objects with higher \fIgoal\fP value and unchanged
-for the rest. \fB-r\fP option enables recursive mode.
+value is specified in \fIGOAL\fP\fB+\fP form, \fIgoal\fP value is increased to
+\fIGOAL\fP for objects with lower \fIgoal\fP value and unchanged for the rest.
+Similarly, if new value is specified as \fIGOAL\fP\fB\-\fP, \fIgoal\fP value is
+decreased to \fIGOAL\fP for objects with higher \fIgoal\fP value and unchanged
+for the rest. Since version 3.0 of MooseFS goal can be also defined as a group of
+expressions with labels. Label expressions are described below.
+\fB-r\fP option enables recursive mode.
 These tools can be used on any file, directory or deleted (\fItrash\fP) file.
-.PP
-\fBmfsrgetgoal\fP and \fBmfsrsetgoal\fP are deprecated aliases for
-\fBmfsgetgoal -r\fP and \fBmfssetgoal -r\fP respectively.
 .PP
 \fBmfsgettrashtime\fP and \fBmfssettrashtime\fP operate on object's
 \fItrashtime\fP value, i.e. the number of seconds the file is preserved in
@@ -98,16 +97,13 @@ special \fItrash\fP directory before it's finally removed from filesystem.
 file, but for every given directory additionally prints current \fItrashtime\fP
 value of all contained objects (files and directories).
 \fBmfssettrashtime\fP changes current \fItrashtime\fP value of given object(s).
-If new value is specified in \fB+\fP\fIN\fP form, \fItrashtime\fP value is
-increased to \fIN\fP for objects with lower \fItrashtime\fP value and unchanged
-for the rest. Similarly, if new value is specified as \fB\-\fP\fIN\fP,
-\fItrashtime\fP value is decreased to \fIN\fP for objects with higher
+If new value is specified in \fISECONDS\fP\fB+\fP form, \fItrashtime\fP value is
+increased to \fISECONDS\fP for objects with lower \fItrashtime\fP value and unchanged
+for the rest. Similarly, if new value is specified as \fISECONDS\fP\fB\-\fP,
+\fItrashtime\fP value is decreased to \fISECONDS\fP for objects with higher
 \fItrashtime\fP value and unchanged for the rest. \fB-r\fP option enables
 recursive mode.
 These tools can be used on any file, directory or deleted (\fItrash\fP) file.
-.PP
-\fBmfsrgettrashtime\fP and \fBmfsrsettrashtime\fP are deprecated aliases for
-\fBmfsgettrashtime -r\fP and \fBmfssettrashtime -r\fP respectively.
 .PP
 \fBmfsgeteattr\fP, \fBmfsseteattr\fP and \fBmfsdeleattr\fP
 tools are used to get, set or delete some extra attributes. Attributes are
@@ -159,10 +155,16 @@ for sum of chunk sizes (not considering goals) with \fB-s\fP, \fB-S\fP options a
 hdd space (more or less chunk sizes multiplied by goal of each chunk) with \fB-r\fP, \fB-R\fP options.
 Small letters set soft quota, capital letters set hard quota. \fB-a\fP and \fB-A\fP options in
 \fBmfsdelquota\fP mean all kinds of quota. Quota behaviour is described below.
+For soft quota grace period can be defined using \fB-p\fP option. When grace period is not given then
+default value will be used (option defined in mfsmaster.cfg or seven days if it's not defined there).
 .PP
 \fBmfsfilepaths\fP tool can be used to find all occurences (hard links) of given file in filesystem.
 Also can be used to find file by number of i-node. In case of searching by i-node tool has to be run
 in mfs mounted directory.
+.PP
+\fBmfscopygoal\fP, \fBmfscopytrashtime\fP, \fBmfscopyeattr\fP and \fBmfscopyquota\fP tools can be used
+to copy particular settings from one object to another.
+
 .SH GENERAL OPTIONS
 Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
@@ -198,6 +200,47 @@ show size
 .TP
 \fB-r\fP
 show realsize
+.SH LABELS
+Since version 3.0 of MooseFS goals for files can be defined as expressions with labels.
+Labels are letters (A-Z - 26 letters) that can be assigned to chunkservers. Each chunk server can
+have multiple (up to 26) labels. \fBmfssetgoal\fP accepts expressions with labels along with simple numeric goals.
+To set goal with label user has to specify goal expression:
+.PP
+\fBmfssetgoal\fP LABELS \fIFILE\fP - a file will be stored according to the LABELS expression. LABELS
+expression consist of set of subexpressions separated by commas, each subexpression specifies the storage schema
+of one copy of the file. Subexpression can be: an asterisk or a label schema. Label schema can be one label or an expression with 
+sums, multiplications and brackets. Sum means a file can be stored on any chunkserver matching any element of the
+sum (logical or). Multiplication means a file can be stored only on a chunkserver matching all elements (logical and).
+Asterisk means any chunkserver. Identical subexpressions can be shortened by adding a number in front of one instead
+of repeating it a number of times.
+.PP
+\fBmfssetgoal\fP -K KEEP_LABELS [ -C CREATE_LABELS ] [ -A ARCHIVE_LABELS -A ARCHIVE_DELAY ] \fIFILE\fP - a file will be created
+(and written) using CREATE_LABELS then almost imediatelly system will use KEEP_LABELS and if ARCHIVE_LABELS and ARCHIVE_DELAY are specified
+then ARCHIVE_LABELS will be used after ARCHIVE_DELAY days after last file modifictaion time.
+.PP
+Examples:
+.PP
+\fBmfssetgoal\fP A,B \fIFILE\fP - a file will have two copies, one copy will be stored on chunkserver(s) 
+with label A, the other on chunkserver(s) with label B
+.PP
+\fBmfssetgoal\fP A,* \fIFILE\fP - a file will have two copies, one copy will be stored on chunkserver(s) 
+with label A, the other on any chunkserver(s)
+.PP
+\fBmfssetgoal\fP *,* \fIFILE\fP - a file will have two copies, stored on any chunkservers (different for each copy) 
+.PP
+\fBmfssetgoal\fP AB,C+D \fIFILE\fP - a file will have two copies, one copy will be stored on any chunkserver(s) that has both
+labels A and B (multiplication of labels), the other on any chunkserver(s) that has either the C label or the D label
+(sum of labels)
+.PP
+\fBmfssetgoal\fP A,B[X+Y],C[X+Y] \fIFILE\fP - a file will have three copies, one copy will be stored on any chunkserver(s) 
+with A label, the second on any chunserver(s) that has the B label and either X or Y label, the third on any chunkserver(s), that
+has the C label and either X or Y label
+.PP
+\fBmfssetgoal\fP A,A \fIFILE\fP is equivalent to \fBmfssetgoal\fP 2A \fIFILE\fP
+.PP
+\fBmfssetgoal\fP A,BC,BC,BC \fIFILE\fP is equivalent to \fBmfssetgoal\fP A,3BC \fIFILE\fP
+.PP
+\fBmfssetgoal\fP *,* \fIFILE\fP is equivalent to \fBmfssetgoal\fP 2* \fIFILE\fP is equivalent to \fBmfssetgoal\fP 2 \fIFILE\fP
 .SH EXTRA ATTRIBUTES
 \fBnoowner\fP This flag means,
 that particular object belongs to current user (\fIuid\fP and \fIgid\fP are equal
@@ -212,6 +255,8 @@ it could be useful to turn it off.
 .PP
 \fBnoentrycache\fP This flag is similar to above. It prevents directory entries
 from being cached in kernel.
+.PP
+\fBnodatacache\fP This flag means, that data cache should be cleared every time a file is opened.
 .SH QUOTAS
 Quota is always set on a directory. Hard quota cannot be exceeded anytime.
 Soft quota can be exceeded for a period of time (7 days). Once a quota is exceeded in a

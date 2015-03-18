@@ -64,6 +64,7 @@
 #include "md5.h"
 #include "mastercomm.h"
 #include "masterproxy.h"
+#include "csorder.h"
 #include "chunkloccache.h"
 #include "symlinkcache.h"
 #include "negentrycache.h"
@@ -71,6 +72,7 @@
 #include "conncache.h"
 #include "readdata.h"
 #include "writedata.h"
+#include "delayrun.h"
 #include "csdb.h"
 #include "stats.h"
 #include "strerr.h"
@@ -137,8 +139,11 @@ static struct fuse_lowlevel_ops mfs_oper = {
 	.listxattr      = mfs_listxattr,
 	.removexattr    = mfs_removexattr,
 #if FUSE_VERSION >= 26
-//	.getlk		= mfs_getlk,
-//	.setlk		= mfs_setlk,
+	.getlk		= mfs_getlk,
+	.setlk		= mfs_setlk,
+#endif
+#if FUSE_VERSION >= 29
+	.flock          = mfs_flock,
 #endif
 };
 
@@ -150,6 +155,7 @@ struct mfsopts {
 	char *subfolder;
 	char *password;
 	char *md5pass;
+	char *preferedlabels;
 	unsigned nofile;
 	signed nice;
 #ifdef MFS_USE_MEMLOCK
@@ -182,6 +188,7 @@ struct mfsopts {
 	double direntrycacheto;
 	double negentrycacheto;
 	double groupscacheto;
+	int fsyncbeforeclose;
 };
 
 static struct mfsopts mfsopts;
@@ -219,6 +226,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfssubfolder=%s", subfolder, 0),
 	MFS_OPT("mfspassword=%s", password, 0),
 	MFS_OPT("mfsmd5pass=%s", md5pass, 0),
+	MFS_OPT("mfspreflabels=%s", preferedlabels, 0),
 	MFS_OPT("mfsrlimitnofile=%u", nofile, 0),
 	MFS_OPT("mfsnice=%d", nice, 0),
 #ifdef MFS_USE_MEMLOCK
@@ -247,6 +255,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfsnegentrycacheto=%lf", negentrycacheto, 0),
 	MFS_OPT("mfsgroupscacheto=%lf", groupscacheto, 0),
 //	MFS_OPT("mfsaclsupport", xattraclsupport, 1),
+	MFS_OPT("mfsfsyncbeforeclose", fsyncbeforeclose, 1),
 
 	FUSE_OPT_KEY("-m",             KEY_META),
 	FUSE_OPT_KEY("--meta",         KEY_META),
@@ -322,6 +331,7 @@ static void usage(const char *progname) {
 #ifdef MFS_USE_MALLOPT
 "    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 8)\n"
 #endif
+"    -o mfsfsyncbeforeclose      force fsync before last file close (safer but can be inefficient - especially in case of small files)\n"
 "    -o mfswritecachesize=N      define size of write cache in MiB (default: 128)\n"
 "    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 128)\n"
 "    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n"
@@ -329,12 +339,13 @@ static void usage(const char *progname) {
 "    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n"
 "    -o mfsmaster=HOST           define mfsmaster location (default: " DEFAULT_MASTERNAME ")\n"
 "    -o mfsport=PORT             define mfsmaster port number (default: " DEFAULT_MASTER_CLIENT_PORT ")\n"
-"    -o mfsbind=IP               define source ip address for connections (default: NOT DEFINED - choosen automatically by OS)\n"
+"    -o mfsbind=IP               define source ip address for connections (default: NOT DEFINED - chosen automatically by OS)\n"
 "    -o mfsproxy=IP              define listen ip address of local master proxy for communication with tools (default: 127.0.0.1)\n"
 "    -o mfssubfolder=PATH        define subfolder to mount as root (default: /)\n"
 "    -o mfspassword=PASSWORD     authenticate to mfsmaster with password\n"
 "    -o mfsmd5pass=MD5           authenticate to mfsmaster using directly given md5 (only if mfspassword is not defined)\n"
 "    -o mfsdonotrememberpassword do not remember password in memory - more secure, but when session is lost then new session is created without password\n"
+"    -o mfspreflabels=LABELEXPR  specify prefered labels for choosing chunkservers during I/O\n"
 "\n");
 	fprintf(stderr,
 "CMODE can be set to:\n"
@@ -355,6 +366,16 @@ static void usage(const char *progname) {
 "    Only xfs on Linux works a little different. Beware that there is a strange\n"
 "    operation - chown(-1,-1) which is usually converted by a kernel into something\n"
 "    like 'chmod ug-s', and therefore can't be controlled by MFS as 'chown'\n"
+"\n");
+	fprintf(stderr,
+"LABELEXPR grammar:\n"
+"    LABELEXPR -> S ';' LABELEXPR | S\n"
+"    S -> S '+' M | S '|' M | S '||' M | M\n"
+"    M -> M '*' L | M '&' L | M '&&' L | M L | L\n"
+"    L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']'\n"
+"\n"
+"    Subexpressions should be placed in priority order.\n"
+"    Up to nine subexpressions (priorities) can be specified.\n"
 "\n");
 }
 
@@ -506,7 +527,7 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	char s;
 	conn->max_write = 131072;
 	conn->max_readahead = 131072;
-#if defined(FUSE_CAP_BIG_WRITES) || defined(FUSE_CAP_DONT_MASK)
+#if defined(FUSE_CAP_BIG_WRITES) || defined(FUSE_CAP_DONT_MASK) || defined(FUSE_CAP_FLOCK_LOCKS) || defined(FUSE_CAP_POSIX_LOCKS)
 	conn->want = 0;
 #endif
 #ifdef FUSE_CAP_BIG_WRITES
@@ -514,6 +535,12 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 #endif
 #ifdef FUSE_CAP_DONT_MASK
 	conn->want |= FUSE_CAP_DONT_MASK;
+#endif
+#ifdef FUSE_CAP_FLOCK_LOCKS
+	conn->want |= FUSE_CAP_FLOCK_LOCKS;
+#endif
+#ifdef FUSE_CAP_POSIX_LOCKS
+	conn->want |= FUSE_CAP_POSIX_LOCKS;
 #endif
 	if (piped[1]>=0) {
 		s=0;
@@ -745,6 +772,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 
 	if (mfsopts.meta==0) {
 		csdb_init();
+		delay_init();
 		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries);
 		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries);
 	}
@@ -761,6 +789,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		if (mfsopts.meta==0) {
 			write_data_term();
 			read_data_term();
+			delay_term();
 			csdb_term();
 		}
 		masterproxy_term();
@@ -776,7 +805,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		mfs_meta_init(mfsopts.debug,mfsopts.entrycacheto,mfsopts.attrcacheto);
 		se = fuse_lowlevel_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), (void*)piped);
 	} else {
-		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1); //mfsopts.xattraclsupport);
+		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncbeforeclose); //mfsopts.xattraclsupport);
 		se = fuse_lowlevel_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
 	}
 	if (se==NULL) {
@@ -792,6 +821,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		if (mfsopts.meta==0) {
 			write_data_term();
 			read_data_term();
+			delay_term();
 			csdb_term();
 		}
 		masterproxy_term();
@@ -820,6 +850,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		if (mfsopts.meta==0) {
 			write_data_term();
 			read_data_term();
+			delay_term();
 			csdb_term();
 		}
 		masterproxy_term();
@@ -862,6 +893,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	if (mfsopts.meta==0) {
 		write_data_term();
 		read_data_term();
+		delay_term();
 		csdb_term();
 	}
 	masterproxy_term();
@@ -1041,6 +1073,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.subfolder = NULL;
 	mfsopts.password = NULL;
 	mfsopts.md5pass = NULL;
+	mfsopts.preferedlabels = NULL;
 	mfsopts.nofile = 0;
 	mfsopts.nice = -19;
 #ifdef MFS_USE_MEMLOCK
@@ -1075,6 +1108,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.direntrycacheto = 1.0;
 	mfsopts.negentrycacheto = 1.0;
 	mfsopts.groupscacheto = 300.0;
+	mfsopts.fsyncbeforeclose = 0;
 
 	custom_cfg = 0;
 
@@ -1217,6 +1251,10 @@ int main(int argc, char *argv[]) {
 		fuse_opt_add_arg(&args, "-o" DEFAULT_OPTIONS);
 	}
 
+	if (csorder_init(mfsopts.preferedlabels)<0) {
+		fprintf(stderr,"error parsing prefered labels expression\nsee: %s -h for help\n",argv[0]);
+		return 1;
+	}
 
 	make_fsname(&args);
 	remove_mfsmount_magic(&args);

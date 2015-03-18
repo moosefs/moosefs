@@ -32,8 +32,11 @@
 #include "filesystem.h"
 #include "sessions.h"
 #include "openfiles.h"
+#include "flocklocks.h"
+#include "posixlocks.h"
 #include "csdb.h"
 #include "chunks.h"
+#include "labelsets.h"
 #include "metadata.h"
 #include "slogger.h"
 #include "massert.h"
@@ -244,6 +247,26 @@ int do_acquire(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return of_mr_acquire(inode,cuid);
 }
 
+int do_archchg(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,uid,nsinodes;
+	uint8_t flags;
+	uint64_t chgchunks,notchgchunks;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(uid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(flags,ptr);
+	EAT(ptr,filename,lv,')');
+	EAT(ptr,filename,lv,':');
+	GETU64(chgchunks,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU64(notchgchunks,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(nsinodes,ptr);
+	return fs_mr_archchg(ts,inode,uid,flags,chgchunks,notchgchunks,nsinodes);
+}
+
 int do_attr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,mode,uid,gid,atime,mtime;
 	EAT(ptr,filename,lv,'(');
@@ -397,6 +420,24 @@ int do_emptysustained(const char *filename,uint64_t lv,uint32_t ts,const char *p
 	return fs_mr_emptysustained(ts,freeinodes);
 }
 
+int do_flock(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,sessionid;
+	uint64_t owner;
+	char cmd;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(sessionid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU64(owner,ptr);
+	EAT(ptr,filename,lv,',');
+	cmd = *ptr;
+	ptr++;
+	EAT(ptr,filename,lv,')');
+	return flock_mr_change(inode,sessionid,owner,cmd);
+}
+
 int do_freeinodes(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t freeinodes;
 	EAT(ptr,filename,lv,'(');
@@ -412,7 +453,7 @@ int do_incversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,'(');
 	GETU64(chunkid,ptr);
 	EAT(ptr,filename,lv,')');
-	return fs_mr_incversion(chunkid);
+	return chunk_mr_increase_version(chunkid);
 }
 
 int do_link(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -428,15 +469,110 @@ int do_link(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return fs_mr_link(ts,inode,parent,strlen((char*)name),name);
 }
 
+int do_labeldesc(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint8_t labelid;
+	uint8_t name[256];
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU8(labelid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETNAME(name,ptr,filename,lv,')');
+	EAT(ptr,filename,lv,')');
+	return labelset_mr_setdescription(labelid,name);
+}
+
+int do_labelset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint16_t labelsetid,arch_delay;
+	uint8_t create_labelscnt,keep_labelscnt,arch_labelscnt,create_mode,i;
+	uint32_t create_labelmasks[9*MASKORGROUP];
+	uint32_t keep_labelmasks[9*MASKORGROUP];
+	uint32_t arch_labelmasks[9*MASKORGROUP];
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU16(labelsetid,ptr);
+	EAT(ptr,filename,lv,',');
+	if (*ptr=='W') {
+		EAT(ptr,filename,lv,'W');
+		GETU8(create_labelscnt,ptr);
+		EAT(ptr,filename,lv,',');
+		EAT(ptr,filename,lv,'K');
+		GETU8(keep_labelscnt,ptr);
+		EAT(ptr,filename,lv,',');
+		if (*ptr=='A') {
+			EAT(ptr,filename,lv,'A');
+			GETU8(arch_labelscnt,ptr);
+			EAT(ptr,filename,lv,',');
+			GETU8(create_mode,ptr);
+			EAT(ptr,filename,lv,',');
+			GETU16(arch_delay,ptr);
+			if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9 || arch_labelscnt==0 || arch_labelscnt>9) {
+				return ERROR_EINVAL;
+			}
+			for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETU32(create_labelmasks[i],ptr);
+			}
+			for (i=0 ; i<keep_labelscnt*MASKORGROUP ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETU32(keep_labelmasks[i],ptr);
+			}
+			for (i=0 ; i<arch_labelscnt*MASKORGROUP ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETU32(arch_labelmasks[i],ptr);
+			}
+		} else {
+			GETU8(create_mode,ptr);
+			arch_delay = 0;
+			if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9) {
+				return ERROR_EINVAL;
+			}
+			arch_labelscnt = keep_labelscnt;
+			for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETU32(create_labelmasks[i],ptr);
+			}
+			for (i=0 ; i<keep_labelscnt*MASKORGROUP ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETU32(keep_labelmasks[i],ptr);
+				arch_labelmasks[i] = keep_labelmasks[i];
+			}
+		}
+	} else {
+		GETU8(create_labelscnt,ptr);
+		if (create_labelscnt==0 || create_labelscnt>9) {
+			return ERROR_EINVAL;
+		}
+		keep_labelscnt = create_labelscnt;
+		arch_labelscnt = create_labelscnt;
+		for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
+			EAT(ptr,filename,lv,',');
+			GETU32(create_labelmasks[i],ptr);
+			keep_labelmasks[i] = create_labelmasks[i];
+			arch_labelmasks[i] = create_labelmasks[i];
+		}
+		create_mode = CREATE_MODE_STD;
+		arch_delay = 0;
+	}
+	EAT(ptr,filename,lv,')');
+	return labelset_mr_labelset(labelsetid,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
+}
+
 int do_length(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode;
 	uint64_t length;
+	uint8_t canmodmtime;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU64(length,ptr);
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU8(canmodmtime,ptr);
+	} else {
+		canmodmtime = 1;
+	}
 	EAT(ptr,filename,lv,')');
-	return fs_mr_length(ts,inode,length);
+	return fs_mr_length(ts,inode,length,canmodmtime);
 }
 
 int do_move(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -465,6 +601,30 @@ int do_nextchunkid(const char *filename,uint64_t lv,uint32_t ts,const char *ptr)
 	return chunk_mr_nextchunkid(chunkid);
 }
 
+int do_posixlock(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,sessionid,pid;
+	uint64_t owner,start,end;
+	char cmd;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(sessionid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU64(owner,ptr);
+	EAT(ptr,filename,lv,',');
+	cmd = *ptr;
+	ptr++;
+	EAT(ptr,filename,lv,',');
+	GETU64(start,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU64(end,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(pid,ptr);
+	EAT(ptr,filename,lv,')');
+	return posix_lock_mr_change(inode,sessionid,owner,cmd,start,end,pid);
+}
+
 int do_purge(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode;
 	EAT(ptr,filename,lv,'(');
@@ -477,7 +637,7 @@ int do_quota(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,stimestamp,sinodes,hinodes;
 	uint64_t slength,ssize,srealsize;
 	uint64_t hlength,hsize,hrealsize;
-	uint32_t flags,exceeded;
+	uint32_t flags,exceeded,timelimit;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
@@ -502,8 +662,14 @@ int do_quota(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETU64(srealsize,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU64(hrealsize,ptr);
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU32(timelimit,ptr);
+	} else {
+		timelimit = 0;
+	}
 	EAT(ptr,filename,lv,')');
-	return fs_mr_quota(ts,inode,exceeded,flags,stimestamp,sinodes,hinodes,slength,hlength,ssize,hsize,srealsize,hrealsize);
+	return fs_mr_quota(ts,inode,exceeded,flags,stimestamp,sinodes,hinodes,slength,hlength,ssize,hsize,srealsize,hrealsize,timelimit);
 }
 
 /*
@@ -610,6 +776,44 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return sessions_mr_sesadd(rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,infosize,sessionid);
 }
 
+int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t rootinode,sesflags,peerip,sessionid;
+	uint32_t rootuid,rootgid,mapalluid,mapallgid;
+	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
+	static uint8_t *info = NULL;
+	static uint32_t infosize = 0;
+
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU32(sessionid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(rootinode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(sesflags,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(rootuid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(rootgid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(mapalluid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(mapallgid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(mingoal,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(maxgoal,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(mintrashtime,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(maxtrashtime,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(peerip,ptr);
+	EAT(ptr,filename,lv,',');
+	GETPATH(info,infosize,ptr,filename,lv,')');
+	EAT(ptr,filename,lv,')');
+	return sessions_mr_seschanged(sessionid,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,infosize);
+}
+
 int do_sesdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t sessionid;
 
@@ -627,6 +831,22 @@ int do_sesdisconnected(const char *filename,uint64_t lv,uint32_t ts,const char *
 	GETU32(sessionid,ptr);
 	EAT(ptr,filename,lv,')');
 	return sessions_mr_disconnected(sessionid,ts);
+}
+
+int do_rollback(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,indx;
+	uint64_t prevchunkid,chunkid;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(indx,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU64(prevchunkid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU64(chunkid,ptr);
+	EAT(ptr,filename,lv,')');
+	return fs_mr_rollback(inode,indx,prevchunkid,chunkid);
 }
 
 int do_seteattr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -871,6 +1091,7 @@ int do_trunc(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 int do_write(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,indx,opflag;
 	uint64_t chunkid;
+	uint8_t canmodmtime;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
@@ -881,10 +1102,16 @@ int do_write(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	} else {
 		opflag=1;
 	}
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU8(canmodmtime,ptr);
+	} else {
+		canmodmtime=1;
+	}
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU64(chunkid,ptr);
-	return fs_mr_write(ts,inode,indx,opflag,chunkid);
+	return fs_mr_write(ts,inode,indx,opflag,canmodmtime,chunkid);
 }
 
 #define HASHCODESTR(str) (((((uint8_t*)(str))[0]*256U+((uint8_t*)(str))[1])*256U+((uint8_t*)(str))[2])*256U+((uint8_t*)(str))[3])
@@ -928,6 +1155,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 				return do_acquire(filename,lv,ts,ptr+6);
 			}
 			break;
+		case HASHCODE('A','R','C','H'):
+			if (strncmp(ptr,"ARCHCHG",7)==0) {
+				return do_archchg(filename,lv,ts,ptr+6);
+			}
+			break;
 		case HASHCODE('C','R','E','A'):
 			if (strncmp(ptr,"CREATE",6)==0) {
 				return do_create(filename,lv,ts,ptr+6);
@@ -969,6 +1201,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 				return do_emptysustained(filename,lv,ts,ptr+13);
 			}
 			break;
+		case HASHCODE('F','L','O','C'):
+			if (strncmp(ptr,"FLOCK",5)==0) {
+				return do_flock(filename,lv,ts,ptr+5);
+			}
+			break;
 		case HASHCODE('F','R','E','E'):
 			if (strncmp(ptr,"FREEINODES",10)==0) {
 				return do_freeinodes(filename,lv,ts,ptr+10);
@@ -977,6 +1214,13 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 		case HASHCODE('I','N','C','V'):
 			if (strncmp(ptr,"INCVERSION",10)==0) {
 				return do_incversion(filename,lv,ts,ptr+10);
+			}
+			break;
+		case HASHCODE('L','A','B','E'):
+			if (strncmp(ptr,"LABELSET",8)==0) {
+				return do_labelset(filename,lv,ts,ptr+8);
+			} else if (strncmp(ptr,"LABELDESC",9)==0) {
+				return do_labeldesc(filename,lv,ts,ptr+9);
 			}
 			break;
 		case HASHCODE('L','E','N','G'):
@@ -993,6 +1237,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 			break;
 		case HASHCODE('M','O','V','E'):
 			return do_move(filename,lv,ts,ptr+4);
+		case HASHCODE('P','O','S','I'):
+			if (strncmp(ptr,"POSIXLOCK",9)==0) {
+				return do_posixlock(filename,lv,ts,ptr+9);
+			}
+			break;
 		case HASHCODE('P','U','R','G'):
 			if (strncmp(ptr,"PURGE",5)==0) {
 				return do_purge(filename,lv,ts,ptr+5);
@@ -1016,6 +1265,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 		case HASHCODE('R','E','N','U'):
 			if (strncmp(ptr,"RENUMEDGES",10)==0) {
 				return do_renumedges(filename,lv,ts,ptr+10);
+			}
+			break;
+		case HASHCODE('R','O','L','L'):
+			if (strncmp(ptr,"ROLLBACK",8)==0) {
+				return do_rollback(filename,lv,ts,ptr+8);
 			}
 			break;
 		case HASHCODE('S','E','T','E'):
@@ -1066,6 +1320,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 		case HASHCODE('S','E','S','A'):
 			if (strncmp(ptr,"SESADD",6)==0) {
 				return do_sesadd(filename,lv,ts,ptr+6);
+			}
+			break;
+		case HASHCODE('S','E','S','C'):
+			if (strncmp(ptr,"SESCHANGED",10)==0) {
+				return do_seschanged(filename,lv,ts,ptr+10);
 			}
 			break;
 		case HASHCODE('S','E','S','D'):

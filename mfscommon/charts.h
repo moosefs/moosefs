@@ -131,8 +131,8 @@ typedef struct _estatdef {
 
 uint64_t charts_get (uint32_t chartnumber,uint32_t count);
 
-uint32_t charts_datasize(uint32_t chartid,uint32_t maxentries);
-void charts_makedata(uint8_t *buff,uint32_t chartid,uint32_t maxentries);
+uint32_t charts_monotonic_data (uint8_t *buff);
+uint32_t charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries);
 uint32_t charts_make_png(uint32_t chartid,uint32_t chartwidth,uint32_t chartheight);
 void charts_get_png(uint8_t *buff);
 

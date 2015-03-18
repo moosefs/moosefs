@@ -110,7 +110,7 @@ int chunk_load(FILE *fd,uint8_t mver) {
 		if (chunkid==0 && version==0 && lockedto==0) {
 			return 0;
 		}
-		printf("*|i:%016"PRIX64"|v:%08"PRIX32"|t:%10"PRIu32"\n",chunkid,version,lockedto);
+		printf("CHUNK|i:%016"PRIX64"|v:%08"PRIX32"|t:%10"PRIu32"\n",chunkid,version,lockedto);
 	}
 }
 
@@ -147,9 +147,9 @@ int fs_loadedge(FILE *fd,uint8_t mver) {
 	}
 
 	if (parent_id==0) {
-		printf("E|p:      NULL|c:%10"PRIu32"|i:%016"PRIX64"|n:",child_id,edge_id);
+		printf("EDGE|p:      NULL|c:%10"PRIu32"|i:%016"PRIX64"|n:",child_id,edge_id);
 	} else {
-		printf("E|p:%10"PRIu32"|c:%10"PRIu32"|i:%016"PRIX64"|n:",parent_id,child_id,edge_id);
+		printf("EDGE|p:%10"PRIu32"|c:%10"PRIu32"|i:%016"PRIX64"|n:",parent_id,child_id,edge_id);
 	}
 	print_name(fd,nleng);
 	printf("\n");
@@ -278,7 +278,7 @@ int fs_loadnode(FILE *fd,uint8_t mver) {
 	ctimestamp = get32bit(&ptr);
 	trashtime = get32bit(&ptr);
 
-	printf("%c|i:%10"PRIu32"|#:%"PRIu8"|e:%1"PRIX8"|m:%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%10"PRIu32,c,nodeid,goal,flags,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
+	printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:%1"PRIX8"|m:%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%10"PRIu32,c,nodeid,goal,flags,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
 
 	if (type==TYPE_BLOCKDEV || type==TYPE_CHARDEV) {
 		uint32_t rdev;
@@ -428,7 +428,7 @@ int fs_loadfree(FILE *fd,uint8_t mver) {
 		ptr = rbuff;
 		nodeid = get32bit(&ptr);
 		ftime = get32bit(&ptr);
-		printf("I|i:%10"PRIu32"|f:%10"PRIu32"\n",nodeid,ftime);
+		printf("FREEID|i:%10"PRIu32"|f:%10"PRIu32"\n",nodeid,ftime);
 		t--;
 	}
 	return 0;
@@ -464,7 +464,7 @@ int fs_loadquota(FILE *fd,uint8_t mver) {
 		hsize = get64bit(&ptr);
 		srealsize = get64bit(&ptr);
 		hrealsize = get64bit(&ptr);
-		printf("Q|i:%10"PRIu32"|e:%c|f:%02"PRIX8"|s:%10"PRIu32,nodeid,(exceeded)?'1':'0',flags,stimestamp);
+		printf("QUOTA|i:%10"PRIu32"|e:%c|f:%02"PRIX8"|s:%10"PRIu32,nodeid,(exceeded)?'1':'0',flags,stimestamp);
 		if (flags&QUOTA_FLAG_SINODES) {
 			printf("|si:%10"PRIu32,sinodes);
 		} else {
@@ -537,7 +537,7 @@ int xattr_load(FILE *fd,uint8_t mver) {
 			fseek(fd,anleng+avleng,SEEK_CUR);
 			continue;
 		}
-		printf("X|i:%10"PRIu32"|n:",inode);
+		printf("XATTR|i:%10"PRIu32"|n:",inode);
 		print_name(fd,anleng);
 		printf("|v:");
 		print_hex(fd,avleng);
@@ -580,7 +580,7 @@ int posix_acl_load(FILE *fd,uint8_t mver) {
                 mask = get16bit(&ptr);
                 namedusers = get16bit(&ptr);
                 namedgroups = get16bit(&ptr);
-		printf("A|i:%10"PRIu32"|t:%"PRIu8"|u:%"PRIo16"|g:%"PRIo16"|o:%"PRIo16"|m:%"PRIo16"|n:(",inode,acltype,userperm,groupperm,otherperm,mask);
+		printf("POSIXACL|i:%10"PRIu32"|t:%"PRIu8"|u:%"PRIo16"|g:%"PRIo16"|o:%"PRIo16"|m:%"PRIo16"|n:(",inode,acltype,userperm,groupperm,otherperm,mask);
 		acls = namedusers+namedgroups;
 		acbcnt = 0;
 		while (acls>0) {
@@ -691,9 +691,9 @@ int sessions_load(FILE *fd,uint8_t mver) {
 		makestrip(strip,peerip);
 		if (mver>=0x11) {
 			disconnected = get32bit(&ptr);
-			printf("M|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
+			printf("SESSION|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
 		} else {
-			printf("M|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid);
+			printf("SESSION|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid);
 		}
 		for (i=0 ; i<statsinfile ; i++) {
 			printf("%c%"PRIu32,(i==0)?'[':',',get32bit(&ptr));
@@ -743,20 +743,20 @@ int csdb_load(FILE *fd,uint8_t mver) {
 			ip = get32bit(&ptr);
 			port = get16bit(&ptr);
 			makestrip(strip,ip);
-			printf("Z|i:%s|p:%5"PRIu16"\n",strip,port);
+			printf("CHUNKSERVER|i:%s|p:%5"PRIu16"\n",strip,port);
 		} else if (mver<=0x11) {
 			ip = get32bit(&ptr);
 			port = get16bit(&ptr);
 			csid = get16bit(&ptr);
 			makestrip(strip,ip);
-			printf("Z|i:%s|p:%5"PRIu16"|#:%5"PRIu16"\n",strip,port,csid);
+			printf("CHUNKSERVER|i:%s|p:%5"PRIu16"|#:%5"PRIu16"\n",strip,port,csid);
 		} else {
 			ip = get32bit(&ptr);
 			port = get16bit(&ptr);
 			csid = get16bit(&ptr);
 			maintenance = get8bit(&ptr);
 			makestrip(strip,ip);
-			printf("Z|i:%s|p:%5"PRIu16"|#:%5"PRIu16"|m:%u\n",strip,port,csid,(maintenance)?1:0);
+			printf("CHUNKSERVER|i:%s|p:%5"PRIu16"|#:%5"PRIu16"|m:%u\n",strip,port,csid,(maintenance)?1:0);
 		}
 		t--;
 	}
@@ -779,12 +779,67 @@ int of_load(FILE *fd,uint8_t mver) {
 		sessionid = get32bit(&ptr);
 		inode = get32bit(&ptr);
 		if (sessionid>0 && inode>0) {
-			printf("O|s:%10"PRIu32"|i:%10"PRIu32"\n",sessionid,inode);
+			printf("OPENFILE|s:%10"PRIu32"|i:%10"PRIu32"\n",sessionid,inode);
 		} else {
 			return 0;
 		}
 	}
 	return 0;       // unreachable
+}
+
+int flock_load(FILE *fd,uint8_t mver) {
+	uint8_t loadbuff[17];
+	const uint8_t *ptr;
+	uint32_t sessionid,inode;
+	uint64_t owner;
+	uint8_t ltype;
+
+	(void)mver;
+	for (;;) {
+		if (fread(loadbuff,1,17,fd)!=17) {
+			fprintf(stderr,"loading flock locks: read error\n");
+			return -1;
+		}
+		ptr = loadbuff;
+		inode = get32bit(&ptr);
+		sessionid = get32bit(&ptr);
+		owner = get64bit(&ptr);
+		ltype = get8bit(&ptr);
+		if (inode==0 && owner==0 && sessionid==0) {
+			return 0;
+		}
+		printf("FLOCK|i:%10"PRIu32"|s:%10"PRIu32"|o:%016"PRIX64"|t:%c\n",inode,sessionid,owner,ltype?'W':'R');
+	}
+	return 0;	// unreachable
+}
+
+int posix_lock_load(FILE *fd,uint8_t mver) {
+	uint8_t loadbuff[37];
+	const uint8_t *ptr;
+	uint32_t sessionid,inode,pid;
+	uint64_t owner,start,end;
+	uint8_t type;
+
+	(void)mver;
+	for (;;) {
+		if (fread(loadbuff,1,37,fd)!=37) {
+			fprintf(stderr,"loading flock locks: read error\n");
+			return -1;
+		}
+		ptr = loadbuff;
+		inode = get32bit(&ptr);
+		owner = get64bit(&ptr);
+		sessionid = get32bit(&ptr);
+		pid = get32bit(&ptr);
+		start = get64bit(&ptr);
+		end = get64bit(&ptr);
+		type = get8bit(&ptr);
+		if (inode==0 && owner==0 && sessionid==0) {
+			return 0;
+		}
+		printf("POSIXLOCK|i:%10"PRIu32"|s:%10"PRIu32"|o:%016"PRIX64"|p:%10"PRIu32"|r:<%20"PRIu64",%20"PRIu64")|t:%c\n",inode,sessionid,owner,pid,start,end,(type==POSIX_LOCK_RDLCK)?'R':(type==POSIX_LOCK_WRLCK)?'W':'?');
+	}
+	return 0;	// unreachable
 }
 
 int hexdump(FILE *fd,uint64_t sleng) {
@@ -906,7 +961,12 @@ int fs_load(FILE *fd,uint8_t fver) {
 		printf("# section header: %c%c%c%c%c%c%c%c (%02X%02X%02X%02X%02X%02X%02X%02X) ; length: %"PRIu64"\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),dispchar(hdr[4]),dispchar(hdr[5]),dispchar(hdr[6]),dispchar(hdr[7]),hdr[0],hdr[1],hdr[2],hdr[3],hdr[4],hdr[5],hdr[6],hdr[7],sleng);
 		mver = (((hdr[5]-'0')&0xF)<<4)+(hdr[7]&0xF);
 		printf("# section type: %c%c%c%c ; version: 0x%02"PRIX8"\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),mver);
-		if (memcmp(hdr,"NODE",4)==0) {
+		if (memcmp(hdr,"SESS",4)==0) {
+			if (sessions_load(fd,mver)<0) {
+				printf("error reading metadata (SESS)\n");
+				return -1;
+			}
+		} else if (memcmp(hdr,"NODE",4)==0) {
 			if (fs_loadnodes(fd,fver,mver)<0) {
 				printf("error reading metadata (NODE)\n");
 				return -1;
@@ -926,11 +986,6 @@ int fs_load(FILE *fd,uint8_t fver) {
 				printf("error reading metadata (QUOT)\n");
 				return -1;
 			}
-		} else if (memcmp(hdr,"CHNK",4)==0) {
-			if (chunk_load(fd,mver)<0) {
-				printf("error reading metadata (CHNK)\n");
-				return -1;
-			}
 		} else if (memcmp(hdr,"XATR",4)==0) {
 			if (xattr_load(fd,mver)<0) {
 				printf("error reading metadata (XATR)\n");
@@ -941,9 +996,14 @@ int fs_load(FILE *fd,uint8_t fver) {
 				printf("error reading metadata (PACL)\n");
 				return -1;
 			}
-		} else if (memcmp(hdr,"SESS",4)==0) {
-			if (sessions_load(fd,mver)<0) {
-				printf("error reading metadata (SESS)\n");
+		} else if (memcmp(hdr,"FLCK",4)==0) {
+			if (flock_load(fd,mver)<0) {
+				printf("error reading metadata (FLCK)\n");
+				return -1;
+			}
+		} else if (memcmp(hdr,"PLCK",4)==0) {
+			if (posix_lock_load(fd,mver)<0) {
+				printf("error reading metadata (PLCK)\n");
 				return -1;
 			}
 		} else if (memcmp(hdr,"OPEN",4)==0) {
@@ -954,6 +1014,11 @@ int fs_load(FILE *fd,uint8_t fver) {
 		} else if (memcmp(hdr,"CSDB",4)==0) {
 			if (csdb_load(fd,mver)<0) {
 				printf("error reading metadata (CSDB)\n");
+				return -1;
+			}
+		} else if (memcmp(hdr,"CHNK",4)==0) {
+			if (chunk_load(fd,mver)<0) {
+				printf("error reading metadata (CHNK)\n");
 				return -1;
 			}
 		} else {

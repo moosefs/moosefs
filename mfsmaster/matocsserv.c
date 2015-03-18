@@ -55,6 +55,7 @@
 #include "mfsstrerr.h"
 #include "hashfn.h"
 #include "clocks.h"
+#include "labelsets.h"
 
 #define MaxPacketSize CSTOMA_MAXPACKETSIZE
 
@@ -99,6 +100,7 @@ typedef struct matocsserventry {
 	uint16_t servport;		// port to connect to
 	uint16_t timeout;		// communication timeout
 	uint32_t load;			// current load
+	uint8_t hlstatus;		// heavy load status (0 - unknown, 1 - ok, 2 - overloaded)
 	uint64_t usedspace;		// used hdd space in bytes
 	uint64_t totalspace;		// total hdd space in bytes
 	uint32_t chunkscount;
@@ -106,9 +108,12 @@ typedef struct matocsserventry {
 	uint64_t todeltotalspace;
 	uint32_t todelchunkscount;
 	uint32_t errorcounter;
+	uint16_t writecounter;
 	uint16_t rrepcounter;
 	uint16_t wrepcounter;
 	uint16_t delcounter;
+
+	uint32_t labelmask;
 
 	uint32_t create_total_counter;
 	uint32_t rrep_total_counter;
@@ -119,7 +124,8 @@ typedef struct matocsserventry {
 	uint16_t csid;
 	uint8_t registered;
 
-	uint8_t cancreatechunks;
+	uint8_t privflag;
+//	uint8_t cancreatechunks;
 
 //	double carry;
 	uint32_t dist;
@@ -346,7 +352,7 @@ void matocsserv_log_extra_info(void) {
 			}
 			overloaded = csdb_server_is_overloaded(eptr->csptr,now)?1:0;
 			maintained = csdb_server_is_being_maintained(eptr->csptr)?1:0;
-			syslog(LOG_NOTICE,"cs %s:%u ; usedspace: %"PRIu64" ; totalspace: %"PRIu64" ; usage: %.2lf%% ; load: %"PRIu32" ; timeout: %"PRIu16" ; chunkscount: %"PRIu32" ; errorcounter: %"PRIu32" ; rrepcounter: %"PRIu16" ; wrepcounter: %"PRIu16" ; delcounter: %"PRIu32" ; create_total: %"PRIu32" ; rrep_total: %"PRIu32" ; wrep_total: %"PRIu32" ; del_total: %"PRIu32" ; create/s: %.4lf ; rrep/s: %.4lf ; wrep/s: %.4lf ; del/s: %.4lf ; csid: %"PRIu16" ; cancreatechunks: %"PRIu8" ; dist: %"PRIu32" ; first: %"PRIu8" ; corr: %.4lf ; overloaded: %"PRIu8" ; maintained: %"PRIu8,eptr->servstrip,eptr->servport,eptr->usedspace,eptr->totalspace,100.0*(double)(eptr->usedspace)/(double)(eptr->totalspace),eptr->load,eptr->timeout,eptr->chunkscount,eptr->errorcounter,eptr->rrepcounter,eptr->wrepcounter,eptr->delcounter,eptr->create_total_counter,eptr->rrep_total_counter,eptr->wrep_total_counter,eptr->del_total_counter,eptr->create_total_counter/dur,eptr->rrep_total_counter/dur,eptr->wrep_total_counter/dur,eptr->del_total_counter/dur,eptr->csid,eptr->cancreatechunks,eptr->dist,eptr->first,eptr->corr,overloaded,maintained);
+			syslog(LOG_NOTICE,"cs %s:%u ; usedspace: %"PRIu64" ; totalspace: %"PRIu64" ; usage: %.2lf%% ; load: %"PRIu32" ; timeout: %"PRIu16" ; chunkscount: %"PRIu32" ; errorcounter: %"PRIu32" ; writecounter: %"PRIu16" ; rrepcounter: %"PRIu16" ; wrepcounter: %"PRIu16" ; delcounter: %"PRIu32" ; create_total: %"PRIu32" ; rrep_total: %"PRIu32" ; wrep_total: %"PRIu32" ; del_total: %"PRIu32" ; create/s: %.4lf ; rrep/s: %.4lf ; wrep/s: %.4lf ; del/s: %.4lf ; csid: %"PRIu16" ; privflag: %"PRIu8" ; dist: %"PRIu32" ; first: %"PRIu8" ; corr: %.4lf ; hlstatus: %"PRIu8" ; overloaded: %"PRIu8" ; maintained: %"PRIu8,eptr->servstrip,eptr->servport,eptr->usedspace,eptr->totalspace,100.0*(double)(eptr->usedspace)/(double)(eptr->totalspace),eptr->load,eptr->timeout,eptr->chunkscount,eptr->errorcounter,eptr->writecounter,eptr->rrepcounter,eptr->wrepcounter,eptr->delcounter,eptr->create_total_counter,eptr->rrep_total_counter,eptr->wrep_total_counter,eptr->del_total_counter,eptr->create_total_counter/dur,eptr->rrep_total_counter/dur,eptr->wrep_total_counter/dur,eptr->del_total_counter/dur,eptr->csid,eptr->privflag,eptr->dist,eptr->first,eptr->corr,eptr->hlstatus,overloaded,maintained);
 			eptr->create_total_counter = 0;
 			eptr->rrep_total_counter = 0;
 			eptr->wrep_total_counter = 0;
@@ -370,6 +376,7 @@ int matocsserv_space_compare(const void *a,const void *b) {
 	return 0;
 }
 
+/*
 void matocsserv_usagedifference(double *minusage,double *maxusage,uint16_t *usablescount,uint16_t *totalscount) {
 	matocsserventry *eptr;
 	uint32_t j,k;
@@ -379,7 +386,7 @@ void matocsserv_usagedifference(double *minusage,double *maxusage,uint16_t *usab
 	j = 0;
 	k = 0;
 	for (eptr = matocsservhead ; eptr && j<65535 && k<65535; eptr=eptr->next) {
-		if (eptr->mode!=KILL) {
+		if (eptr->mode!=KILL && eptr->csptr!=NULL) {
 			if (eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace) {
 				spaceinc = (double)(eptr->usedspace+(64*1024*1024)) / (double)(eptr->totalspace);
 				if (spaceinc>1.0) {
@@ -435,151 +442,61 @@ void matocsserv_usagedifference(double *minusage,double *maxusage,uint16_t *usab
 		}
 	}
 }
+*/
 
-uint16_t matocsserv_getservers_ordered(uint16_t csids[MAXCSCOUNT],double maxusagediff,uint32_t *pmin,uint32_t *pmax) {
+// uint16_t matocsserv_getservers_ordered(uint16_t csids[MAXCSCOUNT],double maxusagediff,uint32_t *pmin,uint32_t *pmax) {
+uint16_t matocsserv_getservers_ordered(uint16_t csids[MAXCSCOUNT]) {
 	static struct servsort {
 		double space;
 		uint16_t csid;
-	} servsorttab[MAXCSCOUNT],servtab[MAXCSCOUNT];
+	} servtab[MAXCSCOUNT];
 	matocsserventry *eptr;
-	uint32_t i,j,k,min,mid,max;
-	double minspace=1.0,maxspace=0.0;
-	uint64_t tspace,uspace;
-	double space;
+	uint32_t i,scnt;
 	uint32_t now = main_time();
 
-//	syslog(LOG_NOTICE,"getservers start");
-	j = 0;
-	tspace = 0;
-	uspace = 0;
-	for (eptr = matocsservhead ; eptr && j<MAXCSCOUNT; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && csdb_server_is_overloaded(eptr->csptr,now)==0 && csdb_server_is_being_maintained(eptr->csptr)==0) {
-			uspace += eptr->usedspace;
-			tspace += eptr->totalspace;
-			space = (double)(eptr->usedspace) / (double)(eptr->totalspace);
-			if (j==0) {
-				minspace = maxspace = space;
-			} else if (space<minspace) {
-				minspace = space;
-			} else if (space>maxspace) {
-				maxspace = space;
-			}
-			servtab[j].csid = eptr->csid;
-			servtab[j].space = space;
-//			syslog(LOG_NOTICE,"ptr: %p, space:%lf",eptr,space);
-			j++;
+	scnt = 0;
+	for (eptr = matocsservhead ; eptr && scnt<MAXCSCOUNT; eptr=eptr->next) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && (csdb_server_is_overloaded(eptr->csptr,now)==0 || eptr->hlstatus==1) && csdb_server_is_being_maintained(eptr->csptr)==0) {
+			servtab[scnt].csid = eptr->csid;
+			servtab[scnt].space = (double)(eptr->usedspace) / (double)(eptr->totalspace);
+			scnt++;
 		}
 	}
-	if (j==0) {
-//		syslog(LOG_NOTICE,"getservers - noservers");
+	if (scnt==0) {
 		return 0;
 	}
 
-	space = (double)(uspace)/(double)(tspace);
-//	syslog(LOG_NOTICE,"getservers - minspace: %lf , maxspace: %lf , diff: %lf , maxusagediff: %lf",minspace,maxspace,maxspace-minspace,maxusagediff);
-//	if (maxspace-minspace<=maxusagediff*2) {
-//		maxusagediff = (maxspace-minspace)/2.0;
-//	}
-	min = 0;
-	max = j;
-	mid = 0;
-	for (i=0 ; i<j ; i++) {
-		if (servtab[i].space<space-maxusagediff) {
-			csids[min++]=servtab[i].csid;
-		} else if (servtab[i].space>space+maxusagediff) {
-			csids[--max]=servtab[i].csid;
-		} else {
-			servsorttab[mid++]=servtab[i];
-		}
+	qsort(servtab,scnt,sizeof(struct servsort),matocsserv_space_compare);
+	
+	for (i=0 ; i<scnt ; i++) {
+		csids[i]=servtab[i].csid;
 	}
-
-	// random <0-min)
-	for (i=0 ; i<min ; i++) {
-		// k = random <i,j)
-		k = i+rndu32_ranged(min-i);
-		// swap(i,k)
-		if (i!=k) {
-			uint16_t p = csids[i];
-			csids[i] = csids[k];
-			csids[k] = p;
-		}
-	}
-
-	// random <max-j)
-	for (i=max ; i<j ; i++) {
-		// k = random <i,j)
-		k = i+rndu32_ranged(j-i);
-		// swap(i,k)
-		if (i!=k) {
-			uint16_t p = csids[i];
-			csids[i] = csids[k];
-			csids[k] = p;
-		}
-	}
-
-	// sort <min-max)
-	if (mid>0) {
-		qsort(servsorttab,mid,sizeof(struct servsort),matocsserv_space_compare);
-	}
-	for (i=0 ; i<mid ; i++) {
-		csids[min+i]=servsorttab[i].csid;
-	}
-	if (pmin!=NULL) {
-		*pmin=min;
-	}
-	if (pmax!=NULL) {
-		*pmax=j-max;
-	}
-//		syslog(LOG_NOTICE,"getservers <0-%"PRIu32") random ; <%"PRIu32"-%"PRIu32") sort ; <%"PRIu32"-END) random",min,min,max,max);
-//		for (i=0 ; i<j ; i++) {
-//			syslog(LOG_NOTICE,"getservers - s%"PRIu32" : %p",i,ptrs[i]);
-//		}
-	return j;
+	return scnt;
 }
 
-static inline matocsserventry* matocsserv_weighted_roundrobin(matocsserventry* servers[MAXCSCOUNT],uint32_t cnt) {
-	uint32_t i,pos;
-	double minerr,err;
-	double expdist;
-	uint64_t totalspace;
-
-	totalspace = 0;
-	for (i=0 ; i<cnt ; i++) {
-		totalspace += servers[i]->totalspace;
+static int matocsserv_err_compare(const void *a,const void *b) {
+	const struct rservsort {
+		double err;
+		matocsserventry *ptr;
+	} *aa=a,*bb=b;
+	if (aa->err < bb->err) {
+		return -1;
 	}
-
-	minerr = 0.0;
-	pos = 0xFFFFFFFF;
-	for (i=0 ; i<cnt ; i++) {
-		servers[i]->dist++;
-		if (servers[i]->first) {
-			err = 1.0;
-		} else {
-			expdist = totalspace;
-			expdist /= servers[i]->totalspace;
-			err = (expdist + servers[i]->corr) / servers[i]->dist;
-		}
-		if (pos==0xFFFFFFFF || err < minerr) {
-			minerr = err;
-			pos = i;
-		}
+	if (aa->err > bb->err) {
+		return 1;
 	}
-
-	if (servers[pos]->first) {
-		servers[pos]->first = 0;
-	} else {
-		expdist = totalspace;
-		expdist /= servers[pos]->totalspace;
-		servers[pos]->corr += expdist - servers[pos]->dist;
-	}
-	servers[pos]->dist = 0;
-	return servers[pos];
+	return 0;
 }
 
-static inline void matocsserv_correlation_fixer() {
+static inline void matocsserv_weighted_roundrobin_sort(matocsserventry* servers[MAXCSCOUNT],uint32_t cnt) {
 	matocsserventry *eptr;
-	double dist;
+	double expdist;
+	uint32_t i;
 	uint64_t totalspace;
+	static struct rservsort {
+		double err;
+		matocsserventry *ptr;
+	} servtab[MAXCSCOUNT];
 
 	totalspace = 0;
 	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
@@ -588,16 +505,75 @@ static inline void matocsserv_correlation_fixer() {
 		}
 	}
 
-	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
-			dist = totalspace;
-			dist /= eptr->totalspace;
-			eptr->dist = rndu32_ranged(dist*1000)/1000;
-			eptr->corr = 0.0;
+
+	for (i=0 ; i<cnt ; i++) {
+		if (servers[i]->first) {
+			servtab[i].err = 1.0;
+		} else {
+			expdist = totalspace;
+			expdist /= servers[i]->totalspace;
+			servtab[i].err = (expdist + servers[i]->corr) / (servers[i]->dist + 1);
 		}
+		servtab[i].err += 1000.0 * servers[i]->writecounter;
+		servtab[i].ptr = servers[i];
+	}
+
+	qsort(servtab,cnt,sizeof(struct rservsort),matocsserv_err_compare);
+
+	for (i=0 ; i<cnt ; i++) {
+		servers[i] = servtab[i].ptr;
 	}
 }
 
+
+static inline void matocsserv_weighted_roundrobin_used(matocsserventry* servers[MAXCSCOUNT],uint32_t cnt) {
+	static uint32_t fcnt = 0;
+	matocsserventry *eptr;
+	double expdist,dist;
+	uint32_t i,totalcnt;
+	uint64_t totalspace;
+
+	totalspace = 0;
+	totalcnt = 0;
+	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+			totalspace += eptr->totalspace;
+			totalcnt++;
+			eptr->dist += cnt;
+		}
+	}
+
+	fcnt += cnt;
+	if (fcnt>(totalcnt*10)) { // correlation fixer
+		fcnt = 0;
+		for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+				dist = totalspace;
+				dist /= eptr->totalspace;
+				eptr->dist = rndu32_ranged(dist*1000)/1000;
+				eptr->corr = 0.0;
+			}
+		}
+		for (i=0 ; i<cnt ; i++) {
+			servers[i]->create_total_counter++;
+		}
+	} else { // standard weighted round-robin
+		for (i=0 ; i<cnt ; i++) {
+			if (servers[i]->first) {
+				servers[i]->first = 0;
+			} else {
+				expdist = totalspace;
+				expdist /= servers[i]->totalspace;
+				servers[i]->corr += expdist - (servers[i]->dist + i + 1 - cnt);
+			}
+			servers[i]->dist = cnt - i - 1;
+			servers[i]->create_total_counter++;
+		}
+	}
+
+}
+
+#if 0
 void matocsserv_recalc_createflag(double tolerance) {
 	matocsserventry *eptr;
 	double avg,m;
@@ -653,6 +629,61 @@ void matocsserv_recalc_createflag(double tolerance) {
 		}
 	}
 }
+#endif
+
+uint8_t matocsserv_server_has_labels(void *e,uint32_t *labelmask) {
+	matocsserventry *eptr = (matocsserventry*)e;
+	uint32_t i;
+	if (labelmask[0]==0) { // '*'
+		return 1;
+	}
+	for (i=0 ; i<MASKORGROUP && labelmask[i]!=0 ; i++) {
+		if ((eptr->labelmask&labelmask[i])==labelmask[i]) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+uint16_t matocsserv_servers_with_labelsets(uint32_t *labelmask) {
+	uint16_t cnt;
+	matocsserventry *eptr;
+	cnt = 0;
+	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+			if (matocsserv_server_has_labels(eptr,labelmask)) {
+				cnt++;
+			}
+		}
+	}
+	return cnt;
+}
+
+uint16_t matocsserv_servers_with_label(uint8_t label) {
+	uint16_t cnt;
+	matocsserventry *eptr;
+	cnt = 0;
+	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+			if (eptr->labelmask & (1<<label)) {
+				cnt++;
+			}
+		}
+	}
+	return cnt;
+}
+
+uint16_t matocsserv_servers_count(void) {
+	uint16_t cnt;
+	matocsserventry *eptr;
+	cnt = 0;
+	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+			cnt++;
+		}
+	}
+	return cnt;
+}
 
 uint16_t matocsserv_almostfull_servers(void) {
 	uint16_t cnt;
@@ -668,251 +699,136 @@ uint16_t matocsserv_almostfull_servers(void) {
 	return cnt;
 }
 
-uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],double tolerance,uint16_t demand) {
-	static uint32_t fcnt=0;
-	matocsserventry* servtab[MAXCSCOUNT];
-//	double servmed[MAXCSCOUNT];
-//	double median,m;
+void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT],uint16_t *olcscnt,uint16_t olcsids[MAXCSCOUNT],uint16_t *allcscnt,uint16_t allcsids[MAXCSCOUNT]) {
 	matocsserventry *eptr;
-	uint32_t i,j;
 	uint32_t gracecnt;
 	uint32_t allcnt;
 	uint32_t totalcnt;
-//	uint32_t availcnt;
-//	uint32_t mediancnt;
-//	uint8_t useonlymedian;
-	uint16_t csid;
 	uint32_t now = main_time();
-
-#if 0
-	/* find median usage */
-	allcnt=0;
-	median = 0.0;
-	for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-		eptr->cancreatechunks = 0;
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE && eptr->csptr!=NULL) {
-			servmed[allcnt] = (double)(eptr->usedspace)/(double)(eptr->totalspace);
-			allcnt++;
-		}
-	}
-	useonlymedian = 0;
-	if (allcnt>=5) {
-		median = median_find(servmed,allcnt);
-		mediancnt = 0;
-		for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE && eptr->csptr!=NULL) {
-				m = (double)(eptr->usedspace)/(double)(eptr->totalspace);
-				if (m > median - tolerance && m < median + tolerance) {
-					mediancnt++;
-				}
-			}
-		}
-		if (mediancnt * 3 > allcnt * 2) {
-			useonlymedian = 1;
-		}
-	}
-#endif
-	matocsserv_recalc_createflag(tolerance);
 
 	gracecnt = 0;
 	allcnt = 0;
 	totalcnt = 0;
-//	availcnt=0;
+
+	*stdcscnt = 0;
+	*olcscnt = 0;
+	*allcscnt = 0;
 
 	for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE && eptr->csptr!=NULL) {
-			totalcnt++;
-			if (eptr->cancreatechunks) {
-				if (csdb_server_is_overloaded(eptr->csptr,now) || csdb_server_is_being_maintained(eptr->csptr)) {
-					gracecnt++;
-				} else {
-					servtab[allcnt] = eptr;
-					allcnt++;
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+			allcsids[*allcscnt] = eptr->csid;
+			(*allcscnt)++;
+		       	if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=2) {
+				totalcnt++;
+				olcsids[*olcscnt] = eptr->csid;
+				(*olcscnt)++;
+				if ((eptr->privflag & 2) == 0) {
+					if ((csdb_server_is_overloaded(eptr->csptr,now) && eptr->hlstatus!=1) || csdb_server_is_being_maintained(eptr->csptr)) {
+						gracecnt++;
+					} else {
+						stdcsids[*stdcscnt] = eptr->csid;
+						(*stdcscnt)++;
+						allcnt++;
+					}
+				}
+			} else {
+				if ((eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE) {
+					olcsids[*olcscnt] = eptr->csid;
+					(*olcscnt)++;
 				}
 			}
 		}
 	}
-	fcnt += demand;
-	if (fcnt>(totalcnt*10)) {
-		matocsserv_correlation_fixer();
-		fcnt = 0;
-	}
+
 	if ((gracecnt*5) > (gracecnt+allcnt)) { // there are more than 20% CS in 'grace' state - add all of them to the list
 		for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE && eptr->csptr!=NULL) {
-				if (eptr->cancreatechunks && (csdb_server_is_overloaded(eptr->csptr,now) || csdb_server_is_being_maintained(eptr->csptr))) {
-					servtab[allcnt] = eptr;
-					allcnt++;
+			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->csptr!=NULL && eptr->hlstatus!=2) {
+				if ((eptr->privflag & 2)==0 && ((csdb_server_is_overloaded(eptr->csptr,now) && eptr->hlstatus!=1) || csdb_server_is_being_maintained(eptr->csptr))) {
+					stdcsids[*stdcscnt] = eptr->csid;
+					(*stdcscnt)++;
 				}
 			}
 		}
 	}
-	if (demand>allcnt) {
-		demand=allcnt;
-	}
-	if (demand==allcnt) {
-		for (i=0 ; i<demand ; i++) {
-			eptr = servtab[i];
-			csids[i] = eptr->csid;
-			eptr->create_total_counter++;
-		}
-		return demand;
-	}
-	i = 0;
-	while (i<demand) {
-		eptr = matocsserv_weighted_roundrobin(servtab,allcnt);
-		csid = eptr->csid;
-		for (j=0 ; j<i && csids[j]!=csid ; j++) {
-		}
-		if (j==i) {
-			csids[j] = csid;
-			i++;
-			eptr->create_total_counter++;
-		}
-	}
-	return demand;
 }
 
-#if 0
-int matocsserv_carry_compare(const void *a,const void *b) {
-	const struct rservsort {
-		double w;
-		double carry;
-		matocsserventry *ptr;
-	} *aa=a,*bb=b;
-	if (aa->carry > bb->carry) {
-		return -1;
-	}
-	if (aa->carry < bb->carry) {
-		return 1;
-	}
-	return 0;
-}
-
-uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],double tolerance,uint16_t demand) {
-	static struct rservsort {
-		double w;
-		double carry;
-		matocsserventry *ptr;
-	} servtab[MAXCSCOUNT];
-	double servmed[MAXCSCOUNT];
-	double median,m;
+uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *overloaded) {
+	matocsserventry* servtab[MAXCSCOUNT];
 	matocsserventry *eptr;
-	uint64_t maxtotalspace;
-	double carry;
 	uint32_t i;
 	uint32_t gracecnt;
 	uint32_t allcnt;
-	uint32_t availcnt;
-	uint32_t mediancnt;
-	uint8_t useonlymedian;
+	uint32_t totalcnt;
+//	uint32_t wspacecnt;
 	uint32_t now = main_time();
 
-	/* find max total space */
-	maxtotalspace = 0;
-	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
-		if ((eptr->mode==HEADER || eptr->mode==DATA) && eptr->totalspace > maxtotalspace && eptr->csptr!=NULL) {
-			maxtotalspace = eptr->totalspace;
-		}
-	}
-	if (maxtotalspace==0) {
-		return 0;
-	}
+//	matocsserv_recalc_createflag(tolerance);
 
-	/* find median usage */
-	allcnt=0;
-	for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE && eptr->csptr!=NULL) {
-			servmed[allcnt] = (double)(eptr->usedspace)/(double)(eptr->totalspace);
-			allcnt++;
-		}
-	}
-	useonlymedian = 0;
-	if (allcnt>=5) {
-		median = median_find(servmed,allcnt);
-		mediancnt = 0;
-		for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE && eptr->csptr!=NULL) {
-				m = (double)(eptr->usedspace)/(double)(eptr->totalspace);
-				if (m > median - tolerance && m < median + tolerance) {
-					mediancnt++;
-				}
+/*
+	totalcnt = 0;
+	wspacecnt = 0;
+
+	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && eptr->cancreatechunks) {
+			totalcnt++;
+			if (eptr->cancreatechunks && (eptr->totalspace - eptr->usedspace) * 100 > eptr->totalspace) { // used space <= 99%
+				wspacecnt++;
 			}
 		}
-		if (mediancnt * 3 > allcnt * 2) {
-			useonlymedian = 1;
-		}
-	} else {
-		median = 0.0; // make compiler happy
 	}
-
-	gracecnt=0;
-	allcnt=0;
-	availcnt=0;
+*/
+	gracecnt = 0;
+	allcnt = 0;
+	totalcnt = 0;
+	*overloaded = 0;
 
 	for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE && eptr->csptr!=NULL) {
-			m = (double)(eptr->usedspace)/(double)(eptr->totalspace);
-			if (useonlymedian==0 || (m > median - tolerance && m < median + tolerance)) {
-				if (csdb_server_is_overloaded(eptr->csptr,now) || csdb_server_is_being_maintained(eptr->csptr)) {
-					gracecnt++;
-				} else {
-					servtab[allcnt].w = (double)eptr->totalspace/(double)maxtotalspace;
-					servtab[allcnt].carry = eptr->carry;
-					servtab[allcnt].ptr = eptr;
-					allcnt++;
-					if (eptr->carry>=1.0) {
-						availcnt++;
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+		       	if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=2) {
+				totalcnt++;
+				if ((eptr->privflag & 2) == 0) {
+	//			if (eptr->cancreatechunks) {
+					if ((csdb_server_is_overloaded(eptr->csptr,now) && eptr->hlstatus!=1) || csdb_server_is_being_maintained(eptr->csptr)) {
+						gracecnt++;
+					} else {
+						servtab[allcnt] = eptr;
+						allcnt++;
 					}
 				}
+			} else {
+				if ((eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE) {
+					(*overloaded)++;
+				}
 			}
 		}
 	}
+
 	if ((gracecnt*5) > (gracecnt+allcnt)) { // there are more than 20% CS in 'grace' state - add all of them to the list
 		for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE && eptr->csptr!=NULL) {
-				m = (double)(eptr->usedspace)/(double)(eptr->totalspace);
-				if (useonlymedian==0 || (m > median - tolerance && m < median + tolerance)) {
-					if (csdb_server_is_overloaded(eptr->csptr,now) || csdb_server_is_being_maintained(eptr->csptr)) {
-						servtab[allcnt].w = (double)eptr->totalspace/(double)maxtotalspace;
-						servtab[allcnt].carry = eptr->carry;
-						servtab[allcnt].ptr = eptr;
-						allcnt++;
-						if (eptr->carry>=1.0) {
-							availcnt++;
-						}
-					}
+			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->csptr!=NULL && eptr->hlstatus!=2) {
+				if ((eptr->privflag & 2)==0 && ((csdb_server_is_overloaded(eptr->csptr,now) && eptr->hlstatus!=1) || csdb_server_is_being_maintained(eptr->csptr))) {
+//				if (eptr->cancreatechunks && csdb_server_is_overloaded(eptr->csptr,now)) {
+					servtab[allcnt] = eptr;
+					allcnt++;
 				}
 			}
 		}
 	}
-	if (demand>allcnt) {
-		demand=allcnt;
-	}
-	while (availcnt<demand) {
-		availcnt=0;
-		for (i=0 ; i<allcnt ; i++) {
-			carry = servtab[i].carry + servtab[i].w;
-			if (carry>10.0) {
-				carry = 10.0;
-			}
-			servtab[i].carry = carry;
-			servtab[i].ptr->carry = carry;
-			if (carry>=1.0) {
-				availcnt++;
-			}
-		}
-	}
-	qsort(servtab,allcnt,sizeof(struct rservsort),matocsserv_carry_compare);
-	for (i=0 ; i<demand ; i++) {
-		csids[i] = servtab[i].ptr->csid;
-		servtab[i].ptr->carry-=1.0;
-	}
-	return demand;
-}
-#endif
 
-uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replimit) {
+	matocsserv_weighted_roundrobin_sort(servtab,allcnt);
+
+	for (i=0 ; i<allcnt ; i++) {
+		csids[i] = servtab[i]->csid;
+	}
+
+	return allcnt;
+}
+
+void matocsserv_useservers_wrandom(void* servers[MAXCSCOUNT],uint16_t cnt) {
+	matocsserv_weighted_roundrobin_used((matocsserventry **)servers,cnt);
+}
+
+uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replimit,uint8_t *allservflag) {
 	matocsserventry *eptr;
 	uint32_t j,k,r;
 	uint16_t x;
@@ -920,11 +836,16 @@ uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replim
 	double a;
 
 	j=0;
+	*allservflag = 1; // 1 means that there are no servers which reached replication limit
 	for (eptr = matocsservhead ; eptr && j<MAXCSCOUNT; eptr=eptr->next) {
 		a = ((uint32_t)(eptr->csid*UINT32_C(0x9874BF31)+now*UINT32_C(0xB489FC37)))/4294967296.0;
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(eptr->totalspace/100) && eptr->wrepcounter+a<replimit && eptr->csptr!=NULL && csdb_server_is_overloaded(eptr->csptr,now)==0 && csdb_server_is_being_maintained(eptr->csptr)==0) {
-			csids[j] = eptr->csid;
-			j++;
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(eptr->totalspace/100) && eptr->csptr!=NULL && (csdb_server_is_overloaded(eptr->csptr,now)==0 || eptr->hlstatus==1) && csdb_server_is_being_maintained(eptr->csptr)==0) {
+			if (eptr->wrepcounter+a<replimit) {
+				csids[j] = eptr->csid;
+				j++;
+			} else {
+				*allservflag = 0;
+			}
 		}
 	}
 	if (j==0) {
@@ -966,20 +887,19 @@ char* matocsserv_getstrip(void *e) {
 	return empty;
 }
 
-int matocsserv_get_csdata(void *e,uint32_t *servip,uint16_t *servport,uint32_t *servver) {
+int matocsserv_get_csdata(void *e,uint32_t *servip,uint16_t *servport,uint32_t *servver,uint32_t *servlabelmask) {
 	matocsserventry *eptr = (matocsserventry *)e;
 	if (eptr->mode!=KILL) {
 		*servip = eptr->servip;
 		*servport = eptr->servport;
-		if (servver) {
-			*servver = eptr->version;
-		}
+		*servver = eptr->version;
+		*servlabelmask = eptr->labelmask;
 		return 0;
 	}
 	return -1;
 }
 
-void matocsserv_getservdata(void *e,uint32_t *ver,uint64_t *uspc,uint64_t *tspc,uint32_t *chunkcnt,uint64_t *tduspc,uint64_t *tdtspc,uint32_t *tdchunkcnt,uint32_t *errcnt,uint32_t *load) {
+void matocsserv_getservdata(void *e,uint32_t *ver,uint64_t *uspc,uint64_t *tspc,uint32_t *chunkcnt,uint64_t *tduspc,uint64_t *tdtspc,uint32_t *tdchunkcnt,uint32_t *errcnt,uint32_t *load,uint8_t *hlstatus,uint32_t *labelmask) {
 	matocsserventry *eptr = (matocsserventry *)e;
 	if (eptr->mode!=KILL) {
 		*ver = eptr->version;
@@ -991,6 +911,8 @@ void matocsserv_getservdata(void *e,uint32_t *ver,uint64_t *uspc,uint64_t *tspc,
 		*tdchunkcnt = eptr->todelchunkscount;
 		*errcnt = eptr->errorcounter;
 		*load = eptr->load;
+		*hlstatus = eptr->hlstatus;
+		*labelmask = eptr->labelmask;
 	} else {
 		*ver = 0;
 		*uspc = 0;
@@ -1001,13 +923,97 @@ void matocsserv_getservdata(void *e,uint32_t *ver,uint64_t *uspc,uint64_t *tspc,
 		*tdchunkcnt = 0;
 		*errcnt = 0;
 		*load = 0;
+		*hlstatus = 0;
+		*labelmask = 0;
 	}
 }
 
+#if 0
 uint8_t matocsserv_can_create_chunks(void *e,double tolerance) {
 	matocsserventry *eptr = (matocsserventry *)e;
 	matocsserv_recalc_createflag(tolerance);
 	return eptr->cancreatechunks;
+}
+#endif
+
+void matocsserv_write_counters(void *e,uint8_t x) {
+	matocsserventry *eptr = (matocsserventry *)e;
+	if (x) {
+		eptr->writecounter++;
+	} else {
+		if (eptr->writecounter==0) {
+			syslog(LOG_NOTICE,"can't decrease write counter - structure error");
+		} else {
+			eptr->writecounter--;
+		}
+	}
+}
+
+uint8_t matocsserv_is_privileged(void *e,uint8_t dstflag) {
+	matocsserventry *eptr = (matocsserventry *)e;
+	if (dstflag) {
+		return eptr->privflag & 2;
+	} else {
+		return eptr->privflag & 1;
+	}
+}
+
+void matocsserv_want_to_be_privileged(void *dst,void *src) {
+	matocsserventry *dsteptr = (matocsserventry *)dst;
+	matocsserventry *srceptr = (matocsserventry *)src;
+	matocsserventry *eptr;
+	static uint32_t lastupdate = 0;
+	static uint8_t srcfilled = 0;
+	static uint8_t dstfilled = 0;
+	uint32_t totalcnt;
+	uint32_t srcprivs;
+	uint32_t dstprivs;
+
+	if (lastupdate + 15 < main_time()) {
+		lastupdate = main_time();
+		for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+			eptr->privflag = 0;
+		}
+		if (dsteptr!=NULL && srceptr!=NULL) {
+			dsteptr->privflag |= 2;
+			srceptr->privflag |= 1;
+		}
+		srcfilled = 0;
+		dstfilled = 0;
+	} else if ((srcfilled==0 || dstfilled==0) && (dsteptr!=NULL && srceptr!=NULL)) {
+		totalcnt = 0;
+		srcprivs = 0;
+		dstprivs = 0;
+		for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->csptr!=NULL) {
+				totalcnt++;
+				if (eptr->privflag & 1) {
+					srcprivs++;
+				} else if (eptr->privflag & 2) {
+					dstprivs++;
+				}
+			}
+		}
+		if (srcprivs * 10 < totalcnt) {
+			srceptr->privflag |= 1;
+		} else {
+			srcfilled = 1;
+		}
+		if (dstprivs * 10 < totalcnt) {
+			dsteptr->privflag |= 2;
+		} else {
+			dstfilled = 1;
+		}
+	}
+}
+
+void matocsserv_privileged_cleanup(void) {
+	matocsserv_want_to_be_privileged(NULL,NULL);
+}
+
+double matocsserv_get_usage(void *e) {
+	matocsserventry *eptr = (matocsserventry *)e;
+	return (double)(eptr->usedspace) / (double)(eptr->totalspace);
 }
 
 double matocsserv_replication_write_counter(void *e,uint32_t now) {
@@ -1171,44 +1177,48 @@ void matocsserv_got_deletechunk_status(matocsserventry *eptr,const uint8_t *data
 }
 
 int matocsserv_send_replicatechunk(void *e,uint64_t chunkid,uint32_t version,void *src) {
-	matocsserventry *eptr = (matocsserventry *)e;
+	matocsserventry *dsteptr = (matocsserventry *)e;
 	matocsserventry *srceptr = (matocsserventry *)src;
 	uint8_t *data;
 
-	if (matocsserv_replication_find(chunkid,version,eptr)) {
+	if (matocsserv_replication_find(chunkid,version,dsteptr)) {
 		return -1;
 	}
-	if (eptr->mode!=KILL && srceptr->mode!=KILL) {
-		data = matocsserv_createpacket(eptr,MATOCS_REPLICATE,8+4+4+2);
+	if (dsteptr->mode!=KILL && srceptr->mode!=KILL) {
+//		dsteptr->dist = 0;
+		data = matocsserv_createpacket(dsteptr,MATOCS_REPLICATE,8+4+4+2);
 		put64bit(&data,chunkid);
 		put32bit(&data,version);
 		put32bit(&data,srceptr->servip);
 		put16bit(&data,srceptr->servport);
-		matocsserv_replication_begin(chunkid,version,eptr,1,&src);
-//		eptr->carry = 0;
+		matocsserv_replication_begin(chunkid,version,dsteptr,1,&src);
 	}
 	return 0;
 }
 
-int matocsserv_send_replicatechunk_xor(void *e,uint64_t chunkid,uint32_t version,uint8_t cnt,void **src,uint64_t *srcchunkid,uint32_t *srcversion) {
-	matocsserventry *eptr = (matocsserventry *)e;
+int matocsserv_send_replicatechunk_xor(void *e,uint64_t chunkid,uint32_t version,uint8_t cnt,const uint32_t xormasks[4],void **src,uint64_t *srcchunkid,uint32_t *srcversion) {
+	matocsserventry *dsteptr = (matocsserventry *)e;
 	matocsserventry *srceptr;
 	uint8_t i;
 	uint8_t *data;
 
-	if (matocsserv_replication_find(chunkid,version,eptr)) {
+	if (matocsserv_replication_find(chunkid,version,dsteptr)) {
 		return -1;
 	}
-	if (eptr->mode!=KILL) {
+	if (dsteptr->mode!=KILL) {
 		for (i=0 ; i<cnt ; i++) {
 			srceptr = (matocsserventry *)(src[i]);
 			if (srceptr->mode==KILL) {
 				return 0;
 			}
 		}
-		data = matocsserv_createpacket(eptr,MATOCS_REPLICATE,8+4+cnt*(8+4+4+2));
+		data = matocsserv_createpacket(dsteptr,MATOCS_REPLICATE,8+4+16+cnt*(8+4+4+2));
 		put64bit(&data,chunkid);
 		put32bit(&data,version);
+		put32bit(&data,xormasks[0]);
+		put32bit(&data,xormasks[1]);
+		put32bit(&data,xormasks[2]);
+		put32bit(&data,xormasks[3]);
 		for (i=0 ; i<cnt ; i++) {
 			srceptr = (matocsserventry *)(src[i]);
 			put64bit(&data,srcchunkid[i]);
@@ -1216,8 +1226,7 @@ int matocsserv_send_replicatechunk_xor(void *e,uint64_t chunkid,uint32_t version
 			put32bit(&data,srceptr->servip);
 			put16bit(&data,srceptr->servport);
 		}
-		matocsserv_replication_begin(chunkid,version,eptr,cnt,src);
-//		eptr->carry = 0;
+		matocsserv_replication_begin(chunkid,version,dsteptr,cnt,src);
 	}
 	return 0;
 }
@@ -1428,7 +1437,6 @@ void matocsserv_got_chunkop_status(matocsserventry *eptr,const uint8_t *data,uin
 		syslog(LOG_NOTICE,"(%s:%"PRIu16") chunkop(%016"PRIX64",%08"PRIX32",%08"PRIX32",%016"PRIX64",%08"PRIX32",%"PRIu32") status: %s",eptr->servstrip,eptr->servport,chunkid,version,newversion,copychunkid,copyversion,leng,mfsstrerr(status));
 	}
 }
-
 
 void matocsserv_get_version(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid = 0;
@@ -1756,6 +1764,16 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 }
 
 
+void matocsserv_labels(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
+	if (length!=4) {
+		syslog(LOG_NOTICE,"CSTOMA_LABELS - wrong size (%"PRIu32"/4)",length);
+		eptr->mode=KILL;
+		return;
+	}
+	passert(data);
+	eptr->labelmask = get32bit(&data);
+}
+
 void matocsserv_space(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
 	if (length!=16 && length!=32 && length!=40) {
 		syslog(LOG_NOTICE,"CSTOMA_SPACE - wrong size (%"PRIu32"/16|32|40)",length);
@@ -1778,8 +1796,8 @@ void matocsserv_space(matocsserventry *eptr,const uint8_t *data,uint32_t length)
 }
 
 void matocsserv_current_load(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
-	if (length!=4) {
-		syslog(LOG_NOTICE,"CSTOMA_CURRENT_LOAD - wrong size (%"PRIu32"/4)",length);
+	if (length!=4 &&length!=5) {
+		syslog(LOG_NOTICE,"CSTOMA_CURRENT_LOAD - wrong size (%"PRIu32"/4|5)",length);
 		eptr->mode=KILL;
 		return;
 	}
@@ -1787,6 +1805,9 @@ void matocsserv_current_load(matocsserventry *eptr,const uint8_t *data,uint32_t 
 	eptr->load = get32bit(&data);
 	if (eptr->csptr) {
 		csdb_server_load(eptr->csptr,eptr->load);
+	}
+	if (length==5) {
+		eptr->hlstatus = get8bit(&data);
 	}
 }
 
@@ -1910,6 +1931,9 @@ void matocsserv_gotpacket(matocsserventry *eptr,uint32_t type,const uint8_t *dat
 			break;
 		case CSTOMA_ERROR_OCCURRED:
 			matocsserv_error_occurred(eptr,data,length);
+			break;
+		case CSTOMA_LABELS:
+			matocsserv_labels(eptr,data,length);
 			break;
 		case CSTOAN_CHUNK_CHECKSUM:
 			matocsserv_got_chunk_checksum(eptr,data,length);
@@ -2286,6 +2310,7 @@ void matocsserv_serve(struct pollfd *pdesc) {
 			eptr->servport = 0;
 			eptr->timeout = DefaultTimeout;
 			eptr->load = 0;
+			eptr->hlstatus = 0;
 			eptr->usedspace = 0;
 			eptr->totalspace = 0;
 			eptr->chunkscount = 0;
@@ -2293,9 +2318,12 @@ void matocsserv_serve(struct pollfd *pdesc) {
 			eptr->todeltotalspace = 0;
 			eptr->todelchunkscount = 0;
 			eptr->errorcounter = 0;
+			eptr->writecounter = 0;
 			eptr->rrepcounter = 0;
 			eptr->wrepcounter = 0;
 			eptr->delcounter = 0;
+
+			eptr->labelmask = 0;
 
 			eptr->create_total_counter = 0;
 			eptr->rrep_total_counter = 0;
@@ -2306,7 +2334,8 @@ void matocsserv_serve(struct pollfd *pdesc) {
 			eptr->csid = MAXCSCOUNT;
 			eptr->registered = UNREGISTERED;
 
-			eptr->cancreatechunks = 1;
+			eptr->privflag = 0;
+//			eptr->cancreatechunks = 1;
 
 //			eptr->carry=(double)(rndu32())/(double)(0xFFFFFFFFU);
 			eptr->dist = 0;
@@ -2520,6 +2549,7 @@ int matocsserv_init(void) {
 	main_poll_register(matocsserv_desc,matocsserv_serve);
 	main_keepalive_register(matocsserv_keep_alive);
 	main_info_register(matocsserv_log_extra_info);
+	main_time_register(1,0,matocsserv_privileged_cleanup);
 //	main_time_register(TIMEMODE_SKIP_LATE,60,0,matocsserv_status);
 	return 0;
 }

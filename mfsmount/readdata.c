@@ -16,7 +16,7 @@
  * along with MooseFS; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * or visit http://www.gnu.org/licenses/gpl.txt
- */
+*/
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -47,7 +47,9 @@
 #include "pcqueue.h"
 #include "sockets.h"
 #include "conncache.h"
+#include "csorder.h"
 #include "csdb.h"
+#include "delayrun.h"
 #include "mastercomm.h"
 #include "clocks.h"
 #include "portable.h"
@@ -130,6 +132,7 @@ typedef struct inodedata_s {
 	uint8_t flengisvalid;
 	uint8_t waitingworker;
 	uint8_t inqueue;
+	uint8_t canmodatime;
 	int pipe[2];
 	uint8_t readahead;
 	uint64_t lastoffset;
@@ -168,7 +171,7 @@ static pthread_mutex_t glock;
 //static uint32_t usedblocks;
 //#endif
 
-static pthread_t dqueue_worker_th;
+//static pthread_t dqueue_worker_th;
 
 static uint32_t workers_avail;
 static uint32_t workers_total;
@@ -179,27 +182,27 @@ static pthread_attr_t worker_thattr;
 // static pthread_t read_worker_th[WORKERS];
 //static inodedata *read_worker_id[WORKERS];
 
-static void *jqueue,*dqueue;
+static void *jqueue; //,*dqueue;
 
 /* queues */
 
-/* glock: UNUSED */
-void read_delayed_enqueue(inodedata *id,uint32_t cnt) {
-	uint64_t t;
-	if (cnt>0) {
-		t = monotonic_useconds();
-		queue_put(dqueue,t>>32,t&0xFFFFFFFFU,(uint8_t*)id,cnt);
+void read_enqueue(inodedata *id) {
+	queue_put(jqueue,0,0,(uint8_t*)id,0);
+}
+
+void read_delayrun_enqueue(void *udata) {
+	queue_put(jqueue,0,0,(uint8_t*)udata,0);
+}
+
+void read_delayed_enqueue(inodedata *id,uint32_t usecs) {
+	if (usecs>0) {
+		delay_run(read_delayrun_enqueue,id,usecs);
 	} else {
 		queue_put(jqueue,0,0,(uint8_t*)id,0);
 	}
 }
 
-/* glock: UNUSED */
-void read_enqueue(inodedata *id) {
-	queue_put(jqueue,0,0,(uint8_t*)id,0);
-}
-
-/* worker thread | glock: UNUSED */
+/* worker thread | glock: UNUSED
 void* read_dqueue_worker(void *arg) {
 	uint64_t t,usec;
 	uint32_t husec,lusec,cnt;
@@ -236,6 +239,7 @@ void* read_dqueue_worker(void *arg) {
 	}
 	return NULL;
 }
+*/
 
 /* glock: UNLOCKED */
 void read_job_end(inodedata *id,int status,uint32_t delay) {
@@ -407,6 +411,9 @@ void* read_worker(void *arg) {
 	uint8_t recstatus;
 	uint8_t gotstatus;
 
+	cspri chain[100];
+	uint16_t chainelements;
+
 	uint32_t chindx;
 	uint32_t ip;
 	uint16_t port;
@@ -415,15 +422,12 @@ void* read_worker(void *arg) {
 	uint64_t chunkid;
 	uint32_t version;
 	const uint8_t *csdata;
-	uint32_t tmpip;
-	uint16_t tmpport;
-	uint32_t tmpver;
 	uint32_t csver;
-	uint32_t cnt,bestcnt;
+	uint32_t cnt;
 	uint32_t csdatasize;
 	uint8_t csdataver;
-	uint8_t csrecsize;
 	uint8_t rdstatus;
+	uint8_t canmodatime;
 	int status;
 	char csstrip[16];
 	uint8_t reqsend;
@@ -495,6 +499,11 @@ void* read_worker(void *arg) {
 			continue;
 		}
 
+		canmodatime = id->canmodatime;
+		if (canmodatime==2) {
+			id->canmodatime = 1;
+		}
+
 		zassert(pthread_mutex_unlock(&glock));
 
 		if (status!=STATUS_OK) {
@@ -504,7 +513,7 @@ void* read_worker(void *arg) {
 
 		// get chunk data from master
 //		start = monotonic_seconds();
-		rdstatus = fs_readchunk(id->inode,chindx,&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
+		rdstatus = fs_readchunk(id->inode,chindx,canmodatime,&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
 
 		if (rdstatus!=STATUS_OK) {
 			zassert(pthread_mutex_lock(&glock));
@@ -530,7 +539,7 @@ void* read_worker(void *arg) {
 						read_job_end(id,EIO,0);
 					}
 				} else {
-					read_delayed_enqueue(id,1+((id->trycnt<30)?(id->trycnt/3):10));
+					read_delayed_enqueue(id,10000+((id->trycnt<30)?((id->trycnt-1)*300000):10000000));
 				}
 			}
 			continue;	// get next job
@@ -579,7 +588,13 @@ void* read_worker(void *arg) {
 			continue;
 		}
 
-		if (csdata==NULL || csdatasize==0) {
+		if (csdata!=NULL && csdatasize>0) {
+			chainelements = csorder_sort(chain,csdataver,csdata,csdatasize,0);
+		} else {
+			chainelements = 0;
+		}
+
+		if (csdata==NULL || csdatasize==0 || chainelements==0) {
 			zassert(pthread_mutex_lock(&glock));
 			rreq->busy = 0;
 			zassert(pthread_mutex_unlock(&glock));
@@ -588,18 +603,45 @@ void* read_worker(void *arg) {
 			if (id->trycnt>=maxretries) {
 				read_job_end(id,ENXIO,0);
 			} else {
-				read_delayed_enqueue(id,60);
+				read_delayed_enqueue(id,60000000);
 			}
 			continue;
 		}
 
+		ip = chain[0].ip;
+		port = chain[0].port;
+		csver = chain[0].version;
+		if (id->lastchunkid==chunkid) {
+			if (id->laststatus==0) { // error occured
+				for (i=0 ; i<chainelements ; i++) {
+					if (chain[i].ip != id->lastip || chain[i].port != id->lastport) {
+						ip = chain[i].ip;
+						port = chain[i].port;
+						csver = chain[i].version;
+						break;
+					}
+				}
+			} else { // ok
+				for (i=1 ; i<chainelements ; i++) {
+					if (chain[i].ip == id->lastip && chain[i].port == id->lastport) {
+						ip = chain[i].ip;
+						port = chain[i].port;
+						csver = chain[i].version;
+						break;
+					}
+				}
+			}
+		}
+#if 0
 		ip = 0; // make old compilers happy
 		port = 0; // make old compilers happy
 		csver = 0; // make old compilers happy
 		if (csdataver==0) {
 			csrecsize = 6;
-		} else {
+		} else if (csdataver==1) {
 			csrecsize = 10;
+		} else {
+			csrecsize = 14;
 		}
 		// choose cs
 		bestcnt = 0xFFFFFFFF;
@@ -610,6 +652,11 @@ void* read_worker(void *arg) {
 				tmpver = get32bit(&csdata);
 			} else {
 				tmpver = 0;
+			}
+			if (csdataver>1) {
+				tmplabelmask = get32bit(&csdata);
+			} else {
+				tmplabelmask = 0;
 			}
 			csdatasize-=csrecsize;
 			if (id->lastchunkid==chunkid && tmpip==id->lastip && tmpport==id->lastport) {
@@ -631,7 +678,7 @@ void* read_worker(void *arg) {
 				bestcnt = cnt;
 			}
 		}
-
+#endif
 		if (ip || port) {
 			csdb_readinc(ip,port);
 			id->lastchunkid = chunkid;
@@ -647,7 +694,7 @@ void* read_worker(void *arg) {
 			if (id->trycnt>=maxretries) {
 				read_job_end(id,ENXIO,0);
 			} else {
-				read_delayed_enqueue(id,60);
+				read_delayed_enqueue(id,60000000);
 			}
 			continue;
 		}
@@ -695,7 +742,7 @@ void* read_worker(void *arg) {
 			if (id->trycnt>=maxretries) {
 				read_job_end(id,EIO,0);
 			} else {
-				read_delayed_enqueue(id,1+((id->trycnt<30)?(id->trycnt/3):10));
+				read_delayed_enqueue(id,10000+((id->trycnt<30)?((id->trycnt-1)*300000):10000000));
 			}
 			continue;
 		}
@@ -1122,7 +1169,7 @@ void* read_worker(void *arg) {
 				read_job_end(id,status,0);
 			} else {
 				zassert(pthread_mutex_unlock(&glock));
-				read_job_end(id,0,1+((id->trycnt<30)?(id->trycnt/3):10));
+				read_job_end(id,0,10000+((id->trycnt<30)?((id->trycnt-1)*300000):10000000));
 			}
 		} else {
 			id->laststatus = 1;
@@ -1136,8 +1183,8 @@ void* read_worker(void *arg) {
 /* API | glock: INITIALIZED,UNLOCKED */
 void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries) {
         uint32_t i;
-	sigset_t oldset;
-	sigset_t newset;
+//	sigset_t oldset;
+//	sigset_t newset;
 
 	maxretries = retries;
 	readahead = readaheadleng;
@@ -1155,19 +1202,20 @@ void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t read
 		idhash[i]=NULL;
 	}
 
-	dqueue = queue_new(0);
+//	dqueue = queue_new(0);
 	jqueue = queue_new(0);
 
         zassert(pthread_attr_init(&worker_thattr));
         zassert(pthread_attr_setstacksize(&worker_thattr,0x100000));
-	sigemptyset(&newset);
-	sigaddset(&newset, SIGTERM);
-	sigaddset(&newset, SIGINT);
-	sigaddset(&newset, SIGHUP);
-	sigaddset(&newset, SIGQUIT);
-	pthread_sigmask(SIG_BLOCK, &newset, &oldset);
-        zassert(pthread_create(&dqueue_worker_th,&worker_thattr,read_dqueue_worker,NULL));
-	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+
+//	sigemptyset(&newset);
+//	sigaddset(&newset, SIGTERM);
+//	sigaddset(&newset, SIGINT);
+//	sigaddset(&newset, SIGHUP);
+//	sigaddset(&newset, SIGQUIT);
+//	pthread_sigmask(SIG_BLOCK, &newset, &oldset);
+//	zassert(pthread_create(&dqueue_worker_th,&worker_thattr,read_dqueue_worker,NULL));
+//	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
 
 	zassert(pthread_mutex_lock(&glock));
 	workers_avail = 0;
@@ -1188,7 +1236,7 @@ void read_data_term(void) {
 	uint32_t i;
 	inodedata *id,*idn;
 
-	queue_close(dqueue);
+//	queue_close(dqueue);
 	queue_close(jqueue);
 	zassert(pthread_mutex_lock(&glock));
 	while (workers_total>0) {
@@ -1196,8 +1244,8 @@ void read_data_term(void) {
 		zassert(pthread_cond_wait(&worker_term_cond,&glock));
 	}
 	zassert(pthread_mutex_unlock(&glock));
-	zassert(pthread_join(dqueue_worker_th,NULL));
-	queue_delete(dqueue);
+//	zassert(pthread_join(dqueue_worker_th,NULL));
+//	queue_delete(dqueue);
 	queue_delete(jqueue);
 	for (i=0 ; i<IDHASHSIZE ; i++) {
 		for (id = idhash[i] ; id ; id = idn) {
@@ -1288,6 +1336,8 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 	int status;
 	double now;
 	zassert(pthread_mutex_lock(&glock));
+
+	id->canmodatime = 2;
 
 	*vrhead = NULL;
 	*iov = NULL;
@@ -1672,6 +1722,19 @@ void read_inode_dirty_region(uint32_t inode,uint64_t offset,uint32_t size,const 
 	zassert(pthread_mutex_unlock(&glock));
 }
 
+void read_inode_dont_modify_atime(uint32_t inode) {
+	uint32_t idh = IDHASH(inode);
+	inodedata *id;
+
+	zassert(pthread_mutex_lock(&glock));
+	for (id = idhash[idh] ; id ; id=id->next) {
+		if (id->inode == inode) {
+			id->canmodatime = 0;
+		}
+	}
+	zassert(pthread_mutex_unlock(&glock));
+}
+
 // void read_inode_ops(uint32_t inode) {
 void read_inode_set_length(uint32_t inode,uint64_t newlength,uint8_t active) {
 	uint32_t idh = IDHASH(inode);
@@ -1887,6 +1950,7 @@ void* read_data_new(uint32_t inode) {
 	id->pipe[0] = pfd[0];
 	id->pipe[1] = pfd[1];
 	id->inqueue = 0;
+	id->canmodatime = 1;
 	id->readahead = 0;
 	id->lastoffset = 0;
 	id->closewaiting = 0;

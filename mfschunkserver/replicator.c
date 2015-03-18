@@ -68,6 +68,8 @@ typedef struct _repsrc {
 
 	uint32_t ip;
 	uint16_t port;
+
+	uint32_t crcsums[4];
 } repsrc;
 
 typedef struct _replication {
@@ -425,11 +427,12 @@ static void rep_cleanup(replication *r) {
 }
 
 /* srcs: srccnt * (chunkid:64 version:32 ip:32 port:16) */
-uint8_t replicate(uint64_t chunkid,uint32_t version,uint8_t srccnt,const uint8_t *srcs) {
+uint8_t replicate(uint64_t chunkid,uint32_t version,const uint32_t xormasks[4],uint8_t srccnt,const uint8_t *srcs) {
 	replication r;
-	uint8_t status,i,vbuffs,first;
+	uint8_t status,i,j,vbuffs,first;
 	uint16_t b,blocks;
-	uint32_t xcrc,crc;
+	uint32_t xcrc[4],crc;
+	uint32_t codeindex,codeword;
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	int s;
@@ -508,6 +511,10 @@ uint8_t replicate(uint64_t chunkid,uint32_t version,uint8_t srccnt,const uint8_t
 	if (rep_wait_for_connection(&r,CONNMSECTO)<0) {
 		rep_cleanup(&r);
 		return ERROR_CANTCONNECT;
+	}
+// disable Nagle
+	for (i=0 ; i<srccnt ; i++) {
+		tcpnodelay(r.repsources[i].sock);
 	}
 // open chunk
 	status = hdd_open(chunkid,0);
@@ -715,6 +722,49 @@ uint8_t replicate(uint64_t chunkid,uint32_t version,uint8_t srccnt,const uint8_t
 				}
 			}
 		} else {
+			for (i=0 ; i<srccnt ; i++) {
+				if (r.repsources[i].mode!=IDLE) {
+					rptr = r.repsources[i].packet;
+					rptr += 16;
+					crc = get32bit(&rptr);
+					for (j=0 ; j<4 ; j++) {
+						r.repsources[i].crcsums[j] = mycrc32(0,rptr+j*MFSBLOCKSIZE/4,MFSBLOCKSIZE/4);
+					}
+					if (crc != mycrc32_combine(mycrc32_combine(r.repsources[i].crcsums[0],r.repsources[i].crcsums[1],MFSBLOCKSIZE/4),mycrc32_combine(r.repsources[i].crcsums[2],r.repsources[i].crcsums[3],MFSBLOCKSIZE/4),MFSBLOCKSIZE/2)) {
+						uint32_t ip;
+						ip = r.repsources[i].ip;
+						syslog(LOG_WARNING,"replicator: received data with wrong checksum from (%u.%u.%u.%u:%04"PRIX16")",(ip>>24)&0xFF,(ip>>16)&0xFF,(ip>>8)&0xFF,ip&0xFF,r.repsources[i].port);
+						rep_cleanup(&r);
+						return ERROR_CRC;
+					}
+				}
+			}
+			crc = mycrc32_zeroblock(0,MFSBLOCKSIZE/4);
+			for (codeindex=0 ; codeindex<4 ; codeindex++) {
+				codeword = xormasks[codeindex];
+				first = 1;
+				for (i=0 ; i<srccnt ; i++) {
+					for (j=0 ; j<4 ; j++) {
+						if (r.repsources[i].mode!=IDLE && (codeword&UINT32_C(0x80000000))) {
+							rptr = r.repsources[i].packet;
+							rptr += 16;
+							if (first) {
+								memcpy(r.xorbuff+4+codeindex*MFSBLOCKSIZE/4,rptr+4+j*MFSBLOCKSIZE/4,MFSBLOCKSIZE/4);
+								first = 0;
+								xcrc[codeindex] = r.repsources[i].crcsums[j];
+							} else {
+								xordata(r.xorbuff+4+codeindex*MFSBLOCKSIZE/4,rptr+4+j*MFSBLOCKSIZE/4,MFSBLOCKSIZE/4);
+								xcrc[codeindex] ^= r.repsources[i].crcsums[j] ^ crc;
+							}
+						}
+						codeword>>=1;
+					}
+				}
+			}
+			crc = mycrc32_combine(mycrc32_combine(xcrc[0],xcrc[1],MFSBLOCKSIZE/4),mycrc32_combine(xcrc[2],xcrc[3],MFSBLOCKSIZE/4),MFSBLOCKSIZE/2);
+			wptr = r.xorbuff;
+			put32bit(&wptr,crc);
+/*
 			first=1;
 			if (vbuffs&1) {
 				xcrc = 0;
@@ -744,6 +794,7 @@ uint8_t replicate(uint64_t chunkid,uint32_t version,uint8_t srccnt,const uint8_t
 			}
 			wptr = r.xorbuff;
 			put32bit(&wptr,xcrc);
+*/
 			status = hdd_write(chunkid,0,b,r.xorbuff+4,0,MFSBLOCKSIZE,r.xorbuff);
 			if (status!=STATUS_OK) {
 				syslog(LOG_WARNING,"replicator: xor write status: %s",mfsstrerr(status));

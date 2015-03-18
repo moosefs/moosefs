@@ -132,5 +132,6 @@
 # How long to sustain a disconnected client session (in seconds; default is 86400 = 1 day)
 # SESSION_SUSTAIN_TIME = 86400
 
-# Time limit in seconds for soft quota (default is 604800 - 7 days)
-# QUOTA_TIME_LIMIT = 604800
+# Default grace period in seconds for soft quota (default is 604800 - 7 days)
+# Deprecates: QUOTA_TIME_LIMIT
+# QUOTA_DEFAULT_GRACE_PERIOD = 604800

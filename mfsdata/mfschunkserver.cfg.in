@@ -37,20 +37,23 @@
 # percent of total work time the chunkserver is allowed to spend on hdd space rebalancing
 # HDD_REBALANCE_UTILIZATION = 20
 
-# how many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged
+# How many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged
 # HDD_ERROR_TOLERANCE_COUNT = 2
 # HDD_ERROR_TOLERANCE_PERIOD = 600
 
 # enables/disables fsync before chunk closing
 # HDD_FSYNC_BEFORE_CLOSE = 0
 
-# maximum number of active workers and maximum number of idle workers
-# WORKERS_MAX = 150
+# Maximum number of active workers and maximum number of idle workers
+# WORKERS_MAX = 250
 # WORKERS_MAX_IDLE = 40
 
 ###############################################
 # MASTER CONNECTION OPTIONS                   #
 ###############################################
+
+# labels string (default is empty - no labels)
+# LABELS = 
 
 # local address to use for master connections (default is *, i.e. default local address)
 # BIND_HOST = *

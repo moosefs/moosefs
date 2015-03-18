@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "March 2015" "MooseFS 3.0.11-1" "This is part of MooseFS"
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
@@ -130,7 +130,10 @@ port to listen on for client (mount) connections
 How long to sustain a disconnected client session (in seconds; default is 86400 = 1 day)
 .TP
 \fBQUOTA_TIME_LIMIT\fP
-Time limit in seconds for soft quota (default is 604800 = 7 days)
+Grace period in secods for soft quota (deprecated, use \fBQUOTA_DEFAULT_GRACE_PERIOD\fP instead for default value or specify it individually)
+.TP
+\fBQUOTA_DEFAULT_GRACE_PERIOD\fP
+Default grace period in seconds for soft quota (default is 604800 = 7 days)
 .SH NOTES
 .PP
 Chunks in master are tested in a loop. Speed (or frequency) is regulated by two

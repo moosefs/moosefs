@@ -1041,7 +1041,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 */
 			status = hdd_write(gchunkid,gversion,blocknum,rptr+4,offset,size,rptr);
 			if (status!=STATUS_OK) {
-//				syslog(LOG_NOTICE,"hdd_write error: %u",status);
+//				syslog(LOG_NOTICE,"hdd_write error: %s",mfsstrerr(status));
 				rstat = 1;
 				break;
 			}

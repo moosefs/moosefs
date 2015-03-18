@@ -28,30 +28,32 @@
 
 #include "strerr.h"
 
-#define massert(e,msg) ((e) ? (void)0 : (fprintf(stderr,"failed assertion '%s' : %s\n",#e,(msg)),syslog(LOG_ERR,"failed assertion '%s' : %s",#e,(msg)),abort()))
-// #define passert(ptr) ((ptr!=NULL) ? (ptr!=(void*)(-1)) ? (void)0 :  : (fprintf(stderr,"out of memory: %s is NULL\n",#ptr),syslog(LOG_ERR,"out of memory: %s is NULL",#ptr),abort()))
-#define sassert(e) ((e) ? (void)0 : (fprintf(stderr,"failed assertion '%s'\n",#e),syslog(LOG_ERR,"failed assertion '%s'",#e),abort()))
+#define massert(e,msg) ((e) ? (void)0 : (fprintf(stderr,"%s:%u - failed assertion '%s' : %s\n",__FILE__,__LINE__,#e,(msg)),syslog(LOG_ERR,"%s:%u - failed assertion '%s' : %s",__FILE__,__LINE__,#e,(msg)),abort()))
+#define sassert(e) ((e) ? (void)0 : (fprintf(stderr,"%s:%u - failed assertion '%s'\n",__FILE__,__LINE__,#e),syslog(LOG_ERR,"%s:%u - failed assertion '%s'",__FILE__,__LINE__,#e),abort()))
 #define passert(ptr) if (ptr==NULL) { \
-		fprintf(stderr,"out of memory: %s is NULL\n",#ptr); \
-		syslog(LOG_ERR,"out of memory: %s is NULL",#ptr); \
+		fprintf(stderr,"%s:%u - out of memory: %s is NULL\n",__FILE__,__LINE__,#ptr); \
+		syslog(LOG_ERR,"%s:%u - out of memory: %s is NULL",__FILE__,__LINE__,#ptr); \
 		abort(); \
 	} else if (ptr==((void*)(-1))) { \
 		const char *_mfs_errorstring = strerr(errno); \
-		syslog(LOG_ERR,"mmap error on %s, error: %s",#ptr,_mfs_errorstring); \
-		fprintf(stderr,"mmap error on %s, error: %s\n",#ptr,_mfs_errorstring); \
+		syslog(LOG_ERR,"%s:%u - mmap error on %s, error: %s",__FILE__,__LINE__,#ptr,_mfs_errorstring); \
+		fprintf(stderr,"%s:%u - mmap error on %s, error: %s\n",__FILE__,__LINE__,#ptr,_mfs_errorstring); \
 		abort(); \
 	}
 #define eassert(e) if (!(e)) { \
 		const char *_mfs_errorstring = strerr(errno); \
-		syslog(LOG_ERR,"failed assertion '%s', error: %s",#e,_mfs_errorstring); \
-		fprintf(stderr,"failed assertion '%s', error: %s\n",#e,_mfs_errorstring); \
+		syslog(LOG_ERR,"%s:%u - failed assertion '%s', error: %s",__FILE__,__LINE__,#e,_mfs_errorstring); \
+		fprintf(stderr,"%s:%u - failed assertion '%s', error: %s\n",__FILE__,__LINE__,#e,_mfs_errorstring); \
 		abort(); \
 	}
-#define zassert(e) if ((e)!=0) { \
+#define zassert(e) { \
+	int _mfs_assert_ret = (e); \
+	if (_mfs_assert_ret!=0) { \
 		const char *_mfs_errorstring = strerr(errno); \
-		syslog(LOG_ERR,"unexpected status, '%s' returned: %s",#e,_mfs_errorstring); \
-		fprintf(stderr,"unexpected status, '%s' returned: %s\n",#e,_mfs_errorstring); \
+		syslog(LOG_ERR,"%s:%u - unexpected status, '%s' returned: %d (errno: %s)",__FILE__,__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
+		fprintf(stderr,"%s:%u - unexpected status, '%s' returned: %d (errno: %s)\n",__FILE__,__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
 		abort(); \
-	}
+	} \
+}
 
 #endif

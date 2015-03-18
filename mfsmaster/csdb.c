@@ -46,6 +46,8 @@
 #define CSDB_OP_NEWID 3
 #define CSDB_OP_MAINTENANCEON 4
 #define CSDB_OP_MAINTENANCEOFF 5
+// #define CSDB_OP_FASTREPLICATIONON 6
+// #define CSDB_OP_FASTREPLICATIONOFF 7
 
 static uint32_t HeavyLoadGracePeriod;
 static uint32_t HeavyLoadThreshold;
@@ -62,6 +64,7 @@ typedef struct csdbentry {
 	uint32_t heavyloadts;		// last timestamp of heavy load state (load > thresholds)
 	uint32_t load;
 	uint8_t maintenance;
+//	uint8_t fastreplication;
 	void *eptr;
 	struct csdbentry *next;
 } csdbentry;
@@ -185,6 +188,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 	csptr->csid = csid;
 	csptr->heavyloadts = 0;
 	csptr->maintenance = 0;
+//	csptr->fastreplication = 1;
 	csptr->load = 0;
 	csptr->eptr = eptr;
 	csptr->next = csdbhash[hash];
@@ -259,7 +263,7 @@ uint32_t csdb_servlist_size(void) {
 			i++;
 		}
 	}
-	return i*(4+4+2+2+8+8+4+8+8+4+4+4+4);
+	return i*(4+4+2+2+8+8+4+8+8+4+4+4+4+4);
 }
 
 void csdb_servlist_data(uint8_t *ptr) {
@@ -277,9 +281,15 @@ void csdb_servlist_data(uint8_t *ptr) {
 			}
 			p = ptr;
 			if (csptr->eptr) {
-				uint32_t version,chunkscount,tdchunkscount,errorcounter,load;
+				uint32_t version,chunkscount,tdchunkscount,errorcounter,load,labelmask;
 				uint64_t usedspace,totalspace,tdusedspace,tdtotalspace;
-				matocsserv_getservdata(csptr->eptr,&version,&usedspace,&totalspace,&chunkscount,&tdusedspace,&tdtotalspace,&tdchunkscount,&errorcounter,&load);
+				uint8_t hlstatus;
+				matocsserv_getservdata(csptr->eptr,&version,&usedspace,&totalspace,&chunkscount,&tdusedspace,&tdtotalspace,&tdchunkscount,&errorcounter,&load,&hlstatus,&labelmask);
+				if (hlstatus==1) {
+					gracetime = 0;
+				} else if (hlstatus==2) {
+					gracetime = 0xFFFFFFFF;
+				}
 				put32bit(&ptr,version&0xFFFFFF);
 				put32bit(&ptr,csptr->ip);
 				put16bit(&ptr,csptr->port);
@@ -293,6 +303,7 @@ void csdb_servlist_data(uint8_t *ptr) {
 				put32bit(&ptr,errorcounter);
 				put32bit(&ptr,load);
 				put32bit(&ptr,gracetime);
+				put32bit(&ptr,labelmask);
 			} else {
 				put32bit(&ptr,0x01000000);
 				put32bit(&ptr,csptr->ip);
@@ -307,6 +318,7 @@ void csdb_servlist_data(uint8_t *ptr) {
 				put32bit(&ptr,0);
 				put32bit(&ptr,0);
 				put32bit(&ptr,gracetime);
+				put32bit(&ptr,0);
 			}
 			if (csptr->maintenance) {
 				*p |= 2;
@@ -368,6 +380,7 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 			csdbtab[csid] = csptr;
 			csptr->heavyloadts = 0;
 			csptr->maintenance = 0;
+//			csptr->fastreplication = 1;
 			csptr->load = 0;
 			csptr->eptr = NULL;
 			csptr->next = csdbhash[hash];
@@ -478,6 +491,33 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 				}
 			}
 			return ERROR_MISMATCH;
+/*		case CSDB_OP_FASTREPLICATIONON:
+			hash = CSDBHASHFN(ip,port);
+			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
+				if (csptr->ip == ip && csptr->port == port) {
+					if (csptr->fastreplication!=0) {
+						return ERROR_MISMATCH;
+					}
+					csptr->fastreplication = 1;
+					meta_version_inc();
+					return STATUS_OK;
+				}
+			}
+			return ERROR_MISMATCH;
+		case CSDB_OP_FASTREPLICATIONOFF:
+			hash = CSDBHASHFN(ip,port);
+			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
+				if (csptr->ip == ip && csptr->port == port) {
+					if (csptr->fastreplication!=1) {
+						return ERROR_MISMATCH;
+					}
+					csptr->fastreplication = 0;
+					meta_version_inc();
+					return STATUS_OK;
+				}
+			}
+			return ERROR_MISMATCH;
+*/
 	}
 	return ERROR_MISMATCH;
 }
@@ -526,7 +566,31 @@ uint8_t csdb_maintenance(uint32_t ip,uint16_t port,uint8_t onoff) {
 	}
 	return ERROR_NOTFOUND;
 }
+/*
+uint8_t csdb_fastreplication(uint32_t ip,uint16_t port,uint8_t onoff) {
+	uint32_t hash;
+	csdbentry *csptr;
 
+	if (onoff!=0 && onoff!=1) {
+		return ERROR_EINVAL;
+	}
+	hash = CSDBHASHFN(ip,port);
+	for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
+		if (csptr->ip == ip && csptr->port == port) {
+			if (csptr->fastreplication!=onoff) {
+				csptr->fastreplication = onoff;
+				if (onoff) {
+					changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_FASTREPLICATIONON,ip,port);
+				} else {
+					changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_FASTREPLICATIONOFF,ip,port);
+				}
+			}
+			return STATUS_OK;
+		}
+	}
+	return ERROR_NOTFOUND;
+}
+*/
 /*
 uint8_t csdb_find(uint32_t ip,uint16_t port,uint16_t csid) {
 	uint32_t hash;
@@ -598,6 +662,10 @@ uint16_t csdb_sort_servers(void) {
 	return servers;
 }
 
+uint16_t csdb_servers_count(void) {
+	return servers;
+}
+
 uint16_t csdb_getnumber(void *v_csptr) {
 	csdbentry *csptr = (csdbentry*)v_csptr;
 	if (csptr!=NULL) {
@@ -643,6 +711,7 @@ uint8_t csdb_store(bio *fd) {
 			put16bit(&ptr,csptr->port);
 			put16bit(&ptr,csptr->csid);
 			put8bit(&ptr,csptr->maintenance);
+//			put8bit(&ptr,csptr->fastreplication);
 			l++;
 		}
 	}
@@ -663,6 +732,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 	uint32_t l,t,ip;
 	uint16_t port,csid;
 	uint8_t maintenance;
+//	uint8_t fastreplication;
 	uint8_t nl=1;
 	uint32_t bsize;
 
@@ -684,6 +754,8 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		bsize = 8;
 	} else {
 		bsize = 9;
+//	} else {
+//		bsize = 10;
 	}
 	l=0;
 	while (t>0) {
@@ -727,6 +799,11 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		} else {
 			maintenance = 0;
 		}
+//		if (mver>=0x13) {
+//			fastreplication = get8bit(&ptr);
+//		} else {
+//			fastreplication = 0;
+//		}
 		hash = CSDBHASHFN(ip,port);
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 			if (csptr->ip == ip && csptr->port == port) {
@@ -770,6 +847,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		csptr->load = 0;
 		csptr->eptr = NULL;
 		csptr->maintenance = maintenance;
+//		csptr->fastreplication = fastreplication;
 		csptr->next = csdbhash[hash];
 		csdbhash[hash] = csptr;
 		servers++;

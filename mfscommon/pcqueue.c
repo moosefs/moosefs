@@ -168,6 +168,7 @@ int queue_put(void *que,uint32_t id,uint32_t op,uint8_t *data,uint32_t leng) {
 		}
 		if (q->closed) {
 			zassert(pthread_mutex_unlock(&(q->lock)));
+			free(qe);
 			errno = EIO;
 			return -1;
 		}

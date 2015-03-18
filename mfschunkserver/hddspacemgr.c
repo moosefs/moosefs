@@ -219,6 +219,7 @@ typedef struct folder {
 	uint64_t avail;
 	uint64_t total;
 	hddstats cstat;
+	hddstats monotonic;
 	hddstats stats[STATSHISTORY];
 	uint32_t statspos;
 	ioerror lasterrtab[LASTERRSIZE];
@@ -230,6 +231,7 @@ typedef struct folder {
 	dev_t devid;
 	ino_t lockinode;
 	int lfd;
+	int dumpfd;
 	double read_corr;
 	double write_corr;
 	uint32_t read_dist;
@@ -664,7 +666,7 @@ static inline void hdd_stats_datafsync(folder *f,int64_t fsynctime) {
 	zassert(pthread_mutex_unlock(&statslock));
 }
 
-uint32_t hdd_diskinfo_v1_size() {
+uint32_t hdd_diskinfo_size(void) {
 	folder *f;
 	uint32_t s,sl;
 
@@ -675,59 +677,12 @@ uint32_t hdd_diskinfo_v1_size() {
 		if (sl>255) {
 			sl = 255;
 		}
-		s += 34+sl;
+		s += 2+34+3*64+sl;
 	}
 	return s;
 }
 
-void hdd_diskinfo_v1_data(uint8_t *buff) {
-	folder *f;
-	uint32_t sl;
-	uint32_t ei;
-	if (buff) {
-		for (f=folderhead ; f ; f=f->next ) {
-			sl = strlen(f->path);
-			if (sl>255) {
-				put8bit(&buff,255);
-				memcpy(buff,"(...)",5);
-				memcpy(buff+5,f->path+(sl-250),250);
-				buff += 255;
-			} else {
-				put8bit(&buff,sl);
-				if (sl>0) {
-					memcpy(buff,f->path,sl);
-					buff += sl;
-				}
-			}
-			put8bit(&buff,((f->todel)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANINPROGRESS)?4:0));
-			ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
-			put64bit(&buff,f->lasterrtab[ei].chunkid);
-			put32bit(&buff,f->lasterrtab[ei].timestamp);
-			put64bit(&buff,f->total-f->avail);
-			put64bit(&buff,f->total);
-			put32bit(&buff,f->chunkcount);
-		}
-	}
-	zassert(pthread_mutex_unlock(&folderlock));
-}
-
-uint32_t hdd_diskinfo_v2_size() {
-	folder *f;
-	uint32_t s,sl;
-
-	s = 0;
-	zassert(pthread_mutex_lock(&folderlock));
-	for (f=folderhead ; f ; f=f->next ) {
-		sl = strlen(f->path);
-		if (sl>255) {
-			sl = 255;
-		}
-		s += 2+226+sl;
-	}
-	return s;
-}
-
-void hdd_diskinfo_v2_data(uint8_t *buff) {
+void hdd_diskinfo_data(uint8_t *buff) {
 	folder *f;
 	hddstats s;
 	uint32_t sl;
@@ -738,13 +693,13 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 		for (f=folderhead ; f ; f=f->next ) {
 			sl = strlen(f->path);
 			if (sl>255) {
-				put16bit(&buff,226+255);	// size of this entry
+				put16bit(&buff,34+3*64+255);	// size of this entry
 				put8bit(&buff,255);
 				memcpy(buff,"(...)",5);
 				memcpy(buff+5,f->path+(sl-250),250);
 				buff += 255;
 			} else {
-				put16bit(&buff,226+sl);	// size of this entry
+				put16bit(&buff,34+3*64+sl);	// size of this entry
 				put8bit(&buff,sl);
 				if (sl>0) {
 					memcpy(buff,f->path,sl);
@@ -773,6 +728,69 @@ void hdd_diskinfo_v2_data(uint8_t *buff) {
 				hdd_stats_add(&s,&(f->stats[(f->statspos+pos)%STATSHISTORY]));
 			}
 			hdd_stats_binary_pack(&buff,&s);	// 64B
+		}
+		zassert(pthread_mutex_unlock(&statslock));
+	}
+	zassert(pthread_mutex_unlock(&folderlock));
+}
+
+uint32_t hdd_diskinfo_monotonic_size(void) {
+	folder *f;
+	uint32_t s,sl;
+
+	s = 2;
+	zassert(pthread_mutex_lock(&folderlock));
+	for (f=folderhead ; f ; f=f->next ) {
+		sl = strlen(f->path);
+		if (sl>255) {
+			sl = 255;
+		}
+		s += 2+34+64+sl;
+	}
+	return s;
+}
+
+void hdd_diskinfo_monotonic_data(uint8_t *buff) {
+	folder *f;
+	uint32_t sl;
+	uint32_t ei;
+	uint16_t cnt;
+	if (buff) {
+		cnt = 0;
+		for (f=folderhead ; f ; f=f->next ) {
+			cnt++;
+		}
+		put16bit(&buff,cnt);
+		zassert(pthread_mutex_lock(&statslock));
+		for (f=folderhead ; f ; f=f->next ) {
+			sl = strlen(f->path);
+			if (sl>255) {
+				put16bit(&buff,34+64+255);	// size of this entry
+				put8bit(&buff,255);
+				memcpy(buff,"(...)",5);
+				memcpy(buff+5,f->path+(sl-250),250);
+				buff += 255;
+			} else {
+				put16bit(&buff,34+64+sl);	// size of this entry
+				put8bit(&buff,sl);
+				if (sl>0) {
+					memcpy(buff,f->path,sl);
+					buff += sl;
+				}
+			}
+			put8bit(&buff,((f->todel)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANINPROGRESS)?4:0));
+			ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
+			put64bit(&buff,f->lasterrtab[ei].chunkid);
+			put32bit(&buff,f->lasterrtab[ei].timestamp);
+			if (f->scanstate==SCST_SCANINPROGRESS) {
+				put64bit(&buff,f->scanprogress);
+				put64bit(&buff,0);
+			} else {
+				put64bit(&buff,f->total-f->avail);
+				put64bit(&buff,f->total);
+			}
+			put32bit(&buff,f->chunkcount);
+			hdd_stats_binary_pack(&buff,&(f->monotonic));	// 64B
 		}
 		zassert(pthread_mutex_unlock(&statslock));
 	}
@@ -831,6 +849,7 @@ void hdd_diskinfo_movestats(void) {
 			f->statspos--;
 		}
 		f->stats[f->statspos] = f->cstat;
+		hdd_stats_add(&(f->monotonic),&(f->cstat));
 		hdd_stats_clear(&(f->cstat));
 	}
 	zassert(pthread_mutex_unlock(&statslock));
@@ -1389,6 +1408,102 @@ static inline folder* hdd_getfolder() {
 	return bf;
 }
 */
+
+static inline void hdd_folder_dump_chunkdb_begin(folder *f) {
+	uint32_t pleng;
+	char *fname;
+	uint8_t hdr[14];
+	uint8_t *wptr;
+	pleng = strlen(f->path);
+	fname = malloc(pleng+13);
+	passert(fname);
+	memcpy(fname,f->path,pleng);
+	memcpy(fname+pleng,".tmp_chunkdb",12);
+	fname[pleng+12] = 0;
+	f->dumpfd = open(fname,O_WRONLY | O_TRUNC | O_CREAT,0666);
+	if (f->dumpfd<0) {
+		mfs_arg_errlog(LOG_NOTICE,"%s: open error",fname);
+	}
+	free(fname);
+	if (f->dumpfd>=0) {
+		memcpy(hdr,"MFS CHUNK DB",12);
+		wptr = hdr+12;
+		put16bit(&wptr,pleng);
+		if (write(f->dumpfd,hdr,14)!=14) {
+			close(f->dumpfd);
+			f->dumpfd = -1;
+			return;
+		}
+		if (write(f->dumpfd,f->path,pleng)!=(int32_t)pleng) {
+			close(f->dumpfd);
+			f->dumpfd = -1;
+		}
+	}
+}
+
+static inline void hdd_folder_dump_chunkdb_end(folder *f) {
+	if (f->dumpfd>=0) {
+		uint32_t pleng;
+		char *fname_src,*fname_dst;
+		uint8_t buff[16];
+
+		memset(buff,0,16);
+
+		if (write(f->dumpfd,buff,16)!=16) {
+			close(f->dumpfd);
+			f->dumpfd = -1;
+			return;
+		}
+
+		if (close(f->dumpfd)<0) {
+			f->dumpfd = -1;
+			return;
+		}
+
+		pleng = strlen(f->path);
+		fname_src = malloc(pleng+13);
+		fname_dst = malloc(pleng+9);
+		passert(fname_src);
+		passert(fname_dst);
+		memcpy(fname_src,f->path,pleng);
+		memcpy(fname_src+pleng,".tmp_chunkdb",12);
+		fname_src[pleng+12] = 0;
+		memcpy(fname_dst,f->path,pleng);
+		memcpy(fname_dst+pleng,".chunkdb",8);
+		fname_dst[pleng+8] = 0;
+		rename(fname_src,fname_dst);
+		free(fname_src);
+		free(fname_dst);
+	}
+}
+
+static inline void hdd_folder_dump_chunkdb_chunk(folder *f,chunk *c) {
+	if (f->dumpfd>=0) {
+		uint8_t buff[16];
+		uint8_t *wptr;
+		uint16_t nleng;
+		wptr = buff;
+		nleng = strlen(c->filename);
+		put64bit(&wptr,c->chunkid);
+		put32bit(&wptr,c->version);
+		if (c->validattr) {
+			put16bit(&wptr,c->blocks);
+		} else {
+			put16bit(&wptr,0xFFFF);
+		}
+		put16bit(&wptr,nleng);
+		if (write(f->dumpfd,buff,16)!=16) {
+			close(f->dumpfd);
+			f->dumpfd = -1;
+			return;
+		}
+		if (write(f->dumpfd,c->filename,nleng)!=nleng) {
+			close(f->dumpfd);
+			f->dumpfd = -1;
+		}
+	}
+}
+
 uint8_t hdd_senddata(folder *f,int rmflag) {
 	uint32_t i;
 	uint8_t todel;
@@ -1405,8 +1520,9 @@ uint8_t hdd_senddata(folder *f,int rmflag) {
 			if (c->owner==f) {
 				c->todel = todel;
 				if (rmflag) {
-					hdd_report_lost_chunk(c->chunkid);
 					if (c->state==CH_AVAIL) {
+						hdd_report_lost_chunk(c->chunkid);
+						hdd_folder_dump_chunkdb_chunk(f,c);
 						*cptr = c->next;
 						if (c->fd>=0) {
 							close(c->fd);
@@ -1490,9 +1606,11 @@ void hdd_check_folders(void) {
 				// no break - it's ok !!!
 			case SCST_WORKING:
 				if (f->toremove==2) {
+					hdd_folder_dump_chunkdb_begin(f);
 					f->toremove = 1;
 				}
 				if (hdd_senddata(f,1)) {
+					hdd_folder_dump_chunkdb_end(f);
 					f->toremove = 0;
 				}
 				changed = 1;
@@ -4599,14 +4717,15 @@ static inline int hdd_check_filename(const char *fname,uint64_t *chunkid,uint32_
 	return 0;
 }
 
-static inline void hdd_add_chunk(folder *f,const char *fullname,uint64_t chunkid,uint32_t version,uint8_t todel) {
+static inline void hdd_add_chunk(folder *f,const char *fullname,uint64_t chunkid,uint32_t version,uint16_t blocks,uint8_t todel) {
 	struct stat sb;
 	folder *prevf,*currf;
 	chunk *c;
-	uint16_t blocks;
 	uint8_t validattr;
 
-	if (f->sizelimit) {
+	if (blocks<1024) {
+		validattr = 1;
+	} else if (f->sizelimit) {
 		if (stat(fullname,&sb)<0) {
 			if (f->todel<2) {
 				unlink(fullname);
@@ -4687,6 +4806,114 @@ static inline void hdd_add_chunk(folder *f,const char *fullname,uint64_t chunkid
 	hdd_chunk_release(c);
 }
 
+static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen,uint8_t todel) {
+	struct stat sb;
+	int fd;
+	uint8_t *chunkbuff;
+	uint8_t c;
+	const uint8_t *rptr,*rptrmem,*endbuff;
+	uint8_t *wptr;
+	uint16_t pleng;
+	uint64_t chunkid;
+	uint32_t version;
+	uint16_t blocks;
+
+	memcpy(fullname+plen,".chunkdb",8);
+	fullname[plen+8]='\0';
+
+	fd = open(fullname,O_RDONLY);
+	if (fd<0) {
+		return -1;
+	}
+	if (fstat(fd,&sb)<0) {
+		close(fd);
+		return -1;
+	}
+//	if (sb.st_size<12 || (sb.st_size-12)%6!=0) {
+//		close(fd);
+//		return -1;
+//	}
+	chunkbuff = malloc(sb.st_size);
+	if (chunkbuff==NULL) {
+		close(fd);
+		return -1;
+	}
+	if (read(fd,chunkbuff,sb.st_size)!=sb.st_size) {
+		free(chunkbuff);
+		close(fd);
+		return -1;
+	}
+	close(fd);
+	if (unlink(fullname)<0) {
+		free(chunkbuff);
+		return -1;
+	}
+
+	rptr = chunkbuff;
+	endbuff = rptr+sb.st_size;
+
+	if (memcmp(rptr,"MFS CHUNK DB",12)!=0) {
+		syslog(LOG_NOTICE,"scanning folder %s: wrong header in .chunkdb - fallback to standard scan",f->path);
+		free(chunkbuff);
+		return -1;
+	}
+	rptr+=12;
+
+	pleng = get16bit(&rptr);
+	if (rptr+pleng>endbuff || pleng != plen || memcmp(rptr,fullname,pleng)!=0) {
+		syslog(LOG_NOTICE,"scanning folder %s: wrong path in .chunkdb - fallback to standard scan",f->path);
+		free(chunkbuff);
+		return -1;
+	}
+	rptr += pleng;
+	rptrmem = rptr;
+	chunkid = 0;
+	version = 0;
+	blocks = 0;
+	pleng = 1;
+
+	while (rptr+16<=endbuff) {
+		chunkid = get64bit(&rptr);
+		version = get32bit(&rptr);
+		blocks = get16bit(&rptr);
+		pleng = get16bit(&rptr);
+		if (chunkid==0 || pleng==0) {
+			break;
+		}
+		if (rptr+pleng>endbuff) {
+			break;
+		}
+		rptr+=pleng;
+	}
+	if (rptr!=endbuff || chunkid!=0 || version!=0 || blocks!=0 || pleng!=0) {
+		syslog(LOG_NOTICE,"scanning folder %s: data malformed in .chunkdb - fallback to standard scan",f->path);
+		free(chunkbuff);
+		return -1;
+	}
+
+	rptr = rptrmem;
+
+	while (1) {
+		chunkid = get64bit(&rptr);
+		version = get32bit(&rptr);
+		blocks = get16bit(&rptr);
+		pleng = get16bit(&rptr);
+		if (chunkid==0 && version==0 && blocks==0 && pleng==0) {
+			break;
+		}
+		wptr = (uint8_t*)rptr + pleng;
+		c = *wptr;
+		*wptr = 0;
+		hdd_add_chunk(f,(const char*)rptr,chunkid,version,blocks,todel);
+		rptr+=pleng;
+		*wptr = c;
+	}
+
+	syslog(LOG_NOTICE,"scanning folder %s: .chunkdb used - full scan don't needed",f->path);
+	free(chunkbuff);
+	return 0;
+}
+
 void* hdd_folder_scan(void *arg) {
 	folder *f = (folder*)arg;
 	DIR *dd;
@@ -4722,111 +4949,114 @@ void* hdd_folder_scan(void *arg) {
 		mkdir(fullname,0755);
 	}
 
-	fullname[plen++]='_';
-	fullname[plen++]='_';
-	fullname[plen++]='/';
-	fullname[plen]='\0';
+	if (hdd_folder_fastscan(f,fullname,plen,todel)<0) {
 
-	/* size of name added to size of structure because on some os'es d_name has size of 1 byte */
-	destorage = (struct dirent*)malloc(sizeof(struct dirent)+pathconf(f->path,_PC_NAME_MAX)+1);
-	passert(destorage);
+		fullname[plen++]='_';
+		fullname[plen++]='_';
+		fullname[plen++]='/';
+		fullname[plen]='\0';
 
-	scanterm = 0;
+		/* size of name added to size of structure because on some os'es d_name has size of 1 byte */
+		destorage = (struct dirent*)malloc(sizeof(struct dirent)+pathconf(f->path,_PC_NAME_MAX)+1);
+		passert(destorage);
 
-	zassert(pthread_mutex_lock(&dclock));
-	hddspacechanged = 1;
-	zassert(pthread_mutex_unlock(&dclock));
+		scanterm = 0;
 
-	if (todel==0) {
-		for (subf=0 ; subf<256 ; subf++) {
+		zassert(pthread_mutex_lock(&dclock));
+		hddspacechanged = 1;
+		zassert(pthread_mutex_unlock(&dclock));
+
+		if (todel==0) {
+			for (subf=0 ; subf<256 ; subf++) {
+				fullname[plen-3]="0123456789ABCDEF"[subf>>4];
+				fullname[plen-2]="0123456789ABCDEF"[subf&15];
+				mkdir(fullname,0755);
+			}
+
+	/* move chunks from "X/name" to "XX/name" */
+
+			oldfullname = malloc(oldplen+38);
+			passert(oldfullname);
+			memcpy(oldfullname,f->path,oldplen);
+			oldfullname[oldplen++]='_';
+			oldfullname[oldplen++]='/';
+			oldfullname[oldplen]='\0';
+
+			for (subf=0 ; subf<16 ; subf++) {
+				oldfullname[oldplen-2]="0123456789ABCDEF"[subf];
+				oldfullname[oldplen]='\0';
+				dd = opendir(oldfullname);
+				if (dd==NULL) {
+					continue;
+				}
+				while (readdir_r(dd,destorage,&de)==0 && de!=NULL) {
+					if (hdd_check_filename(de->d_name,&namechunkid,&nameversion)<0) {
+						continue;
+					}
+					memcpy(oldfullname+oldplen,de->d_name,36);
+					memcpy(fullname+plen,de->d_name,36);
+					fullname[plen-3]="0123456789ABCDEF"[(namechunkid>>4)&15];
+					fullname[plen-2]="0123456789ABCDEF"[namechunkid&15];
+					rename(oldfullname,fullname);
+				}
+				oldfullname[oldplen]='\0';
+				rmdir(oldfullname);
+				closedir(dd);
+			}
+			free(oldfullname);
+
+		}
+	/* scan new file names */
+
+		tcheckcnt = 0;
+		lastperc = 0;
+		lasttime = time(NULL);
+		for (subf=0 ; subf<256 && scanterm==0 ; subf++) {
 			fullname[plen-3]="0123456789ABCDEF"[subf>>4];
 			fullname[plen-2]="0123456789ABCDEF"[subf&15];
-			mkdir(fullname,0755);
-		}
-
-/* move chunks from "X/name" to "XX/name" */
-
-		oldfullname = malloc(oldplen+38);
-		passert(oldfullname);
-		memcpy(oldfullname,f->path,oldplen);
-		oldfullname[oldplen++]='_';
-		oldfullname[oldplen++]='/';
-		oldfullname[oldplen]='\0';
-
-		for (subf=0 ; subf<16 ; subf++) {
-			oldfullname[oldplen-2]="0123456789ABCDEF"[subf];
-			oldfullname[oldplen]='\0';
-			dd = opendir(oldfullname);
-			if (dd==NULL) {
-				continue;
-			}
-			while (readdir_r(dd,destorage,&de)==0 && de!=NULL) {
-				if (hdd_check_filename(de->d_name,&namechunkid,&nameversion)<0) {
-					continue;
-				}
-				memcpy(oldfullname+oldplen,de->d_name,36);
-				memcpy(fullname+plen,de->d_name,36);
-				fullname[plen-3]="0123456789ABCDEF"[(namechunkid>>4)&15];
-				fullname[plen-2]="0123456789ABCDEF"[namechunkid&15];
-				rename(oldfullname,fullname);
-			}
-			oldfullname[oldplen]='\0';
-			rmdir(oldfullname);
-			closedir(dd);
-		}
-		free(oldfullname);
-
-	}
-/* scan new file names */
-
-	tcheckcnt = 0;
-	lastperc = 0;
-	lasttime = time(NULL);
-	for (subf=0 ; subf<256 && scanterm==0 ; subf++) {
-		fullname[plen-3]="0123456789ABCDEF"[subf>>4];
-		fullname[plen-2]="0123456789ABCDEF"[subf&15];
-		fullname[plen]='\0';
-//		mkdir(fullname,0755);
-		dd = opendir(fullname);
-		if (dd) {
-			while (readdir_r(dd,destorage,&de)==0 && de!=NULL && scanterm==0) {
-//#warning debug
-//				portable_usleep(100000);
-//
-				if (hdd_check_filename(de->d_name,&namechunkid,&nameversion)<0) {
-					continue;
-				}
-				memcpy(fullname+plen,de->d_name,36);
-				hdd_add_chunk(f,fullname,namechunkid,nameversion,todel);
-				tcheckcnt++;
-				if (tcheckcnt>=1000) {
-					zassert(pthread_mutex_lock(&folderlock));
-					if (f->scanstate==SCST_SCANTERMINATE) {
-						scanterm = 1;
+			fullname[plen]='\0';
+	//		mkdir(fullname,0755);
+			dd = opendir(fullname);
+			if (dd) {
+				while (readdir_r(dd,destorage,&de)==0 && de!=NULL && scanterm==0) {
+	//#warning debug
+	//				portable_usleep(100000);
+	//
+					if (hdd_check_filename(de->d_name,&namechunkid,&nameversion)<0) {
+						continue;
 					}
-					zassert(pthread_mutex_unlock(&folderlock));
-					// portable_usleep(100000); - slow down scanning (also change 1000 in 'if' to something much smaller) - for tests
-					tcheckcnt = 0;
+					memcpy(fullname+plen,de->d_name,36);
+					hdd_add_chunk(f,fullname,namechunkid,nameversion,0xFFFF,todel);
+					tcheckcnt++;
+					if (tcheckcnt>=1000) {
+						zassert(pthread_mutex_lock(&folderlock));
+						if (f->scanstate==SCST_SCANTERMINATE) {
+							scanterm = 1;
+						}
+						zassert(pthread_mutex_unlock(&folderlock));
+						// portable_usleep(100000); - slow down scanning (also change 1000 in 'if' to something much smaller) - for tests
+						tcheckcnt = 0;
+					}
 				}
+				closedir(dd);
 			}
-			closedir(dd);
+			currenttime = time(NULL);
+			currentperc = ((subf*100.0)/256.0);
+			if (currentperc>lastperc && currenttime>lasttime) {
+				lastperc=currentperc;
+				lasttime=currenttime;
+				zassert(pthread_mutex_lock(&folderlock));
+				f->scanprogress = currentperc;
+				zassert(pthread_mutex_unlock(&folderlock));
+				zassert(pthread_mutex_lock(&dclock));
+				hddspacechanged = 1; // report chunk count to master
+				zassert(pthread_mutex_unlock(&dclock));
+				syslog(LOG_NOTICE,"scanning folder %s: %"PRIu8"%% (%"PRIu32"s)",f->path,lastperc,currenttime-begintime);
+			}
 		}
-		currenttime = time(NULL);
-		currentperc = ((subf*100.0)/256.0);
-		if (currentperc>lastperc && currenttime>lasttime) {
-			lastperc=currentperc;
-			lasttime=currenttime;
-			zassert(pthread_mutex_lock(&folderlock));
-			f->scanprogress = currentperc;
-			zassert(pthread_mutex_unlock(&folderlock));
-			zassert(pthread_mutex_lock(&dclock));
-			hddspacechanged = 1; // report chunk count to master
-			zassert(pthread_mutex_unlock(&dclock));
-			syslog(LOG_NOTICE,"scanning folder %s: %"PRIu8"%% (%"PRIu32"s)",f->path,lastperc,currenttime-begintime);
-		}
+		free(destorage);
 	}
 	free(fullname);
-	free(destorage);
 //	fprintf(stderr,"hdd space manager: %s: %"PRIu32" chunks found\n",f->path,f->chunkcount);
 
 	hdd_testshuffle(f);
@@ -4908,6 +5138,9 @@ void hdd_term(void) {
 		if (f->scanstate==SCST_SCANTERMINATE || f->scanstate==SCST_SCANFINISHED) {
 			i++;
 		}
+		if (f->scanstate==SCST_WORKING && f->toremove==0) {
+			hdd_folder_dump_chunkdb_begin(f);
+		}
 	}
 	zassert(pthread_mutex_unlock(&folderlock));
 //	syslog(LOG_NOTICE,"waiting for scanning threads (%"PRIu32")",i);
@@ -4917,7 +5150,7 @@ void hdd_term(void) {
 		for (f=folderhead ; f ; f=f->next) {
 			if (f->scanstate==SCST_SCANFINISHED) {
 				zassert(pthread_join(f->scanthread,NULL));
-				f->scanstate = SCST_WORKING;	// any state - to prevent calling pthread_join again
+				f->scanstate = SCST_SCANTERMINATE;	// any state - to prevent calling pthread_join again
 				i--;
 			}
 		}
@@ -4926,7 +5159,10 @@ void hdd_term(void) {
 	for (i=0 ; i<HASHSIZE ; i++) {
 		for (c=hashtab[i] ; c ; c=cn) {
 			cn = c->next;
-			if (c->state==CH_AVAIL) {
+			if (c->owner!=NULL) {
+				hdd_folder_dump_chunkdb_chunk(c->owner,c);
+			}
+			if (c->state==CH_AVAIL && c->owner!=NULL) {
 				if (c->crcchanged) {
 					syslog(LOG_WARNING,"hdd_term: CRC not flushed - writing now");
 					if (chunk_writecrc(c)!=STATUS_OK) {
@@ -4964,6 +5200,9 @@ void hdd_term(void) {
 	}
 	for (f=folderhead ; f ; f=fn) {
 		fn = f->next;
+		if (f->scanstate==SCST_WORKING && f->toremove==0) {
+			hdd_folder_dump_chunkdb_end(f);
+		}
 		if (f->lfd>=0) {
 			close(f->lfd);
 		}
@@ -5353,6 +5592,7 @@ int hdd_parseline(char *hddcfgline) {
 				f->chunktabsize = 0;
 				f->chunktab = NULL;
 				hdd_stats_clear(&(f->cstat));
+				hdd_stats_clear(&(f->monotonic));
 				for (l=0 ; l<STATSHISTORY ; l++) {
 					hdd_stats_clear(&(f->stats[l]));
 				}
@@ -5407,6 +5647,7 @@ int hdd_parseline(char *hddcfgline) {
 	f->chunktabsize = 0;
 	f->chunktab = NULL;
 	hdd_stats_clear(&(f->cstat));
+	hdd_stats_clear(&(f->monotonic));
 	for (l=0 ; l<STATSHISTORY ; l++) {
 		hdd_stats_clear(&(f->stats[l]));
 	}
@@ -5423,6 +5664,7 @@ int hdd_parseline(char *hddcfgline) {
 	f->devid = sb.st_dev;
 	f->lockinode = sb.st_ino;
 	f->lfd = lfd;
+	f->dumpfd = -1;
 	f->testhead = NULL;
 	f->testtail = &(f->testhead);
 //	f->carry = (double)(random()&0x7FFFFFFF)/(double)(0x7FFFFFFF);

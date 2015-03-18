@@ -144,7 +144,8 @@ void* sessions_find_session(uint32_t sessionid) {
 
 static inline void sessions_clean_session(session *sesdata) {
 //	filelist *fl,*afl;
-	of_sessionremoved(sesdata->sessionid);
+	of_session_removed(sesdata->sessionid);
+//	flock_session_removed(sesdata->sessionid);
 //	fl=sesdata->openedfiles;
 //	while (fl) {
 //		afl = fl;
@@ -816,6 +817,8 @@ static inline void* sessions_create_session(uint32_t rootinode,uint8_t sesflags,
 			memcpy(sesdata->info,info,ileng);
 			sesdata->info[ileng]=0;
 		}
+	} else {
+		sesdata->info = NULL;
 	}
 	sesdata->closed = 0;
 //	sesdata->openedfiles = NULL;
@@ -836,6 +839,42 @@ static inline void* sessions_create_session(uint32_t rootinode,uint8_t sesflags,
 	return sesdata;
 }
 
+static inline void sessions_change_session(session *sesdata,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const char *info,uint32_t ileng) {
+	sesdata->rootinode = rootinode;
+	sesdata->sesflags = (sesflags&(~SESFLAG_METARESTORE));
+	sesdata->rootuid = rootuid;
+	sesdata->rootgid = rootgid;
+	sesdata->mapalluid = mapalluid;
+	sesdata->mapallgid = mapallgid;
+	sesdata->mingoal = mingoal;
+	sesdata->maxgoal = maxgoal;
+	sesdata->mintrashtime = mintrashtime;
+	sesdata->maxtrashtime = maxtrashtime;
+	sesdata->peerip = peerip;
+	if (sesdata->info!=NULL) {
+		free(sesdata->info);
+	}
+	if (ileng>0) {
+		if (info[ileng-1]==0) {
+			sesdata->info = strdup(info);
+			passert(sesdata->info);
+		} else {
+			sesdata->info = malloc(ileng+1);
+			passert(sesdata->info);
+			memcpy(sesdata->info,info,ileng);
+			sesdata->info[ileng]=0;
+		}
+	} else {
+		sesdata->info = NULL;
+	}
+
+	if ((sesflags&SESFLAG_METARESTORE)==0) {
+		changelog("%" PRIu32 "|SESCHANGED(%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%s)",main_time(),sesdata->sessionid,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,changelog_escape_name(ileng,(uint8_t*)info));
+	} else {
+		meta_version_inc();
+	}
+}
+
 void* sessions_new_session(uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const char *info,uint32_t ileng) {
 	session *sesdata;
 	sesdata = sessions_create_session(rootinode,sesflags&(~SESFLAG_METARESTORE),rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
@@ -848,6 +887,21 @@ uint8_t sessions_mr_sesadd(uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,
 	if (sesdata->sessionid!=sessionid) {
 		return ERROR_MISMATCH;
 	}
+	return STATUS_OK;
+}
+
+void sessions_chg_session(void *vsesdata,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const char *info,uint32_t ileng) {
+	session *sesdata = (session*)vsesdata;
+	sessions_change_session(sesdata,rootinode,sesflags&(~SESFLAG_METARESTORE),rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
+}
+
+uint8_t sessions_mr_seschanged(uint32_t sessionid,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
+	session *sesdata;
+	sesdata = sessions_find_session(sessionid);
+	if (sesdata==NULL) {
+		return ERROR_MISMATCH;
+	}
+	sessions_change_session(sesdata,rootinode,sesflags|SESFLAG_METARESTORE,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,(const char*)info,ileng);
 	return STATUS_OK;
 }
 
@@ -990,19 +1044,19 @@ uint8_t sessions_is_root_remapped(void *vsesdata) {
 	return (sesdata->rootuid!=0)?1:0;
 }
 
-uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t goal) {
+uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t mingoal,uint8_t maxgoal) {
 	session *sesdata = (session*)vsesdata;
 	switch (smode) {
 		case SMODE_SET:
-			if (goal<sesdata->mingoal || goal>sesdata->maxgoal) {
+			if (mingoal<sesdata->mingoal || maxgoal>sesdata->maxgoal) {
 				return ERROR_EPERM;
 			}
 		case SMODE_INCREASE:
-			if (goal>sesdata->maxgoal) {
+			if (maxgoal>sesdata->maxgoal) {
 				return ERROR_EPERM;
 			}
 		case SMODE_DECREASE:
-			if (goal<sesdata->mingoal) {
+			if (mingoal<sesdata->mingoal) {
 				return ERROR_EPERM;
 			}
 	}

@@ -1,6 +1,6 @@
 sbin_PROGRAMS=mfsnetdump
 
-AM_CPPFLAGS=-I$(top_srcdir)/mfscommon -I$(top_srcdir)/mfsnetdump -I.
+AM_CPPFLAGS=-I$(top_srcdir)/mfscommon -I.
 
 mfsnetdump_SOURCES=\
 	mfsnetdump.c \

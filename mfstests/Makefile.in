@@ -90,7 +90,7 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 TESTS = mfstest_datapack$(EXEEXT) mfstest_clocks$(EXEEXT) \
-	mfstest_crc32$(EXEEXT)
+	mfstest_crc32$(EXEEXT) mfstest_delayrun$(EXEEXT)
 noinst_PROGRAMS = $(am__EXEEXT_1)
 subdir = mfstests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -106,7 +106,7 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__EXEEXT_1 = mfstest_datapack$(EXEEXT) mfstest_clocks$(EXEEXT) \
-	mfstest_crc32$(EXEEXT)
+	mfstest_crc32$(EXEEXT) mfstest_delayrun$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 am__dirstamp = $(am__leading_dot)dirstamp
 am_mfstest_clocks_OBJECTS = mfstest_clocks-mfstest_clocks.$(OBJEXT) \
@@ -136,6 +136,18 @@ mfstest_datapack_LDADD = $(LDADD)
 mfstest_datapack_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(mfstest_datapack_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
+am_mfstest_delayrun_OBJECTS =  \
+	mfstest_delayrun-mfstest_delayrun.$(OBJEXT) \
+	../mfscommon/mfstest_delayrun-delayrun.$(OBJEXT) \
+	../mfscommon/mfstest_delayrun-clocks.$(OBJEXT) \
+	../mfscommon/mfstest_delayrun-strerr.$(OBJEXT)
+mfstest_delayrun_OBJECTS = $(am_mfstest_delayrun_OBJECTS)
+am__DEPENDENCIES_1 =
+mfstest_delayrun_DEPENDENCIES = $(am__DEPENDENCIES_1)
+mfstest_delayrun_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(mfstest_delayrun_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -172,9 +184,9 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(mfstest_clocks_SOURCES) $(mfstest_crc32_SOURCES) \
-	$(mfstest_datapack_SOURCES)
+	$(mfstest_datapack_SOURCES) $(mfstest_delayrun_SOURCES)
 DIST_SOURCES = $(mfstest_clocks_SOURCES) $(mfstest_crc32_SOURCES) \
-	$(mfstest_datapack_SOURCES)
+	$(mfstest_datapack_SOURCES) $(mfstest_delayrun_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -584,6 +596,15 @@ mfstest_crc32_SOURCES = \
 	../mfscommon/clocks.h ../mfscommon/clocks.c
 
 mfstest_crc32_CFLAGS = 
+mfstest_delayrun_SOURCES = \
+	mfstest_delayrun.c mfstest.h \
+	../mfscommon/delayrun.h ../mfscommon/delayrun.c \
+	../mfscommon/clocks.h ../mfscommon/clocks.c \
+	../mfscommon/strerr.h ../mfscommon/strerr.c
+
+mfstest_delayrun_LDADD = $(PTHREAD_LIBS)
+mfstest_delayrun_CFLAGS = $(PTHREAD_CFLAGS) -D_USE_PTHREADS
+mfstest_delayrun_CPPFLAGS = $(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
 all: all-am
 
 .SUFFIXES:
@@ -653,6 +674,19 @@ mfstest_crc32$(EXEEXT): $(mfstest_crc32_OBJECTS) $(mfstest_crc32_DEPENDENCIES) $
 mfstest_datapack$(EXEEXT): $(mfstest_datapack_OBJECTS) $(mfstest_datapack_DEPENDENCIES) $(EXTRA_mfstest_datapack_DEPENDENCIES) 
 	@rm -f mfstest_datapack$(EXEEXT)
 	$(AM_V_CCLD)$(mfstest_datapack_LINK) $(mfstest_datapack_OBJECTS) $(mfstest_datapack_LDADD) $(LIBS)
+../mfscommon/mfstest_delayrun-delayrun.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfstest_delayrun-clocks.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfstest_delayrun-strerr.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+
+mfstest_delayrun$(EXEEXT): $(mfstest_delayrun_OBJECTS) $(mfstest_delayrun_DEPENDENCIES) $(EXTRA_mfstest_delayrun_DEPENDENCIES) 
+	@rm -f mfstest_delayrun$(EXEEXT)
+	$(AM_V_CCLD)$(mfstest_delayrun_LINK) $(mfstest_delayrun_OBJECTS) $(mfstest_delayrun_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -664,9 +698,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstest_clocks-clocks.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstest_crc32-clocks.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstest_crc32-crc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstest_delayrun-clocks.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstest_delayrun-delayrun.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstest_delayrun-strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfstest_clocks-mfstest_clocks.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfstest_crc32-mfstest_crc32.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfstest_datapack-mfstest_datapack.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfstest_delayrun-mfstest_delayrun.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -775,6 +813,62 @@ mfstest_datapack-mfstest_datapack.obj: mfstest_datapack.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfstest_datapack.c' object='mfstest_datapack-mfstest_datapack.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfstest_datapack_CFLAGS) $(CFLAGS) -c -o mfstest_datapack-mfstest_datapack.obj `if test -f 'mfstest_datapack.c'; then $(CYGPATH_W) 'mfstest_datapack.c'; else $(CYGPATH_W) '$(srcdir)/mfstest_datapack.c'; fi`
+
+mfstest_delayrun-mfstest_delayrun.o: mfstest_delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -MT mfstest_delayrun-mfstest_delayrun.o -MD -MP -MF $(DEPDIR)/mfstest_delayrun-mfstest_delayrun.Tpo -c -o mfstest_delayrun-mfstest_delayrun.o `test -f 'mfstest_delayrun.c' || echo '$(srcdir)/'`mfstest_delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfstest_delayrun-mfstest_delayrun.Tpo $(DEPDIR)/mfstest_delayrun-mfstest_delayrun.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfstest_delayrun.c' object='mfstest_delayrun-mfstest_delayrun.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -c -o mfstest_delayrun-mfstest_delayrun.o `test -f 'mfstest_delayrun.c' || echo '$(srcdir)/'`mfstest_delayrun.c
+
+mfstest_delayrun-mfstest_delayrun.obj: mfstest_delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -MT mfstest_delayrun-mfstest_delayrun.obj -MD -MP -MF $(DEPDIR)/mfstest_delayrun-mfstest_delayrun.Tpo -c -o mfstest_delayrun-mfstest_delayrun.obj `if test -f 'mfstest_delayrun.c'; then $(CYGPATH_W) 'mfstest_delayrun.c'; else $(CYGPATH_W) '$(srcdir)/mfstest_delayrun.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfstest_delayrun-mfstest_delayrun.Tpo $(DEPDIR)/mfstest_delayrun-mfstest_delayrun.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfstest_delayrun.c' object='mfstest_delayrun-mfstest_delayrun.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -c -o mfstest_delayrun-mfstest_delayrun.obj `if test -f 'mfstest_delayrun.c'; then $(CYGPATH_W) 'mfstest_delayrun.c'; else $(CYGPATH_W) '$(srcdir)/mfstest_delayrun.c'; fi`
+
+../mfscommon/mfstest_delayrun-delayrun.o: ../mfscommon/delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfstest_delayrun-delayrun.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfstest_delayrun-delayrun.Tpo -c -o ../mfscommon/mfstest_delayrun-delayrun.o `test -f '../mfscommon/delayrun.c' || echo '$(srcdir)/'`../mfscommon/delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfstest_delayrun-delayrun.Tpo ../mfscommon/$(DEPDIR)/mfstest_delayrun-delayrun.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/delayrun.c' object='../mfscommon/mfstest_delayrun-delayrun.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfstest_delayrun-delayrun.o `test -f '../mfscommon/delayrun.c' || echo '$(srcdir)/'`../mfscommon/delayrun.c
+
+../mfscommon/mfstest_delayrun-delayrun.obj: ../mfscommon/delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfstest_delayrun-delayrun.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfstest_delayrun-delayrun.Tpo -c -o ../mfscommon/mfstest_delayrun-delayrun.obj `if test -f '../mfscommon/delayrun.c'; then $(CYGPATH_W) '../mfscommon/delayrun.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/delayrun.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfstest_delayrun-delayrun.Tpo ../mfscommon/$(DEPDIR)/mfstest_delayrun-delayrun.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/delayrun.c' object='../mfscommon/mfstest_delayrun-delayrun.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfstest_delayrun-delayrun.obj `if test -f '../mfscommon/delayrun.c'; then $(CYGPATH_W) '../mfscommon/delayrun.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/delayrun.c'; fi`
+
+../mfscommon/mfstest_delayrun-clocks.o: ../mfscommon/clocks.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfstest_delayrun-clocks.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfstest_delayrun-clocks.Tpo -c -o ../mfscommon/mfstest_delayrun-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfstest_delayrun-clocks.Tpo ../mfscommon/$(DEPDIR)/mfstest_delayrun-clocks.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/clocks.c' object='../mfscommon/mfstest_delayrun-clocks.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfstest_delayrun-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
+
+../mfscommon/mfstest_delayrun-clocks.obj: ../mfscommon/clocks.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfstest_delayrun-clocks.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfstest_delayrun-clocks.Tpo -c -o ../mfscommon/mfstest_delayrun-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfstest_delayrun-clocks.Tpo ../mfscommon/$(DEPDIR)/mfstest_delayrun-clocks.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/clocks.c' object='../mfscommon/mfstest_delayrun-clocks.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfstest_delayrun-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
+
+../mfscommon/mfstest_delayrun-strerr.o: ../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfstest_delayrun-strerr.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfstest_delayrun-strerr.Tpo -c -o ../mfscommon/mfstest_delayrun-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfstest_delayrun-strerr.Tpo ../mfscommon/$(DEPDIR)/mfstest_delayrun-strerr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/mfstest_delayrun-strerr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfstest_delayrun-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+
+../mfscommon/mfstest_delayrun-strerr.obj: ../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfstest_delayrun-strerr.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfstest_delayrun-strerr.Tpo -c -o ../mfscommon/mfstest_delayrun-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfstest_delayrun-strerr.Tpo ../mfscommon/$(DEPDIR)/mfstest_delayrun-strerr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/mfstest_delayrun-strerr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfstest_delayrun_CPPFLAGS) $(CPPFLAGS) $(mfstest_delayrun_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfstest_delayrun-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -992,6 +1086,13 @@ mfstest_clocks.log: mfstest_clocks$(EXEEXT)
 mfstest_crc32.log: mfstest_crc32$(EXEEXT)
 	@p='mfstest_crc32$(EXEEXT)'; \
 	b='mfstest_crc32'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+mfstest_delayrun.log: mfstest_delayrun$(EXEEXT)
+	@p='mfstest_delayrun$(EXEEXT)'; \
+	b='mfstest_delayrun'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

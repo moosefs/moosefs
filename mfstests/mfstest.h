@@ -21,6 +21,7 @@
 #ifndef _MFSTEST_H_
 #define _MFSTEST_H_
 
+#include <stdio.h>
 #include <inttypes.h>
 
 #define STR_AUX(x) #x

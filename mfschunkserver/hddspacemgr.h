@@ -39,10 +39,10 @@ void hdd_get_lost_chunk_data(uint8_t *buff,uint32_t limit);
 uint32_t hdd_get_new_chunk_count(uint32_t limit);
 void hdd_get_new_chunk_data(uint8_t *buff,uint32_t limit);
 /* lock/unlock pair */
-uint32_t hdd_diskinfo_v1_size();
-void hdd_diskinfo_v1_data(uint8_t *buff);
-uint32_t hdd_diskinfo_v2_size();
-void hdd_diskinfo_v2_data(uint8_t *buff);
+uint32_t hdd_diskinfo_size(void);
+void hdd_diskinfo_data(uint8_t *buff);
+uint32_t hdd_diskinfo_monotonic_size(void);
+void hdd_diskinfo_monotonic_data(uint8_t *buff);
 /* lock/unlock pair */
 void hdd_get_chunks_begin();
 void hdd_get_chunks_end();

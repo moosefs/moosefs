@@ -120,6 +120,7 @@ static pthread_t rpthid,npthid;
 static pthread_mutex_t fdlock,reclock,aflock;
 
 static uint32_t sessionid;
+static uint64_t metaid;
 static uint32_t masterversion;
 
 static char masterstrip[17];
@@ -593,7 +594,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 
 	for (cnt=0 ; cnt<maxretries ; cnt++) {
 		pthread_mutex_lock(&fdlock);
-		if (sessionlost) {
+		if (sessionlost==1) {
 			pthread_mutex_unlock(&fdlock);
 			return NULL;
 		}
@@ -660,7 +661,7 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 
 	for (cnt=0 ; cnt<maxretries ; cnt++) {
 		pthread_mutex_lock(&fdlock);
-		if (sessionlost) {
+		if (sessionlost==1) {
 			pthread_mutex_unlock(&fdlock);
 			return NULL;
 		}
@@ -793,6 +794,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint8_t mingoal,maxgoal;
 	uint32_t mintrashtime,maxtrashtime;
+	int32_t rleng;
 	const char *sesflagposstrtab[]={SESFLAG_POS_STRINGS};
 	const char *sesflagnegstrtab[]={SESFLAG_NEG_STRINGS};
 	struct passwd pwd,*pw;
@@ -804,15 +806,26 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 		return -1;
 	}
 
-	havepassword=(cargs->passworddigest==NULL)?0:1;
-	ileng=strlen(cargs->info)+1;
+	havepassword = (cargs->passworddigest==NULL)?0:1;
+	ileng = strlen(cargs->info)+1;
 	if (cargs->meta) {
-		pleng=0;
-		regbuff = malloc(8+64+9+ileng+16);
+		pleng = 0;
+		rleng = 9;
 	} else {
-		pleng=strlen(cargs->subfolder)+1;
-		regbuff = malloc(8+64+13+pleng+ileng+16);
+		pleng = strlen(cargs->subfolder)+1;
+		rleng = 13;
 	}
+	rleng += 8+64+pleng+ileng;
+	if (havepassword) {
+		rleng += 16;
+	}
+	if (sessionlost==2) {
+		rleng += 4;
+		if (metaid!=0) {
+			rleng += 8;
+		}
+	}
+	regbuff = malloc(rleng);
 
 	do {
 		fd = tcpsocket();
@@ -936,19 +949,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 		}
 		wptr = regbuff;
 		put32bit(&wptr,CLTOMA_FUSE_REGISTER);
-		if (cargs->meta) {
-			if (havepassword) {
-				put32bit(&wptr,64+9+ileng+16);
-			} else {
-				put32bit(&wptr,64+9+ileng);
-			}
-		} else {
-			if (havepassword) {
-				put32bit(&wptr,64+13+ileng+pleng+16);
-			} else {
-				put32bit(&wptr,64+13+ileng+pleng);
-			}
-		}
+		put32bit(&wptr,rleng-8);
 		memcpy(wptr,FUSE_REGISTER_BLOB_ACL,64);
 		wptr+=64;
 		put8bit(&wptr,(cargs->meta)?REGISTER_NEWMETASESSION:REGISTER_NEWSESSION);
@@ -961,11 +962,18 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 		if (!cargs->meta) {
 			put32bit(&wptr,pleng);
 			memcpy(wptr,cargs->subfolder,pleng);
+			wptr+=pleng;
+		}
+		if (sessionlost==2) {
+			put32bit(&wptr,sessionid);
+			if (metaid!=0) {
+				put64bit(&wptr,metaid);
+			}
 		}
 		if (havepassword) {
-			memcpy(wptr+pleng,digest,16);
+			memcpy(wptr,digest,16);
 		}
-		if (tcptowrite(fd,regbuff,8+64+(cargs->meta?9:13)+ileng+pleng+(havepassword?16:0),1000)!=(int32_t)(8+64+(cargs->meta?9:13)+ileng+pleng+(havepassword?16:0))) {
+		if (tcptowrite(fd,regbuff,rleng,1000)!=rleng) {
 			if (oninit) {
 				fprintf(stderr,"error sending data to mfsmaster: %s\n",strerr(errno));
 			} else {
@@ -1001,7 +1009,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 			return -1;
 		}
 		i = get32bit(&rptr);
-		if (!(i==1 || i==4 || (cargs->meta && (i==5 || i==9 || i==19)) || (cargs->meta==0 && (i==13 || i==21 || i==25 || i==35)))) {
+		if (!(i==1 || i==4 || (cargs->meta && (i==19 || i==27)) || (cargs->meta==0 && (i==35 || i==43)))) {
 			if (oninit) {
 				fprintf(stderr,"got incorrect answer from mfsmaster\n");
 			} else {
@@ -1088,46 +1096,46 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 			}
 		}
 	} while (i==4);
-	if (i==9 || i==19 || i==25 || i==35) {
-		masterversion = get32bit(&rptr);
-//		dir_cache_master_switch((masterversion<VERSION2INT(1,6,21))?0:(masterversion<VERSION2INT(1,6,22))?1:2);
-	} else {
-		masterversion = 0;
-//		dir_cache_master_switch(0);
+	masterversion = get32bit(&rptr);
+	if (masterversion < VERSION2INT(2,1,7)) {
+		if (oninit) {
+			fprintf(stderr,"incompatible mfsmaster version\n");
+		} else {
+			syslog(LOG_WARNING,"incompatible mfsmaster version");
+		}
+		tcpclose(fd);
+		fd=-1;
+		free(regbuff);
+		return -1;
 	}
 	sessionid = get32bit(&rptr);
+	if ((cargs->meta && i==27) || (cargs->meta==0 && i==43)) {
+		metaid = get64bit(&rptr);
+	}
 	sesflags = get8bit(&rptr);
 	if (!cargs->meta) {
 		rootuid = get32bit(&rptr);
 		rootgid = get32bit(&rptr);
-		if (i>=21) {
-			mapalluid = get32bit(&rptr);
-			mapallgid = get32bit(&rptr);
-		} else {
-			mapalluid = 0;
-			mapallgid = 0;
-		}
+		mapalluid = get32bit(&rptr);
+		mapallgid = get32bit(&rptr);
 	} else {
 		rootuid = 0;
 		rootgid = 0;
 		mapalluid = 0;
 		mapallgid = 0;
 	}
-	if (i==19 || i==35) {
-		mingoal = get8bit(&rptr);
-		maxgoal = get8bit(&rptr);
-		mintrashtime = get32bit(&rptr);
-		maxtrashtime = get32bit(&rptr);
-	} else {
-		mingoal = 0;
-		maxgoal = 0;
-		mintrashtime = 0;
-		maxtrashtime = 0;
-	}
+	mingoal = get8bit(&rptr);
+	maxgoal = get8bit(&rptr);
+	mintrashtime = get32bit(&rptr);
+	maxtrashtime = get32bit(&rptr);
 	free(regbuff);
 	lastwrite=time(NULL);
 	if (oninit==0) {
-		syslog(LOG_NOTICE,"registered to master with new session");
+		if (sessionlost==2) {
+			syslog(LOG_NOTICE,"registered to master using previous session");
+		} else {
+			syslog(LOG_NOTICE,"registered to master with new session");
+		}
 	}
 	if (cargs->clearpassword && cargs->passworddigest!=NULL) {
 		memset(cargs->passworddigest,0,16);
@@ -1245,7 +1253,8 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 void fs_reconnect() {
 	uint32_t newmasterip;
 	uint32_t i;
-	uint8_t *wptr,regbuff[8+64+9];
+	uint8_t *wptr,regbuff[8+64+17];
+	int32_t rleng;
 	const uint8_t *rptr;
 
 	if (sessionid==0) {
@@ -1281,7 +1290,13 @@ void fs_reconnect() {
 		master_stats_inc(MASTER_CONNECTS);
 		wptr = regbuff;
 		put32bit(&wptr,CLTOMA_FUSE_REGISTER);
-		put32bit(&wptr,73);
+		if (masterversion>=VERSION2INT(3,0,11) && metaid!=0) {
+			put32bit(&wptr,81);
+			rleng = 8+81;
+		} else {
+			put32bit(&wptr,73);
+			rleng = 8+73;
+		}
 		memcpy(wptr,FUSE_REGISTER_BLOB_ACL,64);
 		wptr+=64;
 		put8bit(&wptr,REGISTER_RECONNECT);
@@ -1289,13 +1304,14 @@ void fs_reconnect() {
 		put16bit(&wptr,VERSMAJ);
 		put8bit(&wptr,VERSMID);
 		put8bit(&wptr,VERSMIN);
-		if (tcptowrite(fd,regbuff,8+64+9,1000)!=8+64+9) {
+		put64bit(&wptr,metaid);
+		if (tcptowrite(fd,regbuff,rleng,1000)!=rleng) {
 			syslog(LOG_WARNING,"master: register error (write: %s)",strerr(errno));
 			tcpclose(fd);
 			fd=-1;
 			return;
 		}
-		master_stats_add(MASTER_BYTESSENT,16+64);
+		master_stats_add(MASTER_BYTESSENT,rleng);
 		master_stats_inc(MASTER_PACKETSSENT);
 		if (tcptoread(fd,regbuff,8,1000)!=8) {
 			syslog(LOG_WARNING,"master: register error (read header: %s)",strerr(errno));
@@ -1354,7 +1370,7 @@ void fs_reconnect() {
 		}
 	} while (i==4);
 	if (rptr[0]!=0) {
-		sessionlost=1;
+		sessionlost=(rptr[0]==ERROR_EPERM)?2:1;
 		syslog(LOG_WARNING,"master: register status: %s",mfs_strerror(rptr[0]));
 		tcpclose(fd);
 		fd=-1;
@@ -1365,7 +1381,8 @@ void fs_reconnect() {
 }
 
 void fs_close_session(void) {
-	uint8_t *wptr,regbuff[8+64+5];
+	uint8_t *wptr,regbuff[8+64+5+8];
+	int32_t rleng;
 
 	if (sessionid==0) {
 		return;
@@ -1373,17 +1390,26 @@ void fs_close_session(void) {
 
 	wptr = regbuff;
 	put32bit(&wptr,CLTOMA_FUSE_REGISTER);
-	put32bit(&wptr,69);
+	if (masterversion>=VERSION2INT(3,0,11) && metaid!=0) {
+		put32bit(&wptr,77);
+		rleng = 8+77;
+	} else {
+		put32bit(&wptr,69);
+		rleng = 8+69;
+	}
 	memcpy(wptr,FUSE_REGISTER_BLOB_ACL,64);
 	wptr+=64;
 	put8bit(&wptr,REGISTER_CLOSESESSION);
 	put32bit(&wptr,sessionid);
-	if (tcptowrite(fd,regbuff,8+64+5,1000)!=8+64+5) {
+	put64bit(&wptr,metaid);
+	if (tcptowrite(fd,regbuff,rleng,1000)!=rleng) {
 		syslog(LOG_WARNING,"master: close session error (write: %s)",strerr(errno));
 	}
 	if (masterversion>=VERSION2INT(1,7,29)) {
 		if (tcptoread(fd,regbuff,9,500)!=9) {
 			syslog(LOG_WARNING,"master: close session error (read: %s)",strerr(errno));
+		} else if (regbuff[8]!=0) {
+			syslog(LOG_NOTICE,"master: closes session error: %s",mfs_strerror(regbuff[8]));
 		}
 	}
 }
@@ -1708,8 +1734,9 @@ int fs_init_master_connection(const char *bindhostname,const char *masterhostnam
 	master_statsptr_init();
 
 	fd = -1;
-	sessionlost = bgregister;
+	sessionlost = bgregister?1:0;
 	sessionid = 0;
+	metaid = 0;
 	disconnect = 0;
 	donotsendsustainedinodes = 0;
 
@@ -2877,7 +2904,7 @@ uint8_t fs_release(uint32_t inode) {
 }
 */
 
-uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
+uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -2887,12 +2914,19 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t *csdataver,uint64_t *l
 	*csdata = NULL;
 	*csdatasize = 0;
 
-	wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,8);
+	if (masterversion>VERSION2INT(3,0,3)) {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,9);
+	} else {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,8);
+	}
 	if (wptr==NULL) {
 		return ERROR_IO;
 	}
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
+	if (masterversion>VERSION2INT(3,0,3)) {
+		put8bit(&wptr,canmodatime);
+	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_READ_CHUNK,&i);
 	if (rptr==NULL) {
 		ret = ERROR_IO;
@@ -2901,7 +2935,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t *csdataver,uint64_t *l
 	} else {
 		if (i&1) {
 			*csdataver = get8bit(&rptr);
-			if (i<21 || ((i-21)%10)!=0) {
+			if (i<21 || ((*csdataver)==1 && ((i-21)%10)!=0) || ((*csdataver)==2 && ((i-21)%14)!=0)) {
 				ret = ERROR_IO;
 			} else {
 				*csdatasize = i-21;
@@ -2930,7 +2964,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t *csdataver,uint64_t *l
 	return ret;
 }
 
-uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
+uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -2940,12 +2974,19 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t *csdataver,uint64_t *
 	*csdata = NULL;
 	*csdatasize = 0;
 
-	wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK,8);
+	if (masterversion>VERSION2INT(3,0,3)) {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK,9);
+	} else {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK,8);
+	}
 	if (wptr==NULL) {
 		return ERROR_IO;
 	}
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
+	if (masterversion>VERSION2INT(3,0,3)) {
+		put8bit(&wptr,canmodmtime);
+	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_WRITE_CHUNK,&i);
 	if (rptr==NULL) {
 		ret = ERROR_IO;
@@ -2954,7 +2995,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t *csdataver,uint64_t *
 	} else {
 		if (i&1) {
 			*csdataver = get8bit(&rptr);
-			if (i<21 || ((i-21)%10)!=0) {
+			if (i<21 || ((*csdataver)==1 && ((i-21)%10)!=0) || ((*csdataver)==2 && ((i-21)%14)!=0)) {
 				ret = ERROR_IO;
 			} else {
 				*csdatasize = i-21;
@@ -2983,19 +3024,26 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t *csdataver,uint64_t *
 	return ret;
 }
 
-uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length) {
+uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t canmodmtime) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
 	uint8_t ret;
 	threc *rec = fs_get_my_threc();
-	wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK_END,20);
+	if (masterversion>VERSION2INT(3,0,3)) {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK_END,21);
+	} else {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK_END,20);
+	}
 	if (wptr==NULL) {
 		return ERROR_IO;
 	}
 	put64bit(&wptr,chunkid);
 	put32bit(&wptr,inode);
 	put64bit(&wptr,length);
+	if (masterversion>VERSION2INT(3,0,3)) {
+		put8bit(&wptr,canmodmtime);
+	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_WRITE_CHUNK_END,&i);
 	if (rptr==NULL) {
 		ret = ERROR_IO;
@@ -3010,6 +3058,99 @@ uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length) {
 	return ret;
 }
 
+uint8_t fs_flock(uint32_t inode,uint32_t reqid,uint64_t owner,uint8_t cmd) {
+	uint8_t *wptr;
+	const uint8_t *rptr;
+	uint32_t i;
+	uint8_t ret;
+	threc *rec = fs_get_my_threc();
+	wptr = fs_createpacket(rec,CLTOMA_FUSE_FLOCK,17);
+	if (wptr==NULL) {
+		return ERROR_IO;
+	}
+	put32bit(&wptr,inode);
+	put32bit(&wptr,reqid);
+	put64bit(&wptr,owner);
+	put8bit(&wptr,cmd);
+	rptr = fs_sendandreceive(rec,MATOCL_FUSE_FLOCK,&i);
+	if (rptr==NULL) {
+		ret = ERROR_IO;
+	} else if (i==1) {
+		ret = rptr[0];
+	} else {
+		pthread_mutex_lock(&fdlock);
+		disconnect = 1;
+		pthread_mutex_unlock(&fdlock);
+		ret = ERROR_IO;
+	}
+	return ret;
+}
+
+uint8_t fs_posixlock(uint32_t inode,uint32_t reqid,uint64_t owner,uint8_t cmd,uint8_t type,uint64_t start,uint64_t end,uint32_t pid,uint8_t *rtype,uint64_t *rstart,uint64_t *rend,uint32_t *rpid) {
+	uint8_t *wptr;
+	const uint8_t *rptr;
+	uint32_t i;
+	uint8_t ret;
+	threc *rec = fs_get_my_threc();
+	wptr = fs_createpacket(rec,CLTOMA_FUSE_POSIX_LOCK,38);
+	if (wptr==NULL) {
+		return ERROR_IO;
+	}
+	put32bit(&wptr,inode);
+	put32bit(&wptr,reqid);
+	put64bit(&wptr,owner);
+	put32bit(&wptr,pid);
+	put8bit(&wptr,cmd);
+	put8bit(&wptr,type);
+	put64bit(&wptr,start);
+	put64bit(&wptr,end);
+	rptr = fs_sendandreceive(rec,MATOCL_FUSE_POSIX_LOCK,&i);
+	if (rtype!=NULL) {
+		*rtype = POSIX_LOCK_UNLCK;
+	}
+	if (rstart!=NULL) {
+		*rstart = 0;
+	}
+	if (rend!=NULL) {
+		*rend = 0;
+	}
+	if (rpid!=NULL) {
+		*rpid = 0;
+	}
+	if (rptr==NULL) {
+		ret = ERROR_IO;
+	} else if (i==1) {
+		ret = rptr[0];
+	} else if (i==21) {
+		if (rpid!=NULL) {
+			*rpid = get32bit(&rptr);
+		} else {
+			rptr += 4;
+		}
+		if (rtype!=NULL) {
+			*rtype = get8bit(&rptr);
+		} else {
+			rptr++;
+		}
+		if (rstart!=NULL) {
+			*rstart = get64bit(&rptr);
+		} else {
+			rptr += 8;
+		}
+		if (rend!=NULL) {
+			*rend = get64bit(&rptr);
+		} else {
+			rptr += 8;
+		}
+		ret = STATUS_OK;
+	} else {
+		pthread_mutex_lock(&fdlock);
+		disconnect = 1;
+		pthread_mutex_unlock(&fdlock);
+		ret = ERROR_IO;
+	}
+	return ret;
+}
 
 // FUSE - META
 

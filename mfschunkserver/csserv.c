@@ -199,8 +199,12 @@ void csserv_idlejob_finished(uint8_t status,void *ijp) {
 				ptr = csserv_create_packet(eptr,CSTOAN_CHUNK_BLOCKS,8+4+2+1);
 				put64bit(&ptr,ij->chunkid);
 				put32bit(&ptr,ij->version);
-				memcpy(ptr,ij->buff,2);
-				ptr+=2;
+				if (status==STATUS_OK) {
+					memcpy(ptr,ij->buff,2);
+					ptr+=2;
+				} else {
+					put16bit(&ptr,0);
+				}
 				put8bit(&ptr,status);
 				break;
 			case IJ_GET_CHUNK_CHECKSUM:
@@ -297,34 +301,19 @@ void csserv_get_chunk_checksum_tab(csserventry *eptr,const uint8_t *data,uint32_
 	ij->jobid = job_get_chunk_checksum_tab(csserv_idlejob_finished,ij,ij->chunkid,ij->version,ij->buff);
 }
 
-void csserv_hdd_list_v1(csserventry *eptr,const uint8_t *data,uint32_t length) {
+void csserv_hdd_list(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t l;
 	uint8_t *ptr;
 
 	(void)data;
 	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOCS_HDD_LIST(1) - wrong size (%"PRIu32"/0)",length);
+		syslog(LOG_NOTICE,"CLTOCS_HDD_LIST - wrong size (%"PRIu32"/0)",length);
 		eptr->state = CLOSE;
 		return;
 	}
-	l = hdd_diskinfo_v1_size();	// lock
-	ptr = csserv_create_packet(eptr,CSTOCL_HDD_LIST_V1,l);
-	hdd_diskinfo_v1_data(ptr);	// unlock
-}
-
-void csserv_hdd_list_v2(csserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t l;
-	uint8_t *ptr;
-
-	(void)data;
-	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOCS_HDD_LIST(2) - wrong size (%"PRIu32"/0)",length);
-		eptr->state = CLOSE;
-		return;
-	}
-	l = hdd_diskinfo_v2_size();	// lock
-	ptr = csserv_create_packet(eptr,CSTOCL_HDD_LIST_V2,l);
-	hdd_diskinfo_v2_data(ptr);	// unlock
+	l = hdd_diskinfo_size();	// lock
+	ptr = csserv_create_packet(eptr,CSTOCL_HDD_LIST,l);
+	hdd_diskinfo_data(ptr);	// unlock
 }
 
 void csserv_chart(csserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -370,11 +359,32 @@ void csserv_chart_data(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	} else {
 		maxentries = UINT32_C(0xFFFFFFFF);
 	}
-	l = charts_datasize(chartid,maxentries);
+	l = charts_makedata(NULL,chartid,maxentries);
 	ptr = csserv_create_packet(eptr,ANTOCL_CHART_DATA,l);
 	if (l>0) {
 		charts_makedata(ptr,chartid,maxentries);
 	}
+}
+
+void csserv_monotonic_data(csserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t *ptr;
+	uint32_t l;
+	uint32_t dil;
+
+	(void)data;
+	if (length!=0) {
+		syslog(LOG_NOTICE,"CLTOAN_MONOTONIC_DATA - wrong size (%"PRIu32"/0)",length);
+		eptr->state = CLOSE;
+		return;
+	}
+	l = charts_monotonic_data(NULL);
+	dil = hdd_diskinfo_monotonic_size();
+	ptr = csserv_create_packet(eptr,ANTOCL_MONOTONIC_DATA,l+dil);
+	if (l>0) {
+		charts_monotonic_data(ptr);
+		ptr += l;
+	}
+	hdd_diskinfo_monotonic_data(ptr);
 }
 
 void csserv_module_info(csserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -445,17 +455,17 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 		case ANTOCS_GET_CHUNK_CHECKSUM_TAB:
 			csserv_get_chunk_checksum_tab(eptr,data,length);
 			break;
-		case CLTOCS_HDD_LIST_V1:
-			csserv_hdd_list_v1(eptr,data,length);
-			break;
-		case CLTOCS_HDD_LIST_V2:
-			csserv_hdd_list_v2(eptr,data,length);
+		case CLTOCS_HDD_LIST:
+			csserv_hdd_list(eptr,data,length);
 			break;
 		case CLTOAN_CHART:
 			csserv_chart(eptr,data,length);
 			break;
 		case CLTOAN_CHART_DATA:
 			csserv_chart_data(eptr,data,length);
+			break;
+		case CLTOAN_MONOTONIC_DATA:
+			csserv_monotonic_data(eptr,data,length);
 			break;
 		case CLTOAN_MODULE_INFO:
 			csserv_module_info(eptr,data,length);

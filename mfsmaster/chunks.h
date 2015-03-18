@@ -27,18 +27,8 @@
 
 #define MAXCSCOUNT 10000
 
-/*
-int chunk_create(uint64_t *chunkid,uint8_t goal);
-int chunk_duplicate(uint64_t *chunkid,uint64_t oldchunkid,uint8_t goal);
-int chunk_increase_version(uint64_t chunkid);
-int chunk_truncate(uint64_t chunkid,uint32_t length);
-int chunk_duptrunc(uint64_t *chunkid,uint64_t oldchunkid,uint32_t length,uint8_t goal);
-int chunk_reinitialize(uint64_t chunkid);
-
-void chunk_load_goal(void);
-*/
-int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal,uint8_t opflag);
-int chunk_mr_multi_truncate(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal);
+int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t opflag);
+int chunk_mr_multi_truncate(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid);
 //int chunk_multi_reinitialize(uint32_t ts,uint64_t chunkid);
 int chunk_mr_unlock(uint64_t chunkid);
 int chunk_mr_increase_version(uint64_t chunkid);
@@ -58,15 +48,19 @@ uint32_t chunk_count(void);
 void chunk_info(uint32_t *allchunks,uint32_t *allcopies,uint32_t *regcopies);
 uint8_t chunk_counters_in_progress(void);
 
-int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies);
+int chunk_get_archflag(uint64_t chunkid,uint8_t *archflag);
+int chunk_univ_archflag(uint64_t chunkid,uint8_t archflag,uint32_t *archflagchanged);
+int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies,uint8_t *goalcopies,uint8_t archflag,uint32_t *archflagchanged);
 
-int chunk_multi_modify(uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal,uint8_t *opflag);
-int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t goal);
+int chunk_multi_modify(uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag);
+int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid);
 //int chunk_multi_reinitialize(uint64_t chunkid);
-int chunk_repair(uint8_t goal,uint64_t ochunkid,uint32_t *nversion);
+int chunk_repair(uint8_t lsetid,uint64_t ochunkid,uint32_t *nversion);
+
+int chunk_locked_or_busy(void *cptr);
 
 /* ---- */
-uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip,uint32_t *version,uint8_t *count,uint8_t cs_data[100*10]);
+uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip,uint32_t *version,uint8_t *count,uint8_t cs_data[100*14]);
 /* ---- */
 uint16_t chunk_server_connected(void *ptr);
 
@@ -88,11 +82,13 @@ void chunk_got_truncate_status(uint16_t csid,uint64_t chunkid,uint8_t status);
 void chunk_got_duptrunc_status(uint16_t csid,uint64_t chunkid,uint8_t status);
 
 /* ---- */
+uint8_t chunk_labelset_can_be_fulfilled(uint8_t labelcnt,uint32_t **labelmasks);
+
 uint8_t chunk_no_more_pending_jobs(void);
 
-int chunk_change_file(uint64_t chunkid,uint8_t prevgoal,uint8_t newgoal);
-int chunk_delete_file(uint64_t chunkid,uint8_t goal);
-int chunk_add_file(uint64_t chunkid,uint8_t goal);
+int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid);
+int chunk_delete_file(uint64_t chunkid,uint8_t lsetid);
+int chunk_add_file(uint64_t chunkid,uint8_t lsetid);
 int chunk_unlock(uint64_t chunkid);
 
 void chunk_get_memusage(uint64_t allocated[3],uint64_t used[3]);

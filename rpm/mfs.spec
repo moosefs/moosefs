@@ -20,7 +20,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	2.0.60
+Version:	3.0.11
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -331,18 +331,22 @@ exit 0
 %attr(755,root,root) %{_bindir}/mfsmakesnapshot
 %attr(755,root,root) %{_bindir}/mfsgetgoal
 %attr(755,root,root) %{_bindir}/mfssetgoal
+%attr(755,root,root) %{_bindir}/mfscopygoal
 %attr(755,root,root) %{_bindir}/mfsrgetgoal
 %attr(755,root,root) %{_bindir}/mfsrsetgoal
 %attr(755,root,root) %{_bindir}/mfsgettrashtime
 %attr(755,root,root) %{_bindir}/mfssettrashtime
+%attr(755,root,root) %{_bindir}/mfscopytrashtime
 %attr(755,root,root) %{_bindir}/mfsrgettrashtime
 %attr(755,root,root) %{_bindir}/mfsrsettrashtime
 %attr(755,root,root) %{_bindir}/mfsgeteattr
 %attr(755,root,root) %{_bindir}/mfsseteattr
 %attr(755,root,root) %{_bindir}/mfsdeleattr
+%attr(755,root,root) %{_bindir}/mfscopyeattr
 %attr(755,root,root) %{_bindir}/mfsgetquota
 %attr(755,root,root) %{_bindir}/mfssetquota
 %attr(755,root,root) %{_bindir}/mfsdelquota
+%attr(755,root,root) %{_bindir}/mfscopyquota
 %attr(755,root,root) %{_bindir}/mfsfilepaths
 %attr(755,root,root) %{_bindir}/mfssnapshot
 %attr(755,root,root) %{_bindir}/mfstools
@@ -355,18 +359,22 @@ exit 0
 %{_mandir}/man1/mfsmakesnapshot.1*
 %{_mandir}/man1/mfsgetgoal.1*
 %{_mandir}/man1/mfssetgoal.1*
+%{_mandir}/man1/mfscopygoal.1*
 %{_mandir}/man1/mfsrgetgoal.1*
 %{_mandir}/man1/mfsrsetgoal.1*
 %{_mandir}/man1/mfsgettrashtime.1*
 %{_mandir}/man1/mfssettrashtime.1*
+%{_mandir}/man1/mfscopytrashtime.1*
 %{_mandir}/man1/mfsrgettrashtime.1*
 %{_mandir}/man1/mfsrsettrashtime.1*
 %{_mandir}/man1/mfsgeteattr.1*
 %{_mandir}/man1/mfsseteattr.1*
 %{_mandir}/man1/mfsdeleattr.1*
+%{_mandir}/man1/mfscopyeattr.1*
 %{_mandir}/man1/mfsgetquota.1*
 %{_mandir}/man1/mfssetquota.1*
 %{_mandir}/man1/mfsdelquota.1*
+%{_mandir}/man1/mfscopyquota.1*
 %{_mandir}/man1/mfsfilepaths.1*
 %{_mandir}/man1/mfstools.1*
 %{_mandir}/man8/mfsmount.8*

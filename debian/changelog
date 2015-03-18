@@ -1,59 +1,113 @@
-moosefs (2.0.60-1) unstable; urgency=medium
+moosefs (3.0.11-1) unstable; urgency=medium
 
   * (all) changed license of standard version to GPLv2
   * (all) changed name moosefs-ce to just moosefs
 
  -- MooseFS Team <contact@moosefs.com>  Wed, 18 Mar 2015 12:00:00 +0100
 
-moosefs (2.0.54-1) unstable; urgency=medium
-
-  * (mount) fixed network timeouts in master-mount connection module.
-
- -- MooseFS Team <contact@moosefs.com>  Wed, 11 Mar 2015 12:00:00 +0100
-
-moosefs (2.0.53-1) unstable; urgency=medium
+moosefs (3.0.10-1) unstable; urgency=medium
 
   * (master) fixed possible reference to freed memory during metadata recovery
   * (master) added minimal priority queue length
   * (cs) fixed removing damaged disks (lock file issue)
   * (master) treat servers in maintenance mode as overloaded (no chunk
     creations, replications etc.)
+  * (master+tools) added tools for manipulating archive flag
+  * (master+mount) added prefered labels for I/O
+  * (master) added option for setting length of chunks priority queues
 
  -- MooseFS Team <contact@moosefs.com>  Tue, 10 Mar 2015 12:00:00 +0100
 
-moosefs (2.0.52-1) unstable; urgency=medium
+moosefs (3.0.9-1) unstable; urgency=medium
 
-  * (master) added option for setting length of chunks priority queues
+  * (all) added separated goal for "create", "keep" and "archive"
+  * (all) added "create mode" (loose/standard/strict)
+  * (master) fixed check for ENOSPC condition
+  * (mount) added "chunkready" condition before close (alternative to full
+    fsync)
 
- -- MooseFS Team <contact@moosefs.com>  Wed, 04 Mar 2015 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Thu, 19 Feb 2015 12:00:00 +0100
 
-moosefs (2.0.51-1) unstable; urgency=medium
-
-  * (master+cgi+cli) added quota-licences (pro version only)
-
- -- MooseFS Team <contact@moosefs.com>  Thu, 26 Feb 2015 12:00:00 +0100
-
-moosefs (2.0.50-1) unstable; urgency=medium
+moosefs (3.0.8-1) unstable; urgency=medium
 
   * (master) fixed descriptor leak
+  * (mount) new delayed ops scheduler
 
- -- MooseFS Team <contact@moosefs.com>  Tue, 10 Feb 2015 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Wed, 11 Feb 2015 12:00:00 +0100
 
-moosefs (2.0.49-1) unstable; urgency=medium
+moosefs (3.0.7-1) unstable; urgency=medium
+
+  * (cs+master) added heavy-loaded status
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 06 Feb 2015 12:00:00 +0100
+
+moosefs (3.0.6-1) unstable; urgency=medium
+
+  * (master) removed chunk preallocation
+  * (master) added write-in-progress counters
+  * (master) added experimental "new chunk" algorithm
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 05 Feb 2015 12:00:00 +0100
+
+moosefs (3.0.5-1) unstable; urgency=medium
+
+  * (master) changed preallocation algorithm
+  * (all) changed assert macros (added source file and line number to syslog
+    msg)
+  * (mount) made fsync before close optional (added option mfsfsyncbeforeclose)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 03 Feb 2015 12:00:00 +0100
+
+moosefs (3.0.4-1) unstable; urgency=medium
 
   * (cs) made fsync before close optional
   * (all) added missing options to manpages
+  * (mount+master) changed atime/mtime setattr handling (avoid fsync on mtime
+    change)
 
  -- MooseFS Team <contact@moosefs.com>  Mon, 02 Feb 2015 12:00:00 +0100
 
-moosefs (2.0.48-1) unstable; urgency=medium
+moosefs (3.0.3-1) unstable; urgency=medium
 
+  * (cs) disabled Nagle's algorithm in mainserv and replicator
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 30 Jan 2015 12:00:00 +0100
+
+moosefs (3.0.2-1) unstable; urgency=medium
+
+  * (master) added experimental functions in preallocation
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 29 Jan 2015 12:00:00 +0100
+
+moosefs (3.0.1-1) unstable; urgency=medium
+
+  * (master) changed preallocation formula
+  * (master) changed choosing privlileged servers for rebalance replication
+  * (cs) added new xor-replication
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 28 Jan 2015 12:00:00 +0100
+
+moosefs (3.0.0-1) unstable; urgency=medium
+
+  * (master+mount) fixed small posix incompatibility (utime with NULL arg)
+  * (all) change version to 3.0
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 22 Jan 2015 12:00:00 +0100
+
+moosefs (2.1.12-1) unstable; urgency=medium
+
+  * (master+cs) monotonic chart counters
   * (cs) fixed error handling in writing data (mainserv)
-  * (mount) fixed error handling bug in writing data module
 
- -- MooseFS Team <contact@moosefs.com>  Wed, 14 Jan 2015 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Tue, 13 Jan 2015 12:00:00 +0100
 
-moosefs (2.0.47-1) unstable; urgency=medium
+moosefs (2.1.11-1) unstable; urgency=medium
+
+  * (master) better state switching (pro version only)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 12 Jan 2015 12:00:00 +0100
+
+moosefs (2.1.10-1) unstable; urgency=medium
 
   * (cs) fixed handling .metaid file
   * (cs) fixed showing incorrect I/O error messages
@@ -61,23 +115,94 @@ moosefs (2.0.47-1) unstable; urgency=medium
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 09 Jan 2015 12:00:00 +0100
 
-moosefs (2.0.46-1) unstable; urgency=medium
+moosefs (2.1.9-1) unstable; urgency=medium
 
   * (master) force rebalancing when some servers are almost full (regardless of
     undergoal priority queues)
+  * (master) fixed adding chunks to priority queues (when replication limits
+    are not reached then undergoal chunks shouldn't be added to queues)
   * (master) fixed potential double decreasing number of sockets in session
     data
 
  -- MooseFS Team <contact@moosefs.com>  Thu, 08 Jan 2015 12:00:00 +0100
 
-moosefs (2.0.45-1) unstable; urgency=medium
+moosefs (2.1.8-1) unstable; urgency=medium
 
+  * (master) fixed leader-follower synchronization issue (preallocated chunk
+    deletion - pro version only)
+  * (master) fixed setting goal to 9
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 07 Jan 2015 12:00:00 +0100
+
+moosefs (2.1.7-1) unstable; urgency=medium
+
+  * (master) fixed serious incompatibility with mounts 2.1+
+  * (master) added chunk preallocation
+  * (master) added deleting wrong versioned chunks that do not belong to any
+    file
   * (mount) fixed printed informations about mapall (thanks to Tom Ivar
     Helbekkmo)
   * (master) fixed rmdir mapall/maproot rights check (thanks to Tom Ivar
     Helbekkmo)
 
  -- MooseFS Team <contact@moosefs.com>  Wed, 24 Dec 2014 12:00:00 +0100
+
+moosefs (2.1.6-1) unstable; urgency=medium
+
+  * (master) added rollback after client disconnection
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 22 Dec 2014 12:00:00 +0100
+
+moosefs (2.1.5-1) unstable; urgency=medium
+
+  * (master) fixed algorithm responsible for choosing servers for new chunks
+  * (master) rollback changes when no chunkservers finished chunk ops (like
+    create,duplicate etc.)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 19 Dec 2014 12:00:00 +0100
+
+moosefs (2.1.4-1) unstable; urgency=medium
+
+  * (cgi+cli) added labelset tables
+  * (master) minor changes in replication algorithm
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 17 Dec 2014 12:00:00 +0100
+
+moosefs (2.1.3-1) unstable; urgency=medium
+
+  * (master) fixed replication algorithm (no replication for labeled chunks
+    when one or more servers are disconnected)
+  * (cgi+cli) fixed typo (number of column for disconnected chunkservers in cli
+    mode)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 15 Dec 2014 12:00:00 +0100
+
+moosefs (2.1.2-1) unstable; urgency=medium
+
+  * (master) added quota-licences (pro version only)
+  * (master) restrict label manipulations to mounts with 'admin' property in
+    exports file
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 12 Dec 2014 12:00:00 +0100
+
+moosefs (2.1.1-1) unstable; urgency=medium
+
+  * (tools) added tools for copying mfs attributes
+    (mfscopygoal,mfscopytrashtime,mfscopyeattr and mfscopyquota)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 10 Dec 2014 12:00:00 +0100
+
+moosefs (2.1.0-1) unstable; urgency=medium
+
+  * (mount+master) added support for global flock locks (Linux, kernel 3.8+,
+    libfuse 2.9+ only)
+  * (mount+master) added support for global posix locks (Linux only)
+  * (cgi+cli) added resources tab with open files and acquired locks
+  * (master) better 'wrong version' chunks handling
+  * (mount) changes in 'write' procedures (much faster random writes)
+  * (all) added support for labels (georeplication)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 04 Dec 2014 12:00:00 +0100
 
 moosefs (2.0.44-1) unstable; urgency=medium
 

@@ -117,6 +117,7 @@ typedef struct masterconn {
 	uint8_t masteraddrvalid;
 	uint8_t registerstate;
 	uint8_t new_register_mode;
+	uint8_t hlstatus;
 //	uint8_t accepted;
 } masterconn;
 
@@ -276,6 +277,33 @@ uint8_t* masterconn_create_attached_packet(masterconn *eptr,uint32_t type,uint32
 	return ptr;
 }
 
+static uint32_t labelmask = 0;
+
+void masterconn_parselabels(void) {
+	char *labelsstr,*p,c;
+
+	labelsstr = cfg_getstr("LABELS","");
+	labelmask = 0;
+
+	for (p=labelsstr ; *p ; p++) {
+		c = *p;
+		if (c>='A' && c<='Z') {
+			labelmask |= (1 << (c-'A'));
+		} else if (c>='a' && c<='z') {
+			labelmask |= (1 << (c-'a'));
+		}
+	}
+
+	free(labelsstr);
+}
+
+void masterconn_sendlabels(masterconn *eptr) {
+	uint8_t *buff;
+
+	buff = masterconn_create_attached_packet(eptr,CSTOMA_LABELS,4);
+	put32bit(&buff,labelmask);
+}
+
 void masterconn_sendregister(masterconn *eptr) {
 	uint8_t *buff;
 	uint32_t myip;
@@ -429,6 +457,9 @@ void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length)
 			if (eptr->registerstate == UNREGISTERED || eptr->registerstate == WAITING) {
 				hdd_get_chunks_begin(1);
 				eptr->registerstate = INPROGRESS;
+				if (eptr->masterversion>=VERSION2INT(2,1,0)) {
+					masterconn_sendlabels(eptr);
+				}
 			}
 			if (eptr->registerstate == INPROGRESS) {
 				masterconn_sendnextchunks(eptr);
@@ -556,6 +587,20 @@ void masterconn_send_error_occurred() {
 }
 */
 
+void masterconn_heavyload(uint32_t load,uint8_t hlstatus) {
+	masterconn *eptr = masterconnsingleton;
+	uint8_t *buff;
+
+	if (eptr->registerstate==REGISTERED && eptr->mode==DATA && eptr->masterversion>=VERSION2INT(3,0,7)) {
+		if (hlstatus != eptr->hlstatus) {
+			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);
+			put32bit(&buff,load);
+			put8bit(&buff,hlstatus);
+			eptr->hlstatus = hlstatus;
+		}
+	}
+}
+
 void masterconn_check_hdd_space() {
 	masterconn *eptr = masterconnsingleton;
 	uint8_t *buff;
@@ -616,8 +661,14 @@ void masterconn_reportload(void) {
 	uint8_t *buff;
 	if (eptr->mode==DATA && eptr->masterversion>=VERSION2INT(1,6,28) && eptr->registerstate==REGISTERED) {
 		load = job_getload();
-		buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,4);
-		put32bit(&buff,load);
+		if (eptr->masterversion>=VERSION2INT(3,0,7)) {
+			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);
+			put32bit(&buff,load);
+			put8bit(&buff,eptr->hlstatus);
+		} else {
+			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,4);
+			put32bit(&buff,load);
+		}
 	}
 }
 
@@ -824,11 +875,12 @@ void masterconn_replicate(masterconn *eptr,const uint8_t *data,uint32_t length) 
 	uint32_t version;
 	uint32_t ip;
 	uint16_t port;
+	uint32_t xormasks[4];
 	uint8_t *ptr;
 	void *packet;
 
-	if (length!=8+4+4+2 && (length<12+18 || length>12+18*100 || (length-12)%18!=0)) {
-		syslog(LOG_NOTICE,"MATOCS_REPLICATE - wrong size (%"PRIu32"/18|12+n*18[n:1..100])",length);
+	if (!(length==18 || (length>=28+18 && length<=28+8*18 && (length-28)%18==0))) {
+		syslog(LOG_NOTICE,"MATOCS_REPLICATE - wrong size (%"PRIu32"/18|12+n*18[n:1..100]|28+n*18[n:1..8])",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -844,7 +896,11 @@ void masterconn_replicate(masterconn *eptr,const uint8_t *data,uint32_t length) 
 //		syslog(LOG_NOTICE,"start job replication (%08"PRIX64":%04"PRIX32":%04"PRIX32":%02"PRIX16")",chunkid,version,ip,port);
 		job_replicate_simple(masterconn_replicationfinished,packet,chunkid,version,ip,port);
 	} else {
-		job_replicate(masterconn_replicationfinished,packet,chunkid,version,(length-12)/18,data);
+		xormasks[0] = get32bit(&data);
+		xormasks[1] = get32bit(&data);
+		xormasks[2] = get32bit(&data);
+		xormasks[3] = get32bit(&data);
+		job_replicate_raid(masterconn_replicationfinished,packet,chunkid,version,(length-28)/18,xormasks,data);
 	}
 }
 
@@ -1037,6 +1093,7 @@ void masterconn_connected(masterconn *eptr) {
 	eptr->outputtail = &(eptr->outputhead);
 	eptr->conncnt++;
 	eptr->masterversion = 0;
+	eptr->hlstatus = 0;
 	eptr->registerstate = UNREGISTERED;
 
 	masterconn_sendregister(eptr);
@@ -1520,6 +1577,7 @@ void masterconn_reload(void) {
 	}
 
 	main_time_change(reconnect_hook,ReconnectionDelay,0);
+	masterconn_parselabels();
 }
 
 int masterconn_init(void) {
@@ -1543,12 +1601,14 @@ int masterconn_init(void) {
 	if (Timeout<10 && Timeout>0) {
 		Timeout=10;
 	}
+	masterconn_parselabels();
 	eptr = masterconnsingleton = malloc(sizeof(masterconn));
 	passert(eptr);
 
 	eptr->masteraddrvalid = 0;
 	eptr->new_register_mode = 3;
 	eptr->masterversion = 0;
+	eptr->hlstatus = 0;
 	eptr->mode = FREE;
 	eptr->pdescpos = -1;
 	eptr->conncnt = 0;

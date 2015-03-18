@@ -43,6 +43,7 @@
 #include "mainserv.h"
 #include "hddspacemgr.h"
 #include "replicator.h"
+#include "masterconn.h"
 
 #define JHASHSIZE 0x400
 #define JHASHPOS(id) ((id)&0x3FF)
@@ -115,6 +116,7 @@ typedef struct _chunk_rw_args {
 typedef struct _chunk_rp_args {
 	uint64_t chunkid;
 	uint32_t version;
+	uint32_t xormasks[4];
 	uint8_t srccnt;
 } chunk_rp_args;
 
@@ -138,6 +140,8 @@ typedef struct _jobpool {
 	int rpipe,wpipe;
 	int32_t fdpdescpos;
 	uint32_t workers_max;
+	uint32_t workers_himark;
+	uint32_t workers_lomark;
 	uint32_t workers_max_idle;
 	uint32_t workers_avail;
 	uint32_t workers_total;
@@ -344,7 +348,7 @@ void* job_worker(void *arg) {
 				if (jstate==JSTATE_DISABLED) {
 					status = ERROR_NOTDONE;
 				} else {
-					status = replicate(rpargs->chunkid,rpargs->version,rpargs->srccnt,((uint8_t*)(jptr->args))+sizeof(chunk_rp_args));
+					status = replicate(rpargs->chunkid,rpargs->version,rpargs->xormasks,rpargs->srccnt,((uint8_t*)(jptr->args))+sizeof(chunk_rp_args));
 				}
 				break;
 			case OP_GETBLOCKS:
@@ -661,7 +665,7 @@ uint32_t job_serv_write(void (*callback)(uint8_t status,void *extra),void *extra
 	return job_new(jp,OP_SERV_WRITE,args,callback,extra);
 }
 
-uint32_t job_replicate(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint8_t srccnt,const uint8_t *srcs) {
+uint32_t job_replicate_raid(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint8_t srccnt,const uint32_t xormasks[4],const uint8_t *srcs) {
 	jobpool* jp = globalpool;
 	chunk_rp_args *args;
 	uint8_t *ptr;
@@ -672,6 +676,10 @@ uint32_t job_replicate(void (*callback)(uint8_t status,void *extra),void *extra,
 	args->chunkid = chunkid;
 	args->version = version;
 	args->srccnt = srccnt;
+	args->xormasks[0] = xormasks[0];
+	args->xormasks[1] = xormasks[1];
+	args->xormasks[2] = xormasks[2];
+	args->xormasks[3] = xormasks[3];
 	memcpy(ptr,srcs,srccnt*18);
 	return job_new(jp,OP_REPLICATE,args,callback,extra);
 }
@@ -687,6 +695,10 @@ uint32_t job_replicate_simple(void (*callback)(uint8_t status,void *extra),void 
 	args->chunkid = chunkid;
 	args->version = version;
 	args->srccnt = 1;
+	args->xormasks[0] = UINT32_C(0x88888888);
+	args->xormasks[1] = UINT32_C(0x44444444);
+	args->xormasks[2] = UINT32_C(0x22222222);
+	args->xormasks[3] = UINT32_C(0x11111111);
 	put64bit(&ptr,chunkid);
 	put32bit(&ptr,version);
 	put32bit(&ptr,ip);
@@ -753,6 +765,28 @@ void job_serve(struct pollfd *pdesc) {
 	}
 }
 
+void job_heavyload_test(void) {
+	jobpool* jp = globalpool;
+	uint8_t hlstatus = 0;
+	uint32_t load = 0; // make stupid gcc happy
+
+	zassert(pthread_mutex_lock(&(jp->jobslock)));
+	if (jp->workers_total - jp->workers_avail > jp->workers_himark) {
+		hlstatus = 2;
+	}
+	if (jp->workers_total - jp->workers_avail < jp->workers_lomark) {
+		hlstatus = 1;
+	}
+	if (hlstatus) {
+		load = (jp->workers_total - jp->workers_avail) + queue_elements(jp->jobqueue);
+	}
+	zassert(pthread_mutex_unlock(&(jp->jobslock)));
+
+	if (hlstatus) {
+		masterconn_heavyload(load,hlstatus);
+	}
+}
+
 void job_wantexit(void) {
 	exiting = 1;
 }
@@ -770,7 +804,9 @@ void job_reload(void) {
 
 	zassert(pthread_mutex_lock(&(jp->jobslock)));
 
-	jp->workers_max = cfg_getuint32("WORKERS_MAX",150);
+	jp->workers_max = cfg_getuint32("WORKERS_MAX",250);
+	jp->workers_himark = (jp->workers_max * 3) / 4;
+	jp->workers_lomark = (jp->workers_max * 2) / 4;
 	jp->workers_max_idle = cfg_getuint32("WORKERS_MAX_IDLE",40);
 
 	zassert(pthread_mutex_unlock(&(jp->jobslock)));
@@ -779,7 +815,7 @@ void job_reload(void) {
 int job_init(void) {
 //	globalpool = (jobpool*)malloc(sizeof(jobpool));
 	exiting = 0;
-	globalpool = job_pool_new(256);
+	globalpool = job_pool_new(cfg_getuint32("WORKERS_QUEUE_LENGTH",250)); // deprecated option
 
 	job_reload();
 
@@ -787,6 +823,7 @@ int job_init(void) {
 	main_wantexit_register(job_wantexit);
 	main_canexit_register(job_canexit);
 	main_reload_register(job_reload);
+	main_eachloop_register(job_heavyload_test);
 	main_poll_register(job_desc,job_serve);
 	return 0;
 }

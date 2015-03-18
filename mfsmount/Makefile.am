@@ -5,10 +5,11 @@ AM_CPPFLAGS=-I$(top_srcdir)/mfscommon
 
 
 mfsmount_LDADD=$(PTHREAD_LIBS) $(FUSE_LIBS)
-mfsmount_CFLAGS=$(PTHREAD_CFLAGS) -D_USE_PTHREADS $(FUSE_CFLAGS) -DFUSE_USE_VERSION=26 -DAPPNAME=mfsmount
+mfsmount_CFLAGS=$(PTHREAD_CFLAGS) -D_USE_PTHREADS $(FUSE_CFLAGS) -DFUSE_USE_VERSION=29 -DAPPNAME=mfsmount
 mfsmount_CPPFLAGS=$(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
 
 mfsmount_SOURCES=\
+	labelparser.c labelparser.h \
 	dirattrcache.c dirattrcache.h \
 	symlinkcache.c symlinkcache.h \
 	negentrycache.c negentrycache.h \
@@ -20,6 +21,7 @@ mfsmount_SOURCES=\
 	mastercomm.c mastercomm.h \
 	masterproxy.c masterproxy.h \
 	cscomm.c cscomm.h \
+	csorder.c csorder.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
 	csdb.c csdb.h \
@@ -27,6 +29,7 @@ mfsmount_SOURCES=\
 	oplog.c oplog.h \
 	main.c \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
+	../mfscommon/delayrun.c ../mfscommon/delayrun.h \
 	../mfscommon/pcqueue.c ../mfscommon/pcqueue.h \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/md5.c ../mfscommon/md5.h \
@@ -39,6 +42,7 @@ mfsmount_SOURCES=\
 
 mfstools_SOURCES=\
 	mfstools.c \
+	labelparser.c labelparser.h \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/sockets.c ../mfscommon/sockets.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
@@ -57,8 +61,9 @@ mfstools_links=\
 	mfscheckfile mfsdirinfo mfsfileinfo mfsfilerepair \
 	mfsgetgoal mfsgettrashtime mfsrgetgoal mfsrgettrashtime \
 	mfsrsetgoal mfsrsettrashtime mfssetgoal mfssettrashtime \
-	mfsgeteattr mfsseteattr mfsdeleattr \
-	mfsgetquota mfssetquota mfsdelquota \
+	mfscopygoal mfscopytrashtime \
+	mfsgeteattr mfsseteattr mfsdeleattr mfscopyeattr \
+	mfsgetquota mfssetquota mfsdelquota mfscopyquota \
 	mfsmakesnapshot mfsappendchunks mfsfilepaths
 
 install-exec-hook:

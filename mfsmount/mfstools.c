@@ -38,6 +38,7 @@
 #include <poll.h>
 #include <errno.h>
 
+#include "labelparser.h"
 #include "datapack.h"
 #include "strerr.h"
 #include "mfsstrerr.h"
@@ -852,6 +853,473 @@ int open_two_files_master_conn(const char *fname,const char *sname,uint32_t *fin
 }
 */
 
+#if 0
+
+#define LABELS_BUFF_SIZE ((((26+1)*MASKORGROUP)+5)*9)
+
+static inline char* make_label_expr(char *strbuff,uint8_t labelscnt,uint32_t labelmasks[9][MASKORGROUP]) {
+	uint8_t i,j;
+	char *p,c;
+
+	p = strbuff;
+	for (i=0 ; i<labelscnt ; i++) {
+		if (i>0) {
+			*p = ' ';
+			p++;
+			*p = ',';
+			p++;
+			*p = ' ';
+			p++;
+		}
+		*p = '[';
+		p++;
+		for (j=0 ; j<MASKORGROUP ; j++) {
+			if (labelmasks[i][j]==0) {
+				break;
+			}
+			if (j>0) {
+				*p = '+';
+				p++;
+			}
+			for (c='A' ; c<='Z' ; c++) {
+				if (labelmasks[i][j] & (1 << (c-'A'))) {
+					*p = c;
+					p++;
+				}
+			}
+		}
+		if (j==0) {
+			*p = '*';
+			p++;
+		}
+		*p = ']';
+		p++;
+	}
+	*p = '\0';
+	return strbuff;
+}
+
+/* grammar productions:
+ *	A -> [1-9] E ',' A | [1-9] E ';' A
+ *	E -> '*' | S
+ *	S -> S '+' M | S '|' M | S '||' M | M
+ *	M -> M '*' L | M '&' L | M '&&' L | M L | L
+ *	L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']'
+ */
+
+enum {
+	OR,
+	AND,
+	REF,
+	ANY,
+	SYM
+};
+
+typedef struct _node {
+	uint8_t op;
+	uint8_t val;
+	struct _node *arg1;
+	struct _node *arg2;
+} node;
+
+typedef struct _expr {
+	const char *str;
+	node *terms[9];
+	uint8_t erroroccured;
+} expr;
+
+
+static inline void expr_rfree(node *actnode) {
+	if (actnode!=NULL) {
+		if (actnode->op!=REF) {
+			expr_rfree(actnode->arg1);
+			expr_rfree(actnode->arg2);
+		}
+		free(actnode);
+	}
+}
+
+static inline node* newnode(uint8_t op,int8_t val,node *arg1,node *arg2) {
+	node *aux;
+	aux = (node*)malloc(sizeof(node));
+	aux->op = op;
+	aux->val = val;
+	aux->arg1 = arg1;
+	aux->arg2 = arg2;
+	return aux;
+}
+
+static inline node* expr_or(expr *e);
+
+static inline void expr_eat_white(expr *e) {
+	while (e->str[0]==' ' || e->str[0]=='\t') {
+		e->str++;
+	}
+}
+
+/* L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']' */
+static inline node* expr_sym(expr *e) {
+	node *a;
+	uint8_t v;
+	expr_eat_white(e);
+	if (e->str[0]=='(') {
+		e->str++;
+		expr_eat_white(e);
+		a=expr_or(e);
+		expr_eat_white(e);
+		if (e->str[0]==')') {
+			e->str++;
+			return a;
+		} else {
+			if ((int8_t)(e->str[0])>=32) {
+				printf("parse error, closing round bracket expected, next char: '%c'\n",e->str[0]);
+			} else {
+				printf("parse error, closing round bracket expected, next code: 0x%02"PRIX8"\n",(uint8_t)(e->str[0]));
+			}
+			expr_rfree(a);
+			e->erroroccured = 1;
+			return NULL;
+		}
+	}
+	if (e->str[0]=='[') {
+		e->str++;
+		expr_eat_white(e);
+		a=expr_or(e);
+		expr_eat_white(e);
+		if (e->str[0]==']') {
+			e->str++;
+			return a;
+		} else {
+			if ((int8_t)(e->str[0])>=32) {
+				printf("parse error, closing round bracket expected, next char: '%c'\n",e->str[0]);
+			} else {
+				printf("parse error, closing round bracket expected, next code: 0x%02"PRIX8"\n",(uint8_t)(e->str[0]));
+			}
+			expr_rfree(a);
+			e->erroroccured = 1;
+			return NULL;
+		}
+	}
+	if (e->str[0]>='A' && e->str[0]<='Z') {
+		v = e->str[0]-'A';
+		e->str++;
+		return newnode(SYM,v,NULL,NULL);
+	}
+	if (e->str[0]>='a' && e->str[0]<='z') {
+		v = e->str[0]-'a';
+		e->str++;
+		return newnode(SYM,v,NULL,NULL);
+	}
+	if ((int8_t)(e->str[0])>=32) {
+		printf("parse error, next char: '%c'\n",e->str[0]);
+	} else {
+		printf("parse error, next code: 0x%02"PRIX8"\n",(uint8_t)(e->str[0]));
+	}
+	e->erroroccured = 1;
+	return NULL;
+}
+
+/* M -> M '*' L | M '&' L | M '&&' L | M L | L */
+static inline node* expr_and(expr *e) {
+	node *a;
+	node *b;
+	expr_eat_white(e);
+	a = expr_sym(e);
+	expr_eat_white(e);
+	if (e->str[0]=='&' && e->str[1]=='&') {
+		e->str += 2;
+		b = expr_and(e);
+		return newnode(AND,0,a,b);
+	} else if (e->str[0]=='&' || e->str[0]=='*') {
+		e->str ++;
+		b = expr_and(e);
+		return newnode(AND,0,a,b);	
+	} else if ((e->str[0]>='A' && e->str[0]<='Z') || (e->str[0]>='a' && e->str[0]<='z') || e->str[0]=='(' || e->str[0]=='[') {
+		b = expr_and(e);
+		return newnode(AND,0,a,b);
+	} else {
+		return a;
+	}
+}
+
+/* S -> S '+' M | S '|' M | S '||' M | M */
+static inline node* expr_or(expr *e) {
+	node *a;
+	node *b;
+	expr_eat_white(e);
+	a = expr_and(e);
+	expr_eat_white(e);
+	if (e->str[0]=='|' && e->str[1]=='|') {
+		e->str += 2;
+		b = expr_or(e);
+		return newnode(OR,0,a,b);
+	} else if (e->str[0]=='|' || e->str[0]=='+') {
+		e->str ++;
+		b = expr_or(e);
+		return newnode(OR,0,a,b);
+	} else {
+		return a;
+	}
+}
+
+/* E -> '*' | S */
+static inline node* expr_first(expr *e) {
+	expr_eat_white(e);
+	if (e->str[0]=='*') {
+		e->str++;
+		return newnode(ANY,0,NULL,NULL);
+	}
+	return expr_or(e);
+}
+
+/* A -> [1-9] E ',' A | [1-9] E ';' A */
+static inline void expr_top(expr *e) {
+	uint32_t i;
+	uint32_t g;
+	uint8_t f;
+	node *a;
+
+	i = 0;
+	while (i<9) {
+		expr_eat_white(e);
+		f = 0;
+		if (e->str[0]>='1' && e->str[0]<='9') {
+			g = e->str[0]-'0';
+			e->str++;
+			f = 1;
+		} else {
+			g = 1;
+		}
+		expr_eat_white(e);
+		if (i==0 && f==1 && e->str[0]==0) { // number only
+			a = newnode(ANY,0,NULL,NULL);
+		} else {
+			a = expr_first(e);
+		}
+		expr_eat_white(e);
+		if (e->erroroccured) {
+			expr_rfree(a);
+			return;
+		}
+		if (i+g>9) {
+			break;
+		}
+		f = 0;
+		while (g>0) {
+			if (f==1) {
+				e->terms[i] = newnode(REF,0,a,NULL);
+			} else {
+				e->terms[i] = a;
+				f = 1;
+			}
+			i++;
+			g--;
+		}
+		if (e->str[0]==',' || e->str[0]==';') {
+			e->str++;
+		} else if (e->str[0]) {
+			if ((int8_t)(e->str[0])>=32) {
+				printf("parse error, next char: '%c'\n",e->str[0]);
+			} else {
+				printf("parse error, next code: 0x%02"PRIX8"\n",(uint8_t)(e->str[0]));
+			}
+			e->erroroccured = 1;
+			return;
+		} else {
+			return;
+		}
+	}
+	printf("parse error, too many copies\n");
+	e->erroroccured = 1;
+	return;
+}
+
+typedef struct _termval {
+	uint8_t cnt;
+	uint32_t *labelmasks;
+} termval;
+
+static int label_cmp(const void *a,const void *b) {
+	uint32_t aa = *((const uint32_t*)a);
+	uint32_t bb = *((const uint32_t*)b);
+	return (aa>bb)?1:(aa<bb)?-1:0;
+}
+
+static inline termval* expr_eval(node *a) {
+	termval *t1,*t2,*t;
+	uint32_t i,j;
+	t1 = NULL;
+	t2 = NULL;
+	t = NULL;
+	if (a->op==REF) {
+		return expr_eval(a->arg1);
+	}
+	if (a->op==ANY) {
+		t1 = malloc(sizeof(termval));
+		t1->cnt = 0;
+		t1->labelmasks = NULL;
+		return t1;
+	}
+	if (a->op==SYM) {
+		t1 = malloc(sizeof(termval));
+		t1->cnt = 1;
+		t1->labelmasks = malloc(sizeof(uint32_t));
+		t1->labelmasks[0] = 1 << a->val;
+		return t1;
+	}
+	if (a->op==OR || a->op==AND) {
+		t1 = expr_eval(a->arg1);
+		t2 = expr_eval(a->arg2);
+		if (t1==NULL || t2==NULL || t1->cnt==0 || t2->cnt==0) {
+			if (t1) {
+				free(t1->labelmasks);
+				free(t1);
+			}
+			if (t2) {
+				free(t2->labelmasks);
+				free(t2);
+			}
+			return NULL;
+		}
+		t = malloc(sizeof(termval));
+	}
+	if (a->op==AND) {
+		t->cnt = t1->cnt*t2->cnt;
+		t->labelmasks = malloc(sizeof(uint32_t)*t->cnt);
+		for (i=0 ; i<t1->cnt ; i++) {
+			for (j=0 ; j<t2->cnt ; j++) {
+				t->labelmasks[i*t2->cnt+j] = (t1->labelmasks[i] | t2->labelmasks[j]);
+			}
+		}
+	} else if (a->op==OR) {
+		t->cnt = t1->cnt+t2->cnt;
+		t->labelmasks = malloc(sizeof(uint32_t)*t->cnt);
+		memcpy(t->labelmasks,t1->labelmasks,sizeof(uint32_t)*t1->cnt);
+		memcpy(t->labelmasks+t1->cnt,t2->labelmasks,sizeof(uint32_t)*t2->cnt);
+	} else {
+		if (t) { /* satisify cppcheck */
+			free(t);
+		}
+		return NULL;
+	}
+	free(t1->labelmasks);
+	free(t2->labelmasks);
+	free(t1);
+	free(t2);
+	if (t->cnt>1) {
+		qsort(t->labelmasks,t->cnt,sizeof(uint32_t),label_cmp);
+		for (i=0 ; i+1<t->cnt ; i++) {
+			while (t->labelmasks[i]==t->labelmasks[i+1] && i+1<t->cnt) {
+				if (i+2<t->cnt) {
+					memmove(t->labelmasks+i+1,t->labelmasks+i+2,sizeof(uint32_t)*(t->cnt-i-2));
+				}
+				t->cnt--;
+			}
+		}
+	}
+	if (t->cnt > MASKORGROUP) {
+		printf("Too many 'or' groups (max: %u)\n",MASKORGROUP);
+		free(t->labelmasks);
+		free(t);
+		return NULL;
+	}
+	return t;
+}
+
+static inline int parse_label_expr(char *exprstr,uint8_t *labelscnt,uint32_t labelmasks[9][MASKORGROUP]) {
+	expr e;
+	termval *t;
+	uint32_t i,j;
+	int res;
+
+	res = 0;
+	e.str = exprstr;
+	e.erroroccured = 0;
+	for (i=0 ; i<9 ; i++) {
+		e.terms[i] = NULL;
+	}
+	expr_top(&e);
+	if (e.erroroccured) {
+		res = -1;
+	}
+	for (i=0 ; i<9 && res==0 && e.terms[i]!=NULL ; i++) {
+		t = expr_eval(e.terms[i]);
+		if (t==NULL) {
+			res = -1;
+		} else {
+			for (j=0 ; j<MASKORGROUP ; j++) {
+				if (j<t->cnt) {
+					labelmasks[i][j] = t->labelmasks[j];
+				} else {
+					labelmasks[i][j] = 0;
+				}
+			}
+			free(t->labelmasks);
+			free(t);
+		}
+	}
+	if (res==0) {
+		*labelscnt = i;
+	}
+	for (i=0 ; i<9 ; i++) {
+		expr_rfree(e.terms[i]);
+	}
+	return res;
+}
+#endif
+
+// formats:
+//  #     - number of seconds
+//  #s    - number of seconds
+//  #.#m  - number of minutes
+//  #.#h  - number of hours
+//  #.#d  - number of days
+//  #.#w  - number of weeks
+static inline uint32_t parse_period(char *str,char **endpos) {
+	double base;
+	double divisor;
+	base = 0.0;
+	while ((*str)>='0' && (*str)<='9') {
+		base *= 10.0;
+		base += (*str)-'0';
+		str++;
+	}
+	if ((*str)=='.') {
+		divisor = 0.1;
+		str++;
+		while ((*str)>='0' && (*str)<='9') {
+			base += ((*str)-'0')*divisor;
+			divisor /= 10.0;
+		}
+	}
+	while ((*str)==' ') {
+		str++;
+	}
+	if ((*str)=='s') {
+		str++;
+	} else if ((*str)=='m') {
+		str++;
+		base *= 60.0;
+	} else if ((*str)=='h') {
+		str++;
+		base *= 3600.0;
+	} else if ((*str)=='d') {
+		str++;
+		base *= 86400.0;
+	} else if ((*str)=='w') {
+		str++;
+		base *= 604800.0;
+	}
+	*endpos = str;
+	if (base >= UINT32_MAX) {
+		return UINT32_MAX;
+	}
+	if (base <= 0) {
+		return 0;
+	}
+	return base;
+}
+
 int file_paths(const char* fname) {
 	uint8_t reqbuff[16],*wptr,*buff;
 	const uint8_t *rptr;
@@ -1034,12 +1502,170 @@ int check_file(const char* fname) {
 }
 */
 
-int get_goal(const char *fname,uint8_t mode) {
+/*
+int copy_goal_src(const char *fname,void **params) {
+	int fd;
+	open_master_conn(fname,&inode,NULL,0,0);
+	if (fd<0) {
+		return -1;
+	}
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_FUSE_GETGOAL);
+	put32bit(&wptr,9);
+	put32bit(&wptr,0);
+	put32bit(&wptr,inode);
+	put8bit(&wptr,GMODE_NORMAL);
+	if (tcpwrite(fd,reqbuff,17)!=17) {
+		printf("%s: master query: send error\n",fname);
+		close_master_conn(1);
+		return -1;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("%s: master query: receive error\n",fname);
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_FUSE_GETGOAL) {
+		printf("%s: master query: wrong answer (type)\n",fname);
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("%s: master query: receive error\n",fname);
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("%s: master query: wrong answer (queryid)\n",fname);
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng==1) {
+		printf("%s: %s\n",fname,mfsstrerr(*rptr));
+		free(buff);
+		return -1;
+	} else if (leng<2) {
+		printf("%s: master query: wrong answer (leng)\n",fname);
+		free(buff);
+		return -1;
+	}
+	fn = get8bit(&rptr);
+	dn = get8bit(&rptr);
+	if ((fn!=0 || dn!=1) && (fn!=1 || dn!=0)) {
+		printf("%s: master query: wrong answer (fn,dn)\n",fname);
+		free(buff);
+		return -1;
+	}
+	goal = get8bit(&rptr);
+	if (goal>0) {
+		*params = malloc(1);
+		wptr = *params;
+		put8bit(&wptr,goal);
+	} else {
+		labelscnt = get8bit(&rptr);
+		if (labelscnt>9 || labelscnt<1) {
+			printf("%s: master query: wrong answer (labelscnt)\n",fname);
+			free(buff);
+			return -1;
+		}
+		*params = malloc(2+labelscnt*MASKORGROUP*sizeof(uint32_t));
+		wptr = *params;
+		put8bit(&wptr,0);
+		put8bit(&wptr,labelscnt);
+		memcpy(wptr,rptr,labelscnt*MASKORGROUP*sizeof(uint32_t));
+	}
+	cnt = get32bit(&rptr);
+	if (cnt!=1) {
+		printf("%s: master query: wrong answer (cnt)\n",fname);
+		free(buff);
+		free(*params);
+		return -1;
+	}
+	free(buff);
+	return 0;
+}
+*/
+
+static inline int labels_deserialize(const uint8_t **rptr,uint8_t *create_mode,uint8_t *create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t *keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t *arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t *arch_delay) {
+	uint8_t lc,og;
+	if (masterversion>=VERSION2INT(3,0,9)) {
+		*create_mode = get8bit(rptr);
+		*arch_delay = get16bit(rptr);
+		*create_labelscnt = get8bit(rptr);
+		*keep_labelscnt = get8bit(rptr);
+		*arch_labelscnt = get8bit(rptr);
+		if (*create_labelscnt>9 || *create_labelscnt<1 || *keep_labelscnt>9 || *keep_labelscnt<1 || *arch_labelscnt>9 || *arch_labelscnt<1) {
+			return -1;
+		}
+		for (lc=0 ; lc<*create_labelscnt ; lc++) {
+			for (og=0 ; og<MASKORGROUP ; og++) {
+				create_labelmasks[lc][og] = get32bit(rptr);
+			}
+		}
+		for (lc=0 ; lc<*keep_labelscnt ; lc++) {
+			for (og=0 ; og<MASKORGROUP ; og++) {
+				keep_labelmasks[lc][og] = get32bit(rptr);
+			}
+		}
+		for (lc=0 ; lc<*arch_labelscnt ; lc++) {
+			for (og=0 ; og<MASKORGROUP ; og++) {
+				arch_labelmasks[lc][og] = get32bit(rptr);
+			}
+		}
+	} else {
+		*create_mode = CREATE_MODE_STD;
+		*arch_delay = 0;
+		*create_labelscnt = get8bit(rptr);
+		if (*create_labelscnt>9 || *create_labelscnt<1) {
+			return -1;
+		}
+		*keep_labelscnt = *create_labelscnt;
+		*arch_labelscnt = *create_labelscnt;
+		for (lc=0 ; lc<*create_labelscnt ; lc++) {
+			for (og=0 ; og<MASKORGROUP ; og++) {
+				create_labelmasks[lc][og] = keep_labelmasks[lc][og] = arch_labelmasks[lc][og] = get32bit(rptr);
+			}
+		}
+	}
+	return 0;
+}
+
+void printf_goal(uint8_t create_mode,uint8_t create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t arch_delay,char *endstr) {
+	char create_labelsbuff[LABELS_BUFF_SIZE];
+	char keep_labelsbuff[LABELS_BUFF_SIZE];
+	char arch_labelsbuff[LABELS_BUFF_SIZE];
+	if (arch_delay==0) {
+		if (create_labelscnt==keep_labelscnt) {
+			printf("%"PRIu8" ; create_mode: %s ; create_labels: %s ; keep_labels: %s%s",create_labelscnt,(create_mode==CREATE_MODE_LOOSE)?"LOOSE":(create_mode==CREATE_MODE_STRICT)?"STRICT":"STD",make_label_expr(create_labelsbuff,create_labelscnt,create_labelmasks),make_label_expr(keep_labelsbuff,keep_labelscnt,keep_labelmasks),endstr);
+		} else {
+			printf("%"PRIu8"->%"PRIu8" ; create_mode: %s ; create_labels: %s ; keep_labels: %s%s",create_labelscnt,keep_labelscnt,(create_mode==CREATE_MODE_LOOSE)?"LOOSE":(create_mode==CREATE_MODE_STRICT)?"STRICT":"STD",make_label_expr(create_labelsbuff,create_labelscnt,create_labelmasks),make_label_expr(keep_labelsbuff,keep_labelscnt,keep_labelmasks),endstr);
+		}
+	} else {
+		if (create_labelscnt==keep_labelscnt && keep_labelscnt==arch_labelscnt) {
+			printf("%"PRIu8" ; create_mode: %s ; create_labels: %s ; keep_labels: %s ; arch_labels: %s ; arch_delay: %"PRIu16"d%s",create_labelscnt,(create_mode==CREATE_MODE_LOOSE)?"LOOSE":(create_mode==CREATE_MODE_STRICT)?"STRICT":"STD",make_label_expr(create_labelsbuff,create_labelscnt,create_labelmasks),make_label_expr(keep_labelsbuff,keep_labelscnt,keep_labelmasks),make_label_expr(arch_labelsbuff,arch_labelscnt,arch_labelmasks),arch_delay,endstr);
+		} else {
+			printf("%"PRIu8"->%"PRIu8"->%"PRIu8" ; create_mode: %s ; create_labels: %s ; keep_labels: %s ; arch_labels: %s ; arch_delay: %"PRIu16"d%s",create_labelscnt,keep_labelscnt,arch_labelscnt,(create_mode==CREATE_MODE_LOOSE)?"LOOSE":(create_mode==CREATE_MODE_STRICT)?"STRICT":"STD",make_label_expr(create_labelsbuff,create_labelscnt,create_labelmasks),make_label_expr(keep_labelsbuff,keep_labelscnt,keep_labelmasks),make_label_expr(arch_labelsbuff,arch_labelscnt,arch_labelmasks),arch_delay,endstr);
+		}
+	}
+}
+
+int get_goal(const char *fname,uint8_t *goal,uint8_t *create_mode,uint8_t *create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t *keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t *arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t *arch_delay,uint8_t mode) {
 	uint8_t reqbuff[17],*wptr,*buff;
 	const uint8_t *rptr;
 	uint32_t cmd,leng,inode;
 	uint8_t fn,dn,i;
-	uint8_t goal;
+//	uint8_t goal;
+//	uint8_t labelscnt;
+//	uint32_t labelmasks[9][MASKORGROUP];
 	uint32_t cnt;
 	int fd;
 	fd = open_master_conn(fname,&inode,NULL,0,0);
@@ -1090,11 +1716,7 @@ int get_goal(const char *fname,uint8_t mode) {
 		printf("%s: %s\n",fname,mfsstrerr(*rptr));
 		free(buff);
 		return -1;
-	} else if (leng%5!=2) {
-		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
-		return -1;
-	} else if (mode==GMODE_NORMAL && leng!=7) {
+	} else if (leng<2) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
 		free(buff);
 		return -1;
@@ -1102,33 +1724,69 @@ int get_goal(const char *fname,uint8_t mode) {
 	if (mode==GMODE_NORMAL) {
 		fn = get8bit(&rptr);
 		dn = get8bit(&rptr);
-		goal = get8bit(&rptr);
-		cnt = get32bit(&rptr);
 		if ((fn!=0 || dn!=1) && (fn!=1 || dn!=0)) {
 			printf("%s: master query: wrong answer (fn,dn)\n",fname);
 			free(buff);
 			return -1;
 		}
+		*goal = get8bit(&rptr);
+		if (*goal==0) {
+			if (labels_deserialize(&rptr,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay)<0) {
+				printf("%s: master query: wrong answer (labels)\n",fname);
+				free(buff);
+				return -1;
+			}
+		}
+		cnt = get32bit(&rptr);
 		if (cnt!=1) {
 			printf("%s: master query: wrong answer (cnt)\n",fname);
 			free(buff);
 			return -1;
 		}
-		printf("%s: %"PRIu8"\n",fname,goal);
+		if (*goal==0) {
+			printf("%s: ",fname);
+			printf_goal(*create_mode,*create_labelscnt,create_labelmasks,*keep_labelscnt,keep_labelmasks,*arch_labelscnt,arch_labelmasks,*arch_delay,"\n");
+		} else {
+			printf("%s: %"PRIu8"\n",fname,*goal);
+		}
 	} else {
 		fn = get8bit(&rptr);
 		dn = get8bit(&rptr);
 		printf("%s:\n",fname);
 		for (i=0 ; i<fn ; i++) {
-			goal = get8bit(&rptr);
+			*goal = get8bit(&rptr);
+			if (*goal==0) {
+				if (labels_deserialize(&rptr,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay)<0) {
+					printf("%s: master query: wrong answer (labels)\n",fname);
+					free(buff);
+					return -1;
+				}
+			}
 			cnt = get32bit(&rptr);
-			printf(" files with goal        %"PRIu8" :",goal);
+			if (*goal==0) {
+				printf(" files with goal        ");
+				printf_goal(*create_mode,*create_labelscnt,create_labelmasks,*keep_labelscnt,keep_labelmasks,*arch_labelscnt,arch_labelmasks,*arch_delay," :");
+			} else {
+				printf(" files with goal        %"PRIu8" :",*goal);
+			}
 			print_number(" ","\n",cnt,1,0,1);
 		}
 		for (i=0 ; i<dn ; i++) {
-			goal = get8bit(&rptr);
+			*goal = get8bit(&rptr);
+			if (*goal==0) {
+				if (labels_deserialize(&rptr,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay)<0) {
+					printf("%s: master query: wrong answer (labels)\n",fname);
+					free(buff);
+					return -1;
+				}
+			}
 			cnt = get32bit(&rptr);
-			printf(" directories with goal  %"PRIu8" :",goal);
+			if (*goal==0) {
+				printf(" directories with goal  ");
+				printf_goal(*create_mode,*create_labelscnt,create_labelmasks,*keep_labelscnt,keep_labelmasks,*arch_labelscnt,arch_labelmasks,*arch_delay," :");
+			} else {
+				printf(" directories with goal  %"PRIu8" :",*goal);
+			}
 			print_number(" ","\n",cnt,1,0,1);
 		}
 	}
@@ -1136,12 +1794,12 @@ int get_goal(const char *fname,uint8_t mode) {
 	return 0;
 }
 
-int get_trashtime(const char *fname,uint8_t mode) {
+int get_trashtime(const char *fname,uint32_t *trashtime,uint8_t mode) {
 	uint8_t reqbuff[17],*wptr,*buff;
 	const uint8_t *rptr;
 	uint32_t cmd,leng,inode;
 	uint32_t fn,dn,i;
-	uint32_t trashtime;
+//	uint32_t trashtime;
 	uint32_t cnt;
 	int fd;
 	fd = open_master_conn(fname,&inode,NULL,0,0);
@@ -1204,7 +1862,7 @@ int get_trashtime(const char *fname,uint8_t mode) {
 	if (mode==GMODE_NORMAL) {
 		fn = get32bit(&rptr);
 		dn = get32bit(&rptr);
-		trashtime = get32bit(&rptr);
+		*trashtime = get32bit(&rptr);
 		cnt = get32bit(&rptr);
 		if ((fn!=0 || dn!=1) && (fn!=1 || dn!=0)) {
 			printf("%s: master query: wrong answer (fn,dn)\n",fname);
@@ -1216,21 +1874,21 @@ int get_trashtime(const char *fname,uint8_t mode) {
 			free(buff);
 			return -1;
 		}
-		printf("%s: %"PRIu32"\n",fname,trashtime);
+		printf("%s: %"PRIu32"\n",fname,*trashtime);
 	} else {
 		fn = get32bit(&rptr);
 		dn = get32bit(&rptr);
 		printf("%s:\n",fname);
 		for (i=0 ; i<fn ; i++) {
-			trashtime = get32bit(&rptr);
+			*trashtime = get32bit(&rptr);
 			cnt = get32bit(&rptr);
-			printf(" files with trashtime        %10"PRIu32" :",trashtime);
+			printf(" files with trashtime        %10"PRIu32" :",*trashtime);
 			print_number(" ","\n",cnt,1,0,1);
 		}
 		for (i=0 ; i<dn ; i++) {
-			trashtime = get32bit(&rptr);
+			*trashtime = get32bit(&rptr);
 			cnt = get32bit(&rptr);
-			printf(" directories with trashtime  %10"PRIu32" :",trashtime);
+			printf(" directories with trashtime  %10"PRIu32" :",*trashtime);
 			print_number(" ","\n",cnt,1,0,1);
 		}
 	}
@@ -1238,14 +1896,14 @@ int get_trashtime(const char *fname,uint8_t mode) {
 	return 0;
 }
 
-int get_eattr(const char *fname,uint8_t mode) {
+int get_eattr(const char *fname,uint8_t *eattr,uint8_t mode) {
 	uint8_t reqbuff[17],*wptr,*buff;
 	const uint8_t *rptr;
 	uint32_t cmd,leng,inode;
 	uint8_t fn,dn,i,j;
 	uint32_t fcnt[EATTR_BITS];
 	uint32_t dcnt[EATTR_BITS];
-	uint8_t eattr;
+//	uint8_t eattr;
 	uint32_t cnt;
 	int fd;
 	fd = open_master_conn(fname,&inode,NULL,0,0);
@@ -1308,7 +1966,7 @@ int get_eattr(const char *fname,uint8_t mode) {
 	if (mode==GMODE_NORMAL) {
 		fn = get8bit(&rptr);
 		dn = get8bit(&rptr);
-		eattr = get8bit(&rptr);
+		*eattr = get8bit(&rptr);
 		cnt = get32bit(&rptr);
 		if ((fn!=0 || dn!=1) && (fn!=1 || dn!=0)) {
 			printf("%s: master query: wrong answer (fn,dn)\n",fname);
@@ -1321,10 +1979,10 @@ int get_eattr(const char *fname,uint8_t mode) {
 			return -1;
 		}
 		printf("%s: ",fname);
-		if (eattr>0) {
+		if (*eattr>0) {
 			cnt=0;
 			for (j=0 ; j<EATTR_BITS ; j++) {
-				if (eattr & (1<<j)) {
+				if ((*eattr) & (1<<j)) {
 					printf("%s%s",(cnt)?",":"",eattrtab[j]);
 					cnt=1;
 				}
@@ -1333,7 +1991,6 @@ int get_eattr(const char *fname,uint8_t mode) {
 		} else {
 			printf("-\n");
 		}
-//		printf("%s: %"PRIX8"\n",fname,eattr);
 	} else {
 		for (j=0 ; j<EATTR_BITS ; j++) {
 			fcnt[j]=0;
@@ -1342,19 +1999,19 @@ int get_eattr(const char *fname,uint8_t mode) {
 		fn = get8bit(&rptr);
 		dn = get8bit(&rptr);
 		for (i=0 ; i<fn ; i++) {
-			eattr = get8bit(&rptr);
+			*eattr = get8bit(&rptr);
 			cnt = get32bit(&rptr);
 			for (j=0 ; j<EATTR_BITS ; j++) {
-				if (eattr & (1<<j)) {
+				if ((*eattr) & (1<<j)) {
 					fcnt[j]+=cnt;
 				}
 			}
 		}
 		for (i=0 ; i<dn ; i++) {
-			eattr = get8bit(&rptr);
+			*eattr = get8bit(&rptr);
 			cnt = get32bit(&rptr);
 			for (j=0 ; j<EATTR_BITS ; j++) {
-				if (eattr & (1<<j)) {
+				if ((*eattr) & (1<<j)) {
 					dcnt[j]+=cnt;
 				}
 			}
@@ -1377,30 +2034,18 @@ int get_eattr(const char *fname,uint8_t mode) {
 				}
 			}
 		}
-/*
-		for (i=0 ; i<fn ; i++) {
-			eattr = get8bit(&rptr);
-			cnt = get32bit(&rptr);
-			printf(" files with eattr        %"PRIX8" :",eattr);
-			print_number(" ","\n",cnt,0,1);
-		}
-		for (i=0 ; i<dn ; i++) {
-			eattr = get8bit(&rptr);
-			cnt = get32bit(&rptr);
-			printf(" directories with eattr  %"PRIX8" :",eattr);
-			print_number(" ","\n",cnt,0,1);
-		}
-*/
 	}
 	free(buff);
 	return 0;
 }
 
-int set_goal(const char *fname,uint8_t goal,uint8_t mode) {
-	uint8_t reqbuff[22],*wptr,*buff;
+int set_goal(const char *fname,uint8_t goal,uint8_t create_mode,uint8_t create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t arch_delay,uint8_t mode) {
+	uint8_t reqbuff[25+2*9*4*MASKORGROUP],*wptr,*buff;
 	const uint8_t *rptr;
+	int32_t rleng;
 	uint32_t cmd,leng,inode,uid;
 	uint32_t changed,notchanged,notpermitted,quotaexceeded;
+	uint8_t i,og;
 	int fd;
 	fd = open_master_conn(fname,&inode,NULL,0,1);
 	if (fd<0) {
@@ -1409,13 +2054,67 @@ int set_goal(const char *fname,uint8_t goal,uint8_t mode) {
 	uid = getuid();
 	wptr = reqbuff;
 	put32bit(&wptr,CLTOMA_FUSE_SETGOAL);
-	put32bit(&wptr,14);
+	if (goal>0) {
+		rleng = 14;
+	} else {
+		if (masterversion<VERSION2INT(2,1,0)) {
+			printf("%s: labels not supported (master too old)\n",fname);
+			close_master_conn(0);
+			return -1;
+		}
+		mode = (mode&SMODE_RMASK) | SMODE_LABELS;
+		if (masterversion<VERSION2INT(3,0,9)) {
+			rleng = 14+keep_labelscnt*4*MASKORGROUP;
+		} else {
+			rleng = 20+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4*MASKORGROUP;
+		}
+	}
+	put32bit(&wptr,rleng);
 	put32bit(&wptr,0);
 	put32bit(&wptr,inode);
 	put32bit(&wptr,uid);
-	put8bit(&wptr,goal);
+	if (goal>0) {
+		put8bit(&wptr,goal);
+	} else {
+		if (masterversion<VERSION2INT(3,0,9)) {
+			put8bit(&wptr,keep_labelscnt);
+		} else {
+			put8bit(&wptr,0);
+		}
+	}
 	put8bit(&wptr,mode);
-	if (tcpwrite(fd,reqbuff,22)!=22) {
+	if (goal==0) {
+		if (masterversion<VERSION2INT(3,0,9)) {
+			for (i=0 ; i<keep_labelscnt ; i++) {
+				for (og=0 ; og<MASKORGROUP ; og++) {
+					put32bit(&wptr,keep_labelmasks[i][og]);
+				}
+			}
+		} else {
+			put8bit(&wptr,create_mode);
+			put16bit(&wptr,arch_delay);
+			put8bit(&wptr,create_labelscnt);
+			put8bit(&wptr,keep_labelscnt);
+			put8bit(&wptr,arch_labelscnt);
+			for (i=0 ; i<create_labelscnt ; i++) {
+				for (og=0 ; og<MASKORGROUP ; og++) {
+					put32bit(&wptr,create_labelmasks[i][og]);
+				}
+			}
+			for (i=0 ; i<keep_labelscnt ; i++) {
+				for (og=0 ; og<MASKORGROUP ; og++) {
+					put32bit(&wptr,keep_labelmasks[i][og]);
+				}
+			}
+			for (i=0 ; i<arch_labelscnt ; i++) {
+				for (og=0 ; og<MASKORGROUP ; og++) {
+					put32bit(&wptr,arch_labelmasks[i][og]);
+				}
+			}
+		}
+	}
+	rleng += 8;
+	if (tcpwrite(fd,reqbuff,rleng)!=rleng) {
 		printf("%s: master query: send error\n",fname);
 		close_master_conn(1);
 		return -1;
@@ -1467,8 +2166,13 @@ int set_goal(const char *fname,uint8_t goal,uint8_t mode) {
 		quotaexceeded = 0;
 	}
 	if ((mode&SMODE_RMASK)==0) {
-		if (changed || mode==SMODE_SET) {
-			printf("%s: %"PRIu8"\n",fname,goal);
+		if (changed || mode==SMODE_SET || mode==SMODE_LABELS) {
+			if (mode==SMODE_LABELS) {
+				printf("%s: ",fname);
+				printf_goal(create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay,"\n");
+			} else {
+				printf("%s: %"PRIu8"\n",fname,goal);
+			}
 		} else {
 			printf("%s: goal not changed\n",fname);
 		}
@@ -1647,6 +2351,119 @@ int set_eattr(const char *fname,uint8_t eattr,uint8_t mode) {
 	return 0;
 }
 
+int archive_control(const char *fname,uint8_t archcmd) {
+	uint8_t reqbuff[21],*wptr,*buff;
+	const uint8_t *rptr;
+	uint32_t cmd,leng,inode,uid;
+	int fd;
+	fd = open_master_conn(fname,&inode,NULL,0,1);
+	if (fd<0) {
+		return -1;
+	}
+	uid = getuid();
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_FUSE_ARCHCTL);
+	put32bit(&wptr,archcmd==ARCHCTL_GET?9:13);
+	put32bit(&wptr,0);
+	put32bit(&wptr,inode);
+	put8bit(&wptr,archcmd);
+	if (archcmd==ARCHCTL_GET) {
+		if (tcpwrite(fd,reqbuff,17)!=17) {
+			printf("%s: master query: send error\n",fname);
+			close_master_conn(1);
+			return -1;
+		}
+	} else {
+		put32bit(&wptr,uid);
+		if (tcpwrite(fd,reqbuff,21)!=21) {
+			printf("%s: master query: send error\n",fname);
+			close_master_conn(1);
+			return -1;
+		}
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("%s: master query: receive error\n",fname);
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_FUSE_ARCHCTL) {
+		printf("%s: master query: wrong answer (type)\n",fname);
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("%s: master query: receive error\n",fname);
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("%s: master query: wrong answer (queryid)\n",fname);
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng==1) {
+		printf("%s: %s\n",fname,mfsstrerr(*rptr));
+		free(buff);
+		return -1;
+	}
+	if (archcmd==ARCHCTL_GET) {
+		uint32_t archinodes,partinodes,notarchinodes;
+		uint64_t archchunks,notarchchunks;
+		if (leng!=28) {
+			printf("%s: master query: wrong answer (leng)\n",fname);
+			free(buff);
+			return -1;
+		}
+		archchunks = get64bit(&rptr);
+		notarchchunks = get64bit(&rptr);
+		archinodes = get32bit(&rptr);
+		partinodes = get32bit(&rptr);
+		notarchinodes = get32bit(&rptr);
+		if (archinodes+partinodes+notarchinodes==1) {
+			if (archinodes==1) {
+				printf("%s: all chunks are archived\n",fname);
+			} else if (notarchinodes==1) {
+				printf("%s: all chunks are not archived\n",fname);
+			} else {
+				printf("%s: file is partially archived (archived chunks: %"PRIu64" ; not archived chunks: %"PRIu64")\n",fname,archchunks,notarchchunks);
+			}
+		} else {
+			printf("%s:\n",fname);
+			print_number(" files with all chunks archived:     ","\n",archinodes,1,0,1);
+			print_number(" files with all chunks not archived: ","\n",notarchinodes,1,0,1);
+			print_number(" files partially archived:           ","\n",partinodes,1,0,1);
+			print_number(" archived chunks:                    ","\n",archchunks,1,0,1);
+			print_number(" not archived chunks:                ","\n",notarchchunks,1,0,1);
+		}
+	} else {
+		uint64_t changed,notchanged;
+		uint32_t notpermitted;
+		if (leng!=20) {
+			printf("%s: master query: wrong answer (leng)\n",fname);
+			free(buff);
+			return -1;
+		}
+		changed = get64bit(&rptr);
+		notchanged = get64bit(&rptr);
+		notpermitted = get32bit(&rptr);
+		printf("%s:\n",fname);
+		print_number(" chunks changed:               ","\n",changed,1,0,1);
+		print_number(" chunks not changed:           ","\n",notchanged,1,0,1);
+		print_number(" files with permission denied: ","\n",notpermitted,1,0,1);
+	}
+	free(buff);
+	return 0;
+}
+
 int ip_port_cmp(const void*a,const void*b) {
 	return memcmp(a,b,6);
 }
@@ -1743,8 +2560,9 @@ void digest_to_str(char strdigest[33],uint8_t digest[16]) {
 }
 
 int file_info(uint8_t fileinfomode,const char *fname) {
-	uint8_t reqbuff[20],*wptr,*buff;
+	uint8_t reqbuff[21],*wptr,*buff;
 	const uint8_t *rptr;
+	int32_t rleng;
 	uint32_t indx,cmd,leng,inode,version;
 	uint32_t chunks,copies,copy;
 	char csstrip[16];
@@ -1849,11 +2667,20 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 		do {
 			wptr = reqbuff;
 			put32bit(&wptr,CLTOMA_FUSE_READ_CHUNK);
-			put32bit(&wptr,12);
+			if (masterversion>VERSION2INT(3,0,3)) {
+				rleng = 21;
+				put32bit(&wptr,13);
+			} else {
+				rleng = 20;
+				put32bit(&wptr,12);
+			}
 			put32bit(&wptr,0);
 			put32bit(&wptr,inode);
 			put32bit(&wptr,indx);
-			if (tcpwrite(fd,reqbuff,20)!=20) {
+			if (masterversion>VERSION2INT(3,0,3)) {
+				put8bit(&wptr,0); // canmodatime
+			}
+			if (tcpwrite(fd,reqbuff,rleng)!=rleng) {
 				printf("%s [%"PRIu32"]: master query: send error\n",fname,indx);
 				close_master_conn(1);
 				return -1;
@@ -1893,13 +2720,19 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 				close_master_conn(1);
 				return -1;
 			} else if (leng&1) {
-				if (leng<21 || ((leng-21)%10)!=0) {
+				protover = get8bit(&rptr);
+				if (protover!=1 && protover!=2) {
+					printf("%s [%"PRIu32"]: master query: unknown protocol id (%"PRIu8")\n",fname,indx,protover);
+					free(buff);
+					close_master_conn(1);
+					return -1;
+				}
+				if (leng<21 || (protover==1 && ((leng-21)%10)!=0) || (protover==2 && ((leng-21)%14)!=0)) {
 					printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
 					free(buff);
 					close_master_conn(1);
 					return -1;
 				}
-				protover = get8bit(&rptr);
 			} else {
 				if (leng<20 || ((leng-20)%6)!=0) {
 					printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
@@ -1920,14 +2753,16 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 					printf("\tchunk %"PRIu32": empty\n",indx);
 				} else {
 					printf("\tchunk %"PRIu32": %016"PRIX64"_%08"PRIX32" / (id:%"PRIu64" ver:%"PRIu32")\n",indx,chunkid,version,chunkid,version);
-					if (protover) {
+					if (protover==2) {
+						copies = (leng-21)/14;
+					} else if (protover==1) {
 						copies = (leng-21)/10;
 					} else {
 						copies = (leng-20)/6;
 					}
 					if (leng>0) {
 						wptr = (uint8_t*)rptr;
-						qsort(wptr,copies,(protover)?10:6,ip_port_cmp);
+						qsort(wptr,copies,(protover==2)?14:(protover==1)?10:6,ip_port_cmp);
 						firstdigest = 1;
 						checksumerror = 0;
 						for (copy=0 ; copy<copies ; copy++) {
@@ -1935,7 +2770,9 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 							csstrip[15]=0;
 							csip = get32bit(&rptr);
 							csport = get16bit(&rptr);
-							if (protover) {
+							if (protover==2) {
+								rptr+=8;
+							} else if (protover==1) {
 								rptr+=4;
 							}
 							if (fileinfomode&(FILEINFO_CRC|FILEINFO_SIGNATURE)) {
@@ -2417,35 +3254,43 @@ int eattr_control(const char *fname,uint8_t mode,uint8_t eattr) {
 }
 */
 
-int quota_control(const char *fname,uint8_t del,uint8_t qflags,uint32_t sinodes,uint64_t slength,uint64_t ssize,uint64_t srealsize,uint32_t hinodes,uint64_t hlength,uint64_t hsize,uint64_t hrealsize) {
+int quota_control(const char *fname,uint8_t mode,uint8_t *qflags,uint32_t *graceperiod,uint32_t *sinodes,uint64_t *slength,uint64_t *ssize,uint64_t *srealsize,uint32_t *hinodes,uint64_t *hlength,uint64_t *hsize,uint64_t *hrealsize) {
 	uint8_t reqbuff[73],*wptr,*buff;
 	const uint8_t *rptr;
 	uint32_t cmd,leng,inode;
 	uint32_t curinodes;
 	uint64_t curlength,cursize,currealsize;
+	int32_t psize;
 	int fd;
 //	printf("set quota: %s (soft:%1X,i:%"PRIu32",l:%"PRIu64",w:%"PRIu64",r:%"PRIu64"),(hard:%1X,i:%"PRIu32",l:%"PRIu64",w:%"PRIu64",r:%"PRIu64")\n",fname,sflags,sinodes,slength,ssize,srealsize,hflags,hinodes,hlength,hsize,hrealsize);
-	fd = open_master_conn(fname,&inode,NULL,0,qflags?1:0);
+	if (mode==2) {
+		*qflags = 0;
+	}
+	fd = open_master_conn(fname,&inode,NULL,0,(*qflags)?1:0);
 	if (fd<0) {
 		return -1;
 	}
+	psize = (mode)?9:(masterversion<VERSION2INT(3,0,9))?65:69;
 	wptr = reqbuff;
 	put32bit(&wptr,CLTOMA_FUSE_QUOTACONTROL);
-	put32bit(&wptr,(del)?9:65);
+	put32bit(&wptr,psize);
 	put32bit(&wptr,0);
 	put32bit(&wptr,inode);
-	put8bit(&wptr,qflags);
-	if (del==0) {
-		put32bit(&wptr,sinodes);
-		put64bit(&wptr,slength);
-		put64bit(&wptr,ssize);
-		put64bit(&wptr,srealsize);
-		put32bit(&wptr,hinodes);
-		put64bit(&wptr,hlength);
-		put64bit(&wptr,hsize);
-		put64bit(&wptr,hrealsize);
+	put8bit(&wptr,*qflags);
+	if (mode==0) {
+		if (masterversion>=VERSION2INT(3,0,9)) {
+			put32bit(&wptr,*graceperiod);
+		}
+		put32bit(&wptr,*sinodes);
+		put64bit(&wptr,*slength);
+		put64bit(&wptr,*ssize);
+		put64bit(&wptr,*srealsize);
+		put32bit(&wptr,*hinodes);
+		put64bit(&wptr,*hlength);
+		put64bit(&wptr,*hsize);
+		put64bit(&wptr,*hrealsize);
 	}
-	if (tcpwrite(fd,reqbuff,(del)?17:73)!=((del)?17:73)) {
+	if (tcpwrite(fd,reqbuff,psize+8)!=(psize+8)) {
 		printf("%s: master query: send error\n",fname);
 		close_master_conn(1);
 		return -1;
@@ -2484,40 +3329,49 @@ int quota_control(const char *fname,uint8_t del,uint8_t qflags,uint32_t sinodes,
 		free(buff);
 		close_master_conn(1);
 		return -1;
-	} else if (leng!=85) {
+	} else if (leng!=85 && leng!=89) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
 		free(buff);
 		close_master_conn(1);
 		return -1;
 	}
 	close_master_conn(0);
-	qflags = get8bit(&rptr);
-	sinodes = get32bit(&rptr);
-	slength = get64bit(&rptr);
-	ssize = get64bit(&rptr);
-	srealsize = get64bit(&rptr);
-	hinodes = get32bit(&rptr);
-	hlength = get64bit(&rptr);
-	hsize = get64bit(&rptr);
-	hrealsize = get64bit(&rptr);
+	*qflags = get8bit(&rptr);
+	if (leng==89) {
+		*graceperiod = get32bit(&rptr);
+	} else {
+		*graceperiod = 0;
+	}
+	*sinodes = get32bit(&rptr);
+	*slength = get64bit(&rptr);
+	*ssize = get64bit(&rptr);
+	*srealsize = get64bit(&rptr);
+	*hinodes = get32bit(&rptr);
+	*hlength = get64bit(&rptr);
+	*hsize = get64bit(&rptr);
+	*hrealsize = get64bit(&rptr);
 	curinodes = get32bit(&rptr);
 	curlength = get64bit(&rptr);
 	cursize = get64bit(&rptr);
 	currealsize = get64bit(&rptr);
 	free(buff);
-	printf("%s: (current values | soft quota | hard quota)\n",fname);
+	if ((*graceperiod)>0) {
+		printf("%s: (current values | soft quota | hard quota) ; soft quota grace period: %u seconds\n",fname,*graceperiod);
+	} else {
+		printf("%s: (current values | soft quota | hard quota) ; soft quota grace period: default\n",fname);
+	}
 	print_number(" inodes   | ",NULL,curinodes,0,0,1);
-	print_number(" | ",NULL,sinodes,0,0,qflags&QUOTA_FLAG_SINODES);
-	print_number(" | "," |\n",hinodes,0,0,qflags&QUOTA_FLAG_HINODES);
+	print_number(" | ",NULL,*sinodes,0,0,(*qflags)&QUOTA_FLAG_SINODES);
+	print_number(" | "," |\n",*hinodes,0,0,(*qflags)&QUOTA_FLAG_HINODES);
 	print_number(" length   | ",NULL,curlength,0,1,1);
-	print_number(" | ",NULL,slength,0,1,qflags&QUOTA_FLAG_SLENGTH);
-	print_number(" | "," |\n",hlength,0,1,qflags&QUOTA_FLAG_HLENGTH);
+	print_number(" | ",NULL,*slength,0,1,(*qflags)&QUOTA_FLAG_SLENGTH);
+	print_number(" | "," |\n",*hlength,0,1,(*qflags)&QUOTA_FLAG_HLENGTH);
 	print_number(" size     | ",NULL,cursize,0,1,1);
-	print_number(" | ",NULL,ssize,0,1,qflags&QUOTA_FLAG_SSIZE);
-	print_number(" | "," |\n",hsize,0,1,qflags&QUOTA_FLAG_HSIZE);
+	print_number(" | ",NULL,*ssize,0,1,(*qflags)&QUOTA_FLAG_SSIZE);
+	print_number(" | "," |\n",*hsize,0,1,(*qflags)&QUOTA_FLAG_HSIZE);
 	print_number(" realsize | ",NULL,currealsize,0,1,1);
-	print_number(" | ",NULL,srealsize,0,1,qflags&QUOTA_FLAG_SREALSIZE);
-	print_number(" | "," |\n",hrealsize,0,1,qflags&QUOTA_FLAG_HREALSIZE);
+	print_number(" | ",NULL,*srealsize,0,1,(*qflags)&QUOTA_FLAG_SREALSIZE);
+	print_number(" | "," |\n",*hrealsize,0,1,(*qflags)&QUOTA_FLAG_HREALSIZE);
 	return 0;
 }
 
@@ -2798,8 +3652,10 @@ int snapshot(const char *dstname,char * const *srcnames,uint32_t srcelements,uin
 enum {
 	MFSGETGOAL=1,
 	MFSSETGOAL,
+	MFSCOPYGOAL,
 	MFSGETTRASHTIME,
 	MFSSETTRASHTIME,
+	MFSCOPYTRASHTIME,
 	MFSCHECKFILE,
 	MFSFILEINFO,
 	MFSAPPENDCHUNKS,
@@ -2809,10 +3665,15 @@ enum {
 	MFSGETEATTR,
 	MFSSETEATTR,
 	MFSDELEATTR,
+	MFSCOPYEATTR,
 	MFSGETQUOTA,
 	MFSSETQUOTA,
 	MFSDELQUOTA,
-	MFSFILEPATHS
+	MFSCOPYQUOTA,
+	MFSFILEPATHS,
+	MFSCHKARCHIVE,
+	MFSSETARCHIVE,
+	MFSCLRARCHIVE
 };
 
 static inline void print_numberformat_options() {
@@ -2846,12 +3707,23 @@ void usage(int f) {
 			print_recursive_option();
 			break;
 		case MFSSETGOAL:
-			fprintf(stderr,"set objects goal (desired number of copies)\n\nusage: mfssetgoal [-nhHkmgr] GOAL[-|+] name [name ...]\n");
+			fprintf(stderr,"set objects goal (desired number of copies)\n\nusage: mfssetgoal [-lsnhHkmgr] GOAL[-|+]|LABELS name [name ...]\n       mfssetgoal [-lsnhHkmgr] -K KEEP_LABELS [ -C CREATE_LABELS ] [ -A ARCHIVE_LABELS -d ARCHIVE_DELAY ] name [name ...]\n");
 			print_numberformat_options();
 			print_recursive_option();
+			fprintf(stderr," -l - use 'loose' mode for create (allow using other labels during chunk creation wnen servers are overloaded or full)\n");
+			fprintf(stderr," -s - use 'strict' mode for create (never use other labels for creating new chunks)\n");
 			fprintf(stderr," GOAL+ - increase goal to given value\n");
 			fprintf(stderr," GOAL- - decrease goal to given value\n");
 			fprintf(stderr," GOAL - just set goal to given value\n");
+			fprintf(stderr," LABELS - set goal using labels\n");
+			fprintf(stderr," KEEP_LABELS - specify separate labels/goal used to keep data\n");
+			fprintf(stderr," CREATE_LABELS - specify separate labels/goal used to create new chunks\n");
+			fprintf(stderr," ARCHIVE_LABELS - specify separate labels/goal used when ARCHIVE_DELAY days passed after last file modification (mtime)\n");
+			break;
+		case MFSCOPYGOAL:
+			fprintf(stderr,"copy object goal (desired number of copies)\n\nusage: mfscopygoal [-nhHkmgr] srcname dstname [dstname ...]\n");
+			print_numberformat_options();
+			print_recursive_option();
 			break;
 		case MFSGETTRASHTIME:
 			fprintf(stderr,"get objects trashtime (how many seconds file should be left in trash)\n\nusage: mfsgettrashtime [-nhHkmgr] name [name ...]\n");
@@ -2865,6 +3737,11 @@ void usage(int f) {
 			fprintf(stderr," SECONDS+ - increase trashtime to given value\n");
 			fprintf(stderr," SECONDS- - decrease trashtime to given value\n");
 			fprintf(stderr," SECONDS - just set trashtime to given value\n");
+			break;
+		case MFSCOPYTRASHTIME:
+			fprintf(stderr,"copy objects trashtime (how many seconds file should be left in trash)\n\nusage: mfscopytrashtime [-nhHkmgr] srcname dstname [dstname ...]\n");
+			print_numberformat_options();
+			print_recursive_option();
 			break;
 		case MFSCHECKFILE:
 			fprintf(stderr,"check files\n\nusage: mfscheckfile [-nhHkmg] name [name ...]\n");
@@ -2921,13 +3798,19 @@ void usage(int f) {
 			fprintf(stderr," -f attrname - specify attribute to delete\n");
 			print_extra_attributes();
 			break;
+		case MFSCOPYEATTR:
+			fprintf(stderr,"copy objects extra attributes\n\nusage: mfscopyeattr [-nhHkmgr] srcname dstname [dstname ...]\n");
+			print_numberformat_options();
+			print_recursive_option();
+			break;
 		case MFSGETQUOTA:
 			fprintf(stderr,"get quota for given directory (directories)\n\nusage: mfsgetquota [-nhHkmg] dirname [dirname ...]\n");
 			print_numberformat_options();
 			break;
 		case MFSSETQUOTA:
-			fprintf(stderr,"set quota for given directory (directories)\n\nusage: mfssetquota [-nhHkmg] [-iI inodes] [-lL length] [-sS size] [-rR realsize] dirname [dirname ...]\n");
+			fprintf(stderr,"set quota for given directory (directories)\n\nusage: mfssetquota [-nhHkmg] [-iI inodes] [-p grace_period] [-lL length] [-sS size] [-rR realsize] dirname [dirname ...]\n");
 			print_numberformat_options();
+			fprintf(stderr," -p - set grace period in seconds for soft quota\n");
 			fprintf(stderr," -i/-I - set soft/hard limit for number of filesystem objects\n");
 			fprintf(stderr," -l/-L - set soft/hard limit for sum of files lengths\n");
 			fprintf(stderr," -s/-S - set soft/hard limit for sum of file sizes (chunk sizes)\n");
@@ -2943,9 +3826,23 @@ void usage(int f) {
 			fprintf(stderr," -r/-R - delete real size soft/hard quota\n");
 			fprintf(stderr," -a/-A - delete all soft/hard quotas\n");
 			break;
+		case MFSCOPYQUOTA:
+			fprintf(stderr,"copy quota settings from one directory to another directory (directories)\n\nusage: mfscopyquota [-nhHkmg] srcdirname dstdirname [dstdirname ...]\n");
+			print_numberformat_options();
+			break;
 		case MFSFILEPATHS:
 			fprintf(stderr,"show all paths of given files or node numbers\n\nusage: mfsfilepaths name/inode [name/inode ...]\n");
 			fprintf(stderr,"\nIn case of converting node to path, tool has to be run in mfs-mounted directory\n");
+			break;
+		case MFSCHKARCHIVE:
+			fprintf(stderr,"checks if archive flag is set or not (when directory is specified then command will check it recursivelly)\n\nusage: mfschgarchive [-nhHkmg] name [name ...]\n");
+			print_numberformat_options();
+			break;
+		case MFSSETARCHIVE:
+			fprintf(stderr,"set archive flags in chunks (recursivelly for directories) - moves files to archive (use 'archive' goal/labels instead of 'keep' goal/labels)\n\nusage: mfssetarchive [-nhHkmg] name [name ...]\n");
+			break;
+		case MFSCLRARCHIVE:
+			fprintf(stderr,"clear archive flags in chunks (recursivelly for directories) - moves files from archive (use 'keep' goal/labels instead of 'archive' goal/labels) - it also changes ctime, so files will move back to archive after time specified in mfssetgoal\n\nusage: mfsclrarchive [-nhHkmg] name [name ...]\n");
 			break;
 	}
 	exit(1);
@@ -2953,25 +3850,36 @@ void usage(int f) {
 
 int main(int argc,char **argv) {
 	int l,f,status;
-	int i,found;
+	int i,j,found;
 	int ch;
 	int snapmode = 0;
 	int rflag = 0;
 	uint8_t dirinfomode = 0;
 	uint8_t fileinfomode = 0;
 	uint64_t v;
-	uint8_t eattr = 0,goal = 1,smode = SMODE_SET;
+	uint8_t eattr = 0,goal = 1,smode = SMODE_SET,create_mode = CREATE_MODE_STD;
+	uint32_t create_labelmasks[9][MASKORGROUP];
+	uint32_t keep_labelmasks[9][MASKORGROUP];
+	uint32_t arch_labelmasks[9][MASKORGROUP];
+	uint8_t create_labelscnt = 0;
+	uint8_t keep_labelscnt = 0;
+	uint8_t arch_labelscnt = 0;
+	uint16_t arch_delay = 0;
 	uint32_t trashtime = 86400;
 	uint32_t sinodes = 0,hinodes = 0;
 	uint64_t slength = 0,hlength = 0,ssize = 0,hsize = 0,srealsize = 0,hrealsize = 0;
+	uint32_t graceperiod = 0;
 	uint8_t qflags = 0;
 	char *appendfname = NULL;
+	char *srcname = NULL;
 	char *hrformat;
+	char *p;
 
 	strerr_init();
 
 	l = strlen(argv[0]);
 #define CHECKNAME(name) ((l==(int)(sizeof(name)-1) && strcmp(argv[0],name)==0) || (l>(int)(sizeof(name)-1) && strcmp((argv[0])+(l-sizeof(name)),"/" name)==0))
+
 	if (CHECKNAME("mfstools")) {
 		if (argc==2 && strcmp(argv[1],"create")==0) {
 			fprintf(stderr,"create symlinks\n");
@@ -2980,8 +3888,10 @@ int main(int argc,char **argv) {
 			}
 			SYMLINK("mfsgetgoal")
 			SYMLINK("mfssetgoal")
+			SYMLINK("mfscopygoal")
 			SYMLINK("mfsgettrashtime")
 			SYMLINK("mfssettrashtime")
+			SYMLINK("mfscopytrashtime")
 			SYMLINK("mfscheckfile")
 			SYMLINK("mfsfileinfo")
 			SYMLINK("mfsappendchunks")
@@ -2991,32 +3901,39 @@ int main(int argc,char **argv) {
 			SYMLINK("mfsgeteattr")
 			SYMLINK("mfsseteattr")
 			SYMLINK("mfsdeleattr")
+			SYMLINK("mfscopyeattr")
 			SYMLINK("mfsgetquota")
 			SYMLINK("mfssetquota")
 			SYMLINK("mfsdelquota")
+			SYMLINK("mfscopyquota")
 			SYMLINK("mfsfilepaths")
+			SYMLINK("mfschkarchive")
+			SYMLINK("mfssetarchive")
+			SYMLINK("mfsclrarchive")
 			// deprecated tools:
 			SYMLINK("mfsrgetgoal")
 			SYMLINK("mfsrsetgoal")
 			SYMLINK("mfsrgettrashtime")
 			SYMLINK("mfsrsettrashtime")
 			return 0;
-		} else {
+		} else if (argc==1) {
 			fprintf(stderr,"mfs multi tool\n\nusage:\n\tmfstools create - create symlinks (mfs<toolname> -> %s)\n",argv[0]);
+			fprintf(stderr,"\tmfstools mfs<toolname> ... - work as a given tool\n");
 			fprintf(stderr,"\ntools:\n");
-			fprintf(stderr,"\tmfsgetgoal\n\tmfssetgoal\n\tmfsgettrashtime\n\tmfssettrashtime\n");
-			fprintf(stderr,"\tmfscheckfile\n\tmfsfileinfo\n\tmfsappendchunks\n\tmfsdirinfo\n\tmfsfilerepair\n");
-			fprintf(stderr,"\tmfsmakesnapshot\n");
-			fprintf(stderr,"\tmfsgeteattr\n\tmfsseteattr\n\tmfsdeleattr\n");
-			fprintf(stderr,"\tmfsgetquota\n\tmfssetquota\n\tmfsdelquota\n");
-			fprintf(stderr,"\ndeprecated tools:\n");
-			fprintf(stderr,"\tmfsrgetgoal = mfsgetgoal -r\n");
-			fprintf(stderr,"\tmfsrsetgoal = mfssetgoal -r\n");
-			fprintf(stderr,"\tmfsrgettrashtime = mfsgettreshtime -r\n");
-			fprintf(stderr,"\tmfsrsettrashtime = mfssettreshtime -r\n");
+			fprintf(stderr,"\tmfsgetgoal\n\tmfssetgoal\n\tmfscopygoal\n");
+			fprintf(stderr,"\tmfsgettrashtime\n\tmfssettrashtime\n\tmfscopytrashtime\n");
+			fprintf(stderr,"\tmfsgeteattr\n\tmfsseteattr\n\tmfsdeleattr\n\tmfscopyeattr\n");
+			fprintf(stderr,"\tmfsgetquota\n\tmfssetquota\n\tmfsdelquota\n\tmfscopyquota\n");
+			fprintf(stderr,"\tmfscheckfile\n\tmfsfileinfo\n\tmfsappendchunks\n\tmfsdirinfo\n");
+			fprintf(stderr,"\tmfsfilerepair\n\tmfsmakesnapshot\n\tmfsfilepaths\n");
+			fprintf(stderr,"\tmfschkarchive\n\tmfssetarchive\n\tmfsclrarchive\n");
 			return 1;
 		}
-	} else if (CHECKNAME("mfsgetgoal")) {
+		argv++;
+		argc--;
+		l = strlen(argv[0]);
+	}
+	if (CHECKNAME("mfsgetgoal")) {
 		f=MFSGETGOAL;
 	} else if (CHECKNAME("mfsrgetgoal")) {
 		f=MFSGETGOAL;
@@ -3028,6 +3945,8 @@ int main(int argc,char **argv) {
 		f=MFSSETGOAL;
 		rflag=1;
 		fprintf(stderr,"deprecated tool - use \"mfssetgoal -r\"\n");
+	} else if (CHECKNAME("mfscopygoal")) {
+		f=MFSCOPYGOAL;
 	} else if (CHECKNAME("mfsgettrashtime")) {
 		f=MFSGETTRASHTIME;
 	} else if (CHECKNAME("mfsrgettrashtime")) {
@@ -3040,6 +3959,8 @@ int main(int argc,char **argv) {
 		f=MFSSETTRASHTIME;
 		rflag=1;
 		fprintf(stderr,"deprecated tool - use \"mfssettrashtime -r\"\n");
+	} else if (CHECKNAME("mfscopytrashtime")) {
+		f=MFSCOPYTRASHTIME;
 	} else if (CHECKNAME("mfscheckfile")) {
 		f=MFSCHECKFILE;
 	} else if (CHECKNAME("mfsfileinfo")) {
@@ -3054,18 +3975,28 @@ int main(int argc,char **argv) {
 		f=MFSSETEATTR;
 	} else if (CHECKNAME("mfsdeleattr")) {
 		f=MFSDELEATTR;
+	} else if (CHECKNAME("mfscopyeattr")) {
+		f=MFSCOPYEATTR;
 	} else if (CHECKNAME("mfsgetquota")) {
 		f=MFSGETQUOTA;
 	} else if (CHECKNAME("mfssetquota")) {
 		f=MFSSETQUOTA;
 	} else if (CHECKNAME("mfsdelquota")) {
 		f=MFSDELQUOTA;
+	} else if (CHECKNAME("mfscopyquota")) {
+		f=MFSCOPYQUOTA;
 	} else if (CHECKNAME("mfsfilerepair")) {
 		f=MFSFILEREPAIR;
 	} else if (CHECKNAME("mfsmakesnapshot")) {
 		f=MFSMAKESNAPSHOT;
 	} else if (CHECKNAME("mfsfilepaths")) {
 		f=MFSFILEPATHS;
+	} else if (CHECKNAME("mfschkarchive")) {
+		f=MFSCHKARCHIVE;
+	} else if (CHECKNAME("mfssetarchive")) {
+		f=MFSSETARCHIVE;
+	} else if (CHECKNAME("mfsclrarchive")) {
+		f=MFSCLRARCHIVE;
 	} else {
 		fprintf(stderr,"unknown binary name\n");
 		return 1;
@@ -3113,10 +4044,9 @@ int main(int argc,char **argv) {
 			usage(f);
 		}
 		return snapshot(argv[argc-1],argv,argc-1,snapmode);
-	case MFSGETGOAL:
-	case MFSSETGOAL:
-	case MFSGETTRASHTIME:
-	case MFSSETTRASHTIME:
+	case MFSCOPYGOAL:
+	case MFSCOPYTRASHTIME:
+	case MFSCOPYEATTR:
 		while ((ch=getopt(argc,argv,"rnhHkmg"))!=-1) {
 			switch(ch) {
 			case 'n':
@@ -3144,31 +4074,226 @@ int main(int argc,char **argv) {
 		}
 		argc -= optind;
 		argv += optind;
-		if ((f==MFSSETGOAL || f==MFSSETTRASHTIME) && argc==0) {
+		if (argc<2) {
 			usage(f);
 		}
-		if (f==MFSSETGOAL) {
-			char *p = argv[0];
+		srcname = *argv;
+		argc--;
+		argv++;
+		break;
+	case MFSCOPYQUOTA:
+		while ((ch=getopt(argc,argv,"nhHkmg"))!=-1) {
+			switch(ch) {
+			case 'n':
+				humode=0;
+				break;
+			case 'h':
+				humode=1;
+				break;
+			case 'H':
+				humode=2;
+				break;
+			case 'k':
+				numbermode=1;
+				break;
+			case 'm':
+				numbermode=2;
+				break;
+			case 'g':
+				numbermode=3;
+				break;
+			}
+		}
+		argc -= optind;
+		argv += optind;
+		if (argc<2) {
+			usage(f);
+		}
+		srcname = *argv;
+		argc--;
+		argv++;
+		break;
+	case MFSSETGOAL:
+		while ((ch=getopt(argc,argv,"d:A:K:C:slrnhHkmg"))!=-1) {
+			switch(ch) {
+			case 'd':
+				arch_delay = strtoul(optarg,NULL,10);
+				break;
+			case 'A':
+				if (arch_labelscnt>0) {
+					fprintf(stderr,"option '-A' defined more than once\n");
+					usage(f);
+				}
+				if (parse_label_expr(optarg,&arch_labelscnt,arch_labelmasks)<0) {
+					usage(f);
+				}
+				break;
+			case 'K':
+				if (keep_labelscnt>0) {
+					fprintf(stderr,"option '-K' defined more than once\n");
+					usage(f);
+				}
+				if (parse_label_expr(optarg,&keep_labelscnt,keep_labelmasks)<0) {
+					usage(f);
+				}
+				break;
+			case 'C':
+				if (create_labelscnt>0) {
+					fprintf(stderr,"option '-W' defined more than once\n");
+					usage(f);
+				}
+				if (parse_label_expr(optarg,&create_labelscnt,create_labelmasks)<0) {
+					usage(f);
+				}
+				break;
+			case 'n':
+				humode=0;
+				break;
+			case 'h':
+				humode=1;
+				break;
+			case 'H':
+				humode=2;
+				break;
+			case 'k':
+				numbermode=1;
+				break;
+			case 'm':
+				numbermode=2;
+				break;
+			case 'g':
+				numbermode=3;
+				break;
+			case 'r':
+				rflag=1;
+				break;
+			case 's':
+				if (create_mode==CREATE_MODE_LOOSE) {
+					fprintf(stderr,"flags '-l' and '-s' are mutually exclusive\n");
+					usage(f);
+				}
+				create_mode = CREATE_MODE_STRICT;
+				break;
+			case 'l':
+				if (create_mode==CREATE_MODE_STRICT) {
+					fprintf(stderr,"flags '-l' and '-s' are mutually exclusive\n");
+					usage(f);
+				}
+				create_mode = CREATE_MODE_LOOSE;
+				break;
+			}
+		}
+		argc -= optind;
+		argv += optind;
+		if (arch_labelscnt==0 && arch_delay>0) {
+			fprintf(stderr,"option '-A' without '-d'\n");
+			usage(f);
+		}
+		if (arch_delay==0 && arch_labelscnt>0) {
+			fprintf(stderr,"option '-d' without '-A'\n");
+			usage(f);
+		}
+		if (keep_labelscnt==0 && arch_labelscnt>0) {
+			fprintf(stderr,"option '-A' without '-K'\n");
+			usage(f);
+		}
+		if (keep_labelscnt==0 && create_labelscnt>0) {
+			fprintf(stderr,"option '-C' without '-K'\n");
+			usage(f);
+		}
+		if (arch_labelscnt==0 && keep_labelscnt>0) {
+			arch_labelscnt = keep_labelscnt;
+			for (i=0 ; i<create_labelscnt ; i++) {
+				for (j=0 ; j<MASKORGROUP ; j++) {
+					arch_labelmasks[i][j] = keep_labelmasks[i][j];
+				}
+			}
+		}
+		if (create_labelscnt==0 && keep_labelscnt>0) {
+			create_labelscnt = keep_labelscnt;
+			for (i=0 ; i<create_labelscnt ; i++) {
+				for (j=0 ; j<MASKORGROUP ; j++) {
+					create_labelmasks[i][j] = keep_labelmasks[i][j];
+				}
+			}
+		}
+		if (keep_labelscnt==0 && create_labelscnt==0 && arch_labelscnt==0) {
+			if (argc==0) {
+				usage(f);
+			}
+			p = argv[0];
+			// [1-9] | [1-9]+ | [1-9]-
 			if (p[0]>'0' && p[0]<='9' && (p[1]=='\0' || ((p[1]=='-' || p[1]=='+') && p[2]=='\0'))) {
 				goal = p[0]-'0';
 				if (p[1]=='-') {
-					smode=SMODE_DECREASE;
+					smode = SMODE_DECREASE;
 				} else if (p[1]=='+') {
-					smode=SMODE_INCREASE;
+					smode = SMODE_INCREASE;
 				}
 			} else {
-				fprintf(stderr,"goal should be given as a digit between 1 and 9 optionally folowed by '-' or '+'\n");
-				usage(f);
+				if (parse_label_expr(p,&create_labelscnt,create_labelmasks)<0) {
+					usage(f);
+				}
+				keep_labelscnt = create_labelscnt;
+				arch_labelscnt = create_labelscnt;
+				for (i=0 ; i<create_labelscnt ; i++) {
+					for (j=0 ; j<MASKORGROUP ; j++) {
+						arch_labelmasks[i][j] = keep_labelmasks[i][j] = create_labelmasks[i][j];
+					}
+				}
+				goal = 0;
+				smode = SMODE_SET;
 			}
 			argc--;
 			argv++;
+		} else {
+			goal = 0;
+			smode = SMODE_SET;
 		}
+		break;
+	case MFSGETGOAL:
+	case MFSGETTRASHTIME:
+	case MFSSETTRASHTIME:
+	case MFSGETEATTR:
+	case MFSCHKARCHIVE:
+	case MFSSETARCHIVE:
+	case MFSCLRARCHIVE:
+		while ((ch=getopt(argc,argv,"rnhHkmg"))!=-1) {
+			switch(ch) {
+			case 'n':
+				humode=0;
+				break;
+			case 'h':
+				humode=1;
+				break;
+			case 'H':
+				humode=2;
+				break;
+			case 'k':
+				numbermode=1;
+				break;
+			case 'm':
+				numbermode=2;
+				break;
+			case 'g':
+				numbermode=3;
+				break;
+			case 'r':
+				rflag=1;
+				break;
+			}
+		}
+		argc -= optind;
+		argv += optind;
 		if (f==MFSSETTRASHTIME) {
-			char *p = argv[0];
-			trashtime = 0;
-			while (p[0]>='0' && p[0]<='9') {
-				trashtime*=10;
-				trashtime+=(p[0]-'0');
+			p = argv[0];
+			if (argc==0) {
+				usage(f);
+			}
+			if (p[0]>='0' && p[0]<='9') {
+				trashtime = parse_period(p,&p);
+			}
+			while (p[0]==' ') {
 				p++;
 			}
 			if (p[0]=='\0' || ((p[0]=='-' || p[0]=='+') && p[1]=='\0')) {
@@ -3184,35 +4309,6 @@ int main(int argc,char **argv) {
 			argc--;
 			argv++;
 		}
-		break;
-	case MFSGETEATTR:
-		while ((ch=getopt(argc,argv,"rnhHkmg"))!=-1) {
-			switch(ch) {
-			case 'n':
-				humode=0;
-				break;
-			case 'h':
-				humode=1;
-				break;
-			case 'H':
-				humode=2;
-				break;
-			case 'k':
-				numbermode=1;
-				break;
-			case 'm':
-				numbermode=2;
-				break;
-			case 'g':
-				numbermode=3;
-				break;
-			case 'r':
-				rflag=1;
-				break;
-			}
-		}
-		argc -= optind;
-		argv += optind;
 		break;
 	case MFSSETEATTR:
 	case MFSDELEATTR:
@@ -3263,6 +4359,11 @@ int main(int argc,char **argv) {
 				fprintf(stderr,"no attribute(s) to delete\n");
 			}
 			usage(f);
+		}
+		if (f==MFSSETEATTR) {
+			smode = SMODE_INCREASE;
+		} else {
+			smode = SMODE_DECREASE;
 		}
 		break;
 	case MFSFILEREPAIR:
@@ -3364,7 +4465,7 @@ int main(int argc,char **argv) {
 			fprintf(stderr,"only root can change quota\n");
 			usage(f);
 		}
-		while ((ch=getopt(argc,argv,"nhHkmgi:I:l:L:s:S:r:R:"))!=-1) {
+		while ((ch=getopt(argc,argv,"nhHkmgp:i:I:l:L:s:S:r:R:"))!=-1) {
 			switch(ch) {
 			case 'n':
 				humode=0;
@@ -3383,6 +4484,13 @@ int main(int argc,char **argv) {
 				break;
 			case 'g':
 				numbermode=3;
+				break;
+			case 'p':
+				graceperiod = parse_period(optarg,&p);
+				if (p[0]!='\0') {
+					fprintf(stderr,"bad grace period\n");
+					usage(f);
+				}
 				break;
 			case 'i':
 				if (my_get_number(optarg,&v,UINT32_MAX,0)<0) {
@@ -3620,24 +4728,46 @@ int main(int argc,char **argv) {
 		usage(f);
 	}
 	status=0;
+	if (f==MFSCOPYGOAL) {
+		if (get_goal(srcname,&goal,&create_mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay,GMODE_NORMAL)<0) {
+			return 1;
+		}
+		smode = SMODE_SET;
+	} else if (f==MFSCOPYTRASHTIME) {
+		if (get_trashtime(srcname,&trashtime,GMODE_NORMAL)<0) {
+			return 1;
+		}
+		smode = SMODE_SET;
+	} else if (f==MFSCOPYEATTR) {
+		if (get_eattr(srcname,&eattr,GMODE_NORMAL)<0) {
+			return 1;
+		}
+		smode = SMODE_SET;
+	} else if (f==MFSCOPYQUOTA) {
+		if (quota_control(srcname,2,&qflags,&graceperiod,&sinodes,&slength,&ssize,&srealsize,&hinodes,&hlength,&hsize,&hrealsize)<0) {
+			return 1;
+		}
+	}
 	while (argc>0) {
 		switch (f) {
 		case MFSGETGOAL:
-			if (get_goal(*argv,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
+			if (get_goal(*argv,&goal,&create_mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
 				status=1;
 			}
 			break;
 		case MFSSETGOAL:
-			if (set_goal(*argv,goal,(rflag)?(smode | SMODE_RMASK):smode)<0) {
+		case MFSCOPYGOAL:
+			if (set_goal(*argv,goal,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay,(rflag)?(smode | SMODE_RMASK):smode)<0) {
 				status=1;
 			}
 			break;
 		case MFSGETTRASHTIME:
-			if (get_trashtime(*argv,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
+			if (get_trashtime(*argv,&trashtime,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
 				status=1;
 			}
 			break;
 		case MFSSETTRASHTIME:
+		case MFSCOPYTRASHTIME:
 			if (set_trashtime(*argv,trashtime,(rflag)?(smode | SMODE_RMASK):smode)<0) {
 				status=1;
 			}
@@ -3668,37 +4798,50 @@ int main(int argc,char **argv) {
 			}
 			break;
 		case MFSGETEATTR:
-			if (get_eattr(*argv,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
+			if (get_eattr(*argv,&eattr,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
 				status=1;
 			}
 			break;
 		case MFSSETEATTR:
-			if (set_eattr(*argv,eattr,(rflag)?(SMODE_RMASK | SMODE_INCREASE):SMODE_INCREASE)<0) {
-				status=1;
-			}
-			break;
 		case MFSDELEATTR:
-			if (set_eattr(*argv,eattr,(rflag)?(SMODE_RMASK | SMODE_DECREASE):SMODE_DECREASE)<0) {
+		case MFSCOPYEATTR:
+			if (set_eattr(*argv,eattr,(rflag)?(smode | SMODE_RMASK):smode)<0) {
 				status=1;
 			}
 			break;
 		case MFSGETQUOTA:
-			if (quota_control(*argv,1,0,0,0,0,0,0,0,0,0)<0) {
+			if (quota_control(*argv,2,&qflags,&graceperiod,&sinodes,&slength,&ssize,&srealsize,&hinodes,&hlength,&hsize,&hrealsize)<0) {
 				status=1;
 			}
 			break;
 		case MFSSETQUOTA:
-			if (quota_control(*argv,0,qflags,sinodes,slength,ssize,srealsize,hinodes,hlength,hsize,hrealsize)<0) {
+		case MFSCOPYQUOTA:
+			if (quota_control(*argv,0,&qflags,&graceperiod,&sinodes,&slength,&ssize,&srealsize,&hinodes,&hlength,&hsize,&hrealsize)<0) {
 				status=1;
 			}
 			break;
 		case MFSDELQUOTA:
-			if (quota_control(*argv,1,qflags,0,0,0,0,0,0,0,0)<0) {
+			if (quota_control(*argv,1,&qflags,&graceperiod,&sinodes,&slength,&ssize,&srealsize,&hinodes,&hlength,&hsize,&hrealsize)<0) {
 				status=1;
 			}
 			break;
 		case MFSFILEPATHS:
 			if (file_paths(*argv)<0) {
+				status=1;
+			}
+			break;
+		case MFSCHKARCHIVE:
+			if (archive_control(*argv,ARCHCTL_GET)<0) {
+				status=1;
+			}
+			break;
+		case MFSSETARCHIVE:
+			if (archive_control(*argv,ARCHCTL_SET)<0) {
+				status=1;
+			}
+			break;
+		case MFSCLRARCHIVE:
+			if (archive_control(*argv,ARCHCTL_CLR)<0) {
 				status=1;
 			}
 			break;

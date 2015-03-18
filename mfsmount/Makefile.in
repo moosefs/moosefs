@@ -107,16 +107,19 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am__dirstamp = $(am__leading_dot)dirstamp
-am_mfsmount_OBJECTS = mfsmount-dirattrcache.$(OBJEXT) \
+am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
+	mfsmount-dirattrcache.$(OBJEXT) \
 	mfsmount-symlinkcache.$(OBJEXT) \
 	mfsmount-negentrycache.$(OBJEXT) mfsmount-xattrcache.$(OBJEXT) \
 	mfsmount-chunkloccache.$(OBJEXT) mfsmount-getgroups.$(OBJEXT) \
 	mfsmount-mfs_fuse.$(OBJEXT) mfsmount-mfs_meta_fuse.$(OBJEXT) \
 	mfsmount-mastercomm.$(OBJEXT) mfsmount-masterproxy.$(OBJEXT) \
-	mfsmount-cscomm.$(OBJEXT) mfsmount-readdata.$(OBJEXT) \
-	mfsmount-writedata.$(OBJEXT) mfsmount-csdb.$(OBJEXT) \
-	mfsmount-stats.$(OBJEXT) mfsmount-oplog.$(OBJEXT) \
-	mfsmount-main.$(OBJEXT) ../mfscommon/mfsmount-clocks.$(OBJEXT) \
+	mfsmount-cscomm.$(OBJEXT) mfsmount-csorder.$(OBJEXT) \
+	mfsmount-readdata.$(OBJEXT) mfsmount-writedata.$(OBJEXT) \
+	mfsmount-csdb.$(OBJEXT) mfsmount-stats.$(OBJEXT) \
+	mfsmount-oplog.$(OBJEXT) mfsmount-main.$(OBJEXT) \
+	../mfscommon/mfsmount-clocks.$(OBJEXT) \
+	../mfscommon/mfsmount-delayrun.$(OBJEXT) \
 	../mfscommon/mfsmount-pcqueue.$(OBJEXT) \
 	../mfscommon/mfsmount-crc.$(OBJEXT) \
 	../mfscommon/mfsmount-md5.$(OBJEXT) \
@@ -134,6 +137,7 @@ mfsmount_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(mfsmount_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_mfstools_OBJECTS = mfstools-mfstools.$(OBJEXT) \
+	mfstools-labelparser.$(OBJEXT) \
 	../mfscommon/mfstools-clocks.$(OBJEXT) \
 	../mfscommon/mfstools-sockets.$(OBJEXT) \
 	../mfscommon/mfstools-strerr.$(OBJEXT) \
@@ -396,9 +400,10 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = -I$(top_srcdir)/mfscommon
 mfsmount_LDADD = $(PTHREAD_LIBS) $(FUSE_LIBS)
-mfsmount_CFLAGS = $(PTHREAD_CFLAGS) -D_USE_PTHREADS $(FUSE_CFLAGS) -DFUSE_USE_VERSION=26 -DAPPNAME=mfsmount
+mfsmount_CFLAGS = $(PTHREAD_CFLAGS) -D_USE_PTHREADS $(FUSE_CFLAGS) -DFUSE_USE_VERSION=29 -DAPPNAME=mfsmount
 mfsmount_CPPFLAGS = $(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
 mfsmount_SOURCES = \
+	labelparser.c labelparser.h \
 	dirattrcache.c dirattrcache.h \
 	symlinkcache.c symlinkcache.h \
 	negentrycache.c negentrycache.h \
@@ -410,6 +415,7 @@ mfsmount_SOURCES = \
 	mastercomm.c mastercomm.h \
 	masterproxy.c masterproxy.h \
 	cscomm.c cscomm.h \
+	csorder.c csorder.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
 	csdb.c csdb.h \
@@ -417,6 +423,7 @@ mfsmount_SOURCES = \
 	oplog.c oplog.h \
 	main.c \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
+	../mfscommon/delayrun.c ../mfscommon/delayrun.h \
 	../mfscommon/pcqueue.c ../mfscommon/pcqueue.h \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/md5.c ../mfscommon/md5.h \
@@ -429,6 +436,7 @@ mfsmount_SOURCES = \
 
 mfstools_SOURCES = \
 	mfstools.c \
+	labelparser.c labelparser.h \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/sockets.c ../mfscommon/sockets.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
@@ -445,8 +453,9 @@ mfstools_links = \
 	mfscheckfile mfsdirinfo mfsfileinfo mfsfilerepair \
 	mfsgetgoal mfsgettrashtime mfsrgetgoal mfsrgettrashtime \
 	mfsrsetgoal mfsrsettrashtime mfssetgoal mfssettrashtime \
-	mfsgeteattr mfsseteattr mfsdeleattr \
-	mfsgetquota mfssetquota mfsdelquota \
+	mfscopygoal mfscopytrashtime \
+	mfsgeteattr mfsseteattr mfsdeleattr mfscopyeattr \
+	mfsgetquota mfssetquota mfsdelquota mfscopyquota \
 	mfsmakesnapshot mfsappendchunks mfsfilepaths
 
 all: all-am
@@ -539,6 +548,9 @@ clean-binPROGRAMS:
 	@: > ../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmount-clocks.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsmount-delayrun.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmount-pcqueue.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmount-crc.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
@@ -614,6 +626,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-clocks.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-conncache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-crc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-delayrun.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-pcqueue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-sockets.Po@am__quote@
@@ -625,8 +638,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunkloccache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-cscomm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csdb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csorder.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirattrcache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-getgroups.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-labelparser.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-mastercomm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-masterproxy.Po@am__quote@
@@ -639,6 +654,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-symlinkcache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-writedata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-xattrcache.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfstools-labelparser.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfstools-mfstools.Po@am__quote@
 
 .c.o:
@@ -664,6 +680,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+mfsmount-labelparser.o: labelparser.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-labelparser.o -MD -MP -MF $(DEPDIR)/mfsmount-labelparser.Tpo -c -o mfsmount-labelparser.o `test -f 'labelparser.c' || echo '$(srcdir)/'`labelparser.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-labelparser.Tpo $(DEPDIR)/mfsmount-labelparser.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='labelparser.c' object='mfsmount-labelparser.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-labelparser.o `test -f 'labelparser.c' || echo '$(srcdir)/'`labelparser.c
+
+mfsmount-labelparser.obj: labelparser.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-labelparser.obj -MD -MP -MF $(DEPDIR)/mfsmount-labelparser.Tpo -c -o mfsmount-labelparser.obj `if test -f 'labelparser.c'; then $(CYGPATH_W) 'labelparser.c'; else $(CYGPATH_W) '$(srcdir)/labelparser.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-labelparser.Tpo $(DEPDIR)/mfsmount-labelparser.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='labelparser.c' object='mfsmount-labelparser.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-labelparser.obj `if test -f 'labelparser.c'; then $(CYGPATH_W) 'labelparser.c'; else $(CYGPATH_W) '$(srcdir)/labelparser.c'; fi`
 
 mfsmount-dirattrcache.o: dirattrcache.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-dirattrcache.o -MD -MP -MF $(DEPDIR)/mfsmount-dirattrcache.Tpo -c -o mfsmount-dirattrcache.o `test -f 'dirattrcache.c' || echo '$(srcdir)/'`dirattrcache.c
@@ -819,6 +849,20 @@ mfsmount-cscomm.obj: cscomm.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-cscomm.obj `if test -f 'cscomm.c'; then $(CYGPATH_W) 'cscomm.c'; else $(CYGPATH_W) '$(srcdir)/cscomm.c'; fi`
 
+mfsmount-csorder.o: csorder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-csorder.o -MD -MP -MF $(DEPDIR)/mfsmount-csorder.Tpo -c -o mfsmount-csorder.o `test -f 'csorder.c' || echo '$(srcdir)/'`csorder.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-csorder.Tpo $(DEPDIR)/mfsmount-csorder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='csorder.c' object='mfsmount-csorder.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-csorder.o `test -f 'csorder.c' || echo '$(srcdir)/'`csorder.c
+
+mfsmount-csorder.obj: csorder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-csorder.obj -MD -MP -MF $(DEPDIR)/mfsmount-csorder.Tpo -c -o mfsmount-csorder.obj `if test -f 'csorder.c'; then $(CYGPATH_W) 'csorder.c'; else $(CYGPATH_W) '$(srcdir)/csorder.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-csorder.Tpo $(DEPDIR)/mfsmount-csorder.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='csorder.c' object='mfsmount-csorder.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-csorder.obj `if test -f 'csorder.c'; then $(CYGPATH_W) 'csorder.c'; else $(CYGPATH_W) '$(srcdir)/csorder.c'; fi`
+
 mfsmount-readdata.o: readdata.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-readdata.o -MD -MP -MF $(DEPDIR)/mfsmount-readdata.Tpo -c -o mfsmount-readdata.o `test -f 'readdata.c' || echo '$(srcdir)/'`readdata.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-readdata.Tpo $(DEPDIR)/mfsmount-readdata.Po
@@ -917,6 +961,20 @@ mfsmount-main.obj: main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
 
+../mfscommon/mfsmount-delayrun.o: ../mfscommon/delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-delayrun.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-delayrun.Tpo -c -o ../mfscommon/mfsmount-delayrun.o `test -f '../mfscommon/delayrun.c' || echo '$(srcdir)/'`../mfscommon/delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-delayrun.Tpo ../mfscommon/$(DEPDIR)/mfsmount-delayrun.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/delayrun.c' object='../mfscommon/mfsmount-delayrun.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-delayrun.o `test -f '../mfscommon/delayrun.c' || echo '$(srcdir)/'`../mfscommon/delayrun.c
+
+../mfscommon/mfsmount-delayrun.obj: ../mfscommon/delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-delayrun.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-delayrun.Tpo -c -o ../mfscommon/mfsmount-delayrun.obj `if test -f '../mfscommon/delayrun.c'; then $(CYGPATH_W) '../mfscommon/delayrun.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/delayrun.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-delayrun.Tpo ../mfscommon/$(DEPDIR)/mfsmount-delayrun.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/delayrun.c' object='../mfscommon/mfsmount-delayrun.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-delayrun.obj `if test -f '../mfscommon/delayrun.c'; then $(CYGPATH_W) '../mfscommon/delayrun.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/delayrun.c'; fi`
+
 ../mfscommon/mfsmount-pcqueue.o: ../mfscommon/pcqueue.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-pcqueue.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-pcqueue.Tpo -c -o ../mfscommon/mfsmount-pcqueue.o `test -f '../mfscommon/pcqueue.c' || echo '$(srcdir)/'`../mfscommon/pcqueue.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-pcqueue.Tpo ../mfscommon/$(DEPDIR)/mfsmount-pcqueue.Po
@@ -1014,6 +1072,20 @@ mfstools-mfstools.obj: mfstools.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfstools.c' object='mfstools-mfstools.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfstools_CFLAGS) $(CFLAGS) -c -o mfstools-mfstools.obj `if test -f 'mfstools.c'; then $(CYGPATH_W) 'mfstools.c'; else $(CYGPATH_W) '$(srcdir)/mfstools.c'; fi`
+
+mfstools-labelparser.o: labelparser.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfstools_CFLAGS) $(CFLAGS) -MT mfstools-labelparser.o -MD -MP -MF $(DEPDIR)/mfstools-labelparser.Tpo -c -o mfstools-labelparser.o `test -f 'labelparser.c' || echo '$(srcdir)/'`labelparser.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfstools-labelparser.Tpo $(DEPDIR)/mfstools-labelparser.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='labelparser.c' object='mfstools-labelparser.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfstools_CFLAGS) $(CFLAGS) -c -o mfstools-labelparser.o `test -f 'labelparser.c' || echo '$(srcdir)/'`labelparser.c
+
+mfstools-labelparser.obj: labelparser.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfstools_CFLAGS) $(CFLAGS) -MT mfstools-labelparser.obj -MD -MP -MF $(DEPDIR)/mfstools-labelparser.Tpo -c -o mfstools-labelparser.obj `if test -f 'labelparser.c'; then $(CYGPATH_W) 'labelparser.c'; else $(CYGPATH_W) '$(srcdir)/labelparser.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfstools-labelparser.Tpo $(DEPDIR)/mfstools-labelparser.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='labelparser.c' object='mfstools-labelparser.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfstools_CFLAGS) $(CFLAGS) -c -o mfstools-labelparser.obj `if test -f 'labelparser.c'; then $(CYGPATH_W) 'labelparser.c'; else $(CYGPATH_W) '$(srcdir)/labelparser.c'; fi`
 
 ../mfscommon/mfstools-clocks.o: ../mfscommon/clocks.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfstools_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfstools-clocks.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfstools-clocks.Tpo -c -o ../mfscommon/mfstools-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c

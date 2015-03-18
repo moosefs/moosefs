@@ -149,8 +149,10 @@ void cpu_used (uint64_t *scpu,uint64_t *ucpu) {
 		rdiff = 0;
 	}
 
+#if !(defined(HAVE_SETITIMER) || defined(HAVE_GETRUSAGE))
 	systime = 0;
 	usertime = 0;
+#endif
 
 //	syslog(LOG_NOTICE,"rdiff1: %"PRIu64,rdiff);
 #if defined(HAVE_SETITIMER)

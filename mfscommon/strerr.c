@@ -18,10 +18,19 @@
  * or visit http://www.gnu.org/licenses/gpl.txt
  */
 
+#if defined(_THREAD_SAFE) || defined(_REENTRANT) || defined(_USE_PTHREADS)
+#  define USE_PTHREADS 1
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include <errno.h>
+#ifdef USE_PTHREADS
+#include <pthread.h>
+#endif
+
+#include "massert.h"
 
 typedef struct errent {
 	int num;
@@ -488,6 +497,50 @@ static errent errtab[] = {
 static errent *errhash = NULL;
 static uint32_t errhsize = 0;
 
+#define STRERR_BUFF_SIZE 100
+
+#ifdef USE_PTHREADS
+static pthread_key_t strerrstorage;
+
+static void strerr_storage_free(void *ptr) {
+	if (ptr!=NULL) {
+		free(ptr);
+	}
+}
+
+static void strerr_storage_init(void) {
+	zassert(pthread_key_create(&strerrstorage,strerr_storage_free));
+	zassert(pthread_setspecific(strerrstorage,NULL));
+}
+
+static void* strerr_storage_get(void) {
+	uint8_t *buff;
+	buff = pthread_getspecific(strerrstorage);
+	if (buff==NULL) {
+		buff = malloc(STRERR_BUFF_SIZE);
+		passert(buff);
+		zassert(pthread_setspecific(strerrstorage,buff));
+	}
+	return buff;
+}
+#else
+static void* strerrstorage = NULL;
+
+static void strerr_storage_free(void) {
+	if (strerrstorage!=NULL) {
+		free(strerrstorage);
+	}
+}
+
+static void* strerr_storage_get(void) {
+	if (strerrstorage==NULL) {
+		strerrstorage = malloc(STRERR_BUFF_SIZE);
+		passert(strerrstorage);
+	}
+	return strerrstorage;
+}
+#endif
+
 void strerr_init(void) {
 	uint32_t n;
 	uint32_t hash,disp;
@@ -517,11 +570,19 @@ void strerr_init(void) {
 			errhash[hash] = errtab[n];
 		}
 	}
+
+#ifdef USE_PTHREADS
+	strerr_storage_init();
+#endif
 }
 
 const char* strerr(int error) {
 	uint32_t hash,disp;
+	char* strbuff;
 
+	if (error==0) {
+		return "Success (errno=0)";
+	}
 	hash = error;
 	disp = ((hash * 760092119) & (errhsize-1)) | 1;
 	hash = ((hash * 1905886897) & (errhsize-1));
@@ -532,9 +593,15 @@ const char* strerr(int error) {
 		hash+=disp;
 		hash&=(errhsize-1);
 	}
-	return "Unknown error";
+	strbuff = strerr_storage_get();
+	snprintf(strbuff,STRERR_BUFF_SIZE,"Unknown error: %d",error);
+	strbuff[STRERR_BUFF_SIZE-1] = 0;
+	return strbuff;
 }
 
 void strerr_term(void) {
 	free(errhash);
+#ifndef USE_PTHREADS
+	strerr_storage_free();
+#endif
 }

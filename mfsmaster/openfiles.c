@@ -29,6 +29,8 @@
 #include "MFSCommunication.h"
 #include "openfiles.h"
 #include "metadata.h"
+#include "flocklocks.h"
+#include "posixlocks.h"
 #include "sessions.h"
 #include "changelog.h"
 #include "main.h"
@@ -81,6 +83,8 @@ static inline void of_newnode(uint32_t sessionid,uint32_t inode) {
 
 static inline void of_delnode(ofrelation *ofr) {
 //	syslog(LOG_NOTICE,"del node: sessionid: %"PRIu32", inode: %"PRIu32,ofr->sessionid,ofr->inode);
+	flock_file_closed(ofr->sessionid,ofr->inode);
+	posix_lock_file_closed(ofr->sessionid,ofr->inode);
 	*(ofr->iprev) = ofr->inext;
 	if (ofr->inext) {
 		ofr->inext->iprev = ofr->iprev;
@@ -92,19 +96,15 @@ static inline void of_delnode(ofrelation *ofr) {
 	free(ofr);
 }
 
-static inline uint8_t of_checknode(uint32_t sessionid,uint32_t inode) {
+uint8_t of_checknode(uint32_t sessionid,uint32_t inode) {
 	ofrelation *ofr;
 	uint32_t ihashpos = OF_INODE_HASH(inode);
 
-//	syslog(LOG_NOTICE,"check node: sessionid: %"PRIu32", inode: %"PRIu32" , ihashpos: %"PRIu32,sessionid,inode,ihashpos);
 	for (ofr = inodehash[ihashpos] ; ofr ; ofr = ofr->inext) {
-//		syslog(LOG_NOTICE,"check node: pointer: %p (sessionid: %"PRIu32", inode: %"PRIu32")",ofr,ofr->sessionid,ofr->inode);
 		if (ofr->sessionid==sessionid && ofr->inode==inode) {
-//			syslog(LOG_NOTICE,"check node: found");
 			return 1;
 		}
 	}
-//	syslog(LOG_NOTICE,"check node: not found");
 	return 0;
 }
 
@@ -201,7 +201,7 @@ void of_openfile(uint32_t sessionid,uint32_t inode) {
 	}
 }
 
-void of_sessionremoved(uint32_t sessionid) {
+void of_session_removed(uint32_t sessionid) {
 	ofrelation *ofr,*nofr;
 	uint32_t shashpos = OF_SESSION_HASH(sessionid);
 
@@ -236,6 +236,37 @@ uint32_t of_noofopenedfiles(uint32_t sessionid) {
 		}
 	}
 	return cnt;
+}
+
+uint32_t of_lsof(uint32_t sessionid,uint8_t *buff) {
+	ofrelation *ofr;
+	uint32_t shashpos;
+	uint32_t ret=0;
+
+	if (sessionid==0) {
+		for (shashpos=0 ; shashpos<OF_SESSION_HASHSIZE ; shashpos++) {
+			for (ofr = sessionhash[shashpos] ; ofr ; ofr = ofr->snext) {
+				if (buff==NULL) {
+					ret+=8;
+				} else {
+					put32bit(&buff,ofr->sessionid);
+					put32bit(&buff,ofr->inode);
+				}
+			}
+		}
+	} else {
+		shashpos = OF_SESSION_HASH(sessionid);
+		for (ofr = sessionhash[shashpos] ; ofr ; ofr = ofr->snext) {
+			if (ofr->sessionid==sessionid) {
+				if (buff==NULL) {
+					ret+=4;
+				} else {
+					put32bit(&buff,ofr->inode);
+				}
+			}
+		}
+	}
+	return ret;
 }
 
 int of_mr_acquire(uint32_t sessionid,uint32_t inode) {
@@ -307,7 +338,9 @@ int of_load(bio *fd,uint8_t mver) {
 	int32_t r;
 	uint32_t sessionid,inode;
 
-	(void)mver;
+	if (mver!=0x10) {
+		return -1;
+	}
 
 	for (;;) {
 		r = bio_read(fd,loadbuff,OF_REC_SIZE);

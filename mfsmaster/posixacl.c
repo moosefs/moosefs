@@ -158,6 +158,7 @@ int posix_acl_perm(uint32_t inode,uint32_t auid,uint32_t agids,uint32_t *agid,ui
 				}
 			}
 		}
+		f = 0;
 		for (j=0 ; j<agids ; j++) {
 			if (agid[j]==fgid) {
 				if ((acn->groupperm & acn->mask & modemask) == modemask) {

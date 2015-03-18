@@ -66,6 +66,7 @@
 #include "changelog.h"
 #include "buckets.h"
 #include "clocks.h"
+#include "labelsets.h"
 
 #define HASHTAB_LOBITS 24
 #define HASHTAB_HISIZE (0x80000000>>(HASHTAB_LOBITS))
@@ -73,7 +74,7 @@
 #define HASHTAB_MASK (HASHTAB_LOSIZE-1)
 #define HASHTAB_MOVEFACTOR 5
 
-#define DEFAULT_GOAL 1
+#define DEFAULT_LSETID 1
 #define DEFAULT_TRASHTIME 86400
 
 #define MAXFNAMELENG 255
@@ -116,6 +117,7 @@ typedef struct _statsrecord {
 } statsrecord;
 
 typedef struct _quotanode {
+	uint32_t graceperiod;
 	uint8_t exceeded;	// hard quota exceeded or soft quota reached time limit
 	uint8_t flags;
 	uint32_t stimestamp;	// time when soft quota exceeded
@@ -128,7 +130,7 @@ typedef struct _quotanode {
 } quotanode;
 
 static quotanode *quotahead;
-static uint32_t QuotaTimeLimit;
+static uint32_t QuotaDefaultGracePeriod;
 
 typedef struct _fsnode {
 	uint32_t id;
@@ -137,7 +139,7 @@ typedef struct _fsnode {
 	unsigned aclpermflag:1;
 	unsigned acldefflag:1;
 	unsigned type:4;
-	unsigned goal:4;
+	unsigned lsetid:8;
 	unsigned spare:4;
 	unsigned flags:4;
 	unsigned mode:12;
@@ -1354,13 +1356,13 @@ static inline void fsnodes_check_quotanode(quotanode *qn,uint32_t ts) {
 		qn->stimestamp = ts;
 		chg = 1;
 	}
-	exceeded = ((qn->stimestamp && qn->stimestamp+QuotaTimeLimit<ts))?1:0;
+	exceeded = ((qn->stimestamp && qn->stimestamp+qn->graceperiod<ts))?1:0;
 	if (qn->exceeded != exceeded) {
 		qn->exceeded = exceeded;
 		chg = 1;
 	}
 	if (chg) {
-		changelog("%"PRIu32"|QUOTA(%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64")",ts,qn->node->id,qn->exceeded,qn->flags,qn->stimestamp,qn->sinodes,qn->hinodes,qn->slength,qn->hlength,qn->ssize,qn->hsize,qn->srealsize,qn->hrealsize);
+		changelog("%"PRIu32"|QUOTA(%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu32")",ts,qn->node->id,qn->exceeded,qn->flags,qn->stimestamp,qn->sinodes,qn->hinodes,qn->slength,qn->hlength,qn->ssize,qn->hsize,qn->srealsize,qn->hrealsize,qn->graceperiod);
 	}
 }
 
@@ -1474,7 +1476,7 @@ static inline void fsnodes_get_stats(fsnode *node,statsrecord *sr) {
 				sr->chunks++;
 			}
 		}
-		sr->realsize = sr->size * node->goal;
+		sr->realsize = sr->size * labelset_get_keepmax_goal(node->lsetid);
 		break;
 	case TYPE_SYMLINK:
 		sr->inodes = 1;
@@ -2004,10 +2006,12 @@ static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nlen
 	p->type = type;
 	p->ctime = p->mtime = p->atime = ts;
 	if (type==TYPE_DIRECTORY || type==TYPE_FILE) {
-		p->goal = node->goal;
+		p->lsetid = node->lsetid;
+		labelset_incref(p->lsetid,p->type);
 		p->trashtime = node->trashtime;
 	} else {
-		p->goal = DEFAULT_GOAL;
+		p->lsetid = 0;
+		labelset_incref(p->lsetid,p->type);
 		p->trashtime = DEFAULT_TRASHTIME;
 	}
 	if (type==TYPE_DIRECTORY) {
@@ -2336,7 +2340,7 @@ static inline void fsnodes_checkfile(fsnode *p,uint32_t chunkcount[11]) {
 	for (i=0 ; i<p->data.fdata.chunks ; i++) {
 		chunkid = p->data.fdata.chunktab[i];
 		if (chunkid>0) {
-			chunk_get_validcopies(chunkid,&count);
+			chunk_get_validcopies(chunkid,&count,NULL,0,NULL);
 			if (count>10) {
 				count=10;
 			}
@@ -2386,7 +2390,7 @@ static inline uint8_t fsnodes_appendchunks(uint32_t ts,fsnode *dstobj,fsnode *sr
 		chunkid = srcobj->data.fdata.chunktab[i];
 		dstobj->data.fdata.chunktab[i+dstchunks] = chunkid;
 		if (chunkid>0) {
-			if (chunk_add_file(chunkid,dstobj->goal)!=STATUS_OK) {
+			if (chunk_add_file(chunkid,dstobj->lsetid)!=STATUS_OK) {
 				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcobj->id,i);
 			}
 		}
@@ -2413,23 +2417,25 @@ static inline uint8_t fsnodes_appendchunks(uint32_t ts,fsnode *dstobj,fsnode *sr
 	return STATUS_OK;
 }
 
-static inline void fsnodes_changefilegoal(fsnode *obj,uint8_t goal) {
+static inline void fsnodes_changefilelsetid(fsnode *obj,uint8_t lsetid) {
 	uint32_t i;
 	statsrecord psr,nsr;
 	fsedge *e;
 
 	fsnodes_get_stats(obj,&psr);
 	nsr = psr;
-	nsr.realsize = goal * nsr.size;
+	nsr.realsize = labelset_get_keepmax_goal(lsetid) * nsr.size;
 	for (e=obj->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
 	for (i=0 ; i<obj->data.fdata.chunks ; i++) {
 		if (obj->data.fdata.chunktab[i]>0) {
-			chunk_change_file(obj->data.fdata.chunktab[i],obj->goal,goal);
+			chunk_change_file(obj->data.fdata.chunktab[i],obj->lsetid,lsetid);
 		}
 	}
-	obj->goal = goal;
+	labelset_decref(obj->lsetid,obj->type);
+	obj->lsetid = lsetid;
+	labelset_incref(lsetid,obj->type);
 }
 
 static inline void fsnodes_setlength(fsnode *obj,uint64_t length) {
@@ -2455,7 +2461,7 @@ static inline void fsnodes_setlength(fsnode *obj,uint64_t length) {
 	for (i=chunks ; i<obj->data.fdata.chunks ; i++) {
 		chunkid = obj->data.fdata.chunktab[i];
 		if (chunkid>0) {
-			if (chunk_delete_file(chunkid,obj->goal)!=STATUS_OK) {
+			if (chunk_delete_file(chunkid,obj->lsetid)!=STATUS_OK) {
 				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,obj->id,i);
 			}
 		}
@@ -2498,7 +2504,7 @@ static inline void fsnodes_remove_node(uint32_t ts,fsnode *toremove) {
 		for (i=0 ; i<toremove->data.fdata.chunks ; i++) {
 			chunkid = toremove->data.fdata.chunktab[i];
 			if (chunkid>0) {
-				if (chunk_delete_file(chunkid,toremove->goal)!=STATUS_OK) {
+				if (chunk_delete_file(chunkid,toremove->lsetid)!=STATUS_OK) {
 					syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,toremove->id,i);
 				}
 			}
@@ -2512,6 +2518,7 @@ static inline void fsnodes_remove_node(uint32_t ts,fsnode *toremove) {
 			symlink_free(toremove->data.sdata.path,toremove->data.sdata.pleng);
 		}
 	}
+	labelset_decref(toremove->lsetid,toremove->type);
 	fsnodes_free_id(toremove->id,ts);
 	if (toremove->xattrflag) {
 		xattr_removeinode(toremove->id);
@@ -2757,28 +2764,28 @@ static inline uint8_t fsnodes_undel(uint32_t ts,fsnode *node) {
 	}
 }
 
-static inline void fsnodes_getgoal_recursive(fsnode *node,uint8_t gmode,uint32_t fgtab[10],uint32_t dgtab[10]) {
+static inline void fsnodes_getgoal_recursive(fsnode *node,uint8_t gmode,uint32_t fgtab[256],uint32_t dgtab[256]) {
 	fsedge *e;
 
 	fsnodes_keep_alive_check();
 	if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
-		if (node->goal>9) {
-			syslog(LOG_WARNING,"inode %"PRIu32": goal>9 !!! - fixing",node->id);
-			fsnodes_changefilegoal(node,9);
-		} else if (node->goal<1) {
-			syslog(LOG_WARNING,"inode %"PRIu32": goal<1 !!! - fixing",node->id);
-			fsnodes_changefilegoal(node,1);
-		}
-		fgtab[node->goal]++;
+//		if (node->goal>9) {
+//			syslog(LOG_WARNING,"inode %"PRIu32": goal>9 !!! - fixing",node->id);
+//			fsnodes_changefilegoal(node,9);
+//		} else if (node->goal<1) {
+//			syslog(LOG_WARNING,"inode %"PRIu32": goal<1 !!! - fixing",node->id);
+//			fsnodes_changefilegoal(node,1);
+//		}
+		fgtab[node->lsetid]++;
 	} else if (node->type==TYPE_DIRECTORY) {
-		if (node->goal>9) {
-			syslog(LOG_WARNING,"inode %"PRIu32": goal>9 !!! - fixing",node->id);
-			node->goal=9;
-		} else if (node->goal<1) {
-			syslog(LOG_WARNING,"inode %"PRIu32": goal<1 !!! - fixing",node->id);
-			node->goal=1;
-		}
-		dgtab[node->goal]++;
+//		if (node->goal>9) {
+//			syslog(LOG_WARNING,"inode %"PRIu32": goal>9 !!! - fixing",node->id);
+//			node->goal=9;
+//		} else if (node->goal<1) {
+//			syslog(LOG_WARNING,"inode %"PRIu32": goal<1 !!! - fixing",node->id);
+//			node->goal=1;
+//		}
+		dgtab[node->lsetid]++;
 		if (gmode==GMODE_RECURSIVE) {
 			for (e = node->data.ddata.children ; e ; e=e->nextchild) {
 				fsnodes_getgoal_recursive(e->child,gmode,fgtab,dgtab);
@@ -2863,6 +2870,44 @@ static inline void fsnodes_geteattr_recursive(fsnode *node,uint8_t gmode,uint32_
 	}
 }
 
+static inline void fsnodes_getarch_recursive(fsnode *node,uint64_t *archchunks,uint64_t *notarchchunks,uint32_t *archinodes,uint32_t *partinodes,uint32_t *notarchinodes) {
+	fsedge *e;
+	uint8_t archflag;
+	uint32_t j,archived,notarchived;
+	uint64_t chunkid;
+
+	fsnodes_keep_alive_check();
+	if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
+		archived = 0;
+		notarchived = 0;
+		for (j=0 ; j<node->data.fdata.chunks ; j++) {
+			chunkid = node->data.fdata.chunktab[j];
+			if (chunkid>0) {
+				if (chunk_get_archflag(chunkid,&archflag)==STATUS_OK) {
+					if (archflag) {
+						archived++;
+					} else {
+						notarchived++;
+					}
+				}
+			}
+		}
+		if (archived>0 && notarchived>0) {
+			(*partinodes)++;
+		} else if (archived==0 && notarchived>0) {
+			(*notarchinodes)++;
+		} else if (notarchived==0 && archived>0) {
+			(*archinodes)++;
+		}
+		(*archchunks) += archived;
+		(*notarchchunks) += notarchived;
+	} else if (node->type==TYPE_DIRECTORY) {
+		for (e = node->data.ddata.children ; e ; e=e->nextchild) {
+			fsnodes_getarch_recursive(e->child,archchunks,notarchchunks,archinodes,partinodes,notarchinodes);
+		}
+	}
+}
+
 static inline uint64_t fsnodes_setgoal_recursive_test_quota(fsnode *node,uint32_t uid,uint8_t goal,uint8_t recursive,uint64_t *realsize) {
 	fsedge *e;
 	uint32_t i,lastchunk,lastchunksize;
@@ -2889,7 +2934,7 @@ static inline uint64_t fsnodes_setgoal_recursive_test_quota(fsnode *node,uint32_
 		return 0;
 	} else if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
 		if (!((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid)) {
-			if (goal>node->goal) {
+			if (goal>labelset_get_keepmax_goal(node->lsetid)) {
 				size = 0;
 				if (node->data.fdata.length>0) {
 					lastchunk = (node->data.fdata.length-1)>>MFSCHUNKBITS;
@@ -2907,7 +2952,7 @@ static inline uint64_t fsnodes_setgoal_recursive_test_quota(fsnode *node,uint32_
 						}
 					}
 				}
-				rs = size * (goal - node->goal);
+				rs = size * (goal - labelset_get_keepmax_goal(node->lsetid));
 				if (recursive<2) {
 					if (fsnodes_test_quota(node,0,0,0,rs)) {
 						return 1;
@@ -2920,39 +2965,41 @@ static inline uint64_t fsnodes_setgoal_recursive_test_quota(fsnode *node,uint32_
 	return 0;
 }
 
-static inline void fsnodes_setgoal_recursive(fsnode *node,uint32_t ts,uint32_t uid,uint8_t goal,uint8_t smode,uint32_t *sinodes,uint32_t *ncinodes,uint32_t *nsinodes) {
+static inline void fsnodes_setgoal_recursive(fsnode *node,uint32_t ts,uint32_t uid,uint8_t lsetid,uint8_t smode,uint8_t admin,uint32_t *sinodes,uint32_t *ncinodes,uint32_t *nsinodes) {
 	fsedge *e;
 	uint8_t set;
 
 	fsnodes_keep_alive_check();
 	if (node->type==TYPE_FILE || node->type==TYPE_DIRECTORY || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
-		if ((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) {
+		if (((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) || ((labelset_has_any_labels(node->lsetid)==0 || labelset_has_any_labels(lsetid)==0) && admin==0)) {
 			(*nsinodes)++;
 		} else {
 			set=0;
 			switch (smode&SMODE_TMASK) {
 			case SMODE_SET:
-				if (node->goal!=goal) {
+				if (node->lsetid!=lsetid) {
 					set=1;
 				}
 				break;
 			case SMODE_INCREASE:
-				if (node->goal<goal) {
+				if (node->lsetid<lsetid) {
 					set=1;
 				}
 				break;
 			case SMODE_DECREASE:
-				if (node->goal>goal) {
+				if (node->lsetid>lsetid) {
 					set=1;
 				}
 				break;
 			}
 			if (set) {
 				if (node->type!=TYPE_DIRECTORY) {
-					fsnodes_changefilegoal(node,goal);
+					fsnodes_changefilelsetid(node,lsetid);
 					(*sinodes)++;
 				} else {
-					node->goal=goal;
+					labelset_decref(node->lsetid,node->type);
+					node->lsetid=lsetid;
+					labelset_incref(lsetid,node->type);
 					(*sinodes)++;
 				}
 				node->ctime = ts;
@@ -2962,7 +3009,7 @@ static inline void fsnodes_setgoal_recursive(fsnode *node,uint32_t ts,uint32_t u
 		}
 		if (node->type==TYPE_DIRECTORY && (smode&SMODE_RMASK)) {
 			for (e = node->data.ddata.children ; e ; e=e->nextchild) {
-				fsnodes_setgoal_recursive(e->child,ts,uid,goal,smode,sinodes,ncinodes,nsinodes);
+				fsnodes_setgoal_recursive(e->child,ts,uid,lsetid,smode,admin,sinodes,ncinodes,nsinodes);
 			}
 		}
 	}
@@ -3054,6 +3101,41 @@ static inline void fsnodes_seteattr_recursive(fsnode *node,uint32_t ts,uint32_t 
 	}
 }
 
+static inline void fsnodes_chgarch_recursive(fsnode *node,uint32_t ts,uint32_t uid,uint8_t cmd,uint64_t *chgchunks,uint64_t *notchgchunks,uint32_t *nsinodes) {
+	fsedge *e;
+	uint32_t aflagchanged;
+	uint32_t allchunks;
+	uint32_t j;
+	uint64_t chunkid;
+
+	fsnodes_keep_alive_check();
+	if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
+		if ((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) {
+			(*nsinodes)++;
+		} else {
+			aflagchanged = 0;
+			allchunks = 0;
+			for (j=0 ; j<node->data.fdata.chunks ; j++) {
+				chunkid = node->data.fdata.chunktab[j];
+				if (chunkid>0) {
+					allchunks++;
+					chunk_univ_archflag(chunkid,(cmd==ARCHCTL_SET)?1:0,&aflagchanged);
+				}
+			}
+			(*chgchunks) += aflagchanged;
+			(*notchgchunks) += (allchunks - aflagchanged);
+			if (cmd==ARCHCTL_CLR) {
+				node->ctime = ts;
+			}
+		}
+	}
+	if (node->type==TYPE_DIRECTORY) {
+		for (e = node->data.ddata.children ; e ; e=e->nextchild) {
+			fsnodes_chgarch_recursive(e->child,ts,uid,cmd,chgchunks,notchgchunks,nsinodes);
+		}
+	}
+}
+
 static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentnode,uint32_t nleng,const uint8_t *name,uint8_t smode,uint8_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t cumask,uint8_t mr) {
 	fsedge *e;
 	fsnode *dstnode;
@@ -3108,7 +3190,9 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 					}
 				}
 				fsnodes_get_stats(dstnode,&psr);
-				dstnode->goal = srcnode->goal;
+				labelset_decref(dstnode->lsetid,dstnode->type);
+				dstnode->lsetid = srcnode->lsetid;
+				labelset_incref(dstnode->lsetid,dstnode->type);
 				dstnode->trashtime = srcnode->trashtime;
 //				dstnode->mode = srcnode->mode;
 //				dstnode->atime = srcnode->atime;
@@ -3121,7 +3205,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 						chunkid = srcnode->data.fdata.chunktab[i];
 						dstnode->data.fdata.chunktab[i] = chunkid;
 						if (chunkid>0) {
-							if (chunk_add_file(chunkid,dstnode->goal)!=STATUS_OK) {
+							if (chunk_add_file(chunkid,dstnode->lsetid)!=STATUS_OK) {
 								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcnode->id,i);
 							}
 						}
@@ -3193,7 +3277,9 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 			}
 			fsnodes_get_stats(dstnode,&psr);
 			if ((smode&SNAPSHOT_MODE_CPLIKE_ATTR)==0) {
-				dstnode->goal = srcnode->goal;
+				labelset_decref(dstnode->lsetid,dstnode->type);
+				dstnode->lsetid = srcnode->lsetid;
+				labelset_incref(dstnode->lsetid,dstnode->type);
 				dstnode->trashtime = srcnode->trashtime;
 				dstnode->flags = srcnode->flags;
 				dstnode->mode = srcnode->mode;
@@ -3221,7 +3307,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 						chunkid = srcnode->data.fdata.chunktab[i];
 						dstnode->data.fdata.chunktab[i] = chunkid;
 						if (chunkid>0) {
-							if (chunk_add_file(chunkid,dstnode->goal)!=STATUS_OK) {
+							if (chunk_add_file(chunkid,dstnode->lsetid)!=STATUS_OK) {
 								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcnode->id,i);
 							}
 						}
@@ -3310,7 +3396,7 @@ static inline uint8_t fsnodes_snapshot_recursive_test_quota(fsnode *srcnode,fsno
 				}
 			}
 			(*size) += fsize;
-			(*realsize) += fsize * dstnode->goal;
+			(*realsize) += fsize * labelset_get_keepmax_goal(dstnode->lsetid);
 		} else if (dstnode->type==TYPE_SYMLINK) {
 			(*length) += dstnode->data.sdata.pleng;
 		} else if (dstnode->type==TYPE_DIRECTORY) {
@@ -3718,7 +3804,13 @@ uint8_t fs_get_paths_size(uint32_t rootinode,uint32_t inode,uint32_t *psize) {
 		return ERROR_ENOENT;
 	}
 
-	*psize = fsnodes_get_paths_size(rootinode,p);
+	if (p->type==TYPE_TRASH) {
+		*psize += 7+4;
+	} else if (p->type==TYPE_SUSTAINED) {
+		*psize += 11+4;
+	} else {
+		*psize = fsnodes_get_paths_size(rootinode,p);
+	}
 	return STATUS_OK;
 }
 
@@ -3726,7 +3818,15 @@ void fs_get_paths_data(uint32_t rootinode,uint32_t inode,uint8_t *buff) {
 	fsnode *p;
 
 	if (fsnodes_node_find_ext(rootinode,0,&inode,NULL,&p,0)) {
-		fsnodes_get_paths_data(rootinode,p,buff);
+		if (p->type==TYPE_TRASH) {
+			put32bit(&buff,7);
+			memcpy(buff,"./TRASH",7);
+		} else if (p->type==TYPE_SUSTAINED) {
+			put32bit(&buff,11);
+			memcpy(buff,"./SUSTAINED",11);
+		} else {
+			fsnodes_get_paths_data(rootinode,p,buff);
+		}
 	}
 }
 
@@ -3901,7 +4001,7 @@ uint8_t fs_getattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	return STATUS_OK;
 }
 
-uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint64_t *chunkid) {
+uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint32_t *indx,uint64_t *prevchunkid,uint64_t *chunkid) {
 	fsnode *p;
 	memset(attr,0,35);
 	if (sesflags&SESFLAG_READONLY) {
@@ -3944,24 +4044,25 @@ uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 				size_diff = lastchunksize_post-lastchunksize_pre;
 			}
 		}
-		if (fsnodes_test_quota(p,0,length-p->data.fdata.length,size_diff,p->goal*size_diff)) {
+		if (fsnodes_test_quota(p,0,length-p->data.fdata.length,size_diff,labelset_get_keepmax_goal(p->lsetid)*size_diff)) {
 			return ERROR_QUOTA;
 		}
 	}
 	if (length&MFSCHUNKMASK) {
-		uint32_t indx = (length>>MFSCHUNKBITS);
-		if (indx<p->data.fdata.chunks) {
-			uint64_t ochunkid = p->data.fdata.chunktab[indx];
+		*indx = (length>>MFSCHUNKBITS);
+		if (*indx<p->data.fdata.chunks) {
+			uint64_t ochunkid = p->data.fdata.chunktab[*indx];
 			if (ochunkid>0) {
 				uint8_t status;
 				uint64_t nchunkid;
-				status = chunk_multi_truncate(&nchunkid,ochunkid,length&MFSCHUNKMASK,p->goal);
+				status = chunk_multi_truncate(&nchunkid,ochunkid,length&MFSCHUNKMASK,p->lsetid);
+				*prevchunkid = ochunkid;
 				if (status!=STATUS_OK) {
 					return status;
 				}
-				p->data.fdata.chunktab[indx] = nchunkid;
+				p->data.fdata.chunktab[*indx] = nchunkid;
 				*chunkid = nchunkid;
-				changelog("%"PRIu32"|TRUNC(%"PRIu32",%"PRIu32"):%"PRIu64,(uint32_t)main_time(),inode,indx,nchunkid);
+				changelog("%"PRIu32"|TRUNC(%"PRIu32",%"PRIu32"):%"PRIu64,(uint32_t)main_time(),inode,*indx,nchunkid);
 				return ERROR_DELAYED;
 			}
 		}
@@ -3989,7 +4090,7 @@ uint8_t fs_mr_trunc(uint32_t ts,uint32_t inode,uint32_t indx,uint64_t nchunkid) 
 		return ERROR_EINVAL;
 	}
 	ochunkid = p->data.fdata.chunktab[indx];
-	status = chunk_mr_multi_truncate(ts,&nchunkid,ochunkid,p->goal);
+	status = chunk_mr_multi_truncate(ts,&nchunkid,ochunkid,p->lsetid);
 	if (status!=STATUS_OK) {
 		return status;
 	}
@@ -4017,7 +4118,7 @@ uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint3
 		return ERROR_ENOENT;
 	}
 	fsnodes_setlength(p,length);
-	changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64")",ts,inode,p->data.fdata.length);
+	changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",1)",ts,inode,p->data.fdata.length);
 	p->ctime = p->mtime = ts;
 	fsnodes_fill_attr(p,NULL,uid,gid,auid,agid,sesflags,attr);
 	stats_setattr++;
@@ -4044,6 +4145,11 @@ uint8_t fs_setattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	if ((p->flags&EATTR_NOOWNER)==0) {
 		if (uid!=0 && uid!=p->uid && (setmask&(SET_MODE_FLAG|SET_UID_FLAG|SET_GID_FLAG|SET_ATIME_FLAG|SET_MTIME_FLAG))) {
 			return ERROR_EPERM;
+		}
+		if (uid!=0 && uid!=p->uid && (setmask&(SET_ATIME_NOW_FLAG|SET_MTIME_NOW_FLAG))) {
+			if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_W,sesflags)) {
+				return ERROR_EACCES;
+			}
 		}
 	}
 	if (uid!=0 && uid!=attruid && (setmask&SET_UID_FLAG)) {
@@ -4146,6 +4252,12 @@ uint8_t fs_setattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	if (setmask&SET_MTIME_FLAG) {
 		p->mtime = attrmtime;
 	}
+	if (setmask&SET_ATIME_NOW_FLAG) {
+		p->atime = ts;
+	}
+	if (setmask&SET_MTIME_NOW_FLAG) {
+		p->mtime = ts;
+	}
 	changelog("%"PRIu32"|ATTR(%"PRIu32",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32")",ts,inode,(uint16_t)(p->mode),p->uid,p->gid,p->atime,p->mtime);
 	p->ctime = ts;
 	fsnodes_fill_attr(p,NULL,uid,gid[0],auid,agid,sesflags,attr);
@@ -4175,7 +4287,7 @@ uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_
 	return STATUS_OK;
 }
 
-uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length) {
+uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length,uint8_t canmodmtime) {
 	fsnode *p;
 	p = fsnodes_node_find(inode);
 	if (!p) {
@@ -4185,8 +4297,9 @@ uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length) {
 		return ERROR_EINVAL;
 	}
 	fsnodes_setlength(p,length);
-	p->mtime = ts;
-	p->ctime = ts;
+	if (canmodmtime) {
+		p->mtime = p->ctime = ts;
+	}
 	meta_version_inc();
 	return STATUS_OK;
 }
@@ -4807,7 +4920,7 @@ uint8_t fs_univ_append(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 				}
 			}
 		}
-		if (fsnodes_test_quota(p,0,lengdiff,sizediff,p->goal*sizediff)) {
+		if (fsnodes_test_quota(p,0,lengdiff,sizediff,labelset_get_keepmax_goal(p->lsetid)*sizediff)) {
 			return ERROR_QUOTA;
 		}
 	}
@@ -4927,7 +5040,7 @@ uint8_t fs_opencheck(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 	return STATUS_OK;
 }
 
-uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *length) {
+uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint64_t *chunkid,uint64_t *length) {
 	fsnode *p;
 	uint32_t ts = main_time();
 
@@ -4947,7 +5060,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *le
 		*chunkid = p->data.fdata.chunktab[indx];
 	}
 	*length = p->data.fdata.length;
-	if (p->atime!=ts) {
+	if (p->atime!=ts && canmodatime) {
 		p->atime = ts;
 		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
 	}
@@ -4955,10 +5068,10 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *le
 	return STATUS_OK;
 }
 
-uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *length,uint8_t *opflag) {
+uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint64_t *prevchunkid,uint64_t *chunkid,uint64_t *length,uint8_t *opflag) {
 	int status;
 	uint32_t i;
-	uint64_t ochunkid,nchunkid;
+	uint64_t ochunkid,nchunkid,nlength,lengdiff;
 	statsrecord psr,nsr;
 	fsedge *e;
 	fsnode *p;
@@ -4993,21 +5106,26 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *l
 		lastchunksize = MFSHDRSIZE;
 	}
 	if (indx<lastchunk) {
+		nlength = p->data.fdata.length;
 		if (indx>=p->data.fdata.chunks || p->data.fdata.chunktab[indx]==0) {
 			sizediff = MFSCHUNKSIZE+MFSHDRSIZE;
 		} else {
 			sizediff = 0;
 		}
 	} else if (indx==lastchunk) {
+		nlength = p->data.fdata.length;
 		if (indx>=p->data.fdata.chunks || p->data.fdata.chunktab[indx]==0) {
 			sizediff = MFSCHUNKSIZE+MFSHDRSIZE;
 		} else {
 			sizediff = (MFSCHUNKSIZE+MFSHDRSIZE) - lastchunksize;
 		}
 	} else {
+		nlength = indx;
+		nlength <<= MFSCHUNKBITS;
 		sizediff = MFSCHUNKSIZE+MFSHDRSIZE;
 	}
-	if (fsnodes_test_quota(p,0,0/*lengdiff*/,sizediff,p->goal*sizediff)) {
+	lengdiff = nlength - p->data.fdata.length;
+	if (fsnodes_test_quota(p,0,lengdiff,sizediff,labelset_get_keepmax_goal(p->lsetid)*sizediff)) {
 		return ERROR_QUOTA;
 	}
 	fsnodes_get_stats(p,&psr);
@@ -5026,29 +5144,32 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *l
 		p->data.fdata.chunks = newchunks;
 	}
 	ochunkid = p->data.fdata.chunktab[indx];
-	status = chunk_multi_modify(&nchunkid,ochunkid,p->goal,opflag);
+	*prevchunkid = ochunkid;
+	status = chunk_multi_modify(&nchunkid,ochunkid,p->lsetid,opflag);
 	if (status!=STATUS_OK) {
 		return status;
 	}
 	p->data.fdata.chunktab[indx] = nchunkid;
+	p->data.fdata.length = nlength;
 	fsnodes_get_stats(p,&nsr);
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
 	*chunkid = nchunkid;
 	*length = p->data.fdata.length;
-	changelog("%"PRIu32"|WRITE(%"PRIu32",%"PRIu32",%"PRIu8"):%"PRIu64,ts,inode,indx,*opflag,nchunkid);
-	if (p->mtime!=ts || p->ctime!=ts) {
+	changelog("%"PRIu32"|WRITE(%"PRIu32",%"PRIu32",%"PRIu8",%u):%"PRIu64,ts,inode,indx,*opflag,canmodmtime?1:0,nchunkid);
+	if ((p->mtime!=ts || p->ctime!=ts) && canmodmtime) {
 		p->mtime = p->ctime = ts;
 	}
+//	syslog(LOG_NOTICE,"write end: inode: %u ; indx: %u ; chunktab[indx]: %"PRIu64" ; chunks: %u",inode,indx,p->data.fdata.chunktab[indx],p->data.fdata.chunks);
 	stats_write++;
 	return STATUS_OK;
 }
 
-uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint64_t nchunkid) {
+uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint8_t canmodmtime,uint64_t nchunkid) {
 	int status;
 	uint32_t i;
-	uint64_t ochunkid;
+	uint64_t ochunkid,nlength;
 	statsrecord psr,nsr;
 	fsedge *e;
 	fsnode *p;
@@ -5078,22 +5199,78 @@ uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint
 		}
 		p->data.fdata.chunks = newchunks;
 	}
+	nlength = indx;
+	nlength<<=MFSCHUNKBITS;
+	if (nlength < p->data.fdata.length) {
+		nlength = p->data.fdata.length;
+	}
 	ochunkid = p->data.fdata.chunktab[indx];
-	status = chunk_mr_multi_modify(ts,&nchunkid,ochunkid,p->goal,opflag);
+	status = chunk_mr_multi_modify(ts,&nchunkid,ochunkid,p->lsetid,opflag);
 	if (status!=STATUS_OK) {
 		return status;
 	}
 	p->data.fdata.chunktab[indx] = nchunkid;
+	p->data.fdata.length = nlength;
 	fsnodes_get_stats(p,&nsr);
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
 	meta_version_inc();
-	p->mtime = p->ctime = ts;
+	if (canmodmtime) {
+		p->mtime = p->ctime = ts;
+	}
 	return STATUS_OK;
 }
 
-uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid) {
+static inline uint8_t fs_univ_rollback(uint8_t mr,uint32_t inode,uint32_t indx,uint64_t prevchunkid,uint64_t chunkid) {
+	uint32_t ts = main_time();
+	statsrecord psr,nsr;
+	fsedge *e;
+	fsnode *p;
+//	syslog(LOG_NOTICE,"rollback inode:%u indx:%u !!!",inode,indx);
+	p = fsnodes_node_find(inode);
+	if (!p) {
+		return ERROR_ENOENT;
+	}
+	if (p->type!=TYPE_FILE && p->type!=TYPE_TRASH && p->type!=TYPE_SUSTAINED) {
+		return ERROR_EPERM;
+	}
+	if (indx>MAX_INDEX) {
+		return ERROR_INDEXTOOBIG;
+	}
+	if (indx>=p->data.fdata.chunks) {
+		return ERROR_EINVAL;
+	}
+	if (prevchunkid!=chunkid) {
+		fsnodes_get_stats(p,&psr);
+		if (prevchunkid>0) {
+			chunk_add_file(prevchunkid,p->lsetid);
+		}
+		chunk_delete_file(chunkid,p->lsetid);
+		p->data.fdata.chunktab[indx] = prevchunkid;
+		fsnodes_get_stats(p,&nsr);
+		for (e=p->parents ; e ; e=e->nextparent) {
+			fsnodes_add_sub_stats(e->parent,&nsr,&psr);
+		}
+	}
+	chunk_unlock(chunkid);
+	if (mr) {
+		meta_version_inc();
+	} else {
+		changelog("%"PRIu32"|ROLLBACK(%"PRIu32",%"PRIu32",%"PRIu64",%"PRIu64")",ts,inode,indx,prevchunkid,chunkid);
+	}
+	return STATUS_OK;
+}
+
+uint8_t fs_rollback(uint32_t inode,uint32_t indx,uint64_t prevchunkid,uint64_t chunkid) {
+	return fs_univ_rollback(0,inode,indx,prevchunkid,chunkid);
+}
+
+uint8_t fs_mr_rollback(uint32_t inode,uint32_t indx,uint64_t prevchunkid,uint64_t chunkid) {
+	return fs_univ_rollback(1,inode,indx,prevchunkid,chunkid);
+}
+
+uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t canmodmtime) {
 	uint32_t ts = main_time();
 	if (length>0) {
 		fsnode *p;
@@ -5104,26 +5281,34 @@ uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid) {
 		if (p->type!=TYPE_FILE && p->type!=TYPE_TRASH && p->type!=TYPE_SUSTAINED) {
 			return ERROR_EPERM;
 		}
+//		syslog(LOG_NOTICE,"writeend: inode: %u ; length: %"PRIu64":%"PRIu64" ; chunkid: %016"PRIX64,inode,length,p->data.fdata.length,chunkid);
+//		{
+//			uint32_t i;
+//			for (i=0 ; i<p->data.fdata.chunks ; i++) {
+//				syslog(LOG_NOTICE,"writeend: inode: %u ; indx: %u ; chunkid: %016"PRIX64,inode,i,p->data.fdata.chunktab[i]);
+//			}
+//		}
 		if (length>p->data.fdata.length) {
 			if (fsnodes_test_quota(p,0,length-p->data.fdata.length,0,0)) {
 				return ERROR_QUOTA;
 			}
 			fsnodes_setlength(p,length);
-			p->mtime = p->ctime = ts;
-			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64")",ts,inode,length);
+			if (canmodmtime) {
+				p->mtime = p->ctime = ts;
+			}
+			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",%u)",ts,inode,length,canmodmtime?1:0);
 		}
+//		{
+//			uint32_t i;
+//			for (i=0 ; i<p->data.fdata.chunks ; i++) {
+//				syslog(LOG_NOTICE,"writeend: inode: %u ; indx: %u ; chunkid: %016"PRIX64,inode,i,p->data.fdata.chunktab[i]);
+//			}
+//		}
+//	} else {
+//		syslog(LOG_NOTICE,"writeend: inode: %u ; length: 0 ; chunkid: %016"PRIX64,inode,chunkid);
 	}
 	changelog("%"PRIu32"|UNLOCK(%"PRIu64")",ts,chunkid);
 	return chunk_unlock(chunkid);
-}
-
-void fs_incversion(uint64_t chunkid) {
-	changelog("%"PRIu32"|INCVERSION(%"PRIu64")",(uint32_t)main_time(),chunkid);
-}
-
-uint8_t fs_mr_incversion(uint64_t chunkid) {
-	meta_version_inc();
-	return chunk_mr_increase_version(chunkid);
 }
 
 uint8_t fs_repair(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *notchanged,uint32_t *erased,uint32_t *repaired) {
@@ -5150,7 +5335,7 @@ uint8_t fs_repair(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t ui
 	}
 	fsnodes_get_stats(p,&psr);
 	for (indx=0 ; indx<p->data.fdata.chunks ; indx++) {
-		if (chunk_repair(p->goal,p->data.fdata.chunktab[indx],&nversion)) {
+		if (chunk_repair(p->lsetid,p->data.fdata.chunktab[indx],&nversion)) {
 			changelog("%"PRIu32"|REPAIR(%"PRIu32",%"PRIu32"):%"PRIu32,ts,inode,indx,nversion);
 			p->mtime = p->ctime = ts;
 			if (nversion>0) {
@@ -5193,7 +5378,7 @@ uint8_t fs_mr_repair(uint32_t ts,uint32_t inode,uint32_t indx,uint32_t nversion)
 	}
 	fsnodes_get_stats(p,&psr);
 	if (nversion==0) {
-		status = chunk_delete_file(p->data.fdata.chunktab[indx],p->goal);
+		status = chunk_delete_file(p->data.fdata.chunktab[indx],p->lsetid);
 		p->data.fdata.chunktab[indx]=0;
 	} else {
 		status = chunk_mr_set_version(p->data.fdata.chunktab[indx],nversion);
@@ -5207,11 +5392,11 @@ uint8_t fs_mr_repair(uint32_t ts,uint32_t inode,uint32_t indx,uint32_t nversion)
 	return status;
 }
 
-uint8_t fs_getgoal(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t gmode,uint32_t fgtab[10],uint32_t dgtab[10]) {
+uint8_t fs_getgoal(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t gmode,uint32_t fgtab[256],uint32_t dgtab[256]) {
 	fsnode *p;
 	(void)sesflags;
-	memset(fgtab,0,10*sizeof(uint32_t));
-	memset(dgtab,0,10*sizeof(uint32_t));
+	memset(fgtab,0,256*sizeof(uint32_t));
+	memset(dgtab,0,256*sizeof(uint32_t));
 	if (!GMODE_ISVALID(gmode)) {
 		return ERROR_EINVAL;
 	}
@@ -5280,15 +5465,19 @@ uint8_t fs_geteattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t g
 	return STATUS_OK;
 }
 
-uint8_t fs_univ_setgoal(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t goal,uint8_t smode,uint32_t *sinodes,uint32_t *ncinodes,uint32_t *nsinodes) {
+uint8_t fs_univ_setgoal(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t lsetid,uint8_t smode,uint32_t *sinodes,uint32_t *ncinodes,uint32_t *nsinodes) {
 	uint64_t realsize;
+	uint8_t admin;
 	fsnode *p;
 
 	*sinodes = 0;
 	*ncinodes = 0;
 	*nsinodes = 0;
 
-	if (!SMODE_ISVALID(smode) || goal>9 || goal<1) {
+	if (!SMODE_ISVALID(smode) || lsetid<1) {
+		return ERROR_EINVAL;
+	}
+	if ((smode==SMODE_INCREASE || smode==SMODE_DECREASE) && lsetid>9) {
 		return ERROR_EINVAL;
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0 && (sesflags&SESFLAG_READONLY)) {
@@ -5306,33 +5495,35 @@ uint8_t fs_univ_setgoal(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t
 		// quota
 		if ((smode&SMODE_TMASK)==SMODE_SET || (smode&SMODE_TMASK)==SMODE_INCREASE) {
 			realsize = 0;
-			if (fsnodes_setgoal_recursive_test_quota(p,uid,goal,(smode&SMODE_RMASK)?1:0,&realsize)) {
+			if (fsnodes_setgoal_recursive_test_quota(p,uid,labelset_get_keepmax_goal(lsetid),(smode&SMODE_RMASK)?1:0,&realsize)) {
 				return ERROR_QUOTA;
 			}
 		}
 	}
 
-	fsnodes_setgoal_recursive(p,ts,uid,goal,smode,sinodes,ncinodes,nsinodes);
+	admin = (sesflags&(SESFLAG_ADMIN|SESFLAG_METARESTORE))?1:0;
+
+	fsnodes_setgoal_recursive(p,ts,uid,lsetid,smode,admin,sinodes,ncinodes,nsinodes);
 	if ((smode&SMODE_RMASK)==0 && *nsinodes>0 && *sinodes==0 && *ncinodes==0) {
 		return ERROR_EPERM;
 	}
 
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		changelog("%"PRIu32"|SETGOAL(%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu8"):%"PRIu32",%"PRIu32",%"PRIu32,ts,inode,uid,goal,smode,*sinodes,*ncinodes,*nsinodes);
+		changelog("%"PRIu32"|SETGOAL(%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu8"):%"PRIu32",%"PRIu32",%"PRIu32,ts,inode,uid,lsetid,smode,*sinodes,*ncinodes,*nsinodes);
 	} else {
 		meta_version_inc();
 	}
 	return STATUS_OK;
 }
 
-uint8_t fs_setgoal(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t goal,uint8_t smode,uint32_t *sinodes,uint32_t *ncinodes,uint32_t *nsinodes) {
-	return fs_univ_setgoal(main_time(),rootinode,sesflags,inode,uid,goal,smode,sinodes,ncinodes,nsinodes);
+uint8_t fs_setgoal(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t lsetid,uint8_t smode,uint32_t *sinodes,uint32_t *ncinodes,uint32_t *nsinodes) {
+	return fs_univ_setgoal(main_time(),rootinode,sesflags,inode,uid,lsetid,smode,sinodes,ncinodes,nsinodes);
 }
 
-uint8_t fs_mr_setgoal(uint32_t ts,uint32_t inode,uint32_t uid,uint8_t goal,uint8_t smode,uint32_t sinodes,uint32_t ncinodes,uint32_t nsinodes) {
+uint8_t fs_mr_setgoal(uint32_t ts,uint32_t inode,uint32_t uid,uint8_t lsetid,uint8_t smode,uint32_t sinodes,uint32_t ncinodes,uint32_t nsinodes) {
 	uint32_t si,nci,nsi;
 	uint8_t status;
-	status = fs_univ_setgoal(ts,0,SESFLAG_METARESTORE,inode,uid,goal,smode,&si,&nci,&nsi);
+	status = fs_univ_setgoal(ts,0,SESFLAG_METARESTORE,inode,uid,lsetid,smode,&si,&nci,&nsi);
 	if (status!=STATUS_OK) {
 		return status;
 	}
@@ -5632,7 +5823,7 @@ uint8_t fs_mr_setacl(uint32_t ts,uint32_t inode,uint16_t mode,uint8_t changectim
 	return STATUS_OK;
 }
 
-uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t delflag,uint8_t *flags,uint32_t *sinodes,uint64_t *slength,uint64_t *ssize,uint64_t *srealsize,uint32_t *hinodes,uint64_t *hlength,uint64_t *hsize,uint64_t *hrealsize,uint32_t *curinodes,uint64_t *curlength,uint64_t *cursize,uint64_t *currealsize) {
+uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t delflag,uint8_t *flags,uint32_t *graceperiod,uint32_t *sinodes,uint64_t *slength,uint64_t *ssize,uint64_t *srealsize,uint32_t *hinodes,uint64_t *hlength,uint64_t *hsize,uint64_t *hrealsize,uint32_t *curinodes,uint64_t *curlength,uint64_t *cursize,uint64_t *currealsize) {
 	fsnode *p;
 	quotanode *qn;
 	statsrecord *psr;
@@ -5672,6 +5863,9 @@ uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 		}
 		if (qn) {
 			qn->flags |= *flags;
+			if (*graceperiod!=0) {
+				qn->graceperiod = *graceperiod;
+			}
 			if ((*flags)&QUOTA_FLAG_SINODES) {
 				qn->sinodes = *sinodes;
 			}
@@ -5724,6 +5918,7 @@ uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 			qn->hrealsize = 0;
 		}
 		*flags = qn->flags;
+		*graceperiod = qn->graceperiod;
 		*sinodes = qn->sinodes;
 		*slength = qn->slength;
 		*ssize = qn->ssize;
@@ -5734,6 +5929,7 @@ uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 		*hrealsize = qn->hrealsize;
 	} else {
 		*flags = 0;
+		*graceperiod = 0;
 		*sinodes = 0;
 		*slength = 0;
 		*ssize = 0;
@@ -5750,15 +5946,15 @@ uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 	*currealsize = psr->realsize;
 	if (chg) {
 		if (qn) {
-			changelog("%"PRIu32"|QUOTA(%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64")",main_time(),inode,qn->exceeded,qn->flags,qn->stimestamp,qn->sinodes,qn->hinodes,qn->slength,qn->hlength,qn->ssize,qn->hsize,qn->srealsize,qn->hrealsize);
+			changelog("%"PRIu32"|QUOTA(%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu32")",main_time(),inode,qn->exceeded,qn->flags,qn->stimestamp,qn->sinodes,qn->hinodes,qn->slength,qn->hlength,qn->ssize,qn->hsize,qn->srealsize,qn->hrealsize,qn->graceperiod);
 		} else {
-			changelog("%"PRIu32"|QUOTA(%"PRIu32",0,0,0,0,0,0,0,0,0,0,0)",main_time(),inode);
+			changelog("%"PRIu32"|QUOTA(%"PRIu32",0,0,0,0,0,0,0,0,0,0,0,0)",main_time(),inode);
 		}
 	}
 	return STATUS_OK;
 }
 
-uint8_t fs_mr_quota(uint32_t ts,uint32_t inode,uint8_t exceeded,uint8_t flags,uint32_t stimestamp,uint32_t sinodes,uint32_t hinodes,uint64_t slength,uint64_t hlength,uint64_t ssize,uint64_t hsize,uint64_t srealsize,uint64_t hrealsize) {
+uint8_t fs_mr_quota(uint32_t ts,uint32_t inode,uint8_t exceeded,uint8_t flags,uint32_t stimestamp,uint32_t sinodes,uint32_t hinodes,uint64_t slength,uint64_t hlength,uint64_t ssize,uint64_t hsize,uint64_t srealsize,uint64_t hrealsize,uint32_t graceperiod) {
 	fsnode *p;
 	quotanode *qn;
 
@@ -5780,6 +5976,9 @@ uint8_t fs_mr_quota(uint32_t ts,uint32_t inode,uint8_t exceeded,uint8_t flags,ui
 			qn = fsnodes_new_quotanode(p);
 		}
 		qn->flags = flags;
+		if (graceperiod!=0) {
+			qn->graceperiod = graceperiod;
+		}
 		qn->exceeded = exceeded;
 		qn->stimestamp = stimestamp;
 		qn->sinodes = sinodes;
@@ -5796,85 +5995,154 @@ uint8_t fs_mr_quota(uint32_t ts,uint32_t inode,uint8_t exceeded,uint8_t flags,ui
 }
 
 
-uint32_t fs_getquotainfo_size() {
-	quotanode *qn;
-	uint32_t s=0,size;
-//	s=4;	// QuotaTimeLimit
-	for (qn=quotahead ; qn ; qn=qn->next) {
-		size=fsnodes_getpath_size(qn->node->parents);
-		s+=4+4+1+1+4+3*(4+8+8+8)+1+size;
-	}
-	return s;
-}
-
-void fs_getquotainfo_data(uint8_t * buff) {
+uint32_t fs_getquotainfo(uint8_t *buff) {
 	quotanode *qn;
 	statsrecord *psr;
 	uint32_t size;
-	uint32_t ts = main_time();
-//	put32bit(&buff,QuotaTimeLimit);
-	for (qn=quotahead ; qn ; qn=qn->next) {
-		psr = &(qn->node->data.ddata.stats);
-		put32bit(&buff,qn->node->id);
-		size=fsnodes_getpath_size(qn->node->parents);
-		put32bit(&buff,size+1);
-		put8bit(&buff,'/');
-		fsnodes_getpath_data(qn->node->parents,buff,size);
-		buff+=size;
-		put8bit(&buff,qn->exceeded);
-		put8bit(&buff,qn->flags);
-		if (qn->stimestamp==0) {					// soft quota not exceeded
-			put32bit(&buff,0xFFFFFFFF); 				// time to block = INF
-		} else if (qn->stimestamp+QuotaTimeLimit<ts) {			// soft quota timed out
-			put32bit(&buff,0);					// time to block = 0 (blocked)
-		} else {							// soft quota exceeded, but not timed out
-			put32bit(&buff,qn->stimestamp+QuotaTimeLimit-ts);
-		}
-		if (qn->flags&QUOTA_FLAG_SINODES) {
-			put32bit(&buff,qn->sinodes);
-		} else {
-			put32bit(&buff,0);
-		}
-		if (qn->flags&QUOTA_FLAG_SLENGTH) {
-			put64bit(&buff,qn->slength);
-		} else {
-			put64bit(&buff,0);
-		}
-		if (qn->flags&QUOTA_FLAG_SSIZE) {
-			put64bit(&buff,qn->ssize);
-		} else {
-			put64bit(&buff,0);
-		}
-		if (qn->flags&QUOTA_FLAG_SREALSIZE) {
-			put64bit(&buff,qn->srealsize);
-		} else {
-			put64bit(&buff,0);
-		}
-		if (qn->flags&QUOTA_FLAG_HINODES) {
-			put32bit(&buff,qn->hinodes);
-		} else {
-			put32bit(&buff,0);
-		}
-		if (qn->flags&QUOTA_FLAG_HLENGTH) {
-			put64bit(&buff,qn->hlength);
-		} else {
-			put64bit(&buff,0);
-		}
-		if (qn->flags&QUOTA_FLAG_HSIZE) {
-			put64bit(&buff,qn->hsize);
-		} else {
-			put64bit(&buff,0);
-		}
-		if (qn->flags&QUOTA_FLAG_HREALSIZE) {
-			put64bit(&buff,qn->hrealsize);
-		} else {
-			put64bit(&buff,0);
-		}
-		put32bit(&buff,psr->inodes);
-		put64bit(&buff,psr->length);
-		put64bit(&buff,psr->size);
-		put64bit(&buff,psr->realsize);
+	uint32_t ts;
+	if (buff!=NULL) {
+		ts = main_time();
+	} else {
+		ts = 0;
 	}
+	for (qn=quotahead ; qn ; qn=qn->next) {
+		size=fsnodes_getpath_size(qn->node->parents);
+		if (buff==NULL) {
+			ts += 4+4+4+1+1+4+3*(4+8+8+8)+1+size;
+		} else {
+			psr = &(qn->node->data.ddata.stats);
+			put32bit(&buff,qn->node->id);
+			put32bit(&buff,size+1);
+			put8bit(&buff,'/');
+			fsnodes_getpath_data(qn->node->parents,buff,size);
+			buff+=size;
+			put32bit(&buff,qn->graceperiod);
+			put8bit(&buff,qn->exceeded);
+			put8bit(&buff,qn->flags);
+			if (qn->stimestamp==0) {					// soft quota not exceeded
+				put32bit(&buff,0xFFFFFFFF); 				// time to block = INF
+			} else if (qn->stimestamp+qn->graceperiod<ts) {			// soft quota timed out
+				put32bit(&buff,0);					// time to block = 0 (blocked)
+			} else {							// soft quota exceeded, but not timed out
+				put32bit(&buff,qn->stimestamp+qn->graceperiod-ts);
+			}
+			if (qn->flags&QUOTA_FLAG_SINODES) {
+				put32bit(&buff,qn->sinodes);
+			} else {
+				put32bit(&buff,0);
+			}
+			if (qn->flags&QUOTA_FLAG_SLENGTH) {
+				put64bit(&buff,qn->slength);
+			} else {
+				put64bit(&buff,0);
+			}
+			if (qn->flags&QUOTA_FLAG_SSIZE) {
+				put64bit(&buff,qn->ssize);
+			} else {
+				put64bit(&buff,0);
+			}
+			if (qn->flags&QUOTA_FLAG_SREALSIZE) {
+				put64bit(&buff,qn->srealsize);
+			} else {
+				put64bit(&buff,0);
+			}
+			if (qn->flags&QUOTA_FLAG_HINODES) {
+				put32bit(&buff,qn->hinodes);
+			} else {
+				put32bit(&buff,0);
+			}
+			if (qn->flags&QUOTA_FLAG_HLENGTH) {
+				put64bit(&buff,qn->hlength);
+			} else {
+				put64bit(&buff,0);
+			}
+			if (qn->flags&QUOTA_FLAG_HSIZE) {
+				put64bit(&buff,qn->hsize);
+			} else {
+				put64bit(&buff,0);
+			}
+			if (qn->flags&QUOTA_FLAG_HREALSIZE) {
+				put64bit(&buff,qn->hrealsize);
+			} else {
+				put64bit(&buff,0);
+			}
+			put32bit(&buff,psr->inodes);
+			put64bit(&buff,psr->length);
+			put64bit(&buff,psr->size);
+			put64bit(&buff,psr->realsize);
+		}
+	}
+	return ts;
+}
+
+uint8_t fs_archget(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint64_t *archchunks,uint64_t *notarchchunks,uint32_t *archinodes,uint32_t *partinodes,uint32_t *notarchinodes) {
+	fsnode *p;
+
+	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
+		return ERROR_ENOENT;
+	}
+	if (p->type!=TYPE_DIRECTORY && p->type!=TYPE_FILE && p->type!=TYPE_TRASH && p->type!=TYPE_SUSTAINED) {
+		return ERROR_EPERM;
+	}
+	fsnodes_keep_alive_begin();
+	*archchunks = 0;
+	*notarchchunks = 0;
+	*archinodes = 0;
+	*partinodes = 0;
+	*notarchinodes = 0;
+	fsnodes_getarch_recursive(p,archchunks,notarchchunks,archinodes,partinodes,notarchinodes);
+	return STATUS_OK;
+}
+
+uint8_t fs_univ_archchg(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t cmd,uint64_t *chgchunks,uint64_t *notchgchunks,uint32_t *nsinodes) {
+	fsnode *p;
+
+	*chgchunks = 0;
+	*notchgchunks = 0;
+	*nsinodes = 0;
+
+	if (sesflags&SESFLAG_READONLY) {
+		return ERROR_EROFS;
+	}
+//	if ((sesflags&SESFLAG_ADMIN)==0) {
+//		return ERROR_EPERM;
+//	}
+	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
+		return ERROR_ENOENT;
+	}
+	if (p->type!=TYPE_DIRECTORY && p->type!=TYPE_FILE && p->type!=TYPE_TRASH && p->type!=TYPE_SUSTAINED) {
+		return ERROR_EPERM;
+	}
+	fsnodes_keep_alive_begin();
+	fsnodes_chgarch_recursive(p,ts,uid,cmd,chgchunks,notchgchunks,nsinodes);
+	if (p->type!=TYPE_DIRECTORY && *nsinodes>0 && *chgchunks==0 && *notchgchunks==0) {
+		return ERROR_EPERM;
+	}
+
+	if ((sesflags&SESFLAG_METARESTORE)==0) {
+		changelog("%"PRIu32"|ARCHCHG(%"PRIu32",%"PRIu32",%"PRIu8"):%"PRIu64",%"PRIu64",%"PRIu32,ts,inode,uid,cmd,*chgchunks,*notchgchunks,*nsinodes);
+	} else {
+		meta_version_inc();
+	}
+	return STATUS_OK;
+}
+
+uint8_t fs_archchg(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t cmd,uint64_t *chgchunks,uint64_t *notchgchunks,uint32_t *nsinodes) {
+	return fs_univ_archchg(main_time(),rootinode,sesflags,inode,uid,cmd,chgchunks,notchgchunks,nsinodes);
+}
+
+uint8_t fs_mr_archchg(uint32_t ts,uint32_t inode,uint32_t uid,uint8_t cmd,uint64_t chgchunks,uint64_t notchgchunks,uint32_t nsinodes) {
+	uint64_t cc,ncc;
+	uint32_t nsi;
+	uint8_t status;
+	status = fs_univ_archchg(ts,0,SESFLAG_METARESTORE,inode,uid,cmd,&cc,&ncc,&nsi);
+	if (status!=STATUS_OK) {
+		return status;
+	}
+	if (cc!=chgchunks || ncc!=notchgchunks || nsi!=nsinodes) {
+		return ERROR_MISMATCH;
+	}
+	return STATUS_OK;
 }
 
 uint32_t fs_getdirpath_size(uint32_t inode) {
@@ -5944,7 +6212,7 @@ static inline void fs_add_file_to_chunks(fsnode *f) {
 		for (i=0 ; i<f->data.fdata.chunks ; i++) {
 			chunkid = f->data.fdata.chunktab[i];
 			if (chunkid>0) {
-				chunk_add_file(chunkid,f->goal);
+				chunk_add_file(chunkid,f->lsetid);
 			}
 		}
 	}
@@ -6007,7 +6275,10 @@ void fs_test_files() {
 	uint32_t j;
 	uint32_t k;
 	uint64_t chunkid;
-	uint8_t vc,valid,ugflag;
+	uint8_t vc,goal,valid,ugflag,aflag;
+	uint32_t aflagchanged,allchunks;
+	uint16_t arch_delay;
+	uint32_t arch_delay_sec;
 	static uint32_t files=0;
 	static uint32_t ugfiles=0;
 	static uint32_t mfiles=0;
@@ -6022,10 +6293,13 @@ void fs_test_files() {
 	static uint32_t unavailsustainedfiles=0;
 	static char *msgbuff=NULL,*tmp;
 	static uint32_t leng=0;
+	uint32_t now;
 	fsnode *f;
 	fsedge *e;
 
-	if ((uint32_t)(main_time())<=test_start_time) {
+	now = main_time();
+
+	if (now<=test_start_time) {
 		return;
 	}
 	if (i==0) {
@@ -6099,17 +6373,28 @@ void fs_test_files() {
 		leng=0;
 
 		fsinfo_loopstart = fsinfo_loopend;
-		fsinfo_loopend = main_time();
+		fsinfo_loopend = now;
 	}
-	for (k=0 ; k<(nodehashsize/14400) && i<noderehashpos ; k++,i++) {
+	for (k=0 ; k<(nodehashsize/32768) && i<noderehashpos ; k++,i++) {
 		for (f=nodehashtab[i>>HASHTAB_LOBITS][i&HASHTAB_MASK] ; f ; f=f->next) {
 			if (f->type==TYPE_FILE || f->type==TYPE_TRASH || f->type==TYPE_SUSTAINED) {
 				valid = 1;
 				ugflag = 0;
+				aflagchanged = 0;
+				allchunks = 0;
+				arch_delay = labelset_get_arch_delay(f->lsetid);
+				if (arch_delay==0U || arch_delay>49710U) {
+					aflag = 0;
+				} else {
+					arch_delay_sec = ((uint32_t)arch_delay) * 86400U;
+					arch_delay_sec += f->ctime;
+					aflag = (arch_delay_sec < now && arch_delay_sec >= f->ctime)?1:0; // arch_delay_sec < f->mtime means overflow
+				}
 				for (j=0 ; j<f->data.fdata.chunks ; j++) {
 					chunkid = f->data.fdata.chunktab[j];
 					if (chunkid>0) {
-						if (chunk_get_validcopies(chunkid,&vc)!=STATUS_OK) {
+						allchunks++;
+						if (chunk_get_validcopies(chunkid,&vc,&goal,aflag,&aflagchanged)!=STATUS_OK) {
 							if (errors<ERRORS_LOG_MAX) {
 								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->id,j);
 								if (leng<MSGBUFFSIZE) {
@@ -6137,12 +6422,15 @@ void fs_test_files() {
 							}
 							valid = 0;
 							mchunks++;
-						} else if (vc<f->goal) {
+						} else if (vc<goal) {
 							ugflag = 1;
 							ugchunks++;
 						}
 						chunks++;
 					}
+				}
+				if (aflagchanged) {
+					changelog("%"PRIu32"|ARCHCHG(%"PRIu32",0,%u):%"PRIu32",%"PRIu32",0",main_time(),f->id,ARCHCTL_SET,aflagchanged,allchunks-aflagchanged);
 				}
 				if (valid==0) {
 					mfiles++;
@@ -6719,7 +7007,7 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 	ptr = unodebuff;
 	put8bit(&ptr,f->type);
 	put32bit(&ptr,f->id);
-	put8bit(&ptr,f->goal);
+	put8bit(&ptr,f->lsetid);
 	put8bit(&ptr,f->flags);
 	put16bit(&ptr,f->mode);
 	put32bit(&ptr,f->uid);
@@ -6908,7 +7196,11 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	p->acldefflag = 0;
 	p->type = type;
 	p->id = get32bit(&ptr);
-	p->goal = get8bit(&ptr);
+	p->lsetid = get8bit(&ptr);
+	if (type!=TYPE_DIRECTORY && type!=TYPE_FILE && type!=TYPE_TRASH && type!=TYPE_SUSTAINED) {
+		p->lsetid=0;
+	}
+	labelset_incref(p->lsetid,p->type);
 	if (mver<=0x11) {
 		uint16_t flagsmode = get16bit(&ptr);
 		p->flags = flagsmode>>12;
@@ -7330,14 +7622,14 @@ int fs_loadfree(bio *fd,uint8_t mver) {
 }
 
 // quota entry:
-// inode:4 exceeded:1 flags:1 ts:4 sinodes:4 hinodes:4 slength:8 hlength:8 ssize:8 hsize:8 srealsize:8 hrealsize:8 = 66B
+// inode:4 graceperiod:4 exceeded:1 flags:1 ts:4 sinodes:4 hinodes:4 slength:8 hlength:8 ssize:8 hsize:8 srealsize:8 hrealsize:8 = 66B
 
 uint8_t fs_storequota(bio *fd) {
-	uint8_t wbuff[66*100],*ptr;
+	uint8_t wbuff[70*100],*ptr;
 	quotanode *qn;
 	uint32_t l;
 	if (fd==NULL) {
-		return 0x10;
+		return 0x11;
 	}
 	l=0;
 	for (qn = quotahead ; qn ; qn=qn->next) {
@@ -7353,7 +7645,7 @@ uint8_t fs_storequota(bio *fd) {
 	ptr=wbuff;
 	for (qn = quotahead ; qn ; qn=qn->next) {
 		if (l==100) {
-				if (bio_write(fd,wbuff,66*100)!=(66*100)) {
+				if (bio_write(fd,wbuff,70*100)!=(70*100)) {
 					syslog(LOG_NOTICE,"write error");
 					return 0xFF;
 				}
@@ -7361,6 +7653,7 @@ uint8_t fs_storequota(bio *fd) {
 				ptr=wbuff;
 			}
 			put32bit(&ptr,qn->node->id);
+			put32bit(&ptr,qn->graceperiod);
 			put8bit(&ptr,qn->exceeded);
 			put8bit(&ptr,qn->flags);
 			put32bit(&ptr,qn->stimestamp);
@@ -7375,7 +7668,7 @@ uint8_t fs_storequota(bio *fd) {
 			l++;
 	}
 	if (l>0) {
-		if (bio_write(fd,wbuff,66*l)!=(66*l)) {
+		if (bio_write(fd,wbuff,70*l)!=(70*l)) {
 			syslog(LOG_NOTICE,"write error");
 			return 0xFF;
 		}
@@ -7384,14 +7677,13 @@ uint8_t fs_storequota(bio *fd) {
 }
 
 int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
-	uint8_t rbuff[66*100];
+	uint8_t rbuff[70*100];
 	const uint8_t *ptr;
 	quotanode *qn;
 	fsnode *fn;
 	uint32_t l,t,id;
 	uint8_t nl=1;
-
-	(void)mver;
+	int32_t rsize;
 
 	if (bio_read(fd,rbuff,4)!=4) {
 		int err = errno;
@@ -7406,12 +7698,13 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 	ptr=rbuff;
 	t = get32bit(&ptr);
 	quotahead = NULL;
+	rsize = (mver==0x10)?66:70;
 //	freetail = &(freelist);
 	l=0;
 	while (t>0) {
 		if (l==0) {
 			if (t>100) {
-				if (bio_read(fd,rbuff,66*100)!=(66*100)) {
+				if (bio_read(fd,rbuff,rsize*100)!=(rsize*100)) {
 					int err = errno;
 					if (nl) {
 						fputc('\n',stderr);
@@ -7423,7 +7716,7 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 				}
 				l=100;
 			} else {
-				if (bio_read(fd,rbuff,66*t)!=(66*t)) {
+				if (bio_read(fd,rbuff,rsize*t)!=(rsize*t)) {
 					int err = errno;
 					if (nl) {
 						fputc('\n',stderr);
@@ -7447,13 +7740,18 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 			fprintf(stderr,"quota defined for %s inode: %"PRIu32"\n",(fn==NULL)?"non existing":"not directory",id);
 			syslog(LOG_ERR,"quota defined for %s inode: %"PRIu32,(fn==NULL)?"non existing":"not directory",id);
 			if (ignoreflag) {
-				ptr+=62;
+				ptr+=(rsize-4);
 			} else {
 				fprintf(stderr,"use option '-i' to remove this quota definition");
 				return -1;
 			}
 		} else {
 			qn = fsnodes_new_quotanode(fn);
+			if (mver==0x10) {
+				qn->graceperiod = QuotaDefaultGracePeriod;
+			} else {
+				qn->graceperiod = get32bit(&ptr);
+			}
 			qn->exceeded = get8bit(&ptr);
 			qn->flags = get8bit(&ptr);
 			qn->stimestamp = get32bit(&ptr);
@@ -7485,7 +7783,8 @@ void fs_new(void) {
 	root->acldefflag = 0;
 	root->type = TYPE_DIRECTORY;
 	root->ctime = root->mtime = root->atime = main_time();
-	root->goal = DEFAULT_GOAL;
+	root->lsetid = DEFAULT_LSETID;
+	labelset_incref(root->lsetid,root->type);
 	root->trashtime = DEFAULT_TRASHTIME;
 	root->flags = 0;
 	root->mode = 0777;
@@ -7537,7 +7836,11 @@ void fs_cs_disconnected(void) {
 
 
 void fs_reload(void) {
-	QuotaTimeLimit = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400);
+	if (cfg_isdefined("QUOTA_TIME_LIMIT") && !cfg_isdefined("QUOTA_DEFAULT_GRACE_PERIOD")) {
+		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400); // deprecated option
+	} else {
+		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_DEFAULT_GRACE_PERIOD",7*86400);
+	}
 }
 
 int fs_strinit(void) {
@@ -7557,10 +7860,14 @@ int fs_strinit(void) {
 	symlink_init();
 	chunktab_init();
 	test_start_time = main_time()+900;
-	QuotaTimeLimit = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400);
+	if (cfg_isdefined("QUOTA_TIME_LIMIT") && !cfg_isdefined("QUOTA_DEFAULT_GRACE_PERIOD")) {
+		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400); // deprecated option
+	} else {
+		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_DEFAULT_GRACE_PERIOD",7*86400);
+	}
 
 	main_reload_register(fs_reload);
-	main_time_register(1,0,fs_test_files);
+	main_msectime_register(100,0,fs_test_files);
 	main_time_register(1,0,fsnodes_check_all_quotas);
 	main_time_register(300,0,fs_emptytrash);
 	main_time_register(60,0,fs_emptysustained);

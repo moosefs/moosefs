@@ -68,6 +68,8 @@
 
 #define MFS_ROOT_ID 1
 
+#define MASKORGROUP 4
+
 #define MFS_NAME_MAX 255
 #define MFS_SYMLINK_MAX 1024
 #define MFS_PATH_MAX 1024
@@ -129,7 +131,12 @@
 
 #define ERROR_CSNOTPRESENT    43        // Chunkserver not present
 
-#define ERROR_MAX             44
+#define ERROR_WAITING         44        // Waiting on lock
+#define ERROR_EAGAIN          45        // Resource temporarily unavailable
+#define ERROR_EINTR           46        // Interrupted system call
+#define ERROR_ECANCELED       47        // Operation canceled
+
+#define ERROR_MAX             48
 
 #define ERROR_STRINGS \
 	"OK", \
@@ -176,6 +183,10 @@
 	"Entity not found", \
 	"Entity is active", \
 	"Chunkserver not present", \
+	"Waiting on lock", \
+	"Resource temporarily unavailable", \
+	"Interrupted system call", \
+	"Operation canceled", \
 	"Unknown MFS error"
 
 /* type for readdir command */
@@ -214,15 +225,41 @@
 // instead of using FUSE_SETATTR with SET_GOAL_FLAG use FUSE_SETGOAL command
 // instead of using FUSE_SETATTR with SET_GOAL_FLAG use FUSE_SETTRASH_TIMEOUT command
 // instead of using FUSE_SETATTR with SET_LENGTH_FLAG/SET_OPENED_FLAG use FUSE_TRUNCATE command
-#define SET_GOAL_FLAG          0x0001
-#define SET_MODE_FLAG          0x0002
-#define SET_UID_FLAG           0x0004
-#define SET_GID_FLAG           0x0008
-#define SET_LENGTH_FLAG        0x0010
-#define SET_MTIME_FLAG         0x0020
-#define SET_ATIME_FLAG         0x0040
-#define SET_OPENED_FLAG        0x0080
-#define SET_DELETE_FLAG        0x0100
+//
+// SET_CURRENTTIME_FLAG - version > 2.1.12
+
+// #define SET_GOAL_FLAG          0x0001
+#define SET_INVAL_FLAG         0x01
+#define SET_MODE_FLAG          0x02
+#define SET_UID_FLAG           0x04
+#define SET_GID_FLAG           0x08
+// #define SET_LENGTH_FLAG        0x0010
+#define SET_MTIME_NOW_FLAG     0x10
+#define SET_MTIME_FLAG         0x20
+#define SET_ATIME_FLAG         0x40
+#define SET_ATIME_NOW_FLAG     0x80
+// #define SET_OPENED_FLAG        0x0080
+// #define SET_DELETE_FLAG        0x0100
+
+// flock.cmd:
+#define FLOCK_UNLOCK           0
+#define FLOCK_TRY_SHARED       1
+#define FLOCK_LOCK_SHARED      2
+#define FLOCK_TRY_EXCLUSIVE    3
+#define FLOCK_LOCK_EXCLUSIVE   4
+#define FLOCK_INTERRUPT        5
+#define FLOCK_RELEASE          6
+
+// posix_locks.cmd:
+#define POSIX_LOCK_CMD_GET     0
+#define POSIX_LOCK_CMD_SET     1
+#define POSIX_LOCK_CMD_TRY     2
+#define POSIX_LOCK_CMD_INT     3
+
+// posix_locks.type:
+#define POSIX_LOCK_UNLCK       0
+#define POSIX_LOCK_RDLCK       1
+#define POSIX_LOCK_WRLCK       2
 
 // dtypes:
 #define DTYPE_UNKNOWN          0
@@ -234,17 +271,27 @@
 #define SMODE_SET              0
 #define SMODE_INCREASE         1
 #define SMODE_DECREASE         2
+#define SMODE_LABELS           3
 #define SMODE_RSET             4
 #define SMODE_RINCREASE        5
 #define SMODE_RDECREASE        6
+#define SMODE_RLABELS          7
 #define SMODE_TMASK            3
 #define SMODE_RMASK            4
-#define SMODE_ISVALID(x)       (((x)&SMODE_TMASK)!=3 && ((uint32_t)(x))<=7)
+#define SMODE_ISVALID(x)       (((uint32_t)(x))<=7)
 
 // gmode:
 #define GMODE_NORMAL           0
 #define GMODE_RECURSIVE        1
 #define GMODE_ISVALID(x)       (((uint32_t)(x))<=1)
+
+// create_mode:
+// loose = use other labels when servers are overloaded or full
+// std = use other labels when servers are full
+// strict = never use other labels
+#define CREATE_MODE_LOOSE       0
+#define CREATE_MODE_STD         1
+#define CREATE_MODE_STRICT      2
 
 // extraattr:
 
@@ -288,6 +335,11 @@
 // acl:
 #define POSIX_ACL_ACCESS       1
 #define POSIX_ACL_DEFAULT      2
+
+// archctl:
+#define ARCHCTL_CLR            0
+#define ARCHCTL_SET            1
+#define ARCHCTL_GET            2
 
 // getdir:
 #define GETDIR_FLAG_WITHATTR   0x01
@@ -363,6 +415,8 @@
 #define MFS_CSSERV_COMMAND_BACKTOWORK 1
 #define MFS_CSSERV_COMMAND_MAINTENANCEON 2
 #define MFS_CSSERV_COMMAND_MAINTENANCEOFF 3
+// #define MFS_CSSERV_COMMAND_FASTREPLICATIONON 4
+// #define MFS_CSSERV_COMMAND_FASTREPLICATIONOFF 5
 
 #define MFS_SESSION_COMMAND_REMOVE 0
 
@@ -419,6 +473,7 @@
 #define MATOAN_METACHANGES_LOG (PROTO_BASE+51)
 // maxsize=250000
 // 0xFF:8 version:64 logdata:string ( N*[ char:8 ] ) = LOG_DATA
+// 0xAA:8 version:64 logdata:string ( N*[ char:8 ] ) = LOG_DATA with ack (intr. in version 3.0.10)
 // 0x55:8 = LOG_ROTATE
 
 
@@ -493,7 +548,8 @@
 // 0xFF:8 version:64 logdata:string ( N*[ char:8 ] )
 // since version 1.6.28:
 #define CSTOMA_CURRENT_LOAD (PROTO_BASE+103)
-// load:32
+// load:32 - (version < 3.0.7)
+// load:32 hlstatus:8 - (version >= 3.0.7)
 
 // 0x0068
 // #define MATOCS_STRUCTURE_LOG_ROTATE (PROTO_BASE+104)
@@ -515,6 +571,10 @@
 #define CSTOMA_CHUNK_NEW (PROTO_BASE+107)
 // N*[ chunkid:64 version:32 ]
 
+
+// 0x006D
+#define CSTOMA_LABELS (PROTO_BASE+109)
+// labelmask:32
 
 // 0x006E
 #define MATOCS_CREATE (PROTO_BASE+110)
@@ -552,8 +612,8 @@
 #define MATOCS_REPLICATE (PROTO_BASE+150)
 // simple copy:
 //  chunkid:64 version:32 ip:32 port:16
-// multi copy (make new chunk as XOR of couple of chunks)
-//  chunkid:64 version:32 N*[chunkid:64 version:32 ip:32 port:16]
+// raid copy (make new chunk as XOR of different parts of couple of chunks - using xormasks)
+//  chunkid:64 version:32 4 * [ xormask:32 ] N * [chunkid:64 version:32 ip:32 port:16]
 
 // 0x0097
 #define CSTOMA_REPLICATE (PROTO_BASE+151)
@@ -574,6 +634,7 @@
 // 0x0099
 #define CSTOMA_CHUNKOP (PROTO_BASE+153)
 // chunkid:64 version:32 newversion:32 copychunkid:64 copyversion:32 length:32 status:8
+
 
 // 0x00A0
 #define MATOCS_TRUNCATE (PROTO_BASE+160)
@@ -710,15 +771,19 @@
 #define REGISTER_NEWSESSION 2
 // rcode==2: first register
 // CLTOMA:
-//  rcode:8 version:32 ileng:32 info:ilengB pleng:32 path:plengB [ passcode:16B ]
+//  rcode:8 version:32 ileng:32 info:ilengB pleng:32 path:plengB [ sessionid:32 [ metaid:64 ]] [ passcode:16B ]
 // MATOCL:
-//  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 [ mapalluid:32 mapallgid:32 [ mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ] ]
+//  sessionid:32 sesflags:8 rootuid:32 rootgid:32 ( version < 1.6.1)
+//  sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 ( version >= 1.6.1 && version < 1.6.21 )
+//  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 ( version >= 1.6.21 && version < 1.6.26 )
+//  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 1.6.26 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.11 )
 //  status:8
 
 #define REGISTER_RECONNECT 3
 // rcode==3: mount reconnect
 // CLTOMA:
-//  rcode:8 sessionid:32 version:32
+//  rcode:8 sessionid:32 version:32 [ metaid:64 ]
 // MATOCL:
 //  status:8
 
@@ -732,15 +797,18 @@
 #define REGISTER_NEWMETASESSION 5
 // rcode==5: first register
 // CLTOMA:
-//  rcode:8 version:32 ileng:32 info:ilengB [ passcode:16B ]
+//  rcode:8 version:32 ileng:32 info:ilengB [ sessionid:32 [ metaid:64 ]] [ passcode:16B ]
 // MATOCL:
-//  version:32 sessionid:32 sesflags:8
+//  sessionid:32 sesflags:8 ( version < 1.6.21 )
+//  version:32 sessionid:32 sesflags:8 ( version >= 1.6.21 && version < 1.6.26 )
+//  version:32 sessionid:32 sesflags:8 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 1.6.26 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.11 )
 //  status:8
 
 #define REGISTER_CLOSESESSION 6
 // rcode==6: close session
 // CLTOMA:
-//  rcode:8 sessionid:32
+//  rcode:8 sessionid:32 [ metaid:64 ]
 // MATOCL:
 //  status:8
 
@@ -909,26 +977,29 @@
 
 // 0x01B0
 #define CLTOMA_FUSE_READ_CHUNK (PROTO_BASE+432)
-// msgid:32 inode:32 chunkindx:32
+// msgid:32 inode:32 chunkindx:32 - version < 3.0.4
+// msgid:32 inode:32 chunkindx:32 canmodatime:8
 
 // 0x01B1
 #define MATOCL_FUSE_READ_CHUNK (PROTO_BASE+433)
 // maxsize=4096
 // msgid:32 status:8
 // msgid:32 length:64 chunkid:64 version:32 N*[ ip:32 port:16 ]
-// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32)
-// msgid:32 protocolid:8 length:64 srcs:16 srcs*[chunkid:64 version:32 ip:32 port:16 cs_ver:32 ] - not implemented
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32 - protocolid==1)
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 labelmask:32 ] (master and client both versions >= 3.0.10 - protocolid==2)
 
 // 0x01B2
 #define CLTOMA_FUSE_WRITE_CHUNK (PROTO_BASE+434)
-// msgid:32 inode:32 chunkindx:32
+// msgid:32 inode:32 chunkindx:32 - version < 3.0.4
+// msgid:32 inode:32 chunkindx:32 canmodmtime:8
 
 // 0x01B3
 #define MATOCL_FUSE_WRITE_CHUNK (PROTO_BASE+435)
 // maxsize=4096
 // msgid:32 status:8
 // msgid:32 length:64 chunkid:64 version:32 N*[ ip:32 port:16 ]
-// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32)
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32 - protocolid==1)
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 labelmask:32 ] (master and client both versions >= 3.0.10 - protocolid==2)
 
 // 0x01B4
 #define CLTOMA_FUSE_WRITE_CHUNK_END (PROTO_BASE+436)
@@ -993,12 +1064,14 @@
 #define MATOCL_FUSE_GETGOAL (PROTO_BASE+447)
 // maxsize=100000
 // msgid:32 status:8
-// msgid:32 gdirs:8 gfiles:8 gdirs*[ goal:8 dirs:32 ] gfiles*[ goal:8 files:32 ]
+// msgid:32 gdirs:8 gfiles:8 gdirs*[ goal:8 dirs:32 ] gfiles*[ goal:8 files:32 ] (version < 2.1.0)
+// msgid:32 gdirs:8 gfiles:8 gdirs*[ goal:8 dirs:32 | zero:8 labelscnt:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] dirs:32 ] gfiles*[ goal:8 files:32 | zero:8 labelscnt:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] files:32 ] (version >= 2.1.0)
 
 
 // 0x01C0
 #define CLTOMA_FUSE_SETGOAL (PROTO_BASE+448)
-// msgid:32 inode:32 uid:32 goal:8 smode:8
+// msgid:32 inode:32 uid:32 goal:8 smode:8 (any version)
+// msgid:32 inode:32 uid:32 labelscnt:8 smode:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 2.1.0)
 
 // 0x01C1
 #define MATOCL_FUSE_SETGOAL (PROTO_BASE+449)
@@ -1209,18 +1282,52 @@
 // msgid:32 status:8
 // msgid:32 N*[ length:32 path:lengthB ]
 
+// 0x01E8
 #define CLTOMA_FUSE_GETACL (PROTO_BASE+488)
 // msgid:32 inode:32 acltype:8 opened:8 uid:32 gcnt:32 gcnt * [ gid:32 ]
 
+// 0x01E9
 #define MATOCL_FUSE_GETACL (PROTO_BASE+489)
 // msgid:32 status:8
 // msgid:32 userperm:16 groupperm:16 otherperm:16 mask:16 namedusers:16 namedgroups:16 namedusers * [ id:32 perm:16 ] namedgroups * [ id:32 perm:16 ]
 
+// 0x01EA
 #define CLTOMA_FUSE_SETACL (PROTO_BASE+490)
 // msgid:32 inode:32 uid:32 acltype:8 userperm:16 groupperm:16 otherperm:16 mask:16 namedusers:16 namedgroups:16 namedusers * [ id:32 perm:16 ] namedgroups * [ id:32 perm:16 ]
 
+// 0x01EB
 #define MATOCL_FUSE_SETACL (PROTO_BASE+491)
 // msgid:32 status:8
+
+// 0x01EC
+#define CLTOMA_FUSE_FLOCK (PROTO_BASE+492)
+// msgid:32 inode:32 reqid:32 owner:64 cmd:8
+
+// 0x01ED
+#define MATOCL_FUSE_FLOCK (PROTO_BASE+493)
+// msgid:32 status:8
+
+
+// 0x01EE
+#define CLTOMA_FUSE_POSIX_LOCK (PROTO_BASE+494)
+// msgid:32 inode:32 reqid:32 owner:64 pid:32 cmd:8 type:8 start:64 end:64
+
+// 0x01EF
+#define MATOCL_FUSE_POSIX_LOCK (PROTO_BASE+495)
+// msgid:32 status:8 (cmd != POSIX_LOCK_CMD_GET || status != STATUS_OK)
+// msgid:32 pid:32 type:8 start:64 end:64 (cmd == POSIX_LOCK_CMD_GET && status == STATUS_OK)
+
+
+// 0x01F0
+#define CLTOMA_FUSE_ARCHCTL (PROTO_BASE+496)
+// msgid:32 inode:32 cmd:8 (cmd==ARCHCTL_GET)
+// msgid:32 inode:32 cmd:8 uid:32 (cmd==ARCHCTL_SET or cmd==ARCHCTL_CLR)
+
+// 0x01F1
+#define MATOCL_FUSE_ARCHCTL (PROTO_BASE+497)
+// msgid:32 status:8
+// msgid:32 archchunks:64 notarchchunks:64 archinodes:32 partialinodes:32 notarchinodes:32 (cmd==ARCHCTL_GET)
+// msgid:32 chunkschanged:64 chunksnotchanged:64 inodesnotpermitted:32 (cmd==ARCHCTL_SET or cmd==ARCHCTL_CLR)
 
 
 // special - sustained (opened) inodes - keep opened files.
@@ -1241,16 +1348,19 @@
 // 0x01F5
 #define MATOCL_CSERV_LIST (PROTO_BASE+501)
 // N*[ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 ] (version < 1.5.13)
-// N*[version:32 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 ] (version >= 1.5.13)
+// N*[disconnected:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 ] (version >= 1.5.13 && version < 1.6.28)
+// N*[flags:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 ] (version >= 1.6.28 && version < 1.7.25)
+// N*[flags:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 ] (version >= 1.7.25 && version < 2.1.0)
+// N*[flags:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 labelmask:32 ] (version >= 2.1.0)
 
 
 // 0x01F6
-#define CLTOCS_HDD_LIST_V1 (PROTO_BASE+502)
-// -
+#define CLTOAN_MONOTONIC_DATA (PROTO_BASE+502)
 
 // 0x01F7
-#define CSTOCL_HDD_LIST_V1 (PROTO_BASE+503)
-// N*[ path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 ]
+#define ANTOCL_MONOTONIC_DATA (PROTO_BASE+503)
+// N:16 N * [ data:64 ] // master
+// N:16 N * [ data:64 ] M:16 M * [ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 bytesread:64 byteswritten:64 usecread:64 usecwrite:64 usecfsync:64 readops:32 writeops:32 fsyncops:32 usecreadmax:32 usecwritemax:32 usecfsyncmax:32 ]
 
 
 // 0x01F8
@@ -1315,7 +1425,9 @@
 
 // 0x0203
 #define MATOCL_CHUNKSTEST_INFO (PROTO_BASE+515)
-// loopstart:32 loopend:32 del_invalid:32 nodel_invalid:32 del_unused:32 nodel_unused:32 del_diskclean:32 nodel_diskclean:32 del_overgoal:32 nodel_overgoal:32 copy_undergoal:32 nocopy_undergoal:32 copy_rebalance:32 [ locked_unused:32 locked_used:32 ]
+// loopstart:32 loopend:32 del_invalid:32 nodel_invalid:32 del_unused:32 nodel_unused:32 del_diskclean:32 nodel_diskclean:32 del_overgoal:32 nodel_overgoal:32 copy_undergoal:32 nocopy_undergoal:32 copy_rebalance:32
+// loopstart:32 loopend:32 del_invalid:32 nodel_invalid:32 del_unused:32 nodel_unused:32 del_diskclean:32 nodel_diskclean:32 del_overgoal:32 nodel_overgoal:32 copy_undergoal:32 nocopy_undergoal:32 copy_rebalance:32 locked_unused:32 locked_used:32
+// loopstart:32 loopend:32 del_invalid:32 nodel_invalid:32 del_unused:32 nodel_unused:32 del_diskclean:32 nodel_diskclean:32 del_overgoal:32 nodel_overgoal:32 copy_undergoal:32 nocopy_undergoal:32 copy_wronglabels:32 nocopy_wronglabels:32 copy_rebalance:32 labels_dont_match:32 locked_unused:32 locked_used:32 (version >= 2.1.4)
 
 
 // 0x0204
@@ -1396,21 +1508,74 @@
 //     9 - symlinks
 //     10 - quota
 
+// 0x0212
 #define CLTOAN_MODULE_INFO (PROTO_BASE+530)
 // -
+
+// 0x0213
 #define ANTOCL_MODULE_INFO (PROTO_BASE+531)
 // module_type:8 module_version:32 module_id:16 meta_id:64 leader_ip:32 leader_port:16
 
+// 0x0214
+#define CLTOMA_LIST_OPEN_FILES (PROTO_BASE+532)
+// [ msgid:32 ] sessionid:32
+
+// 0x0215
+#define MATOCL_LIST_OPEN_FILES (PROTO_BASE+533)
+// [ msgid:32 ] N*[ sessionid:32 inode:32 ] // if input sessionid==0
+// [ msgid:32 ] N*[ inode:32 ] // if input sessionid>0
+
+// 0x0216
+#define CLTOMA_LIST_ACQUIRED_LOCKS (PROTO_BASE+534)
+// [ msgid:32 ] inode:32
+
+// 0x0217
+#define MATOCL_LIST_ACQUIRED_LOCKS (PROTO_BASE+535)
+// [ msgid:32 ] N*[ inode:32 sessionid:32 owner:64 pid:32 start:64 end:64 ctype:8 ] // if input inode==0
+// [ msgid:32 ] N*[ sessionid:32 owner:64 pid:32 start:64 end:64 ctype:8 ] // if input inode>0
+
+// 0x0218
+#define CLTOMA_MASS_RESOLVE_PATHS (PROTO_BASE+536)
+// N*[ inode:32 ]
+
+// 0x0219
+#define MATOCL_MASS_RESOLVE_PATHS (PROTO_BASE+537)
+// N*[ inode:32 pathssize:32 M*[ pathleng:32 path:pathlengB ] ]
+
+// 0x021A
+#define CLTOMA_SET_LABEL_DESCRIPTION (PROTO_BASE+538)
+// labelid:8 description:NAME
+
+// 0x021B
+#define MATOCL_SET_LABEL_DESCRIPTION (PROTO_BASE+539)
+// status:8
+
+// 0x021C
+#define CLTOMA_LABEL_INFO (PROTO_BASE+540)
+// -
+
+// 0x021D
+#define MATOCL_LABEL_INFO (PROTO_BASE+541)
+// allservers:16 N*[ labelid:8 description:NAME labeledservers:16 inodes:32 ]
+
+// 0x021E
+#define CLTOMA_LABEL_SET_INFO (PROTO_BASE+542)
+// - 
+
+// 0x021F
+#define MATOCL_LABEL_SET_INFO (PROTO_BASE+543)
+// allservers:16 N*[ labelsetid:8 inodes:32 canbefulfilled:8 labelscnt:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ]
+
+
 // CHUNKSERVER STATS
 
-
 // 0x0258
-#define CLTOCS_HDD_LIST_V2 (PROTO_BASE+600)
+#define CLTOCS_HDD_LIST (PROTO_BASE+600)
 // -
 
 // 0x0259
-#define CSTOCL_HDD_LIST_V2 (PROTO_BASE+601)
-// N*[ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 3 * [ bytesread:64 byteswritten:64 usecread:64 usecwrite:64 usecfsync:64 readops:32 writeops:32 fsyncops:32 usecreadmax:32 usecwritemax:32 usecfsyncmax:32 ] ]
+#define CSTOCL_HDD_LIST (PROTO_BASE+601)
+// N * [ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 3 * [ bytesread:64 byteswritten:64 usecread:64 usecwrite:64 usecfsync:64 readops:32 writeops:32 fsyncops:32 usecreadmax:32 usecwritemax:32 usecfsyncmax:32 ] ]
 
 
 #endif

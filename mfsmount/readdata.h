@@ -32,5 +32,6 @@ void read_inode_dirty_region(uint32_t inode,uint64_t offset,uint32_t size,const 
 void read_inode_set_length(uint32_t inode,uint64_t newlength,uint8_t active);
 void* read_data_new(uint32_t inode);
 void read_data_end(void *vid);
+void read_inode_dont_modify_atime(uint32_t inode);
 
 #endif

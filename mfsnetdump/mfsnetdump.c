@@ -29,6 +29,7 @@
 
 typedef struct _userdata {
 	uint8_t bytesskip;
+	uint32_t maxdatainpacket;
 } userdata;
 
 struct _mfscmd {
@@ -366,17 +367,17 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 					printf(COLOR_CLEAR);
 				}
 				printf("\n");
-				if (payloadlen-8<=128) {
+				if (payloadlen-8<=ud->maxdatainpacket) {
 					if (mfslen < payloadlen-8) {
 						hexdump(payload+8,mfslen);
 					} else {
 						hexdump(payload+8,payloadlen-8);
 					}
 				} else {
-					if (mfslen < 128) {
+					if (mfslen < ud->maxdatainpacket) {
 						hexdump(payload+8,mfslen);
 					} else {
-						hexdump(payload+8,128);
+						hexdump(payload+8,ud->maxdatainpacket);
 						printf("\t(...)\n");
 					}
 				}
@@ -425,7 +426,7 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 }
 
 void usage(const char *appname) {
-	fprintf(stderr,"usage: %s [-i interface] [-f pcap_filter] [-c packet count] [-e commands] [-o commands]\n\t-e: do not display this commands\n\t-o: when present only this commands will be displayed\n",appname);
+	fprintf(stderr,"usage: %s [-r pcap_file] [-i interface] [-f pcap_filter] [-c packet_count] [-s max_bytes_to_show] [-e commands] [-o commands]\n\t-e: do not display this commands\n\t-o: when present only this commands will be displayed\n",appname);
 }
 
 int main(int argc, char **argv) {
@@ -433,6 +434,7 @@ int main(int argc, char **argv) {
 	char errbuf[PCAP_ERRBUF_SIZE];
 	char *dev;
 	char *filter;
+	char *pcapfile;
 	int32_t packetcnt;
 	bpf_u_int32 devnet;
 	bpf_u_int32 devmask;
@@ -440,16 +442,22 @@ int main(int argc, char **argv) {
 	int datalink;
 	struct bpf_program fp;
 	userdata udm;
+	uint8_t ok = 1;
 
 	commands_convert();
 
 	dev = NULL;
 	filter = NULL;
+	pcapfile = NULL;
 	packetcnt = -1;
+	udm.maxdatainpacket = 128;
 
-	while ((ch = getopt(argc, argv, "si:f:c:e:o:?")) != -1) {
+	while ((ch = getopt(argc, argv, "ms:i:f:c:e:o:r:?")) != -1) {
 		switch (ch) {
 			case 's':
+				udm.maxdatainpacket = strtoul(optarg,NULL,0);
+				break;
+			case 'm':
 				if (filter) {
 					free(filter);
 				}
@@ -476,35 +484,57 @@ int main(int argc, char **argv) {
 			case 'o':
 				commands_onlyuse(optarg);
 				break;
+			case 'r':
+				if (pcapfile) {
+					free(pcapfile);
+				}
+				pcapfile = strdup(optarg);
+				break;
 			default:
 				usage(argv[0]);
-				return 1;
+				goto err;
 		}
 	}
 
-	if (dev==NULL) {
+	if (dev!=NULL && pcapfile!=NULL) {
+		fprintf(stderr,"Options '-i' and '-r' are mutually exclusive\n");
+		goto err;
+	}
+	if (dev==NULL && pcapfile==NULL) {
 		dev = pcap_lookupdev(errbuf);
 		if (dev == NULL) {
 			fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
-			return 1;
+			goto err;
 		}
 	}
 
-
-	if (pcap_lookupnet(dev, &devnet, &devmask, errbuf)<0) {
-		printf("Device: %s\n",dev);
-		fprintf(stderr, "Couldn't get netmask for device %s: %s\n", dev, errbuf);
-		devnet = 0;
-		devmask = 0;
+	if (pcapfile!=NULL) {
+		handle = pcap_open_offline(pcapfile,errbuf);
+		if (handle == NULL) {
+			fprintf(stderr, "Couldn't open pcap file %s: %s\n", pcapfile,errbuf);
+			goto err;
+		}
+#ifdef PCAP_NETMASK_UNKNOWN
+		devnet = PCAP_NETMASK_UNKNOWN;
+#else
+		devnet = 0xffffffff;
+#endif
 	} else {
-//		printf("Device: %s (%u.%u.%u.%u/%u.%u.%u.%u)\n", dev, (devnet>>24)&0xFF,(devnet>>16)&0xFF,(devnet>>8)&0xFF,devnet&0xFF,(devmask>>24)&0xFF,(devmask>>16)&0xFF,(devmask>>8)&0xFF,devmask&0xFF);	// BIG/LITTLE ENDIAN ???
-		printf("Device: %s (%u.%u.%u.%u/%u.%u.%u.%u)\n", dev, devnet&0xFF,(devnet>>8)&0xFF,(devnet>>16)&0xFF,(devnet>>24)&0xFF,devmask&0xFF,(devmask>>8)&0xFF,(devmask>>16)&0xFF,(devmask>>24)&0xFF);
-	}
+		if (pcap_lookupnet(dev, &devnet, &devmask, errbuf)<0) {
+			printf("Device: %s\n",dev);
+			fprintf(stderr, "Couldn't get netmask for device %s: %s\n", dev, errbuf);
+			devnet = 0;
+			devmask = 0;
+		} else {
+	//		printf("Device: %s (%u.%u.%u.%u/%u.%u.%u.%u)\n", dev, (devnet>>24)&0xFF,(devnet>>16)&0xFF,(devnet>>8)&0xFF,devnet&0xFF,(devmask>>24)&0xFF,(devmask>>16)&0xFF,(devmask>>8)&0xFF,devmask&0xFF);	// BIG/LITTLE ENDIAN ???
+			printf("Device: %s (%u.%u.%u.%u/%u.%u.%u.%u)\n", dev, devnet&0xFF,(devnet>>8)&0xFF,(devnet>>16)&0xFF,(devnet>>24)&0xFF,devmask&0xFF,(devmask>>8)&0xFF,(devmask>>16)&0xFF,(devmask>>24)&0xFF);
+		}
 
-	handle = pcap_open_live(dev, 100000, 1, 1000, errbuf);
-	if (handle == NULL) {
-		fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
-		return 1;
+		handle = pcap_open_live(dev, 100000, 1, 1000, errbuf);
+		if (handle == NULL) {
+			fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
+			goto err;
+		}
 	}
 
 	datalink = pcap_datalink(handle);
@@ -516,18 +546,18 @@ int main(int argc, char **argv) {
 		udm.bytesskip = 0;
 	} else {
 		fprintf(stderr, "%s is not an Ethernet (type: %s)\n", dev, pcap_datalink_val_to_name(datalink));
-		return 1;
+		goto err;
 	}
 
 	if (filter!=NULL) {
 		if (pcap_compile(handle, &fp, filter, 0, devnet)<0) {
 			fprintf(stderr, "Couldn't parse filter %s: %s\n", filter, pcap_geterr(handle));
-			return 1;
+			goto err;
 		}
 
 		if (pcap_setfilter(handle, &fp)<0) {
 			fprintf(stderr, "Couldn't install filter %s: %s\n", filter, pcap_geterr(handle));
-			return 1;
+			goto err;
 		}
 	}
 
@@ -537,6 +567,16 @@ int main(int argc, char **argv) {
 	pcap_close(handle);
 
 	printf("\nCapture complete.\n");
-	return 0;
+	ok = 0;
+err:
+	if (pcapfile) {
+		free(pcapfile);
+	}
+	if (filter) {
+		free(filter);
+	}
+	if (dev) {
+		free(dev);
+	}
+	return ok;
 }
-

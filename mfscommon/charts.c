@@ -109,6 +109,8 @@ static stat_record *series;
 static uint32_t pointers[RANGES];
 static uint32_t timepoint[RANGES];
 
+static uint64_t *monotonic;
+
 //chart times (for subscripts)
 static uint32_t shhour,shmin;
 static uint32_t medhour,medmin;
@@ -1005,6 +1007,12 @@ void charts_add (uint64_t *data,uint32_t datats) {
 
 	int32_t nowtime,delta;
 
+	if (data) {
+		for (j=0 ; j<statdefscount ; j++) {
+			monotonic[j] += data[j];
+		}
+	}
+
 	ts = localtime(&now);
 #ifdef HAVE_STRUCT_TM_TM_GMTOFF
 	local = now+ts->tm_gmtoff;
@@ -1197,6 +1205,9 @@ void charts_term (void) {
 	if (series) {
 		free(series);
 	}
+	if (monotonic) {
+		free(monotonic);
+	}
 	if (compbuff) {
 		free(compbuff);
 	}
@@ -1317,9 +1328,12 @@ int charts_init (const uint32_t *calcs,const statdef *stats,const estatdef *esta
 	}
 
 	if (statdefscount>0) {
+		monotonic = (uint64_t*)malloc(sizeof(uint64_t)*statdefscount);
+		passert(monotonic);
 		series = (stat_record*)malloc(sizeof(stat_record)*statdefscount);
 		passert(series);
 		for (i=0 ; i<statdefscount ; i++) {
+			monotonic[i] = 0;
 			for (j=0 ; j<RANGES ; j++) {
 				series[i][j] = malloc(MAXLENG*sizeof(uint64_t));
 				passert(series[i][j]);
@@ -1328,6 +1342,7 @@ int charts_init (const uint32_t *calcs,const statdef *stats,const estatdef *esta
 		}
 	} else {
 		series = NULL;
+		monotonic = NULL;
 	}
 
 	for (i=0 ; i<RANGES ; i++) {
@@ -1877,18 +1892,19 @@ void charts_makechart(uint32_t type,uint32_t range,uint32_t width,uint32_t heigh
 	}
 }
 
-uint32_t charts_datasize(uint32_t number,uint32_t maxentries) {
-	uint32_t chtype,chrange;
-
-	chtype = number / 10;
-	chrange = number % 10;
-	if (maxentries>MAXLENG) {
-		maxentries = MAXLENG;
+uint32_t charts_monotonic_data (uint8_t *buff) {
+	uint32_t i;
+	if (buff==NULL) {
+		return sizeof(uint16_t)+sizeof(uint64_t)*statdefscount;
 	}
-	return (chrange<RANGES && CHARTS_IS_DIRECT_STAT(chtype))?maxentries*8+8:0;
+	put16bit(&buff,statdefscount);
+	for (i=0 ; i<statdefscount ; i++) {
+		put64bit(&buff,monotonic[i]);
+	}
+	return 0;
 }
 
-void charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries) {
+uint32_t charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries) {
 	uint32_t i,j,ts,chtype,chrange;
 	uint64_t *tab;
 
@@ -1896,6 +1912,9 @@ void charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries) {
 	chrange = number % 10;
 	if (maxentries>MAXLENG) {
 		maxentries = MAXLENG;
+	}
+	if (buff==NULL) {
+		return (chrange<RANGES && CHARTS_IS_DIRECT_STAT(chtype))?maxentries*8+8:0;
 	}
 	if (chrange<RANGES && CHARTS_IS_DIRECT_STAT(chtype)) {
 #ifdef USE_PTHREADS
@@ -1932,6 +1951,7 @@ void charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries) {
 		zassert(pthread_mutex_unlock(&glock));
 #endif
 	}
+	return 0;
 }
 
 void charts_chart_to_rawchart(uint32_t chartwidth,uint32_t chartheight) {

@@ -92,7 +92,11 @@ static inline int sockaddrfill(struct sockaddr_in *sa,const char *hostname,const
 		}
 	}
 
-	r = random()%n;
+	if (n>0) {
+		r = random()%n;
+	} else {
+		r = 0;
+	}
 
 	for (res = reshead ; res ; res=res->ai_next) {
 		if (res->ai_family==family && res->ai_socktype==socktype && res->ai_addrlen==sizeof(struct sockaddr_in)) {

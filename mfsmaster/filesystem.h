@@ -36,7 +36,7 @@ uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t freeinodes,uint32_t sustainedinode
 uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t freeinodes);
 uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t freeinodes);
 uint8_t fs_mr_link(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint32_t nleng_dst,uint8_t *name_dst);
-uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length);
+uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length,uint8_t canmodmtime);
 uint8_t fs_mr_move(uint32_t ts,uint32_t parent_src,uint32_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint32_t nleng_dst,const uint8_t *name_dst,uint32_t inode);
 uint8_t fs_mr_repair(uint32_t ts,uint32_t inode,uint32_t indx,uint32_t nversion);
 // uint8_t fs_reinit(uint32_t ts,uint32_t inode,uint32_t indx,uint64_t chunkid);
@@ -48,15 +48,16 @@ uint8_t fs_mr_unlink(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *n
 uint8_t fs_mr_purge(uint32_t ts,uint32_t inode);
 uint8_t fs_mr_undel(uint32_t ts,uint32_t inode);
 uint8_t fs_mr_trunc(uint32_t ts,uint32_t inode,uint32_t indx,uint64_t chunkid);
-uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint64_t chunkid);
+uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint8_t canmodmtime,uint64_t chunkid);
+uint8_t fs_mr_rollback(uint32_t inode,uint32_t indx,uint64_t prevchunkid,uint64_t chunkid);
 uint8_t fs_mr_unlock(uint64_t chunkid);
-uint8_t fs_mr_incversion(uint64_t chunkid);
 uint8_t fs_mr_setgoal(uint32_t ts,uint32_t inode,uint32_t uid,uint8_t goal,uint8_t smode,uint32_t sinodes,uint32_t ncinodes,uint32_t nsinodes);
 uint8_t fs_mr_settrashtime(uint32_t ts,uint32_t inode,uint32_t uid,uint32_t trashtime,uint8_t smode,uint32_t sinodes,uint32_t ncinodes,uint32_t nsinodes);
 uint8_t fs_mr_seteattr(uint32_t ts,uint32_t inode,uint32_t uid,uint8_t eattr,uint8_t smode,uint32_t sinodes,uint32_t ncinodes,uint32_t nsinodes);
 uint8_t fs_mr_setxattr(uint32_t ts,uint32_t inode,uint32_t anleng,const uint8_t *attrname,uint32_t avleng,const uint8_t *attrvalue,uint32_t mode);
 uint8_t fs_mr_setacl(uint32_t ts,uint32_t inode,uint16_t mode,uint8_t changectime,uint8_t acltype,uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t mask,uint16_t namedusers,uint16_t namedgroups,const uint8_t *aclblob);
-uint8_t fs_mr_quota(uint32_t ts,uint32_t inode,uint8_t exceeded,uint8_t flags,uint32_t stimestamp,uint32_t sinodes,uint32_t hinodes,uint64_t slength,uint64_t hlength,uint64_t ssize,uint64_t hsize,uint64_t srealsize,uint64_t hrealsize);
+uint8_t fs_mr_quota(uint32_t ts,uint32_t inode,uint8_t exceeded,uint8_t flags,uint32_t stimestamp,uint32_t sinodes,uint32_t hinodes,uint64_t slength,uint64_t hlength,uint64_t ssize,uint64_t hsize,uint64_t srealsize,uint64_t hrealsize,uint32_t graceperiod);
+uint8_t fs_mr_archchg(uint32_t ts,uint32_t inode,uint32_t uid,uint8_t flags,uint64_t chgchunks,uint64_t notchgchunks,uint32_t nsinodes);
 
 //uint64_t fs_mr_getversion(void);
 
@@ -79,7 +80,8 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 uint8_t fs_getattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint8_t attr[35]);
 uint8_t fs_setattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint8_t setmask,uint16_t attrmode,uint32_t attruid,uint32_t attrgid,uint32_t attratime,uint32_t attrmtime,uint8_t sugidclearmode,uint8_t attr[35]);
 
-uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint64_t *chunkid);
+uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint32_t *indx,uint64_t *prevchunkid,uint64_t *chunkid);
+// uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint64_t *chunkid);
 uint8_t fs_end_setlength(uint64_t chunkid);
 uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35]);
 
@@ -101,10 +103,13 @@ uint8_t fs_checkfile(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 
 uint8_t fs_opencheck(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint8_t flags,uint8_t attr[35]);
 
-uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *length);
-uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *length,uint8_t *opflag);
+uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint64_t *chunkid,uint64_t *length);
+// uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *length,uint8_t *opflag);
+uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint64_t *prevchunkid,uint64_t *chunkid,uint64_t *length,uint8_t *opflag);
 // uint8_t fs_reinitchunk(uint32_t inode,uint32_t indx,uint64_t *chunkid);
-uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid);
+uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t canmodmtime);
+
+uint8_t fs_rollback(uint32_t inode,uint32_t indx,uint64_t prevchunkid,uint64_t chunkid);
 
 uint8_t fs_repair(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *notchanged,uint32_t *erased,uint32_t *repaired);
 
@@ -132,6 +137,9 @@ void fs_get_parents_data(uint32_t rootinode,uint32_t inode,uint8_t *buff);
 uint8_t fs_get_paths_size(uint32_t rootinode,uint32_t inode,uint32_t *psize);
 void fs_get_paths_data(uint32_t rootinode,uint32_t inode,uint8_t *buff);
 
+uint8_t fs_archget(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint64_t *archchunks,uint64_t *notarchchunks,uint32_t *archinodes,uint32_t *partinodes,uint32_t *notarchinodes);
+uint8_t fs_archchg(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t cmd,uint64_t *chgchunks,uint64_t *notchgchunks,uint32_t *nsinodes);
+
 // RESERVED
 //uint8_t fs_acquire(uint32_t inode,uint32_t sessionid);
 //uint8_t fs_release(uint32_t inode,uint32_t sessionid);
@@ -155,12 +163,11 @@ uint8_t fs_getdetachedattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,ui
 uint8_t fs_get_dir_stats(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t *inodes,uint32_t *dirs,uint32_t *files,uint32_t *chunks,uint64_t *length,uint64_t *size,uint64_t *rsize);
 
 // QUOTA
-uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t delflag,uint8_t *flags,uint32_t *sinodes,uint64_t *slength,uint64_t *ssize,uint64_t *srealsize,uint32_t *hinodes,uint64_t *hlength,uint64_t *hsize,uint64_t *hrealsize,uint32_t *curinodes,uint64_t *curlength,uint64_t *cursize,uint64_t *currealsize);
+uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t delflag,uint8_t *flags,uint32_t *graceperiod,uint32_t *sinodes,uint64_t *slength,uint64_t *ssize,uint64_t *srealsize,uint32_t *hinodes,uint64_t *hlength,uint64_t *hsize,uint64_t *hrealsize,uint32_t *curinodes,uint64_t *curlength,uint64_t *cursize,uint64_t *currealsize);
 //uint8_t fs_deletequota(uint32_t inode,uint8_t sflags,uint8_t hflags);
 //uint8_t fs_setquota(uint32_t inode,uint8_t sflags,uint8_t hflags,uint32_t sinodes,uint64_t slength,uint64_t ssize,uint64_t srealsize,uint32_t hinodes,uint64_t hlength,uint64_t hsize,uint64_t hrealsize);
 //uint8_t fs_getquota(uint32_t inode,uint8_t *sflags,uint8_t *hflags,uint32_t *sinodes,uint64_t *slength,uint64_t *ssize,uint64_t *srealsize,uint32_t *hinodes,uint64_t *hlength,uint64_t *hsize,uint64_t *hrealsize);
-uint32_t fs_getquotainfo_size(void);
-void fs_getquotainfo_data(uint8_t *buff);
+uint32_t fs_getquotainfo(uint8_t *buff);
 
 // SPECIAL - LOG EMERGENCY INCREASE VERSION FROM CHUNKS-MODULE
 void fs_incversion(uint64_t chunkid);

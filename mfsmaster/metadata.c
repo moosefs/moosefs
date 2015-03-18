@@ -46,8 +46,11 @@
 #include "sessions.h"
 #include "xattr.h"
 #include "posixacl.h"
+#include "flocklocks.h"
+#include "posixlocks.h"
 #include "openfiles.h"
 #include "csdb.h"
+#include "labelsets.h"
 #include "chunks.h"
 #include "filesystem.h"
 #include "metadata.h"
@@ -143,6 +146,9 @@ void meta_store(bio *fd) {
 	if (meta_store_chunk(fd,sessions_store,"SESS")<0) { // (metadump!!!)
 		return;
 	}
+	if (meta_store_chunk(fd,labelset_store,"LABS")<0) { // needs to be before NODE (refcnt)
+		return;
+	}
 	if (meta_store_chunk(fd,fs_storenodes,"NODE")<0) {
 		return;
 	}
@@ -155,13 +161,19 @@ void meta_store(bio *fd) {
 	if (meta_store_chunk(fd,fs_storequota,"QUOT")<0) {
 		return;
 	}
-	if (meta_store_chunk(fd,xattr_store,"XATR")<0) { // (fsnodes<->xattr!!!)
+	if (meta_store_chunk(fd,xattr_store,"XATR")<0) { // dependency: NODE (fsnodes<->xattr)
 		return;
 	}
-	if (meta_store_chunk(fd,posix_acl_store,"PACL")<0) { // (fsnodes<->posix_acl!!!)
+	if (meta_store_chunk(fd,posix_acl_store,"PACL")<0) { // dependency: NODE (fsnodes<->posix_acl))
 		return;
 	}
 	if (meta_store_chunk(fd,of_store,"OPEN")<0) {
+		return;
+	}
+	if (meta_store_chunk(fd,flock_store,"FLCK")<0) { // dependency: OPEN
+		return;
+	}
+	if (meta_store_chunk(fd,posix_lock_store,"PLCK")<0) { // dependency: OPEN
 		return;
 	}
 	if (meta_store_chunk(fd,csdb_store,"CSDB")<0) {
@@ -400,12 +412,28 @@ int meta_load(bio *fd,uint8_t fver) {
 					syslog(LOG_ERR,"error reading metadata (posix_acl)");
 					return -1;
 				}
-			} else if (memcmp(hdr,"LOCK",4)==0) {
-				fprintf(stderr,"ignoring locks\n");
-				bio_skip(fd,sleng);
-//				if (meta_skip(fd,sleng)<0) {
-//					return -1;
-//				}
+			} else if (memcmp(hdr,"FLCK",4)==0) {
+				if (mver>flock_store(NULL)) {
+					mfs_syslog(LOG_ERR,"error reading metadata (flock_locks) - metadata in file have been stored by newer version of MFS !!!");
+					return -1;
+				}
+				fprintf(stderr,"loading flock_locks data ... ");
+				fflush(stderr);
+				if (flock_load(fd,mver,ignoreflag)<0) {
+					syslog(LOG_ERR,"error reading metadata (flock_locks)");
+					return -1;
+				}
+			} else if (memcmp(hdr,"PLCK",4)==0) {
+				if (mver>posix_lock_store(NULL)) {
+					mfs_syslog(LOG_ERR,"error reading metadata (posix_locks) - metadata in file have been stored by newer version of MFS !!!");
+					return -1;
+				}
+				fprintf(stderr,"loading posix_locks data ... ");
+				fflush(stderr);
+				if (posix_lock_load(fd,mver,ignoreflag)<0) {
+					syslog(LOG_ERR,"error reading metadata (posix_locks)");
+					return -1;
+				}
 			} else if (memcmp(hdr,"CSDB",4)==0) {
 				if (mver>csdb_store(NULL)) {
 					mfs_syslog(LOG_ERR,"error reading metadata (csdb) - metadata in file have been stored by newer version of MFS !!!");
@@ -428,6 +456,17 @@ int meta_load(bio *fd,uint8_t fver) {
 				if (sessions_load(fd,mver)<0) {
 					fprintf(stderr,"error\n");
 					syslog(LOG_ERR,"error reading metadata (sessions)");
+					return -1;
+				}
+			} else if (memcmp(hdr,"LABS",4)==0) {
+				if (mver>labelset_store(NULL)) {
+					mfs_syslog(LOG_ERR,"error reading metadata (label sets) - metadata in file have been stored by newer version of MFS !!!");
+					return -1;
+				}
+				fprintf(stderr,"loading label data ... ");
+				fflush(stderr);
+				if (labelset_load(fd,mver,ignoreflag)<0) {
+					syslog(LOG_ERR,"error reading metadata (label sets)");
 					return -1;
 				}
 			} else if (memcmp(hdr,"OPEN",4)==0) {
@@ -647,7 +686,7 @@ int meta_storeall(int bg) {
 		fd = bio_file_open("metadata.mfs.back.tmp",BIO_WRITE,META_FILE_BUFFER_SIZE);
 //		fd = fopen("metadata.mfs.back.tmp","w");
 		if (fd==NULL) {
-			syslog(LOG_ERR,"can't open metadata file");
+			mfs_errlog(LOG_ERR,"metadata store child - open error");
 			// try to save in alternative location - just in case
 			estat = meta_emergency_saves();
 			if (i==0) { // background
@@ -755,6 +794,14 @@ void meta_cleanup(void) {
 	fflush(stderr);
 	posix_acl_cleanup();
 	fprintf(stderr,"done\n");
+	fprintf(stderr,"cleaning flock locks data ...");
+	fflush(stderr);
+	flock_cleanup();
+	fprintf(stderr,"done\n");
+	fprintf(stderr,"cleaning posix locks data ...");
+	fflush(stderr);
+	posix_lock_cleanup();
+	fprintf(stderr,"done\n");
 	fprintf(stderr,"cleaning chunkservers data ...");
 	fflush(stderr);
 	csdb_cleanup();
@@ -766,6 +813,10 @@ void meta_cleanup(void) {
 	fprintf(stderr,"cleaning sessions data ...");
 	fflush(stderr);
 	sessions_cleanup();
+	fprintf(stderr,"done\n");
+	fprintf(stderr,"cleaning label sets data ...");
+	fflush(stderr);
+	labelset_cleanup();
 	fprintf(stderr,"done\n");
 	metaversion = 0;
 	mfs_syslog(LOG_NOTICE,"metadata have been cleaned");
@@ -1284,6 +1335,10 @@ void meta_reload(void) {
 int meta_init(void) {
 	metaversion = 0;
 	metafileid = 0;
+	if (labelset_init()<0) {
+		mfs_syslog(LOG_ERR,"label sets init error");
+		return -1;
+	}
 	if (fs_strinit()<0) {
 		mfs_syslog(LOG_ERR,"filesystem-tree init error");
 		return -1;
@@ -1298,6 +1353,14 @@ int meta_init(void) {
 	}
 	if (posix_acl_init()<0) {
 		mfs_syslog(LOG_ERR,"posix_acl init error");
+		return -1;
+	}
+	if (flock_init()<0) {
+		mfs_syslog(LOG_ERR,"flock_locks init error");
+		return -1;
+	}
+	if (posix_lock_init()<0) {
+		mfs_syslog(LOG_ERR,"posix_locks init error");
 		return -1;
 	}
 	if (csdb_init()<0) {

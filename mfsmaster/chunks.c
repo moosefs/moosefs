@@ -55,6 +55,7 @@
 #include "hashfn.h"
 #include "buckets.h"
 #include "clocks.h"
+#include "labelsets.h"
 
 #define MINLOOPTIME 60
 #define MAXLOOPTIME 7200
@@ -79,7 +80,7 @@
 //#define DISCLOOPELEMENTS (HASHSIZE/0x400)
 
 
-enum {JOBS_INIT,JOBS_EVERYLOOP,JOBS_EVERYTICK};
+enum {JOBS_INIT,JOBS_EVERYLOOP,JOBS_EVERYTICK,JOBS_TERM};
 
 /* chunk.operation */
 enum {NONE=0,CREATE,SET_VERSION,DUPLICATE,TRUNCATE,DUPTRUNC,REPLICATE};
@@ -95,13 +96,15 @@ static const char* opstr[] = {
 };
 
 /* slist.valid */
-/* INVALID - wrong version / or got info from chunkserver (IO error etc.)  ->  to delete */
+/* INVALID - got info from chunkserver (IO error etc.)  ->  to delete */
 /* DEL - deletion in progress */
 /* BUSY - operation in progress */
 /* VALID - ok */
+/* WVER - wrong version - repair or delete */
 /* TDBUSY - to be deleted + operation in progress */
 /* TDVALID - ok, to be deleted */
-enum {INVALID,DEL,BUSY,VALID,TDBUSY,TDVALID};
+/* TDWVER - wrong version, to be deleted */
+enum {INVALID,DEL,BUSY,VALID,WVER,TDBUSY,TDVALID,TDWVER};
 
 typedef struct _discserv {
 	uint16_t csid;
@@ -148,13 +151,15 @@ static slist *slfreehead = NULL;
 typedef struct chunk {
 	uint64_t chunkid;
 	uint32_t version;
-	uint8_t goal;
+	uint8_t lsetid;
 	uint8_t allvalidcopies;
 	uint8_t regularvalidcopies;
 	unsigned ondangerlist:1;
 	unsigned needverincrease:1;
 	unsigned interrupted:1;
-	unsigned operation:4;
+	unsigned writeinprogress:1;
+	unsigned archflag:1;
+	unsigned operation:3;
 	uint32_t lockedto;
 	uint32_t fcount;
 	slist *slisthead;
@@ -206,7 +211,7 @@ static uint32_t opsinprogress = 0;
 static uint16_t csregisterinprogress = 0;
 static uint8_t csreceivingchunks = 0;
 
-#define DANGER_PRIORITIES 5
+#define DANGER_PRIORITIES 6
 
 static chunk** chunks_priority_queue[DANGER_PRIORITIES];
 static uint32_t chunks_priority_leng[DANGER_PRIORITIES];
@@ -240,6 +245,7 @@ typedef struct _job_info {
 	uint32_t del_diskclean;
 	uint32_t del_overgoal;
 	uint32_t copy_undergoal;
+	uint32_t copy_wronglabels;
 } job_info;
 
 typedef struct _loop_info {
@@ -247,9 +253,10 @@ typedef struct _loop_info {
 	uint32_t locked_unused;
 	uint32_t locked_used;
 	uint32_t copy_rebalance;
+	uint32_t labels_dont_match;
 } loop_info;
 
-static loop_info chunksinfo = {{0,0,0,0,0},{0,0,0,0,0},0,0,0};
+static loop_info chunksinfo = {{0,0,0,0,0,0},{0,0,0,0,0,0},0,0,0,0};
 static uint32_t chunksinfo_loopstart=0,chunksinfo_loopend=0;
 
 static uint64_t lastchunkid=0;
@@ -264,6 +271,104 @@ uint32_t regularchunkcounts[11][11];
 
 static uint32_t stats_deletions=0;
 static uint32_t stats_replications=0;
+
+/* perfect matching */
+static uint32_t queue[10+MAXCSCOUNT];
+static uint32_t qtop=0;
+
+static inline void queue_push(uint32_t data) {
+	queue[qtop++] = data;
+}
+
+static inline uint32_t queue_pop(void) {
+	return queue[--qtop];
+}
+
+static inline int queue_notempty(void) {
+	return (qtop>0);
+}
+
+static inline void queue_empty(void) {
+	qtop = 0;
+}
+
+int32_t* do_perfect_match(uint32_t labelcnt,uint32_t servcnt,uint32_t **labelmasks,uint16_t *servers) {
+	uint32_t i,l,x,v;
+	static int32_t *matching = NULL;
+	static int32_t *augment = NULL;
+	static uint8_t *visited = NULL;
+	static uint32_t tablength = 0;
+
+	if (labelcnt + servcnt > tablength || matching==NULL || augment==NULL || visited==NULL) {
+		tablength = 100 + 2 * (labelcnt + servcnt);
+		if (matching) {
+			free(matching);
+		}
+		if (augment) {
+			free(augment);
+		}
+		if (visited) {
+			free(visited);
+		}
+		matching = malloc(sizeof(int32_t)*tablength);
+		passert(matching);
+		memset(matching,0xff,sizeof(int32_t)*tablength);
+		augment = malloc(sizeof(int32_t)*tablength);
+		passert(augment);
+		memset(augment,0xff,sizeof(int32_t)*tablength);
+		visited = malloc(sizeof(uint8_t)*tablength);
+		passert(visited);
+		memset(visited,0,sizeof(uint8_t)*tablength);
+	}
+
+	for (i=0 ; i<servcnt+labelcnt ; i++) {
+		matching[i] = -1;
+		augment[i] = -1;
+	}
+
+	if (servcnt==0 || labelcnt==0) {
+		return matching;
+	}
+
+	for (l=0 ; l<labelcnt ; l++) {
+		if (matching[l]==-1) {
+			for (i=0 ; i<servcnt+labelcnt ; i++) {
+				visited[i] = 0;
+			}
+			visited[l] = 1;
+			augment[l] = -1;
+			queue_push(l);
+			while (queue_notempty()) {
+				x = queue_pop();
+				if (x<labelcnt) {
+					for (v=0 ; v<servcnt ; v++) {
+						if (matocsserv_server_has_labels(cstab[servers[v]].ptr,labelmasks[x])) {
+							if (visited[labelcnt+v]==0) {
+								visited[labelcnt+v]=1;
+								augment[labelcnt+v]=x;
+								queue_push(labelcnt+v);
+							}
+						}
+					}
+				} else if (matching[x] >= 0) {
+					augment[matching[x]] = x;
+					visited[matching[x]] = 1;
+					queue_push(matching[x]);
+				} else {
+					while (augment[x]>=0) {
+						if (x>=labelcnt) {
+							matching[x] = augment[x];
+							matching[augment[x]] = x;
+						}
+						x = augment[x];
+					}
+					queue_empty();
+				}
+			}
+		}
+	}
+	return matching;
+}
 
 void chunk_stats(uint32_t *del,uint32_t *repl) {
 	*del = stats_deletions;
@@ -473,13 +578,15 @@ chunk* chunk_new(uint64_t chunkid) {
 	regularchunkcounts[0][0]++;
 	newchunk->chunkid = chunkid;
 	newchunk->version = 0;
-	newchunk->goal = 0;
+	newchunk->lsetid = 0;
 	newchunk->lockedto = 0;
 	newchunk->allvalidcopies = 0;
 	newchunk->regularvalidcopies = 0;
 	newchunk->needverincrease = 1;
 	newchunk->ondangerlist = 0;
 	newchunk->interrupted = 0;
+	newchunk->writeinprogress = 0;
+	newchunk->archflag = 0;
 	newchunk->operation = NONE;
 	newchunk->slisthead = NULL;
 	newchunk->fcount = 0;
@@ -488,6 +595,7 @@ chunk* chunk_new(uint64_t chunkid) {
 	lastchunkid = chunkid;
 	lastchunkptr = newchunk;
 	chunk_hash_add(newchunk);
+	// labelset_state_change(0,0,0,c->lsetid,c->archflag,c->regularvalidcopies); - not needed since lsetid==0 , archflag==0 and regularvalidcopies==0
 	return newchunk;
 }
 
@@ -513,13 +621,16 @@ void chunk_delete(chunk* c) {
 		lastchunkptr=NULL;
 	}
 	chunks--;
-	allchunkcounts[c->goal][0]--;
-	regularchunkcounts[c->goal][0]--;
+	allchunkcounts[labelset_get_keeparch_goal(c->lsetid,c->archflag)][0]--;
+	regularchunkcounts[labelset_get_keeparch_goal(c->lsetid,c->archflag)][0]--;
+	labelset_state_change(c->lsetid,c->archflag,c->regularvalidcopies,0,0,0);
 	chunk_hash_delete(c);
 	chunk_free(c);
 }
 
-static inline void chunk_state_change(uint8_t oldgoal,uint8_t newgoal,uint8_t oldavc,uint8_t newavc,uint8_t oldrvc,uint8_t newrvc) {
+static inline void chunk_state_change(uint8_t oldlsetid,uint8_t newlsetid,uint8_t oldarchflag,uint8_t newarchflag,uint8_t oldavc,uint8_t newavc,uint8_t oldrvc,uint8_t newrvc) {
+	uint8_t oldgoal = labelset_get_keeparch_goal(oldlsetid,oldarchflag);
+	uint8_t newgoal = labelset_get_keeparch_goal(newlsetid,newarchflag);
 	if (oldgoal>9) {
 		oldgoal=10;
 	}
@@ -538,6 +649,7 @@ static inline void chunk_state_change(uint8_t oldgoal,uint8_t newgoal,uint8_t ol
 	if (newrvc>9) {
 		newrvc=10;
 	}
+	labelset_state_change(oldlsetid,oldarchflag,oldrvc,newlsetid,newarchflag,newrvc);
 	allchunkcounts[oldgoal][oldavc]--;
 	allchunkcounts[newgoal][newavc]++;
 	regularchunkcounts[oldgoal][oldrvc]--;
@@ -624,11 +736,31 @@ static inline void chunk_priority_enqueue(uint8_t j,chunk *c) {
 	}
 }
 
-static inline void chunk_priority_queue_check(chunk *c) {
+static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 	slist *s;
 	uint32_t vc,tdc;
 	uint8_t j;
+	static uint16_t *servers = NULL;
+	uint32_t servcnt;
+	uint32_t **labelmasks;
+	uint32_t labelcnt;
+	int32_t *matching;
+	uint8_t wronglabels;
 
+	if (c==NULL) {
+		if (servers==NULL && checklabels==0) {
+			servers = malloc(sizeof(uint16_t)*MAXCSCOUNT);
+			passert(servers);
+		}
+		if (servers!=NULL && checklabels==1) {
+			free(servers);
+		}
+		return;
+	}
+
+	if (c->ondangerlist || servers==NULL) {
+		return;
+	}
 	vc = 0;
 	tdc = 0;
 	for (s=c->slisthead ; s ; s=s->next) {
@@ -641,7 +773,24 @@ static inline void chunk_priority_queue_check(chunk *c) {
 			break;
 		}
 	}
-	if (vc+tdc > 0 && vc < c->goal) { // undergoal chunk
+	wronglabels = 0;
+	if (labelset_has_keeparch_labels(c->lsetid,c->archflag) && vc >= labelset_get_keeparch_goal(c->lsetid,c->archflag) && checklabels) {
+		servcnt = 0;
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->valid==VALID) {
+				servers[servcnt++] = s->csid;
+			}
+		}
+		labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+		matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
+		for (j=0 ; j<labelcnt ; j++) {
+			if (matching[j]<0) { // there are unmatched labels
+				wronglabels = 1;
+				break;
+			}
+		}
+	}
+	if (vc+tdc > 0 && (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag) || wronglabels)) { // undergoal chunk
 		if (vc==0 && tdc==1) { // highest priority - chunks only on one disk "marked for removal"
 			j = 0;
 		} else if (vc==1 && tdc==0) { // next priority - chunks only on one regular disk
@@ -650,8 +799,10 @@ static inline void chunk_priority_queue_check(chunk *c) {
 			j = 2;
 		} else if (tdc>0) { // next priority - chunks on "marked for removal" disks
 			j = 3;
-		} else { // lowest priority - standard undergoal chunks
+		} else if (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag)) { // next priority - standard undergoal chunks
 			j = 4;
+		} else { // latest priority - changed labels
+			j = 5;
 		}
 		chunk_priority_enqueue(j,c);
 	}
@@ -686,13 +837,109 @@ void chunk_delopchunk(uint16_t csid,uint64_t chunkid) {
 	}
 }
 
+static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t lsetid,uint8_t *olflag) {
+	int32_t *matching;
+	uint32_t **labelmasks;
+	uint8_t labelcnt;
+	uint8_t create_mode;
+	uint16_t servcount;
+	uint16_t goodlabelscount;
+	uint16_t overloaded;
+	uint32_t i,j;
+	int32_t x;
+
+	servcount = matocsserv_getservers_wrandom(csids,&overloaded);
+	if (servcount==0) {
+		*olflag = (overloaded>0)?1:0;
+		return 0;
+	}
+	create_mode = labelset_get_create_mode(lsetid);
+	labelcnt = labelset_get_create_goal(lsetid);
+	if (servcount < labelcnt && servcount + overloaded >= labelcnt) {
+		*olflag = 1;
+		return 0;
+	} else {
+		*olflag = 0;
+	}
+	if (labelset_has_create_labels(lsetid)) {
+		labelcnt = labelset_get_create_labelmasks(lsetid,&labelmasks);
+
+		// reverse server list
+		for (i=0 ; i<servcount/2 ; i++) {
+			x = csids[i];
+			csids[i] = csids[servcount-1-i];
+			csids[servcount-1-i] = x;
+		}
+
+		// match servers to labels
+		matching = do_perfect_match(labelcnt,servcount,labelmasks,csids);
+
+		if (create_mode != CREATE_MODE_STRICT) {
+			goodlabelscount = 0;
+			// extend matching to fulfill goal
+			for (i=0 ; i<labelcnt ; i++) {
+				if (matching[i]<0) {
+					for (j=0 ; j<servcount ; j++) {
+						if (matching[labelcnt+servcount-j-1]<0) {
+							matching[i] = labelcnt+servcount-j-1;
+							matching[labelcnt+servcount-j-1] = i;
+							break;
+						}
+					}
+				} else {
+					goodlabelscount++;
+				}
+				if (matching[i]<0) { // no more servers
+					break;
+				}
+			}
+
+			if (create_mode == CREATE_MODE_STD) {
+				if (goodlabelscount < labelcnt && goodlabelscount + overloaded >= labelcnt) {
+					*olflag = 1;
+					return 0;
+				}
+			}
+
+		}
+
+		// setting servers in proper order
+		i = 0;
+		j = servcount-1;
+		while (i<j) {
+			while (i<j && matching[labelcnt+i]>=0) {
+				i++;
+			}
+			while (i<j && matching[labelcnt+j]<0) {
+				j--;
+			}
+			if (i<j) {
+				x = matching[labelcnt+i];
+				matching[labelcnt+i] = matching[labelcnt+j];
+				matching[labelcnt+j] = x;
+				x = csids[i];
+				csids[i] = csids[j];
+				csids[j] = x;
+			}
+		}
+		if (create_mode == CREATE_MODE_STRICT) {
+			if (i < labelcnt && i + overloaded >= labelcnt) {
+				*olflag = 1;
+				return 0;
+			}
+			return i;
+		}
+	}
+	return servcount;
+}
+
 void chunk_emergency_increase_version(chunk *c) {
 	slist *s;
 	uint32_t i;
 	i=0;
 //	chunk_remove_diconnected_chunks(c);
 	for (s=c->slisthead ;s ; s=s->next) {
-		if (s->valid!=INVALID && s->valid!=DEL) {
+		if (s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
 			if (s->valid==TDVALID || s->valid==TDBUSY) {
 				s->valid = TDBUSY;
 			} else {
@@ -708,7 +955,7 @@ void chunk_emergency_increase_version(chunk *c) {
 		c->interrupted = 0;
 		c->operation = SET_VERSION;
 		c->version++;
-		fs_incversion(c->chunkid);
+		changelog("%"PRIu32"|INCVERSION(%"PRIu64")",(uint32_t)main_time(),c->chunkid);
 	} else {
 		matoclserv_chunk_status(c->chunkid,ERROR_CHUNKLOST);
 	}
@@ -727,13 +974,16 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 		s = *st;
 		if (!cstab[s->csid].valid) {
 			if (s->valid==TDBUSY || s->valid==TDVALID) {
-				chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 				c->allvalidcopies--;
 			}
 			if (s->valid==BUSY || s->valid==VALID) {
-				chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 				c->allvalidcopies--;
 				c->regularvalidcopies--;
+			}
+			if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) { // pro forma
+				matocsserv_write_counters(cstab[s->csid].ptr,0);
 			}
 			c->needverincrease = 1;
 			*st = s->next;
@@ -763,16 +1013,17 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 			}
 		}
 		if (opfinished) {
-			if (c->operation!=REPLICATE) {
+			if (c->operation==REPLICATE) {
+				c->operation = NONE;
+				c->lockedto = 0;
+				matoclserv_chunk_unlocked(c->chunkid,c);
+			} else {
 				if (validcopies) {
 					chunk_emergency_increase_version(c);
 				} else {
 					matoclserv_chunk_status(c->chunkid,ERROR_NOTDONE);
 					c->operation = NONE;
 				}
-			} else {
-				c->operation = NONE;
-				c->lockedto = 0;
 			}
 		} else {
 			if (c->operation!=REPLICATE) {
@@ -780,7 +1031,7 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 			}
 		}
 	}
-	chunk_priority_queue_check(c);
+	chunk_priority_queue_check(c,1);
 	return 0;
 }
 
@@ -791,16 +1042,46 @@ int chunk_mr_increase_version(uint64_t chunkid) {
 		return ERROR_NOCHUNK;
 	}
 	c->version++;
+	meta_version_inc();
 	return STATUS_OK;
 }
 
 /* --- */
 
-int chunk_change_file(uint64_t chunkid,uint8_t prevgoal,uint8_t newgoal) {
-	chunk *c;
-	uint8_t oldgoal;
+static inline void chunk_find_lsetid(chunk *c) {
+	uint32_t i;
+	uint8_t g;
+	uint8_t mg;
+	uint8_t lsetid,v;
+	mg = 0;
+	lsetid = 0;
+	v = 0;
+	for (i=0 ; i<c->ftab[0] ; i++) {
+		if (c->ftab[i]>0) {
+			g = labelset_get_keepmax_goal(i);
+			if (g>mg) {
+				mg = g;
+				lsetid = i;
+				v = 0;
+			} else if (g==mg) {
+				if (lsetid<=9 && v==0) {
+					lsetid = i;
+				} else if (lsetid>9 && i>9) {
+					lsetid = g;
+					v = 1;
+				}
+			}
+		}
+	}
+	massert(lsetid>0,"wrong labels set");
+	c->lsetid = lsetid;
+}
 
-	if (prevgoal==newgoal) {
+int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid) {
+	chunk *c;
+	uint8_t oldlsetid;
+
+	if (prevlsetid==newlsetid) {
 		return STATUS_OK;
 	}
 	c = chunk_find(chunkid);
@@ -811,56 +1092,65 @@ int chunk_change_file(uint64_t chunkid,uint8_t prevgoal,uint8_t newgoal) {
 		syslog(LOG_WARNING,"serious structure inconsistency: (chunkid:%016"PRIX64")",c->chunkid);
 		return ERROR_CHUNKLOST;	// ERROR_STRUCTURE
 	}
-	oldgoal = c->goal;
+	oldlsetid = c->lsetid;
 	if (c->fcount==1) {
-		c->goal = newgoal;
+		c->lsetid = newlsetid;
 	} else {
 		if (c->ftab==NULL) {
-			c->ftab = malloc(sizeof(uint32_t)*10);
+			uint32_t ftableng = prevlsetid;
+			if (newlsetid > ftableng) {
+				ftableng = newlsetid;
+			}
+			ftableng++;
+			c->ftab = malloc(sizeof(uint32_t)*ftableng);
 			passert(c->ftab);
-			memset(c->ftab,0,sizeof(uint32_t)*10);
-			c->ftab[c->goal]=c->fcount-1;
-			c->ftab[newgoal]=1;
-			if (newgoal > c->goal) {
-				c->goal = newgoal;
-			}
+			memset(c->ftab,0,sizeof(uint32_t)*ftableng);
+			c->ftab[0] = ftableng;
+			massert(c->lsetid==prevlsetid,"wrong labels set");
+			c->ftab[prevlsetid] = c->fcount-1;
+			c->ftab[newlsetid] = 1;
+			chunk_find_lsetid(c);
 		} else {
-			c->ftab[prevgoal]--;
-			c->ftab[newgoal]++;
-			c->goal = 9;
-			while (c->ftab[c->goal]==0) {
-				c->goal--;
+			if (newlsetid >= c->ftab[0]) {
+				c->ftab = realloc(c->ftab,sizeof(uint32_t)*(newlsetid+1));
+				passert(c->ftab);
+				memset(c->ftab+c->ftab[0],0,sizeof(uint32_t)*(newlsetid+1-c->ftab[0]));
+				c->ftab[0] = newlsetid+1;
 			}
+			massert(c->ftab[prevlsetid]>0,"wrong ftab entry");
+			c->ftab[prevlsetid]--;
+			c->ftab[newlsetid]++;
+			chunk_find_lsetid(c);
 		}
 	}
-	if (oldgoal!=c->goal) {
-		chunk_state_change(oldgoal,c->goal,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+	if (oldlsetid!=c->lsetid) {
+		chunk_state_change(oldlsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+		chunk_priority_queue_check(c,1);
+	} else {
+		chunk_priority_queue_check(c,0);
 	}
-	chunk_priority_queue_check(c);
 	return STATUS_OK;
 }
 
-static inline int chunk_delete_file_int(chunk *c,uint8_t goal) {
-	uint8_t oldgoal;
+static inline int chunk_delete_file_int(chunk *c,uint8_t lsetid) {
+	uint8_t oldlsetid;
 
 	if (c->fcount==0) {
 		syslog(LOG_WARNING,"serious structure inconsistency: (chunkid:%016"PRIX64")",c->chunkid);
 		return ERROR_CHUNKLOST;	// ERROR_STRUCTURE
 	}
-	oldgoal = c->goal;
+	massert(lsetid>0,"wrong labels set");
+	oldlsetid = c->lsetid;
 	if (c->fcount==1) {
-		c->goal = 0;
+		c->lsetid = 0;
 		c->fcount = 0;
 //#ifdef METARESTORE
 //		printf("D%"PRIu64"\n",c->chunkid);
 //#endif
 	} else {
 		if (c->ftab) {
-			c->ftab[goal]--;
-			c->goal = 9;
-			while (c->ftab[c->goal]==0) {
-				c->goal--;
-			}
+			c->ftab[lsetid]--;
+			chunk_find_lsetid(c);
 		}
 		c->fcount--;
 		if (c->fcount==1 && c->ftab) {
@@ -868,66 +1158,101 @@ static inline int chunk_delete_file_int(chunk *c,uint8_t goal) {
 			c->ftab = NULL;
 		}
 	}
-	if (oldgoal!=c->goal) {
-		chunk_state_change(oldgoal,c->goal,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+	if (oldlsetid!=c->lsetid) {
+		chunk_state_change(oldlsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
 	}
 	return STATUS_OK;
 }
 
-static inline int chunk_add_file_int(chunk *c,uint8_t goal) {
-	uint8_t oldgoal;
+static inline int chunk_add_file_int(chunk *c,uint8_t lsetid) {
+	uint8_t oldlsetid;
 
-	oldgoal = c->goal;
+	massert(lsetid>0,"wrong labels set");
+	oldlsetid = c->lsetid;
 	if (c->fcount==0) {
-		c->goal = goal;
+		c->lsetid = lsetid;
 		c->fcount = 1;
-	} else if (goal==c->goal) {
+	} else if (lsetid==c->lsetid) {
 		c->fcount++;
 		if (c->ftab) {
-			c->ftab[goal]++;
+			c->ftab[lsetid]++;
 		}
 	} else {
 		if (c->ftab==NULL) {
-			c->ftab = malloc(sizeof(uint32_t)*10);
+			uint32_t ftableng = c->lsetid;
+			if (lsetid > ftableng) {
+				ftableng = lsetid;
+			}
+			ftableng++;
+			c->ftab = malloc(sizeof(uint32_t)*ftableng);
 			passert(c->ftab);
-			memset(c->ftab,0,sizeof(uint32_t)*10);
-			c->ftab[c->goal]=c->fcount;
-			c->ftab[goal]=1;
+			memset(c->ftab,0,sizeof(uint32_t)*ftableng);
+			c->ftab[0] = ftableng;
+			c->ftab[c->lsetid] = c->fcount;
+			c->ftab[lsetid] = 1;
 			c->fcount++;
-			if (goal > c->goal) {
-				c->goal = goal;
-			}
+			chunk_find_lsetid(c);
 		} else {
-			c->ftab[goal]++;
-			c->fcount++;
-			c->goal = 9;
-			while (c->ftab[c->goal]==0) {
-				c->goal--;
+			if (lsetid >= c->ftab[0]) {
+				c->ftab = realloc(c->ftab,sizeof(uint32_t)*(lsetid+1));
+				passert(c->ftab);
+				memset(c->ftab+c->ftab[0],0,sizeof(uint32_t)*(lsetid+1-c->ftab[0]));
+				c->ftab[0] = lsetid+1;
 			}
+			c->ftab[lsetid]++;
+			c->fcount++;
+			chunk_find_lsetid(c);
 		}
 	}
-	if (oldgoal!=c->goal) {
-		chunk_state_change(oldgoal,c->goal,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+	if (oldlsetid!=c->lsetid) {
+		chunk_state_change(oldlsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
 	}
 	return STATUS_OK;
 }
 
-int chunk_delete_file(uint64_t chunkid,uint8_t goal) {
+int chunk_delete_file(uint64_t chunkid,uint8_t lsetid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
 		return ERROR_NOCHUNK;
 	}
-	return chunk_delete_file_int(c,goal);
+	return chunk_delete_file_int(c,lsetid);
 }
 
-int chunk_add_file(uint64_t chunkid,uint8_t goal) {
+int chunk_add_file(uint64_t chunkid,uint8_t lsetid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
 		return ERROR_NOCHUNK;
 	}
-	return chunk_add_file_int(c,goal);
+	return chunk_add_file_int(c,lsetid);
+}
+
+static inline void chunk_write_counters(chunk *c,uint8_t x) {
+	slist *s;
+	if (x) {
+		if (c->writeinprogress==0) {
+			c->writeinprogress = 1;
+		} else {
+			return;
+		}
+	} else {
+		if (c->writeinprogress) {
+			c->writeinprogress = 0;
+		} else {
+			return;
+		}
+	}
+	for (s=c->slisthead ;s ; s=s->next) {
+		if (s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
+			matocsserv_write_counters(cstab[s->csid].ptr,x);
+		}
+	}
+}
+
+int chunk_locked_or_busy(void *cptr) {
+	chunk *c = (chunk*)cptr;
+	return (c->lockedto==0 && c->operation==NONE)?1:0;
 }
 
 int chunk_unlock(uint64_t chunkid) {
@@ -937,8 +1262,10 @@ int chunk_unlock(uint64_t chunkid) {
 	if (c==NULL) {
 		return ERROR_NOCHUNK;
 	}
-	c->lockedto=0;
-	chunk_priority_queue_check(c);
+	c->lockedto = 0;
+	chunk_write_counters(c,0);
+	matoclserv_chunk_unlocked(c->chunkid,c);
+	chunk_priority_queue_check(c,1);
 	return STATUS_OK;
 }
 
@@ -948,11 +1275,37 @@ int chunk_mr_unlock(uint64_t chunkid) {
 	if (c==NULL) {
 		return ERROR_NOCHUNK;
 	}
-	c->lockedto=0;
+	c->lockedto = 0;
+	chunk_write_counters(c,0);
 	return STATUS_OK;
 }
 
-int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies) {
+int chunk_get_archflag(uint64_t chunkid,uint8_t *archflag) {
+	chunk *c;
+	c = chunk_find(chunkid);
+	if (c==NULL) {
+		return ERROR_NOCHUNK;
+	}
+	*archflag = c->archflag;
+	return STATUS_OK;
+}
+
+int chunk_univ_archflag(uint64_t chunkid,uint8_t archflag,uint32_t *archflagchanged) {
+	chunk *c;
+	c = chunk_find(chunkid);
+	if (c==NULL) {
+		return ERROR_NOCHUNK;
+	}
+	if (archflag != c->archflag) {
+		chunk_state_change(c->lsetid,c->lsetid,c->archflag,archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+		c->archflag = archflag;
+		chunk_priority_queue_check(c,1);
+		(*archflagchanged)++;
+	}
+	return STATUS_OK;
+}
+
+int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies,uint8_t *goalcopies,uint8_t archflag,uint32_t *archflagchanged) {
 	chunk *c;
 	*vcopies = 0;
 	c = chunk_find(chunkid);
@@ -960,13 +1313,25 @@ int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies) {
 		return ERROR_NOCHUNK;
 	}
 	*vcopies = c->allvalidcopies;
+	if (archflag==1 && c->archflag==0) {
+		chunk_state_change(c->lsetid,c->lsetid,c->archflag,archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+		c->archflag = archflag;
+		chunk_priority_queue_check(c,1);
+		(*archflagchanged)++;
+	}
+	if (goalcopies!=NULL) {
+		*goalcopies = labelset_get_keeparch_goal(c->lsetid,c->archflag);
+	}
 	return STATUS_OK;
 }
 
-int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal,uint8_t *opflag) {
+int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
 	uint16_t csids[MAXCSCOUNT];
+	static void **chosen = NULL;
+	static uint32_t chosenleng = 0;
 	uint16_t servcount=0;
 	uint32_t vc;
+	uint8_t overloaded;
 	slist *os,*s;
 	uint32_t i;
 	chunk *oc,*c;
@@ -980,28 +1345,36 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 
 	if (ochunkid==0) {	// new chunk
 		if (mr==0) {
-			servcount = matocsserv_getservers_wrandom(csids,AcceptableDifference*1.5,goal);
+			servcount = chunk_creation_servers(csids,lsetid,&overloaded);
 			if (servcount==0) {
-				uint16_t uscount,tscount;
-				double minusage,maxusage;
-				matocsserv_usagedifference(&minusage,&maxusage,&uscount,&tscount);
-				if (uscount>0 && csstable) {
-					return ERROR_NOSPACE;
+				if (overloaded) {
+					return ERROR_EAGAIN;
 				} else {
-					return ERROR_NOCHUNKSERVERS;
+					uint16_t scount;
+					scount = matocsserv_servers_count();
+					if (scount>0 && csstable) {
+						return ERROR_NOSPACE;
+					} else {
+						return ERROR_NOCHUNKSERVERS;
+					}
 				}
 			}
 			c = chunk_new(nextchunkid++);
 			c->version = 1;
 			c->interrupted = 0;
 			c->operation = CREATE;
-			chunk_add_file_int(c,goal);
-			if (servcount<goal) {
+			chunk_add_file_int(c,lsetid);
+			if (servcount<labelset_get_create_goal(lsetid)) {
 				c->allvalidcopies = servcount;
 				c->regularvalidcopies = servcount;
 			} else {
-				c->allvalidcopies = goal;
-				c->regularvalidcopies = goal;
+				c->allvalidcopies = labelset_get_create_goal(lsetid);
+				c->regularvalidcopies = labelset_get_create_goal(lsetid);
+			}
+			if (c->allvalidcopies>chosenleng) {
+				chosenleng = c->allvalidcopies+10;
+				chosen = malloc(sizeof(void*)*chosenleng);
+				passert(chosen);
 			}
 			for (i=0 ; i<c->allvalidcopies ; i++) {
 				s = slist_malloc();
@@ -1010,10 +1383,12 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 				s->version = c->version;
 				s->next = c->slisthead;
 				c->slisthead = s;
+				chosen[i] = cstab[s->csid].ptr;
 				matocsserv_send_createchunk(cstab[s->csid].ptr,c->chunkid,c->version);
 				chunk_addopchunk(s->csid,c->chunkid);
 			}
-			chunk_state_change(c->goal,c->goal,0,c->allvalidcopies,0,c->regularvalidcopies);
+			matocsserv_useservers_wrandom(chosen,c->allvalidcopies);
+			chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 			*opflag=1;
 			*nchunkid = c->chunkid;
 		} else {
@@ -1022,7 +1397,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 			}
 			c = chunk_new(nextchunkid++);
 			c->version = 1;
-			chunk_add_file_int(c,goal);
+			chunk_add_file_int(c,lsetid);
 		}
 	} else {
 		c = NULL;
@@ -1045,21 +1420,21 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 				if (c->operation!=NONE) {
 					return ERROR_CHUNKBUSY;
 				}
-				if (csstable==0) {
+				if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
 					vc = 0;
 					for (s=c->slisthead ; s ; s=s->next) {
 						if (s->valid==VALID) {
 							vc++;
 						}
 					}
-					if (vc < c->goal) {
-						return ERROR_LOCKED; // just try again later
+					if (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
+						return ERROR_EAGAIN; // just try again later
 					}
 				}
 				if (c->needverincrease) {
 					i=0;
 					for (s=c->slisthead ;s ; s=s->next) {
-						if (s->valid!=INVALID && s->valid!=DEL) {
+						if (s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
 							if (s->valid==TDVALID || s->valid==TDBUSY) {
 								s->valid = TDBUSY;
 							} else {
@@ -1075,7 +1450,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 						c->interrupted = 0;
 						c->operation = SET_VERSION;
 						c->version++;
-						*opflag=1;
+						*opflag = 1;
 					} else {
 						if (csstable) {
 							return ERROR_CHUNKLOST;
@@ -1084,7 +1459,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 						}
 					}
 				} else {
-					*opflag=0;
+					*opflag = 0;
 				}
 			} else {
 				if (*nchunkid != ochunkid) {
@@ -1107,27 +1482,27 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 				if (oc->operation!=NONE) {
 					return ERROR_CHUNKBUSY;
 				}
-				if (csstable==0) {
+				if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
 					vc = 0;
 					for (os=oc->slisthead ; os ; os=os->next) {
 						if (os->valid==VALID) {
 							vc++;
 						}
 					}
-					if (vc < oc->goal) {
-						return ERROR_LOCKED; // just try again later
+					if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
+						return ERROR_EAGAIN; // just try again later
 					}
 				}
 				i=0;
 				for (os=oc->slisthead ;os ; os=os->next) {
-					if (os->valid!=INVALID && os->valid!=DEL) {
+					if (os->valid!=INVALID && os->valid!=DEL && os->valid!=WVER && os->valid!=TDWVER) {
 						if (c==NULL) {
 							c = chunk_new(nextchunkid++);
 							c->version = 1;
 							c->interrupted = 0;
 							c->operation = DUPLICATE;
-							chunk_delete_file_int(oc,goal);
-							chunk_add_file_int(c,goal);
+							chunk_delete_file_int(oc,lsetid);
+							chunk_add_file_int(c,lsetid);
 						}
 						s = slist_malloc();
 						s->csid = os->csid;
@@ -1143,7 +1518,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 					}
 				}
 				if (c!=NULL) {
-					chunk_state_change(c->goal,c->goal,0,c->allvalidcopies,0,c->regularvalidcopies);
+					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 				}
 				if (i>0) {
 					*nchunkid = c->chunkid;
@@ -1161,26 +1536,27 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 				}
 				c = chunk_new(nextchunkid++);
 				c->version = 1;
-				chunk_delete_file_int(oc,goal);
-				chunk_add_file_int(c,goal);
+				chunk_delete_file_int(oc,lsetid);
+				chunk_add_file_int(c,lsetid);
 				*nchunkid = c->chunkid;
 			}
 		}
 	}
 
-	c->lockedto=ts+LOCKTIMEOUT;
+	c->lockedto = ts+LOCKTIMEOUT;
+	chunk_write_counters(c,1);
 	return STATUS_OK;
 }
 
-int chunk_multi_modify(uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal,uint8_t *opflag) {
-	return chunk_univ_multi_modify(main_time(),0,nchunkid,ochunkid,goal,opflag);
+int chunk_multi_modify(uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
+	return chunk_univ_multi_modify(main_time(),0,nchunkid,ochunkid,lsetid,opflag);
 }
 
-int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal,uint8_t opflag) {
-	return chunk_univ_multi_modify(ts,1,nchunkid,ochunkid,goal,&opflag);
+int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t opflag) {
+	return chunk_univ_multi_modify(ts,1,nchunkid,ochunkid,lsetid,&opflag);
 }
 
-int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t goal) {
+int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid) {
 	slist *os,*s;
 	uint32_t i;
 	chunk *oc,*c;
@@ -1214,20 +1590,20 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			if (c->operation!=NONE) {
 				return ERROR_CHUNKBUSY;
 			}
-			if (csstable==0) {
+			if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
 				vc = 0;
 				for (os=oc->slisthead ; os ; os=os->next) {
 					if (os->valid==VALID) {
 						vc++;
 					}
 				}
-				if (vc < oc->goal) {
-					return ERROR_LOCKED; // just try again later
+				if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
+					return ERROR_EAGAIN; // just try again later
 				}
 			}
 			i=0;
 			for (s=c->slisthead ;s ; s=s->next) {
-				if (s->valid!=INVALID && s->valid!=DEL) {
+				if (s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
 					if (s->valid==TDVALID || s->valid==TDBUSY) {
 						s->valid = TDBUSY;
 					} else {
@@ -1269,27 +1645,27 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			if (oc->operation!=NONE) {
 				return ERROR_CHUNKBUSY;
 			}
-			if (csstable==0) {
+			if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
 				vc = 0;
 				for (os=oc->slisthead ; os ; os=os->next) {
 					if (os->valid==VALID) {
 						vc++;
 					}
 				}
-				if (vc < oc->goal) {
-					return ERROR_LOCKED; // just try again later
+				if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
+					return ERROR_EAGAIN; // just try again later
 				}
 			}
 			i=0;
 			for (os=oc->slisthead ;os ; os=os->next) {
-				if (os->valid!=INVALID && os->valid!=DEL) {
+				if (os->valid!=INVALID && os->valid!=DEL && os->valid!=WVER && os->valid!=TDWVER) {
 					if (c==NULL) {
 						c = chunk_new(nextchunkid++);
 						c->version = 1;
 						c->interrupted = 0;
 						c->operation = DUPTRUNC;
-						chunk_delete_file_int(oc,goal);
-						chunk_add_file_int(c,goal);
+						chunk_delete_file_int(oc,lsetid);
+						chunk_add_file_int(c,lsetid);
 					}
 					s = slist_malloc();
 					s->csid = os->csid;
@@ -1305,7 +1681,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 				}
 			}
 			if (c!=NULL) {
-				chunk_state_change(c->goal,c->goal,0,c->allvalidcopies,0,c->regularvalidcopies);
+				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 			}
 			if (i>0) {
 				*nchunkid = c->chunkid;
@@ -1322,8 +1698,8 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			}
 			c = chunk_new(nextchunkid++);
 			c->version = 1;
-			chunk_delete_file_int(oc,goal);
-			chunk_add_file_int(c,goal);
+			chunk_delete_file_int(oc,lsetid);
+			chunk_add_file_int(c,lsetid);
 			*nchunkid = c->chunkid;
 		}
 	}
@@ -1332,15 +1708,15 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 	return STATUS_OK;
 }
 
-int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t goal) {
-	return chunk_univ_multi_truncate(main_time(),0,nchunkid,ochunkid,length,goal);
+int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid) {
+	return chunk_univ_multi_truncate(main_time(),0,nchunkid,ochunkid,length,lsetid);
 }
 
-int chunk_mr_multi_truncate(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal) {
-	return chunk_univ_multi_truncate(ts,1,nchunkid,ochunkid,0,goal);
+int chunk_mr_multi_truncate(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid) {
+	return chunk_univ_multi_truncate(ts,1,nchunkid,ochunkid,0,lsetid);
 }
 
-int chunk_repair(uint8_t goal,uint64_t ochunkid,uint32_t *nversion) {
+int chunk_repair(uint8_t lsetid,uint64_t ochunkid,uint32_t *nversion) {
 	uint32_t bestversion;
 	chunk *c;
 	slist *s;
@@ -1357,13 +1733,14 @@ int chunk_repair(uint8_t goal,uint64_t ochunkid,uint32_t *nversion) {
 	if (c->lockedto>=(uint32_t)main_time()) { // can't repair locked chunks - but if it's locked, then likely it doesn't need to be repaired
 		return 0;
 	}
+	chunk_write_counters(c,0);
 	bestversion = 0;
 	for (s=c->slisthead ; s ; s=s->next) {
 		if (cstab[s->csid].valid) {
 			if (s->valid == VALID || s->valid == TDVALID || s->valid == BUSY || s->valid == TDBUSY) {	// found chunk that is ok - so return
 				return 0;
 			}
-			if (s->valid == INVALID) {
+			if (s->valid == WVER || s->valid == TDWVER) {
 				if (s->version>=bestversion) {
 					bestversion = s->version;
 				}
@@ -1371,7 +1748,7 @@ int chunk_repair(uint8_t goal,uint64_t ochunkid,uint32_t *nversion) {
 		}
 	}
 	if (bestversion==0) {	// didn't find sensible chunk - so erase it
-		chunk_delete_file_int(c,goal);
+		chunk_delete_file_int(c,lsetid);
 		return 1;
 	}
 	if (c->allvalidcopies>0 || c->regularvalidcopies>0) {
@@ -1381,20 +1758,25 @@ int chunk_repair(uint8_t goal,uint64_t ochunkid,uint32_t *nversion) {
 		if (c->regularvalidcopies>0) {
 			syslog(LOG_WARNING,"wrong regular valid copies counter - (counter value: %u, should be: 0) - fixed",c->regularvalidcopies);
 		}
-		chunk_state_change(c->goal,c->goal,c->allvalidcopies,0,c->regularvalidcopies,0);
+		chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,0,c->regularvalidcopies,0);
 		c->allvalidcopies = 0;
 		c->regularvalidcopies = 0;
 	}
 	c->version = bestversion;
 	for (s=c->slisthead ; s ; s=s->next) {
-		if (s->valid == INVALID && s->version==bestversion && cstab[s->csid].valid) {
-			s->valid = VALID;
-			c->allvalidcopies++;
-			c->regularvalidcopies++;
+		if (s->version==bestversion && cstab[s->csid].valid) {
+			if (s->valid==WVER) {
+				s->valid = VALID;
+				c->allvalidcopies++;
+				c->regularvalidcopies++;
+			} else if (s->valid==TDWVER) {
+				s->valid = TDVALID;
+				c->allvalidcopies++;
+			}
 		}
 	}
 	*nversion = bestversion;
-	chunk_state_change(c->goal,c->goal,0,c->allvalidcopies,0,c->regularvalidcopies);
+	chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 	c->needverincrease = 1;
 	return 1;
 }
@@ -1415,6 +1797,7 @@ typedef struct locsort {
 	uint32_t ip;
 	uint16_t port;
 	uint32_t csver;
+	uint32_t labelmask;
 	uint32_t dist;
 	uint32_t rnd;
 } locsort;
@@ -1434,7 +1817,7 @@ int chunk_locsort_cmp(const void *aa,const void *bb) {
 	return 0;
 }
 
-uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip,uint32_t *version,uint8_t *count,uint8_t cs_data[100*10]) {
+uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip,uint32_t *version,uint8_t *count,uint8_t cs_data[100*14]) {
 	chunk *c;
 	slist *s;
 	uint8_t i;
@@ -1449,8 +1832,8 @@ uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip
 	*version = c->version;
 	cnt=0;
 	for (s=c->slisthead ;s ; s=s->next) {
-		if (s->valid!=INVALID && s->valid!=DEL && cstab[s->csid].valid) {
-			if (cnt<100 && matocsserv_get_csdata(cstab[s->csid].ptr,&(lstab[cnt].ip),&(lstab[cnt].port),&(lstab[cnt].csver))==0) {
+		if (s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER && cstab[s->csid].valid) {
+			if (cnt<100 && matocsserv_get_csdata(cstab[s->csid].ptr,&(lstab[cnt].ip),&(lstab[cnt].port),&(lstab[cnt].csver),&(lstab[cnt].labelmask))==0) {
 				lstab[cnt].dist = topology_distance(lstab[cnt].ip,cuip);	// in the future prepare more sofisticated distance function
 				lstab[cnt].rnd = rndu32();
 				cnt++;
@@ -1470,8 +1853,11 @@ uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip
 	for (i=0 ; i<cnt ; i++) {
 		put32bit(&wptr,lstab[i].ip);
 		put16bit(&wptr,lstab[i].port);
-		if (mode) {
+		if (mode>0) {
 			put32bit(&wptr,lstab[i].csver);
+		}
+		if (mode>1) {
+			put32bit(&wptr,lstab[i].labelmask);
 		}
 	}
 	*count = cnt;
@@ -1570,18 +1956,25 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 	s = slist_malloc();
 	s->csid = csid;
 	if (c->version!=(version&0x7FFFFFFF)) {
-		s->valid = INVALID;
+		if (version&0x80000000) {
+			s->valid = TDWVER;
+		} else {
+			s->valid = WVER;
+		}
 		s->version = version&0x7FFFFFFF;
 	} else {
+		if (c->writeinprogress) {
+			matocsserv_write_counters(cstab[csid].ptr,1);
+		}
 		if (version&0x80000000) {
-			s->valid=TDVALID;
+			s->valid = TDVALID;
 			s->version = c->version;
-			chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies);
+			chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies);
 			c->allvalidcopies++;
 		} else {
-			s->valid=VALID;
+			s->valid = VALID;
 			s->version = c->version;
-			chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+			chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
 			c->allvalidcopies++;
 			c->regularvalidcopies++;
 		}
@@ -1612,18 +2005,21 @@ void chunk_damaged(uint16_t csid,uint64_t chunkid) {
 	for (s=c->slisthead ; s ; s=s->next) {
 		if (s->csid==csid) {
 			if (s->valid==TDBUSY || s->valid==TDVALID) {
-				chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 				c->allvalidcopies--;
 			}
 			if (s->valid==BUSY || s->valid==VALID) {
-				chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 				c->allvalidcopies--;
 				c->regularvalidcopies--;
+			}
+			if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
+				matocsserv_write_counters(cstab[csid].ptr,0);
 			}
 			s->valid = INVALID;
 			s->version = 0;
 			c->needverincrease = 1;
-			chunk_priority_queue_check(c);
+			chunk_priority_queue_check(c,1);
 			return;
 		}
 	}
@@ -1651,13 +2047,16 @@ void chunk_lost(uint16_t csid,uint64_t chunkid) {
 	while ((s=*sptr)) {
 		if (s->csid==csid) {
 			if (s->valid==TDBUSY || s->valid==TDVALID) {
-				chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 				c->allvalidcopies--;
 			}
 			if (s->valid==BUSY || s->valid==VALID) {
-				chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 				c->allvalidcopies--;
 				c->regularvalidcopies--;
+			}
+			if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
+				matocsserv_write_counters(cstab[csid].ptr,0);
 			}
 			c->needverincrease = 1;
 			*sptr = s->next;
@@ -1670,7 +2069,7 @@ void chunk_lost(uint16_t csid,uint64_t chunkid) {
 		changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 		chunk_delete(c);
 	} else {
-		chunk_priority_queue_check(c);
+		chunk_priority_queue_check(c,1);
 	}
 }
 
@@ -1819,13 +2218,16 @@ void chunk_got_delete_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
 		if (s->csid == csid) {
 			if (s->valid!=DEL) {
 				if (s->valid==TDBUSY || s->valid==TDVALID) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 					c->allvalidcopies--;
 				}
 				if (s->valid==BUSY || s->valid==VALID) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 					c->allvalidcopies--;
 					c->regularvalidcopies--;
+				}
+				if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
+					matocsserv_write_counters(cstab[s->csid].ptr,0);
 				}
 				syslog(LOG_WARNING,"got unexpected delete status");
 			}
@@ -1852,19 +2254,22 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->csid == csid) {
 				if (s->valid!=BUSY) {
-					syslog(LOG_WARNING,"got replication status from server not signed as busy !!!");
+					syslog(LOG_WARNING,"got replication status from server not set as busy !!!");
 				}
 				if (status!=0 || version!=c->version) {
 					if (s->valid==TDBUSY || s->valid==TDVALID) {
-						chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 						c->allvalidcopies--;
 					}
 					if (s->valid==BUSY || s->valid==VALID) {
-						chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 						c->allvalidcopies--;
 						c->regularvalidcopies--;
 					}
-					s->valid=INVALID;
+					if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
+						matocsserv_write_counters(cstab[s->csid].ptr,0);
+					}
+					s->valid = INVALID;
 					s->version = 0;	// after unfinished operation can't be shure what version chunk has
 				} else {
 					if (s->valid == BUSY || s->valid == VALID) {
@@ -1873,25 +2278,31 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 				}
 				chunk_delopchunk(s->csid,c->chunkid);
 			} else if (s->valid==BUSY) {
-				syslog(LOG_WARNING,"got replication status from one server, but another is signed as busy !!!");
+				syslog(LOG_WARNING,"got replication status from one server, but another is set as busy !!!");
 			}
 		}
 		c->operation = NONE;
 		c->lockedto = 0;
+		matoclserv_chunk_unlocked(c->chunkid,c);
 	} else { // low priority replication
 		if (status!=0) {
+			chunk_priority_queue_check(c,1);
 			return ;
 		}
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->csid == csid) {
 				syslog(LOG_WARNING,"got replication status from server which had had that chunk before (chunk:%016"PRIX64"_%08"PRIX32")",chunkid,version);
 				if (s->valid==VALID && version!=c->version) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 					c->allvalidcopies--;
 					c->regularvalidcopies--;
 					s->valid = INVALID;
 					s->version = version;
+					if (c->writeinprogress) {
+						matocsserv_write_counters(cstab[s->csid].ptr,0);
+					}
 				}
+				chunk_priority_queue_check(c,1);
 				return;
 			}
 		}
@@ -1900,7 +2311,8 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 		if (c->lockedto>=(uint32_t)main_time() || version!=c->version) {
 			s->valid = INVALID;
 		} else {
-			chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+			chunk_write_counters(c,0);
+			chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
 			c->allvalidcopies++;
 			c->regularvalidcopies++;
 			s->valid = VALID;
@@ -1909,6 +2321,7 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 		s->next = c->slisthead;
 		c->slisthead = s;
 	}
+	chunk_priority_queue_check(c,1);
 }
 
 
@@ -1932,15 +2345,18 @@ void chunk_operation_status(chunk *c,uint8_t status,uint16_t csid) {
 			if (status!=0) {
 				c->interrupted = 1;	// increase version after finish, just in case
 				if (s->valid==TDBUSY || s->valid==TDVALID) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 					c->allvalidcopies--;
 				}
 				if (s->valid==BUSY || s->valid==VALID) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 					c->allvalidcopies--;
 					c->regularvalidcopies--;
 				}
-				s->valid=INVALID;
+				if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
+					 matocsserv_write_counters(cstab[s->csid].ptr,0);
+				}
+				s->valid = INVALID;
 				s->version = 0;	// after unfinished operation can't be shure what version chunk has
 			} else {
 				if (s->valid==TDBUSY || s->valid==TDVALID) {
@@ -1960,12 +2376,16 @@ void chunk_operation_status(chunk *c,uint8_t status,uint16_t csid) {
 	}
 	if (opfinished) {
 		if (validcopies) {
+//			syslog(LOG_NOTICE,"operation finished, chunk: %016"PRIX64" ; op: %s ; interrupted: %u",c->chunkid,opstr[c->operation],c->interrupted);
 			if (c->interrupted) {
 				chunk_emergency_increase_version(c);
 			} else {
 				matoclserv_chunk_status(c->chunkid,STATUS_OK);
 				c->operation = NONE;
 				c->needverincrease = 0;
+				if (c->lockedto==0) {
+					matoclserv_chunk_unlocked(c->chunkid,c);
+				}
 			}
 		} else {
 			matoclserv_chunk_status(c->chunkid,ERROR_NOTDONE);
@@ -2049,30 +2469,55 @@ void chunk_store_info(uint8_t *buff) {
 	put32bit(&buff,chunksinfo.notdone.del_overgoal);
 	put32bit(&buff,chunksinfo.done.copy_undergoal);
 	put32bit(&buff,chunksinfo.notdone.copy_undergoal);
+	put32bit(&buff,chunksinfo.done.copy_wronglabels);
+	put32bit(&buff,chunksinfo.notdone.copy_wronglabels);
 	put32bit(&buff,chunksinfo.copy_rebalance);
+	put32bit(&buff,chunksinfo.labels_dont_match);
 	put32bit(&buff,chunksinfo.locked_unused);
 	put32bit(&buff,chunksinfo.locked_used);
 }
 
 //jobs state: jobshpos
 
-void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage,double maxusage,uint32_t now,uint8_t extrajob) {
+void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,uint8_t extrajob) {
 	slist *s;
-	static uint16_t *dcsids;
+	static uint16_t *dcsids = NULL;
 	static uint16_t dservcount;
-	static uint16_t *bcsids;
-	static uint16_t bservcount;
-	static uint32_t min,max;
-	static uint16_t *rcsids;
+//	static uint16_t *bcsids;
+//	static uint16_t bservcount;
+	static uint16_t *rcsids = NULL;
 	uint16_t rservcount;
 	uint16_t srccsid,dstcsid;
-	uint16_t i,j;
-	uint32_t vc,tdc,ivc,bc,tdb,dc;
+	uint16_t i,j,k;
+	uint32_t vc,tdc,ivc,bc,tdb,dc,wvc,tdw;
 	static loop_info inforec;
 	static uint32_t delnotdone;
 	static uint32_t deldone;
 	static uint32_t prevtodeletecount;
 	static uint32_t delloopcnt;
+	uint32_t **labelmasks;
+	uint32_t labelcnt;
+	static uint16_t *servers = NULL;
+	uint32_t servcnt;
+	int32_t *matching;
+	uint32_t forcereplication;
+
+	if (servers==NULL) {
+		servers = malloc(sizeof(uint16_t)*MAXCSCOUNT);
+		passert(servers);
+	}
+	if (rcsids==NULL) {
+		rcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
+		passert(rcsids);
+	}
+	if (dcsids==NULL) {
+		dcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
+		passert(dcsids);
+	}
+//	if (bcsids==NULL) {
+//		bcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
+//		passert(bcsids);
+//	}
 
 	if (c==NULL) {
 		if (scount==JOBS_INIT) { // init tasks
@@ -2081,16 +2526,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 			prevtodeletecount = 0;
 			delloopcnt = 0;
 			memset(&inforec,0,sizeof(loop_info));
-			dcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
-			passert(dcsids);
-			bcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
-			passert(bcsids);
-			rcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
-			passert(rcsids);
-			dservcount=0;
-			bservcount=0;
-			min=0;
-			max=0;
+			dservcount = 0;
 		} else if (scount==JOBS_EVERYLOOP) { // every loop tasks
 			delloopcnt++;
 			if (delloopcnt>=16) {
@@ -2123,8 +2559,18 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 			chunksinfo_loopstart = chunksinfo_loopend;
 			chunksinfo_loopend = now;
 		} else if (scount==JOBS_EVERYTICK) { // every second tasks
-			dservcount=0;
-			bservcount=0;
+			dservcount = 0;
+//			bservcount=0;
+		} else if (scount==JOBS_TERM) {
+			if (servers!=NULL) {
+				free(servers);
+			}
+			if (rcsids!=NULL) {
+				free(rcsids);
+			}
+			if (dcsids!=NULL) {
+				free(dcsids);
+			}
 		}
 		return;
 	}
@@ -2134,6 +2580,10 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 		return;
 	}
 
+	if (c->lockedto < now) {
+		chunk_write_counters(c,0);
+	}
+
 // step 1. calculate number of valid and invalid copies
 	vc = 0;
 	tdc = 0;
@@ -2141,6 +2591,8 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 	bc = 0;
 	tdb = 0;
 	dc = 0;
+	wvc = 0;
+	tdw = 0;
 	for (s=c->slisthead ; s ; s=s->next) {
 		switch (s->valid) {
 		case INVALID:
@@ -2161,96 +2613,137 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 		case DEL:
 			dc++;
 			break;
+		case WVER:
+			wvc++;
+			break;
+		case TDWVER:
+			tdw++;
+			break;
 		}
 	}
 	if (c->allvalidcopies!=vc+tdc+bc+tdb) {
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": wrong all valid copies counter - (counter value: %u, should be: %u) - fixed",c->chunkid,c->version,c->allvalidcopies,vc+tdc+bc+tdb);
-		chunk_state_change(c->goal,c->goal,c->allvalidcopies,vc+tdc+bc+tdb,c->regularvalidcopies,c->regularvalidcopies);
+		chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,vc+tdc+bc+tdb,c->regularvalidcopies,c->regularvalidcopies);
 		c->allvalidcopies = vc+tdc+bc+tdb;
 	}
 	if (c->regularvalidcopies!=vc+bc) {
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": wrong regular valid copies counter - (counter value: %u, should be: %u) - fixed",c->chunkid,c->version,c->regularvalidcopies,vc+bc);
-		chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,vc+bc);
+		chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,vc+bc);
 		c->regularvalidcopies = vc+bc;
 	}
 	if (tdb+bc==0 && c->operation!=NONE) {
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk in middle of operation %s, but no chunk server is busy - finish operation",c->chunkid,c->version,opstr[c->operation]);
 		c->operation = NONE;
 	}
-	if (tdb+bc>0 && c->operation==NONE) {
-		if (tdc+vc>0) {
-			syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": unexpected BUSY copies - fixing",c->chunkid,c->version);
-			for (s=c->slisthead ; s ; s=s->next) {
-				if (s->valid == BUSY) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
-					c->allvalidcopies--;
-					c->regularvalidcopies--;
-					s->valid = INVALID;
-					s->version = 0;
-				} else if (s->valid == TDBUSY) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
-					c->allvalidcopies--;
-					s->valid = INVALID;
-					s->version = 0;
+	if (c->lockedto < now) {
+		if (tdb+bc>0 && c->operation==NONE) {
+			if (tdc+vc>0) {
+				syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": unexpected BUSY copies - fixing",c->chunkid,c->version);
+				for (s=c->slisthead ; s ; s=s->next) {
+					if (s->valid == BUSY) {
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						c->allvalidcopies--;
+						c->regularvalidcopies--;
+						s->valid = INVALID;
+						s->version = 0;
+					} else if (s->valid == TDBUSY) {
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						c->allvalidcopies--;
+						s->valid = INVALID;
+						s->version = 0;
+					}
 				}
+			} else {
+				syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": unexpected BUSY copies - can't fix",c->chunkid,c->version);
 			}
-		} else {
-			syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": unexpected BUSY copies - can't fix",c->chunkid,c->version);
+		}
+
+/*
+#warning debug
+	{
+		static FILE *fd = NULL;
+		static uint32_t cnt = 0;
+		if (fd==NULL) {
+			fd = fopen("chunklog.txt","a");
+		}
+		if (fd!=NULL) {
+			fprintf(fd,"chunk %016"PRIX64": ivc=%"PRIu32" , dc=%"PRIu32" , vc=%"PRIu32" , bc=%"PRIu32" , wvc=%"PRIu32" , tdv=%"PRIu32" , tdb=%"PRIu32" , tdw=%"PRIu32" , goal=%"PRIu8" , scount=%"PRIu16"\n",c->chunkid,ivc,dc,vc,bc,wvc,tdc,tdb,tdw,c->goal,scount);
+			cnt++;
+		}
+		if (cnt>100000) {
+			fclose(fd);
+			fd = NULL;
+			cnt = 0;
 		}
 	}
-
-//	syslog(LOG_WARNING,"chunk %016"PRIX64": ivc=%"PRIu32" , tdc=%"PRIu32" , vc=%"PRIu32" , bc=%"PRIu32" , tdb=%"PRIu32" , dc=%"PRIu32" , goal=%"PRIu8" , scount=%"PRIu16,c->chunkid,ivc,tdc,vc,bc,tdb,dc,c->goal,scount);
+*/
+//	syslog(LOG_WARNING,"chunk %016"PRIX64": ivc=%"PRIu32" , dc=%"PRIu32" , vc=%"PRIu32" , bc=%"PRIu32" , wvc=%"PRIu32" , tdv=%"PRIu32" , tdb=%"PRIu32" , tdw=%"PRIu32" , goal=%"PRIu8" , scount=%"PRIu16,c->chunkid,ivc,dc,vc,bc,wvc,tdc,tdb,tdw,c->goal,scount);
 
 // step 2. check number of copies
-	if (tdc+vc+tdb+bc==0 && ivc>0 && c->fcount>0/* c->flisthead */) {
-		if (ivc>=c->goal) {
-			uint32_t bestversion;
-			bestversion = 0;
-			for (s=c->slisthead ; s ; s=s->next) {
-				if (s->valid == INVALID) {
-					if (s->version>=bestversion) {
-						bestversion = s->version;
-					}
-				}
-			}
-			if (bestversion>0 && (bestversion+1)==c->version) {
-				syslog(LOG_WARNING,"chunk %016"PRIX64" has only invalid copies (%"PRIu32") - fixing it",c->chunkid,ivc);
-				c->version = bestversion;
+		if (tdc+vc+tdb+bc==0 && wvc+tdw>0 && c->fcount>0/* c->flisthead */) {
+			if ((tdw+wvc)>=labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
+				uint32_t bestversion;
+				bestversion = 0;
 				for (s=c->slisthead ; s ; s=s->next) {
-					if (s->valid == INVALID && s->version==bestversion && cstab[s->csid].valid) {
-						s->valid = VALID;
-						c->allvalidcopies++;
-						c->regularvalidcopies++;
-					}
-					if (s->valid == INVALID) {
-						syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32" - invalid copy on (%s - ver:%08"PRIX32")",c->chunkid,c->version,matocsserv_getstrip(cstab[s->csid].ptr),s->version);
-					} else {
-						syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32" - valid copy on (%s - ver:%08"PRIX32")",c->chunkid,c->version,matocsserv_getstrip(cstab[s->csid].ptr),s->version);
+					if (s->valid == WVER || s->valid==TDWVER) {
+						if (s->version>=bestversion) {
+							bestversion = s->version;
+						}
 					}
 				}
-				chunk_state_change(c->goal,c->goal,0,c->allvalidcopies,0,c->regularvalidcopies);
-				c->needverincrease = 1;
-				return;
+				if (bestversion>0 && ((bestversion+1)==c->version || c->version+1==bestversion)) {
+					syslog(LOG_WARNING,"chunk %016"PRIX64" has only invalid copies (%"PRIu32") - fixing it",c->chunkid,wvc+tdw);
+					c->version = bestversion;
+					for (s=c->slisthead ; s ; s=s->next) {
+						if (s->version==bestversion && cstab[s->csid].valid) {
+							if (s->valid == WVER) {
+								s->valid = VALID;
+								c->allvalidcopies++;
+								c->regularvalidcopies++;
+							} else if (s->valid == TDWVER) {
+								s->valid = TDVALID;
+								c->allvalidcopies++;
+							}
+						}
+						if (s->valid == WVER || s->valid == TDWVER) {
+							syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32" - wrong versioned copy on (%s - ver:%08"PRIX32")",c->chunkid,c->version,matocsserv_getstrip(cstab[s->csid].ptr),s->version);
+						} else {
+							syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32" - valid copy on (%s - ver:%08"PRIX32")",c->chunkid,c->version,matocsserv_getstrip(cstab[s->csid].ptr),s->version);
+						}
+					}
+					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
+					c->needverincrease = 1;
+					return;
+				}
 			}
 		}
-		syslog(LOG_WARNING,"chunk %016"PRIX64" has only invalid copies (%"PRIu32") - please repair it manually",c->chunkid,ivc);
-		for (s=c->slisthead ; s ; s=s->next) {
-			syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32" - invalid copy on (%s - ver:%08"PRIX32")",c->chunkid,c->version,matocsserv_getstrip(cstab[s->csid].ptr),s->version);
+		if (tdc+vc+tdb+bc==0 && wvc+tdw+ivc>0 && c->fcount>0) {
+			if (wvc+tdw==0) {
+				syslog(LOG_WARNING,"chunk %016"PRIX64" has only invalid copies (%"PRIu32") - please repair it manually",c->chunkid,ivc);
+			} else {
+				syslog(LOG_WARNING,"chunk %016"PRIX64" has only copies with wrong versions (%"PRIu32") - please repair it manually",c->chunkid,wvc+tdw);
+			}
+			for (s=c->slisthead ; s ; s=s->next) {
+				if (s->valid==INVALID) {
+					syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32" - invalid copy on (%s - ver:%08"PRIX32")",c->chunkid,c->version,matocsserv_getstrip(cstab[s->csid].ptr),s->version);
+				} else {
+					syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32" - copy with wrong version on (%s - ver:%08"PRIX32")",c->chunkid,c->version,matocsserv_getstrip(cstab[s->csid].ptr),s->version);
+				}
+			}
+			return;
 		}
-		return;
+
+		if (tdc+vc+tdb+bc+ivc+dc+wvc+tdw==0 && c->fcount>0) {
+			syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32": there are no copies",c->chunkid,c->version);
+			return;
+		}
 	}
 
-	if (tdc+vc+tdb+bc+ivc+dc==0) {
-		syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32": there are no copies",c->chunkid,c->version);
-		return;
-	}
-
-// step 3a. delete invalid copies
-
+// step 3.0. delete invalid copies
 	if (extrajob == 0) {
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
-				if (s->valid==INVALID || s->valid==DEL) {
+				if (s->valid==WVER || s->valid==TDWVER || s->valid==INVALID || s->valid==DEL) {
 					if (s->valid==DEL) {
 						syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": cnunk hasn't been deleted since previous loop - retry",c->chunkid,c->version);
 					}
@@ -2263,7 +2756,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 					ivc--;
 				}
 			} else {
-				if (s->valid==INVALID) {
+				if (s->valid==WVER || s->valid==TDWVER || s->valid==INVALID) {
 					inforec.notdone.del_invalid++;
 					delnotdone++;
 				}
@@ -2271,24 +2764,24 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 		}
 	}
 
-// step 3b. check for unfinished replications
+// step 3.1. check for unfinished replications
 	if (extrajob == 0) {
 		if (c->operation==REPLICATE && c->lockedto<now) {
 			syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk hasn't been replicated since previous loop - retry",c->chunkid,c->version);
 			for (s=c->slisthead ; s ; s=s->next) {
 				if (s->valid==TDBUSY || s->valid==BUSY) {
 					if (s->valid==TDBUSY) {
-						chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 						c->allvalidcopies--;
 						tdb--;
 					}
 					if (s->valid==BUSY) {
-						chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 						c->allvalidcopies--;
 						c->regularvalidcopies--;
 						bc--;
 					}
-					s->valid=INVALID;
+					s->valid = INVALID;
 					s->version = 0;	// after unfinished operation can't be shure what version chunk has
 					chunk_delopchunk(s->csid,c->chunkid);
 					ivc++;
@@ -2296,6 +2789,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 			}
 			c->operation = NONE;
 			c->lockedto = 0;
+			matoclserv_chunk_unlocked(c->chunkid,c);
 		}
 	}
 
@@ -2306,7 +2800,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 				inforec.locked_unused++;
 			} else {
 				inforec.locked_used++;
-				if (c->goal > vc+bc && vc+tdc+bc+tdb > 0) {
+				if (labelset_get_keeparch_goal(c->lsetid,c->archflag) > vc+bc && vc+tdc+bc+tdb > 0) {
 					if (c->operation!=NONE) {
 						syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32": can't replicate chunk - operation %s in progress",c->chunkid,c->version,opstr[c->operation]);
 					} else {
@@ -2317,6 +2811,8 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 		}
 		return ;
 	}
+
+//	assert(c->lockedto < now && c->writeinprogress == 0)
 
 // step 5. check busy count
 	if ((bc+tdb)>0) {
@@ -2332,10 +2828,10 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 			if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
 				if (s->valid==VALID || s->valid==TDVALID) {
 					if (s->valid==TDVALID) {
-						chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 						c->allvalidcopies--;
 					} else {
-						chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 						c->allvalidcopies--;
 						c->regularvalidcopies--;
 					}
@@ -2356,51 +2852,103 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 		return ;
 	}
 
-// step 7a. if chunk has too many copies then delete some of them
-	if (extrajob==0 && vc > c->goal) {
-		uint8_t prevdone;
-//		syslog(LOG_WARNING,"vc (%"PRIu32") > goal (%"PRIu32") - delete",vc,c->goal);
-		if (dservcount==0) {
-			// dservcount = matocsserv_getservers_ordered(dcsids,AcceptableDifference/2.0,NULL,NULL);
-			dservcount = matocsserv_getservers_ordered(dcsids,0.0,NULL,NULL);
-		}
-		inforec.notdone.del_overgoal+=(vc-(c->goal));
-		delnotdone+=(vc-(c->goal));
-		prevdone = 1;
-		for (i=0 ; i<dservcount && vc>c->goal && prevdone; i++) {
-			for (s=c->slisthead ; s && s->csid!=dcsids[dservcount-1-i] ; s=s->next) {}
-			if (s && s->valid==VALID) {
+// step 7.0. if chunk has enough valid copies and more than one copy with wrong version then delete all copies with wrong version
+	if (extrajob==0 && vc >= labelset_get_keeparch_goal(c->lsetid,c->archflag) && wvc>0) {
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->valid == WVER) {
 				if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
-					c->allvalidcopies--;
-					c->regularvalidcopies--;
-					c->needverincrease = 1;
 					s->valid = DEL;
 					stats_deletions++;
 					matocsserv_send_deletechunk(cstab[s->csid].ptr,c->chunkid,0);
-					inforec.done.del_overgoal++;
-					inforec.notdone.del_overgoal--;
-					deldone++;
-					delnotdone--;
-					vc--;
+					wvc--;
 					dc++;
-				} else {
-					prevdone=0;
+				}
+			}
+		}
+	}
+
+// step 7.1. if chunk has too many copies then delete some of them
+	if (extrajob==0 && vc > labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
+		uint8_t prevdone;
+		if (dservcount==0) {
+			// dservcount = matocsserv_getservers_ordered(dcsids,AcceptableDifference/2.0,NULL,NULL);
+			dservcount = matocsserv_getservers_ordered(dcsids);
+		}
+	//	syslog(LOG_WARNING,"vc (%"PRIu32") > goal (%"PRIu32") - delete",vc,labelset_getgoal(c->lsetid));
+		inforec.notdone.del_overgoal+=(vc-(labelset_get_keeparch_goal(c->lsetid,c->archflag)));
+		delnotdone+=(vc-labelset_get_keeparch_goal(c->lsetid,c->archflag));
+		prevdone = 1;
+
+		if (labelset_has_keeparch_labels(c->lsetid,c->archflag)) { // labels version
+			servcnt = 0;
+			for (i=0 ; i<dservcount ; i++) {
+				for (s=c->slisthead ; s && s->csid!=dcsids[dservcount-1-i] ; s=s->next) {}
+				if (s && s->valid==VALID) {
+					servers[servcnt++] = s->csid;
+				}
+			}
+			labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+			matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
+			for (i=0 ; i<servcnt && vc>labelset_get_keeparch_goal(c->lsetid,c->archflag) && prevdone ; i++) {
+				if (matching[i+labelcnt]<0) {
+					for (s=c->slisthead ; s && s->csid!=servers[i] ; s=s->next) {}
+					if (s && s->valid==VALID) {
+						if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
+							chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+							c->allvalidcopies--;
+							c->regularvalidcopies--;
+							c->needverincrease = 1;
+							s->valid = DEL;
+							stats_deletions++;
+							matocsserv_send_deletechunk(cstab[s->csid].ptr,c->chunkid,0);
+							inforec.done.del_overgoal++;
+							inforec.notdone.del_overgoal--;
+							deldone++;
+							delnotdone--;
+							vc--;
+							dc++;
+						} else {
+							prevdone=0;
+						}
+					}
+				}
+			}
+		} else { // classic goal version
+			for (i=0 ; i<dservcount && vc>labelset_get_keeparch_goal(c->lsetid,c->archflag) && prevdone; i++) {
+				for (s=c->slisthead ; s && s->csid!=dcsids[dservcount-1-i] ; s=s->next) {}
+				if (s && s->valid==VALID) {
+					if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
+						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						c->allvalidcopies--;
+						c->regularvalidcopies--;
+						c->needverincrease = 1;
+						s->valid = DEL;
+						stats_deletions++;
+						matocsserv_send_deletechunk(cstab[s->csid].ptr,c->chunkid,0);
+						inforec.done.del_overgoal++;
+						inforec.notdone.del_overgoal--;
+						deldone++;
+						delnotdone--;
+						vc--;
+						dc++;
+					} else {
+						prevdone=0;
+					}
 				}
 			}
 		}
 		return;
 	}
 
-// step 7b. if chunk has one copy on each server and some of them have status TODEL then delete one of it
-	if (extrajob==0 && vc+tdc>=scount && vc<c->goal && tdc>0 && vc+tdc>1) {
+// step 7.2. if chunk has one copy on each server and some of them have status TDVALID then delete them
+	if (extrajob==0 && vc+tdc>=scount && vc<labelset_get_keeparch_goal(c->lsetid,c->archflag) && tdc>0 && vc+tdc>1) {
 		uint8_t prevdone;
-//		syslog(LOG_WARNING,"vc+tdc (%"PRIu32") >= scount (%"PRIu32") and vc (%"PRIu32") < goal (%"PRIu32") and tdc (%"PRIu32") > 0 and vc+tdc > 1 - delete",vc+tdc,scount,vc,c->goal,tdc);
+//		syslog(LOG_WARNING,"vc+tdc (%"PRIu32") >= scount (%"PRIu32") and vc (%"PRIu32") < goal (%"PRIu32") and tdc (%"PRIu32") > 0 and vc+tdc > 1 - delete",vc+tdc,scount,vc,labelset_getgoal(c->goal),tdc);
 		prevdone = 0;
 		for (s=c->slisthead ; s && prevdone==0 ; s=s->next) {
 			if (s->valid==TDVALID) {
 				if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 					c->allvalidcopies--;
 					c->needverincrease = 1;
 					s->valid = DEL;
@@ -2418,12 +2966,34 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 		return;
 	}
 
-//step 8. if chunk has number of copies less than goal then make another copy of this chunk
-	if (c->goal > vc && vc+tdc > 0) {
+// step 8. check matching for labeled chunks
+	forcereplication = 0;
+	if (labelset_has_keeparch_labels(c->lsetid,c->archflag)) {
+		servcnt = 0;
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->valid==VALID) {
+				servers[servcnt++] = s->csid;
+			}
+		}
+		labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+		matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
+		for (i=0 ; i<labelcnt ; i++) {
+			if (matching[i]<0) { // there are unmatched labels
+				forcereplication++;
+			}
+		}
+	}
+
+// step 9. if chunk has number of copies less than goal then make another copy of this chunk
+	if ((forcereplication || labelset_get_keeparch_goal(c->lsetid,c->archflag) > vc) && vc+tdc > 0) {
+		uint8_t canbefixed;
+		canbefixed = 1;
 		if (csdb_replicate_undergoals()) {
 //		if ((csdb_getdisconnecttime()+ReplicationsDelayDisconnect)<now) {
 			uint32_t rgvc,rgtdc;
 			uint32_t lclass;
+			uint8_t allservflag;
+
 			if (vc==0 && tdc==1) { // highest priority - chunks only on one disk "marked for removal"
 				j = 0;
 				lclass = 0;
@@ -2436,19 +3006,27 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 			} else if (tdc>0) { // next priority - chunks on "marked for removal" disks
 				j = 3;
 				lclass = 1;
-			} else { // lowest priority - standard undergoal chunks
+			} else if (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag)) { // next priority - standard undergoal chunks
 				j = 4;
+				lclass = 1;
+			} else { // lowest priority - wrong labeled chunks
+				j = 5;
 				lclass = 1;
 			}
 			if (extrajob==0) {
 				for (i=0 ; i<j ; i++) {
 					if (chunks_priority_leng[i]>0) { // we have chunks with higher priority than current chunk
 						chunk_priority_enqueue(j,c); // in such case only enqueue this chunk for future processing
+						if (j<5) {
+							inforec.notdone.copy_undergoal++;
+						} else {
+							inforec.notdone.copy_wronglabels++;
+						}
 						return;
 					}
 				}
 			}
-			rservcount = matocsserv_getservers_lessrepl(rcsids,MaxWriteRepl[lclass]);
+			rservcount = matocsserv_getservers_lessrepl(rcsids,MaxWriteRepl[lclass],&allservflag);
 			rgvc=0;
 			rgtdc=0;
 			for (s=c->slisthead ; s ; s=s->next) {
@@ -2461,60 +3039,179 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 				}
 			}
 			if (rgvc+rgtdc>0 && rservcount>0) { // have at least one server to read from and at least one to write to
-				for (i=0 ; i<rservcount ; i++) {
-					for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
-					if (!s) {
-						uint32_t r;
-						if (rgvc>0) {	// if there are VALID copies then make copy of one VALID chunk
-							r = 1+rndu32_ranged(rgvc);
-							srccsid = MAXCSCOUNT;
-							for (s=c->slisthead ; s && r>0 ; s=s->next) {
-								if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==VALID) {
-									r--;
-									srccsid = s->csid;
-								}
-							}
-						} else {	// if not then use TDVALID chunks.
-							r = 1+rndu32_ranged(rgtdc);
-							srccsid = MAXCSCOUNT;
-							for (s=c->slisthead ; s && r>0 ; s=s->next) {
-								if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==TDVALID) {
-									r--;
-									srccsid = s->csid;
-								}
+				if (labelset_has_keeparch_labels(c->lsetid,c->archflag)) { // labels version
+					uint32_t dstservcnt;
+					uint8_t allowallservers;
+					servcnt = 0;
+					for (i=0 ; i<rservcount ; i++) {
+						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
+						if (s==NULL) {
+							servers[servcnt++] = rcsids[i];
+						}
+					}
+					dstservcnt = servcnt;
+					for (s=c->slisthead ; s ; s=s->next) {
+						if (s->valid==VALID) {
+							servers[servcnt++] = s->csid;
+						}
+					}
+					labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+					matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
+					allowallservers = 0;
+					if (scount<=rservcount) { // all servers can accept replication
+						uint32_t unmatchedlabels;
+						unmatchedlabels = 0;
+						for (i=0 ; i<labelcnt ; i++) {
+							if (matching[i]<0) {
+								unmatchedlabels++;
 							}
 						}
-						if (srccsid!=MAXCSCOUNT) {
-							stats_replications++;
-							// high priority replication
-							if (matocsserv_send_replicatechunk(cstab[rcsids[i]].ptr,c->chunkid,c->version,cstab[srccsid].ptr)<0) {
-								syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": error sending replicate command",c->chunkid,c->version);
+						if (vc >= labelset_get_keeparch_goal(c->lsetid,c->archflag)) { // not undergoal chunk
+							if (unmatchedlabels >= forcereplication) { // can't fix wrong labels
+								canbefixed = 0;
+							}
+						} else { // this is undergoal chunk
+							if (labelset_get_keeparch_goal(c->lsetid,c->archflag)>scount && vc==scount) {
+								canbefixed = 0;
+							} else if (unmatchedlabels>0) { // can't match all labels, so use all chunkservers
+								allowallservers = 1;
+							}
+						}
+					}
+/*
+					if (vc < labelset_getgoal(c->lsetid) && csdb_servers_count()<=rservcount) { // all servers can accept replications
+						for (i=0 ; i<labelcnt ; i++) {
+							if (matching[i]<0) {
+								unmatchedlabels++;
+							}
+						}
+					}
+*/
+					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
+						if (matching[i+labelcnt]>=0 || allowallservers) {
+							uint32_t r;
+							if (rgvc>0) {	// if there are VALID copies then make copy of one VALID chunk
+								r = 1+rndu32_ranged(rgvc);
+								srccsid = MAXCSCOUNT;
+								for (s=c->slisthead ; s && r>0 ; s=s->next) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==VALID) {
+										r--;
+										srccsid = s->csid;
+									}
+								}
+							} else {	// if not then use TDVALID chunks.
+								r = 1+rndu32_ranged(rgtdc);
+								srccsid = MAXCSCOUNT;
+								for (s=c->slisthead ; s && r>0 ; s=s->next) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==TDVALID) {
+										r--;
+										srccsid = s->csid;
+									}
+								}
+							}
+							if (srccsid!=MAXCSCOUNT) {
+								stats_replications++;
+								// high priority replication
+								if (matocsserv_send_replicatechunk(cstab[servers[i]].ptr,c->chunkid,c->version,cstab[srccsid].ptr)<0) {
+									syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": error sending replicate command",c->chunkid,c->version);
+									return;
+								}
+								chunk_addopchunk(servers[i],c->chunkid);
+								c->operation = REPLICATE;
+								c->lockedto = now+LOCKTIMEOUT;
+								s = slist_malloc();
+								s->csid = servers[i];
+								s->valid = BUSY;
+								s->version = c->version;
+								s->next = c->slisthead;
+								c->slisthead = s;
+								chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+								c->allvalidcopies++;
+								c->regularvalidcopies++;
+								if (extrajob==0) {
+									if (j<5) {
+										inforec.done.copy_undergoal++;
+									} else {
+										inforec.done.copy_wronglabels++;
+									}
+								}
 								return;
 							}
-							chunk_addopchunk(rcsids[i],c->chunkid);
-							c->operation = REPLICATE;
-							c->lockedto = now+LOCKTIMEOUT;
-							s = slist_malloc();
-							s->csid = rcsids[i];
-							s->valid = BUSY;
-							s->version = c->version;
-							s->next = c->slisthead;
-							c->slisthead = s;
-							chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
-							c->allvalidcopies++;
-							c->regularvalidcopies++;
-							if (extrajob==0) {
-								inforec.done.copy_undergoal++;
+						}
+					}
+				} else { // classic goal version
+					if (labelset_get_keeparch_goal(c->lsetid,c->archflag)>scount && vc==scount) {
+						canbefixed = 0;
+					}
+					for (i=0 ; i<rservcount ; i++) {
+						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
+						if (!s) {
+							uint32_t r;
+							if (rgvc>0) {	// if there are VALID copies then make copy of one VALID chunk
+								r = 1+rndu32_ranged(rgvc);
+								srccsid = MAXCSCOUNT;
+								for (s=c->slisthead ; s && r>0 ; s=s->next) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==VALID) {
+										r--;
+										srccsid = s->csid;
+									}
+								}
+							} else {	// if not then use TDVALID chunks.
+								r = 1+rndu32_ranged(rgtdc);
+								srccsid = MAXCSCOUNT;
+								for (s=c->slisthead ; s && r>0 ; s=s->next) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==TDVALID) {
+										r--;
+										srccsid = s->csid;
+									}
+								}
 							}
-							return;
+							if (srccsid!=MAXCSCOUNT) {
+								stats_replications++;
+								// high priority replication
+								if (matocsserv_send_replicatechunk(cstab[rcsids[i]].ptr,c->chunkid,c->version,cstab[srccsid].ptr)<0) {
+									syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": error sending replicate command",c->chunkid,c->version);
+									return;
+								}
+								chunk_addopchunk(rcsids[i],c->chunkid);
+								c->operation = REPLICATE;
+								c->lockedto = now+LOCKTIMEOUT;
+								s = slist_malloc();
+								s->csid = rcsids[i];
+								s->valid = BUSY;
+								s->version = c->version;
+								s->next = c->slisthead;
+								c->slisthead = s;
+								chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+								c->allvalidcopies++;
+								c->regularvalidcopies++;
+								if (extrajob==0) {
+									if (j<5) { // pro forma = should be always true
+										inforec.done.copy_undergoal++;
+									} else {
+										inforec.done.copy_wronglabels++;
+									}
+								}
+								return;
+							}
 						}
 					}
 				}
 			}
-			chunk_priority_enqueue(j,c);
+			if (canbefixed && allservflag==0) { // enqueue only chunks which can be fixed and only if there are servers which reached replication limits
+				chunk_priority_enqueue(j,c);
+			}
 		}
 		if (extrajob==0) {
-			inforec.notdone.copy_undergoal++;
+			if (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
+				inforec.notdone.copy_undergoal++;
+			} else {
+				if (canbefixed==0) {
+					inforec.labels_dont_match++;
+				} else {
+					inforec.notdone.copy_wronglabels++;
+				}
+			}
 		}
 	}
 
@@ -2522,7 +3219,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 		return;
 	}
 
-	if (fullservers==0) { // force rebalance when some servers are almost full
+	if (fullservers==0) {
 		for (i=0 ; i<DANGER_PRIORITIES ; i++) {
 			if (chunks_priority_leng[i]>0) { // we have pending undergaal chunks, so ignore chunkserver rebalance
 				return;
@@ -2535,77 +3232,154 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 		}
 	}
 
-// step 9. if there is too big difference between chunkservers then make copy of chunk from server with biggest disk usage on server with lowest disk usage
-	if (c->goal >= vc && vc+tdc>0 && ((maxusage-minusage)>AcceptableDifference || (maxusage>minusage && last_rebalance+(0.01/(maxusage-minusage))<now))) {
-		if (bservcount==0) {
-			if ((maxusage-minusage)>AcceptableDifference) { // fast rebalance
-				bservcount = matocsserv_getservers_ordered(bcsids,AcceptableDifference/2.0,&min,&max);
-			} else { // slow rebalance
-				bservcount = matocsserv_getservers_ordered(bcsids,0.0,&min,&max);
+	if (labelset_get_keeparch_goal(c->lsetid,c->archflag) == vc && vc+tdc>0) {
+		double maxdiff;
+
+		servcnt = 0;
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->valid==VALID) {
+				servers[servcnt++] = s->csid;
 			}
 		}
-		if (min>0 || max>0) {
-			srccsid = MAXCSCOUNT;
-			dstcsid = MAXCSCOUNT;
-			if (max>0) {
-				for (i=0 ; i<max && srccsid==MAXCSCOUNT ; i++) {
-					uint8_t lclass;
-					lclass = (matocsserv_can_create_chunks(cstab[bcsids[bservcount-1-i]].ptr,AcceptableDifference*1.5)<2)?2:3;
-					if (matocsserv_replication_read_counter(cstab[bcsids[bservcount-1-i]].ptr,now)<MaxReadRepl[lclass]) {
-						for (s=c->slisthead ; s && s->csid!=bcsids[bservcount-1-i] ; s=s->next ) {}
-						if (s && (s->valid==VALID || s->valid==TDVALID)) {
-							srccsid=s->csid;
-						}
-					}
-				}
+		labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+		matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
+
+		if (dservcount==0) {
+			dservcount = matocsserv_getservers_ordered(dcsids);
+		}
+
+		srccsid = MAXCSCOUNT;
+		dstcsid = MAXCSCOUNT;
+		maxdiff = 0.0;
+
+		for (i=0 ; i<servcnt ; i++) {
+			uint32_t *labelmask;
+			uint8_t unmatched;
+			double srcusage,dstusage;
+			uint8_t lclass;
+
+			if (matching[labelcnt+i]>=0) {
+				labelmask = labelmasks[matching[labelcnt+i]];
+				unmatched = 0;
 			} else {
-				for (i=0 ; i<(bservcount-min) && srccsid==MAXCSCOUNT ; i++) {
-					uint8_t lclass;
-					lclass = (matocsserv_can_create_chunks(cstab[bcsids[bservcount-1-i]].ptr,AcceptableDifference*1.5)<2)?2:3;
-					if (matocsserv_replication_read_counter(cstab[bcsids[bservcount-1-i]].ptr,now)<MaxReadRepl[lclass]) {
-						for (s=c->slisthead ; s && s->csid!=bcsids[bservcount-1-i] ; s=s->next ) {}
-						if (s && (s->valid==VALID || s->valid==TDVALID)) {
-							srccsid=s->csid;
-						}
-					}
-				}
+				labelmask = NULL;
+				unmatched = 1;
 			}
-			if (srccsid!=MAXCSCOUNT) {
-				if (min>0) {
-					for (i=0 ; i<min && dstcsid==MAXCSCOUNT ; i++) {
-						uint8_t lclass;
-						lclass = matocsserv_can_create_chunks(cstab[bcsids[i]].ptr,AcceptableDifference*1.5)?2:3;
-						if (matocsserv_replication_write_counter(cstab[bcsids[i]].ptr,now)<MaxWriteRepl[lclass]) {
-							for (s=c->slisthead ; s && s->csid!=bcsids[i] ; s=s->next ) {}
-							if (s==NULL) {
-								dstcsid=bcsids[i];
-							}
+			srcusage = matocsserv_get_usage(cstab[servers[i]].ptr);
+			lclass = matocsserv_is_privileged(cstab[servers[i]].ptr,0)?3:2;
+//			lclass = (matocsserv_can_create_chunks(cstab[servers[i]].ptr,AcceptableDifference*1.5)<2)?2:3;
+			if (matocsserv_replication_read_counter(cstab[servers[i]].ptr,now)<MaxReadRepl[lclass]) {
+				for (j=0 ; j<dservcount ; j++) {
+					for (k=0 ; k<servcnt && servers[k]!=dcsids[j] ; k++) { }
+					if (k==servcnt) { // not one of copies
+						dstusage = matocsserv_get_usage(cstab[dcsids[j]].ptr);
+						if (srcusage - dstusage < maxdiff) {
+							break;
 						}
-					}
-				} else {
-					for (i=0 ; i<bservcount-max && dstcsid==MAXCSCOUNT ; i++) {
-						uint8_t lclass;
-						lclass = matocsserv_can_create_chunks(cstab[bcsids[i]].ptr,AcceptableDifference*1.5)?2:3;
-						if (matocsserv_replication_write_counter(cstab[bcsids[i]].ptr,now)<MaxWriteRepl[lclass]) {
-							for (s=c->slisthead ; s && s->csid!=bcsids[i] ; s=s->next ) {}
-							if (s==NULL) {
-								dstcsid=bcsids[i];
+						if (((srcusage - dstusage) <= AcceptableDifference) && last_rebalance+(0.01/(srcusage-dstusage))>=now) {
+							break;
+						}
+						if (unmatched || matocsserv_server_has_labels(cstab[dcsids[j]].ptr,labelmask)) {
+							lclass = matocsserv_is_privileged(cstab[dcsids[j]].ptr,1)?3:2;
+//							lclass = matocsserv_can_create_chunks(cstab[dcsids[j]].ptr,AcceptableDifference*1.5)?2:3;
+							if (matocsserv_replication_write_counter(cstab[dcsids[j]].ptr,now)<MaxWriteRepl[lclass]) {
+								maxdiff = srcusage - dstusage;
+								dstcsid = dcsids[j];
+								srccsid = servers[i];
 							}
 						}
 					}
 				}
-				if (dstcsid!=MAXCSCOUNT) {
-					stats_replications++;
-//					matocsserv_getlocation(srcserv,&ip,&port);
-					// low priority replication
-					matocsserv_send_replicatechunk(cstab[dstcsid].ptr,c->chunkid,c->version,cstab[srccsid].ptr);
-					c->needverincrease = 1;
-					inforec.copy_rebalance++;
-					last_rebalance = now;
-				}
 			}
+		}
+
+		if (dstcsid!=MAXCSCOUNT && srccsid!=MAXCSCOUNT) {
+			if (maxdiff > AcceptableDifference*1.5) {
+				matocsserv_want_to_be_privileged(cstab[dstcsid].ptr,cstab[srccsid].ptr);
+			}
+			stats_replications++;
+			matocsserv_send_replicatechunk(cstab[dstcsid].ptr,c->chunkid,c->version,cstab[srccsid].ptr);
+			c->needverincrease = 1;
+			inforec.copy_rebalance++;
+			last_rebalance = now;
+		}
+
+		return;
+	}
+}
+
+uint8_t chunk_labelset_can_be_fulfilled(uint8_t labelcnt,uint32_t **labelmasks) {
+	static uint16_t *stdcsids = NULL;
+	static uint16_t *olcsids = NULL;
+	static uint16_t *allcsids = NULL;
+	static uint16_t stdcscnt;
+	static uint16_t olcscnt;
+	static uint16_t allcscnt;
+	uint8_t r;
+	uint32_t i;
+	int32_t *matching;
+
+	if (stdcsids==NULL) {
+		stdcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
+		passert(stdcsids);
+	}
+	if (olcsids==NULL) {
+		olcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
+		passert(olcsids);
+	}
+	if (allcsids==NULL) {
+		allcsids = malloc(sizeof(uint16_t)*MAXCSCOUNT);
+		passert(allcsids);
+	}
+
+	if (labelcnt==0 || labelmasks==NULL) {
+		matocsserv_getservers_test(&stdcscnt,stdcsids,&olcscnt,olcsids,&allcscnt,allcsids);
+	}
+
+	matching = do_perfect_match(labelcnt,stdcscnt,labelmasks,stdcsids);
+
+	r = 1;
+	for (i=0 ; i<labelcnt ; i++) {
+		if (matching[i]<0) {
+			r = 0;
+			break;
 		}
 	}
+	if (r==1) {
+		return 3; // can be fulfilled
+	}
+
+	if (olcsids > stdcsids) {
+		matching = do_perfect_match(labelcnt,olcscnt,labelmasks,olcsids);
+
+		r = 1;
+		for (i=0 ; i<labelcnt ; i++) {
+			if (matching[i]<0) {
+				r = 0;
+				break;
+			}
+		}
+		if (r==1) {
+			return 2; // can be fulfilled using overloaded servers
+		}
+	}
+
+	if (allcsids > stdcsids) {
+		matching = do_perfect_match(labelcnt,allcscnt,labelmasks,allcsids);
+
+		r = 1;
+		for (i=0 ; i<labelcnt ; i++) {
+			if (matching[i]<0) {
+				r = 0;
+				break;
+			}
+		}
+		if (r==1) {
+			return 1; // can be fulfilled using servers with no space available
+		}
+	}
+
+	return 0;
 }
 
 static inline void chunk_clean_priority_queues(void) {
@@ -2626,8 +3400,8 @@ static inline void chunk_clean_priority_queues(void) {
 
 void chunk_jobs_main(void) {
 	uint32_t i,j,l,h,t,lc,hashsteps;
-	uint16_t uscount,tscount,fullservers;
-	double minusage,maxusage;
+	uint16_t scount;
+	uint16_t fullservers;
 	chunk *c,*cn;
 	uint32_t now;
 #ifdef MFSDEBUG
@@ -2644,16 +3418,16 @@ void chunk_jobs_main(void) {
 		return;
 	}
 
-	matocsserv_usagedifference(&minusage,&maxusage,&uscount,&tscount);
+	scount = matocsserv_servers_count();
 
-	if (minusage>maxusage || uscount==0 || chunkrehashpos==0) {
+	if (scount==0 || chunkrehashpos==0) {
 		return;
 	}
 
 	fullservers = matocsserv_almostfull_servers();
 
 	now = main_time();
-	chunk_do_jobs(NULL,JOBS_EVERYTICK,0,0.0,0.0,now,0);
+	chunk_do_jobs(NULL,JOBS_EVERYTICK,0,now,0);
 
 	// first serve some endangered and undergoal chunks
 	lc = 0;
@@ -2684,7 +3458,7 @@ void chunk_jobs_main(void) {
 				chunks_priority_leng[j]--;
 				if (c!=NULL) {
 					c->ondangerlist = 0;
-					chunk_do_jobs(c,uscount,fullservers,minusage,maxusage,now,1);
+					chunk_do_jobs(c,scount,fullservers,now,1);
 					lc++;
 				}
 			} while (t!=h && lc<HashCPTMax);
@@ -2704,7 +3478,7 @@ void chunk_jobs_main(void) {
 	hashsteps = 1+((chunkrehashpos)/(LoopTimeMin*TICKSPERSECOND));
 	for (i=0 ; i<hashsteps && lc<HashCPTMax ; i++) {
 		if (jobshpos>=chunkrehashpos) {
-			chunk_do_jobs(NULL,JOBS_EVERYLOOP,0,0.0,0.0,now,0);	// every loop tasks
+			chunk_do_jobs(NULL,JOBS_EVERYLOOP,0,now,0);	// every loop tasks
 			jobshpos=0;
 		} else {
 			c = chunkhashtab[jobshpos>>HASHTAB_LOBITS][jobshpos&HASHTAB_MASK];
@@ -2714,7 +3488,7 @@ void chunk_jobs_main(void) {
 					changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 					chunk_delete(c);
 				} else {
-					chunk_do_jobs(c,uscount,fullservers,minusage,maxusage,now,0);
+					chunk_do_jobs(c,scount,fullservers,now,0);
 					lc++;
 				}
 				c = cn;
@@ -2722,43 +3496,11 @@ void chunk_jobs_main(void) {
 			jobshpos++;
 		}
 	}
-		// delete unused chunks from structures
-//		l=0;
-//		cp = &(chunkhash[jobshpos]);
-//		while ((c=*cp)!=NULL) {
-//			if (c->fcount==0 && /*c->flisthead==NULL && */c->slisthead==NULL) {
-//				*cp = (c->next);
-//				chunk_delete(c);
-//			} else {
-//				cp = &(c->next);
-//				l++;
-//				lc++;
-//			}
-//		}
-//		if (l>0) {
-//			r = rndu32_ranged(l);
-//			l=0;
-		// do jobs on rest of them
-//			for (c=chunkhash[jobshpos] ; c ; c=c->next) {
-//				if (l>=r) {
-//					chunk_do_jobs(c,uscount,0,minusage,maxusage);
-//				}
-//				l++;
-//			}
-//			l=0;
-//			for (c=chunkhash[jobshpos] ; l<r && c ; c=c->next) {
-//				chunk_do_jobs(c,uscount,0,minusage,maxusage);
-//				l++;
-//			}
-//		}
-//		jobshpos+=123;	// if HASHSIZE is any power of 2 then any odd number is good here
-//		jobshpos%=HASHSIZE;
-//	}
 }
 
 /* ---- */
 
-#define CHUNKFSIZE 16
+#define CHUNKFSIZE 17
 #define CHUNKCNT 1000
 /*
 void chunk_text_dump(FILE *fd) {
@@ -2772,7 +3514,7 @@ void chunk_text_dump(FILE *fd) {
 			if (lockedto<now) {
 				lockedto = 0;
 			}
-			fprintf(fd,"*|i:%016"PRIX64"|v:%08"PRIX32"|g:%"PRIu8"|t:%10"PRIu32"\n",c->chunkid,c->version,c->goal,lockedto);
+			fprintf(fd,"*|i:%016"PRIX64"|v:%08"PRIX32"|g:%"PRIu8"|t:%10"PRIu32"\n",c->chunkid,c->version,c->lsetid,lockedto);
 		}
 	}
 }
@@ -2781,13 +3523,12 @@ int chunk_load(bio *fd,uint8_t mver) {
 	uint8_t hdr[8];
 	uint8_t loadbuff[CHUNKFSIZE];
 	const uint8_t *ptr;
-	int32_t r;
+	int32_t r,recsize;
 	chunk *c;
 // chunkdata
 	uint64_t chunkid;
 	uint32_t version,lockedto;
-
-	(void)mver;
+	uint8_t archflag;
 
 	chunks=0;
 	if (bio_read(fd,hdr,8)!=8) {
@@ -2796,9 +3537,10 @@ int chunk_load(bio *fd,uint8_t mver) {
 	}
 	ptr = hdr;
 	nextchunkid = get64bit(&ptr);
+	recsize = (mver==0x10)?16:CHUNKFSIZE;
 	for (;;) {
-		r = bio_read(fd,loadbuff,CHUNKFSIZE);
-		if (r!=CHUNKFSIZE) {
+		r = bio_read(fd,loadbuff,recsize);
+		if (r!=recsize) {
 			syslog(LOG_WARNING,"chunks: read error");
 			return -1;
 		}
@@ -2806,12 +3548,18 @@ int chunk_load(bio *fd,uint8_t mver) {
 		chunkid = get64bit(&ptr);
 		version = get32bit(&ptr);
 		lockedto = get32bit(&ptr);
+		if (mver==0x10) {
+			archflag = 0;
+		} else {
+			archflag = get8bit(&ptr);
+		}
 		if (chunkid>0) {
 			c = chunk_new(chunkid);
 			c->version = version;
 			c->lockedto = lockedto;
+			c->archflag = archflag;
 		} else {
-			if (version==0 && lockedto==0) {
+			if (version==0 && lockedto==0 && archflag==0) {
 				return 0;
 			} else {
 				syslog(LOG_WARNING,"chunks: wrong ending - chunk zero with version: %"PRIu32" and locked to: %"PRIu32,version,lockedto);
@@ -2826,6 +3574,7 @@ uint8_t chunk_store(bio *fd) {
 	uint8_t hdr[8];
 	uint8_t storebuff[CHUNKFSIZE*CHUNKCNT];
 	uint8_t *ptr;
+	uint8_t archflag;
 	uint32_t i,j;
 	chunk *c;
 // chunkdata
@@ -2834,7 +3583,7 @@ uint8_t chunk_store(bio *fd) {
 	uint32_t lockedto,now;
 
 	if (fd==NULL) {
-		return 0x10;
+		return 0x11;
 	}
 	now = main_time();
 	ptr = hdr;
@@ -2855,6 +3604,8 @@ uint8_t chunk_store(bio *fd) {
 				lockedto = 0;
 			}
 			put32bit(&ptr,lockedto);
+			archflag = c->archflag;
+			put8bit(&ptr,archflag);
 			j++;
 			if (j==CHUNKCNT) {
 				if (bio_write(fd,storebuff,CHUNKFSIZE*CHUNKCNT)!=(CHUNKFSIZE*CHUNKCNT)) {
@@ -2927,8 +3678,6 @@ void chunk_cleanup(void) {
 			regularchunkcounts[i][j]=0;
 		}
 	}
-//	jobshpos = 0;
-//	chunk_do_jobs(NULL,JOBS_INIT,0,0.0,0.0);	// clear chunk loop internal data
 }
 
 void chunk_newfs(void) {
@@ -2977,6 +3726,11 @@ int chunk_parse_rep_list(char *strlist,double *replist) {
 		return 1;
 	}
 	return -1;
+}
+
+void chunk_term(void) {
+	chunk_priority_queue_check(NULL,1); // free tabs
+	chunk_do_jobs(NULL,JOBS_TERM,0,main_time(),0); // free tabs
 }
 
 void chunk_reload(void) {
@@ -3087,7 +3841,7 @@ void chunk_reload(void) {
 	if (cfg_isdefined("ACCEPTABLE_PERCENTAGE_DIFFERENCE")) {
 		AcceptableDifference = cfg_getdouble("ACCEPTABLE_PERCENTAGE_DIFFERENCE",1.0)/100.0; // 1%
 	} else {
-		AcceptableDifference = cfg_getdouble("ACCEPTABLE_DIFFERENCE",0.01); // 1% - this is deprecated option
+		AcceptableDifference = cfg_getdouble("ACCEPTABLE_DIFFERENCE",0.01); // 1% - deprecated option
 	}
 	if (AcceptableDifference<0.001) { // 1%
 		AcceptableDifference = 0.001;
@@ -3263,10 +4017,12 @@ int chunk_strinit(void) {
 		chunks_priority_head[j] = 0;
 		chunks_priority_tail[j] = 0;
 	}
-	chunk_do_jobs(NULL,JOBS_INIT,0,0.0,0.0,main_time(),0);	// clear chunk loop internal data
+	chunk_do_jobs(NULL,JOBS_INIT,0,main_time(),0);	// clear chunk loop internal data, and allocate tabs
+	chunk_priority_queue_check(NULL,0); // allocate 'servers' tab
 
 	main_reload_register(chunk_reload);
 	// main_time_register(1,0,chunk_jobs_main);
 	main_msectime_register(1000/TICKSPERSECOND,0,chunk_jobs_main);
+	main_destruct_register(chunk_term);
 	return 1;
 }

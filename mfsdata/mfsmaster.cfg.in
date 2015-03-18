@@ -1,0 +1,136 @@
+###############################################
+# RUNTIME OPTIONS                             #
+###############################################
+
+# user to run daemon as (default is @DEFAULT_USER@)
+# WORKING_USER = @DEFAULT_USER@
+
+# group to run daemon as (optional - if empty then default user group will be used)
+# WORKING_GROUP = @DEFAULT_GROUP@
+
+# name of process to place in syslog messages (default is mfsmaster)
+# SYSLOG_IDENT = mfsmaster
+
+# whether to perform mlockall() to avoid swapping out mfsmaster process (default is 0, i.e. no)
+# LOCK_MEMORY = 0
+
+# nice level to run daemon with (default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with)
+# NICE_LEVEL = -19
+
+# set default umask for group and others (user has always 0, default is 027 - block write for group and block all for others)
+# FILE_UMASK = 027
+
+# where to store daemon lock file (default is @DATA_PATH@)
+# DATA_PATH = @DATA_PATH@
+
+# alternate location/name of mfsexports.cfg file (default is @ETC_PATH@/mfs/mfsexports.cfg)
+# EXPORTS_FILENAME = @ETC_PATH@/mfs/mfsexports.cfg
+
+# alternate location/name of mfstopology.cfg file (default is @ETC_PATH@/mfs/mfstopology.cfg)
+# TOPOLOGY_FILENAME = @ETC_PATH@/mfs/mfstopology.cfg
+
+# number of metadata change log files (default is 50)
+# BACK_LOGS = 50
+
+
+# number of previous metadata files to be kept (default is 1)
+# BACK_META_KEEP_PREVIOUS = 1
+
+# how many seconds of change logs have to be preserved in memory (default is 1800; this sets the minimum, actual number may be a bit bigger 
+# due to logs being kept in 5k blocks; zero disables extra logs storage)
+# CHANGELOG_PRESERVE_SECONDS = 1800
+
+
+###############################################
+# COMMAND CONNECTION OPTIONS                  #
+###############################################
+
+# IP address to listen on for metalogger, masters and supervisors connections (* means any)
+# MATOML_LISTEN_HOST = *
+
+# port to listen on for metalogger, masters and supervisors connections (default is @DEFAULT_MASTER_CONTROL_PORT@)
+# MATOML_LISTEN_PORT = @DEFAULT_MASTER_CONTROL_PORT@
+
+
+###############################################
+# CHUNKSERVER CONNECTION OPTIONS              #
+###############################################
+
+# IP address to listen on for chunkservers connections (* means any)
+# MATOCS_LISTEN_HOST = *
+
+# port to listen on for chunkserver connections (default is @DEFAULT_MASTER_CS_PORT@)
+# MATOCS_LISTEN_PORT = @DEFAULT_MASTER_CS_PORT@
+
+# default timeout in seconds for master-chunkserver connection (default is 10)
+# MATOCS_TIMEOUT = 10
+
+###############################################
+# CHUNKSERVER WORKING OPTIONS                 #
+###############################################
+
+# initial delay in seconds before starting replications (default is 300)
+# REPLICATIONS_DELAY_INIT = 300
+
+
+# Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)
+# CHUNKS_LOOP_MAX_CPS = 100000
+
+# Chunks loop shouldn't be done in less seconds than given number (default is 300)
+# CHUNKS_LOOP_MIN_TIME = 300
+
+# Soft maximum number of chunks to delete on one chunkserver (default is 10)
+# CHUNKS_SOFT_DEL_LIMIT = 10
+
+# Hard maximum number of chunks to delete on one chunkserver (default is 25)
+# CHUNKS_HARD_DEL_LIMIT = 25
+
+# Maximum number of chunks to replicate to one chunkserver (default is 2,1,1,4)
+# one number is equal to four same numbers separated by colons
+#  first limit is for endangered chunks (chunks with only one copy)
+#  second limit is for undergoal chunks (chunks with number of copies lower than specified goal)
+#  third limit is for rebalance between servers with space usage around arithmetic mean
+#  fourth limit is for rebalance between other servers (very low or very high space usage)
+# usually first number should be grater than or equal to second, second greater than or equal to third, and fourth greater than or equal to third ( 1st >= 2nd >= 3rd <= 4th )
+# CHUNKS_WRITE_REP_LIMIT = 2,1,1,4
+
+# Maximum number of chunks to replicate from one chunkserver (default is 10,5,2,5)
+# one number is equal to four same numbers separated by colons
+# limit groups are the same as in write limit, also relations between numbers should be the same as in write limits ( 1st >= 2nd >= 3rd <= 4th )
+# CHUNKS_READ_REP_LIMIT = 10,5,2,5
+
+# Threshold for chunkserver load (default is 100)
+# CS_HEAVY_LOAD_THRESHOLD = 100
+
+# Threshold ratio for chunkserver load (default is 5.0, Whenever chunkserver load is higher than previously specified threshold and this ratio times higher than average load, then chunkserver is switched into 'grace' mode)
+# CS_HEAVY_LOAD_RATIO_THRESHOLD = 5.0
+
+# Defines how long chunkservers will remain in 'grace' mode (in seconds)
+# CS_HEAVY_LOAD_GRACE_PERIOD = 900
+
+# Maximum difference between space usage of chunkservers in percentage points (default is 1.0 ; valid values: 0.1 - 10.0)
+# Deprecates: ACCEPTABLE_DIFFERENCE (ACCEPTABLE_PERCENTAGE_DIFFERENCE = ACCEPTABLE_DIFFERENCE * 100.0)
+# ACCEPTABLE_PERCENTAGE_DIFFERENCE = 1.0
+
+# Length of priority queues (for endangered, undergoal etc. chunks - chunks that should be processed first - default value is 1000000).
+# PRIORITY_QUEUES_LENGTH = 1000000
+
+###############################################
+# CLIENTS CONNECTION OPTIONS                  #
+###############################################
+
+# IP address to listen on for client (mount) connections (* means any)
+# MATOCL_LISTEN_HOST = *
+
+# port to listen on for client (mount) connections (default is @DEFAULT_MASTER_CLIENT_PORT@)
+# MATOCL_LISTEN_PORT = @DEFAULT_MASTER_CLIENT_PORT@
+
+###############################################
+# CLIENTS WORKING OPTIONS                     #
+###############################################
+
+# How long to sustain a disconnected client session (in seconds; default is 86400 = 1 day)
+# SESSION_SUSTAIN_TIME = 86400
+
+# Time limit in seconds for soft quota (default is 604800 - 7 days)
+# QUOTA_TIME_LIMIT = 604800

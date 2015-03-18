@@ -1,0 +1,108 @@
+.TH mfsmetalogger "8" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfsmetalogger \- start, restart or stop Moose File System metalogger process
+.SH SYNOPSIS
+.B mfsmetalogger
+[\fB\-f\fP]
+[\fB\-c\fP \fICFGFILE\fP] [\fB\-u\fP]
+[\fB\-d\fP]
+[\fB\-t\fP\fI LOCKTIMEOUT\fP]
+[\fIACTION\fP]
+.PP
+.B mfsmetalogger \-s
+[\fB\-c\fP \fICFGFILE\fP]
+.PP
+.B mfsmetalogger \-v
+.PP
+.B mfsmetalogger \-h
+.SH DESCRIPTION
+.PP
+\fBmfsmetalogger\fP is the metadata replication server of Moose File System.
+Depending on parameters it can start, restart or stop MooseFS metalogger process.
+Without any options it starts MooseFS metalogger, killing previously run process
+if lock file exists.
+.PP
+SIGHUP (or 'reload' \fIACTION\fP) forces \fBmfsmetalogger\fP to reload all configuration files.
+.PP
+mfsmetalogger exists since 1.6.5 version of MooseFS; before this version
+\fBmfschunkserver\fP\|(8) was responsible of logging metadata changes.
+.TP
+\fB\-v\fP
+print version information and exit
+.TP
+\fB\-h\fP
+print usage information and exit
+.TP
+\fB\-f\fP
+(deprecated, use \fBstart\fP action instead)
+forcily run MooseFS metalogger process, without trying to kill previous instance
+(this option allows to run MooseFS metalogger if stale PID file exists)
+.TP
+\fB\-s\fP
+(deprecated, use \fBstop\fP action instead)
+stop MooseFS metalogger process
+.TP
+\fB\-c\fP \fICFGFILE\fP
+specify alternative path of configuration file (default is
+\fBmfsmetalogger.cfg\fP in system configuration directory)
+.TP
+\fB\-u\fP
+log undefined configuration values (when default is assumed)
+.TP
+\fB\-d\fP
+run in foreground, don't daemonize
+.TP
+\fB\-t\fP \fILOCKTIMEOUT\fP
+how long to wait for lockfile (default is 60 seconds)
+.TP
+\fIACTION\fP
+is the one of \fBstart\fP, \fBstop\fP, \fBrestart\fP, \fBreload\fP, \fBtest\fP or \fBkill\fP. Default action is
+\fBrestart\fP unless \fB\-s\fP (stop) or \fB\-f\fP (start) option is given.
+Note that \fB\-s\fP and \fB\-f\fP options are deprecated, likely to disappear
+and \fIACTION\fP parameter to become obligatory in MooseFS 1.7.
+.SH FILES
+.TP
+\fBmfsmetalogger.cfg\fP
+configuration file for MooseFS metalogger process; refer to
+\fBmfsmetalogger.cfg\fI\|(5) manual for defails
+.TP
+\fBmfsmetalogger.lock\fP
+PID file of running MooseFS metalogger process
+(created in RUN_PATH by MooseFS < 1.6.9)
+.TP
+.BR .mfsmetalogger.lock
+lock file of running MooseFS metalogger process
+(created in data directory since MooseFS 1.6.9)
+.TP
+\fBchangelog_ml.\fP*\fB.mfs\fP
+MooseFS filesystem metadata change logs (backup of master change log files)
+.TP
+\fBmetadata.ml.mfs.back\fP
+Latest copy of complete metadata.mfs.back file from MooseFS master.
+.TP
+\fBsessions.ml.mfs\fP
+Latest copy of sessions.mfs file from MooseFS master.
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfsmetalogger.cfg (5),
+.BR moosefs (7)

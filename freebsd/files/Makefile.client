@@ -1,0 +1,26 @@
+# Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
+# $FreeBSD$
+
+PORTNAME=	moosefs
+#PORTVERSION=	# set in 'include'
+#PORTREVISION=	# set in 'include'
+CATEGORIES=	sysutils
+PKGNAMESUFFIX=	-client
+
+.include "bsd.port.moosefs.mk"
+
+COMMENT=	Moosefs client tools
+
+USES=		fuse pkgconfig
+
+CONFIGURE_ARGS+=	--disable-mfsmaster \
+			--disable-mfsmetalogger \
+			--disable-mfscgiserv \
+			--disable-mfscgi \
+			--disable-mfscli \
+			--disable-mfsnetdump \
+			--disable-mfssupervisor \
+			--disable-mfschunkserver \
+			--enable-mfsmount
+
+.include <bsd.port.mk>

@@ -1,0 +1,558 @@
+/* config.h.in.  Generated from configure.ac by autoheader.  */
+
+/* Define if building universal (internal helper macro) */
+#undef AC_APPLE_UNIVERSAL_BUILD
+
+/* poll does not work properly on devices */
+#undef BROKEN_POLL
+
+/* bswap16 */
+#undef BSWAP16
+
+/* bswap32 */
+#undef BSWAP32
+
+/* bswap64 */
+#undef BSWAP64
+
+/* Define to 1 if the `closedir' function returns void instead of `int'. */
+#undef CLOSEDIR_VOID
+
+/* Data directory */
+#undef DATA_PATH
+
+/* Default cgiserver http port */
+#undef DEFAULT_CGISERV_HTTP_PORT
+
+/* Default chunkserver data port */
+#undef DEFAULT_CS_DATA_PORT
+
+/* Default working group */
+#undef DEFAULT_GROUP
+
+/* Default master name */
+#undef DEFAULT_MASTERNAME
+
+/* Default master client port */
+#undef DEFAULT_MASTER_CLIENT_PORT
+
+/* Default master command port */
+#undef DEFAULT_MASTER_CONTROL_PORT
+
+/* Default master chunkserver port */
+#undef DEFAULT_MASTER_CS_PORT
+
+/* Default port base */
+#undef DEFAULT_PORTBASE
+
+/* Default working user */
+#undef DEFAULT_USER
+
+/* Configuration directory */
+#undef ETC_PATH
+
+/* Define to nothing if C supports flexible array members, and to 1 if it does
+   not. That way, with a declaration like `struct s { int n; double
+   d[FLEXIBLE_ARRAY_MEMBER]; };', the struct hack can be used with pre-C99
+   compilers. When computing the size of such an object, don't use 'sizeof
+   (struct s)' as it overestimates the size. Use 'offsetof (struct s, d)'
+   instead. Don't use 'offsetof (struct s, d[0])', as this doesn't work with
+   MSVC and with C++ compilers. */
+#undef FLEXIBLE_ARRAY_MEMBER
+
+/* Define to 1 if you have the <arpa/inet.h> header file. */
+#undef HAVE_ARPA_INET_H
+
+/* Define to 1 if you have the `atexit' function. */
+#undef HAVE_ATEXIT
+
+/* Define to 1 if you have the `bzero' function. */
+#undef HAVE_BZERO
+
+/* Define to 1 if you have the `clock_gettime' function. */
+#undef HAVE_CLOCK_GETTIME
+
+/* Define to 1 if you have the declaration of `strerror_r', and to 0 if you
+   don't. */
+#undef HAVE_DECL_STRERROR_R
+
+/* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
+   */
+#undef HAVE_DIRENT_H
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the `dup2' function. */
+#undef HAVE_DUP2
+
+/* Define to 1 if you have the <fcntl.h> header file. */
+#undef HAVE_FCNTL_H
+
+/* Define to 1 if you have the `fork' function. */
+#undef HAVE_FORK
+
+/* Define to 1 if you have the `fseeko' function. */
+#undef HAVE_FSEEKO
+
+/* Define to 1 if you have the `ftello' function. */
+#undef HAVE_FTELLO
+
+/* Define to 1 if you have the `ftruncate' function. */
+#undef HAVE_FTRUNCATE
+
+/* libfuse has function fuse_version */
+#undef HAVE_FUSE_VERSION
+
+/* Define to 1 if you have the `getaddrinfo' function. */
+#undef HAVE_GETADDRINFO
+
+/* Define to 1 if you have the `getcwd' function. */
+#undef HAVE_GETCWD
+
+/* Define to 1 if you have the `getpass' function. */
+#undef HAVE_GETPASS
+
+/* Define to 1 if you have the `getrusage' function. */
+#undef HAVE_GETRUSAGE
+
+/* Define to 1 if you have the `gettimeofday' function. */
+#undef HAVE_GETTIMEOFDAY
+
+/* Define to 1 if you have the <inttypes.h> header file. */
+#undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the <limits.h> header file. */
+#undef HAVE_LIMITS_H
+
+/* Define to 1 if `lstat' has the bug that it succeeds when given the
+   zero-length file name argument. */
+#undef HAVE_LSTAT_EMPTY_STRING_BUG
+
+/* Define to 1 if you have the `mach_absolute_time' function. */
+#undef HAVE_MACH_ABSOLUTE_TIME
+
+/* Define to 1 if you have the <mach/mach.h> header file. */
+#undef HAVE_MACH_MACH_H
+
+/* Define to 1 if you have the <mach/mach_time.h> header file. */
+#undef HAVE_MACH_MACH_TIME_H
+
+/* Define to 1 if you have the `mach_timebase_info' function. */
+#undef HAVE_MACH_TIMEBASE_INFO
+
+/* Define to 1 if your system has a GNU libc compatible `malloc' function, and
+   to 0 otherwise. */
+#undef HAVE_MALLOC
+
+/* Define to 1 if you have the <malloc.h> header file. */
+#undef HAVE_MALLOC_H
+
+/* Define to 1 if you have the `mallopt' function. */
+#undef HAVE_MALLOPT
+
+/* Define to 1 if you have the `memmove' function. */
+#undef HAVE_MEMMOVE
+
+/* Define to 1 if you have the <memory.h> header file. */
+#undef HAVE_MEMORY_H
+
+/* Define to 1 if you have the `memset' function. */
+#undef HAVE_MEMSET
+
+/* Define to 1 if you have the `mkdir' function. */
+#undef HAVE_MKDIR
+
+/* Define to 1 if you have the `mkstemp' function. */
+#undef HAVE_MKSTEMP
+
+/* Define to 1 if you have the `mktemp' function. */
+#undef HAVE_MKTEMP
+
+/* Define to 1 if you have the `mlockall' function. */
+#undef HAVE_MLOCKALL
+
+/* Define to 1 if you have the `mmap' function. */
+#undef HAVE_MMAP
+
+/* Define to 1 if you have the <ndir.h> header file, and it defines `DIR'. */
+#undef HAVE_NDIR_H
+
+/* Define to 1 if you have the <netdb.h> header file. */
+#undef HAVE_NETDB_H
+
+/* Define to 1 if you have the <netinet/in.h> header file. */
+#undef HAVE_NETINET_IN_H
+
+/* Define to 1 if you have the <pcap.h> header file. */
+#undef HAVE_PCAP_H
+
+/* Define to 1 if you have the `perror' function. */
+#undef HAVE_PERROR
+
+/* Define to 1 if you have the `poll' function. */
+#undef HAVE_POLL
+
+/* Define to 1 if you have the `prctl' function. */
+#undef HAVE_PRCTL
+
+/* Define to 1 if you have the `pread' function. */
+#undef HAVE_PREAD
+
+/* Define if you have POSIX threads libraries and header files. */
+#undef HAVE_PTHREAD
+
+/* Define to 1 if you have the `pthread_spin_lock' function. */
+#undef HAVE_PTHREAD_SPIN_LOCK
+
+/* Define to 1 if you have the `pwrite' function. */
+#undef HAVE_PWRITE
+
+/* Define to 1 if you have the `readv' function. */
+#undef HAVE_READV
+
+/* Define to 1 if your system has a GNU libc compatible `realloc' function,
+   and to 0 otherwise. */
+#undef HAVE_REALLOC
+
+/* Define to 1 if you have the `realpath' function. */
+#undef HAVE_REALPATH
+
+/* Define to 1 if you have the `setitimer' function. */
+#undef HAVE_SETITIMER
+
+/* Do we have sockaddr.sin_len? */
+#undef HAVE_SOCKADDR_SIN_LEN
+
+/* Define to 1 if you have the `socket' function. */
+#undef HAVE_SOCKET
+
+/* Define to 1 if `stat' has the bug that it succeeds when given the
+   zero-length file name argument. */
+#undef HAVE_STAT_EMPTY_STRING_BUG
+
+/* Define to 1 if stdbool.h conforms to C99. */
+#undef HAVE_STDBOOL_H
+
+/* Define to 1 if you have the <stddef.h> header file. */
+#undef HAVE_STDDEF_H
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H
+
+/* Define to 1 if you have the `strchr' function. */
+#undef HAVE_STRCHR
+
+/* Define to 1 if you have the `strdup' function. */
+#undef HAVE_STRDUP
+
+/* Define to 1 if you have the `strerror' function. */
+#undef HAVE_STRERROR
+
+/* Define to 1 if you have the `strerror_r' function. */
+#undef HAVE_STRERROR_R
+
+/* Define to 1 if you have the <strings.h> header file. */
+#undef HAVE_STRINGS_H
+
+/* Define to 1 if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
+/* Define to 1 if you have the `strtol' function. */
+#undef HAVE_STRTOL
+
+/* Define to 1 if you have the `strtoul' function. */
+#undef HAVE_STRTOUL
+
+/* Define to 1 if `ru_maxrss' is a member of `struct rusage'. */
+#undef HAVE_STRUCT_RUSAGE_RU_MAXRSS
+
+/* Define to 1 if `st_birthtime' is a member of `struct stat'. */
+#undef HAVE_STRUCT_STAT_ST_BIRTHTIME
+
+/* Define to 1 if `st_blksize' is a member of `struct stat'. */
+#undef HAVE_STRUCT_STAT_ST_BLKSIZE
+
+/* Define to 1 if `st_blocks' is a member of `struct stat'. */
+#undef HAVE_STRUCT_STAT_ST_BLOCKS
+
+/* Define to 1 if `st_flags' is a member of `struct stat'. */
+#undef HAVE_STRUCT_STAT_ST_FLAGS
+
+/* Define to 1 if `st_rdev' is a member of `struct stat'. */
+#undef HAVE_STRUCT_STAT_ST_RDEV
+
+/* Define to 1 if `tm_gmtoff' is a member of `struct tm'. */
+#undef HAVE_STRUCT_TM_TM_GMTOFF
+
+/* Define to 1 if your `struct stat' has `st_blocks'. Deprecated, use
+   `HAVE_STRUCT_STAT_ST_BLOCKS' instead. */
+#undef HAVE_ST_BLOCKS
+
+/* Define to 1 if you have the <syslog.h> header file. */
+#undef HAVE_SYSLOG_H
+
+/* Define to 1 if you have the <sys/dir.h> header file, and it defines `DIR'.
+   */
+#undef HAVE_SYS_DIR_H
+
+/* Define to 1 if you have the <sys/mman.h> header file. */
+#undef HAVE_SYS_MMAN_H
+
+/* Define to 1 if you have the <sys/ndir.h> header file, and it defines `DIR'.
+   */
+#undef HAVE_SYS_NDIR_H
+
+/* Define to 1 if you have the <sys/prctl.h> header file. */
+#undef HAVE_SYS_PRCTL_H
+
+/* Define to 1 if you have the <sys/resource.h> header file. */
+#undef HAVE_SYS_RESOURCE_H
+
+/* Define to 1 if you have the <sys/rusage.h> header file. */
+#undef HAVE_SYS_RUSAGE_H
+
+/* Define to 1 if you have the <sys/socket.h> header file. */
+#undef HAVE_SYS_SOCKET_H
+
+/* Define to 1 if you have the <sys/statvfs.h> header file. */
+#undef HAVE_SYS_STATVFS_H
+
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/sysctl.h> header file. */
+#undef HAVE_SYS_SYSCTL_H
+
+/* Define to 1 if you have the <sys/time.h> header file. */
+#undef HAVE_SYS_TIME_H
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have <sys/wait.h> that is POSIX.1 compatible. */
+#undef HAVE_SYS_WAIT_H
+
+/* Define to 1 if you have the <unistd.h> header file. */
+#undef HAVE_UNISTD_H
+
+/* Define to 1 if you have the `vfork' function. */
+#undef HAVE_VFORK
+
+/* Define to 1 if you have the <vfork.h> header file. */
+#undef HAVE_VFORK_H
+
+/* Define to 1 if `fork' works. */
+#undef HAVE_WORKING_FORK
+
+/* Define to 1 if `vfork' works. */
+#undef HAVE_WORKING_VFORK
+
+/* Define to 1 if you have the `writev' function. */
+#undef HAVE_WRITEV
+
+/* Define to 1 if you have the <zlib.h> header file. */
+#undef HAVE_ZLIB_H
+
+/* Define to 1 if the system has the type `_Bool'. */
+#undef HAVE__BOOL
+
+/* have __sync_fetch_and_OP intrinsics */
+#undef HAVE___SYNC_FETCH_AND_OP
+
+/* have __sync_OP_and_fetch intrinsics */
+#undef HAVE___SYNC_OP_AND_FETCH
+
+/* Build light version */
+#undef LIGHT_MFS
+
+/* Define to 1 if `lstat' dereferences a symlink specified with a trailing
+   slash. */
+#undef LSTAT_FOLLOWS_SLASHED_SYMLINK
+
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
+#undef LT_OBJDIR
+
+/* Name of package */
+#undef PACKAGE
+
+/* Define to the address where bug reports for this package should be sent. */
+#undef PACKAGE_BUGREPORT
+
+/* Define to the full name of this package. */
+#undef PACKAGE_NAME
+
+/* Define to the full name and version of this package. */
+#undef PACKAGE_STRING
+
+/* Define to the one symbol short name of this package. */
+#undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
+/* Define to the version of this package. */
+#undef PACKAGE_VERSION
+
+/* Installation prefix */
+#undef PREFIX
+
+/* Base value for protocol commands */
+#undef PROTO_BASE
+
+/* Define to necessary symbol if this constant uses a non-standard name on
+   your system. */
+#undef PTHREAD_CREATE_JOINABLE
+
+/* Release number */
+#undef RELEASE
+
+/* PID file directory */
+#undef RUN_PATH
+
+/* Define to 1 if you have the ANSI C header files. */
+#undef STDC_HEADERS
+
+/* Define to 1 if strerror_r returns char *. */
+#undef STRERROR_R_CHAR_P
+
+/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
+#undef TIME_WITH_SYS_TIME
+
+/* Define to 1 if your <sys/time.h> declares `struct tm'. */
+#undef TM_IN_SYS_TIME
+
+/* Full MFS version as a hex number */
+#undef VERSHEX
+
+/* Version number of package */
+#undef VERSION
+
+/* Version converter from human readable format to binary format used in MFS
+   packets */
+#undef VERSION2INT
+
+/* Major MFS version */
+#undef VERSMAJ
+
+/* Middle MFS version */
+#undef VERSMID
+
+/* Minor MFS version */
+#undef VERSMIN
+
+/* MFS version - string */
+#undef VERSSTR
+
+/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
+   significant byte first (like Motorola and SPARC, unlike Intel). */
+#if defined AC_APPLE_UNIVERSAL_BUILD
+# if defined __BIG_ENDIAN__
+#  define WORDS_BIGENDIAN 1
+# endif
+#else
+# ifndef WORDS_BIGENDIAN
+#  undef WORDS_BIGENDIAN
+# endif
+#endif
+
+/* Enable large inode numbers on Mac OS X 10.5.  */
+#ifndef _DARWIN_USE_64_BIT_INODE
+# define _DARWIN_USE_64_BIT_INODE 1
+#endif
+
+/* Number of bits in a file offset, on hosts where this is settable. */
+#undef _FILE_OFFSET_BITS
+
+/* Define for large files, on AIX-style hosts. */
+#undef _LARGE_FILES
+
+/* Define for Solaris 2.5.1 so the uint32_t typedef from <sys/synch.h>,
+   <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
+   #define below would cause a syntax error. */
+#undef _UINT32_T
+
+/* Define for Solaris 2.5.1 so the uint64_t typedef from <sys/synch.h>,
+   <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
+   #define below would cause a syntax error. */
+#undef _UINT64_T
+
+/* Define for Solaris 2.5.1 so the uint8_t typedef from <sys/synch.h>,
+   <pthread.h>, or <semaphore.h> is not used. If the typedef were allowed, the
+   #define below would cause a syntax error. */
+#undef _UINT8_T
+
+/* Define to empty if `const' does not conform to ANSI C. */
+#undef const
+
+/* Define to `int' if <sys/types.h> doesn't define. */
+#undef gid_t
+
+/* Define to `__inline__' or `__inline' if that's what the C compiler
+   calls it, or to nothing if 'inline' is not supported under any name.  */
+#ifndef __cplusplus
+#undef inline
+#endif
+
+/* Define to the type of a signed integer type of width exactly 16 bits if
+   such a type exists and the standard includes do not define it. */
+#undef int16_t
+
+/* Define to the type of a signed integer type of width exactly 32 bits if
+   such a type exists and the standard includes do not define it. */
+#undef int32_t
+
+/* Define to the type of a signed integer type of width exactly 64 bits if
+   such a type exists and the standard includes do not define it. */
+#undef int64_t
+
+/* Define to the type of a signed integer type of width exactly 8 bits if such
+   a type exists and the standard includes do not define it. */
+#undef int8_t
+
+/* Define to rpl_malloc if the replacement function should be used. */
+#undef malloc
+
+/* Define to `int' if <sys/types.h> does not define. */
+#undef mode_t
+
+/* Define to `long int' if <sys/types.h> does not define. */
+#undef off_t
+
+/* Define to `int' if <sys/types.h> does not define. */
+#undef pid_t
+
+/* Define to rpl_realloc if the replacement function should be used. */
+#undef realloc
+
+/* Define to `unsigned int' if <sys/types.h> does not define. */
+#undef size_t
+
+/* Define to `int' if <sys/types.h> doesn't define. */
+#undef uid_t
+
+/* Define to the type of an unsigned integer type of width exactly 16 bits if
+   such a type exists and the standard includes do not define it. */
+#undef uint16_t
+
+/* Define to the type of an unsigned integer type of width exactly 32 bits if
+   such a type exists and the standard includes do not define it. */
+#undef uint32_t
+
+/* Define to the type of an unsigned integer type of width exactly 64 bits if
+   such a type exists and the standard includes do not define it. */
+#undef uint64_t
+
+/* Define to the type of an unsigned integer type of width exactly 8 bits if
+   such a type exists and the standard includes do not define it. */
+#undef uint8_t
+
+/* Define as `fork' if `vfork' does not work. */
+#undef vfork
+
+/* Define to empty if the keyword `volatile' does not work. Warning: valid
+   code using `volatile' can become incorrect without. Disable with care. */
+#undef volatile

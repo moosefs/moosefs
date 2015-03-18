@@ -1,0 +1,68 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:		moosefs-cgiserv
+# Required-Start:	$network $remote_fs
+# Required-Stop:	$remote_fs
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	Start mfscgiserv at boot time
+# Description:		moosefs-cgiserv provides HTTP server for MooseFS CGI monitor.
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/sbin/mfscgiserv
+NAME=moosefs-cgiserv
+
+test -e $DAEMON || exit 0
+
+# Include moosefs-cgiserv defaults if available
+. /lib/lsb/init-functions
+MFSCGISERV_ENABLE=false
+MFSCGISERV_DEFAULTS_FILE=/etc/default/moosefs-cgiserv
+if [ -s "$MFSCGISERV_DEFAULTS_FILE" ]; then
+    . "$MFSCGISERV_DEFAULTS_FILE"
+    case "x$MFSCGISERV_ENABLE" in
+        xtrue) ;;
+        xfalse)
+	    log_warning_msg "$NAME not enabled in \"$MFSCGISERV_DEFAULTS_FILE\", exiting..."
+	    exit 0
+	    ;;
+        *)
+            log_failure_msg "value of MFSCGISERV_ENABLE must be either 'true' or 'false';"
+            log_failure_msg "not starting ${NAME}."
+            exit 1
+            ;;
+    esac
+fi
+
+set -e
+
+case "$1" in
+	start)
+		echo "Starting ${NAME}:"
+		$DAEMON $DAEMON_OPTS start
+		;;
+
+	stop)
+		echo "Stopping ${NAME}:"
+		$DAEMON stop
+		;;
+
+	force-reload|restart)
+		echo "Restarting ${NAME}:"
+		$DAEMON restart
+		;;
+
+	status)
+		$DAEMON test > /dev/null
+		;;
+
+	*)
+		N=/etc/init.d/$NAME
+		echo "Usage: $N {start|stop|restart|force-reload|status}" >&2
+		exit 1
+		;;
+esac
+
+exit 0

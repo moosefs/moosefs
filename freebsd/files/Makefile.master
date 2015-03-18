@@ -1,0 +1,27 @@
+# Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
+# $FreeBSD$
+
+PORTNAME=	moosefs
+#PORTVERSION=	# set in 'include'
+#PORTREVISION=	# set in 'include'
+CATEGORIES=	sysutils
+PKGNAMESUFFIX=	-master
+
+.include "bsd.port.moosefs.mk"
+
+COMMENT=	Managing the whole filesystem and storing metadata
+
+USE_RC_SUBR=	mfsmaster
+PLIST_SUB+=	MFS_WORKDIR="${MFS_WORKDIR}"
+
+CONFIGURE_ARGS+=	--enable-mfsmaster \
+			--disable-mfsmetalogger \
+			--disable-mfscgiserv \
+			--disable-mfscgi \
+			--disable-mfscli \
+			--disable-mfsnetdump \
+			--disable-mfssupervisor \
+			--disable-mfschunkserver \
+			--disable-mfsmount
+
+.include <bsd.port.mk>

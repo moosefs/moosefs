@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# PROVIDE: mfsmetalogger
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf to enable mfsmetalogger:
+#
+# mfsmetalogger_enable="YES"
+#
+
+. /etc/rc.subr
+
+name=mfsmetalogger
+rcvar=mfsmetalogger_enable
+
+config_file=%%PREFIX%%/etc/mfs/${name}.cfg
+
+required_files=${config_file}
+
+command=%%PREFIX%%/sbin/${name}
+pid_file=%%MFS_WORKDIR%%/mfs/.${name}.lock
+command_args="-c $config_file"
+
+load_rc_config $name
+
+# set defaults
+: ${mfsmetalogger_enable="NO"}
+
+run_rc_command "$1"

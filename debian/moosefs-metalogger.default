@@ -1,0 +1,8 @@
+# /etc/default/moosefs-metalogger
+
+# Start moosefs-metalogger from init.d script on boot.
+#   Only allowed values are "true" and "false".
+#   Undefined values default to "false".
+MFSMETALOGGER_ENABLE=false
+
+DAEMON_OPTS=""

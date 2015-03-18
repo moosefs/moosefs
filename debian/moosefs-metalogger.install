@@ -1,0 +1,4 @@
+etc/mfs/mfsmetalogger.cfg.dist
+usr/sbin/mfsmetalogger
+usr/share/man/man5/mfsmetalogger.cfg.5
+usr/share/man/man8/mfsmetalogger.8

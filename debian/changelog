@@ -1,0 +1,1192 @@
+moosefs (2.0.60-1) unstable; urgency=medium
+
+  * (all) changed license of standard version to GPLv2
+  * (all) changed name moosefs-ce to just moosefs
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 18 Mar 2015 12:00:00 +0100
+
+moosefs (2.0.54-1) unstable; urgency=medium
+
+  * (mount) fixed network timeouts in master-mount connection module.
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 11 Mar 2015 12:00:00 +0100
+
+moosefs (2.0.53-1) unstable; urgency=medium
+
+  * (master) fixed possible reference to freed memory during metadata recovery
+  * (master) added minimal priority queue length
+  * (cs) fixed removing damaged disks (lock file issue)
+  * (master) treat servers in maintenance mode as overloaded (no chunk
+    creations, replications etc.)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 10 Mar 2015 12:00:00 +0100
+
+moosefs (2.0.52-1) unstable; urgency=medium
+
+  * (master) added option for setting length of chunks priority queues
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 04 Mar 2015 12:00:00 +0100
+
+moosefs (2.0.51-1) unstable; urgency=medium
+
+  * (master+cgi+cli) added quota-licences (pro version only)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 26 Feb 2015 12:00:00 +0100
+
+moosefs (2.0.50-1) unstable; urgency=medium
+
+  * (master) fixed descriptor leak
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 10 Feb 2015 12:00:00 +0100
+
+moosefs (2.0.49-1) unstable; urgency=medium
+
+  * (cs) made fsync before close optional
+  * (all) added missing options to manpages
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 02 Feb 2015 12:00:00 +0100
+
+moosefs (2.0.48-1) unstable; urgency=medium
+
+  * (cs) fixed error handling in writing data (mainserv)
+  * (mount) fixed error handling bug in writing data module
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 14 Jan 2015 12:00:00 +0100
+
+moosefs (2.0.47-1) unstable; urgency=medium
+
+  * (cs) fixed handling .metaid file
+  * (cs) fixed showing incorrect I/O error messages
+  * (cs) fixed drive removals
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 09 Jan 2015 12:00:00 +0100
+
+moosefs (2.0.46-1) unstable; urgency=medium
+
+  * (master) force rebalancing when some servers are almost full (regardless of
+    undergoal priority queues)
+  * (master) fixed potential double decreasing number of sockets in session
+    data
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 08 Jan 2015 12:00:00 +0100
+
+moosefs (2.0.45-1) unstable; urgency=medium
+
+  * (mount) fixed printed informations about mapall (thanks to Tom Ivar
+    Helbekkmo)
+  * (master) fixed rmdir mapall/maproot rights check (thanks to Tom Ivar
+    Helbekkmo)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 24 Dec 2014 12:00:00 +0100
+
+moosefs (2.0.44-1) unstable; urgency=medium
+
+  * (master) fixed read rebalance limit
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 27 Nov 2014 12:00:00 +0100
+
+moosefs (2.0.43-1) unstable; urgency=medium
+
+  * (master) introducing new licence model (new licences with size limit for
+    pro version)
+  * (all) fixed portability issues with usleep (thanks to Tom Ivar Helbekkmo)
+  * (all) setting socket options after listen (thanks to Tom Ivar Helbekkmo)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 31 Oct 2014 12:00:00 +0100
+
+moosefs (2.0.42-1) unstable; urgency=medium
+
+  * (tools) fixed printing ip numbers in mfsfileinfo
+  * (mount) changed format of ip numbers in messages from hex to standard
+  * (master) changed format of ip numbers in some messages from hex to standard
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 29 Oct 2014 12:00:00 +0100
+
+moosefs (2.0.41-1) unstable; urgency=medium
+
+  * (mount) fixed buffer overrun (FreeBSD and OS X only)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 21 Oct 2014 13:00:00 +0200
+
+moosefs (2.0.40-1) unstable; urgency=medium
+
+  * (cs) fixed serious bug (new chunks were created on disks 'marked for
+    removal') - introduced in 1.7.31
+  * (cs) fixed bug (segfault on very rare ocassions during disk scanning just
+    after startup - caused by damaged chunk files)
+  * (mount) fixed memory leak (supplementary group tabs) - intr. in 2.0.1
+  * (rpm) fixed systemd scripts
+  * (daemons) added increasing limit of core dump size (debugging purposes)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 15 Oct 2014 13:00:00 +0200
+
+moosefs (2.0.39-1) unstable; urgency=medium
+
+  * (mount) added ability to mount from /etc/fstab on FreeBSD
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 06 Oct 2014 13:00:00 +0200
+
+moosefs (2.0.38-1) unstable; urgency=medium
+
+  * (mount) fixed memory leak in workaround on FreeBSD early-release bug
+    (FreeBSD only)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 02 Oct 2014 13:00:00 +0200
+
+moosefs (2.0.37-1) unstable; urgency=medium
+
+  * (cs) added internal open files limit
+  * (master) changed chunkserver choosing algorithm
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 23 Sep 2014 13:00:00 +0200
+
+moosefs (2.0.36-1) unstable; urgency=medium
+
+  * (cgi) fixed sorting masters by ip
+  * (master) fixed acl posix compatibility (two tests from pjd)
+  * (cs) fixed compatibility issues with master 1.6
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 18 Sep 2014 13:00:00 +0200
+
+moosefs (2.0.35-1) unstable; urgency=medium
+
+  * (freebsd) fixed cgiserv and cli port
+  * (mount) fixed setting acl
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 12 Sep 2014 13:00:00 +0200
+
+moosefs (2.0.34-1) unstable; urgency=medium
+
+  * (mount) workaround for bug in FreeBSD Fuse version
+  * (master) added setting correct metaid in "new" followers (pro version only)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 21 Aug 2014 13:00:00 +0200
+
+moosefs (2.0.33-1) unstable; urgency=medium
+
+  * (cs,supervisor) more reliable network code in supervisor module (pro
+    version only)
+  * (cs,master) added check for metaid in chunkservers (also hard drives) and
+    secondary masters
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 18 Aug 2014 13:00:00 +0200
+
+moosefs (2.0.32-1) unstable; urgency=medium
+
+  * (cs) changed delay handling method (delayed file close,free crc block etc.)
+  * (mount) fixed truncate loop (fixed bug intr. in 2.0.26)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 13 Aug 2014 13:00:00 +0200
+
+moosefs (2.0.31-1) unstable; urgency=medium
+
+  * (cs) fixed bug: write data error not causing exit from write loop -
+    sometimes could lead to segfault.
+  * (master) fixed setting data cache drop bit.
+  * (cli) fixed printed options for mfssupervisor
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 12 Aug 2014 13:00:00 +0200
+
+moosefs (2.0.30-1) unstable; urgency=medium
+
+  * (daemons) added writing pid to lockfile
+  * (all) added freebsd port-maker
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 09 Jul 2014 13:00:00 +0200
+
+moosefs (2.0.29-1) unstable; urgency=medium
+
+  * (cs) moved fsync to background (improved write performance)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 03 Jul 2014 13:00:00 +0200
+
+moosefs (2.0.28-1) unstable; urgency=medium
+
+  * (master) fixed syslog message about metaloggers in masters (pro version
+    only)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 30 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.27-1) unstable; urgency=medium
+
+  * (tools) added to mfsfileinfo checksum digest and file signature calculation
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 27 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.26-1) unstable; urgency=medium
+
+  * (cs) fixed bug in replicator
+  * (mount) fixed truncate loop
+  * (mount) fixed potential descriptor leak
+  * (master) fixed bug with duplicated chunkserver id
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 26 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.25-1) unstable; urgency=medium
+
+  * (mount) better handling error counters
+  * (master) fixed replication status handling
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 23 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.24-1) unstable; urgency=medium
+
+  * (master) added unfinished replications detection
+  * (master) added source ip and port in replication status message
+  * (cs) fixed handling job buffers
+  * (daemons) added ignoring profiling signals
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 23 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.23-1) unstable; urgency=medium
+
+  * (mount) changed chunkserver choosing algorithm
+  * (master) added checks for busy/operation mismatch
+  * (master) added checks for busy status during duplicate/duplicate+truncate
+    operations
+  * (cs) added ignoring 'marked for removal' disks in internal rebalance
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 18 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.22-1) unstable; urgency=medium
+
+  * (master) add chunks to priority queues after chunk damage, chunk lost and
+    set goal
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 17 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.21-1) unstable; urgency=medium
+
+  * (supervisor+cstool) fixed version shown
+  * (supervisor) fixed 'DEAD' master recognition routine
+  * (master) fixed segfault introduced in 2.0.20
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 17 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.20-1) unstable; urgency=medium
+
+  * (cs) fixed handling unfinished jobs on socket timeout
+  * (master) fixed missing chunks CHUNKDEL LEADER/FOLLOWER race condition (pro
+    version only)
+  * (master) postpone write to undergoal chunks during registration process
+    (wait for all cs)
+  * (master) undergoal replications have higher priority than write chunk
+  * (all) added check for EINTR status after poll in sockets module
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 16 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.19-1) unstable; urgency=medium
+
+  * (master+cs) added support for 'get version' packet
+  * (all) fixed licence text in source files
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 13 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.18-1) unstable; urgency=medium
+
+  * (cs) fixed bandwidth charts
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 12 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.17-1) unstable; urgency=medium
+
+  * (daemons) added 'info' handler (for future use)
+  * (master) changed median to arithmetic mean in 'new chunk' algorithm
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 12 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.16-1) unstable; urgency=medium
+
+  * (master+cs) added 'maxentries' to chart data packet
+  * (master) improved median usage calculations
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 11 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.15-1) unstable; urgency=medium
+
+  * (master) fixed floating replication limits
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 10 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.14-1) unstable; urgency=medium
+
+  * (master) replication limits can be defined as floating point numbers
+  * (master+cgi+cli) changed store status (background,download and foreground)
+  * (master+cgi+cli) changed option "canchangequota" to "admin"
+  * (master) added rename/unlink "metadata.mfs" in case of using '-a' option
+  * (master+cgi+cli) last save duration changed from seconds to miliseconds
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 10 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.13-1) unstable; urgency=medium
+
+  * (master) added separate replication limits for different cases
+  * (cs) deleting already deleted chunk returns status ok.
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 09 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.12-1) unstable; urgency=medium
+
+  * (mount) changed readworker behaviour in case of having no data to read
+  * (master) added block version check during metadata read
+  * (metadump) added support for newest metadata format
+  * (cs) changed format of reported ip in replicator module
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 06 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.11-1) unstable; urgency=medium
+
+  * (cgi) fixed missing master condition
+  * (netdump) new binary - mfsnetdump
+  * (cs) new binary - mfschunktool
+  * (master+cgi+cli) added maintenance mode to chunkservers
+  * (cli) fixed cs-commands bug
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 03 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.10-1) unstable; urgency=medium
+
+  * (cgi) added colors for versions
+  * (master) fixed dirinfo counters update on write in master-follower (pro
+    version only)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 02 Jun 2014 13:00:00 +0200
+
+moosefs (2.0.9-1) unstable; urgency=medium
+
+  * (all) fixed compatibility with very old compilers
+  * (cgi) added avg line and tooltips to '%used' bars
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 30 May 2014 13:00:00 +0200
+
+moosefs (2.0.8-1) unstable; urgency=medium
+
+  * (master) even better replication priority algorithm
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 29 May 2014 13:00:00 +0200
+
+moosefs (2.0.7-1) unstable; urgency=medium
+
+  * (master) improved replication priority algorithm
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 28 May 2014 13:00:00 +0200
+
+moosefs (2.0.6-1) unstable; urgency=medium
+
+  * (master) added replication priority
+    "pseudomissing->endangered->undergoal->rebalance"
+  * (master) added option for setting metadata download frequency (pro version
+    only)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 27 May 2014 13:00:00 +0200
+
+moosefs (2.0.5-1) unstable; urgency=medium
+
+  * (master) fixed finding best metadata file (-a option)
+  * (cs) fixed infinite loop condition in sockets module
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 26 May 2014 13:00:00 +0200
+
+moosefs (2.0.4-1) unstable; urgency=medium
+
+  * (master+mount) fixed "chunk lost" condition during cs registration
+  * (mount) fixed support for "tail -f"
+  * (master) fixed xattr snapshot bug (attr name length not copied)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 22 May 2014 13:00:00 +0200
+
+moosefs (2.0.3-1) unstable; urgency=medium
+
+  * (master) autorepair chunk version for standard scenarios
+  * (master) fixed dealing with chunks that doesn't exist in metadata
+  * (master) fixed status returned by CHUNKADD/CHUNKDEL
+  * (all) faster endian conversions
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 20 May 2014 13:00:00 +0200
+
+moosefs (2.0.2-1) unstable; urgency=medium
+
+  * (mount) turn on posix-ACL's by default
+  * (mount) add release number to version reporting (in df -i)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 15 May 2014 13:00:00 +0200
+
+moosefs (2.0.1-1) unstable; urgency=medium
+
+  * (master) download meta file from followers
+  * (master) added "get paths" and "get parents" commands
+  * (master) added ability to send directories in parts
+  * (master) keep network connections alive during long operations
+  * (all) keep CL-CS and CS-CS connections alive between operations
+  * (mount) fixed race-condition in read module
+  * (mount) fixed local buffer lock in 'oplog'
+  * (cs) fixed race condition in resolver
+  * (mount) fixed truncate in read module
+  * (master) fixed new chunk/delete chunk constants
+  * (master+mount) implementing full support for posix-ACL's
+  * (master+mount+tools) move permission checking from kernel to master
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 14 May 2014 13:00:00 +0200
+
+moosefs (1.7.31) unstable; urgency=medium
+
+  * (cs) fixed choosing disk algorithm
+  * (cs) removed (some) unimportant syslog messages
+  * (cs) tuning glibc malloc arenas
+  * (cs) fixed protocol autonegotiation
+  * (cs) fixed CS-CS and CS-CL communication charts
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 01 Apr 2014 13:00:00 +0200
+
+moosefs (1.7.30) unstable; urgency=medium
+
+  * (cs) fixed compatibility with mfs 1.6
+  * (mount) fixed "no xattr" bit bug (intr. in 1.7.25)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 26 Mar 2014 12:00:00 +0100
+
+moosefs (1.7.29) unstable; urgency=medium
+
+  * (cs) fixed descriptor leak (intr. in 1.7.25)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 26 Mar 2014 12:00:00 +0100
+
+moosefs (1.7.28) unstable; urgency=medium
+
+  * (all) fixed thread creation routine (introduced in 1.7.24)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 11 Mar 2014 12:00:00 +0100
+
+moosefs (1.7.27) unstable; urgency=medium
+
+  * (cs) added memory chart
+  * (master+cs) added virtual memory usage to memory charts
+  * (cs) fixed race condition in charts (introduced in 1.7.25)
+  * (cgi+cli) fixed cs charts
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 11 Mar 2014 12:00:00 +0100
+
+moosefs (1.7.26) unstable; urgency=medium
+
+  * (master+mount) create file using one command
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 05 Mar 2014 12:00:00 +0100
+
+moosefs (1.7.25) unstable; urgency=medium
+
+  * (all) fixed another bug in new network module (introduced in 1.7.21 and
+    1.7.22)
+  * (cs) new I/O model
+  * (master) added xattr flag
+  * (master) added copying xattrs during snapshot (cp-like version)
+  * (master) changed metadata version handling
+  * (master) changed node structure (RAM and HDD)
+  * (master+cs) added chunkserver id (identyfying cs in master)
+  * (master+cs) new registration algorithm (vers. 6)
+  * (master+mount) "no xattr" bit in file attr
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 27 Feb 2014 12:00:00 +0100
+
+moosefs (1.7.24) unstable; urgency=medium
+
+  * (mount) fixed xattr cache bug
+  * (master) fixed ENOSPC condition after switching
+  * (cgi+cli) fixed sortkeys for hdd write bandwidth
+  * (master) turn off internal supervisor if there are connections from
+    external supervisor
+  * (cs) added common routine for thread creation
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 19 Feb 2014 12:00:00 +0100
+
+moosefs (1.7.23) unstable; urgency=medium
+
+  * (master) bug fix version (bugs introduced in 1.7.21 and 1.7.22)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 06 Feb 2014 12:00:00 +0100
+
+moosefs (1.7.22) unstable; urgency=medium
+
+  * (master) fixed cs disconnection (make master responsive during
+    disconnection)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 05 Feb 2014 12:00:00 +0100
+
+moosefs (1.7.21) unstable; urgency=medium
+
+  * (master) fixed master<->chunkserver network module (make master responsive
+    during chunk registration)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 05 Feb 2014 12:00:00 +0100
+
+moosefs (1.7.20) unstable; urgency=medium
+
+  * (mount) added negative lookup cache
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 03 Feb 2014 12:00:00 +0100
+
+moosefs (1.7.19) unstable; urgency=medium
+
+  * (mount) added xattr cache
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 30 Jan 2014 12:00:00 +0100
+
+moosefs (1.7.18) unstable; urgency=medium
+
+  * (mount) setting FUSE capabilities (improved efficiency)
+  * (cs) fixed disk choosing algorithm
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 29 Jan 2014 12:00:00 +0100
+
+moosefs (1.7.17) unstable; urgency=medium
+
+  * (cs) fixed mutex double-lock error (introduced in 1.7.14)
+  * (master) improved calculation of init hash size
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 28 Jan 2014 12:00:00 +0100
+
+moosefs (1.7.16) unstable; urgency=medium
+
+  * (master+cgi+cli) memory usage detailed report
+  * (master+cs+ml) fixed starvation scenario in network modules
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 22 Jan 2014 12:00:00 +0100
+
+moosefs (1.7.15) unstable; urgency=medium
+
+  * (master+cs) new charts prepared for mfs 2.0
+  * (cs) options for transfering data between disks
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 15 Jan 2014 12:00:00 +0100
+
+moosefs (1.7.14) unstable; urgency=medium
+
+  * (master) added simple supervisor (allow start masters without manual
+    supervisor)
+  * (cs) fixed internal rebalance algorithm
+  * (cgi+cli) new class for mfs communication
+  * (cgi+cli) introduced pro/ce version (for forthcoming mfs 2.0)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 08 Jan 2014 12:00:00 +0100
+
+moosefs (1.7.13) unstable; urgency=medium
+
+  * (cs) added rebalance utilization limit option
+  * (cs) added error tolerance options
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 12 Dec 2013 12:00:00 +0100
+
+moosefs (1.7.12) unstable; urgency=medium
+
+  * (master) fixed metadata synchronization bug (HUP detected to early)
+  * (master) fixed metadata synchronization bug (settrashtime,setgoal,seteattr)
+  * (master+cs) changed cs/disk choosing algorithm (random->rr and using only
+    servers/disks close to median)
+  * (cs) added rebalancing of disks usage
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 11 Dec 2013 12:00:00 +0100
+
+moosefs (1.7.11) unstable; urgency=medium
+
+  * (mount) fixed read/write bug (status EAGAIN on read/write caused EIO)
+  * (cli) added user defined separator
+  * (cgi+cli) display licence data
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 22 Nov 2013 12:00:00 +0100
+
+moosefs (1.7.10) unstable; urgency=medium
+
+  * (master) added licences for version pro
+  * (mount) fixed very rare race condition (fuse context)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 21 Nov 2013 12:00:00 +0100
+
+moosefs (1.7.9) unstable; urgency=medium
+
+  * (master) fixed chunk deletions during chunkserver disconnection
+  * (daemons) fixed 'stop' status (ok when daemon is already stopped)
+  * (daemons) added 'try-restart' action
+  * (all) fixed status returned from socket operations
+  * (mount) add ignoring SIGPIPE
+  * (all) improved crc32 calculation (1.7 times faster)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 12 Nov 2013 12:00:00 +0100
+
+moosefs (1.7.8) unstable; urgency=medium
+
+  * (master) new 'open files' module (also fixed some bugs)
+  * (master) better management of chunks deletion in master
+  * (master) fixed bug (adding chunkservers by ELECT)
+  * (cgi+cli) added displaying disconnected sessions
+  * (master+cgi+cli) added option to remove disconnected sessions
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 05 Nov 2013 12:00:00 +0100
+
+moosefs (1.7.7) unstable; urgency=medium
+
+  * (master+cs) added ability to change leader on demand
+  * (mount) fixed couple of small bugs in new "read data" module
+  * (supervisor) fixed connecting bugs
+  * (master) added progress info during metadata restoring
+  * (master) fixed net timeouts (fixing time after long operations)
+  * (mount) fixed connection problems when one master is dead
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 22 Oct 2013 13:00:00 +0200
+
+moosefs (1.7.6) unstable; urgency=medium
+
+  * (master) imporoved chunk hashmap
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 20 Sep 2013 13:00:00 +0200
+
+moosefs (1.7.5) unstable; urgency=medium
+
+  * (master) fixed network timeouts for data transfer
+  * (master) changed hashmaps
+  * (cgi) BUSY state detection (mainly during data transfer)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 12 Sep 2013 13:00:00 +0200
+
+moosefs (1.7.4) unstable; urgency=medium
+
+  * (mount) read procedures have been rewritten (with read ahead support)
+  * (mount) read+write dynamic number of workers
+  * (cs) dynamic number of workers
+  * (cs) fixed segfault condition during closing application
+  * (master) improved memory allocation
+  * (master) improved hashmaps
+  * (master) fixed bug (sending changelogs to desynchronized followers)
+  * (master) fixed bug (cs added to metadata in desynchronized followers)
+  * (master) imporoved sending old changelogs (sending in groups)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 14 Aug 2013 13:00:00 +0200
+
+moosefs (1.7.3) unstable; urgency=medium
+
+  * (man) automatically set release date and version
+  * (cgiserv) fixed lock-file issue (early truncate - introduced in 1.7.1)
+  * (master+mount) when chunk is definitely lost then do not wait for it in
+    clients
+  * (cs) reduced amount of space reports to master (inspired by Davies Liu)
+  * (mount) imporved write efficiency (inspired by Davies Liu)
+  * (master) fixed 'rename/mv' bug in metarestore
+  * (master) fixed csdb cleanup bug
+  * (master) added SYNC/DESYNC to state description in syslog
+  * (supervisor) imporved connecting to masters
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 30 Jul 2013 13:00:00 +0200
+
+moosefs (1.7.2) unstable; urgency=medium
+
+  * (cgi+cli) fixed recognition of using wrong DNS name
+  * (cgi+cli) fixed commands bug in cli mode
+  * (cgi+cli) added inputs for master host name and ports
+  * (all) fixed distclean (automake strange behavior)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 12 Jul 2013 13:00:00 +0200
+
+moosefs (1.7.1) unstable; urgency=medium
+
+  * (cgi+cli) simple support for master-ha
+  * (cgi+cli) fixed path bug introduced in 1.7.0
+  * (all) added default-mastername and default-portbase options to configure
+    script
+  * (mount) fixed reconnecting to ELECT
+  * (cgiserv) fixed pidfile bug
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 11 Jul 2013 13:00:00 +0200
+
+moosefs (1.7.0) unstable; urgency=medium
+
+  * (cgi+cli) mfs.cgi can be used also in CLI mode (for monitoring scripts
+    etc.)
+  * (dist) CGI permissions fix in RPM packaging
+  * (dist) preliminary systemd support inspired by Arch Linux
+  * (master+tools) added building files from particular chunks (manual file
+    recovery)
+  * (cs) join master tasks queue and client tasks queue into one tasks queue.
+  * (cgi+cli) added chunkserver 'load' charts.
+  * (cgi+cli) added 'load' column in chunkservers tabble
+  * (master+cs) simple chunkserver overload detection
+  * (master) 'grace' state for chunkservers - after overload detection given
+    chunkserver is in 'grace' state for some time - new chunks are not created
+    on that server in this state
+  * (cgi+cli+master) turn off 'grace' state
+  * (master) in 'noowner' i-nodes mode copy 'owner' bits to 'group' and 'other'
+    bits
+  * (common) increase time events frequency
+  * (master) increase freqency of chunk-loop task (1 per second to 50 per
+    seconds)
+  * (mount) fixed invalidate open-dir dentry cache
+  * (master) fixed sustaining old sessions by clients who can't properly
+    register
+  * (cs) improved efficiency (removed lock in network thread)
+  * (master) fixed chunkserver disconnection handling (remove server data form
+    chunks 'in background')
+  * (master) changed directory size (from GB to 'floating point' numbers, size
+    nxxxxyy = xxxx.yy * 2^(10*n), f.e. 2053189 = 531.89MB)
+  * (master+tools) added mfssnapshot option (cp-like mode) - set files
+    ownership to user who makes snapshot.
+  * (cgi+cli) python scripts where made Python 3 compatible
+  * (all) added support for quota (per directory)
+  * (all) added support for xattr's (without special ACL treatment)
+  * (master) fixed dirinfo calculation bug (symbolic link snapshots)
+  * (all) added support for high availability
+  * (master) added meterestore option (mfsmetarestore is now included in
+    mfsmaster)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 05 Jul 2013 13:00:00 +0200
+
+moosefs (1.6.27) unstable; urgency=medium
+
+  * (metarestore) fixed bug - freeing filenames memory too early
+  * (all) added initial support for extra attributes (xattr), which will be
+    introduced in upcoming version 1.7
+  * (master+metalogger) better change log synchronization (storage in master
+    memory and sending expected version in metalogger - inspired by Davies Liu)
+  * (master) acceptable difference of percent of hdd usage added to
+    configuration (up to this version this parameter was constantly set to
+    0.01% - patch contributed by Davies Liu)
+  * (master) added emergency store metadata to some other places on errors
+    during standard hourly store (inspired by Davies Liu)
+  * (cs) default space to be left (256MB) moved to config file (inspired by
+    Davies Liu)
+  * (cs) added extra limits in mfshdd.cfg (minimum space to be left, maximum
+    space to be used)
+  * (cs) fixed charts overflow issue (overflow in net transfer on about 575Mbps
+    and hdd transfer on about 77MBps)
+  * (metalogger) fixed issue: file variable was not clear after close (on rare
+    occasions might cause segfault after disconnecting from master)
+  * (all) cfg files moved form PREFIX/etc/ to PREFIX/etc/mfs/
+  * (cgiserv) improved CGI handle (added support for custom http responses,
+    such as "302 Found")
+  * (master+cgi) showing disconnected chunkservers in "Servers" tab.
+  * (deb+rpm) mfscgiserv moved from mfscgi to separate package, changes in init
+    scripts
+  * (mount) added option 'mfsdelayedinit' - for being run from fstab/init
+    scripts
+  * (master) optimized goal management in chunks
+  * (master) fixed rare race-condition on clear/preserve cache during open in
+    mount
+  * (mount) fixed compiling problems on Mac OS X
+  * (all) changed code to be more compatible with new gcc 4.7 (gcc 4.7 has too
+    strong optimizations - it can generate unpredictable code)
+  * (master) sustain session time could be defined in mfsmaster.cfg
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 09 Aug 2012 13:00:00 +0200
+
+moosefs (1.6.26) unstable; urgency=medium
+
+  * (all) fixed signal handling in multithreaded modules
+  * (master) added goal and trashtime limits to mfsexport.cfg
+  * (metalogger) added simple check for downloaded metadata file (inspired by
+    Davies Liu)
+  * (master) better handle disk full (inspired by Davies Liu)
+  * (master+metalogger) added keeping previous copies of metadata (inspired by
+    Davies Liu)
+  * (all) reload all settings on "reload" (SIGHUP)
+  * (cs) disk scanning in background
+  * (cs) fixed long termination issue (found by Davies Liu)
+  * (master) fixed modify/open cache race
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 01 Feb 2012 12:00:00 +0100
+
+moosefs (1.6.25) unstable; urgency=medium
+
+  * (metadump) fixed dumping big files (>2TiB)
+  * (metarestore) fixed bug: nonexisting changelog file caused segv
+  * (master+mount) added 'sugidclearmode' and 'mkdircopysgid' compatibility
+    options
+  * (master) improved chunk deletion algorithm (soft/hard limits per server)
+  * (all) ready for new metadata file format, which will be introduced in
+    upcomoing version 1.7
+  * (all) ready for quota handling, which will be introduced in upcoming
+    version 1.7
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 30 Dec 2011 12:00:00 +0100
+
+moosefs (1.6.24) unstable; urgency=medium
+
+  * (master+mount) proxy in mount for mfstools (fixes problems with frequent
+    connect to master)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 06 Dec 2011 12:00:00 +0100
+
+moosefs (1.6.23) unstable; urgency=medium
+
+  * (master+mount) removed directory cache (didn't increase performance as
+    expected and caused many troubles)
+  * (metarestore) added option (-i) - ignore some structure inconsistencies
+  * (metarestore) added option (-b) - in case of errors save the best metadata
+    file
+  * (mount) more dynamic write cache management (changed condition ib<tb/5 to
+    ib<3*fb where: ib - inode blocks in cache, tb - total blocks in cache, fb -
+    free block in cache)
+  * (master) save metadata file to alternative locations in case of error
+  * (all) increased file length limit from 2TiB to 128PiB
+  * (cgiserv) fixed directory traversal vulnerability
+  * (cgiserv) added lockfile/pidfile and actions such as 'start', 'stop',
+    'restart' and 'test'.
+  * (mount) fixed parsing file with defaults
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 08 Nov 2011 12:00:00 +0100
+
+moosefs (1.6.22) unstable; urgency=medium
+
+  * (mount) added resolving master hostname whenever connection has failed
+  * (cs) removed getting attributes of every chunk during initialization -
+    speeds up starting of chunkserver
+  * (cs) changed calculating of total/used space. Superuser space now is
+    substracted from total space instead of adding it to used space
+  * (master+mount) fixed directory cache.
+  * (debian) rewritten init scripts to use mfscommon commands
+    (start/stop/restart/reload) instead of start-stop-daemon (where stop caused
+    killing all instances of daemon)
+  * (debian) changed init scripts to bail out early if MFS*_ENABLE is not true
+    (i.e. given daemon is not scripts-controlled)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 09 May 2011 13:00:00 +0200
+
+moosefs (1.6.21) unstable; urgency=medium
+
+  * (mount) added support of default config file (mfsmount.cfg)
+  * (metarestore) fixed snapshot bug
+  * (metarestore) improved tolerance for damaged changelog files
+  * (master,mount) added full directory (with attributes) cache on client
+    (mfsmount) side
+  * (mount) added symlink cache on client (mfsmount) side
+  * (mount) added hidden files '.oplog' and '.ophistory' with detailed info
+    about current/historical operations performed by mfsmount
+  * (master) added simple net topology support
+  * (all) added -D_POSIX_PTHREAD_SEMANTICS to CFLAGS - needed by Solaris-like
+    OSes
+  * (cs) fixed detection of 'damaged disk' condition
+  * (mount) fixed error caused segfaults during umount on certain conditions
+  * (daemon) added 'test' command - checks if process is running and returns
+    its PID
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 14 Apr 2011 13:00:00 +0200
+
+moosefs (1.6.20) unstable; urgency=medium
+
+  * (cs) fixed "packet too big" issue during register to master (split big
+    register packet with all chunks info into small packets)
+  * (cs,metalogger,master) added minimum socket timeout (ten seconds)
+  * (mount) accepting nop packets during write (for future use)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 14 Jan 2011 12:00:00 +0100
+
+moosefs (1.6.19) unstable; urgency=medium
+
+  * (debian) separated mfs-common and mfs-metalogger subpackages, added init
+    scripts (contributed by Christopher Lewis)
+  * (daemon) fixed return values (return non zero on error)
+  * (cs) fixed chunk testing bug (any error during chunk opening caused
+    assigning whole disk as damaged)
+  * (cs,metalogger) added resolving master name when connection failed (patch
+    contributed by Davies Liu)
+  * (mount) added creating new session when prevoius is lost (inspired by
+    Davies Liu)
+  * (cs) added for unused chunks week delay before deletion (inspired by Davies
+    Liu)
+  * (cgi) added switching between name and IP in 'path' column in 'Disks' table
+    (inspired by Davies Liu)
+  * (master) do not update ctime when goal, trashtime or extra attributes are
+    not changing
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 15 Dec 2010 12:00:00 +0100
+
+moosefs (1.6.18) unstable; urgency=medium
+
+  * (metalogger) added sending metadata after metalogger startup
+  * (master,metalogger) added sending two change logs together with metadata
+  * (metarestore) imporved merging change logs
+  * (all) added a lot of assertions (mainly NULL pointers, and unsuccessful
+    thread functions)
+  * (all) fixed some minor bugs and potential race conditions (makes valgrind
+    happy)
+  * (cs) added ability to use read-only disks in "marked for removal" mode (to
+    retrieve missing chunks from damaged disks)
+  * (cs) added showing scanning progress during startup
+  * (all/master) added releasing used resources at the end
+  * (all) changed some malloc/free allocations into mmap/munmap
+  * (all) new error messages routines
+  * (daemons) added proper handling SIGINT in "foreground" mode
+  * (cgiserv) fixed small bug (malformed request could crash cgiserv)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 08 Nov 2010 12:00:00 +0100
+
+moosefs (1.6.17) unstable; urgency=medium
+
+  * (master,tools) added automatic data cache management
+  * (master,tools) new flag "nodatacache"
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 20 Jul 2010 13:00:00 +0200
+
+moosefs (1.6.16) unstable; urgency=medium
+
+  * (master) added clearing suid/sgid bits
+  * (master) added check for "sticky" flag during rename and unlink operations
+  * (master) fixed posix compatibility (removing empty directory on rename)
+  * (master) fixed posix compatibility (proper changing ctime)
+  * (master) fixed some constants (better support for larger systems - with
+    millions of files and chunks)
+  * (master) fixed error logging (logging is turning off when there are too
+    many messages)
+  * (all) fixed some OpenSolaris compile issues (mainly added -D__EXTENSIONS__
+    to compile flags)
+  * (all) fixed OpenSolaris pthreads issue (errno doesn't work correctly
+    without proper compiler flags)
+  * (man) added mfscgiserv man page, added "BIND" options descriptions to man
+    pages
+  * (cs) fixed hdd stats (overflow on negative time difference)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 19 Jul 2010 13:00:00 +0200
+
+moosefs (1.6.15) unstable; urgency=medium
+
+  * (daemons) fixed "double free" error
+  * (metarestore) fixed bugs in "REPAIR" and "SNAPSHOT" entries
+  * (master) fixed bug in "snapshot" command ("mfsmakesnapshot dir dir/" caused
+    master to hung-up)
+  * (master) preserving atime and mtime during "snapshot" operation (makes
+    "snapshot" to work more like "cp -Rp" than "cp -R")
+  * (cs) ommit "marked for removal" disks during chunk test loop
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 09 Apr 2010 13:00:00 +0200
+
+moosefs (1.6.14) unstable; urgency=medium
+
+  * (all) improved messages
+  * (cs) prevent from using localhost as a master IP address
+  * (all) remove some BSDisms from code
+  * (metalogger) added BIND_HOST option (as in mount and cs)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 19 Mar 2010 12:00:00 +0100
+
+moosefs (1.6.13) unstable; urgency=medium
+
+  * (master) fixed poll events bug
+  * (autotools) added m4 module for posix threads detection
+  * (master) added exporting "meta" to default mfsexports.cfg
+  * (master,tools) removed "allowdatacache" flag (will be managed automatically
+    in the future)
+  * (master,cs) added support for not compressed PNG images in chart module
+    (when build without zlib)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 08 Feb 2010 12:00:00 +0100
+
+moosefs (1.6.12) unstable; urgency=medium
+
+  * (mount) fixed locking in read module
+  * (mount,cs) added ability to bind outgoing sockets to specific IP
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 25 Jan 2010 12:00:00 +0100
+
+moosefs (1.6.11) unstable; urgency=medium
+
+  * (cs) removed dirent.d_type test
+  * (cs) fixed some memory leaks
+  * (mount) improved attribute cache
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 31 Dec 2009 12:00:00 +0100
+
+moosefs (1.6.10) unstable; urgency=medium
+
+  * fixed errors introduced in 1.6.9
+  * added 'reload' command to master
+  * split chunk counters into 'all' and 'regular' (new approach to disks
+    removal - since this version chunks on 'marked for removal' disks are not
+    deleted)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 09 Dec 2009 12:00:00 +0100
+
+moosefs (1.6.9) unstable; urgency=medium
+
+  * updated manpages
+  * added support for mlockall (prevent from swapping)
+  * redesigned charts module
+  * redesigned locking mechanizm (daemons)
+  * added HDD I/O stats
+  * removing unfinished jobs from queue on socket close
+  * added 'cache file' flag
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 24 Nov 2009 12:00:00 +0100
+
+moosefs (1.6.8) unstable; urgency=medium
+
+  * added options to set nice level and number of I/O retries in mfsmount
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 26 Oct 2009 12:00:00 +0100
+
+moosefs (1.6.7) unstable; urgency=medium
+
+  * fixed error: damaged disk caused SIGSEGV in mfschunkserver
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 05 Oct 2009 13:00:00 +0200
+
+moosefs (1.6.6) unstable; urgency=medium
+
+  * fixed errors introduced in 1.6.5
+  * changed directory structure in CS (from 16 subfolders to 256 subfolders)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 02 Oct 2009 13:00:00 +0200
+
+moosefs (1.6.5) unstable; urgency=medium
+
+  * fixed some performance issues
+  * added new module "mfsmetalogger"
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 23 Sep 2009 13:00:00 +0200
+
+moosefs (1.6.4) unstable; urgency=medium
+
+  * rewrite mfs to use poll instead of select
+  * fixed some errors in new write module
+  * limit cache usage by inode in write module
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 25 Aug 2009 13:00:00 +0200
+
+moosefs (1.6.3) unstable; urgency=medium
+
+  * reduced version increasing
+  * increased open files limit in chunkserver
+  * decreased time window in damage disk detection
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 24 Aug 2009 13:00:00 +0200
+
+moosefs (1.6.2) unstable; urgency=medium
+
+  * fixed "race" in writedata module
+  * increased session timeout in mfsmaster for new sessions
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 19 Aug 2009 13:00:00 +0200
+
+moosefs (1.6.1) unstable; urgency=medium
+
+  * Added 'mapall' option to exports
+  * Added flags 'noattrcache' and 'noentrycache'
+  * Rewritten "Writedata" module in mfsmount
+  * Added source (read) limit to replications
+  * Prefer localhost during some operations (reduce network usage)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 14 Aug 2009 13:00:00 +0200
+
+moosefs (1.6.0) unstable; urgency=medium
+
+  * (all) Removed duplicate source files.
+  * (all) Strip whitespace at the end of configuration file lines.
+  * (cs) Rewritten in multi-threaded model.
+  * (cs) Added periodical chunk testing functionality (HDD_TEST_FREQ option).
+  * (cs) New -v option (prints version and exits).
+  * (master) Added "noowner" objects flag (causes objects to belong to current
+    user).
+  * (master) Maintaining `mfsdirinfo` data online, so it doesn't need to be
+    calculated on every request.
+  * (master) Filesystem access authorization system (NFS-like mfsexports.cfg
+    file, REJECT_OLD_CLIENTS option) with ro/rw, password and maproot
+    functionality.
+  * (master) New -v option (prints version and exits).
+  * (mount) Rewritten options parsing in mount-like way, making possible to use
+    standard FUSE mount utilities (see mfsmount(8) manual for new syntax).
+    Note: old syntax is no longer accepted and mountpoint is mandatory now
+    (there is no default).
+  * (mount) Updated for FUSE 2.6+.
+  * (mount) Added password, file data cache, attribute cache and entry cache
+    options. By default attribute cache and directory entry cache are enabled,
+    file data cache and file entry cache are disabled.
+  * (mount) opendir() no longer reads directory contents - it's done on first
+    readdir() now; fixes "rm -r" on recent Linux/glibc/coreutils combo.
+  * (mount) Fixed mtime setting just before close() (by flushing file on mtime
+    change); fixes mtime preserving on "cp -p".
+  * (mount) Added statistics accessible through MFSROOT/.stats pseudo-file.
+  * (mount) Changed master access method for mfstools (direct .master
+    pseudo-file replaced by .masterinfo redirection); fixes possible mfstools
+    race condition and allows to use mfstools on read-only filesystem.
+  * (tools) Units cleanup in values display (exact values, IEC-60027/binary
+    prefixes, SI/decimal prefixes); new options: -n, -h, -H and MFSHRFORMAT
+    environment variable - refer to mfstools(8) manual for details).
+  * (tools) mfsrgetgoal, mfsrsetgoal, mfsrgettrashtime, mfsrsettrashtime have
+    been deprecated in favour of new "-r" option for mfsgetgoal, mfssetgoal,
+    mfsgettrashtime, mfssettrashtime tools.
+  * (tools) mfssnapshot utility replaced by mfsappendchunks (direct descendant
+    of old utility) and mfsmakesnapshot (which creates "real" recursive
+    snapshots and behaves similar to "cp -r").
+  * (tools) New mfsfilerepair utility, which allows partial recovery of file
+    with some missing or broken chunks.
+  * (cgi) First public version of CGI scripts allowing to monitor MFS
+    installation from WWW browser.
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 01 Jul 2009 13:00:00 +0200
+
+moosefs (1.5.12) unstable; urgency=medium
+
+  * Fixed CRC cache in chunkserver
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 28 Jan 2009 12:00:00 +0100
+
+moosefs (1.5.11) unstable; urgency=medium
+
+  * Added CRC-block and file descriptor cache in chunkserver.
+  * Removed compilation warnings on 64-bit machines.
+  * Optimized chunkserver choice in mfsmount.
+  * Better replication algorithm.
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 18 Dec 2008 12:00:00 +0100
+
+moosefs (1.5.10) unstable; urgency=medium
+
+  * Fixed replication algorithm.
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 03 Dec 2008 12:00:00 +0100
+
+moosefs (1.5.9) unstable; urgency=medium
+
+  * Improved rebalancing algorithm.
+  * Protections against overriding metadata.mfs.back by older metadata.mfs.
+  * Fixes to build mfstools, mfsmaster and mfsmetarestore with Large File
+    Support on Linux (previously only mfsmount had LFS enabled).
+  * Less verbose logging in mfsmaster.
+  * Log chunkserver disconnections in mfsmaster.
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 19 Nov 2008 12:00:00 +0100
+
+moosefs (1.5.8) unstable; urgency=medium
+
+  * Better memory allocation in Master's chunks module.
+  * Syslog messages used only for debugging purposes were commented out.
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 26 Aug 2008 13:00:00 +0200
+
+moosefs (1.5.7) unstable; urgency=medium
+
+  * Fix for stack buffer overrun (by 4 bytes) in mfsmount.
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 01 Aug 2008 13:00:00 +0200
+
+moosefs (1.5.6) unstable; urgency=medium
+
+  * Memory allocation fix in mfsmaster.
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 25 Jul 2008 13:00:00 +0200
+
+moosefs (1.5.5) unstable; urgency=medium
+
+  * Mounting options fix for FreeBSD in mfsmount.
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 10 Jul 2008 13:00:00 +0200
+
+moosefs (1.5.4) unstable; urgency=medium
+
+  * Blocking rebalance replications when undergoal chunks exist.
+  * Minor bugfixes.
+  * Build system improvements.
+  * MooseFS and mfsmount version numbers synchronized.
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 08 Jul 2008 13:00:00 +0200
+
+moosefs (1.5) unstable; urgency=medium
+
+  * First version released as Open Source.
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 30 May 2008 13:00:00 +0200
+

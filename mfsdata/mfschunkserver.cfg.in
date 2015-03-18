@@ -1,0 +1,80 @@
+###############################################
+# RUNTIME OPTIONS                             #
+###############################################
+
+# user to run daemon as (default is @DEFAULT_USER@)
+# WORKING_USER = @DEFAULT_USER@
+
+# group to run daemon as (optional - if empty then default user group will be used)
+# WORKING_GROUP = @DEFAULT_GROUP@
+
+# name of process to place in syslog messages (default is mfschunkserver)
+# SYSLOG_IDENT = mfschunkserver
+
+# whether to perform mlockall() to avoid swapping out mfschunkserver process (default is 0, i.e. no)
+# LOCK_MEMORY = 0
+
+# nice level to run daemon with (default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with)
+# NICE_LEVEL = -19
+
+# set default umask for group and others (user has always 0, default is 027 - block write for group and block all for others)
+# FILE_UMASK = 027
+
+# where to store daemon lock file (default is @DATA_PATH@)
+# DATA_PATH = @DATA_PATH@
+
+# alternate location/name of mfshdd.cfg file (default is @ETC_PATH@/mfs/mfshdd.cfg)
+# HDD_CONF_FILENAME = @ETC_PATH@/mfs/mfshdd.cfg
+
+# chunk test period in seconds (default is 10)
+# HDD_TEST_FREQ = 10
+
+# how much space should be left unused on each hard drive (default: 256MiB)
+# number format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B?
+# examples: 0.5GB ; .5G ; 2.56GiB ; 1256M etc.
+# HDD_LEAVE_SPACE_DEFAULT = 256MiB
+
+# percent of total work time the chunkserver is allowed to spend on hdd space rebalancing
+# HDD_REBALANCE_UTILIZATION = 20
+
+# how many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged
+# HDD_ERROR_TOLERANCE_COUNT = 2
+# HDD_ERROR_TOLERANCE_PERIOD = 600
+
+# enables/disables fsync before chunk closing
+# HDD_FSYNC_BEFORE_CLOSE = 0
+
+# maximum number of active workers and maximum number of idle workers
+# WORKERS_MAX = 150
+# WORKERS_MAX_IDLE = 40
+
+###############################################
+# MASTER CONNECTION OPTIONS                   #
+###############################################
+
+# local address to use for master connections (default is *, i.e. default local address)
+# BIND_HOST = *
+
+# MooseFS master host, IP is allowed only in single-master installations (default is @DEFAULT_MASTERNAME@)
+# MASTER_HOST = @DEFAULT_MASTERNAME@
+
+# MooseFS master command port (default is @DEFAULT_MASTER_CS_PORT@)
+# MASTER_PORT = @DEFAULT_MASTER_CS_PORT@
+
+
+# timeout in seconds for master connections (default is 10)
+# MASTER_TIMEOUT = 10
+
+# delay in seconds before next try to reconnect to master if not connected (default is 5)
+# MASTER_RECONNECTION_DELAY = 5
+
+###############################################
+# CLIENTS CONNECTION OPTIONS                  #
+###############################################
+
+# IP address to listen for client (mount) connections (* means any)
+# CSSERV_LISTEN_HOST = *
+
+# port to listen for client (mount) connections (default is @DEFAULT_CS_DATA_PORT@)
+# CSSERV_LISTEN_PORT = @DEFAULT_CS_DATA_PORT@
+

@@ -1,0 +1,60 @@
+.TH mfstopology.cfg "5" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfstopology.cfg \- MooseFS network topology definitions
+.SH DESCRIPTION
+The file \fBmfstopology.cfg\fP contains assignments of IP addresses into 
+network locations (usually switch numbers). This file is optional. If your
+network has one switch or decreasing traffic between switches is not necessary
+then leave this file empty.
+.SH SYNTAX
+.PP
+Syntax is:
+.TP
+\fIADDRESS\fP \fISWITCH-NUMBER\fP
+.PP
+Lines starting with \fB#\fP character are ignored as comments.
+.PP
+\fIADDRESS\fP can be specified in several forms:
+.PP
+.nf
+.ta +2i
+\fB*\fP	all addresses
+\fBn.n.n.n\fP	single IP address
+\fBn.n.n.n/b\fP	IP class specified by network address and bits number
+\fBn.n.n.n/m.m.m.m\fP	IP class specified by network address and mask
+\fBf.f.f.f-t.t.t.t\fP	IP range specified by from-to addresses (inclusive)
+.fi
+.PP
+\fISWITCH-NUMBER\fP can be specified as any positive 32-bit numer.
+.SH NOTES
+If one IP belongs to more than one definition then last definition is used.
+.PP
+As for now distance between switches is constant. So distance between machines
+is calculated as: \fB0\fP when IP numbers are the same, \fB1\fP when IP numbers
+are different, but switch numbers are the same and \fB2\fP when switch numbers
+are different
+.PP
+Distances are used only to sort chunkservers during read and write operations.
+New chunks are still created randomly. Also rebalance routines do not take
+distances into account.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfsmaster.cfg (5)

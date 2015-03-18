@@ -1,0 +1,8 @@
+# /etc/default/moosefs-chunkserver
+
+# Start moosefs-chunkserver from init.d script on boot.
+#   Only allowed values are "true" and "false".
+#   Undefined values default to "false".
+MFSCHUNKSERVER_ENABLE=false
+
+DAEMON_OPTS=""

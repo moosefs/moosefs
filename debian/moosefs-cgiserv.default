@@ -1,0 +1,12 @@
+# /etc/default/moosefs-cgiserv
+
+# Start mfscgiserv from init.d script on boot.
+#   Only allowed values are "true" and "false".
+#   Undefined values default to "false".
+MFSCGISERV_ENABLE=false
+
+# user and group used to run mfscgiserv
+MFSCGISERV_USER=nobody
+MFSCGISERV_GROUP=nogroup
+
+DAEMON_OPTS=""

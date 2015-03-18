@@ -1,0 +1,12 @@
+************************************************************************
+
+A startup script has been installed as:
+
+%%PREFIX%%/etc/rc.d/mfscgiserv
+
+Use it to start/stop the mfscgiserv service after you have added
+the following line to your rc.conf file:
+
+mfscgiserv_enable="YES"
+
+************************************************************************

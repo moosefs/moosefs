@@ -1,0 +1,116 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:		moosefs-master
+# Required-Start:	$network $remote_fs
+# Required-Stop:	$remote_fs
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	Start moosefs-master at boot time
+# Description:		moosefs-master provides metadata management for MooseFS.
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/sbin/mfsmaster
+NAME=moosefs-master
+DEFAULT_USER=mfs
+DEFAULT_GROUP=mfs
+DEFAULT_DATADIR=/var/lib/mfs
+DEFAULT_CFG=/etc/mfs/mfsmaster.cfg
+COMPAT_CFG=/etc/mfsmaster.cfg
+
+test -e $DAEMON || exit 0
+
+# Include moosefs-master defaults if available
+. /lib/lsb/init-functions
+MFSMASTER_ENABLE=false
+MFSMASTER_DEFAULTS_FILE=/etc/default/moosefs-master
+MFSMASTER_CONFIG_FILE=
+if [ -s "$MFSMASTER_DEFAULTS_FILE" ]; then
+    . "$MFSMASTER_DEFAULTS_FILE"
+    case "x$MFSMASTER_ENABLE" in
+        xtrue) ;;
+        xfalse)
+	    log_warning_msg "$NAME not enabled in \"$MFSMASTER_DEFAULTS_FILE\", exiting..."
+	    exit 0
+	    ;;
+        *)
+            log_failure_msg "value of MFSMASTER_ENABLE must be either 'true' or 'false';"
+            log_failure_msg "not starting ${NAME}."
+            exit 1
+            ;;
+    esac
+fi
+
+set -e
+
+if [ -n "$MFSMASTER_CONFIG_FILE" ]; then
+	CFGFILE="$MFSMASTER_CONFIG_FILE"
+elif [ -f "$DEFAULT_CFG" -o ! -f "$COMPAT_CFG" ]; then
+	CFGFILE="$DEFAULT_CFG"
+else
+	CFGFILE="$COMPAT_CFG"
+fi
+if [ -s "$CFGFILE" ]; then
+	DATADIR=$(sed -e 's/[ 	]#.*$//' -n -e 's/^DATA_PATH[ 	]*=[ 	]*\([^ 	]*\)[ 	]*$/\1/p' "$CFGFILE")
+	MFSUSER=$(sed -e 's/[ 	]#.*$//' -n -e 's/^WORKING_USER[ 	]*=[ 	]*\([^ 	]*\)[ 	]*$/\1/p' "$CFGFILE")
+	MFSGROUP=$(sed -e 's/[ 	]#.*$//' -n -e 's/^WORKING_GROUP[ 	]*=[ 	]*\([^ 	]*\)[ 	]*$/\1/p' "$CFGFILE")
+else
+	DATADIR=
+	MFSUSER=
+	MFSGROUP=
+fi
+: ${DATADIR:=$DEFAULT_DATADIR}
+: ${MFSUSER:=$DEFAULT_USER}
+: ${MFSGROUP:=$DEFAULT_GROUP}
+
+check_dirs()
+{
+	# check that the metadata dir exists
+	if [ ! -d "$DATADIR" ]; then
+		mkdir "$DATADIR"
+	fi
+	chmod 0755 "$DATADIR"
+	chown -R $MFSUSER:$MFSGROUP "$DATADIR"
+	if [ ! -e "$DATADIR"/metadata.mfs ]; then
+		if [ ! -e "$DATADIR"/metadata.mfs.back ]; then
+			echo "MFSM NEW" > "$DATADIR"/metadata.mfs
+		fi
+	fi
+}
+
+case "$1" in
+	start)
+		check_dirs
+		echo "Starting ${NAME}:"
+		$DAEMON ${MFSMASTER_CONFIG_FILE:+-c $MFSMASTER_CONFIG_FILE} start
+		;;
+
+	stop)
+		echo "Stopping ${NAME}:"
+		$DAEMON ${MFSMASTER_CONFIG_FILE:+-c $MFSMASTER_CONFIG_FILE} stop
+		;;
+
+	reload|force-reload)
+		echo "Reloading ${NAME}:"
+		$DAEMON ${MFSMASTER_CONFIG_FILE:+-c $MFSMASTER_CONFIG_FILE} reload
+		;;
+
+	restart)
+		check_dirs
+		echo "Restarting ${NAME}:"
+		$DAEMON ${MFSMASTER_CONFIG_FILE:+-c $MFSMASTER_CONFIG_FILE} restart
+		;;
+
+	status)
+		$DAEMON ${MFSMASTER_CONFIG_FILE:+-c $MFSMASTER_CONFIG_FILE} test 2> /dev/null
+		;;
+
+	*)
+		N=/etc/init.d/$NAME
+		echo "Usage: $N {start|stop|restart|reload|force-reload|status}" >&2
+		exit 1
+		;;
+esac
+
+exit 0

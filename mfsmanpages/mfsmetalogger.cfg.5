@@ -1,0 +1,81 @@
+.TH mfsmetalogger.cfg "5" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfsmetalogger.cfg \- configuration file for \fBmfsmetalogger\fP
+.SH DESCRIPTION
+The file \fBmfsmetalogger.cfg\fP contains configuration of MooseFS
+metalogger process.
+.SH SYNTAX
+.PP
+Syntax is:
+.TP
+\fIOPTION\fP \fB=\fP \fIVALUE\fP
+.PP
+Lines starting with \fB#\fP character are ignored as comments.
+.SH OPTIONS
+Configuration options:
+.TP
+\fBDATA_PATH\fP
+where to store metadata files
+.TP
+\fBLOCK_FILE\fP
+(deprecated)
+daemon lock/pid file
+.TP
+\fBWORKING_USER\fP
+user to run daemon as
+.TP
+\fBWORKING_GROUP\fP
+group to run daemon as (optional - if empty then default user group will be used)
+.TP
+\fBSYSLOG_IDENT\fP
+name of process to place in syslog messages (default is mfsmetalogger)
+.TP
+\fBLOCK_MEMORY\fP
+whether to perform mlockall() to avoid swapping out mfsmetalogger process (default is 0, i.e. no)
+.TP
+\fBNICE_LEVEL\fP
+nice level to run daemon with (default is -19 if possible; note: process must be started as root to increase priority)
+.TP
+\fBBACK_LOGS\fP
+number of metadata change log files (default is 50)
+.TP
+\fBBACK_META_KEEP_PREVIOUS\fP
+number of previous metadata files to be kept (default is 3)
+.TP
+\fBMETA_DOWNLOAD_FREQ\fP
+metadata download frequency in hours (default is 24, at most \fBBACK_LOGS\fP/2)
+.TP
+\fBBIND_HOST\fP
+local address to use for master connections; default is *, i.e. default local address
+.TP
+\fBMASTER_HOST\fP
+address of MooseFS master host to connect with (default is mfsmaster)
+.TP
+\fBMASTER_PORT\fP
+number of MooseFS master port to connect with (default is 9420)
+.TP
+\fBMASTER_RECONNECTION_DELAY\fP
+delay in seconds before trying to reconnect to master after disconnection (default is 30)
+.TP
+\fBMASTER_TIMEOUT\fP
+timeout (in seconds) for master connections (default is 60)
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR mfsmetalogger (8)

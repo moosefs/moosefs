@@ -1,0 +1,1 @@
+ MooseFS CGI monitor.

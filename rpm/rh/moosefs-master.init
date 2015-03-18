@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# Init file for the MooseFS master service
+#
+# chkconfig: - 92 84
+#
+# description: MooseFS master
+#
+# processname: mfsmaster
+# config: @sysconfdir@/mfsmaster.cfg
+
+# Source function library.
+. @initddir@/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Source initialization configuration.
+[ -r "/etc/sysconfig/mfsmaster" ] && . /etc/sysconfig/mfsmaster
+
+# Check that networking is up.
+[ "${NETWORKING}" == "no" ] && exit 0
+[ -x "@sbindir@/mfsmaster" ] || exit 1
+[ -r "@sysconfdir@/mfs/mfsexports.cfg" -o -r "@sysconfdir@/mfsexports.cfg" ] || exit 1
+
+RETVAL=0
+prog="mfsmaster"
+
+start () {
+    echo -n $"Starting $prog: "
+    $prog start >/dev/null 2>&1 && success || failure
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
+    return $RETVAL
+}
+
+stop () {
+    echo -n $"Stopping $prog: "
+    $prog stop >/dev/null 2>&1 && success || failure
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/$prog
+    return $RETVAL
+}
+
+reload () {
+    echo -n $"Reloading $prog: "
+    $prog reload >/dev/null 2>&1 && success || failure
+    RETVAL=$?
+    echo
+    return $RETVAL
+}
+
+restart () {
+    stop
+    start
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    restart
+    ;;
+  condrestart|try-restart)
+    [ -e /var/lock/subsys/$prog ] && restart
+    RETVAL=$?
+    ;;
+  reload|force-reload)
+    reload
+    RETVAL=$?
+    ;;
+  status)
+    status $prog
+    RETVAL=$?
+    ;;
+  *)
+    echo $"Usage: $0 {start|stop|reload|force-reload|restart|try-restart|condrestart|status}"
+    RETVAL=1
+esac
+
+exit $RETVAL

@@ -1,0 +1,10 @@
+@unexec if cmp -s %D/etc/mfs/mfsmetalogger.cfg.dist %D/etc/mfs/mfsmetalogger.cfg; then rm -f %D/etc/mfs/mfsmetalogger.cfg; fi
+etc/mfs/mfsmetalogger.cfg.dist
+sbin/mfsmetalogger
+man/man5/mfsmetalogger.cfg.5.gz
+man/man8/mfsmetalogger.8.gz
+@exec  if [ ! -f %D/etc/mfs/mfsmetalogger.cfg ]; then /bin/cp %D/etc/mfs/mfsmetalogger.cfg.dist %D/etc/mfs/mfsmetalogger.cfg; fi
+@exec mkdir -p %%MFS_WORKDIR%%/mfs
+@exec chown mfs:mfs %%MFS_WORKDIR%%/mfs
+@dirrm %%MFS_WORKDIR%%/mfs
+@dirrmtry etc/mfs

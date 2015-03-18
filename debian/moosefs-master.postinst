@@ -1,0 +1,32 @@
+#!/bin/sh
+
+set -e
+
+case "${1}" in
+	configure)
+		if ! getent passwd mfs > /dev/null 2>&1
+		then
+			mkdir -p /var/lib/mfs
+			chmod 0755 /var/lib/mfs
+			adduser --quiet --system --group --no-create-home --home /var/lib/mfs mfs
+			chown -R mfs:mfs /var/lib/mfs
+		fi
+		if [ ! -f /var/lib/mfs/metadata.mfs -a ! -f /var/lib/mfs/metadata.mfs.back -a -f /var/lib/mfs/metadata.mfs.empty ]; then
+			cp /var/lib/mfs/metadata.mfs.empty /var/lib/mfs/metadata.mfs
+			chown -R mfs:mfs /var/lib/mfs
+		fi
+		;;
+
+	abort-upgrade|abort-remove|abort-deconfigure)
+
+		;;
+
+	*)
+		echo "postinst called with unknown argument \`${1}'" >&2
+		exit 1
+		;;
+esac
+
+#DEBHELPER#
+
+exit 0

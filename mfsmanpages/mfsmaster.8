@@ -1,0 +1,114 @@
+.TH mfsmaster "8" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfsmaster \- start, restart or stop Moose File System master process
+.SH SYNOPSIS
+.B mfsmaster
+[\fB\-c\fP \fICFGFILE\fP]
+[\fB\-u\fP]
+[\fB\-i\fP]
+[\fB\-a\fP]
+[\fB\-e\fP]
+[\fB\-x\fP[\fBx\fP]]
+[\fB\-t\fP \fILOCKTIMEOUT\fP]
+[\fIACTION\fP]
+.PP
+.B mfsmaster \-v
+.PP
+.B mfsmaster \-h
+.SH DESCRIPTION
+.PP
+\fBmfsmaster\fP is the master program of Moose File System.
+.SH OPTIONS
+.TP
+\fB\-v\fP
+print version information and exit
+.TP
+\fB\-h\fP
+print usage information and exit
+.TP
+\fB\-c\fP \fICFGFILE\fP
+specify alternative path of configuration file (default is
+\fBmfsmaster.cfg\fP in system configuration directory)
+.TP
+\fB\-u\fP
+log undefined configuration values (when default is assumed)
+.TP
+\fB\-f\fP
+run in foreground, don't daemonize
+.TP
+\fB\-t\fP \fILOCKTIMEOUT\fP
+how long to wait for lockfile (in seconds; default is 1800 seconds)
+.TP
+\fB\-i\fP
+ignore some metadata structure errors
+.TP
+\fB\-a\fP
+automatically restore metadata from change logs
+.TP
+\fB\-e\fP
+start without metadata (usable only in pro version - used to start additional masters)
+.TP
+\fB\-x\fP
+produce more verbose output
+.TP
+\fB\-xx\fP
+even more verbose output
+.TP
+\fIACTION\fP
+is the one of \fBstart\fP, \fBstop\fP, \fBrestart\fP, \fBreload\fP, \fBtest\fP or \fBkill\fP. 
+Default action is \fBrestart\fP. The \fBtest\fP action will yeld one of two responses:
+"mfsmaster pid: PID" or "mfsmaster is not running". The \fBkill\fP
+action will send a SIGKILL to the currently running master 
+process. SIGHUP or \fBreload\fP action forces \fBmfsmaster\fP 
+to reload all configuration files.
+.SH FILES
+.TP
+\fBmfsmaster.cfg\fP
+configuration file for MooseFS master process; refer to \fBmfsmaster.cfg\fP\|(5) manual for defails
+.TP
+\fBmfsexports.cfg\fP
+MooseFS access control file; refer to
+\fBmfsexports.cfg\fP\|(5) manual for defails
+.TP
+\fBmfstopology.cfg\fP
+Network topology definitions; refer to \fBmfstopology.cfg\fP\|(5) manual for defails
+.TP
+.BR .mfsmaster.lock
+lock file of running MooseFS master process
+(created in data directory)
+.TP
+\fBmetadata.mfs\fP, \fBmetadata\.mfs\.back\fP
+MooseFS filesystem metadata image (created in data directory)
+.TP
+\fBchangelog.\fP*\fB.mfs\fP
+MooseFS filesystem metadata change logs (created in data directory; merged into \fBmetadata.mfs\fP once per hour)
+.TP
+\fBdata.stats\fP
+MooseFS master charts state (created in data directory)
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR mfschunkserver (8),
+.BR mfsmount (8),
+.BR mfsmaster.cfg (5),
+.BR mfsexports.cfg (5),
+.BR mfstopology.cfg (5),
+.BR moosefs (7)

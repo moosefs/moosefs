@@ -1,0 +1,13 @@
+[Unit]
+Description=MooseFS CGI server
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=@SBIN_PATH@/mfscgiserv start
+ExecStop=@SBIN_PATH@/mfssgiserv stop
+PIDFile=@DATA_PATH@/.mfscgiserv.lock
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

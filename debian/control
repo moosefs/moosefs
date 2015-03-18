@@ -1,0 +1,65 @@
+Source: moosefs
+Section: admin
+Priority: extra
+Maintainer: MooseFS Team <contact@moosefs.com>
+Build-Depends: debhelper (>= 7.0.15), autotools-dev, libc6-dev, libfuse-dev, pkg-config, zlib1g-dev, libpcap-dev, python (>= 2.5)
+Standards-Version: 3.7.3
+Homepage: http://moosefs.com/
+
+Package: moosefs-master
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: MooseFS master server
+ MooseFS master (metadata) server.
+
+Package: moosefs-metalogger
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: MooseFS metalogger server
+ MooseFS metalogger (metadata replication) server.
+
+
+Package: moosefs-chunkserver
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: MooseFS data server
+ MooseFS data server.
+
+Package: moosefs-client
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: MooseFS client
+ MooseFS clients: mfsmount and mfstools.
+
+Package: moosefs-cli
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.5)
+Description: MooseFS CLI Utility
+ MooseFS CLI utilities.
+
+Package: moosefs-cgi
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.5)
+Description: MooseFS CGI Monitor
+ MooseFS CGI monitor.
+
+Package: moosefs-cgiserv
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, moosefs-cgi
+Description: Simple CGI-capable HTTP server to run MooseFS CGI Monitor
+ Simple CGI-capable HTTP server to run MooseFS CGI monitor.
+
+Package: moosefs-netdump
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: MooseFS network packet dump utility
+ MooseFS network packet dump utility
+
+Package: moosefs-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: MooseFS debug binaries
+ MooseFS binaries with debuging symbols.
+

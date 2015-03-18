@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# Init file for the MooseFS chunkserver service
+#
+# chkconfig: - 93 83
+#
+# description: MooseFS chunkserver
+#
+# processname: mfschunkserver
+# config: @sysconfdir@/mfschunkserver.cfg
+
+# Source function library.
+. @initddir@/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Source initialization configuration.
+[ -r "/etc/sysconfig/mfschunkserver" ] && . /etc/sysconfig/mfschunkserver
+
+# Check that networking is up.
+[ "${NETWORKING}" == "no" ] && exit 0
+[ -x "@sbindir@/mfschunkserver" ] || exit 1
+[ -r "@sysconfdir@/mfs/mfshdd.cfg" -o -r "@sysconfdir@/mfshdd.cfg" ] || exit 1
+
+RETVAL=0
+prog="mfschunkserver"
+
+start () {
+    echo -n $"Starting $prog: "
+    $prog start >/dev/null 2>&1 && success || failure
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
+    return $RETVAL
+}
+
+stop () {
+    echo -n $"Stopping $prog: "
+    $prog stop >/dev/null 2>&1 && success || failure
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/$prog
+    return $RETVAL
+}
+
+reload () {
+    echo -n $"Reloading $prog: "
+    $prog reload >/dev/null 2>&1 && success || failure
+    RETVAL=$?
+    echo
+    return $RETVAL
+}
+
+restart () {
+    stop
+    start
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    restart
+    ;;
+  condrestart|try-restart)
+    [ -e /var/lock/subsys/$prog ] && restart
+    RETVAL=$?
+    ;;
+  reload|force-reload)
+    reload
+    RETVAL=$?
+    ;;
+  status)
+    status $prog
+    RETVAL=$?
+    ;;
+  *)
+    echo $"Usage: $0 {start|stop|reload|force-reload|restart|try-restart|condrestart|status}"
+    RETVAL=1
+esac
+
+exit $RETVAL

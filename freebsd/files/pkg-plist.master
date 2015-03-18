@@ -1,0 +1,23 @@
+@unexec if cmp -s %D/etc/mfs/mfsmaster.cfg.dist %D/etc/mfs/mfsmaster.cfg; then rm -f %D/etc/mfs/mfsmaster.cfg; fi
+@unexec if cmp -s %D/etc/mfs/mfsexports.cfg.dist %D/etc/mfs/mfsexports.cfg; then rm -f %D/etc/mfs/mfsexports.cfg; fi
+@unexec if cmp -s %D/etc/mfs/mfstopology.cfg.dist %D/etc/mfs/mfstopology.cfg; then rm -f %D/etc/mfs/mfstopology.cfg; fi
+etc/mfs/mfsmaster.cfg.dist
+etc/mfs/mfsexports.cfg.dist
+etc/mfs/mfstopology.cfg.dist
+sbin/mfsmaster
+sbin/mfsmetadump
+sbin/mfsmetarestore
+man/man5/mfsexports.cfg.5.gz
+man/man5/mfsmaster.cfg.5.gz
+man/man5/mfstopology.cfg.5.gz
+man/man8/mfsmaster.8.gz
+man/man8/mfsmetarestore.8.gz
+@exec mkdir -p %%MFS_WORKDIR%%/mfs
+%%MFS_WORKDIR%%/mfs/metadata.mfs.empty
+@exec chown mfs:mfs %%MFS_WORKDIR%%/mfs
+@exec chown mfs:mfs %%MFS_WORKDIR%%/mfs/metadata.mfs.empty
+@exec  if [ ! -f %D/etc/mfs/mfsmaster.cfg ]; then /bin/cp %D/etc/mfs/mfsmaster.cfg.dist %D/etc/mfs/mfsmaster.cfg; fi
+@exec  if [ ! -f %D/etc/mfs/mfsexports.cfg ]; then /bin/cp %D/etc/mfs/mfsexports.cfg.dist %D/etc/mfs/mfsexports.cfg; fi
+@exec  if [ ! -f %D/etc/mfs/mfstopology.cfg ]; then /bin/cp %D/etc/mfs/mfstopology.cfg.dist %D/etc/mfs/mfstopology.cfg; fi
+@dirrm %%MFS_WORKDIR%%/mfs
+@dirrmtry etc/mfs

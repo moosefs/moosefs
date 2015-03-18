@@ -1,0 +1,16 @@
+# The optional mfsmount.cfg file can be used to specify defaults for mfsmount.
+# Default mount options can be specified on one line separated by commas or
+# over several lines.
+#
+# Examples:
+#
+# nosuid,nodev
+# mfsmaster=@DEFAULT_MASTERNAME@
+# mfspassword=secret
+#
+# The default mount point can also be set. The default mount point must begin 
+# with a "/" and be a fully qualified path.
+#
+# Example:
+#
+# /mnt/mfs

@@ -1,0 +1,192 @@
+.TH mfsmaster.cfg "5" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
+.SH DESCRIPTION
+The file \fBmfsmaster.cfg\fP contains configuration of MooseFS master process.
+.SH SYNTAX
+.PP
+Syntax is:
+.TP
+\fIOPTION\fP \fB=\fP \fIVALUE\fP
+.PP
+Lines starting with \fB#\fP character are ignored as comments.
+.SH OPTIONS
+Configuration options:
+.TP
+\fBWORKING_USER\fP
+user to run daemon as
+.TP
+\fBWORKING_GROUP\fP
+group to run daemon as; optional value - if empty then default user group will be used
+.TP
+\fBSYSLOG_IDENT\fP
+name of process to place in syslog messages; default is mfsmaster
+.TP
+\fBLOCK_MEMORY\fP
+whether to perform mlockall() to avoid swapping out mfsmaster process; default is 0, i.e. no
+.TP
+\fBNICE_LEVEL\fP
+nice level to run daemon with; default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with
+.TP
+\fBFILE_UMASK\fP
+set default umask for group and others (user has always 0); default is 027 - block write for group and block all for others
+.TP
+\fBDATA_PATH\fP
+where to store metadata files and lock file
+.TP
+\fBEXPORTS_FILENAME\fP
+alternate location/name of \fBmfsexports.cfg\fP file
+.TP
+\fBTOPOLOGY_FILENAME\fP
+alternate location/name of \fBmfstopology.cfg\fP file
+.TP
+\fBLICENCE_FILENAME\fP
+alternate location/name of \fBmfslicence.bin\fP file (pro version only)
+.TP
+\fBBACK_LOGS\fP
+number of metadata change log files (default is 50)
+.TP
+\fBMETADATA_DOWNLOAD_FREQ\fP
+how often (in hours) leader will download metadata from followers (pro version only ; default is 24)
+.TP
+\fBBACK_META_KEEP_PREVIOUS\fP
+number of previous metadata files to be kept (default is 1)
+.TP
+\fBCHANGELOG_PRESERVE_SECONDS\fP
+how many seconds of change logs have to be preserved in memory (default is 1800; 
+this sets the minimum, actual number may be a bit bigger due to logs being kept 
+in 5k blocks; zero disables extra logs storage)
+.TP
+\fBMATOML_LISTEN_HOST\fP
+IP address to listen on for metalogger, masters and supervisors connections (* means any)
+.TP
+\fBMATOML_LISTEN_PORT\fP
+port to listen on for metalogger, masters and supervisors connections
+.TP
+\fBMASTER_RECONNECTION_DELAY\fP
+delay in seconds before next try to reconnect to master-leader if not connected (pro version only ; default is 5)
+.TP
+\fBMASTER_TIMEOUT\fP
+timeout in seconds for master-leader connections (pro version only ; default is 10)
+.TP
+\fBBIND_HOST\fP
+local address to use for connecting with master-leader (pro version only ; default is *, i.e. default local address)
+.TP
+\fBMATOCS_LISTEN_HOST\fP
+IP address to listen on for chunkserver connections (\fB*\fP means any)
+.TP
+\fBMATOCS_LISTEN_PORT\fP
+port to listen on for chunkserver connections
+.TP
+\fBMATOCS_TIMEOUT\fP
+default timeout in seconds for master-chunkserver connection (default is 10)
+.TP
+\fBREPLICATIONS_DELAY_INIT\fP
+initial delay in seconds before starting replications (default is 300)
+.TP
+\fBCHUNKS_LOOP_MAX_CPS\fP
+Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)
+.TP
+\fBCHUNKS_LOOP_MIN_TIME\fP
+Chunks loop shouldn't be done in less seconds than given number (default is 300)
+.TP
+\fBCHUNKS_SOFT_DEL_LIMIT\fP
+Soft maximum number of chunks to delete on one chunkserver (default is 10)
+.TP
+\fBCHUNKS_HARD_DEL_LIMIT\fP
+Hard maximum number of chunks to delete on one chunkserver (default is 25)
+.TP
+\fBCHUNKS_WRITE_REP_LIMIT\fP
+Maximum number of chunks to replicate to one chunkserver (default is 2,1,1,4 - see NOTES)
+.TP
+\fBCHUNKS_READ_REP_LIMIT\fP
+Maximum number of chunks to replicate from one chunkserver (default is 10,5,2,5 - see NOTES)
+.TP
+\fBCS_HEAVY_LOAD_THRESHOLD\fP
+Threshold for chunkserver load. (default is 100 - see NOTES)
+.TP
+\fBCS_HEAVY_LOAD_RATIO_THRESHOLD\fP
+Threshold ratio for chunkserver load (default is 5.0 - see NOTES)
+.TP
+\fBCS_HEAVY_LOAD_GRACE_PERIOD\fP
+Defines how long chunkservers will remain in 'grace' mode (default is 900 - see NOTES)
+.TP
+\fBACCEPTABLE_DIFFERENCE\fP
+Maximum difference between space usage of chunkservers (deprecated, use \fBACCEPTABLE_PERCENTAGE_DIFFERENCE\fP instead)
+.TP
+\fBACCEPTABLE_PERCENTAGE_DIFFERENCE\fP
+Maximum percentage difference between space usage of chunkservers (default is 1 = 1%)
+.TP
+\fBPRIORITY_QUEUES_LENGTH\fP
+Length of priority queues (for endangered, undergoal etc. chunks - chunks that should be processed first - default is 1000000)
+.TP
+\fBMATOCL_LISTEN_HOST\fP
+IP address to listen on for client (mount) connections (\fB*\fP means any)
+.TP
+\fBMATOCL_LISTEN_PORT\fP
+port to listen on for client (mount) connections
+.TP
+\fBSESSION_SUSTAIN_TIME\fP
+How long to sustain a disconnected client session (in seconds; default is 86400 = 1 day)
+.TP
+\fBQUOTA_TIME_LIMIT\fP
+Time limit in seconds for soft quota (default is 604800 = 7 days)
+.SH NOTES
+.PP
+Chunks in master are tested in a loop. Speed (or frequency) is regulated by two
+options \fBCHUNKS_LOOP_MIN_TIME\fP and \fBCHUNKS_LOOP_MAX_CPS\fP. First
+defines minimal time between iterations of the loop and second defines 
+maximal number of chunk tests per second. 
+Typically at the beginning, when number of chunks is small, time is
+constant, regulated by \fBCHUNK_LOOP_MIN_TIME\fP, but when number of chunks
+beccomes bigger then time of loop can increase according to
+\fBCHUNKS_LOOP_MAX_CPS\fP.
+.PP
+Example: \fBCHUNKS_LOOP_MIN_TIME\fP is set to 300, \fBCHUNKS_LOOP_MAX_CPS\fP 
+is set to 100000 and there is 1000000 (one million) chunks in the system. 1000000/100000 = 10, 
+which is less than 300, so one loop iteration will take 300 seconds.
+With 1000000000 (one billion) chunks the system needs 10000 seconds for one iteration of the loop.
+.PP
+Deletion limits are defined as 'soft' and 'hard' limit. When number of chunks
+to delete increases from loop to loop, current limit can be temporary
+increased above soft limit, but never above hard limit.
+.PP
+Replication limits are divided into four cases:
+.TP
+.IP \[bu] 2
+first limit is for endangered chunks (chunks with only one copy)
+.TP
+.IP \[bu] 2
+second limit is for undergoal chunks (chunks with number of copies lower than specified goal)
+.TP
+.IP \[bu] 2
+third limit is for rebalance between servers with space usage around arithmetic mean
+.TP
+.IP \[bu] 2
+fourth limit is for rebalance between other servers (very low or very high space usage)
+.PP
+Usually first number should be grater than or equal to second, second greater than or equal to third, and fourth greater than or equal to third ( 1st >= 2nd >= 3rd <= 4th ). If one number is given, then all limits are set to this number (for backward compatibility).
+.PP
+Whenever chunkserver load is higher than \fBCS_HEAVY_LOAD_THRESHOLD\fP  and \fBCS_HEAVY_LOAD_RATIO_THRESHOLD\fP times higher than average load, then chunkserver is switched into 'grace' mode. Chunkserver stays in grace mode for \fBCS_HEAVY_LOAD_GRACE_PERIOD\fP seconds.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfsexports.cfg (5)
+.BR mfstopology.cfg (5)

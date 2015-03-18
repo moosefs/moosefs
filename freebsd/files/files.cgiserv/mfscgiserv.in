@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# PROVIDE: mfscgiserv
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf to enable mfscgiserv:
+#
+# mfscgiserv_enable="YES"
+#
+
+. /etc/rc.subr
+
+name=mfscgiserv
+rcvar=mfscgiserv_enable
+
+command=%%PREFIX%%/sbin/${name}
+pid_file=%%MFS_WORKDIR%%/mfs/.${name}.lock
+procname="python"
+
+stop_cmd="$command stop"
+status_cmd="$command test"
+
+load_rc_config $name
+
+# set defaults
+: ${mfscgiserv_enable="NO"}
+
+run_rc_command "$1"

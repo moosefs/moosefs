@@ -1,0 +1,215 @@
+.TH mfsmount "8" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfsmount \- mount Moose File System
+.SH SYNOPSIS
+.B mfsmount
+\fImountpoint\fP
+[\fB\-d\fP]
+[\fB\-f\fP]
+[\fB\-s\fP]
+[\fB\-m\fP]
+[\fB\-n\fP]
+[\fB\-p\fP]
+[\fB\-H\fP \fIHOST\fP]
+[\fB\-P\fP \fIPORT\fP]
+[\fB\-S\fP \fIPATH\fP]
+[\fB\-o\fP \fIopt\fP[,\fIopt\fP]...]
+.PP
+.B mfsmount
+\fB\-h\fP|\fB\-\-help\fP
+.PP
+.B mfsmount
+\fB\-V\fP|\fB\-\-version\fP
+.SH DESCRIPTION
+.PP
+Mount Moose File System.
+.PP
+General options:
+.TP
+\fB\-h\fP, \fB\-\-help
+display help and exit
+.TP
+\fB\-V\fP
+display version information and exit
+.PP
+FUSE options:
+.TP
+\fB\-d\fP, \fB-o debug\fP
+enable debug mode (implies \fB\-f\fP)
+.TP
+\fB\-f\fP
+foreground operation
+.TP
+\fB\-s\fP
+disable multi-threaded operation
+.PP
+MooseFS options:
+.TP
+\fB\-c\fP \fICFGFILE\fP, \fB\-o mfscfgfile=\fP\fICFGFILE\fP
+loads file with additional mount options
+.TP
+\fB\-m\fP, \fB\-\-meta\fP, \fB\-o mfsmeta\fP
+mount MFSMETA companion filesystem instead of primary MooseFS
+.TP
+\fB\-n\fP
+omit default mount options (\fB-o allow_other,default_permissions\fP)
+.TP
+\fB\-p\fP
+prompt for password (interactive version of \fB\-o mfspassword=\fP\fIPASS\fP)
+.TP
+\fB\-H\fP \fIHOST\fP, \fB\-o mfsmaster=\fP\fIHOST\fP
+connect with MooseFS master on \fIHOST\fP (default is mfsmaster)
+.TP
+\fB\-P\fP \fIPORT\fP, \fB\-o mfsport=\fP\fIPORT\fP
+connect with MooseFS master on \fIPORT\fP (default is 9421)
+.TP
+\fB\-B\fP \fIIP\fP, \fB\-o mfsbind=\fP\fIIP\fP
+local address to use for connecting with master instead of default one
+.TP
+\fB\-L\fP \fIIP\fP, \fB\-o mfsproxy=\fP\fIIP\fP
+define listen ip address of local master proxy for communication with tools (default: 127.0.0.1)
+.TP
+\fB\-S\fP \fIPATH\fP, \fB-o mfssubfolder=\fP\fIPATH\fP
+mount specified MooseFS directory (default is /, i.e. whole filesystem)
+.TP
+\fB\-o mfspassword=\fP\fIPASSWORD\fP
+authenticate to MooseFS master with \fIPASSWORD\fP
+.TP
+\fB\-o mfsmd5pass=\fP\fIMD5\fP
+authenticate to MooseFS master using directly given \fIMD5\fP (only if
+\fBmfspassword\fP option is not specified)
+.TP
+\fB\-o mfsdonotrememberpassword\fP
+do not remember password in memory - more secure, but when session is lost then new session is created without password
+.TP
+\fB\-o mfsdebug\fP
+print some MooseFS-specific debugging information
+.TP
+\fB\-o mfsdelayedinit\fP
+connection with master is done in background - with this option mount can be run without network (good for being run from fstab / init scripts etc.)
+.TP
+\fB\-o mfsmkdircopysgid=\fP\fIN\fP
+sgid bit should be copied during mkdir operation (default depends on operating system)
+.TP
+\fB\-o mfssugidclearmode=\fP\fISMODE\fP
+set sugid clear mode (see \fBSUGID CLEAR MODES\fP; default depends on operating system)
+.TP
+\fB\-o mfscachemode=\fP\fICMODE\fP
+set cache mode (see \fBDATA CACHE MODES\fP; default is AUTO)
+.TP
+\fB\-o mfscachefiles\fP
+(deprecated) preserve file data in cache (equivalent to '\fB\-o mfscachemode=YES\fP')
+.TP
+\fB\-o mfsattrcacheto=\fP\fISEC\fP
+set attributes cache timeout in seconds (default: 1.0)
+.TP
+\fB\-o mfsxattrcacheto=\fP\fISEC\fP
+set extended attributes (xattr) cache timeout in seconds (default: 30.0)
+.TP
+\fB\-o mfsentrycacheto=\fP\fISEC\fP
+set file entry cache timeout in seconds (default: 0.0, i.e. no cache)
+.TP
+\fB\-o mfsdirentrycacheto=\fP\fISEC\fP
+set directory entry cache timeout in seconds (default: 1.0)
+.TP
+\fB\-o mfsnegentrycacheto=\fP\fISEC\fP
+set negative entry cache timeout in seconds (default: 1.0)
+.TP
+\fB\-o mfsgroupscacheto=\fP\fISEC\fP
+set supplementary groups cache timeout in seconds (default: 300.0)
+.TP
+\fB\-o mfsrlimitnofile=\fP\fIN\fP
+try to change limit of simultaneously opened file descriptors on startup
+(default: 100000)
+.TP
+\fB\-o mfsnice=\fP\fILEVEL\fP
+try to change nice level to specified value on startup (default: -19)
+.TP
+\fB\-o mfswritecachesize=\fP\fIN\fP
+specify write cache size in MiB (in range: 16..2048 - default: 250)
+.TP
+\fB\-o mfsreadaheadsize=\fP\fIN\fP
+define size of all read ahead buffers in MiB (default: 128)
+.TP
+\fB\-o mfsreadaheadleng=\fP\fIN\fP
+define amount of bytes to be additionaly read (default: 1048576)
+.TP
+\fB\-o mfsreadaheadtrigger=\fP\fIN\fP
+define amount of bytes read sequentially that turns on read ahead (default: 10 * \fBmfsreadaheadleng\fP)
+.TP
+\fB\-o mfsioretries=\fP\fIN\fP
+specify number of retiries before I/O error is returned (default: 30)
+.PP
+General mount options (see \fBmount\fP\|(8) manual):
+.TP
+\fB\-o rw\fP|\fB-o ro\fP
+Mount file-system in read-write (default) or read-only mode respectively.
+.TP
+\fB\-o suid\fP|\fB-o nosuid\fP
+Enable or disable suid/sgid attributes to work.
+.TP
+\fB\-o dev\fP|\fB-o nodev\fP
+Enable or disable character or block special device files interpretation.
+.TP
+\fB\-o exec\fP|\fB-o noexec\fP
+Allow or disallow execution of binaries.
+.SH SUGID CLEAR MODE
+During attribute change file systems sometimes clear flags suid and/or sgid.
+Behavior is different on different file systems.
+MFS tries to mimic behavior of most popular file system on given operating systems.
+.TP
+\fBNEVER\fP
+MFS will not change suid and sgid bit on chown
+.TP
+\fBALWAYS\fP
+clear suid and sgid on every chown - safest operation
+.TP
+\fBOSX\fP
+standard behavior in OS X and Solaris (chown made by unprivileged user clear suid and sgid)
+.TP
+\fBBSD\fP
+standard behavior in *BSD systems (like in OSX, but only when something is really changed)
+.TP
+\fBEXT\fP
+standard behavior in most file systems on Linux (directories not changed, others: suid cleared always, sgid only when group exec bit is set)
+.TP
+\fBXFS\fP
+standard behavior in XFS on Linux (like EXT but directories are changed by unprivileged users)
+.SH DATA CACHE MODES
+There are three cache modes: \fBNO\fP, \fBYES\fP and \fBAUTO\fP. Default option
+is \fBAUTO\fP and you shuldn't change it unless you really know what you are
+doing. In \fBAUTO\fP mode data cache is managed automatically by mfsmaster.
+.TP
+\fBNO\fP,\fBNONE\fP or \fBNEVER\fP
+never allow files data to be kept in cache (safest but can reduce efficiency)
+.TP
+\fBYES\fP or \fBALWAYS\fP
+always allow files data to be kept in cache (dangerous)
+.TP
+\fBAUTO\fP
+file cache is managed by mfsmaster automatically (should be very safe and efficient)
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfstools (1),
+.BR moosefs (7),
+.BR mount (8)

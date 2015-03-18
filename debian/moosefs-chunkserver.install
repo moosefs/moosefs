@@ -1,0 +1,7 @@
+etc/mfs/mfschunkserver.cfg.dist
+etc/mfs/mfshdd.cfg.dist
+usr/sbin/mfschunkserver
+usr/sbin/mfschunktool
+usr/share/man/man5/mfschunkserver.cfg.5
+usr/share/man/man5/mfshdd.cfg.5
+usr/share/man/man8/mfschunkserver.8

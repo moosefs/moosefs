@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Init file for the MooseFS CGI monitor service
+#
+# chkconfig: - 93 83
+#
+# description: MooseFS CGI server
+#
+# processname: mfscgiserv
+
+# Source function library.
+. @initddir@/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Source initialization configuration.
+[ -r "/etc/sysconfig/mfscgiserv" ] && . /etc/sysconfig/mfscgiserv
+
+# Check that networking is up.
+[ "${NETWORKING}" == "no" ] && exit 0
+[ -x "@sbindir@/mfscgiserv" ] || exit 1
+
+RETVAL=0
+prog="mfscgiserv"
+
+start () {
+    echo -n $"Starting $prog: "
+    $prog start >/dev/null 2>&1 && success || failure
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
+    return $RETVAL
+}
+
+stop () {
+    echo -n $"Stopping $prog: "
+    $prog stop >/dev/null 2>&1 && success || failure
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/$prog
+    return $RETVAL
+}
+
+restart () {
+    stop
+    start
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart|reload)
+    restart
+    ;;
+  condrestart)
+    [ -e /var/lock/subsys/$prog ] && restart
+    RETVAL=$?
+    ;;
+  status)
+    status $prog
+    RETVAL=$?
+    ;;
+  *)
+    echo $"Usage: $0 {start|stop|restart|condrestart|status}"
+    RETVAL=1
+esac
+
+exit $RETVAL

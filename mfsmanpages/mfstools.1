@@ -1,0 +1,251 @@
+.TH mfstools "1" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfstools \- perform MooseFS\-specific operations
+.SH SYNOPSIS
+.B mfsgetgoal
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfsrgetgoal
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfssetgoal
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB+\fP|\fB-\fP]N \fIOBJECT\fP...
+.PP
+.B mfsrsetgoal
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB+\fP|\fB-\fP]N \fIOBJECT\fP...
+.PP
+.B mfsgettrashtime
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfsrgettrashtime
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfssettrashtime
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB+\fP|\fB-\fP]SECONDS \fIOBJECT\fP...
+.PP
+.B mfsrsettrashtime
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB+\fP|\fB-\fP]SECONDS \fIOBJECT\fP...
+.PP
+.B mfsgeteattr
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfsseteattr
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fB-f\fP \fIATTRNAME\fP [\fB-f\fP \fIATTRNAME\fP ...] \fIOBJECT\fP...
+.PP
+.B mfsdeleattr
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fB-f\fP \fIATTRNAME\fP [\fB-f\fP \fIATTRNAME\fP ...] \fIOBJECT\fP...
+.PP
+.B mfscheckfile
+\fIFILE\fP...
+.PP
+.B mfsfileinfo
+\fIFILE\fP...
+.PP
+.B mfsdirinfo
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-i\fP|\fB-d\fP|\fB-f\fP|\fB-c\fP|\fB-l\fP|\fB-s\fP|\fB-r\fP] \fIOBJECT\fP...
+.PP
+.B mfsfilerepair
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIFILE\fP...
+.PP
+.B mfsappendchunks
+\fISNAPSHOT_FILE\fP \fIOBJECT\fP...
+.PP
+.B mfsmakesnapshot
+[\fB-o\fP] \fISOURCE\fP... \fIDESTINATION\fP
+.PP
+.B mfsgetquota
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] 
+\fIDIRECTORY\fP...
+.PP
+.B mfssetquota
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-i\fP|\fB-I\fP \fIinodes\fP] 
+[\fB-l\fP|\fB-L\fP \fIlength\fP] [\fB-s\fP|\fB-S\fP \fIsize\fP] [\fB-r\fP|\fB-R\fP \fIrealsize\fP]
+\fIDIRECTORY\fP...
+.PP
+.B mfsdelquota
+[\fB-a\fP|\fB-A\fP|\fB-i\fP|\fB-I\fP|\fB-l\fP|\fB-L\fP|\fB-s\fP|\fB-S\fP|\fB-r\fP|\fB-R\fP]
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fB-f\fP \fIDIRECTORY\fP...
+.PP
+.B mfsfilepaths
+\fIOBJECT\fP|\fIINODE\fP...
+.SH DESCRIPTION
+\fBmfsgetgoal\fP and \fBmfssetgoal\fP operate on object's \fIgoal\fP value,
+i.e. the number of copies in which all file data are stored. It means that
+file should survive failure of one less chunkservers than its \fIgoal\fP
+value. \fIGoal\fP must be set between 1 and 9 (note that 1 is strongly
+unadvised).
+\fBmfsgetgoal\fP prints current \fIgoal\fP value of given object(s).
+\fB-r\fP option enables recursive mode, which works as usual for every
+given file, but for every given directory additionally prints current
+\fIgoal\fP value of all contained objects (files and directories).
+\fBmfssetgoal\fP changes current \fIgoal\fP value of given object(s). If new
+value is specified in \fB+\fP\fIN\fP form, \fIgoal\fP value is increased to
+\fIN\fP for objects with lower \fIgoal\fP value and unchanged for the rest.
+Similarly, if new value is specified as \fB\-\fP\fIN\fP, \fIgoal\fP value is
+decreased to \fIN\fP for objects with higher \fIgoal\fP value and unchanged
+for the rest. \fB-r\fP option enables recursive mode.
+These tools can be used on any file, directory or deleted (\fItrash\fP) file.
+.PP
+\fBmfsrgetgoal\fP and \fBmfsrsetgoal\fP are deprecated aliases for
+\fBmfsgetgoal -r\fP and \fBmfssetgoal -r\fP respectively.
+.PP
+\fBmfsgettrashtime\fP and \fBmfssettrashtime\fP operate on object's
+\fItrashtime\fP value, i.e. the number of seconds the file is preserved in
+special \fItrash\fP directory before it's finally removed from filesystem.
+\fITrashtime\fP must be non\-negative integer value.
+\fBmfsgettrashtime\fP prints current \fItrashtime\fP value of given object(s).
+\fB-r\fP option enables recursive mode, which works as usual for every given
+file, but for every given directory additionally prints current \fItrashtime\fP
+value of all contained objects (files and directories).
+\fBmfssettrashtime\fP changes current \fItrashtime\fP value of given object(s).
+If new value is specified in \fB+\fP\fIN\fP form, \fItrashtime\fP value is
+increased to \fIN\fP for objects with lower \fItrashtime\fP value and unchanged
+for the rest. Similarly, if new value is specified as \fB\-\fP\fIN\fP,
+\fItrashtime\fP value is decreased to \fIN\fP for objects with higher
+\fItrashtime\fP value and unchanged for the rest. \fB-r\fP option enables
+recursive mode.
+These tools can be used on any file, directory or deleted (\fItrash\fP) file.
+.PP
+\fBmfsrgettrashtime\fP and \fBmfsrsettrashtime\fP are deprecated aliases for
+\fBmfsgettrashtime -r\fP and \fBmfssettrashtime -r\fP respectively.
+.PP
+\fBmfsgeteattr\fP, \fBmfsseteattr\fP and \fBmfsdeleattr\fP
+tools are used to get, set or delete some extra attributes. Attributes are
+described below.
+.PP
+\fBmfscheckfile\fP checks and prints number of chunks and number of chunk
+copies belonging to specified file(s).
+It can be used on any file, included deleted (\fItrash\fP).
+.PP
+\fBmfsfileinfo\fP prints location (\fIchunkserver\fP host and port) of each
+chunk copy belonging to specified file(s).
+It can be used on any file, included deleted (\fItrash\fP).
+.PP
+\fBmfsdirinfo\fP is extended, MooseFS-specific equivalent of \fBdu -s\fP
+command. It prints summary for each specified object (single file or
+directory tree). If you only want to see one parameter, then add one of
+show options (see \fBSHOW OPTIONS\fP).
+.PP
+\fBmfsfilerepair\fP deals with broken files (those which cause I/O errors on
+read operations) to make them partially readable. In case of missing chunk
+it fills missing parts of file with zeros; in case of chunk version mismatch
+it sets chunk version known to \fBmfsmaster\fP to highest one found on
+chunkservers. Note: because in the second case content mismatch can occur in
+chunks with the same version, it's advised to make a copy (not a snapshot!)
+and delete original file after "repairing".
+.PP
+\fBmfsappendchunks\fP (equivalent of \fBmfssnapshot\fP from MooseFS 1.5)
+appends a lazy copy of specified file(s) to specified snapshot file ("lazy"
+means that creation of new chunks is delayed to the moment one copy is
+modified).
+If multiple files are given, they are merged into one target file in the way
+that each file begins at \fIchunk\fP (64MB) boundary; padding space is left
+empty.
+.PP
+\fBmfsmakesnapshot\fP makes a "real" snapshot (lazy copy, like in case of
+\fBmfsappendchunks\fP) of some object(s) or subtree (similarly to \fBcp -r\fP
+command). It's atomic with respect to each \fISOURCE\fP argument separately.
+If \fIDESTINATION\fP points to already existing file, error will be reported
+unless \fB-o\fP (overwrite) option is given. Note: if \fISOURCE\fP is
+a directory, it's copied as a whole; but if it's followed by trailing slash,
+only directory content is copied.
+.PP
+\fBmfsgetquota\fP, \fBmfssetquota\fP and \fBmfsdelquota\fP
+tools are used to check, define and delete quotas. Quota is set on a directory. It can be set in one 
+of 4 ways: for number of inodes inside the directory (total sum of the
+subtree's inodes) with \fB-i\fP, \fB-I\fP options, for sum of (logical) file lengths with
+\fB-l\fP, \fB-L\fP options,
+for sum of chunk sizes (not considering goals) with \fB-s\fP, \fB-S\fP options and for physical
+hdd space (more or less chunk sizes multiplied by goal of each chunk) with \fB-r\fP, \fB-R\fP options.
+Small letters set soft quota, capital letters set hard quota. \fB-a\fP and \fB-A\fP options in
+\fBmfsdelquota\fP mean all kinds of quota. Quota behaviour is described below.
+.PP
+\fBmfsfilepaths\fP tool can be used to find all occurences (hard links) of given file in filesystem.
+Also can be used to find file by number of i-node. In case of searching by i-node tool has to be run
+in mfs mounted directory.
+.SH GENERAL OPTIONS
+Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
+options to select
+format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
+uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
+prefixes (k, M, G as 10^3, 10^6 etc.). \fB-k\fP, \fB-m\fP and \fB-g\fP show plain numbers
+respectivaly in kibis (binary kilo - 1024), mebis (binary mega - 1024^2)
+and gibis (binary giga - 1024^3).
+The same can be achieved by setting
+\fBMFSHRFORMAT\fP environment variable to: \fB0\fP (exact numbers), \fB1\fP
+or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
+\fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
+numbers and SI prefixes). The default is to print just exact numbers.
+.SH SHOW OPTIONS
+.TP
+\fB-i\fP
+show number of inodes
+.TP
+\fB-d\fP
+show number of directories
+.TP
+\fB-f\fP
+show number of files
+.TP
+\fB-c\fP
+show number of chunks
+.TP
+\fB-l\fP
+show length
+.TP
+\fB-s\fP
+show size
+.TP
+\fB-r\fP
+show realsize
+.SH EXTRA ATTRIBUTES
+\fBnoowner\fP This flag means,
+that particular object belongs to current user (\fIuid\fP and \fIgid\fP are equal
+to \fIuid\fP and \fIgid\fP values of accessing process). Only root (\fIuid\fP=0)
+sees the real \fIuid\fP and \fIgid\fP.
+.PP
+\fBnoattrcache\fP This flag means, that standard file attributes such as uid, gid,
+mode, length and so on won't be stored in kernel cache. In MooseFS 1.5 this was the
+only behaviour, and mfsmount always prevented attributes from being stored in
+kernel cache, but in MooseFS 1.6 attributes can be cached, so in very rare ocassions
+it could be useful to turn it off.
+.PP
+\fBnoentrycache\fP This flag is similar to above. It prevents directory entries
+from being cached in kernel.
+.SH QUOTAS
+Quota is always set on a directory. Hard quota cannot be exceeded anytime.
+Soft quota can be exceeded for a period of time (7 days). Once a quota is exceeded in a
+directory, user must go below the quota during the next 7 days. If not, the soft 
+quota for this particular directory starts to behave like a hard quota. The 7 days period
+is global and cannot currently be modified.
+.SH INHERITANCE
+When new object is created in MooseFS, attributes such as goal, trashtime and extra
+attributes are inherited from parent directory. So if you set i.e. "noowner"
+attribute and goal to 3 in a directory then every new object created in
+this directory will have goal set to 3 and "noowner" flag set. A newly created
+object inherits always the current set of its parent's attributes. Changing a
+directory attribute does not affect its already created children. To change
+an attribute for a directory and all of its children use "-r" option.
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR moosefs (7)

@@ -1,0 +1,86 @@
+.TH mfschunkserver "8" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfschunkserver \- start, restart or stop Moose File System chunkserver process
+.SH SYNOPSIS
+.B mfschunkserver
+[\fB\-c\fP \fICFGFILE\fP] [\fB\-u\fP]
+[\fB\-f\fP]
+[\fB\-t\fP \fILOCKTIMEOUT\fP]
+[\fIACTION\fP]
+.PP
+.B mfschunkserver \-v
+.PP
+.B mfschunkserver \-h
+.SH DESCRIPTION
+.PP
+\fBmfschunkserver\fP is the data server of Moose File System. 
+.SH OPTIONS
+.TP
+\fB\-v\fP
+print version information and exit
+.TP
+\fB\-h\fP
+print usage information and exit
+.TP
+\fB\-c\fP \fICFGFILE\fP
+specify alternative path of configuration file (default is
+\fBmfschunkserver.cfg\fP in system configuration directory)
+.TP
+\fB\-u\fP
+log undefined configuration values (when default is assumed)
+.TP
+\fB\-f\fP
+run in foreground, don't daemonize
+.TP
+\fB\-t\fP \fILOCKTIMEOUT\fP
+how long to wait for lockfile (in seconds; default is 60 seconds)
+.TP
+\fIACTION\fP
+is the one of \fBstart\fP, \fBstop\fP, \fBrestart\fP, \fBreload\fP, \fBtest\fP or \fBkill\fP. Default action is
+\fBrestart\fP. The \fBtest\fP action will yeld one of two responses:
+"mfschunkserver pid: PID" or "mfschunkserver is not running". The \fBkill\fP
+action will send a SIGKILL to the currently running chunkserver 
+process. SIGHUP or \fBreload\fP action forces \fBmfschunkserver\fP 
+to reload all configuration files.
+.SH FILES
+.TP
+\fBmfschunkserver.cfg\fP
+configuration file for MooseFS chunkserver process; refer to
+\fBmfschunkserver.cfg\fP\|(5) manual for defails
+.TP
+\fBmfshdd.cfg\fP
+list of directories (mountpoints) used for MooseFS storage; refer to
+\fBmfshdd.cfg\fP\|(5) manual for defails
+.TP
+.BR .mfschunkserver.lock
+lock file of running MooseFS chunkserver process
+(created in data directory)
+.TP
+\fBdata.csstats\fP
+chunkserver charts state (created in data directory)
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfsmount (8),
+.BR mfschunkserver.cfg (5),
+.BR mfshdd.cfg (5),
+.BR moosefs (7)

@@ -1,0 +1,12 @@
+************************************************************************
+
+A startup script has been installed as:
+
+%%PREFIX%%/etc/rc.d/mfsmaster
+
+Use it to start/stop the mfsmaster service after you have added
+the following line to your rc.conf file:
+
+mfsmaster_enable="YES"
+
+************************************************************************

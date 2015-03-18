@@ -1,0 +1,52 @@
+###############################################
+# RUNTIME OPTIONS                             #
+###############################################
+
+# user to run daemon as (default is @DEFAULT_USER@)
+# WORKING_USER = @DEFAULT_USER@
+
+# group to run daemon as (optional - if empty then default user group will be used)
+# WORKING_GROUP = @DEFAULT_GROUP@
+
+# name of process to place in syslog messages (default is mfsmetalogger)
+# SYSLOG_IDENT = mfsmetalogger
+
+# whether to perform mlockall() to avoid swapping out mfsmetalogger process (default is 0, i.e. no)
+# LOCK_MEMORY = 0
+
+# nice level to run daemon with (default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with)
+# NICE_LEVEL = -19
+
+# set default umask for group and others (user has always 0, default is 027 - block write for group and block all for others)
+# FILE_UMASK = 027
+
+# where to store daemon lock file (default is @DATA_PATH@)
+# DATA_PATH = @DATA_PATH@
+
+# number of metadata change log files (default is 50)
+# BACK_LOGS = 50
+
+# number of previous metadata files to be kept (default is 3)
+# BACK_META_KEEP_PREVIOUS = 3
+
+# metadata download frequency in hours (default is 24, should be at least BACK_LOGS/2)
+# META_DOWNLOAD_FREQ = 24
+
+###############################################
+# MASTER CONNECTION OPTIONS                   #
+###############################################
+
+# delay in seconds before next try to reconnect to master if not connected (default is 5)
+# MASTER_RECONNECTION_DELAY = 5
+
+# local address to use for connecting with master (default is *, i.e. default local address)
+# BIND_HOST = *
+
+# MooseFS master host, IP is allowed only in single-master installations (default is @DEFAULT_MASTERNAME@)
+# MASTER_HOST = @DEFAULT_MASTERNAME@
+
+# MooseFS master supervisor port (default is @DEFAULT_MASTER_CONTROL_PORT@)
+# MASTER_PORT = @DEFAULT_MASTER_CONTROL_PORT@
+
+# timeout in seconds for master connections (default is 10)
+# MASTER_TIMEOUT = 10

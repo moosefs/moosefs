@@ -1,0 +1,14 @@
+[Unit]
+Description=MooseFS Chunkserver
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=@SBIN_PATH@/mfschunkserver start
+ExecStop=@SBIN_PATH@/mfschunkserver stop
+ExecReload=@SBIN_PATH@/mfschunkserver reload
+PIDFile=@DATA_PATH@/.mfschunkserver.lock
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>MFS</title>
+		<script type="text/javascript">
+			document.location.href="mfs.cgi"
+// the above uses default parameter values; full invocation example is shown below
+//			document.location.href="mfs.cgi?masterhost=@DEFAULT_MASTERNAME@&amp;masterport=@DEFAULT_MASTER_CLIENT_PORT@&amp;mastercontrolport=@DEFAULT_MASTER_CONTROL_PORT@&amp;mastername=MooseFS"
+		</script>
+	</head>
+	<body>
+	</body>
+</html>

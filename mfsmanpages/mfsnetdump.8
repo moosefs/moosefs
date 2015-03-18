@@ -1,0 +1,53 @@
+.TH mfsnetdump "8" "March 2015" "MooseFS 2.0.60-1" "This is part of MooseFS"
+.SH NAME
+mfsnetdump \- dump network traffic as mfs packets
+.SH SYNOPSIS
+.B mfsnetdump [-s] [-i net device] [-f pcap_filter] [-c packet count] [-e commands] [-o commands]
+.PP
+.SH DESCRIPTION
+.PP
+\fBmfsnetdump\fP is 
+the supervisor program of Moose File System. It is needed to start 
+a completely new system or a system after a big crash. It can be also used to force select a new
+leader master.
+.SH OPTIONS
+.TP
+\fB\-s\fP
+set standard PCAP filter (dump only mfs ports - default:9419-9422)
+.TP
+\fB\-i\fP
+dump packets using given network interface
+.TP
+\fB\-f\fP
+define pcap filter to filter packets
+.TP
+\fB\-c\fP
+dump only 'count' packets and exit
+.TP
+\fB\-e\fP
+do not display given commands
+.TP
+\fB\-o\fP
+show only given commands
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl.txt
+.SH "SEE ALSO"
+.BR moosefs (7)

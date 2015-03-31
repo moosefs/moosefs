@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.12-1 (2015-03-31)
+
+  - (netdump) fixed man page
+
 * MooseFS 3.0.11-1 (2015-03-18)
 
   - (all) changed license of standard version to GPLv2

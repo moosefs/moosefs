@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * or visit http://www.gnu.org/licenses/gpl.txt
+ * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
 #ifdef HAVE_CONFIG_H
@@ -41,6 +41,9 @@
 #include "memusage.h"
 #include "cpuusage.h"
 
+#include "chartsdefs.h"
+
+#if 0
 #define CHARTS_FILENAME "stats.mfs"
 
 #define CHARTS_UCPU 0
@@ -114,7 +117,7 @@
 	{CHARTS_CALC(0)                    ,CHARTS_DIRECT(CHARTS_MEMORY_RSS)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{CHARTS_NONE                       ,CHARTS_NONE                           ,CHARTS_NONE                       ,0              ,0,0                 ,   0, 0}  \
 };
-
+#endif
 static const uint32_t calcdefs[]=CALCDEFS
 static const statdef statdefs[]=STATDEFS
 static const estatdef estatdefs[]=ESTATDEFS
@@ -176,7 +179,7 @@ int chartsdata_init (void) {
 	mem_used(&rss,&virt);
 
 	main_time_register(60,0,chartsdata_refresh);
-	main_time_register(3600,0,chartsdata_store);
+	main_time_register(3600,30,chartsdata_store);
 	main_destruct_register(chartsdata_term);
-	return charts_init(calcdefs,statdefs,estatdefs,CHARTS_FILENAME);
+	return charts_init(calcdefs,statdefs,estatdefs,CHARTS_FILENAME,0);
 }

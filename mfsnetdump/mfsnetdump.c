@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * or visit http://www.gnu.org/licenses/gpl.txt
+ * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
 #include <stdio.h>
@@ -452,7 +452,7 @@ int main(int argc, char **argv) {
 	packetcnt = -1;
 	udm.maxdatainpacket = 128;
 
-	while ((ch = getopt(argc, argv, "ms:i:f:c:e:o:r:?")) != -1) {
+	while ((ch = getopt(argc, argv, "ms:i:f:c:e:o:r:h?")) != -1) {
 		switch (ch) {
 			case 's':
 				udm.maxdatainpacket = strtoul(optarg,NULL,0);

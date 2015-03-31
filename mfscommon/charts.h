@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * or visit http://www.gnu.org/licenses/gpl.txt
+ * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
 #ifndef _CHARTS_H_
@@ -72,6 +72,7 @@
 
 typedef struct _statdef {
 	char *name;
+	uint32_t statid;
 	uint8_t mode;
 	uint8_t percent;
 	uint8_t scale;
@@ -80,6 +81,8 @@ typedef struct _statdef {
 } statdef;
 
 typedef struct _estatdef {
+	char *name;
+	uint32_t statid;
 	uint32_t c1src;
 	uint32_t c2src;
 	uint32_t c3src;
@@ -132,13 +135,15 @@ typedef struct _estatdef {
 uint64_t charts_get (uint32_t chartnumber,uint32_t count);
 
 uint32_t charts_monotonic_data (uint8_t *buff);
+uint32_t charts_getmaxleng(void);
+void charts_getdata(double *data,uint32_t *timestamp,uint32_t *rsec,uint32_t number);
 uint32_t charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries);
 uint32_t charts_make_png(uint32_t chartid,uint32_t chartwidth,uint32_t chartheight);
 void charts_get_png(uint8_t *buff);
 
 void charts_add (uint64_t *data,uint32_t datats);
 void charts_store (void);
-int charts_init (const uint32_t *calcs,const statdef *stats,const estatdef *estats,const char *filename);
+int charts_init (const uint32_t *calcs,const statdef *stats,const estatdef *estats,const char *filename,uint8_t mode);
 void charts_term (void);
 
 #endif

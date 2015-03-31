@@ -11,6 +11,7 @@ mfschunkserver_SOURCES= \
 	masterconn.c masterconn.h \
 	replicator.c replicator.h \
 	chartsdata.c chartsdata.h \
+	chartsdefs.h \
 	init.h \
 	../mfscommon/main.c ../mfscommon/main.h \
 	../mfscommon/cfg.c ../mfscommon/cfg.h \

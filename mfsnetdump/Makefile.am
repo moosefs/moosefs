@@ -7,6 +7,8 @@ mfsnetdump_SOURCES=\
 	commands.h \
 	../mfscommon/MFSCommunication.h
 
+mfsnetdump.c: commands.h
+
 commands.h: ../mfscommon/MFSCommunication.h
 	@echo "  CONV     commands"
 	@cat ../mfscommon/MFSCommunication.h | grep '^#define [A-Z][A-Z]TO[A-Z][A-Z]' | grep -v MAXPACKETSIZE | awk '{ printf "{%s,\"%s\"},\n",$$2,$$2; }' > commands.h

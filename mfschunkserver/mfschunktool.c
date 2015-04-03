@@ -253,7 +253,7 @@ void usage(const char *appname) {
 }
 
 int main(int argc,char *argv[]) {
-	char ch;
+	int ch;
 	uint8_t fastmode = 0;
 	uint8_t repair = 0;
 	uint8_t verbose = 0;

@@ -79,8 +79,8 @@
 	{"datallopw"    ,STRID('D','T','O','W'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"hlopr"        ,STRID('H','L','O','R'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"hlopw"        ,STRID('H','L','O','W'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
-	{"rntime"       ,STRID('T','I','M','R'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MICRO,   1,60000}, \
-	{"wntime"       ,STRID('T','I','M','W'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MICRO,   1,60000}, \
+	{"rtime"        ,STRID('T','I','M','R'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MICRO,   1,60000}, \
+	{"wtime"        ,STRID('T','I','M','W'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MICRO,   1,60000}, \
 	{"repl"         ,STRID('R','E','P','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"create"       ,STRID('C','R','E','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"delete"       ,STRID('D','E','L','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \

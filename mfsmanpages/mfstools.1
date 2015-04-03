@@ -1,4 +1,4 @@
-.TH mfstools "1" "April 2015" "MooseFS 3.0.12-1" "This is part of MooseFS"
+.TH mfstools "1" "April 2015" "MooseFS 3.0.13-1" "This is part of MooseFS"
 .SH NAME
 mfstools \- perform MooseFS\-specific operations
 .SH SYNOPSIS
@@ -6,7 +6,7 @@ mfstools \- perform MooseFS\-specific operations
 [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
 .PP
 .B mfssetgoal
-[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIGOAL\fP[\fB+\fP|\fB-\fP]|\fILABELS\fP|\fB-K\fP \fIKEEP_LABELS\fP [\fB-C\fP \fICREATE_LABELS\fP] [\fB-A\fP \fIARCHIVE_LABELS\fP \fB-d\fP \fIARCHIVE_DELAY\fP] \fIOBJECT\fP...
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-s\fP] [\fB-l\fP] \fIGOAL\fP[\fB+\fP|\fB-\fP]|\fILABELS\fP|\fB-K\fP \fIKEEP_LABELS\fP [\fB-C\fP \fICREATE_LABELS\fP] [\fB-A\fP \fIARCHIVE_LABELS\fP \fB-d\fP \fIARCHIVE_DELAY\fP] \fIOBJECT\fP...
 .PP
 .B mfscopygoal
 [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
@@ -69,15 +69,16 @@ mfstools \- perform MooseFS\-specific operations
 .B mfsfilepaths
 \fIOBJECT\fP|\fIINODE\fP...
 .SH DESCRIPTION
-\fBmfsgetgoal\fP and \fBmfssetgoal\fP operate on object's \fIgoal\fP value,
-i.e. the number of copies in which all file data are stored. It means that
-file should survive failure of one less chunkservers than its \fIgoal\fP
+\fBmfsgetgoal\fP and \fBmfssetgoal\fP operate on object's \fIgoal\fP value
+and since version 3.0 also object's \fIlabels\fP, i.e. the number of copies
+in which all file data are stored and optionally where those copies should be stored.
+It means that file should survive failure of one less chunkservers than its \fIgoal\fP
 value. \fIGoal\fP must be set between 1 and 9 (note that 1 is strongly
 unadvised).
-\fBmfsgetgoal\fP prints current \fIgoal\fP value of given object(s).
+\fBmfsgetgoal\fP prints current \fIgoal\fP value and \fIlabels\fP of given object(s).
 \fB-r\fP option enables recursive mode, which works as usual for every
 given file, but for every given directory additionally prints current
-\fIgoal\fP value of all contained objects (files and directories).
+\fIgoal\fP/\fIlabels\fP of all contained objects (files and directories).
 \fBmfssetgoal\fP changes current \fIgoal\fP value of given object(s). If new
 value is specified in \fIGOAL\fP\fB+\fP form, \fIgoal\fP value is increased to
 \fIGOAL\fP for objects with lower \fIgoal\fP value and unchanged for the rest.
@@ -85,7 +86,8 @@ Similarly, if new value is specified as \fIGOAL\fP\fB\-\fP, \fIgoal\fP value is
 decreased to \fIGOAL\fP for objects with higher \fIgoal\fP value and unchanged
 for the rest. Since version 3.0 of MooseFS goal can be also defined as a group of
 expressions with labels. Label expressions are described below.
-\fB-r\fP option enables recursive mode.
+\fB-r\fP option enables recursive mode. Option \fB-s\fP enables strict mode for chunk creation
+and \fB-l\fP enables loose mode for chunk creation. Creation modes are described below.
 These tools can be used on any file, directory or deleted (\fItrash\fP) file.
 .PP
 \fBmfsgettrashtime\fP and \fBmfssettrashtime\fP operate on object's
@@ -214,8 +216,8 @@ sum (logical or). Multiplication means a file can be stored only on a chunkserve
 Asterisk means any chunkserver. Identical subexpressions can be shortened by adding a number in front of one instead
 of repeating it a number of times.
 .PP
-\fBmfssetgoal\fP -K KEEP_LABELS [ -C CREATE_LABELS ] [ -A ARCHIVE_LABELS -A ARCHIVE_DELAY ] \fIFILE\fP - a file will be created
-(and written) using CREATE_LABELS then almost imediatelly system will use KEEP_LABELS and if ARCHIVE_LABELS and ARCHIVE_DELAY are specified
+\fBmfssetgoal\fP -K KEEP_LABELS [ -C CREATE_LABELS ] [ -A ARCHIVE_LABELS -d ARCHIVE_DELAY ] \fIFILE\fP - a file will be created
+(and written) using CREATE_LABELS then almost immediatelly system will use KEEP_LABELS and if ARCHIVE_LABELS and ARCHIVE_DELAY are specified
 then ARCHIVE_LABELS will be used after ARCHIVE_DELAY days after last file modifictaion time.
 .PP
 Examples:
@@ -241,6 +243,19 @@ has the C label and either X or Y label
 \fBmfssetgoal\fP A,BC,BC,BC \fIFILE\fP is equivalent to \fBmfssetgoal\fP A,3BC \fIFILE\fP
 .PP
 \fBmfssetgoal\fP *,* \fIFILE\fP is equivalent to \fBmfssetgoal\fP 2* \fIFILE\fP is equivalent to \fBmfssetgoal\fP 2 \fIFILE\fP
+.SH CREATION MODES
+When labels are specified then it is important to specify what to do in case when there is no space available on all servers
+marked with labels needed for new chunk creation. Also all servers marked with such labels can be temporariliy overloaded.
+The question is if the system should create chunks on other servers or not.
+.PP
+Answer to this question should be resolved by user and hence the options \fB-s\fP and \fB-l\fP. By default (no options)
+in case of overloaded servers system will wait for them, but in case of no space available will use other servers.
+.PP
+Option \fB-s\fP turns on STRICT mode. In this mode the system will return error (ENOSPC) in case of no space
+available on servers marked with labels specified for chunk creation.
+.PP
+Option \fB-l\fP turns on LOOSE mode. In this mode the system will use other servers in case of overloaded servers and
+replicate data to correct servers later.
 .SH EXTRA ATTRIBUTES
 \fBnoowner\fP This flag means,
 that particular object belongs to current user (\fIuid\fP and \fIgid\fP are equal

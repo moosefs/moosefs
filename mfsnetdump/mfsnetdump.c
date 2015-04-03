@@ -430,7 +430,7 @@ void usage(const char *appname) {
 }
 
 int main(int argc, char **argv) {
-	char ch;
+	int ch;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	char *dev;
 	char *filter;

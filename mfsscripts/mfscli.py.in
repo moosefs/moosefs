@@ -263,10 +263,10 @@ else: # CLI mode
 			('csrepout',5,1,'Data sent by replicator'),     #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
 			('csservin',6,1,'Data received by csserv'),     #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
 			('csservout',7,1,'Data sent by csserv'),    #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-			('bytesr',8,5,'Bytes read (headers)'),       #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
-			('bytesw',9,5,'Bytes written (headers)'),       #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
-			('llopr',10,1,'Low level reads (headers)'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-			('llopw',11,1,'Low level writes (headers)'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+			('hdrbytesr',8,5,'Bytes read (headers)'),       #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
+			('hdrbytesw',9,5,'Bytes written (headers)'),       #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
+			('hdrllopr',10,1,'Low level reads (headers)'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+			('hdrllopw',11,1,'Low level writes (headers)'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 			('databytesr',12,5,'Bytes read (data)'),   #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
 			('databytesw',13,5,'Bytes written (data)'),   #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
 			('datallopr',14,1,'Low level reads (data)'),    #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
@@ -312,13 +312,13 @@ else: # CLI mode
 	lastid = 0
 	lastmode = None
 	try:
-		opts,args = getopt.getopt(sys.argv[1:],"hH:P:S:C:f:ps:no:rm:i:c:d:28")
+		opts,args = getopt.getopt(sys.argv[1:],"hH:P:S:C:f:ps:no:rm:i:a:b:c:d:28")
 	except:
 		opts = [('-h',None)]
 	for opt,val in opts:
 		if opt=='-h':
 			print("usage:")
-			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|CS|MB|HD|EX|MS|LD|LS|OF|AL|MO|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-c[M|C] count] [-d[M|C] chart_data_columns]" % sys.argv[0])
+			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|CS|MB|HD|EX|MS|LD|LS|OF|AL|MO|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-a count] [-b chart_data_columns] [-c count] [-d chart_data_columns]" % sys.argv[0])
 			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -C(RC/ip/port|BW/ip/port|M[01]/ip/port|RS/sessionid)" % sys.argv[0])
 			print("\ncommon:\n")
 			print("\t-h : print this message")
@@ -371,8 +371,10 @@ else: # CLI mode
 			print("\t-r : reverse order")
 			print("\t-m mode_id : show data specified by 'mode id' (depends on data set)")
 			print("\t-i id : sessionid for -SOF or inode for -SAL")
-			print("\t-c[M|C] count : how many chart entries should be shown (use 'm' for master or 'c' for chunkserver)")
-			print("\t-d[M|C] chart_data_columns : define chart columns (prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice, use 'm' for master or 'c' for chunkserver)")
+			print("\t-a count : how many master chart entries should be shown")
+			print("\t-b chart_data_columns : define master chart columns")
+			print("\t-c count : how many chunkserver chart entries should be shown")
+			print("\t-d chart_data_columns : define chunkserver chart columns (prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice)")
 			print("\t\tmaster charts columns:")
 			for name,no,mode,desc in mcchartslist:
 				if name in mcchartsabr:
@@ -622,40 +624,9 @@ else: # CLI mode
 				ALinode = int(val)
 			if lastsval=='':
 				lastid = int(val)
-		elif opt=='-c':
-			val = val.strip()
-			if val[0]=='M':
-				MCcount = int(val[1:].strip())
-			elif val[0]=='C':
-				CCcount = int(val[1:].strip())
-			else:
-				ok = 0
-				if 'MC' in lastsval:
-					MCcount = int(val)
-					ok = 1
-				if 'CC' in lastsval:
-					CCcount = int(val)
-					ok = 1
-				if ok==0:
-					print("add 'M' or 'C' after option '-c' to choose between master and chunkserver charts count")
-					os._exit(0)
-		elif opt=='-d':
-			val = val.strip()
-			datamode = 2
-			if val[0]=='M':
-				datamode = 0
-				val = val[1:].strip()
-			elif val[0]=='C':
-				datamode = 1
-				val = val[1:].strip()
-			else:
-				if 'MC' in lastsval:
-					datamode = 0
-				if 'CC' in lastsval:
-					datamode = 1
-			if datamode==2:
-				print("add 'M' or 'C' after option '-d' to choose between master and chunkserver charts data")
-				os._exit(0)
+		elif opt=='-a':
+			MCcount = int(val)
+		elif opt=='-b':
 			for x in val.split(','):
 				x = x.strip()
 				if ':' in x:
@@ -679,15 +650,44 @@ else: # CLI mode
 					rawmode = 1
 				else:
 					rawmode = 0
-				if datamode==0 and x in mccharts:
+				if x in mccharts:
 					MCchdata.append((chhost,chport,mccharts[x][0],mccharts[x][1],mccharts[x][2],rawmode))
-				elif datamode==1 and x in cccharts:
+				else:
+					print("Unknown master chart name: %s" % x)
+					os._exit(0)
+		elif opt=='-c':
+			CCcount = int(val)
+		elif opt=='-d':
+			for x in val.split(','):
+				x = x.strip()
+				if ':' in x:
+					xs = x.split(':')
+					if len(xs)==2:
+						chhost = xs[0]
+						chport = 9421+datamode
+						x = xs[1]
+					elif len(xs)==3:
+						chhost = xs[0]
+						chport = int(xs[1])
+						x = xs[2]
+					else:
+						print("Unknown chart name: %s" % x)
+						os._exit(0)
+				else:
+					chhost = None
+					chport = None
+				if x[0]=='+':
+					x = x[1:]
+					rawmode = 1
+				else:
+					rawmode = 0
+				if x in cccharts:
 					if chhost==None or chport==None:
 						print("in chunkserver chart data server ip/host must be specified")
 						os._exit(0)
 					CCchdata.append((chhost,chport,cccharts[x][0],cccharts[x][1],cccharts[x][2],rawmode))
 				else:
-					print("Unknown %s chart name: %s" % (('master' if datamode==0 else 'chunkserver'),x))
+					print("Unknown chunkserver chart name: %s" % x)
 					os._exit(0)
 		elif opt=='-C':
 			clicommands.append(val)

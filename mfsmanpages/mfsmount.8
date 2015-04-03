@@ -1,4 +1,4 @@
-.TH mfsmount "8" "April 2015" "MooseFS 3.0.12-1" "This is part of MooseFS"
+.TH mfsmount "8" "April 2015" "MooseFS 3.0.13-1" "This is part of MooseFS"
 .SH NAME
 mfsmount \- mount Moose File System
 .SH SYNOPSIS
@@ -52,7 +52,7 @@ loads file with additional mount options
 mount MFSMETA companion filesystem instead of primary MooseFS
 .TP
 \fB\-n\fP
-omit default mount options (\fB-o allow_other,default_permissions\fP)
+omit default mount options (\fB-o allow_other\fP)
 .TP
 \fB\-p\fP
 prompt for password (interactive version of \fB\-o mfspassword=\fP\fIPASS\fP)
@@ -139,6 +139,12 @@ define amount of bytes read sequentially that turns on read ahead (default: 10 *
 .TP
 \fB\-o mfsioretries=\fP\fIN\fP
 specify number of retiries before I/O error is returned (default: 30)
+.TP
+\fB\-o mfsfsyncbeforeclose\fP
+force fsync before last file close (safer but can be inefficient - especially in case of small files)
+.TP
+\fB\-o mfspreflabels=\fP\fILABELEXPR\fP
+specify prefered labels for choosing chunkservers during I/O
 .PP
 General mount options (see \fBmount\fP\|(8) manual):
 .TP
@@ -188,6 +194,22 @@ always allow files data to be kept in cache (dangerous)
 .TP
 \fBAUTO\fP
 file cache is managed by mfsmaster automatically (should be very safe and efficient)
+.SH LABEL EXPRESSIONS
+\fBLABELEXPR\fP grammar:
+.TP 11
+\fILABELEXPR\fP
+-> \fIS\fP \fB;\fP \fILABELEXPR\fP | \fIS\fP
+.TP
+\fIS\fP
+-> \fIS\fP \fB+\fP \fIM\fP | \fIM\fP
+.TP
+\fIM\fP
+-> \fIM\fP \fIL\fP | \fIL\fP
+.TP
+\fIL\fP
+-> \fBa\fP .. \fBz\fP | \fBA\fP .. \fBZ\fP | \fB(\fP \fIS\fP \fB)\fP | \fB[\fP \fIS\fP \fB]\fP
+.PP
+Subexpressions should be placed in priority order. Up to nine subexpressions (priorities) can be specified.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT
@@ -210,5 +232,4 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmaster (8),
-.BR mfstools (1),
-.BR moosefs (7)
+.BR mfstools (1)

@@ -4139,7 +4139,7 @@ int main(int argc,char **argv) {
 				break;
 			case 'C':
 				if (create_labelscnt>0) {
-					fprintf(stderr,"option '-W' defined more than once\n");
+					fprintf(stderr,"option '-C' defined more than once\n");
 					usage(f);
 				}
 				if (parse_label_expr(optarg,&create_labelscnt,create_labelmasks)<0) {

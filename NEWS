@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.13-1 (2015-04-03)
+
+  - (tools,mount) fixed man pages
+
 * MooseFS 3.0.12-1 (2015-03-31)
 
   - (netdump) fixed man page

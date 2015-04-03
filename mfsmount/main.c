@@ -370,8 +370,8 @@ static void usage(const char *progname) {
 	fprintf(stderr,
 "LABELEXPR grammar:\n"
 "    LABELEXPR -> S ';' LABELEXPR | S\n"
-"    S -> S '+' M | S '|' M | S '||' M | M\n"
-"    M -> M '*' L | M '&' L | M '&&' L | M L | L\n"
+"    S -> S '+' M | M\n"
+"    M -> M L | L\n"
 "    L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']'\n"
 "\n"
 "    Subexpressions should be placed in priority order.\n"

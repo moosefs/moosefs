@@ -1,3 +1,9 @@
+moosefs (3.0.13-1) unstable; urgency=medium
+
+  * (tools,mount) fixed man pages
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 03 Apr 2015 13:00:00 +0200
+
 moosefs (3.0.12-1) unstable; urgency=medium
 
   * (netdump) fixed man page

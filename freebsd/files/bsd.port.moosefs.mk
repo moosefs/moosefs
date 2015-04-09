@@ -1,7 +1,7 @@
 PORTVERSION=	%%VERSION%%
 PORTREVISION=	1
 
-MASTER_SITES=	http://www.moosefs.org/tl_files/mfscode/
+MASTER_SITES=	http://ppa.moosefs.com/src/
 
 LICENSE=	GPLv2
 
@@ -18,7 +18,7 @@ MFS_CGISERVDIR=	${PREFIX}/sbin
 DISTNAME=	${PORTNAME}-${PORTVERSION}-${PORTREVISION}
 WRKSRC=		${WRKDIR}/${PORTNAME}-${PORTVERSION}
 
-MAINTAINER=	acid@moosefs.com
+MAINTAINER=	freebsd@moosefs.com
 
 USERS=		${MFS_USER}
 GROUPS=		${MFS_GROUP}

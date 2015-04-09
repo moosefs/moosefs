@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.61-1 (2015-04-09)
+
+  - (mount) fixed rare getgroup race condition
+
 * MooseFS 2.0.60-1 (2015-03-18)
 
   - (all) changed license of standard version to GPLv2

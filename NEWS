@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.14-1 (2015-04-09)
+
+  - (mount) fixed rare getgroup race condition
+
 * MooseFS 3.0.13-1 (2015-04-03)
 
   - (tools,mount) fixed man pages

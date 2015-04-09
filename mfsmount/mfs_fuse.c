@@ -2560,7 +2560,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	//	}
 	// } else {
 	if (full_permissions) {
-		gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,2);
+		gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,2); // allow group refresh again (see: getxattr for "com.apple.quarantine")
 		status = fs_opencheck(ino,ctx.uid,gids->gidcnt,gids->gidtab,oflags,attr);
 		groups_rel(gids);
 	} else {
@@ -3850,7 +3850,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	}
 	(void)position;
 	if (full_permissions) {
-		if (strcmp(name,"com.apple.quarantine")==0) {
+		if (strcmp(name,"com.apple.quarantine")==0) { // special case - obtaining groups from the kernel here leads to freeze, so avoid it
 			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,1);
 		} else {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);

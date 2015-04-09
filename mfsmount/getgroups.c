@@ -233,19 +233,14 @@ static pthread_mutex_t glock;
 static int debug_mode;
 
 static inline void groups_remove(groups *g) {
-	if (g->lcnt>0) {
-		g->lcnt--;
+	*(g->prev) = g->next;
+	if (g->next) {
+		g->next->prev = g->prev;
 	}
-	if (g->lcnt==0 && g->pid==0 && g->uid==0 && g->gid==0) {
-		*(g->prev) = g->next;
-		if (g->next) {
-			g->next->prev = g->prev;
-		}
-		if (g->gidtab!=NULL) {
-			free(g->gidtab);
-		}
-		free(g);
+	if (g->gidtab!=NULL) {
+		free(g->gidtab);
 	}
+	free(g);
 }
 
 groups* groups_get_x(pid_t pid,uid_t uid,gid_t gid,uint8_t lockmode) {
@@ -261,11 +256,8 @@ groups* groups_get_x(pid_t pid,uid_t uid,gid_t gid,uint8_t lockmode) {
 //	fprintf(stderr,"groups_get hash: %"PRIu32"\n",h);
 	for (gf = NULL,g = groups_hashtab[h] ; g!=NULL ; g = gn) {
 		gn = g->next;
-		if (g->time + to < t && lockmode==0 && g->locked==0) {
+		if (g->time + to < t && lockmode==0 && g->locked==0 && g->lcnt==0) {
 //			fprintf(stderr,"groups_get remove node (%"PRIu32",%"PRIu32",%"PRIu32") insert_time: %.3lf ; current_time: %.3lf ; timeout: %.3lf\n",g->pid,g->uid,g->gid,g->time,t,to);
-			g->pid=0;
-			g->uid=0;
-			g->gid=0;
 			groups_remove(g);
 		} else {
 //			fprintf(stderr,"groups_get check node (%"PRIu32",%"PRIu32",%"PRIu32")\n",g->pid,g->uid,g->gid);
@@ -345,7 +337,9 @@ groups* groups_get_x(pid_t pid,uid_t uid,gid_t gid,uint8_t lockmode) {
 
 void groups_rel(groups* g) {
 	zassert(pthread_mutex_lock(&glock));
-	groups_remove(g);
+	if (g->lcnt>0) {
+		g->lcnt--;
+	}
 	zassert(pthread_mutex_unlock(&glock));
 }
 

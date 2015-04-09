@@ -1,7 +1,7 @@
 PORTVERSION=	%%VERSION%%
 PORTREVISION=	1
 
-MASTER_SITES=	http://www.moosefs.org/tl_files/mfscode/
+MASTER_SITES=	http://ppa.moosefs.com/src/
 
 LICENSE=	GPLv2
 

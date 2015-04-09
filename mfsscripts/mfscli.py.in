@@ -330,20 +330,20 @@ else: # CLI mode
 			print("\t-P master_port : master client port (default: @DEFAULT_MASTER_CLIENT_PORT@)")
 			print("\t-n : do not resolve ip adresses (default when output device is not tty)")
 			print("\t-f frame charset number : set frame charset to be displayed as table frames in ttymode")
-			print("\t\t-f0 : use simple ascii frames '+','-','|' (default for non utf-8 encodings)")
+			print("\t\t-f0 : use simple ascii frames '+','-','|' (default)")
 			if sys.stdout.encoding=='UTF-8':
 				if sys.version_info[0]<3:
 					print("\t\t-f1 : use utf-8 frames: \xe2\x94\x8f\xe2\x94\xb3\xe2\x94\x93\xe2\x94\xa3\xe2\x95\x8b\xe2\x94\xab\xe2\x94\x97\xe2\x94\xbb\xe2\x94\x9b\xe2\x94\x81\xe2\x94\x83\xe2\x95\xb8\xe2\x95\xb9\xe2\x95\xba\xe2\x95\xbb")
 					print("\t\t-f2 : use utf-8 frames: \xe2\x94\x8c\xe2\x94\xac\xe2\x94\x90\xe2\x94\x9c\xe2\x94\xbc\xe2\x94\xa4\xe2\x94\x94\xe2\x94\xb4\xe2\x94\x98\xe2\x94\x80\xe2\x94\x82\xe2\x95\xb4\xe2\x95\xb5\xe2\x95\xb6\xe2\x95\xb7")
-					print("\t\t-f3 : use utf-8 frames: \xe2\x95\x94\xe2\x95\xa6\xe2\x95\x97\xe2\x95\xa0\xe2\x95\xac\xe2\x95\xa3\xe2\x95\x9a\xe2\x95\xa9\xe2\x95\x9d\xe2\x95\x90\xe2\x95\x91 (default for utf-8 encodings)")
+					print("\t\t-f3 : use utf-8 frames: \xe2\x95\x94\xe2\x95\xa6\xe2\x95\x97\xe2\x95\xa0\xe2\x95\xac\xe2\x95\xa3\xe2\x95\x9a\xe2\x95\xa9\xe2\x95\x9d\xe2\x95\x90\xe2\x95\x91")
 				else:
 					print("\t\t-f1 : use utf-8 frames: \u250f\u2533\u2513\u2523\u254b\u252b\u2517\u253b\u251b\u2501\u2503\u2578\u2579\u257a\u257b")
 					print("\t\t-f2 : use utf-8 frames: \u250c\u252c\u2510\u251c\u253c\u2524\u2514\u2534\u2518\u2500\u2502\u2574\u2575\u2576\u2577")
-					print("\t\t-f3 : use utf-8 frames: \u2554\u2566\u2557\u2560\u256c\u2563\u255a\u2569\u255d\u2550\u2551 (default for utf-8 encodings)")
+					print("\t\t-f3 : use utf-8 frames: \u2554\u2566\u2557\u2560\u256c\u2563\u255a\u2569\u255d\u2550\u2551")
 			else:
 				print("\t\t-f1 : use utf-8 frames (thick single)")
 				print("\t\t-f2 : use utf-8 frames (thin single)")
-				print("\t\t-f3 : use utf-8 frames (double - default for utf-8 encodings)")
+				print("\t\t-f3 : use utf-8 frames (double)")
 			print("\nmonitoring:\n")
 			print("\t-S data set : defines data set to be displayed")
 			print("\t\t-SIN : show full master info")

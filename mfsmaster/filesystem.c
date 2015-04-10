@@ -2971,7 +2971,7 @@ static inline void fsnodes_setgoal_recursive(fsnode *node,uint32_t ts,uint32_t u
 
 	fsnodes_keep_alive_check();
 	if (node->type==TYPE_FILE || node->type==TYPE_DIRECTORY || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
-		if (((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) || ((labelset_has_any_labels(node->lsetid)==0 || labelset_has_any_labels(lsetid)==0) && admin==0)) {
+		if (((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) || ((labelset_has_any_labels(node->lsetid) || labelset_has_any_labels(lsetid)) && admin==0)) {
 			(*nsinodes)++;
 		} else {
 			set=0;

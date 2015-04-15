@@ -7,9 +7,9 @@ PORTNAME=	moosefs
 CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-cgiserv
 
-.include "bsd.port.moosefs.mk"
-
 COMMENT=	Simple cgi-capable web server for using with mfs cgi
+
+.include "Makefile.common"
 
 RUN_DEPENDS=	moosefs-cgi>0:${PORTSDIR}/sysutils/moosefs-cgi
 
@@ -27,7 +27,5 @@ CONFIGURE_ARGS+=	--disable-mfsmaster \
 			--disable-mfssupervisor \
 			--disable-mfschunkserver \
 			--disable-mfsmount
-
-MAN8=		mfscgiserv.8
 
 .include <bsd.port.mk>

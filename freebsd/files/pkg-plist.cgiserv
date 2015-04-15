@@ -1,5 +1,6 @@
+etc/rc.d/mfscgiserv
 sbin/mfscgiserv
 man/man8/mfscgiserv.8.gz
-@exec mkdir -p %%MFS_WORKDIR%%/mfs
-@exec chown mfs:mfs %%MFS_WORKDIR%%/mfs
-@dirrm %%MFS_WORKDIR%%/mfs
+@owner mfs
+@group mfs
+@dir %%MFS_WORKDIR%%/mfs

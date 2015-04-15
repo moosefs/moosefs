@@ -7,9 +7,9 @@ PORTNAME=	moosefs
 CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-supervisor
 
-.include "bsd.port.moosefs.mk"
-
 COMMENT=	Masters supervising utility
+
+.include "Makefile.common"
 
 CONFIGURE_ARGS+=	--disable-mfsmaster \
 			--disable-mfsmetalogger \

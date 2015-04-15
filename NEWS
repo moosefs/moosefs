@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.62-1 (2015-04-15)
+
+  - (all) changed freebsd ports
+  - (cgiserv) fixed POST handling
+  - (mount) fixed handling read-ahead upper limit
+
 * MooseFS 2.0.61-1 (2015-04-09)
 
   - (mount) fixed rare getgroup race condition

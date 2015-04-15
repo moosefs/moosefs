@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.16-1 (2015-04-15)
+
+  - (all) changed freebsd ports
+  - (cgiserv) fixed POST handling
+  - (mount) fixed handling read-ahead upper limit
+
 * MooseFS 3.0.15-1 (2015-04-10)
 
   - (master) added 'admin' flag to default mfsexport.cfg

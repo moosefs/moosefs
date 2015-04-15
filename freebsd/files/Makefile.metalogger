@@ -7,9 +7,9 @@ PORTNAME=	moosefs
 CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-metalogger
 
-.include "bsd.port.moosefs.mk"
-
 COMMENT=	Metadata backing up daemon
+
+.include "Makefile.common"
 
 USE_RC_SUBR=	mfsmetalogger
 PLIST_SUB+=	MFS_WORKDIR="${MFS_WORKDIR}"

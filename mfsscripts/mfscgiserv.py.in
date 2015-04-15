@@ -209,10 +209,12 @@ class HTTP(ClientHandler):
 			if not self.protocol.startswith("HTTP/1") or ( self.protocol[7]!='0' and self.protocol[7]!='1') or len(self.protocol)!=8:
 				self.method = None
 				self.protocol = "HTTP/1.1"
+				self.postbody = None
 				return True
 		except:
 			self.method = None
 			self.protocol = "HTTP/1.1"
+			self.postbody = None
 			return True
 		# put request headers in a dictionary
 		self.headers = {}
@@ -235,9 +237,9 @@ class HTTP(ClientHandler):
 			# request is incomplete if not all message body received
 			if len(body)<content_length:
 				return False
-			f_body = io.StringIO(body)
-			f_body.seek(0)
-			sys.stdin = f_body # compatibility with CGI
+			self.postbody = body
+		else:
+			self.postbody = None
 
 		return True
 
@@ -343,11 +345,22 @@ class HTTP(ClientHandler):
 			return [resp_line + response]
 		else:
 			try:
-				proc = subprocess.Popen(self.file_name, env=e, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-				resp_line = "%s 200 Ok\r\n" %self.protocol
-				if sys.version>='3':
-					resp_line = resp_line.encode('ascii')
-				return [resp_line,proc.stdout]
+				if self.postbody != None:
+					proc = subprocess.Popen(self.file_name, env=e, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+					cgiout, cgierr = proc.communicate(self.postbody)
+					response = cgiout + cgierr
+					if sys.version>='3':
+						response = response.decode('latin-1')
+					resp_line = "%s 200 Ok\r\n" %self.protocol
+					if sys.version>='3':
+						resp_line = resp_line.encode('ascii')
+					return [resp_line + response]
+				else:
+					proc = subprocess.Popen(self.file_name, env=e, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+					resp_line = "%s 200 Ok\r\n" %self.protocol
+					if sys.version>='3':
+						resp_line = resp_line.encode('ascii')
+					return [resp_line,proc.stdout,proc.stderr]
 			except:
 				response = "Content-type: text/plain\r\n\r\n" + traceback.format_exc()
 				resp_line = "%s 200 Ok\r\n" %self.protocol

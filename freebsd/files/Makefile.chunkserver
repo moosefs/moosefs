@@ -7,9 +7,9 @@ PORTNAME=	moosefs
 CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-chunkserver
 
-.include "bsd.port.moosefs.mk"
-
 COMMENT=	Storing files data and synchronizing it among themselves
+
+.include "Makefile.common"
 
 USE_RC_SUBR=	mfschunkserver
 PLIST_SUB+=	MFS_WORKDIR="${MFS_WORKDIR}"

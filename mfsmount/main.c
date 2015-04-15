@@ -1241,7 +1241,7 @@ int main(int argc, char *argv[]) {
 	}
 	if (mfsopts.readaheadleng>0x1000000) {
 		fprintf(stderr,"read ahead length too big (%u B) - decresed to 16 MiB\n",mfsopts.readaheadleng);
-		mfsopts.readaheadleng=2048;
+		mfsopts.readaheadleng=0x1000000;
 	}
 	if (mfsopts.readaheadtrigger==0) {
 		mfsopts.readaheadtrigger=mfsopts.readaheadleng*10;

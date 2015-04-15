@@ -27,6 +27,7 @@ bin/mfsfilepaths
 bin/mfssnapshot
 bin/mfsmount
 bin/mfstools
+etc/mfs/mfsmount.cfg.dist
 man/man1/mfsappendchunks.1.gz
 man/man1/mfscheckfile.1.gz
 man/man1/mfscopyeattr.1.gz
@@ -54,6 +55,4 @@ man/man1/mfssetquota.1.gz
 man/man1/mfssettrashtime.1.gz
 man/man1/mfstools.1.gz
 man/man8/mfsmount.8.gz
-etc/mfs/mfsmount.cfg.dist
 @exec  if [ ! -f %D/etc/mfs/mfsmount.cfg ]; then /bin/cp %D/etc/mfs/mfsmount.cfg.dist %D/etc/mfs/mfsmount.cfg; fi
-@dirrmtry etc/mfs

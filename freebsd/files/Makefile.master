@@ -7,9 +7,9 @@ PORTNAME=	moosefs
 CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-master
 
-.include "bsd.port.moosefs.mk"
-
 COMMENT=	Managing the whole filesystem and storing metadata
+
+.include "Makefile.common"
 
 USE_RC_SUBR=	mfsmaster
 PLIST_SUB+=	MFS_WORKDIR="${MFS_WORKDIR}"

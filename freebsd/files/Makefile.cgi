@@ -7,9 +7,9 @@ PORTNAME=	moosefs
 CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-cgi
 
-.include "bsd.port.moosefs.mk"
-
 COMMENT=	Cgi moosefs interface
+
+.include "Makefile.common"
 
 
 USES=		python:2.5+

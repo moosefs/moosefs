@@ -29,7 +29,7 @@ PORTNAMES="master chunkserver client metalogger cgi cgiserv cli netdump"
 
 PORTFILES="Makefile pkg-descr pkg-plist files"
 
-VERSION=3.0.15
+VERSION=3.0.16
 RELEASE=1
 
 if [ -f "$DISTFILEBASE" ]; then
@@ -54,7 +54,7 @@ for portname in ${PORTNAMES}; do
 			cp -R "${FILEBASEDIR}/files/${portfile}.${portname}" "${portdir}/${portfile}"
 		fi
 	done
-	cat "${FILEBASEDIR}/files/bsd.port.moosefs.mk" | sed "s/^PORTVERSION=.*$/PORTVERSION=	${VERSION}/" > "${portdir}/bsd.port.moosefs.mk"
+	cat "${FILEBASEDIR}/files/Makefile.common" | sed "s/^PORTVERSION=.*$/PORTVERSION=	${VERSION}/" > "${portdir}/Makefile.common"
 	(
 		echo "SHA256 (moosefs-${VERSION}-${RELEASE}.tar.gz) = $SHA256"
 		echo "SIZE (moosefs-${VERSION}-${RELEASE}.tar.gz) = $SIZE"

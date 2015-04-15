@@ -7,9 +7,9 @@ PORTNAME=	moosefs
 CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-netdump
 
-.include "bsd.port.moosefs.mk"
-
 COMMENT=	Network packet dump utility for mfs packets
+
+.include "Makefile.common"
 
 CONFIGURE_ARGS+=	--disable-mfsmaster \
 			--disable-mfsmetalogger \

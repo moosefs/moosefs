@@ -7,9 +7,9 @@ PORTNAME=	moosefs
 CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-client
 
-.include "bsd.port.moosefs.mk"
-
 COMMENT=	Moosefs client tools
+
+.include "Makefile.common"
 
 USES=		fuse pkgconfig
 

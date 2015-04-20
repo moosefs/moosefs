@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.16], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.17], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])

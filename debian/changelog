@@ -1,3 +1,9 @@
+moosefs (3.0.17-1) unstable; urgency=medium
+
+  * (master) fixed 'df' for subnodes with quota set on ancestor nodes
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 20 Apr 2015 13:00:00 +0200
+
 moosefs (3.0.16-1) unstable; urgency=medium
 
   * (all) changed freebsd ports

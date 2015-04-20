@@ -1441,6 +1441,26 @@ static inline uint8_t fsnodes_test_quota(fsnode *node,uint32_t inodes,uint64_t l
 	return 0;
 }
 
+static inline uint64_t fsnodes_get_minrsize_quota(fsnode *node,uint64_t quotarsize) {
+	quotanode *qn;
+	fsedge *e;
+	uint64_t qrsize = quotarsize;
+	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota)) {
+		if ((qn->flags&QUOTA_FLAG_HREALSIZE) && qrsize > qn->hrealsize) {
+			qrsize = qn->hrealsize;
+		}
+		if ((qn->flags&QUOTA_FLAG_SREALSIZE) && qrsize > qn->srealsize) {
+			qrsize = qn->srealsize;
+		}
+	}
+	if (node && node!=root) {
+		for (e=node->parents ; e ; e=e->nextparent) {
+			qrsize = fsnodes_get_minrsize_quota(e->parent,qrsize);
+		}
+	}
+	return qrsize;
+}
+
 // stats
 static inline void fsnodes_get_stats(fsnode *node,statsrecord *sr) {
 	uint32_t i,lastchunk,lastchunksize;
@@ -3878,8 +3898,8 @@ uint8_t fs_getrootinode(uint32_t *rootinode,const uint8_t *path) {
 
 void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t *availspace,uint64_t *trspace,uint64_t *respace,uint32_t *inodes) {
 	fsnode *rn;
-	quotanode *qn;
 	statsrecord sr;
+	uint64_t quotarsize;
 	(void)sesflags;
 	if (rootinode==MFS_ROOT_ID) {
 		*trspace = trashspace;
@@ -3898,16 +3918,14 @@ void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t
 		matocsserv_getspace(totalspace,availspace);
 		fsnodes_get_stats(rn,&sr);
 		*inodes = sr.inodes;
-		qn = rn->data.ddata.quota;
-		if (qn && (qn->flags&QUOTA_FLAG_HREALSIZE)) {
-			if (sr.realsize>=qn->hrealsize) {
-				*availspace = 0;
-			} else if (*availspace > qn->hrealsize - sr.realsize) {
-				*availspace = qn->hrealsize - sr.realsize;
-			}
-			if (*totalspace > qn->hrealsize) {
-				*totalspace = qn->hrealsize;
-			}
+		quotarsize = fsnodes_get_minrsize_quota(rn,UINT64_C(0xFFFFFFFFFFFFFFFF));
+		if (sr.realsize>=quotarsize) {
+			*availspace = 0;
+		} else if (*availspace > quotarsize - sr.realsize) {
+			*availspace = quotarsize - sr.realsize;
+		}
+		if (*totalspace > quotarsize) {
+			*totalspace = quotarsize;
 		}
 		if (sr.realsize + *availspace < *totalspace) {
 			*totalspace = sr.realsize + *availspace;

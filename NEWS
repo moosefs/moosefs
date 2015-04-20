@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.63-1 (2015-04-20)
+
+  - (master) fixed 'df' for subnodes with quota set on ancestor nodes
+
 * MooseFS 2.0.62-1 (2015-04-15)
 
   - (all) changed freebsd ports

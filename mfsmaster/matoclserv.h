@@ -31,7 +31,7 @@ void matoclserv_notify_unlink(uint32_t dirinode,uint8_t nleng,const uint8_t *nam
 void matoclserv_notify_remove(uint32_t dirinode);
 void matoclserv_notify_parent(uint32_t dirinode,uint32_t parent);
 */
-void matoclserv_chunk_unlocked(uint64_t chunkid,void *cptr);
+void matoclserv_chunk_unlocked(uint64_t chunkid);
 void matoclserv_chunk_status(uint64_t chunkid,uint8_t status);
 void matoclserv_fuse_flock_wake_up(uint32_t sessionid,uint32_t msgid,uint8_t status);
 void matoclserv_fuse_posix_lock_wake_up(uint32_t sessionid,uint32_t msgid,uint8_t status);

@@ -1,3 +1,10 @@
+moosefs (3.0.18-1) unstable; urgency=medium
+
+  * (master) fixed bug in chunk unlocking mechanism (few writes to the same
+    chunk may cause master freezing)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 24 Apr 2015 13:00:00 +0200
+
 moosefs (3.0.17-1) unstable; urgency=medium
 
   * (master) fixed 'df' for subnodes with quota set on ancestor nodes

@@ -2860,13 +2860,13 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 
 	if (err!=0) {
 		if (debug_mode) {
-			fprintf(stderr,"IO error occured while reading inode %lu\n",(unsigned long int)ino);
+			fprintf(stderr,"IO error occured while reading inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
 		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);
 	} else {
 		if (debug_mode) {
-			fprintf(stderr,"%"PRIu32" bytes have been read from inode %lu\n",ssize,(unsigned long int)ino);
+			fprintf(stderr,"%"PRIu32" bytes have been read from inode %lu (offset:%llu)\n",ssize,(unsigned long int)ino,(unsigned long long int)off);
 		}
 		oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)ssize);
 //		fuse_reply_buf(req,(char*)buff,ssize);
@@ -2962,16 +2962,16 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	if (err!=0) {
 		pthread_mutex_unlock(&(fileinfo->lock));
 		if (debug_mode) {
-			fprintf(stderr,"IO error occured while writing inode %lu\n",(unsigned long int)ino);
+			fprintf(stderr,"IO error occured while writing inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);
 	} else {
 		pthread_mutex_unlock(&(fileinfo->lock));
 		if (debug_mode) {
-			fprintf(stderr,"%llu bytes have been written to inode %lu\n",(unsigned long long int)size,(unsigned long int)ino);
+			fprintf(stderr,"%llu bytes have been written to inode %lu (offset:%llu)\n",(unsigned long long int)size,(unsigned long int)ino,(unsigned long long int)off);
 		}
-		oplog_printf(&ctx,"write (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)size);
+		oplog_printf(&ctx,"write (%lu,%llu,%llu): OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long long int)size);
 		read_inode_dirty_region(ino,off,size,buf);
 		fuse_reply_write(req,size);
 	}

@@ -761,7 +761,7 @@ int matoclserv_open_check(matoclserventry *eptr,uint32_t fid) {
 */
 
 
-static inline void matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint32_t msgid,uint32_t inode,uint32_t indx,uint8_t canmodmtime) {
+static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint32_t msgid,uint32_t inode,uint32_t indx,uint8_t canmodmtime) {
 	uint8_t *ptr;
 	uint8_t status;
 	uint64_t fleng;
@@ -797,7 +797,7 @@ static inline void matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint
 			lwc->next = NULL;
 			*(lwchunkshashtail[i]) = lwc;
 			lwchunkshashtail[i] = &(lwc->next);
-			return;
+			return 1;
 		}
 		if (status==ERROR_EAGAIN && eptr->version<VERSION2INT(3,0,8)) {
 			status = ERROR_LOCKED;
@@ -805,7 +805,7 @@ static inline void matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_WRITE_CHUNK,5);
 		put32bit(&ptr,msgid);
 		put8bit(&ptr,status);
-		return;
+		return 0;
 	}
 	if (opflag) {	// wait for operation end
 		i = CHUNKHASH(chunkid);
@@ -835,7 +835,7 @@ static inline void matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint
 			put32bit(&ptr,msgid);
 			put8bit(&ptr,status);
 			fs_writeend(0,0,chunkid,0);	// ignore status - just do it.
-			return;
+			return 0;
 		}
 		if (eptr->version>=VERSION2INT(3,0,10)) {
 			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_WRITE_CHUNK,25+count*14);
@@ -862,9 +862,10 @@ static inline void matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint
 		}
 	}
 	sessions_inc_stats(eptr->sesdata,15);
+	return 0;
 }
 
-static inline void matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t msgid,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t fleng) {
+static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t msgid,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t fleng) {
 	uint32_t indx;
 	uint32_t i;
 	uint8_t attr[35];
@@ -874,6 +875,7 @@ static inline void matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_
 	swchunks *swc;
 	lwchunks *lwc;
 	uint64_t chunkid;
+	uint8_t locked;
 
 	status = fs_try_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,opened,uid,gids,gid,auid,agid,fleng,attr,&indx,&prevchunkid,&chunkid);
 	if (status==ERROR_DELAYED) {
@@ -894,9 +896,10 @@ static inline void matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_
 		swc->next = swchunkshash[i];
 		swchunkshash[i] = swc;
 		sessions_inc_stats(eptr->sesdata,2);
-		return;
+		return 0;
 	}
 	if (status==ERROR_LOCKED || status==ERROR_CHUNKBUSY) {
+		locked = 1;
 		i = CHUNKHASH(chunkid);
 		lwc = malloc(sizeof(lwchunks)+sizeof(uint32_t)*gids);
 		passert(lwc);
@@ -920,6 +923,8 @@ static inline void matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_
 		lwc->next = NULL;
 		*(lwchunkshashtail[i]) = lwc;
 		lwchunkshashtail[i] = &(lwc->next);
+	} else {
+		locked = 0;
 	}
 	if (status==STATUS_OK) {
 		status = fs_do_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,gid[0],auid,agid,fleng,attr);
@@ -935,22 +940,24 @@ static inline void matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_
 		memcpy(ptr,attr,35);
 	}
 	sessions_inc_stats(eptr->sesdata,2);
+	return locked;
 }
 
-void matoclserv_chunk_unlocked(uint64_t chunkid,void *cptr) {
+void matoclserv_chunk_unlocked(uint64_t chunkid) {
 	lwchunks *lwc,**plwc;
+	uint8_t locked;
 
 	plwc = lwchunkshashhead + CHUNKHASH(chunkid);
 	while ((lwc = *plwc)) {
 		if (lwc->chunkid == chunkid && lwc->eptr->mode==DATA) {
 			if (lwc->type == FUSE_TRUNCATE) {
-				matoclserv_fuse_truncate_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->opened,lwc->uid,lwc->gids,lwc->gid,lwc->auid,lwc->agid,lwc->fleng);
+				locked = matoclserv_fuse_truncate_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->opened,lwc->uid,lwc->gids,lwc->gid,lwc->auid,lwc->agid,lwc->fleng);
 			} else {
-				matoclserv_fuse_write_chunk_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->indx,lwc->canmodmtime);
+				locked = matoclserv_fuse_write_chunk_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->indx,lwc->canmodmtime);
 			}
 			*plwc = lwc->next;
 			free(lwc);
-			if (chunk_locked_or_busy(cptr)) {
+			if (locked) {
 				break;
 			}
 		} else {

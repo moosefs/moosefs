@@ -1016,7 +1016,7 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 			if (c->operation==REPLICATE) {
 				c->operation = NONE;
 				c->lockedto = 0;
-				matoclserv_chunk_unlocked(c->chunkid,c);
+				matoclserv_chunk_unlocked(c->chunkid);
 			} else {
 				if (validcopies) {
 					chunk_emergency_increase_version(c);
@@ -1264,7 +1264,7 @@ int chunk_unlock(uint64_t chunkid) {
 	}
 	c->lockedto = 0;
 	chunk_write_counters(c,0);
-	matoclserv_chunk_unlocked(c->chunkid,c);
+	matoclserv_chunk_unlocked(c->chunkid);
 	chunk_priority_queue_check(c,1);
 	return STATUS_OK;
 }
@@ -2283,7 +2283,7 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 		}
 		c->operation = NONE;
 		c->lockedto = 0;
-		matoclserv_chunk_unlocked(c->chunkid,c);
+		matoclserv_chunk_unlocked(c->chunkid);
 	} else { // low priority replication
 		if (status!=0) {
 			chunk_priority_queue_check(c,1);
@@ -2384,7 +2384,7 @@ void chunk_operation_status(chunk *c,uint8_t status,uint16_t csid) {
 				c->operation = NONE;
 				c->needverincrease = 0;
 				if (c->lockedto==0) {
-					matoclserv_chunk_unlocked(c->chunkid,c);
+					matoclserv_chunk_unlocked(c->chunkid);
 				}
 			}
 		} else {
@@ -2789,7 +2789,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			}
 			c->operation = NONE;
 			c->lockedto = 0;
-			matoclserv_chunk_unlocked(c->chunkid,c);
+			matoclserv_chunk_unlocked(c->chunkid);
 		}
 	}
 

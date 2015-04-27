@@ -11,7 +11,6 @@ COMMENT=	Cgi moosefs interface
 
 .include "Makefile.common"
 
-
 USES=		python:2.5+
 
 CONFIGURE_ARGS+=	--disable-mfsmaster \

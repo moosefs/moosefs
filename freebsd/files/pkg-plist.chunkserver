@@ -2,7 +2,6 @@
 @unexec if cmp -s %D/etc/mfs/mfshdd.cfg.dist %D/etc/mfs/mfshdd.cfg; then rm -f %D/etc/mfs/mfshdd.cfg; fi
 etc/mfs/mfschunkserver.cfg.dist
 etc/mfs/mfshdd.cfg.dist
-etc/rc.d/mfschunkserver
 sbin/mfschunkserver
 sbin/mfschunktool
 man/man5/mfschunkserver.cfg.5.gz

@@ -1,3 +1,9 @@
+moosefs (2.0.64-1) unstable; urgency=medium
+
+  * (mount) fixed bug in read module (it's theoretical bug).
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 27 Apr 2015 13:00:00 +0200
+
 moosefs (2.0.63-1) unstable; urgency=medium
 
   * (master) fixed 'df' for subnodes with quota set on ancestor nodes

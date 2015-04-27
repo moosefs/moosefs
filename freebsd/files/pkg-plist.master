@@ -4,7 +4,6 @@
 etc/mfs/mfsmaster.cfg.dist
 etc/mfs/mfsexports.cfg.dist
 etc/mfs/mfstopology.cfg.dist
-etc/rc.d/mfsmaster
 sbin/mfsmaster
 sbin/mfsmetadump
 sbin/mfsmetarestore

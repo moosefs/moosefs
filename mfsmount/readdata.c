@@ -1910,7 +1910,7 @@ void* read_data_new(uint32_t inode) {
 
 void read_data_end(void *vid) {
 	inodedata *id,**idp;
-	rrequest *rreq,**rreqp;
+	rrequest *rreq,*rreqn;
 	inodedata *rid = (inodedata*)vid;
 	uint32_t idh = IDHASH(rid->inode);
 
@@ -1922,19 +1922,23 @@ void read_data_end(void *vid) {
 #ifdef RDEBUG
 	fprintf(stderr,"%.6lf: closing: %"PRIu32" ; cleaning req list\n",monotonic_seconds(),rid->inode);
 #endif
-	rreqp = &(rid->reqhead);
-	while ((rreq = *rreqp)) {
+	for (rreq = rid->reqhead ; rreq ; rreq=rreqn) {
+		rreqn = rreq->next;
 #ifdef RDEBUG
 		fprintf(stderr,"%.6lf: closing: %"PRIu32" ; rreq: lcnt: %u ; busy: %u ; free: %u ; filled: %u\n",monotonic_seconds(),rid->inode,rreq->lcnt,rreq->busy,rreq->free,rreq->filled);
 #endif
 		if (rreq->lcnt==0 && rreq->busy==0) {
+			*(rreq->prev) = rreq->next;
+			if (rreq->next) {
+				rreq->next->prev = rreq->prev;
+			} else {
+				rid->reqtail = rreq->prev;
+			}
 			reqbufftotalsize -= rreq->leng;
 			free(rreq->data);
-			*rreqp = rreq->next;
 			free(rreq);
 		} else {
 			rreq->free = 1;
-			rreqp = &(rreq->next);
 		}
 	}
 	while (rid->reqhead!=NULL || rid->inqueue==1) {

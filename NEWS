@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.65-1 (2015-05-04)
+
+  - (master) added missing chunks/files log
+
 * MooseFS 2.0.64-1 (2015-04-27)
 
   - (mount) fixed bug in read module (it's theoretical bug).

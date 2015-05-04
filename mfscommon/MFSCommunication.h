@@ -1396,10 +1396,30 @@
 //     9 - symlinks
 //     10 - quota
 
+// 0x0212
 #define CLTOAN_MODULE_INFO (PROTO_BASE+530)
 // -
+
+// 0x0213
 #define ANTOCL_MODULE_INFO (PROTO_BASE+531)
 // module_type:8 module_version:32 module_id:16 meta_id:64 leader_ip:32 leader_port:16
+
+// 0x0218
+#define CLTOMA_MASS_RESOLVE_PATHS (PROTO_BASE+536)
+// N*[ inode:32 ]
+
+// 0x0219
+#define MATOCL_MASS_RESOLVE_PATHS (PROTO_BASE+537)
+// N*[ inode:32 pathssize:32 M*[ pathleng:32 path:pathlengB ] ]
+
+// 0x0220
+#define CLTOMA_MISSING_CHUNKS (PROTO_BASE+544)
+// -
+
+// 0x0221
+#define MATOCL_MISSING_CHUNKS (PROTO_BASE+545)
+// N*[ chunkdid:64 inode:32 indx:32 ]
+
 
 // CHUNKSERVER STATS
 
@@ -1410,7 +1430,7 @@
 
 // 0x0259
 #define CSTOCL_HDD_LIST_V2 (PROTO_BASE+601)
-// N*[ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 3 * [ bytesread:64 byteswritten:64 usecread:64 usecwrite:64 usecfsync:64 readops:32 writeops:32 fsyncops:32 usecreadmax:32 usecwritemax:32 usecfsyncmax:32 ] ]
+// N*[ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 3*[ bytesread:64 byteswritten:64 usecread:64 usecwrite:64 usecfsync:64 readops:32 writeops:32 fsyncops:32 usecreadmax:32 usecwritemax:32 usecfsyncmax:32 ] ]
 
 
 #endif

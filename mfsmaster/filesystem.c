@@ -66,6 +66,7 @@
 #include "changelog.h"
 #include "buckets.h"
 #include "clocks.h"
+#include "missinglog.h"
 
 #define HASHTAB_LOBITS 24
 #define HASHTAB_HISIZE (0x80000000>>(HASHTAB_LOBITS))
@@ -1439,26 +1440,6 @@ static inline uint8_t fsnodes_test_quota(fsnode *node,uint32_t inodes,uint64_t l
 	return 0;
 }
 
-static inline uint64_t fsnodes_get_minrsize_quota(fsnode *node,uint64_t quotarsize) {
-	quotanode *qn;
-	fsedge *e;
-	uint64_t qrsize = quotarsize;
-	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota)) {
-		if ((qn->flags&QUOTA_FLAG_HREALSIZE) && qrsize > qn->hrealsize) {
-			qrsize = qn->hrealsize;
-		}
-		if ((qn->flags&QUOTA_FLAG_SREALSIZE) && qrsize > qn->srealsize) {
-			qrsize = qn->srealsize;
-		}
-	}
-	if (node && node!=root) {
-		for (e=node->parents ; e ; e=e->nextparent) {
-			qrsize = fsnodes_get_minrsize_quota(e->parent,qrsize);
-		}
-	}
-	return qrsize;
-}
-
 // stats
 static inline void fsnodes_get_stats(fsnode *node,statsrecord *sr) {
 	uint32_t i,lastchunk,lastchunksize;
@@ -1566,6 +1547,40 @@ static inline void fsnodes_add_sub_stats(fsnode *parent,statsrecord *newsr,stats
 	sr.size = newsr->size - prevsr->size;
 	sr.realsize = newsr->realsize - prevsr->realsize;
 	fsnodes_add_stats(parent,&sr);
+}
+
+
+static inline void fsnodes_quota_fixspace(fsnode *node,uint64_t *totalspace,uint64_t *availspace) {
+	quotanode *qn;
+	fsedge *e;
+	statsrecord sr;
+	uint64_t quotarsize;
+	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota) && (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE))) {
+		fsnodes_get_stats(node,&sr);
+		quotarsize = UINT64_C(0xFFFFFFFFFFFFFFFF);
+		if ((qn->flags&QUOTA_FLAG_HREALSIZE) && quotarsize > qn->hrealsize) {
+			quotarsize = qn->hrealsize;
+		}
+		if ((qn->flags&QUOTA_FLAG_SREALSIZE) && quotarsize > qn->srealsize) {
+			quotarsize = qn->srealsize;
+		}
+		if (sr.realsize >= quotarsize) {
+			*availspace = 0;
+		} else if (*availspace > quotarsize - sr.realsize) {
+			*availspace = quotarsize - sr.realsize;
+		}
+		if (*totalspace > quotarsize) {
+			*totalspace = quotarsize;
+		}
+		if (sr.realsize + *availspace < *totalspace) {
+			*totalspace = sr.realsize + *availspace;
+		}
+	}
+	if (node && node!=root) {
+		for (e=node->parents ; e ; e=e->nextparent) {
+			fsnodes_quota_fixspace(e->parent,totalspace,availspace);
+		}
+	}
 }
 
 /*
@@ -3738,7 +3753,13 @@ uint8_t fs_get_paths_size(uint32_t rootinode,uint32_t inode,uint32_t *psize) {
 		return ERROR_ENOENT;
 	}
 
-	*psize = fsnodes_get_paths_size(rootinode,p);
+	if (p->type==TYPE_TRASH) {
+		*psize += 7+4;
+	} else if (p->type==TYPE_SUSTAINED) {
+		*psize += 11+4;
+	} else {
+		*psize = fsnodes_get_paths_size(rootinode,p);
+	}
 	return STATUS_OK;
 }
 
@@ -3746,7 +3767,15 @@ void fs_get_paths_data(uint32_t rootinode,uint32_t inode,uint8_t *buff) {
 	fsnode *p;
 
 	if (fsnodes_node_find_ext(rootinode,0,&inode,NULL,&p,0)) {
-		fsnodes_get_paths_data(rootinode,p,buff);
+		if (p->type==TYPE_TRASH) {
+			put32bit(&buff,7);
+			memcpy(buff,"./TRASH",7);
+		} else if (p->type==TYPE_SUSTAINED) {
+			put32bit(&buff,11);
+			memcpy(buff,"./SUSTAINED",11);
+		} else {
+			fsnodes_get_paths_data(rootinode,p,buff);
+		}
 	}
 }
 
@@ -3799,7 +3828,6 @@ uint8_t fs_getrootinode(uint32_t *rootinode,const uint8_t *path) {
 void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t *availspace,uint64_t *trspace,uint64_t *respace,uint32_t *inodes) {
 	fsnode *rn;
 	statsrecord sr;
-	uint64_t quotarsize;
 	(void)sesflags;
 	if (rootinode==MFS_ROOT_ID) {
 		*trspace = trashspace;
@@ -3816,20 +3844,9 @@ void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t
 		*inodes = 0;
 	} else {
 		matocsserv_getspace(totalspace,availspace);
+		fsnodes_quota_fixspace(rn,totalspace,availspace);
 		fsnodes_get_stats(rn,&sr);
 		*inodes = sr.inodes;
-		quotarsize = fsnodes_get_minrsize_quota(rn,UINT64_C(0xFFFFFFFFFFFFFFFF));
-		if (sr.realsize>=quotarsize) {
-			*availspace = 0;
-		} else if (*availspace > quotarsize - sr.realsize) {
-			*availspace = quotarsize - sr.realsize;
-		}
-		if (*totalspace > quotarsize) {
-			*totalspace = quotarsize;
-		}
-		if (sr.realsize + *availspace < *totalspace) {
-			*totalspace = sr.realsize + *availspace;
-		}
 	}
 	stats_statfs++;
 }
@@ -6102,6 +6119,8 @@ void fs_test_files() {
 		mchunks=0;
 		errors=0;
 
+		missing_log_swap();
+
 		if (fsinfo_msgbuff==NULL) {
 			fsinfo_msgbuff=malloc(MSGBUFFSIZE);
 			passert(fsinfo_msgbuff);
@@ -6142,6 +6161,7 @@ void fs_test_files() {
 							valid =0;
 							mchunks++;
 						} else if (vc==0) {
+							missing_log_insert(chunkid,f->id,j);
 							if (errors<ERRORS_LOG_MAX) {
 								syslog(LOG_ERR,"currently unavailable chunk %016"PRIX64" (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->id,j);
 								if (leng<MSGBUFFSIZE) {

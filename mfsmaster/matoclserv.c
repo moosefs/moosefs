@@ -63,6 +63,7 @@
 #include "slogger.h"
 #include "massert.h"
 #include "clocks.h"
+#include "missinglog.h"
 
 #define MaxPacketSize CLTOMA_MAXPACKETSIZE
 
@@ -1051,6 +1052,70 @@ void matoclserv_module_info(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	put64bit(&ptr,meta_get_fileid());
 	put32bit(&ptr,0);
 	put16bit(&ptr,0);
+}
+
+void matoclserv_mass_resolve_paths(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	static uint32_t *inodetab = NULL;
+	static uint32_t *psizetab = NULL;
+	static uint32_t tabsleng = 0;
+	uint32_t i,j;
+	uint32_t totalsize;
+	uint32_t psize;
+	uint8_t *ptr;
+	uint8_t status;
+	if ((length%4)!=0) {
+		syslog(LOG_NOTICE,"CLTOMA_MASS_RESOLVE_PATHS - wrong size (%"PRIu32"/N*4)",length);
+		eptr->mode = KILL;
+		return;
+	}
+	length>>=2;
+	if (length>tabsleng) {
+		if (inodetab) {
+			free(inodetab);
+		}
+		if (psizetab) {
+			free(psizetab);
+		}
+		tabsleng = ((length+0xFF)&0xFFFFFF00);
+		inodetab = malloc(sizeof(uint32_t)*tabsleng);
+		passert(inodetab);
+		psizetab = malloc(sizeof(uint32_t)*tabsleng);
+		passert(psizetab);
+	}
+	j = 0;
+	totalsize = 0;
+	while (length>0) {
+		i = get32bit(&data);
+		if (i>0) {
+			status = fs_get_paths_size(MFS_ROOT_ID,i,&psize);
+			if (status==STATUS_OK) {
+				inodetab[j] = i;
+				psizetab[j] = psize;
+				j++;
+				totalsize += 8 + psize;
+			}
+		}
+		length--;
+	}
+	ptr = matoclserv_createpacket(eptr,MATOCL_MASS_RESOLVE_PATHS,totalsize);
+	for (i=0 ; i<j ; i++) {
+		put32bit(&ptr,inodetab[i]);
+		put32bit(&ptr,psizetab[i]);
+		fs_get_paths_data(MFS_ROOT_ID,inodetab[i],ptr);
+		ptr+=psizetab[i];
+	}
+}
+
+void matoclserv_missing_chunks(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t *ptr;
+	if (length!=0) {
+		syslog(LOG_NOTICE,"CLTOMA_MISSING_CHUNKS - wrong size (%"PRIu32"/0)",length);
+		eptr->mode = KILL;
+		return;
+	}
+	(void)data;
+	ptr = matoclserv_createpacket(eptr,MATOCL_MISSING_CHUNKS,missing_log_getdata(NULL));
+	missing_log_getdata(ptr);
 }
 
 void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -4151,6 +4216,12 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOAN_MODULE_INFO:
 				matoclserv_module_info(eptr,data,length);
 				break;
+			case CLTOMA_MASS_RESOLVE_PATHS:
+				matoclserv_mass_resolve_paths(eptr,data,length);
+				break;
+			case CLTOMA_MISSING_CHUNKS:
+				matoclserv_missing_chunks(eptr,data,length);
+				break;
 			default:
 				syslog(LOG_NOTICE,"main master server module: got unknown message from unregistered (type:%"PRIu32")",type);
 				eptr->mode=KILL;
@@ -4361,6 +4432,12 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				break;
 			case CLTOAN_MODULE_INFO:
 				matoclserv_module_info(eptr,data,length);
+				break;
+			case CLTOMA_MASS_RESOLVE_PATHS:
+				matoclserv_mass_resolve_paths(eptr,data,length);
+				break;
+			case CLTOMA_MISSING_CHUNKS:
+				matoclserv_missing_chunks(eptr,data,length);
 				break;
 			default:
 				syslog(LOG_NOTICE,"main master server module: got unknown message from mfsmount (type:%"PRIu32")",type);

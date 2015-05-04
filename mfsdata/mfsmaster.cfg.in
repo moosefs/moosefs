@@ -40,6 +40,9 @@
 # due to logs being kept in 5k blocks; zero disables extra logs storage)
 # CHANGELOG_PRESERVE_SECONDS = 1800
 
+# how many missing chunks will be stored in master (up to 100*MISSING_LOG_CAPACITY bytes of memory will be allocated)
+# MISSING_LOG_CAPACITY = 100000
+
 
 ###############################################
 # COMMAND CONNECTION OPTIONS                  #

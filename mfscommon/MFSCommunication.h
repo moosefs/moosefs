@@ -1566,6 +1566,14 @@
 #define MATOCL_LABEL_SET_INFO (PROTO_BASE+543)
 // allservers:16 N*[ labelsetid:8 inodes:32 canbefulfilled:8 labelscnt:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ]
 
+// 0x0220
+#define CLTOMA_MISSING_CHUNKS (PROTO_BASE+544)
+// -
+
+// 0x0221
+#define MATOCL_MISSING_CHUNKS (PROTO_BASE+545)
+// N*[ chunkdid:64 inode:32 indx:32 ]
+
 
 // CHUNKSERVER STATS
 

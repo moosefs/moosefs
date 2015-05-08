@@ -66,6 +66,7 @@
 #include "slogger.h"
 #include "massert.h"
 #include "clocks.h"
+#include "missinglog.h"
 
 #define MaxPacketSize CLTOMA_MAXPACKETSIZE
 
@@ -943,7 +944,7 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 	return locked;
 }
 
-void matoclserv_chunk_unlocked(uint64_t chunkid) {
+void matoclserv_chunk_unlocked(uint64_t chunkid,void *cptr) {
 	lwchunks *lwc,**plwc;
 	uint8_t locked;
 
@@ -957,7 +958,7 @@ void matoclserv_chunk_unlocked(uint64_t chunkid) {
 			}
 			*plwc = lwc->next;
 			free(lwc);
-			if (locked) {
+			if (locked || chunk_locked_or_busy(cptr)) {
 				break;
 			}
 		} else {
@@ -1503,6 +1504,18 @@ void matoclserv_label_set_info(matoclserventry *eptr,const uint8_t *data,uint32_
 	labelset_label_set_info(ptr);
 }
 
+void matoclserv_missing_chunks(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t *ptr;
+	if (length!=0) {
+		syslog(LOG_NOTICE,"CLTOMA_MISSING_CHUNKS - wrong size (%"PRIu32"/0)",length);
+		eptr->mode = KILL;
+		return;
+	}
+	(void)data;
+	ptr = matoclserv_createpacket(eptr,MATOCL_MISSING_CHUNKS,missing_log_getdata(NULL));
+	missing_log_getdata(ptr);
+}
+
 void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint64_t totalspace,availspace,trspace,respace;
 	uint64_t memusage,syscpu,usercpu;
@@ -1591,22 +1604,26 @@ void matoclserv_memory_info(matoclserventry *eptr,const uint8_t *data,uint32_t l
 }
 
 void matoclserv_fstest_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t loopstart,loopend,files,ugfiles,mfiles,chunks,ugchunks,mchunks,msgbuffleng;
+	uint32_t loopstart,loopend,files,ugfiles,mfiles,mtfiles,msfiles,chunks,ugchunks,mchunks,msgbuffleng;
 	char *msgbuff;
 	uint8_t *ptr;
 	(void)data;
-	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOMA_FSTEST_INFO - wrong size (%"PRIu32"/0)",length);
+	if (length!=0 && length!=1) {
+		syslog(LOG_NOTICE,"CLTOMA_FSTEST_INFO - wrong size (%"PRIu32"/0|1)",length);
 		eptr->mode = KILL;
 		return;
 	}
-	fs_test_getdata(&loopstart,&loopend,&files,&ugfiles,&mfiles,&chunks,&ugchunks,&mchunks,&msgbuff,&msgbuffleng);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FSTEST_INFO,msgbuffleng+36);
+	fs_test_getdata(&loopstart,&loopend,&files,&ugfiles,&mfiles,&mtfiles,&msfiles,&chunks,&ugchunks,&mchunks,&msgbuff,&msgbuffleng);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FSTEST_INFO,msgbuffleng+((length==1)?44:36));
 	put32bit(&ptr,loopstart);
 	put32bit(&ptr,loopend);
 	put32bit(&ptr,files);
 	put32bit(&ptr,ugfiles);
 	put32bit(&ptr,mfiles);
+	if (length==1) {
+		put32bit(&ptr,mtfiles);
+		put32bit(&ptr,msfiles);
+	}
 	put32bit(&ptr,chunks);
 	put32bit(&ptr,ugchunks);
 	put32bit(&ptr,mchunks);
@@ -4959,6 +4976,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_LABEL_SET_INFO:
 				matoclserv_label_set_info(eptr,data,length);
 				break;
+			case CLTOMA_MISSING_CHUNKS:
+				matoclserv_missing_chunks(eptr,data,length);
+				break;
 			default:
 				syslog(LOG_NOTICE,"main master server module: got unknown message from unregistered (type:%"PRIu32")",type);
 				eptr->mode=KILL;
@@ -5199,6 +5219,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				break;
 			case CLTOMA_LABEL_SET_INFO:
 				matoclserv_label_set_info(eptr,data,length);
+				break;
+			case CLTOMA_MISSING_CHUNKS:
+				matoclserv_missing_chunks(eptr,data,length);
 				break;
 			default:
 				syslog(LOG_NOTICE,"main master server module: got unknown message from mfsmount (type:%"PRIu32")",type);

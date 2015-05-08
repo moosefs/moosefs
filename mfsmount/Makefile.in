@@ -114,11 +114,10 @@ am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	mfsmount-chunkloccache.$(OBJEXT) mfsmount-getgroups.$(OBJEXT) \
 	mfsmount-mfs_fuse.$(OBJEXT) mfsmount-mfs_meta_fuse.$(OBJEXT) \
 	mfsmount-mastercomm.$(OBJEXT) mfsmount-masterproxy.$(OBJEXT) \
-	mfsmount-cscomm.$(OBJEXT) mfsmount-csorder.$(OBJEXT) \
-	mfsmount-readdata.$(OBJEXT) mfsmount-writedata.$(OBJEXT) \
-	mfsmount-csdb.$(OBJEXT) mfsmount-stats.$(OBJEXT) \
-	mfsmount-oplog.$(OBJEXT) mfsmount-main.$(OBJEXT) \
-	../mfscommon/mfsmount-clocks.$(OBJEXT) \
+	mfsmount-csorder.$(OBJEXT) mfsmount-readdata.$(OBJEXT) \
+	mfsmount-writedata.$(OBJEXT) mfsmount-csdb.$(OBJEXT) \
+	mfsmount-stats.$(OBJEXT) mfsmount-oplog.$(OBJEXT) \
+	mfsmount-main.$(OBJEXT) ../mfscommon/mfsmount-clocks.$(OBJEXT) \
 	../mfscommon/mfsmount-delayrun.$(OBJEXT) \
 	../mfscommon/mfsmount-pcqueue.$(OBJEXT) \
 	../mfscommon/mfsmount-crc.$(OBJEXT) \
@@ -414,7 +413,6 @@ mfsmount_SOURCES = \
 	mfs_meta_fuse.c mfs_meta_fuse.h \
 	mastercomm.c mastercomm.h \
 	masterproxy.c masterproxy.h \
-	cscomm.c cscomm.h \
 	csorder.c csorder.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
@@ -636,7 +634,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunkloccache.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-cscomm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csdb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csorder.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirattrcache.Po@am__quote@
@@ -834,20 +831,6 @@ mfsmount-masterproxy.obj: masterproxy.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='masterproxy.c' object='mfsmount-masterproxy.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-masterproxy.obj `if test -f 'masterproxy.c'; then $(CYGPATH_W) 'masterproxy.c'; else $(CYGPATH_W) '$(srcdir)/masterproxy.c'; fi`
-
-mfsmount-cscomm.o: cscomm.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-cscomm.o -MD -MP -MF $(DEPDIR)/mfsmount-cscomm.Tpo -c -o mfsmount-cscomm.o `test -f 'cscomm.c' || echo '$(srcdir)/'`cscomm.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-cscomm.Tpo $(DEPDIR)/mfsmount-cscomm.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='cscomm.c' object='mfsmount-cscomm.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-cscomm.o `test -f 'cscomm.c' || echo '$(srcdir)/'`cscomm.c
-
-mfsmount-cscomm.obj: cscomm.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-cscomm.obj -MD -MP -MF $(DEPDIR)/mfsmount-cscomm.Tpo -c -o mfsmount-cscomm.obj `if test -f 'cscomm.c'; then $(CYGPATH_W) 'cscomm.c'; else $(CYGPATH_W) '$(srcdir)/cscomm.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-cscomm.Tpo $(DEPDIR)/mfsmount-cscomm.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='cscomm.c' object='mfsmount-cscomm.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-cscomm.obj `if test -f 'cscomm.c'; then $(CYGPATH_W) 'cscomm.c'; else $(CYGPATH_W) '$(srcdir)/cscomm.c'; fi`
 
 mfsmount-csorder.o: csorder.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-csorder.o -MD -MP -MF $(DEPDIR)/mfsmount-csorder.Tpo -c -o mfsmount-csorder.o `test -f 'csorder.c' || echo '$(srcdir)/'`csorder.c

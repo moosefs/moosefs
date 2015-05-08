@@ -790,7 +790,7 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 			}
 		}
 	}
-	if (vc+tdc > 0 && (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag) || wronglabels)) { // undergoal chunk
+	if (vc+tdc > 0 && (vc != labelset_get_keeparch_goal(c->lsetid,c->archflag) || wronglabels)) { // wrong-goal chunk
 		if (vc==0 && tdc==1) { // highest priority - chunks only on one disk "marked for removal"
 			j = 0;
 		} else if (vc==1 && tdc==0) { // next priority - chunks only on one regular disk
@@ -801,7 +801,7 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 			j = 3;
 		} else if (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag)) { // next priority - standard undergoal chunks
 			j = 4;
-		} else { // latest priority - changed labels
+		} else { // latest priority - changed labels or overgoal
 			j = 5;
 		}
 		chunk_priority_enqueue(j,c);
@@ -1016,7 +1016,7 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 			if (c->operation==REPLICATE) {
 				c->operation = NONE;
 				c->lockedto = 0;
-				matoclserv_chunk_unlocked(c->chunkid);
+				matoclserv_chunk_unlocked(c->chunkid,c);
 			} else {
 				if (validcopies) {
 					chunk_emergency_increase_version(c);
@@ -1252,7 +1252,7 @@ static inline void chunk_write_counters(chunk *c,uint8_t x) {
 
 int chunk_locked_or_busy(void *cptr) {
 	chunk *c = (chunk*)cptr;
-	return (c->lockedto==0 && c->operation==NONE)?1:0;
+	return (c->lockedto==0 && c->operation==NONE)?0:1;
 }
 
 int chunk_unlock(uint64_t chunkid) {
@@ -1264,7 +1264,7 @@ int chunk_unlock(uint64_t chunkid) {
 	}
 	c->lockedto = 0;
 	chunk_write_counters(c,0);
-	matoclserv_chunk_unlocked(c->chunkid);
+	matoclserv_chunk_unlocked(c->chunkid,c);
 	chunk_priority_queue_check(c,1);
 	return STATUS_OK;
 }
@@ -2283,7 +2283,7 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 		}
 		c->operation = NONE;
 		c->lockedto = 0;
-		matoclserv_chunk_unlocked(c->chunkid);
+		matoclserv_chunk_unlocked(c->chunkid,c);
 	} else { // low priority replication
 		if (status!=0) {
 			chunk_priority_queue_check(c,1);
@@ -2384,7 +2384,7 @@ void chunk_operation_status(chunk *c,uint8_t status,uint16_t csid) {
 				c->operation = NONE;
 				c->needverincrease = 0;
 				if (c->lockedto==0) {
-					matoclserv_chunk_unlocked(c->chunkid);
+					matoclserv_chunk_unlocked(c->chunkid,c);
 				}
 			}
 		} else {
@@ -2789,7 +2789,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			}
 			c->operation = NONE;
 			c->lockedto = 0;
-			matoclserv_chunk_unlocked(c->chunkid);
+			matoclserv_chunk_unlocked(c->chunkid,c);
 		}
 	}
 
@@ -2868,7 +2868,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	}
 
 // step 7.1. if chunk has too many copies then delete some of them
-	if (extrajob==0 && vc > labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
+	if (vc > labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
 		uint8_t prevdone;
 		if (dservcount==0) {
 			// dservcount = matocsserv_getservers_ordered(dcsids,AcceptableDifference/2.0,NULL,NULL);
@@ -2909,6 +2909,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							dc++;
 						} else {
 							prevdone=0;
+							chunk_priority_enqueue(5,c); // in such case only enqueue this chunk for future processing
 						}
 					}
 				}
@@ -2933,6 +2934,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						dc++;
 					} else {
 						prevdone=0;
+						chunk_priority_enqueue(5,c); // in such case only enqueue this chunk for future processing
 					}
 				}
 			}

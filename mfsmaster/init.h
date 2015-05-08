@@ -34,6 +34,7 @@
 #include "random.h"
 #include "changelog.h"
 #include "chartsdata.h"
+#include "missinglog.h"
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
@@ -64,7 +65,8 @@ struct {
 } RunTab[]={
 	{changelog_init,"change log"},
 	{rnd_init,"random generator"},
-	{dcm_init,"data cache manager"}, // has to be before 'fs_init' and 'matoclserv_networkinit'
+	{missing_log_init,"missing chunks/files log"}, // has to be before 'fs_init'
+	{dcm_init,"data cache manager"}, // has to be before 'fs_init' and 'matoclserv_init'
 	{exports_init,"exports manager"},
 	{topology_init,"net topology module"},
 	{meta_init,"metadata manager"},

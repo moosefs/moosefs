@@ -1,9 +1,19 @@
+moosefs (3.0.19-1) unstable; urgency=medium
+
+  * (master) removed missing chunks/files from messages
+  * (cli+cgi) added presenting missing chunks/files in separate table
+  * (mount) improved reading performance
+  * (master) added missing chunks/files log
+  * (master) added fast delete during rebalance
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 08 May 2015 13:00:00 +0200
+
 moosefs (3.0.18-1) unstable; urgency=medium
 
   * (master) fixed bug in chunk unlocking mechanism (few writes to the same
     chunk may cause master freezing)
 
- -- MooseFS Team <contact@moosefs.com>  Fri, 24 Apr 2015 13:00:00 +0200
+ -- MooseFS Team <contact@moosefs.com>  Wed, 29 Apr 2015 13:00:00 +0200
 
 moosefs (3.0.17-1) unstable; urgency=medium
 

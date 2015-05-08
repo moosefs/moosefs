@@ -1,6 +1,14 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.18-1 (2015-04-24)
+* MooseFS 3.0.19-1 (2015-05-08)
+
+  - (master) removed missing chunks/files from messages
+  - (cli+cgi) added presenting missing chunks/files in separate table
+  - (mount) improved reading performance
+  - (master) added missing chunks/files log
+  - (master) added fast delete during rebalance
+
+* MooseFS 3.0.18-1 (2015-04-29)
 
   - (master) fixed bug in chunk unlocking mechanism (few writes to the same chunk may cause master freezing)
 

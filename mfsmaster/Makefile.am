@@ -22,6 +22,7 @@ mfsmaster_SOURCES=\
 	metadata.c metadata.h \
 	restore.c restore.h \
 	merger.c merger.h \
+	missinglog.c missinglog.h \
 	sharedpointer.c sharedpointer.h \
 	matocsserv.c matocsserv.h \
 	matoclserv.c matoclserv.h \

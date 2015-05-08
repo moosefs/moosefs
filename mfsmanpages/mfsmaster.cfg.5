@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "April 2015" "MooseFS 3.0.18-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "May 2015" "MooseFS 3.0.19-1" "This is part of MooseFS"
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
@@ -56,6 +56,9 @@ number of previous metadata files to be kept (default is 1)
 how many seconds of change logs have to be preserved in memory (default is 1800; 
 this sets the minimum, actual number may be a bit bigger due to logs being kept 
 in 5k blocks; zero disables extra logs storage)
+.TP
+\fBMISSING_LOG_CAPACITY\fP
+how many missing chunks will be stored in master (up to 100*MISSING_LOG_CAPACITY bytes of memory will be allocated ; default value is 100000)
 .TP
 \fBMATOML_LISTEN_HOST\fP
 IP address to listen on for metalogger, masters and supervisors connections (* means any)

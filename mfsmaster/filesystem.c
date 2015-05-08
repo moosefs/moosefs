@@ -67,6 +67,7 @@
 #include "buckets.h"
 #include "clocks.h"
 #include "labelsets.h"
+#include "missinglog.h"
 
 #define HASHTAB_LOBITS 24
 #define HASHTAB_HISIZE (0x80000000>>(HASHTAB_LOBITS))
@@ -217,11 +218,12 @@ static uint64_t *edgeid_id_hashtab;
 static fsedge **edgeid_ptr_hashtab;
 
 #define MSGBUFFSIZE 1000000
-#define ERRORS_LOG_MAX 500
 
 static uint32_t fsinfo_files=0;
 static uint32_t fsinfo_ugfiles=0;
 static uint32_t fsinfo_mfiles=0;
+static uint32_t fsinfo_mtfiles=0;
+static uint32_t fsinfo_msfiles=0;
 static uint32_t fsinfo_chunks=0;
 static uint32_t fsinfo_ugchunks=0;
 static uint32_t fsinfo_mchunks=0;
@@ -1441,26 +1443,6 @@ static inline uint8_t fsnodes_test_quota(fsnode *node,uint32_t inodes,uint64_t l
 	return 0;
 }
 
-static inline uint64_t fsnodes_get_minrsize_quota(fsnode *node,uint64_t quotarsize) {
-	quotanode *qn;
-	fsedge *e;
-	uint64_t qrsize = quotarsize;
-	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota)) {
-		if ((qn->flags&QUOTA_FLAG_HREALSIZE) && qrsize > qn->hrealsize) {
-			qrsize = qn->hrealsize;
-		}
-		if ((qn->flags&QUOTA_FLAG_SREALSIZE) && qrsize > qn->srealsize) {
-			qrsize = qn->srealsize;
-		}
-	}
-	if (node && node!=root) {
-		for (e=node->parents ; e ; e=e->nextparent) {
-			qrsize = fsnodes_get_minrsize_quota(e->parent,qrsize);
-		}
-	}
-	return qrsize;
-}
-
 // stats
 static inline void fsnodes_get_stats(fsnode *node,statsrecord *sr) {
 	uint32_t i,lastchunk,lastchunksize;
@@ -1568,6 +1550,40 @@ static inline void fsnodes_add_sub_stats(fsnode *parent,statsrecord *newsr,stats
 	sr.size = newsr->size - prevsr->size;
 	sr.realsize = newsr->realsize - prevsr->realsize;
 	fsnodes_add_stats(parent,&sr);
+}
+
+
+static inline void fsnodes_quota_fixspace(fsnode *node,uint64_t *totalspace,uint64_t *availspace) {
+	quotanode *qn;
+	fsedge *e;
+	statsrecord sr;
+	uint64_t quotarsize;
+	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota) && (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE))) {
+		fsnodes_get_stats(node,&sr);
+		quotarsize = UINT64_C(0xFFFFFFFFFFFFFFFF);
+		if ((qn->flags&QUOTA_FLAG_HREALSIZE) && quotarsize > qn->hrealsize) {
+			quotarsize = qn->hrealsize;
+		}
+		if ((qn->flags&QUOTA_FLAG_SREALSIZE) && quotarsize > qn->srealsize) {
+			quotarsize = qn->srealsize;
+		}
+		if (sr.realsize >= quotarsize) {
+			*availspace = 0;
+		} else if (*availspace > quotarsize - sr.realsize) {
+			*availspace = quotarsize - sr.realsize;
+		}
+		if (*totalspace > quotarsize) {
+			*totalspace = quotarsize;
+		}
+		if (sr.realsize + *availspace < *totalspace) {
+			*totalspace = sr.realsize + *availspace;
+		}
+	}
+	if (node && node!=root) {
+		for (e=node->parents ; e ; e=e->nextparent) {
+			fsnodes_quota_fixspace(e->parent,totalspace,availspace);
+		}
+	}
 }
 
 /*
@@ -3821,13 +3837,14 @@ uint8_t fs_get_paths_size(uint32_t rootinode,uint32_t inode,uint32_t *psize) {
 	fsnode *p;
 
 	if (fsnodes_node_find_ext(rootinode,0,&inode,NULL,&p,0)==0) {
+		*psize = 0;
 		return ERROR_ENOENT;
 	}
 
 	if (p->type==TYPE_TRASH) {
-		*psize += 7+4;
+		*psize = 7+4;
 	} else if (p->type==TYPE_SUSTAINED) {
-		*psize += 11+4;
+		*psize = 11+4;
 	} else {
 		*psize = fsnodes_get_paths_size(rootinode,p);
 	}
@@ -3899,7 +3916,6 @@ uint8_t fs_getrootinode(uint32_t *rootinode,const uint8_t *path) {
 void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t *availspace,uint64_t *trspace,uint64_t *respace,uint32_t *inodes) {
 	fsnode *rn;
 	statsrecord sr;
-	uint64_t quotarsize;
 	(void)sesflags;
 	if (rootinode==MFS_ROOT_ID) {
 		*trspace = trashspace;
@@ -3916,20 +3932,9 @@ void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t
 		*inodes = 0;
 	} else {
 		matocsserv_getspace(totalspace,availspace);
+		fsnodes_quota_fixspace(rn,totalspace,availspace);
 		fsnodes_get_stats(rn,&sr);
 		*inodes = sr.inodes;
-		quotarsize = fsnodes_get_minrsize_quota(rn,UINT64_C(0xFFFFFFFFFFFFFFFF));
-		if (sr.realsize>=quotarsize) {
-			*availspace = 0;
-		} else if (*availspace > quotarsize - sr.realsize) {
-			*availspace = quotarsize - sr.realsize;
-		}
-		if (*totalspace > quotarsize) {
-			*totalspace = quotarsize;
-		}
-		if (sr.realsize + *availspace < *totalspace) {
-			*totalspace = sr.realsize + *availspace;
-		}
 	}
 	stats_statfs++;
 }
@@ -6246,12 +6251,14 @@ void fs_add_files_to_chunks() {
 	}
 }
 
-void fs_test_getdata(uint32_t *loopstart,uint32_t *loopend,uint32_t *files,uint32_t *ugfiles,uint32_t *mfiles,uint32_t *chunks,uint32_t *ugchunks,uint32_t *mchunks,char **msgbuff,uint32_t *msgbuffleng) {
+void fs_test_getdata(uint32_t *loopstart,uint32_t *loopend,uint32_t *files,uint32_t *ugfiles,uint32_t *mfiles,uint32_t *mtfiles,uint32_t *msfiles,uint32_t *chunks,uint32_t *ugchunks,uint32_t *mchunks,char **msgbuff,uint32_t *msgbuffleng) {
 	*loopstart = fsinfo_loopstart;
 	*loopend = fsinfo_loopend;
 	*files = fsinfo_files;
 	*ugfiles = fsinfo_ugfiles;
 	*mfiles = fsinfo_mfiles;
+	*mtfiles = fsinfo_mtfiles;
+	*msfiles = fsinfo_msfiles;
 	*chunks = fsinfo_chunks;
 	*ugchunks = fsinfo_ugchunks;
 	*mchunks = fsinfo_mchunks;
@@ -6300,15 +6307,12 @@ void fs_test_files() {
 	static uint32_t files=0;
 	static uint32_t ugfiles=0;
 	static uint32_t mfiles=0;
+	static uint32_t mtfiles=0;
+	static uint32_t msfiles=0;
 	static uint32_t chunks=0;
 	static uint32_t ugchunks=0;
 	static uint32_t mchunks=0;
-	static uint32_t errors=0;
 	static uint32_t notfoundchunks=0;
-	static uint32_t unavailchunks=0;
-	static uint32_t unavailfiles=0;
-	static uint32_t unavailtrashfiles=0;
-	static uint32_t unavailsustainedfiles=0;
 	static char *msgbuff=NULL,*tmp;
 	static uint32_t leng=0;
 	uint32_t now;
@@ -6321,12 +6325,6 @@ void fs_test_files() {
 		return;
 	}
 	if (i==0) {
-		if (errors==ERRORS_LOG_MAX) {
-			syslog(LOG_ERR,"only first %u errors (unavailable chunks/files) were logged",ERRORS_LOG_MAX);
-			if (leng<MSGBUFFSIZE) {
-				leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"only first %u errors (unavailable chunks/files) were logged\n",ERRORS_LOG_MAX);
-			}
-		}
 		if (notfoundchunks>0) {
 			syslog(LOG_ERR,"unknown chunks: %"PRIu32,notfoundchunks);
 			if (leng<MSGBUFFSIZE) {
@@ -6334,47 +6332,24 @@ void fs_test_files() {
 			}
 			notfoundchunks=0;
 		}
-		if (unavailchunks>0) {
-			syslog(LOG_ERR,"unavailable chunks: %"PRIu32,unavailchunks);
-			if (leng<MSGBUFFSIZE) {
-				leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"unavailable chunks: %"PRIu32"\n",unavailchunks);
-			}
-			unavailchunks=0;
-		}
-		if (unavailtrashfiles>0) {
-			syslog(LOG_ERR,"unavailable trash files: %"PRIu32,unavailtrashfiles);
-			if (leng<MSGBUFFSIZE) {
-				leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"unavailable trash files: %"PRIu32"\n",unavailtrashfiles);
-			}
-			unavailtrashfiles=0;
-		}
-		if (unavailsustainedfiles>0) {
-			syslog(LOG_ERR,"unavailable sustained files: %"PRIu32,unavailsustainedfiles);
-			if (leng<MSGBUFFSIZE) {
-				leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"unavailable sustained files: %"PRIu32"\n",unavailsustainedfiles);
-			}
-			unavailsustainedfiles=0;
-		}
-		if (unavailfiles>0) {
-			syslog(LOG_ERR,"unavailable files: %"PRIu32,unavailfiles);
-			if (leng<MSGBUFFSIZE) {
-				leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"unavailable files: %"PRIu32"\n",unavailfiles);
-			}
-			unavailfiles=0;
-		}
 		fsinfo_files=files;
 		fsinfo_ugfiles=ugfiles;
 		fsinfo_mfiles=mfiles;
+		fsinfo_mtfiles=mtfiles;
+		fsinfo_msfiles=msfiles;
 		fsinfo_chunks=chunks;
 		fsinfo_ugchunks=ugchunks;
 		fsinfo_mchunks=mchunks;
 		files=0;
 		ugfiles=0;
 		mfiles=0;
+		mtfiles=0;
+		msfiles=0;
 		chunks=0;
 		ugchunks=0;
 		mchunks=0;
-		errors=0;
+
+		missing_log_swap();
 
 		if (fsinfo_msgbuff==NULL) {
 			fsinfo_msgbuff=malloc(MSGBUFFSIZE);
@@ -6413,12 +6388,9 @@ void fs_test_files() {
 					if (chunkid>0) {
 						allchunks++;
 						if (chunk_get_validcopies(chunkid,&vc,&goal,aflag,&aflagchanged)!=STATUS_OK) {
-							if (errors<ERRORS_LOG_MAX) {
-								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->id,j);
-								if (leng<MSGBUFFSIZE) {
-									leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")\n",chunkid,f->id,j);
-								}
-								errors++;
+							syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->id,j);
+							if (leng<MSGBUFFSIZE) {
+								leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")\n",chunkid,f->id,j);
 							}
 							notfoundchunks++;
 							if ((notfoundchunks%1000)==0) {
@@ -6427,17 +6399,7 @@ void fs_test_files() {
 							valid =0;
 							mchunks++;
 						} else if (vc==0) {
-							if (errors<ERRORS_LOG_MAX) {
-								syslog(LOG_ERR,"currently unavailable chunk %016"PRIX64" (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->id,j);
-								if (leng<MSGBUFFSIZE) {
-									leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"currently unavailable chunk %016"PRIX64" (inode: %"PRIu32" ; index: %"PRIu32")\n",chunkid,f->id,j);
-								}
-								errors++;
-							}
-							unavailchunks++;
-							if ((unavailchunks%1000)==0) {
-								syslog(LOG_ERR,"unavailable chunks: %"PRIu32" ...",unavailchunks);
-							}
+							missing_log_insert(chunkid,f->id,j);
 							valid = 0;
 							mchunks++;
 						} else if (vc<goal) {
@@ -6451,48 +6413,13 @@ void fs_test_files() {
 					changelog("%"PRIu32"|ARCHCHG(%"PRIu32",0,%u):%"PRIu32",%"PRIu32",0",main_time(),f->id,ARCHCTL_SET,aflagchanged,allchunks-aflagchanged);
 				}
 				if (valid==0) {
-					mfiles++;
 					if (f->type==TYPE_TRASH) {
-						if (errors<ERRORS_LOG_MAX) {
-							syslog(LOG_ERR,"- currently unavailable file in trash %"PRIu32": %s",f->id,changelog_escape_name(f->parents->nleng,f->parents->name));
-							if (leng<MSGBUFFSIZE) {
-								leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"- currently unavailable file in trash %"PRIu32": %s\n",f->id,changelog_escape_name(f->parents->nleng,f->parents->name));
-							}
-							errors++;
-							unavailtrashfiles++;
-							if ((unavailtrashfiles%1000)==0) {
-								syslog(LOG_ERR,"unavailable trash files: %"PRIu32" ...",unavailtrashfiles);
-							}
-						}
+						mtfiles++;
 					} else if (f->type==TYPE_SUSTAINED) {
-						if (errors<ERRORS_LOG_MAX) {
-							syslog(LOG_ERR,"+ currently unavailable sustained file %"PRIu32": %s",f->id,changelog_escape_name(f->parents->nleng,f->parents->name));
-							if (leng<MSGBUFFSIZE) {
-								leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"+ currently unavailable sustained file %"PRIu32": %s\n",f->id,changelog_escape_name(f->parents->nleng,f->parents->name));
-							}
-							errors++;
-							unavailsustainedfiles++;
-							if ((unavailsustainedfiles%1000)==0) {
-								syslog(LOG_ERR,"unavailable sustained files: %"PRIu32" ...",unavailsustainedfiles);
-							}
-						}
+						msfiles++;
 					} else {
-						uint8_t *path;
-						uint16_t pleng;
 						for (e=f->parents ; e ; e=e->nextparent) {
-							if (errors<ERRORS_LOG_MAX) {
-								fsnodes_getpath(e,&pleng,&path);
-								syslog(LOG_ERR,"* currently unavailable file %"PRIu32": %s",f->id,changelog_escape_name(pleng,path));
-								if (leng<MSGBUFFSIZE) {
-									leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"* currently unavailable file %"PRIu32": %s\n",f->id,changelog_escape_name(pleng,path));
-								}
-								free(path);
-								errors++;
-							}
-							unavailfiles++;
-							if ((unavailfiles%1000)==0) {
-								syslog(LOG_ERR,"unavailable files: %"PRIu32" ...",unavailfiles);
-							}
+							mfiles++;
 						}
 					}
 				} else if (ugflag) {

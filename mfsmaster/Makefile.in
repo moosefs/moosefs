@@ -116,7 +116,8 @@ am_mfsmaster_OBJECTS = mfsmaster-itree.$(OBJEXT) \
 	mfsmaster-openfiles.$(OBJEXT) mfsmaster-csdb.$(OBJEXT) \
 	mfsmaster-labelsets.$(OBJEXT) mfsmaster-sessions.$(OBJEXT) \
 	mfsmaster-metadata.$(OBJEXT) mfsmaster-restore.$(OBJEXT) \
-	mfsmaster-merger.$(OBJEXT) mfsmaster-sharedpointer.$(OBJEXT) \
+	mfsmaster-merger.$(OBJEXT) mfsmaster-missinglog.$(OBJEXT) \
+	mfsmaster-sharedpointer.$(OBJEXT) \
 	mfsmaster-matocsserv.$(OBJEXT) mfsmaster-matoclserv.$(OBJEXT) \
 	mfsmaster-matomlserv.$(OBJEXT) \
 	mfsmaster-datacachemgr.$(OBJEXT) \
@@ -414,6 +415,7 @@ mfsmaster_SOURCES = \
 	metadata.c metadata.h \
 	restore.c restore.h \
 	merger.c merger.h \
+	missinglog.c missinglog.h \
 	sharedpointer.c sharedpointer.h \
 	matocsserv.c matocsserv.h \
 	matoclserv.c matoclserv.h \
@@ -636,6 +638,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-matomlserv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-merger.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-metadata.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-missinglog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-openfiles.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-posixacl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-posixlocks.Po@am__quote@
@@ -920,6 +923,20 @@ mfsmaster-merger.obj: merger.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='merger.c' object='mfsmaster-merger.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -c -o mfsmaster-merger.obj `if test -f 'merger.c'; then $(CYGPATH_W) 'merger.c'; else $(CYGPATH_W) '$(srcdir)/merger.c'; fi`
+
+mfsmaster-missinglog.o: missinglog.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -MT mfsmaster-missinglog.o -MD -MP -MF $(DEPDIR)/mfsmaster-missinglog.Tpo -c -o mfsmaster-missinglog.o `test -f 'missinglog.c' || echo '$(srcdir)/'`missinglog.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-missinglog.Tpo $(DEPDIR)/mfsmaster-missinglog.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='missinglog.c' object='mfsmaster-missinglog.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -c -o mfsmaster-missinglog.o `test -f 'missinglog.c' || echo '$(srcdir)/'`missinglog.c
+
+mfsmaster-missinglog.obj: missinglog.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -MT mfsmaster-missinglog.obj -MD -MP -MF $(DEPDIR)/mfsmaster-missinglog.Tpo -c -o mfsmaster-missinglog.obj `if test -f 'missinglog.c'; then $(CYGPATH_W) 'missinglog.c'; else $(CYGPATH_W) '$(srcdir)/missinglog.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-missinglog.Tpo $(DEPDIR)/mfsmaster-missinglog.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='missinglog.c' object='mfsmaster-missinglog.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -c -o mfsmaster-missinglog.obj `if test -f 'missinglog.c'; then $(CYGPATH_W) 'missinglog.c'; else $(CYGPATH_W) '$(srcdir)/missinglog.c'; fi`
 
 mfsmaster-sharedpointer.o: sharedpointer.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -MT mfsmaster-sharedpointer.o -MD -MP -MF $(DEPDIR)/mfsmaster-sharedpointer.Tpo -c -o mfsmaster-sharedpointer.o `test -f 'sharedpointer.c' || echo '$(srcdir)/'`sharedpointer.c

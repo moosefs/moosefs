@@ -1206,22 +1206,26 @@ void matoclserv_memory_info(matoclserventry *eptr,const uint8_t *data,uint32_t l
 }
 
 void matoclserv_fstest_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t loopstart,loopend,files,ugfiles,mfiles,chunks,ugchunks,mchunks,msgbuffleng;
+	uint32_t loopstart,loopend,files,ugfiles,mfiles,mtfiles,msfiles,chunks,ugchunks,mchunks,msgbuffleng;
 	char *msgbuff;
 	uint8_t *ptr;
 	(void)data;
-	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOMA_FSTEST_INFO - wrong size (%"PRIu32"/0)",length);
+	if (length!=0 && length!=1) {
+		syslog(LOG_NOTICE,"CLTOMA_FSTEST_INFO - wrong size (%"PRIu32"/0|1)",length);
 		eptr->mode = KILL;
 		return;
 	}
-	fs_test_getdata(&loopstart,&loopend,&files,&ugfiles,&mfiles,&chunks,&ugchunks,&mchunks,&msgbuff,&msgbuffleng);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FSTEST_INFO,msgbuffleng+36);
+	fs_test_getdata(&loopstart,&loopend,&files,&ugfiles,&mfiles,&mtfiles,&msfiles,&chunks,&ugchunks,&mchunks,&msgbuff,&msgbuffleng);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FSTEST_INFO,msgbuffleng+((length==1)?44:36));
 	put32bit(&ptr,loopstart);
 	put32bit(&ptr,loopend);
 	put32bit(&ptr,files);
 	put32bit(&ptr,ugfiles);
 	put32bit(&ptr,mfiles);
+	if (length==1) {
+		put32bit(&ptr,mtfiles);
+		put32bit(&ptr,msfiles);
+	}
 	put32bit(&ptr,chunks);
 	put32bit(&ptr,ugchunks);
 	put32bit(&ptr,mchunks);

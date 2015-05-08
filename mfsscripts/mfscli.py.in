@@ -47,6 +47,11 @@ CLTOMA_SESSION_COMMAND = (PROTO_BASE+526)
 MATOCL_SESSION_COMMAND = (PROTO_BASE+527)
 CLTOMA_MEMORY_INFO = (PROTO_BASE+528)
 MATOCL_MEMORY_INFO = (PROTO_BASE+529)
+CLTOMA_MASS_RESOLVE_PATHS = (PROTO_BASE+536)
+MATOCL_MASS_RESOLVE_PATHS = (PROTO_BASE+537)
+CLTOMA_MISSING_CHUNKS = (PROTO_BASE+544)
+MATOCL_MISSING_CHUNKS = (PROTO_BASE+545)
+
 CLTOCS_HDD_LIST_V2 = (PROTO_BASE+600)
 CSTOCL_HDD_LIST_V2 = (PROTO_BASE+601)
 
@@ -186,6 +191,8 @@ else: # CLI mode
 # order and data parameters
 	IMorder = 0
 	IMrev = 0
+	MForder = 0
+	MFrev = 0
 	CSorder = 0
 	CSrev = 0
 	MBorder = 0
@@ -217,7 +224,7 @@ else: # CLI mode
 	for opt,val in opts:
 		if opt=='-h':
 			print("usage:")
-			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|CS|MB|HD|EX|MS|MO|QU) [-o order_id [-r]] [-m mode_id]" % sys.argv[0])
+			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|MO|QU) [-o order_id [-r]] [-m mode_id]" % sys.argv[0])
 			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -C(RC/ip/port|BW/ip/port)" % sys.argv[0])
 			print("\ncommon:\n")
 			print("\t-h : print this message")
@@ -252,6 +259,7 @@ else: # CLI mode
 			print("\t\t-SMU : show only master memory usage")
 			print("\t\t-SIC : show only chunks info (goal/copies matrices)")
 			print("\t\t-SIL : show only loop info (with messages)")
+			print("\t\t-SMF : show only missing chunks/files")
 			print("\t\t-SCS : show connected chunk servers")
 			print("\t\t-SMB : show connected metadata backup servers")
 			print("\t\t-SHD : show hdd data")
@@ -297,6 +305,7 @@ else: # CLI mode
 				sectionsubset.append("MU")
 				sectionsubset.append("IC")
 				sectionsubset.append("IL")
+				sectionsubset.append("MF")
 				if lastmode!=None:
 					INmatrix = lastmode
 				if lastorder!=None:
@@ -327,6 +336,13 @@ else: # CLI mode
 			if 'IL' in val:
 				sectionset.append("IN")
 				sectionsubset.append("IL")
+			if 'MF' in val:
+				sectionset.append("IN")
+				sectionsubset.append("MF")
+				if lastorder!=None:
+					MForder = lastorder
+				if lastrev:
+					MFrev = 1
 			if 'CS' in val:
 				sectionset.append("CS")
 				sectionsubset.append("CS")
@@ -382,6 +398,8 @@ else: # CLI mode
 		elif opt=='-o':
 			if 'IM' in lastsval:
 				IMorder = int(val)
+			if 'MF' in lastsval:
+				MForder = int(val)
 			if 'CS' in lastsval:
 				CSorder = int(val)
 			if 'MB' in lastsval:
@@ -401,6 +419,8 @@ else: # CLI mode
 		elif opt=='-r':
 			if 'IM' in lastsval:
 				IMrev = 1
+			if 'MF' in lastsval:
+				MFrev = 1
 			if 'CS' in lastsval:
 				CSrev = 1
 			if 'MB' in lastsval:
@@ -1135,6 +1155,41 @@ class Master(MFSConn):
 		return sortver
 
 
+def resolve_inodes_paths(leaderconn,inodes):
+	inodepaths = {}
+	if len(inodes)>0:
+		data,length = leaderconn.command(CLTOMA_MASS_RESOLVE_PATHS,MATOCL_MASS_RESOLVE_PATHS,struct.pack(">"+len(inodes)*"L",*inodes))
+		pos = 0
+		while pos+8<=length:
+			inode,psize = struct.unpack(">LL",data[pos:pos+8])
+			pos+=8
+			if psize == 0:
+				if inode not in inodepaths:
+					inodepaths[inode] = []
+				inodepaths[inode].append("./META")
+			elif pos + psize <= length:
+				while psize>=4:
+					pleng = struct.unpack(">L",data[pos:pos+4])[0]
+					pos+=4
+					psize-=4
+					path = data[pos:pos+pleng]
+					pos+=pleng
+					psize-=pleng
+					if sys.version_info[0]>=3:
+						try:
+							path = path.decode('ascii')
+						except UnicodeDecodeError:
+							pass
+					if inode not in inodepaths:
+						inodepaths[inode] = []
+					inodepaths[inode].append(path)
+				if psize!=0:
+					raise RuntimeError("MFS packet malformed")
+		if pos!=length:
+			raise RuntimeError("MFS packet malformed")
+	return inodepaths
+
+
 # find leader
 leaderispro = 0
 leaderfound = 0
@@ -1261,7 +1316,7 @@ if leaderfound and leaderconn.version_less_than(1,6,10):
 		print("""<head>""")
 		print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
 		print("""<title>MFS Info (%s)</title>""" % (htmlentities(mastername)))
-		print("""<link rel="stylesheet" href="/mfs.css" type="text/css" />""")
+		print("""<link rel="stylesheet" href="mfs.css" type="text/css" />""")
 		print("""</head>""")
 		print("""<body>""")
 		if leaderconn.version_unknown():
@@ -1385,7 +1440,7 @@ if cgimode:
 		print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
 		print("""<meta http-equiv="Refresh" content="0; url=%s" />""" % url)
 		print("""<title>MFS Info (%s)</title>""" % (htmlentities(mastername)))
-		print("""<link rel="stylesheet" href="/mfs.css" type="text/css" />""")
+		print("""<link rel="stylesheet" href="mfs.css" type="text/css" />""")
 		print("""</head>""")
 		print("""<body>""")
 		print("""<h1 align="center"><a href="%s">If you see this then it means that redirection didn't work, so click here</a></h1>""" % url)
@@ -1401,7 +1456,7 @@ if cgimode:
 		print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
 		print("""<meta http-equiv="Refresh" content="5; url=%s" />""" % url)
 		print("""<title>MFS Info (%s)</title>""" % (htmlentities(mastername)))
-		print("""<link rel="stylesheet" href="/mfs.css" type="text/css" />""")
+		print("""<link rel="stylesheet" href="mfs.css" type="text/css" />""")
 		print("""</head>""")
 		print("""<body>""")
 		print("""<h3 align="center">Can't perform command - wait 5 seconds for refresh</h3>""")
@@ -1544,7 +1599,7 @@ if cgimode:
 		subsectionstr = fields.getvalue("subsections")
 		sectionsubset = set(subsectionstr.split("|"))
 	else:
-		sectionsubset = ["IM","LI","IG","MU","IC","IL","CS","MB"] # used only in climode - in cgimode turn on all subsections
+		sectionsubset = ["IM","LI","IG","MU","IC","IL","MF","CS","MB"] # used only in climode - in cgimode turn on all subsections
 
 	if leaderfound:
 		if leaderconn.version_less_than(1,7,0):
@@ -1586,7 +1641,7 @@ if cgimode:
 	print("""<head>""")
 	print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
 	print("""<title>MFS Info (%s)</title>""" % (htmlentities(mastername)))
-	print("""<link rel="stylesheet" href="/mfs.css" type="text/css" />""")
+	print("""<link rel="stylesheet" href="mfs.css" type="text/css" />""")
 	print("""<script src="acidtab.js" type="text/javascript"></script>""")
 	print("""</head>""")
 	print("""<body>""")
@@ -1697,6 +1752,18 @@ if cgimode:
 		IMrev = int(fields.getvalue("IMrev"))
 	except Exception:
 		IMrev = 0
+	try:
+		MForder = int(fields.getvalue("MForder"))
+	except Exception:
+		MForder = 0
+	try:
+		MFrev = int(fields.getvalue("MFrev"))
+	except Exception:
+		MFrev = 0
+	try:
+		MFlimit = int(fields.getvalue("MFlimit"))
+	except Exception:
+		MFlimit = 100
 	try:
 		CSorder = int(fields.getvalue("CSorder"))
 	except Exception:
@@ -2806,20 +2873,32 @@ if "IN" in sectionset:
 					print("")
 			else:
 				needseparator=1
-			data,length = leaderconn.command(CLTOMA_FSTEST_INFO,MATOCL_FSTEST_INFO)
-			if length>=36:
-				loopstart,loopend,files,ugfiles,mfiles,chunks,ugchunks,mchunks,msgbuffleng = struct.unpack(">LLLLLLLLL",data[:36])
-				datastr = data[36:].decode('ascii')
+			if (leaderconn.version_at_least(2,0,66) and leaderconn.version_less_than(3,0,0)) or leaderconn.version_at_least(3,0,19):
+				data,length = leaderconn.command(CLTOMA_FSTEST_INFO,MATOCL_FSTEST_INFO,struct.pack(">B",0))
+				pver = 1
+			else:
+				data,length = leaderconn.command(CLTOMA_FSTEST_INFO,MATOCL_FSTEST_INFO)
+				pver = 0
+			if length>=(36 + pver*8):
+				if pver==1:
+					loopstart,loopend,files,ugfiles,mfiles,mtfiles,msfiles,chunks,ugchunks,mchunks,msgbuffleng = struct.unpack(">LLLLLLLLLLL",data[:44])
+					datastr = data[44:].decode('ascii')
+				else:
+					loopstart,loopend,files,ugfiles,mfiles,chunks,ugchunks,mchunks,msgbuffleng = struct.unpack(">LLLLLLLLL",data[:36])
+					datastr = data[36:].decode('ascii')
 				if cgimode:
 					out = []
 					out.append("""<table class="FR" cellspacing="0">""")
-					out.append("""	<tr><th colspan="8">Filesystem check info</th></tr>""")
+					out.append("""	<tr><th colspan="%u">Filesystem check info</th></tr>""" % (8 if pver==0 else 10))
 					out.append("""	<tr>""")
 					out.append("""		<th>check loop start time</th>""")
 					out.append("""		<th>check loop end time</th>""")
 					out.append("""		<th>files</th>""")
 					out.append("""		<th>under-goal files</th>""")
 					out.append("""		<th>missing files</th>""")
+					if pver==1:
+						out.append("""		<th>missing trash files</th>""")
+						out.append("""		<th>missing sustained files</th>""")
 					out.append("""		<th>chunks</th>""")
 					out.append("""		<th>under-goal chunks</th>""")
 					out.append("""		<th>missing chunks</th>""")
@@ -2831,6 +2910,9 @@ if "IN" in sectionset:
 						out.append("""		<td align="right">%u</td>""" % files)
 						out.append("""		<td align="right">%u</td>""" % ugfiles)
 						out.append("""		<td align="right">%u</td>""" % mfiles)
+						if pver==1:
+							out.append("""		<td align="right">%u</td>""" % mtfiles)
+							out.append("""		<td align="right">%u</td>""" % msfiles)
 						out.append("""		<td align="right">%u</td>""" % chunks)
 						out.append("""		<td align="right">%u</td>""" % ugchunks)
 						out.append("""		<td align="right">%u</td>""" % mchunks)
@@ -2845,26 +2927,35 @@ if "IN" in sectionset:
 							out.append("""	</tr>""")
 					else:
 						out.append("""	<tr>""")
-						out.append("""		<td colspan="8" align="center">no data</td>""")
+						out.append("""		<td colspan="%u" align="center">no data</td>""" % (8 if pver==0 else 10))
 						out.append("""	</tr>""")
 					out.append("""</table>""")
 					print("\n".join(out))
 				elif ttymode:
-					tab = Tabble("Filesystem check info",8,"r")
-					tab.header("check loop start time","check loop end time","files","under-goal files","missing files","chunks","under-goal chunks","missing chunks")
-					if loopstart>0:
-						tab.append((time.asctime(time.localtime(loopstart)),"c"),(time.asctime(time.localtime(loopend)),"c"),files,ugfiles,mfiles,chunks,ugchunks,mchunks)
-						if msgbuffleng>0:
-							tab.append(("---","",8))
-							if msgbuffleng==100000:
-								tab.append(("Important messages (first 100k):","c",8))
-							else:
-								tab.append(("Important messages:","c",8))
-							tab.append(("---","",8))
-							for line in datastr.strip().split("\n"):
-								tab.append((line.strip(),"l",8))
+					if pver==1:
+						tab = Tabble("Filesystem check info",10,"r")
+						tabwidth = 10
+						tab.header("check loop start time","check loop end time","files","under-goal files","missing files","missing trash files","missing sustained files","chunks","under-goal chunks","missing chunks")
 					else:
-						tab.append(("no data","c",8))
+						tab = Tabble("Filesystem check info",8,"r")
+						tabwidth = 8
+						tab.header("check loop start time","check loop end time","files","under-goal files","missing files","chunks","under-goal chunks","missing chunks")
+					if loopstart>0:
+						if pver==1:
+							tab.append((time.asctime(time.localtime(loopstart)),"c"),(time.asctime(time.localtime(loopend)),"c"),files,ugfiles,mfiles,mtfiles,msfiles,chunks,ugchunks,mchunks)
+						else:
+							tab.append((time.asctime(time.localtime(loopstart)),"c"),(time.asctime(time.localtime(loopend)),"c"),files,ugfiles,mfiles,chunks,ugchunks,mchunks)
+						if msgbuffleng>0:
+							tab.append(("---","",tabwidth))
+							if msgbuffleng==100000:
+								tab.append(("Important messages (first 100k):","c",tabwidth))
+							else:
+								tab.append(("Important messages:","c",tabwidth))
+							tab.append(("---","",tabwidth))
+							for line in datastr.strip().split("\n"):
+								tab.append((line.strip(),"l",tabwidth))
+					else:
+						tab.append(("no data","c",tabwidth))
 					print(tab)
 				else:
 					out = []
@@ -2874,6 +2965,9 @@ if "IN" in sectionset:
 						out.append("""check loop%sfiles:%s%u""" % (plaintextseparator,plaintextseparator,files))
 						out.append("""check loop%sunder-goal files:%s%u""" % (plaintextseparator,plaintextseparator,ugfiles))
 						out.append("""check loop%smissing files:%s%u""" % (plaintextseparator,plaintextseparator,mfiles))
+						if pver==1:
+							out.append("""check loop%smissing trash files:%s%u""" % (plaintextseparator,plaintextseparator,mtfiles))
+							out.append("""check loop%smissing sustained files:%s%u""" % (plaintextseparator,plaintextseparator,msfiles))
 						out.append("""check loop%schunks:%s%u""" % (plaintextseparator,plaintextseparator,chunks))
 						out.append("""check loop%sunder-goal chunks:%s%u""" % (plaintextseparator,plaintextseparator,ugchunks))
 						out.append("""check loop%smissing chunks:%s%u""" % (plaintextseparator,plaintextseparator,mchunks))
@@ -2883,6 +2977,112 @@ if "IN" in sectionset:
 					else:
 						out.append("""check loop: no data""")
 					print("\n".join(out))
+		except Exception:
+			print_exception()
+
+	if "MF" in sectionsubset and ((leaderconn.version_at_least(2,0,66) and leaderconn.version_less_than(3,0,0)) or leaderconn.version_at_least(3,0,19)):
+		try:
+			if needseparator:
+				if cgimode:
+					print("""<br/>""")
+				else:
+					print("")
+			else:
+				needseparator=1
+			inodes = set()
+			data,length = leaderconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS)
+			missingchunks = []
+			if length%16==0:
+				n = length/16
+				for x in xrange(n):
+					chunkid,inode,indx = struct.unpack(">QLL",data[x*16:x*16+16])
+					inodes.add(inode)
+					missingchunks.append((chunkid,inode,indx))
+			inodepaths = resolve_inodes_paths(leaderconn,inodes)
+			mcdata = []
+			mccnt = 0
+			for chunkid,inode,indx in missingchunks:
+				if inode in inodepaths:
+					paths = inodepaths[inode]
+					mccnt += len(paths)
+				else:
+					paths = []
+					mccnt += 1
+				sf = paths
+				if MForder==1:
+					sf = paths
+				elif MForder==2:
+					sf = inode
+				elif MForder==3:
+					sf = indx
+				elif MForder==4:
+					sf = chunkid
+				mcdata.append((sf,paths,inode,indx,chunkid))
+			mcdata.sort()
+			if MFrev:
+				mcdata.reverse()
+			if cgimode:
+				out = []
+				if mccnt>0:
+					out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_missingfiles" cellspacing="0">""")
+					if MFlimit>0 and mccnt>MFlimit:
+						out.append("""	<tr><th colspan="5">Missing files (gathered by previous file-loop) - %u/%u entries - <a href="%s" class="VISIBLELINK">show more</a> - <a href="%s" class="VISIBLELINK">show all</a></th></tr>""" % (MFlimit,mccnt,createlink({"MFlimit":"%u" % (MFlimit + 100)}),createlink({"MFlimit":"0"})))
+					else:
+						out.append("""	<tr><th colspan="5">Missing files (gathered by previous file-loop)</th></tr>""")
+					out.append("""	<tr>""")
+					out.append("""		<th rowspan="2" class="acid_tab_enumerate">#</th>""")
+					out.append("""		<th rowspan="2">paths</th>""")
+					out.append("""		<th rowspan="2">inode</th>""")
+					out.append("""		<th rowspan="2">index</th>""")
+					out.append("""		<th rowspan="2">chunk&nbsp;id</th>""")
+					out.append("""	</tr>""")
+				else:
+					needseparator=0
+			elif ttymode:
+				tab = Tabble("Missing Files/Chunks (gathered by previous file-loop)",4)
+				tab.header("path","inode","index","chunk id")
+				tab.defattr("l","r","r","r")
+			else:
+				tab = Tabble("missing files",4)
+			missingcount = 0
+			for sf,paths,inode,indx,chunkid in mcdata:
+				if cgimode:
+					if mccnt>0:
+						if len(paths)==0:
+							if missingcount<MFlimit or MFlimit==0:
+								out.append("""	<tr>""")
+								out.append("""		<td align="right"></td>""")
+								out.append("""		<td align="left"> * unknown path * (deleted file)</td>""")
+								out.append("""		<td align="right">%u</td>""" % inode)
+								out.append("""		<td align="right">%u</td>""" % indx)
+								out.append("""		<td align="right">%016X</td>""" % chunkid)
+								out.append("""	</tr>""")
+							missingcount += 1
+						else:
+							for path in paths:
+								if missingcount<MFlimit or MFlimit==0:
+									out.append("""	<tr>""")
+									out.append("""		<td align="right"></td>""")
+									out.append("""		<td align="left">%s</td>""" % path)
+									out.append("""		<td align="right">%u</td>""" % inode)
+									out.append("""		<td align="right">%u</td>""" % indx)
+									out.append("""		<td align="right">%016X</td>""" % chunkid)
+									out.append("""	</tr>""")
+								missingcount += 1
+				else:
+					if len(paths)==0:
+						dline = [" * unknown path * (deleted file)",inode,indx,chunkid]
+						tab.append(*dline)
+					else:
+						for path in paths:
+							dline = [path,inode,indx,chunkid]
+							tab.append(*dline)
+			if cgimode:
+				if mccnt>0:
+					out.append("""</table>""")
+				print("\n".join(out))
+			else:
+				print(tab)
 		except Exception:
 			print_exception()
 

@@ -2210,6 +2210,8 @@ if "IN" in sectionset:
 				strver,sortver = version_str_and_sort((v1,v2,v3))
 				syscpu/=10000000.0
 				usercpu/=10000000.0
+				if leaderconn.version_at_least(2,0,14):
+					lastsaveseconds = lastsaveseconds / 1000.0
 				if cgimode:
 					out = []
 					if length==101:

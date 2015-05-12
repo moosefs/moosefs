@@ -1,3 +1,11 @@
+moosefs (2.0.67-1) unstable; urgency=medium
+
+  * (cli) fixed "last save time" in master general info (-SIG)
+  * (master) added "last seen paths" to TRASH and SUSTAINED files in inode to
+    path resolver
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 12 May 2015 13:00:00 +0200
+
 moosefs (2.0.66-1) unstable; urgency=medium
 
   * (master) removed missing chunks/files from messages

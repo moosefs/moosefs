@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.67-1 (2015-05-12)
+
+  - (cli) fixed "last save time" in master general info (-SIG)
+  - (master) added "last seen paths" to TRASH and SUSTAINED files in inode to path resolver
+
 * MooseFS 2.0.66-1 (2015-05-08)
 
   - (master) removed missing chunks/files from messages

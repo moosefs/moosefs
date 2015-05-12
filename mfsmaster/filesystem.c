@@ -3756,9 +3756,9 @@ uint8_t fs_get_paths_size(uint32_t rootinode,uint32_t inode,uint32_t *psize) {
 	}
 
 	if (p->type==TYPE_TRASH) {
-		*psize = 7+4;
+		*psize = 7+4+3+p->parents->nleng;
 	} else if (p->type==TYPE_SUSTAINED) {
-		*psize = 11+4;
+		*psize = 11+4+3+p->parents->nleng;
 	} else {
 		*psize = fsnodes_get_paths_size(rootinode,p);
 	}
@@ -3770,11 +3770,15 @@ void fs_get_paths_data(uint32_t rootinode,uint32_t inode,uint8_t *buff) {
 
 	if (fsnodes_node_find_ext(rootinode,0,&inode,NULL,&p,0)) {
 		if (p->type==TYPE_TRASH) {
-			put32bit(&buff,7);
-			memcpy(buff,"./TRASH",7);
+			put32bit(&buff,7+3+p->parents->nleng);
+			memcpy(buff,"./TRASH (",9);
+			memcpy(buff+9,p->parents->name,p->parents->nleng);
+			buff[9+p->parents->nleng]=')';
 		} else if (p->type==TYPE_SUSTAINED) {
-			put32bit(&buff,11);
-			memcpy(buff,"./SUSTAINED",11);
+			put32bit(&buff,11+3+p->parents->nleng);
+			memcpy(buff,"./SUSTAINED (",13);
+			memcpy(buff+13,p->parents->name,p->parents->nleng);
+			buff[13+p->parents->nleng]=')';
 		} else {
 			fsnodes_get_paths_data(rootinode,p,buff);
 		}

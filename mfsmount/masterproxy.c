@@ -23,9 +23,11 @@
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <syslog.h>
 
+#include "massert.h"
 #include "sockets.h"
 #include "mastercomm.h"
 #include "datapack.h"
@@ -37,6 +39,9 @@
 
 static int lsock = -1;
 static pthread_t proxythread;
+#ifndef HAVE___SYNC_OP_AND_FETCH
+static pthread_mutex_t tlock;
+#endif
 static uint8_t terminate;
 
 static uint32_t proxyhost;
@@ -142,14 +147,22 @@ static void* masterproxy_server(void *args) {
 static void* masterproxy_acceptor(void *args) {
 	pthread_t clientthread;
 	pthread_attr_t thattr;
-	int sock;
+	sigset_t oldset;
+	sigset_t newset;
+	int sock,res;
 	(void)args;
 
-	pthread_attr_init(&thattr);
-	pthread_attr_setstacksize(&thattr,0x100000);
-	pthread_attr_setdetachstate(&thattr,PTHREAD_CREATE_DETACHED);
+	zassert(pthread_attr_init(&thattr));
+	zassert(pthread_attr_setstacksize(&thattr,0x100000));
+	zassert(pthread_attr_setdetachstate(&thattr,PTHREAD_CREATE_DETACHED));
 
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	while (__sync_or_and_fetch(&terminate,0)==0) {
+#else
+	zassert(pthread_mutex_lock(&tlock));
 	while (terminate==0) {
+		zassert(pthread_mutex_unlock(&tlock));
+#endif
 		sock = tcptoaccept(lsock,1000);
 		if (sock>=0) {
 			int *s = malloc(sizeof(int));
@@ -157,24 +170,50 @@ static void* masterproxy_acceptor(void *args) {
 			*s = sock;
 			tcpnodelay(sock);
 			tcpnonblock(sock);
-			if (pthread_create(&clientthread,&thattr,masterproxy_server,s)<0) {
+			sigemptyset(&newset);
+			sigaddset(&newset, SIGTERM);
+			sigaddset(&newset, SIGINT);
+			sigaddset(&newset, SIGHUP);
+			sigaddset(&newset, SIGQUIT);
+			pthread_sigmask(SIG_BLOCK, &newset, &oldset);
+			res = pthread_create(&clientthread,&thattr,masterproxy_server,s);
+			pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+			if (res<0) {
 				free(s);
 				tcpclose(sock);
 			}
 		}
+#ifdef HAVE___SYNC_OP_AND_FETCH
 	}
+#else
+		zassert(pthread_mutex_lock(&tlock));
+	}
+	zassert(pthread_mutex_unlock(&tlock));
+#endif
 
 	pthread_attr_destroy(&thattr);
 	return NULL;
 }
 
 void masterproxy_term(void) {
-	terminate=1;
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	__sync_or_and_fetch(&terminate,1);
+#else
+	zassert(pthread_mutex_lock(&tlock));
+	terminate = 1;
+	zassert(pthread_mutex_unlock(&tlock));
+#endif
 	pthread_join(proxythread,NULL);
+#ifndef HAVE___SYNC_OP_AND_FETCH
+	zassert(pthread_mutex_destroy(&tlock));
+#endif
 }
 
 int masterproxy_init(const char *masterproxyip) {
 	pthread_attr_t thattr;
+	sigset_t oldset;
+	sigset_t newset;
+
 
 	lsock = tcpsocket();
 	if (lsock<0) {
@@ -201,11 +240,21 @@ int masterproxy_init(const char *masterproxyip) {
 	}
 
 	terminate = 0;
-	pthread_attr_init(&thattr);
-	pthread_attr_setstacksize(&thattr,0x100000);
+#ifndef HAVE___SYNC_OP_AND_FETCH
+	zassert(pthread_mutex_init(&tlock,NULL));
+#endif
+	zassert(pthread_attr_init(&thattr));
+	zassert(pthread_attr_setstacksize(&thattr,0x100000));
 	//pthread_create(&proxythread,&thattr,masterproxy_loop,NULL);
-	pthread_create(&proxythread,&thattr,masterproxy_acceptor,NULL);
-	pthread_attr_destroy(&thattr);
+	sigemptyset(&newset);
+	sigaddset(&newset, SIGTERM);
+	sigaddset(&newset, SIGINT);
+	sigaddset(&newset, SIGHUP);
+	sigaddset(&newset, SIGQUIT);
+	pthread_sigmask(SIG_BLOCK, &newset, &oldset);
+	zassert(pthread_create(&proxythread,&thattr,masterproxy_acceptor,NULL));
+	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+	zassert(pthread_attr_destroy(&thattr));
 
 	return 1;
 }

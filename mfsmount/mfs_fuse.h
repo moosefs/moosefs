@@ -68,6 +68,6 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 #if FUSE_VERSION >= 29
 void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int op);
 #endif
-void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,int fsync_before_close_in);
+void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,int fsync_before_close_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in);
 
 #endif

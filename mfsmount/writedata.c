@@ -631,6 +631,7 @@ void* write_worker(void *arg) {
 	uint8_t donotstayidle;
 	double start,now,lastrcvd,lastblock,lastsent;
 	double workingtime,lrdiff,lbdiff;
+	uint32_t wtotal;
 	uint8_t cnt;
 	uint8_t firsttime = 1;
 	worker *w = (worker*)arg;
@@ -954,6 +955,9 @@ void* write_worker(void *arg) {
 
 		do {
 			now = monotonic_seconds();
+			zassert(pthread_mutex_lock(&workerslock));
+			wtotal = workers_total;
+			zassert(pthread_mutex_unlock(&workerslock));
 			zassert(pthread_mutex_lock(&(ind->lock)));
 
 //			if (ind->status!=0) {
@@ -981,7 +985,7 @@ void* write_worker(void *arg) {
 
 			chd->waitingworker=1;
 
-			if (sending_mode==0 && workingtime<WORKER_BUSY_LAST_SEND_TIMEOUT+((workers_total>HEAVYLOAD_WORKERS)?0:WORKER_BUSY_NOJOBS_INCREASE_TIMEOUT) && waitforstatus<64) {
+			if (sending_mode==0 && workingtime<WORKER_BUSY_LAST_SEND_TIMEOUT+((wtotal>HEAVYLOAD_WORKERS)?0:WORKER_BUSY_NOJOBS_INCREASE_TIMEOUT) && waitforstatus<64) {
 				if (cb==NULL) {
 					ncb = chd->datachainhead;
 				} else {
@@ -1027,16 +1031,16 @@ void* write_worker(void *arg) {
 			}
 
 #ifdef WORKER_DEBUG
-			fprintf(stderr,"workerloop: waitforstatus:%u workingtime:%.6lf workers_total:%u lbdiff:%.6lf donotstayidle:%u\n",waitforstatus,workingtime,workers_total,lbdiff,donotstayidle);
+			fprintf(stderr,"workerloop: waitforstatus:%u workingtime:%.6lf workers_total:%u lbdiff:%.6lf donotstayidle:%u\n",waitforstatus,workingtime,wtotal,lbdiff,donotstayidle);
 #endif
 			if (waitforstatus>0) {
-				if (workingtime>WORKER_BUSY_LAST_SEND_TIMEOUT+WORKER_BUSY_WAIT_FOR_STATUS+((workers_total>HEAVYLOAD_WORKERS)?0:WORKER_BUSY_NOJOBS_INCREASE_TIMEOUT)) { // timeout
+				if (workingtime>WORKER_BUSY_LAST_SEND_TIMEOUT+WORKER_BUSY_WAIT_FOR_STATUS+((wtotal>HEAVYLOAD_WORKERS)?0:WORKER_BUSY_NOJOBS_INCREASE_TIMEOUT)) { // timeout
 					chd->waitingworker=0;
 					zassert(pthread_mutex_unlock(&(ind->lock)));
 					break;
 				}
 			} else {
-				if (lbdiff>=WORKER_IDLE_TIMEOUT || donotstayidle || workers_total>HEAVYLOAD_WORKERS) {
+				if (lbdiff>=WORKER_IDLE_TIMEOUT || donotstayidle || wtotal>HEAVYLOAD_WORKERS) {
 					chd->waitingworker=0;
 					zassert(pthread_mutex_unlock(&(ind->lock)));
 					break;
@@ -1335,8 +1339,8 @@ void write_data_init (uint32_t cachesize,uint32_t retries) {
 	zassert(pthread_cond_init(&worker_term_cond,NULL));
 	worker_term_waiting = 0;
 
-	zassert(pthread_cond_init(&fcbcond,NULL));
 	zassert(pthread_mutex_init(&fcblock,NULL));
+	zassert(pthread_cond_init(&fcbcond,NULL));
 	fcbwaiting=0;
 	cacheblocks = malloc(sizeof(cblock)*cacheblockcount);
 	for (i=0 ; i<cacheblockcount-1 ; i++) {
@@ -1416,8 +1420,8 @@ void write_data_term(void) {
 	free(cacheblocks);
 	zassert(pthread_attr_destroy(&worker_thattr));
 	zassert(pthread_cond_destroy(&worker_term_cond));
-	zassert(pthread_mutex_destroy(&fcblock));
 	zassert(pthread_cond_destroy(&fcbcond));
+	zassert(pthread_mutex_destroy(&fcblock));
 	zassert(pthread_mutex_destroy(&workerslock));
 	zassert(pthread_mutex_destroy(&hashlock));
 }

@@ -175,6 +175,9 @@ struct mfsopts {
 	int cachefiles;
 	int keepcache;
 	int passwordask;
+	int noxattrs;
+	int noposixlocks;
+	int nobsdlocks;
 	int donotrememberpassword;
 //	int xattraclsupport;
 	unsigned writecachesize;
@@ -245,6 +248,12 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfsdelayedinit", delayedinit, 1),
 	MFS_OPT("mfsdonotrememberpassword", donotrememberpassword, 1),
 	MFS_OPT("mfscachefiles", cachefiles, 1),
+	MFS_OPT("mfsnoxattr", noxattrs, 1),
+	MFS_OPT("mfsnoxattrs", noxattrs, 1),
+	MFS_OPT("mfsnoposixlock", noposixlocks, 1),
+	MFS_OPT("mfsnoposixlocks", noposixlocks, 1),
+	MFS_OPT("mfsnobsdlock", nobsdlocks, 1),
+	MFS_OPT("mfsnobsdlocks", nobsdlocks, 1),
 	MFS_OPT("mfscachemode=%s", cachemode, 0),
 	MFS_OPT("mfsmkdircopysgid=%u", mkdircopysgid, 0),
 	MFS_OPT("mfssugidclearmode=%s", sugidclearmodestr, 0),
@@ -295,7 +304,8 @@ static void usage(const char *progname) {
 "    -L IP                       equivalent to '-o mfsproxy=IP'\n"
 "    -S PATH                     equivalent to '-o mfssubfolder=PATH'\n"
 "    -p   --password             similar to '-o mfspassword=PASSWORD', but show prompt and ask user for password\n"
-"    -n   --nostdopts            do not add standard MFS mount options: '-o " DEFAULT_OPTIONS ",fsname=MFS'\n"
+"    -n   --nostdopts            do not add standard MFS mount options: '-o " DEFAULT_OPTIONS ",fsname=MFS'\n");
+	fprintf(stderr,
 "    -o mfscfgfile=CFGFILE       load some mount options from external file (if not specified then use default file: " ETC_PATH "/mfs/mfsmount.cfg or " ETC_PATH "/mfsmount.cfg)\n"
 "    -o mfsdebug                 print some debugging information\n"
 "    -o mfsmeta                  mount meta filesystem (trash etc.)\n"
@@ -346,6 +356,13 @@ static void usage(const char *progname) {
 "    -o mfsmd5pass=MD5           authenticate to mfsmaster using directly given md5 (only if mfspassword is not defined)\n"
 "    -o mfsdonotrememberpassword do not remember password in memory - more secure, but when session is lost then new session is created without password\n"
 "    -o mfspreflabels=LABELEXPR  specify prefered labels for choosing chunkservers during I/O\n"
+"    -o mfsnoxattrs              turn off xattr support\n"
+#if FUSE_VERSION >= 26
+"    -o mfsnoposixlocks          turn off support for global posix locks (lockf + ioctl) - locks will work locally\n"
+#endif
+#if FUSE_VERSION >= 29
+"    -o mfsnobsdlocks            turn off support for global BSD locks (flock) - locks will work locally\n"
+#endif
 "\n");
 	fprintf(stderr,
 "CMODE can be set to:\n"
@@ -537,10 +554,14 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	conn->want |= FUSE_CAP_DONT_MASK;
 #endif
 #ifdef FUSE_CAP_FLOCK_LOCKS
-	conn->want |= FUSE_CAP_FLOCK_LOCKS;
+	if (mfsopts.nobsdlocks==0) {
+		conn->want |= FUSE_CAP_FLOCK_LOCKS;
+	}
 #endif
 #ifdef FUSE_CAP_POSIX_LOCKS
-	conn->want |= FUSE_CAP_POSIX_LOCKS;
+	if (mfsopts.noposixlocks==0) {
+		conn->want |= FUSE_CAP_POSIX_LOCKS;
+	}
 #endif
 	if (piped[1]>=0) {
 		s=0;
@@ -805,7 +826,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		mfs_meta_init(mfsopts.debug,mfsopts.entrycacheto,mfsopts.attrcacheto);
 		se = fuse_lowlevel_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), (void*)piped);
 	} else {
-		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncbeforeclose); //mfsopts.xattraclsupport);
+		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncbeforeclose,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
 		se = fuse_lowlevel_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
 	}
 	if (se==NULL) {
@@ -1095,6 +1116,9 @@ int main(int argc, char *argv[]) {
 	mfsopts.donotrememberpassword = 0;
 //	mfsopts.xattraclsupport = 0;
 	mfsopts.cachefiles = 0;
+	mfsopts.noxattrs = 0;
+	mfsopts.noposixlocks = 0;
+	mfsopts.nobsdlocks = 0;
 	mfsopts.cachemode = NULL;
 	mfsopts.writecachesize = 0;
 	mfsopts.readaheadsize = 0;

@@ -829,30 +829,34 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 	return 0;
 }
 
-int exports_parseline(char *line,uint32_t lineno,exports *arec) {
+int exports_parseline(char *line,uint32_t lineno,exports *arec,exports **defaults) {
 	char *net,*path;
 	char *p;
 	uint32_t pleng;
 
-	arec->pleng = 0;
-	arec->path = NULL;
-	arec->fromip = 0;
-	arec->toip = 0;
-	arec->minversion = 0;
-	arec->alldirs = 0;
-	arec->needpassword = 0;
-	arec->meta = 0;
-	arec->rootredefined = 0;
-	arec->sesflags = SESFLAG_READONLY;
-	arec->mingoal = 1;
-	arec->maxgoal = 9;
-	arec->mintrashtime = 0;
-	arec->maxtrashtime = UINT32_C(0xFFFFFFFF);
-	arec->rootuid = 999;
-	arec->rootgid = 999;
-	arec->mapalluid = 999;
-	arec->mapallgid = 999;
-	arec->next = NULL;
+	if ((*defaults)==NULL) {
+		arec->pleng = 0;
+		arec->path = NULL;
+		arec->fromip = 0;
+		arec->toip = 0;
+		arec->minversion = 0;
+		arec->alldirs = 0;
+		arec->needpassword = 0;
+		arec->meta = 0;
+		arec->rootredefined = 0;
+		arec->sesflags = SESFLAG_READONLY;
+		arec->mingoal = 1;
+		arec->maxgoal = 9;
+		arec->mintrashtime = 0;
+		arec->maxtrashtime = UINT32_C(0xFFFFFFFF);
+		arec->rootuid = 999;
+		arec->rootgid = 999;
+		arec->mapalluid = 999;
+		arec->mapallgid = 999;
+		arec->next = NULL;
+	} else {
+		memcpy(arec,*defaults,sizeof(exports));
+	}
 
 	p = line;
 	while (*p==' ' || *p=='\t') {
@@ -871,7 +875,27 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec) {
 	}
 	*p=0;
 	p++;
-	if (exports_parsenet(net,&arec->fromip,&arec->toip)<0) {
+	if (strcasecmp(net,"DEFAULTS")==0) {
+		while (*p==' ' || *p=='\t') {
+			p++;
+		}
+
+		if (exports_parseoptions(p,lineno,arec)<0) {
+			return -1;
+		}
+
+		if ((arec->sesflags&SESFLAG_MAPALL) && (arec->rootredefined==0)) {
+			arec->rootuid = arec->mapalluid;
+			arec->rootgid = arec->mapallgid;
+		}
+
+		if ((*defaults)==NULL) {
+			*defaults = malloc(sizeof(exports));
+			passert(*defaults);
+		}
+		memcpy(*defaults,arec,sizeof(exports));
+		return 0;
+	} else if (exports_parsenet(net,&arec->fromip,&arec->toip)<0) {
 		mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect ip/network definition in line: %"PRIu32,lineno);
 		return -1;
 	}
@@ -882,8 +906,10 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec) {
 	if (p[0]=='.' && (p[1]==0 || p[1]==' ' || p[1]=='\t')) {
 		path = NULL;
 		pleng = 0;
-		arec->rootuid = 0;
-		arec->rootgid = 0;
+		if (arec->rootredefined==0) {
+			arec->rootuid = 0;
+			arec->rootgid = 0;
+		}
 		arec->meta = 1;
 		p++;
 	} else {
@@ -944,7 +970,7 @@ void exports_loadexports(void) {
 	FILE *fd;
 	char linebuff[10000];
 	uint32_t s,lineno;
-	exports *newexports,**netail,*arec;
+	exports *newexports,**netail,*arec,*defaults;
 
 	fd = fopen(ExportsFileName,"r");
 	if (fd==NULL) {
@@ -969,6 +995,7 @@ void exports_loadexports(void) {
 	lineno = 1;
 	arec = malloc(sizeof(exports));
 	passert(arec);
+	defaults = NULL;
 	while (fgets(linebuff,10000,fd)) {
 		linebuff[9999]=0;
 		s=strlen(linebuff);
@@ -977,7 +1004,7 @@ void exports_loadexports(void) {
 		}
 		if (s>0) {
 			linebuff[s]=0;
-			if (exports_parseline(linebuff,lineno,arec)>=0) {
+			if (exports_parseline(linebuff,lineno,arec,&defaults)>=0) {
 				*netail = arec;
 				netail = &(arec->next);
 				arec = malloc(sizeof(exports));
@@ -987,6 +1014,9 @@ void exports_loadexports(void) {
 		lineno++;
 	}
 	free(arec);
+	if (defaults!=NULL) {
+		free(defaults);
+	}
 	if (ferror(fd)) {
 		fclose(fd);
 		syslog(LOG_WARNING,"error reading mfsexports file - exports not changed");

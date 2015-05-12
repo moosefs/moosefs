@@ -1,5 +1,13 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.20-1 (2015-05-12)
+
+  - (cli) fixed "last save time" in master general info (-SIG)
+  - (master) added "last seen paths" to TRASH and SUSTAINED files in inode to path resolver
+  - (mount) fixed "race conditions" in new reading module (intr. in 3.0.19)
+  - (mount) added "mfsnoxattrs","mfsnoposixlocks" and "mfsnobsdlocks" options
+  - (master) added support for "DEFAULT" options in mfsexports.cfg
+
 * MooseFS 3.0.19-1 (2015-05-08)
 
   - (master) removed missing chunks/files from messages

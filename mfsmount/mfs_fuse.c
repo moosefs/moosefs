@@ -167,6 +167,9 @@ static int sugid_clear_mode = 0;
 static int xattr_cache_on = 0;
 static int xattr_acl_support = 0;
 static int fsync_before_close = 0;
+static int no_xattrs = 0;
+static int no_posix_locks = 0;
+static int no_bsd_locks = 0;
 static int full_permissions = 0;
 
 //static int local_mode = 0;
@@ -3143,6 +3146,10 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 	flock_data *fld;
 	uint32_t refs;
 
+	if (no_bsd_locks) {
+		fuse_reply_err(req,ENOSYS);
+		return;
+	}
 	if (op&LOCK_UN) {
 		lmvalid = 1;
 		lock_mode = FLOCK_UNLOCK;
@@ -3310,6 +3317,10 @@ void mfs_getlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	uint8_t invalid;
 	char ctype,rctype;
 
+	if (no_posix_locks) {
+		fuse_reply_err(req,ENOSYS);
+		return;
+	}
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_GETLK);
 	if (IS_SPECIAL_INODE(ino)) {
@@ -3402,6 +3413,10 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	uint32_t refs;
 	char *cmdname;
 
+	if (no_posix_locks) {
+		fuse_reply_err(req,ENOSYS);
+		return;
+	}
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_SETLK);
 	if (sl) {
@@ -3696,6 +3711,10 @@ void mfs_setxattr (fuse_req_t req, fuse_ino_t ino, const char *name, const char 
 	groups *gids;
 	uint8_t aclxattr;
 
+	if (no_xattrs) {
+		fuse_reply_err(req,ENOSYS);
+		return;
+	}
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_SETXATTR);
 	if (debug_mode) {
@@ -3799,6 +3818,10 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	void *xattr_value_release;
 	uint8_t aclxattr;
 
+	if (no_xattrs) {
+		fuse_reply_err(req,ENOSYS);
+		return;
+	}
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_GETXATTR);
 	if (debug_mode) {
@@ -3948,6 +3971,10 @@ void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 	struct fuse_ctx ctx;
 	groups *gids;
 
+	if (no_xattrs) {
+		fuse_reply_err(req,ENOSYS);
+		return;
+	}
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_LISTXATTR);
 	if (debug_mode) {
@@ -4005,6 +4032,10 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 	groups *gids;
 	uint8_t aclxattr;
 
+	if (no_xattrs) {
+		fuse_reply_err(req,ENOSYS);
+		return;
+	}
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_REMOVEXATTR);
 	if (debug_mode) {
@@ -4069,7 +4100,7 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 	}
 }
 
-void mfs_init(int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,int fsync_before_close_in) {
+void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,int fsync_before_close_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
 	const char* sugid_clear_mode_strings[] = {SUGID_CLEAR_MODE_STRINGS};
 	debug_mode = debug_mode_in;
 	keep_cache = keep_cache_in;
@@ -4082,6 +4113,9 @@ void mfs_init(int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_
 	xattr_cache_on = (xattr_cache_timeout_in>0.0)?1:0;
 	xattr_acl_support = xattr_acl_support_in;
 	fsync_before_close = fsync_before_close_in;
+	no_xattrs = no_xattrs_in;
+	no_posix_locks = no_posix_locks_in;
+	no_bsd_locks = no_bsd_locks_in;
 	if (groups_cache_timeout>0.0) {
 		groups_init(groups_cache_timeout,debug_mode);
 		full_permissions = 1;

@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.21-1 (2015-05-14)
+
+  - (master) fixed bug in flock (bsd) locks
+
 * MooseFS 3.0.20-1 (2015-05-12)
 
   - (cli) fixed "last save time" in master general info (-SIG)

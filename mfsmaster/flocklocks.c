@@ -271,6 +271,27 @@ static inline void flock_lock_remove(lock *l) {
 	flock_do_lock_remove(l);
 }
 
+static inline uint8_t flock_check(inodelocks *il,uint8_t ltype) {
+	if (ltype==LTYPE_READER) {
+		if (il->active!=NULL && il->active->ltype==LTYPE_WRITER) {
+			return 1;
+		}
+		if (FlocksMode==MODE_CORRECT) {
+// additional condition for classic readers/writers algorithm (not seen in any
+// tested OS) - reader should wait when there are other waiting lock's (even if
+// currently acquired lock(s) is a reader lock) - it avoids writer starvation
+			if (il->waiting_head!=NULL) {
+				return 1;
+			}
+		}
+	} else {
+		if (il->active!=NULL) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static inline uint8_t flock_lock_new(inodelocks *il,uint8_t ltype,uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint64_t owner) {
 	lock *l;
 	l = malloc(sizeof(lock));
@@ -282,29 +303,11 @@ static inline uint8_t flock_lock_new(inodelocks *il,uint8_t ltype,uint32_t sessi
 	l->parent = il;
 	l->next = NULL;
 	l->prev = NULL;
-	if (ltype==LTYPE_READER) {
-		if (FlocksMode==MODE_CORRECT) { // classic readers/writers algorithm
-			if (il->waiting_head!=NULL) {
-				l->state = STATE_WAITING;
-				flock_lock_append_req(l,msgid,reqid);
-				flock_lock_inode_attach(l);
-				return ERROR_WAITING;
-			}
-		} else { // FreeBSD, OSX and Linux (in this approach writers can starve)
-			if (il->active!=NULL && il->active->ltype==LTYPE_WRITER) {
-				l->state = STATE_WAITING;
-				flock_lock_append_req(l,msgid,reqid);
-				flock_lock_inode_attach(l);
-				return ERROR_WAITING;
-			}
-		}
-	} else {
-		if (il->active!=NULL) {
-			l->state = STATE_WAITING;
-			flock_lock_append_req(l,msgid,reqid);
-			flock_lock_inode_attach(l);
-			return ERROR_WAITING;
-		}
+	if (flock_check(il,ltype)) {
+		l->state = STATE_WAITING;
+		flock_lock_append_req(l,msgid,reqid);
+		flock_lock_inode_attach(l);
+		return ERROR_WAITING;
 	}
 	flock_lock_inode_attach(l);
 	return STATUS_OK;
@@ -366,6 +369,7 @@ static inline void flock_lock_unlock(lock *l) {
 uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t inode,uint64_t owner,uint8_t op) {
 	inodelocks *il;
 	lock *l,*nl;
+	uint8_t ltype;
 
 //	flock_dump();
 //	syslog(LOG_NOTICE,"flock op: sessionid:%"PRIu32",msgid:%"PRIu32",reqid:%"PRIu32",inode:%"PRIu32",owner:%"PRIu64",op:%u",sessionid,msgid,reqid,inode,owner,op);
@@ -482,27 +486,13 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 	if (op==FLOCK_UNLOCK || op==FLOCK_RELEASE) {
 		return STATUS_OK;
 	}
-	if (op==FLOCK_TRY_SHARED) {
-		if (FlocksMode==MODE_CORRECT) {
-			if (il->waiting_head!=NULL) {
-				return ERROR_EAGAIN;
-			}
-		} else {
-			if (il->active!=NULL && il->active->ltype==LTYPE_WRITER) {
-				return ERROR_EAGAIN;
-			}
-		}
-	}
-	if (op==FLOCK_TRY_EXCLUSIVE) {
-		if (il->active!=NULL) {
+	ltype = (op==FLOCK_TRY_SHARED || op==FLOCK_LOCK_SHARED)?LTYPE_READER:LTYPE_WRITER;
+	if (op==FLOCK_TRY_SHARED || op==FLOCK_TRY_EXCLUSIVE) {
+		if (flock_check(il,ltype)) {
 			return ERROR_EAGAIN;
 		}
 	}
-	if (op==FLOCK_TRY_SHARED || op==FLOCK_LOCK_SHARED) {
-		return flock_lock_new(il,LTYPE_READER,sessionid,msgid,reqid,owner);
-	} else {
-		return flock_lock_new(il,LTYPE_WRITER,sessionid,msgid,reqid,owner);
-	}
+	return flock_lock_new(il,ltype,sessionid,msgid,reqid,owner);
 }
 
 void flock_file_closed(uint32_t sessionid,uint32_t inode) {

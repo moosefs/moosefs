@@ -1539,7 +1539,7 @@ void mfs_mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode,
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
 //		}
-		dcache_invalidate(parent);
+		dcache_invalidate_attr(parent);
 		memset(&e, 0, sizeof(e));
 		e.ino = inode;
 		e.generation = 1;
@@ -1597,7 +1597,8 @@ void mfs_unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //		if (newdircache) {
 //			dir_cache_unlink(parent,nleng,(const uint8_t*)name);
 //		}
-		dcache_invalidate(parent);
+		dcache_invalidate_attr(parent);
+		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
 		oplog_printf(&ctx,"unlink (%lu,%s): OK",(unsigned long int)parent,name);
 		fuse_reply_err(req, 0);
 	}
@@ -1666,7 +1667,7 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
 //		}
-		dcache_invalidate(parent);
+		dcache_invalidate_attr(parent);
 		memset(&e, 0, sizeof(e));
 		e.ino = inode;
 		e.generation = 1;
@@ -1723,7 +1724,8 @@ void mfs_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //		if (newdircache) {
 //			dir_cache_unlink(parent,nleng,(const uint8_t*)name);
 //		}
-		dcache_invalidate(parent);
+		dcache_invalidate_attr(parent);
+		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
 		oplog_printf(&ctx,"rmdir (%lu,%s): OK",(unsigned long int)parent,name);
 		fuse_reply_err(req, 0);
 	}
@@ -1777,7 +1779,7 @@ void mfs_symlink(fuse_req_t req, const char *path, fuse_ino_t parent, const char
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
 //		}
-		dcache_invalidate(parent);
+		dcache_invalidate_attr(parent);
 		memset(&e, 0, sizeof(e));
 		e.ino = inode;
 		e.generation = 1;
@@ -1814,7 +1816,7 @@ void mfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 		oplog_printf(&ctx,"readlink (%lu): %s",(unsigned long int)ino,strerr(status));
 		fuse_reply_err(req, status);
 	} else {
-		dcache_invalidate(ino);
+		dcache_invalidate_attr(ino);
 		symlink_cache_insert(ino,path);
 		oplog_printf(&ctx,"readlink (%lu): OK (%s)",(unsigned long int)ino,(char*)path);
 		fuse_reply_readlink(req, (char*)path);
@@ -1881,10 +1883,11 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 //			dir_cache_unlink(parent,nleng,(const uint8_t*)name);
 //			dir_cache_link(newparent,newnleng,(const uint8_t*)newname,inode,attr);
 //		}
-		dcache_invalidate(parent);
+		dcache_invalidate_attr(parent);
 		if (newparent!=parent) {
-			dcache_invalidate(newparent);
+			dcache_invalidate_attr(newparent);
 		}
+		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
 		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s): OK",(unsigned long int)parent,name,(unsigned long int)newparent,newname);
 		fuse_reply_err(req, 0);
 	}
@@ -1945,9 +1948,9 @@ void mfs_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char *
 //			dir_cache_link(newparent,newnleng,(const uint8_t*)newname,inode,attr);
 //		}
 		if (ino!=inode) {
-			dcache_invalidate(ino);
+			dcache_invalidate_attr(ino);
 		}
-		dcache_invalidate(newparent);
+		dcache_invalidate_attr(newparent);
 		dcache_setattr(inode,attr);
 		memset(&e, 0, sizeof(e));
 		e.ino = inode;
@@ -2406,7 +2409,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	if (debug_mode) {
 		fprintf(stderr,"create (%lu) ok -> keep cache: %lu\n",(unsigned long int)inode,(unsigned long int)fi->keep_cache);
 	}
-	dcache_invalidate(parent);
+	dcache_invalidate_attr(parent);
 	memset(&e, 0, sizeof(e));
 	e.ino = inode;
 	e.generation = 1;
@@ -2666,7 +2669,7 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		}
 		mfs_removefileinfo(fileinfo);
 	}
-	dcache_invalidate(ino);
+	dcache_invalidate_attr(ino);
 	fs_release(ino);
 	oplog_printf(&ctx,"release (%lu): OK",(unsigned long int)ino);
 	fuse_reply_err(req,0);
@@ -3040,7 +3043,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	if (err!=0) {
 		oplog_printf(&ctx,"flush (%lu): %s",(unsigned long int)ino,strerr(err));
 	} else {
-		dcache_invalidate(ino);
+		dcache_invalidate_attr(ino);
 		oplog_printf(&ctx,"flush (%lu): OK",(unsigned long int)ino);
 	}
 	fuse_reply_err(req,err);
@@ -3083,7 +3086,7 @@ void mfs_fsync(fuse_req_t req, fuse_ino_t ino, int datasync, struct fuse_file_in
 	if (err!=0) {
 		oplog_printf(&ctx,"fsync (%lu,%d): %s",(unsigned long int)ino,datasync,strerr(err));
 	} else {
-		dcache_invalidate(ino);
+		dcache_invalidate_attr(ino);
 		oplog_printf(&ctx,"fsync (%lu,%d): OK",(unsigned long int)ino,datasync);
 	}
 	fuse_reply_err(req,err);

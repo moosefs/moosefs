@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.68-1 (2015-05-15)
+
+  - (mount) fixed dircache invalidation
+
 * MooseFS 2.0.67-1 (2015-05-12)
 
   - (cli) fixed "last save time" in master general info (-SIG)

@@ -26,6 +26,7 @@ void dcache_release(void *r);
 uint8_t dcache_lookup(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t *inode,uint8_t attr[35]);
 uint8_t dcache_getattr(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35]);
 void dcache_setattr(uint32_t inode,const uint8_t attr[35]);
-void dcache_invalidate(uint32_t inode);
+void dcache_invalidate_attr(uint32_t inode);
+void dcache_invalidate_name(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name);
 
 #endif

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [2.0.68], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [2.0.69], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -345,17 +345,19 @@ AC_ARG_WITH([systemdsystemunitdir],
 
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 
-if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no"; then
+if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then
 	AM_PATH_PYTHON([2.5],,[:])
 	if test "$PYTHON" = ":"; then
 		enable_mfscgi=no
 		enable_mfscli=no
+		enable_mfssgiserv=no
+		PYTHON="/usr/bin/env python"
 	fi
 fi
 dnl if test "$enable_mfscgi" = "no"; then
 dnl	enable_mfscgiserv=no
 dnl fi
-AM_CONDITIONAL([WITH_PYTHON], [test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no"])
+AM_CONDITIONAL([WITH_PYTHON], [test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"])
 AM_CONDITIONAL([BUILD_SCRIPTS], [test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"])
 AM_CONDITIONAL([INSTALL_CGI], [test "$enable_mfscgi" != "no"])
 AM_CONDITIONAL([INSTALL_CLI], [test "$enable_mfscli" != "no"])

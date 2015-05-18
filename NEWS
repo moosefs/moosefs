@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.69-1 (2015-05-18)
+
+  - (configure) added python as dependency for mfscgiserv
+
 * MooseFS 2.0.68-1 (2015-05-15)
 
   - (mount) fixed dircache invalidation

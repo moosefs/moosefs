@@ -1,3 +1,9 @@
+moosefs (2.0.69-1) unstable; urgency=medium
+
+  * (configure) added python as dependency for mfscgiserv
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 18 May 2015 13:00:00 +0200
+
 moosefs (2.0.68-1) unstable; urgency=medium
 
   * (mount) fixed dircache invalidation

@@ -1899,6 +1899,7 @@ void hdd_test_show_chunks(void) {
 	zassert(pthread_mutex_unlock(&hashlock));
 }
 
+#if 0
 void hdd_test_show_openedchunks(void) {
 	dopchunk *cc,*tcc;
 	uint32_t dhashpos;
@@ -1959,7 +1960,7 @@ void hdd_test_show_openedchunks(void) {
 				if (blocksec>0.0) {
 					blocksec -= now;
 				}
-				printf("id: %"PRIu64" - fd:%d (delay:%.3lfs) crc:%p (delay:%.3lfs) block:%p,blockno:%u (delay:%.3lfs)\n",cc->chunkid,c->fd,fdsec,c->crc,crcsec,c->block,c->blockno,blocksec);
+				printf("id: %"PRIu64" - fd:%d (delay:%.3lfs) crc:%p (delay:%.3lfs) block:%p,blockno:%u (delay:%.3lfs)\n",cc->chunkid,c->fd,fdsec,(void*)(c->crc),crcsec,c->block,c->blockno,blocksec);
 #else /* PRESERVE_BLOCK */
 				double fdsec,crcsec;
 				fdsec = c->opento;
@@ -1970,7 +1971,7 @@ void hdd_test_show_openedchunks(void) {
 				if (crcsec>0.0) {
 					crcsec -= now;
 				}
-				printf("id: %"PRIu64" - fd:%d (delay:%.3lfs) crc:%p (delay:%.3lfs)\n",cc->chunkid,c->fd,fdsec,c->crc,crcsec);
+				printf("id: %"PRIu64" - fd:%d (delay:%.3lfs) crc:%p (delay:%.3lfs)\n",cc->chunkid,c->fd,fdsec,(void*)(c->crc),crcsec);
 #endif /* PRESERVE_BLOCK */
 				hdd_chunk_release(c);
 			}
@@ -1981,6 +1982,7 @@ void hdd_test_show_openedchunks(void) {
 		printf("unlock error: %u\n",errno);
 	}
 }
+#endif
 
 void hdd_delayed_ops() {
 	dopchunk **ccp,*cc,*tcc;

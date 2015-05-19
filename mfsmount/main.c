@@ -342,8 +342,8 @@ static void usage(const char *progname) {
 "    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 8)\n"
 #endif
 "    -o mfsfsyncbeforeclose      force fsync before last file close (safer but can be inefficient - especially in case of small files)\n"
-"    -o mfswritecachesize=N      define size of write cache in MiB (default: 128)\n"
-"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 128)\n"
+"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n"
+"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n"
 "    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n"
 "    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n"
 "    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n"
@@ -1235,7 +1235,7 @@ int main(int argc, char *argv[]) {
 		mfsopts.nofile=100000;
 	}
 	if (mfsopts.writecachesize==0) {
-		mfsopts.writecachesize=128;
+		mfsopts.writecachesize=256;
 	}
 	if (mfsopts.writecachesize<16) {
 		fprintf(stderr,"write cache size too low (%u MiB) - increased to 16 MiB\n",mfsopts.writecachesize);
@@ -1246,7 +1246,7 @@ int main(int argc, char *argv[]) {
 		mfsopts.writecachesize=2048;
 	}
 	if (mfsopts.readaheadsize==0) {
-		mfsopts.readaheadsize=128;
+		mfsopts.readaheadsize=256;
 	}
 	if (mfsopts.readaheadsize<16) {
 		fprintf(stderr,"read ahead size too low (%u MiB) - increased to 16 MiB\n",mfsopts.readaheadsize);

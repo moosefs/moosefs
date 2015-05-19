@@ -1,3 +1,10 @@
+moosefs (3.0.23-1) unstable; urgency=medium
+
+  * (configure) added python as dependency for mfscgiserv
+  * (mount) readdata module improvements (masterdata cache)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 19 May 2015 13:00:00 +0200
+
 moosefs (3.0.22-1) unstable; urgency=medium
 
   * (mount) fixed dircache invalidation

@@ -1108,14 +1108,19 @@ void matoclserv_mass_resolve_paths(matoclserventry *eptr,const uint8_t *data,uin
 
 void matoclserv_missing_chunks(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t *ptr;
-	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOMA_MISSING_CHUNKS - wrong size (%"PRIu32"/0)",length);
+	uint8_t mode;
+	if (length!=0 && length!=1) {
+		syslog(LOG_NOTICE,"CLTOMA_MISSING_CHUNKS - wrong size (%"PRIu32"/0|1)",length);
 		eptr->mode = KILL;
 		return;
 	}
-	(void)data;
-	ptr = matoclserv_createpacket(eptr,MATOCL_MISSING_CHUNKS,missing_log_getdata(NULL));
-	missing_log_getdata(ptr);
+	if (length==1) {
+		mode = get8bit(&data);
+	} else {
+		mode = 0;
+	}
+	ptr = matoclserv_createpacket(eptr,MATOCL_MISSING_CHUNKS,missing_log_getdata(NULL,mode));
+	missing_log_getdata(ptr,mode);
 }
 
 void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {

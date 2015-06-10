@@ -1,5 +1,19 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.71-1 (2015-06-10)
+
+  - (cs) fixed sending disk sizes after chunk deletions
+  - (tools) added displaying chunk information in "mfsfileinfo" for chunks exceeding file size
+  - (cli+cgi) added "missing chunk type" column in "missing files" table
+  - (master) added automatic fixing missing chunks exceeding file size
+  - (cs) fixed "got unknown message (type:212)" issue
+  - (cs) added ip and port to connection error message
+
+* MooseFS 2.0.70-1 (2015-06-01)
+
+  - (master) changed two highest replication priorities (fixes problem with slow replication from "marked for removal" disks)
+  - (cs) added option '!' to paths in mfshdd.cfg - ignore 'metaid'
+
 * MooseFS 2.0.69-1 (2015-05-18)
 
   - (configure) added python as dependency for mfscgiserv

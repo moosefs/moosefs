@@ -27,6 +27,16 @@
 
 #define MAXCSCOUNT 10000
 
+typedef enum {
+	CHUNK_FLOOP_NOTFOUND,
+	CHUNK_FLOOP_DELETED,
+	CHUNK_FLOOP_MISSING_NOCOPY,
+	CHUNK_FLOOP_MISSING_INVALID,
+	CHUNK_FLOOP_MISSING_WRONGVERSION,
+	CHUNK_FLOOP_UNDERGOAL,
+	CHUNK_FLOOP_OK
+} chunkfloop;
+
 /*
 int chunk_create(uint64_t *chunkid,uint8_t goal);
 int chunk_duplicate(uint64_t *chunkid,uint64_t oldchunkid,uint8_t goal);
@@ -59,6 +69,7 @@ void chunk_info(uint32_t *allchunks,uint32_t *allcopies,uint32_t *regcopies);
 uint8_t chunk_counters_in_progress(void);
 
 int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies);
+chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t goal,uint8_t aftereof);
 
 int chunk_multi_modify(uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal,uint8_t *opflag);
 int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t goal);

@@ -35,6 +35,7 @@ typedef struct mlogentry {
 	uint64_t chunkid;
 	uint32_t inode;
 	uint32_t indx;
+	uint8_t type;
 } mlogentry;
 
 static mlogentry *mloghash;
@@ -46,7 +47,7 @@ static uint32_t mloghashprevelements;
 static uint32_t mloghashcapacity;
 static uint8_t blocked;
 
-void missing_log_insert(uint64_t chunkid,uint32_t inode,uint32_t indx) {
+void missing_log_insert(uint64_t chunkid,uint32_t inode,uint32_t indx,uint8_t type) {
 	uint32_t hash,disp;
 	if (blocked || mloghashelements>=mloghashcapacity || chunkid==0) {
 		return;
@@ -66,6 +67,7 @@ void missing_log_insert(uint64_t chunkid,uint32_t inode,uint32_t indx) {
 	mloghash[hash].chunkid = chunkid;
 	mloghash[hash].inode = inode;
 	mloghash[hash].indx = indx;
+	mloghash[hash].type = type;
 	mloghashelements++;
 }
 
@@ -91,10 +93,10 @@ void missing_log_swap(void) {
 	}
 }
 
-uint32_t missing_log_getdata(uint8_t *buff) {
+uint32_t missing_log_getdata(uint8_t *buff,uint8_t mode) {
 	uint32_t i,j;
 	if (buff==NULL) {
-		return mloghashprevelements*16;
+		return mloghashprevelements*((mode==0)?16:17);
 	} else {
 		j = 0;
 		for (i=0 ; i<mloghashprevsize && j<mloghashprevelements ; i++) {
@@ -102,6 +104,9 @@ uint32_t missing_log_getdata(uint8_t *buff) {
 				put64bit(&buff,mloghashprev[i].chunkid);
 				put32bit(&buff,mloghashprev[i].inode);
 				put32bit(&buff,mloghashprev[i].indx);
+				if (mode) {
+					put8bit(&buff,mloghashprev[i].type);
+				}
 				j++;
 			}
 		}

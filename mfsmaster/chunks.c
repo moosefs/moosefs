@@ -215,7 +215,6 @@ static uint32_t chunks_priority_tail[DANGER_PRIORITIES];
 
 // static uint32_t ReplicationsDelayDisconnect=3600;
 static uint32_t ReplicationsDelayInit=60;
-static uint32_t AcceptUnknownChunkDelay=300;
 static uint32_t RemoveDelayDisconnect=3600;
 static uint32_t DangerMaxLeng=1000000;
 
@@ -642,9 +641,9 @@ static inline void chunk_priority_queue_check(chunk *c) {
 		}
 	}
 	if (vc+tdc > 0 && vc < c->goal) { // undergoal chunk
-		if (vc==0 && tdc==1) { // highest priority - chunks only on one disk "marked for removal"
+		if (vc+tdc==1 && c->goal>2) { // highest priority - chunks with one copy and high goal
 			j = 0;
-		} else if (vc==1 && tdc==0) { // next priority - chunks only on one regular disk
+		} else if (vc+tdc==1 && c->goal==2) { // next priority - chunks with one copy
 			j = 1;
 		} else if (vc==1 && tdc>0) { // next priority - chunks on one regular disk and some "marked for removal" disks
 			j = 2;
@@ -840,7 +839,7 @@ int chunk_change_file(uint64_t chunkid,uint8_t prevgoal,uint8_t newgoal) {
 	return STATUS_OK;
 }
 
-static inline int chunk_delete_file_int(chunk *c,uint8_t goal) {
+static inline int chunk_delete_file_int(chunk *c,uint8_t goal,uint32_t delete_timeout) {
 	uint8_t oldgoal;
 
 	if (c->fcount==0) {
@@ -870,6 +869,9 @@ static inline int chunk_delete_file_int(chunk *c,uint8_t goal) {
 	}
 	if (oldgoal!=c->goal) {
 		chunk_state_change(oldgoal,c->goal,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+	}
+	if (c->fcount==0 && delete_timeout>0) {
+		c->lockedto = (uint32_t)main_time()+delete_timeout;
 	}
 	return STATUS_OK;
 }
@@ -918,7 +920,7 @@ int chunk_delete_file(uint64_t chunkid,uint8_t goal) {
 	if (c==NULL) {
 		return ERROR_NOCHUNK;
 	}
-	return chunk_delete_file_int(c,goal);
+	return chunk_delete_file_int(c,goal,0);
 }
 
 int chunk_add_file(uint64_t chunkid,uint8_t goal) {
@@ -961,6 +963,41 @@ int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies) {
 	}
 	*vcopies = c->allvalidcopies;
 	return STATUS_OK;
+}
+
+// CHUNK_FLOOP_NOTFOUND
+// CHUNK_FLOOP_DELETED
+// CHUNK_FLOOP_MISSING_NOCOPY
+// CHUNK_FLOOP_MISSING_INVALID
+// CHUNK_FLOOP_MISSING_WRONGVERSION
+// CHUNK_FLOOP_UNDERGOAL
+// CHUNK_FLOOP_OK
+
+chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t goal,uint8_t aftereof) {
+	chunk *c;
+	slist *s;
+	c = chunk_find(chunkid);
+	if (c==NULL) {
+		return CHUNK_FLOOP_NOTFOUND;
+	}
+	if (c->allvalidcopies==0 && aftereof && c->lockedto==0 && c->operation==NONE) {
+		chunk_delete_file_int(c,goal,UNUSED_DELETE_TIMEOUT);
+		return CHUNK_FLOOP_DELETED;
+	}
+	if (c->allvalidcopies==0) {
+		if (c->slisthead==NULL) {
+			return CHUNK_FLOOP_MISSING_NOCOPY;
+		}
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->version>0 && s->version!=c->version) {
+				return CHUNK_FLOOP_MISSING_WRONGVERSION;
+			}
+		}
+		return CHUNK_FLOOP_MISSING_INVALID;
+	} else if (c->allvalidcopies < goal) {
+		return CHUNK_FLOOP_UNDERGOAL;
+	}
+	return CHUNK_FLOOP_OK;
 }
 
 int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint8_t goal,uint8_t *opflag) {
@@ -1126,7 +1163,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 							c->version = 1;
 							c->interrupted = 0;
 							c->operation = DUPLICATE;
-							chunk_delete_file_int(oc,goal);
+							chunk_delete_file_int(oc,goal,0);
 							chunk_add_file_int(c,goal);
 						}
 						s = slist_malloc();
@@ -1161,7 +1198,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 				}
 				c = chunk_new(nextchunkid++);
 				c->version = 1;
-				chunk_delete_file_int(oc,goal);
+				chunk_delete_file_int(oc,goal,0);
 				chunk_add_file_int(c,goal);
 				*nchunkid = c->chunkid;
 			}
@@ -1288,7 +1325,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 						c->version = 1;
 						c->interrupted = 0;
 						c->operation = DUPTRUNC;
-						chunk_delete_file_int(oc,goal);
+						chunk_delete_file_int(oc,goal,0);
 						chunk_add_file_int(c,goal);
 					}
 					s = slist_malloc();
@@ -1322,7 +1359,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			}
 			c = chunk_new(nextchunkid++);
 			c->version = 1;
-			chunk_delete_file_int(oc,goal);
+			chunk_delete_file_int(oc,goal,0);
 			chunk_add_file_int(c,goal);
 			*nchunkid = c->chunkid;
 		}
@@ -1371,7 +1408,7 @@ int chunk_repair(uint8_t goal,uint64_t ochunkid,uint32_t *nversion) {
 		}
 	}
 	if (bestversion==0) {	// didn't find sensible chunk - so erase it
-		chunk_delete_file_int(c,goal);
+		chunk_delete_file_int(c,goal,0);
 		return 1;
 	}
 	if (c->allvalidcopies>0 || c->regularvalidcopies>0) {
@@ -1555,11 +1592,7 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 		}
 		c = chunk_new(chunkid);
 		c->version = version;
-		if (starttime+AcceptUnknownChunkDelay>main_time()) {
-			c->lockedto = (uint32_t)main_time()+UNUSED_DELETE_TIMEOUT;
-		} else {
-			c->lockedto = 0;
-		}
+		c->lockedto = (uint32_t)main_time()+UNUSED_DELETE_TIMEOUT;
 		changelog("%"PRIu32"|CHUNKADD(%"PRIu64",%"PRIu32",%"PRIu32")",main_time(),c->chunkid,c->version,c->lockedto);
 	}
 	for (s=c->slisthead ; s ; s=s->next) {
@@ -2424,10 +2457,10 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 //		if ((csdb_getdisconnecttime()+ReplicationsDelayDisconnect)<now) {
 			uint32_t rgvc,rgtdc;
 			uint32_t lclass;
-			if (vc==0 && tdc==1) { // highest priority - chunks only on one disk "marked for removal"
+			if (vc+tdc==1 && c->goal>2) { // highest priority - chunks with only one copy and high goal
 				j = 0;
 				lclass = 0;
-			} else if (vc==1 && tdc==0) { // next priority - chunks only on one regular disk
+			} else if (vc+tdc==1 && c->goal==2) { // next priority - chunks with only one copy
 				j = 1;
 				lclass = 0;
 			} else if (vc==1 && tdc>0) { // next priority - chunks on one regular disk and some "marked for removal" disks

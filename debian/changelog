@@ -1,3 +1,23 @@
+moosefs (2.0.71-1) unstable; urgency=medium
+
+  * (cs) fixed sending disk sizes after chunk deletions
+  * (tools) added displaying chunk information in "mfsfileinfo" for chunks
+    exceeding file size
+  * (cli+cgi) added "missing chunk type" column in "missing files" table
+  * (master) added automatic fixing missing chunks exceeding file size
+  * (cs) fixed "got unknown message (type:212)" issue
+  * (cs) added ip and port to connection error message
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 10 Jun 2015 13:00:00 +0200
+
+moosefs (2.0.70-1) unstable; urgency=medium
+
+  * (master) changed two highest replication priorities (fixes problem with
+    slow replication from "marked for removal" disks)
+  * (cs) added option '!' to paths in mfshdd.cfg - ignore 'metaid'
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 01 Jun 2015 13:00:00 +0200
+
 moosefs (2.0.69-1) unstable; urgency=medium
 
   * (configure) added python as dependency for mfscgiserv

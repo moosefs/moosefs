@@ -2376,7 +2376,7 @@ static inline void fsnodes_checkfile(fsnode *p,uint32_t chunkcount[11]) {
 	for (i=0 ; i<p->data.fdata.chunks ; i++) {
 		chunkid = p->data.fdata.chunktab[i];
 		if (chunkid>0) {
-			chunk_get_validcopies(chunkid,&count,NULL,0,NULL);
+			chunk_get_validcopies(chunkid,&count);
 			if (count>10) {
 				count=10;
 			}
@@ -3962,7 +3962,7 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 	memset(attr,0,35);
 
 	if (fsnodes_node_find_ext(rootinode,sesflags,&parent,&rn,&wd,0)==0) {
-		return ERROR_ENOENT;
+		return ERROR_ENOENT_NOCACHE;
 	}
 	if (wd->type!=TYPE_DIRECTORY) {
 		return ERROR_ENOTDIR;
@@ -4007,7 +4007,11 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 	}
 	e = fsnodes_lookup(wd,nleng,name);
 	if (!e) {
-		return ERROR_ENOENT;
+		if (wd->flags&EATTR_NOECACHE) {
+			return ERROR_ENOENT_NOCACHE;
+		} else {
+			return ERROR_ENOENT;
+		}
 	}
 	*inode = e->child->id;
 	fsnodes_fill_attr(e->child,wd,uid,gid[0],auid,agid,sesflags,attr);
@@ -4028,22 +4032,29 @@ uint8_t fs_getattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	return STATUS_OK;
 }
 
-uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint32_t *indx,uint64_t *prevchunkid,uint64_t *chunkid) {
+uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint32_t *indx,uint64_t *prevchunkid,uint64_t *chunkid) {
 	fsnode *p;
 	memset(attr,0,35);
 	if (sesflags&SESFLAG_READONLY) {
 		return ERROR_EROFS;
 	}
-	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,opened)==0) {
+	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,flags & TRUNCATE_FLAG_OPENED)==0) {
 		return ERROR_ENOENT;
 	}
-	if (opened==0) {
+	if ((flags & TRUNCATE_FLAG_OPENED)==0) {
 		if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_W,sesflags)) {
 			return ERROR_EACCES;
 		}
 	}
 	if (p->type!=TYPE_FILE && p->type!=TYPE_TRASH && p->type!=TYPE_SUSTAINED) {
 		return ERROR_EPERM;
+	}
+	if (flags & TRUNCATE_FLAG_UPDATE) {
+		if (length>p->data.fdata.length) {
+			fsnodes_setlength(p,length);
+			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",0)",(uint32_t)main_time(),inode,length);
+		}
+		return STATUS_OK;
 	}
 	if (length>p->data.fdata.length) {
 		uint32_t lastchunk_pre,lastchunksize_pre,lastchunk_post,lastchunksize_post;
@@ -5068,6 +5079,7 @@ uint8_t fs_opencheck(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 }
 
 uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint64_t *chunkid,uint64_t *length) {
+	int status;
 	fsnode *p;
 	uint32_t ts = main_time();
 
@@ -5085,6 +5097,10 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint64_t *
 	}
 	if (indx<p->data.fdata.chunks) {
 		*chunkid = p->data.fdata.chunktab[indx];
+	}
+	status = chunk_read_check(ts,*chunkid);
+	if (status!=STATUS_OK) {
+		return status;
 	}
 	*length = p->data.fdata.length;
 	if (p->atime!=ts && canmodatime) {
@@ -6255,6 +6271,27 @@ void fs_add_files_to_chunks() {
 	}
 }
 
+uint8_t fs_mr_set_file_chunk(uint32_t inode,uint32_t indx,uint64_t chunkid) {
+	fsnode *node;
+	uint64_t oldchunkid;
+	node = fsnodes_node_find(inode);
+	if (node==NULL) {
+		return ERROR_ENOENT;
+	}
+	if (indx>=node->data.fdata.chunks) {
+		return ERROR_MISMATCH;
+	}
+	oldchunkid = node->data.fdata.chunktab[indx];
+	if (oldchunkid>0) {
+		chunk_delete_file(oldchunkid,node->lsetid);
+	}
+	node->data.fdata.chunktab[indx] = chunkid;
+	if (chunkid>0) {
+		chunk_add_file(chunkid,node->lsetid);
+	}
+	return STATUS_OK;
+}
+
 void fs_test_getdata(uint32_t *loopstart,uint32_t *loopend,uint32_t *files,uint32_t *ugfiles,uint32_t *mfiles,uint32_t *mtfiles,uint32_t *msfiles,uint32_t *chunks,uint32_t *ugchunks,uint32_t *mchunks,char **msgbuff,uint32_t *msgbuffleng) {
 	*loopstart = fsinfo_loopstart;
 	*loopend = fsinfo_loopend;
@@ -6303,8 +6340,9 @@ void fs_test_files() {
 	static uint32_t i=0;
 	uint32_t j;
 	uint32_t k;
+	uint32_t lengchunks;
 	uint64_t chunkid;
-	uint8_t vc,goal,valid,ugflag,aflag;
+	uint8_t valid,ugflag,aflag;
 	uint32_t aflagchanged,allchunks;
 	uint16_t arch_delay;
 	uint32_t arch_delay_sec;
@@ -6387,30 +6425,57 @@ void fs_test_files() {
 					arch_delay_sec += f->ctime;
 					aflag = (arch_delay_sec < now && arch_delay_sec >= f->ctime)?1:0; // arch_delay_sec < f->mtime means overflow
 				}
+				lengchunks = ((f->data.fdata.length+MFSCHUNKMASK)>>MFSCHUNKBITS);
 				for (j=0 ; j<f->data.fdata.chunks ; j++) {
 					chunkid = f->data.fdata.chunktab[j];
 					if (chunkid>0) {
 						allchunks++;
-						if (chunk_get_validcopies(chunkid,&vc,&goal,aflag,&aflagchanged)!=STATUS_OK) {
-							syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->id,j);
-							if (leng<MSGBUFFSIZE) {
-								leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")\n",chunkid,f->id,j);
-							}
-							notfoundchunks++;
-							if ((notfoundchunks%1000)==0) {
-								syslog(LOG_ERR,"unknown chunks: %"PRIu32" ...",notfoundchunks);
-							}
-							valid =0;
-							mchunks++;
-						} else if (vc==0) {
-							missing_log_insert(chunkid,f->id,j);
-							valid = 0;
-							mchunks++;
-						} else if (vc<goal) {
-							ugflag = 1;
-							ugchunks++;
+						switch (chunk_fileloop_task(chunkid,f->lsetid,(j>=lengchunks)?1:0,aflag)) {
+							case CHUNK_FLOOP_NOTFOUND:
+								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->id,j);
+								if (leng<MSGBUFFSIZE) {
+									leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")\n",chunkid,f->id,j);
+								}
+								notfoundchunks++;
+								if ((notfoundchunks%1000)==0) {
+									syslog(LOG_ERR,"unknown chunks: %"PRIu32" ...",notfoundchunks);
+								}
+								valid =0;
+								mchunks++;
+								break;
+							case CHUNK_FLOOP_DELETED:
+								f->data.fdata.chunktab[j] = 0;
+								changelog("%"PRIu32"|SETFILECHUNK(%"PRIu32",%"PRIu32",0)",main_time(),f->id,j);
+								syslog(LOG_NOTICE,"inode: %"PRIu32" ; index: %"PRIu32" - removed not existing chunk exceeding file size (chunkid: %016"PRIX64")",f->id,j,chunkid);
+								break;
+							case CHUNK_FLOOP_MISSING_NOCOPY:
+								missing_log_insert(chunkid,f->id,j,0);
+								valid = 0;
+								mchunks++;
+								break;
+							case CHUNK_FLOOP_MISSING_INVALID:
+								missing_log_insert(chunkid,f->id,j,1);
+								valid = 0;
+								mchunks++;
+								break;
+							case CHUNK_FLOOP_MISSING_WRONGVERSION:
+								missing_log_insert(chunkid,f->id,j,2);
+								valid = 0;
+								mchunks++;
+								break;
+							case CHUNK_FLOOP_UNDERGOAL_AFLAG_CHANGED:
+								aflagchanged++;
+								// no break - intentionally
+							case CHUNK_FLOOP_UNDERGOAL_AFLAG_NOT_CHANGED:
+								ugflag = 1;
+								ugchunks++;
+								break;
+							case CHUNK_FLOOP_OK_AFLAG_CHANGED:
+								aflagchanged++;
+								// no break - intentionally
+							case CHUNK_FLOOP_OK_AFLAG_NOT_CHANGED:
+								break;
 						}
-						chunks++;
 					}
 				}
 				if (aflagchanged) {
@@ -6430,6 +6495,7 @@ void fs_test_files() {
 					ugfiles++;
 				}
 				files++;
+				chunks += allchunks;
 			}
 			for (e=f->parents ; e ; e=e->nextparent) {
 				if (e->child != f) {

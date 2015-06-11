@@ -870,6 +870,20 @@ int do_seteattr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return fs_mr_seteattr(ts,inode,uid,eattr,smode,ci,nci,npi);
 }
 
+int do_setfilechunk(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,indx;
+	uint64_t chunkid;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(indx,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU64(chunkid,ptr);
+	EAT(ptr,filename,lv,')');
+	return fs_mr_set_file_chunk(inode,indx,chunkid);
+}
+
 int do_setgoal(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,uid,ci,nci,npi;
 	uint8_t goal,smode;
@@ -1275,6 +1289,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 		case HASHCODE('S','E','T','E'):
 			if (strncmp(ptr,"SETEATTR",8)==0) {
 				return do_seteattr(filename,lv,ts,ptr+8);
+			}
+			break;
+		case HASHCODE('S','E','T','F'):
+			if (strncmp(ptr,"SETFILECHUNK",12)==0) {
+				return do_setfilechunk(filename,lv,ts,ptr+12);
 			}
 			break;
 		case HASHCODE('S','E','T','G'):

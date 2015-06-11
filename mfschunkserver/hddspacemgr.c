@@ -1574,6 +1574,7 @@ void hdd_check_folders(void) {
 	uint32_t i;
 	double monotonic_time;
 	uint32_t err;
+	uint8_t enoent;
 	int changed;
 
 	monotonic_time = monotonic_seconds();
@@ -1646,6 +1647,11 @@ void hdd_check_folders(void) {
 	}
 	for (f=folderhead ; f ; f=f->next) {
 		if (f->damaged || f->toremove || (f->rebalance_in_progress==1 && f->scanstate!=SCST_WORKING)) {
+			if (f->damaged && f->toremove==0 && f->scanstate==SCST_WORKING && f->lastrefresh+60.0<monotonic_time) {
+				hdd_refresh_usage(f);
+				f->lastrefresh = monotonic_time;
+				changed = 1;
+			}
 			continue;
 		}
 		switch (f->scanstate) {
@@ -1672,9 +1678,13 @@ void hdd_check_folders(void) {
 			break;
 		case SCST_WORKING:
 			err = 0;
+			enoent = 0;
 			for (i=0 ; i<LASTERRSIZE; i++) {
 				if (f->lasterrtab[i].monotonic_time+HDDErrorTime>=monotonic_time && (f->lasterrtab[i].errornumber==EIO || f->lasterrtab[i].errornumber==EROFS || f->lasterrtab[i].errornumber==ENOENT)) {
 					err++;
+					if (f->lasterrtab[i].errornumber==ENOENT) {
+						enoent = 1;
+					}
 				}
 			}
 			if (err>HDDErrorCount && f->todel<2) {
@@ -1682,13 +1692,14 @@ void hdd_check_folders(void) {
 				f->toremove = 2;
 				f->damaged = 1;
 				changed = 1;
-			} else {
-				if (f->needrefresh || f->lastrefresh+60.0<monotonic_time) {
-					hdd_refresh_usage(f);
-					f->needrefresh = 0;
-					f->lastrefresh = monotonic_time;
-					changed = 1;
-				}
+			} else if (enoent && err>HDDErrorCount && f->todel>=2) {
+				syslog(LOG_WARNING,"%"PRIu32" errors occurred in %"PRIu32" seconds on folder: %s",err,HDDErrorTime,f->path);
+				f->damaged = 1;
+			} else if (f->needrefresh || f->lastrefresh+60.0<monotonic_time) {
+				hdd_refresh_usage(f);
+				f->needrefresh = 0;
+				f->lastrefresh = monotonic_time;
+				changed = 1;
 			}
 		}
 	}
@@ -3945,6 +3956,10 @@ static int hdd_int_delete(uint64_t chunkid,uint32_t version) {
 		} else {
 			mfs_arg_errlog_silent(LOG_WARNING,"delete_chunk: file:%s - chunk already deleted !!!",c->filename);
 		}
+	} else {
+		zassert(pthread_mutex_lock(&folderlock));
+		c->owner->needrefresh = 1;
+		zassert(pthread_mutex_unlock(&folderlock));
 	}
 	hdd_chunk_delete(c);
 	return STATUS_OK;
@@ -5337,7 +5352,7 @@ int hdd_size_parse(const char *str,uint64_t *ret) {
 
 int hdd_parseline(char *hddcfgline) {
 	uint32_t l,p;
-	int lfd,td,bm;
+	int lfd,td,im,bm;
 	int mfd;
 	char *pptr;
 	char *lockfname;
@@ -5398,21 +5413,23 @@ int hdd_parseline(char *hddcfgline) {
 		hddcfgline[l]='\0';
 	}
 	td = 0;
+	im = 0;
 	bm = REBALANCE_STD;
-	if (hddcfgline[0]=='*') {
-		td = 1;
-		pptr = hddcfgline+1;
+	pptr = hddcfgline;
+	while (1) {
+		if (*pptr == '*') {
+			td = 1;
+		} else if (*pptr == '!') {
+			im = 1;
+		} else if (*pptr == '>') {
+			bm = REBALANCE_FORCE_DST;
+		} else if (*pptr == '<') {
+			bm = REBALANCE_FORCE_SRC;
+		} else {
+			break;
+		}
 		l--;
-	} else if (hddcfgline[0]=='>') {
-		bm = REBALANCE_FORCE_DST;
-		pptr = hddcfgline+1;
-		l--;
-	} else if (hddcfgline[0]=='<') {
-		bm = REBALANCE_FORCE_SRC;
-		pptr = hddcfgline+1;
-		l--;
-	} else {
-		pptr = hddcfgline;
+		pptr++;
 	}
 
 	zassert(pthread_mutex_lock(&folderlock));
@@ -5484,15 +5501,25 @@ int hdd_parseline(char *hddcfgline) {
 			filemetaid = get64bit(&rptr);
 			if (filemetaid!=metaid) {
 				if (metaid>0) {
-					mfs_arg_syslog(LOG_ERR,"hdd space manager: wrong meta id in file '%s' (0x%016"PRIX64",expected:0x%016"PRIX64") - can't use this drive",metaidfname,filemetaid,metaid);
+					if (im==0) {
+						mfs_arg_syslog(LOG_ERR,"hdd space manager: wrong meta id in file '%s' (0x%016"PRIX64",expected:0x%016"PRIX64") - shouldn't use this drive - use '!' in drive definition to ignore this (dangerous)",metaidfname,filemetaid,metaid);
+					} else {
+						mfs_arg_syslog(LOG_ERR,"hdd space manager: wrong meta id in file '%s' (0x%016"PRIX64",expected:0x%016"PRIX64") - forced to use this drive",metaidfname,filemetaid,metaid);
+					}
 				} else {
-					mfs_arg_syslog(LOG_ERR,"hdd space manager: chunkserver without meta id can't use drive with defined meta id (file: '%s')",metaidfname);
+					if (im==0) {
+						mfs_arg_syslog(LOG_ERR,"hdd space manager: chunkserver without meta id shouldn't use drive with defined meta id (file: '%s') - use '!' in drive definition to ignore this (dangerous)",metaidfname);
+					} else {
+						mfs_arg_syslog(LOG_ERR,"hdd space manager: chunkserver without meta id shouldn't use drive with defined meta id (file: '%s') - forced to ignore",metaidfname);
+					}
 				}
 				close(mfd);
 				free(metaidfname);
-				return -1;
+				if (im==0) {
+					return -1;
+				}
 			}
-			metaid = 0; // file exists and is correct, so do not re create it
+			metaid = 0; // file exists and is correct (or forced do be ignored), so do not re create it
 		}
 		close(mfd);
 	}
@@ -5503,6 +5530,7 @@ int hdd_parseline(char *hddcfgline) {
 	memcpy(lockfname+l,".lock",6);
 	lfd = open(lockfname,O_RDWR|O_CREAT|O_TRUNC,0640);
 	if (lfd<0 && errno==EROFS && td) {
+		lfd = open(lockfname,O_RDONLY); // prevents umounting
 		free(lockfname);
 		td = 2;
 	} else {
@@ -5545,7 +5573,7 @@ int hdd_parseline(char *hddcfgline) {
 			zassert(pthread_mutex_unlock(&folderlock));
 		}
 	}
-	if (metaid>0) {
+	if (im==0 && metaid>0) {
 		metaidfname = (char*)malloc(l+8);
 		passert(metaidfname);
 		memcpy(metaidfname,pptr,l);

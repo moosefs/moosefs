@@ -470,6 +470,10 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 		case CLTOAN_MODULE_INFO:
 			csserv_module_info(eptr,data,length);
 			break;
+		case CLTOCS_WRITE_DATA:
+		case CLTOCS_WRITE_FINISH:
+			eptr->state = CLOSE; // silently ignore those packets
+			break;
 		default:
 			syslog(LOG_NOTICE,"got unknown message (type:%"PRIu32")",type);
 			eptr->state = CLOSE;

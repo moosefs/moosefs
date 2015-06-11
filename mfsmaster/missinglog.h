@@ -23,9 +23,9 @@
 
 #include <inttypes.h>
 
-void missing_log_insert(uint64_t chunkid,uint32_t inode,uint32_t indx);
+void missing_log_insert(uint64_t chunkid,uint32_t inode,uint32_t indx,uint8_t type);
 void missing_log_swap(void);
-uint32_t missing_log_getdata(uint8_t *buff);
+uint32_t missing_log_getdata(uint8_t *buff,uint8_t mode);
 int missing_log_init(void);
 
 #endif

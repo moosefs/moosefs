@@ -2563,6 +2563,7 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	uint8_t reqbuff[21],*wptr,*buff;
 	const uint8_t *rptr;
 	int32_t rleng;
+	uint32_t fchunks;
 	uint32_t indx,cmd,leng,inode,version;
 	uint32_t chunks,copies,copy;
 	char csstrip[16];
@@ -2581,60 +2582,63 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	if (fd<0) {
 		return -1;
 	}
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_FUSE_CHECK);
+	put32bit(&wptr,8);
+	put32bit(&wptr,0);
+	put32bit(&wptr,inode);
+	if (tcpwrite(fd,reqbuff,16)!=16) {
+		printf("%s: master query: send error\n",fname);
+		close_master_conn(1);
+		return -1;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("%s: master query: receive error\n",fname);
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_FUSE_CHECK) {
+		printf("%s: master query: wrong answer (type)\n",fname);
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("%s: master query: receive error\n",fname);
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("%s: master query: wrong answer (queryid)\n",fname);
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng==1) {
+		printf("%s: %s\n",fname,mfsstrerr(*rptr));
+		free(buff);
+		return -1;
+	} else if (leng%3!=0 && leng!=44) {
+		printf("%s: master query: wrong answer (leng)\n",fname);
+		free(buff);
+		return -1;
+	}
 	if (fileinfomode&FILEINFO_QUICK) {
-		wptr = reqbuff;
-		put32bit(&wptr,CLTOMA_FUSE_CHECK);
-		put32bit(&wptr,8);
-		put32bit(&wptr,0);
-		put32bit(&wptr,inode);
-		if (tcpwrite(fd,reqbuff,16)!=16) {
-			printf("%s: master query: send error\n",fname);
-			close_master_conn(1);
-			return -1;
-		}
-		if (tcpread(fd,reqbuff,8)!=8) {
-			printf("%s: master query: receive error\n",fname);
-			close_master_conn(1);
-			return -1;
-		}
-		rptr = reqbuff;
-		cmd = get32bit(&rptr);
-		leng = get32bit(&rptr);
-		if (cmd!=MATOCL_FUSE_CHECK) {
-			printf("%s: master query: wrong answer (type)\n",fname);
-			close_master_conn(1);
-			return -1;
-		}
-		buff = malloc(leng);
-		if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-			printf("%s: master query: receive error\n",fname);
-			free(buff);
-			close_master_conn(1);
-			return -1;
-		}
-		close_master_conn(0);
-		rptr = buff;
-		cmd = get32bit(&rptr);	// queryid
-		if (cmd!=0) {
-			printf("%s: master query: wrong answer (queryid)\n",fname);
-			free(buff);
-			return -1;
-		}
-		leng-=4;
-		if (leng==1) {
-			printf("%s: %s\n",fname,mfsstrerr(*rptr));
-			free(buff);
-			return -1;
-		} else if (leng%3!=0 && leng!=44) {
-			printf("%s: master query: wrong answer (leng)\n",fname);
-			free(buff);
-			return -1;
-		}
 		printf("%s:\n",fname);
-		if (leng%3==0) {
-			for (cmd=0 ; cmd<leng ; cmd+=3) {
-				copies = get8bit(&rptr);
-				chunks = get16bit(&rptr);
+	}
+	fchunks = 0;
+	if (leng%3==0) {
+		for (cmd=0 ; cmd<leng ; cmd+=3) {
+			copies = get8bit(&rptr);
+			chunks = get16bit(&rptr);
+			if (fileinfomode&FILEINFO_QUICK) {
 				if (copies==1) {
 					printf("1 copy:");
 				} else {
@@ -2642,29 +2646,35 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 				}
 				print_number(" ","\n",chunks,1,0,1);
 			}
-		} else {
-			for (cmd=0 ; cmd<11 ; cmd++) {
-				chunks = get32bit(&rptr);
-				if (chunks>0) {
-					if (cmd==1) {
-						printf(" chunks with 1 copy:    ");
-					} else if (cmd>=10) {
-						printf(" chunks with 10+ copies:");
-					} else {
-						printf(" chunks with %u copies:  ",cmd);
-					}
-					print_number(" ","\n",chunks,1,0,1);
-				}
-			}
+			fchunks += chunks;
 		}
-		free(buff);
 	} else {
+		for (cmd=0 ; cmd<11 ; cmd++) {
+			chunks = get32bit(&rptr);
+			if (chunks>0 && (fileinfomode&FILEINFO_QUICK)) {
+				if (cmd==1) {
+					printf(" chunks with 1 copy:    ");
+				} else if (cmd>=10) {
+					printf(" chunks with 10+ copies:");
+				} else {
+					printf(" chunks with %u copies:  ",cmd);
+				}
+				print_number(" ","\n",chunks,1,0,1);
+			}
+			fchunks += chunks;
+		}
+	}
+	free(buff);
+	if ((fileinfomode&FILEINFO_QUICK)==0) {
 //	printf("masterversion: %08X\n",masterversion);
-		indx=0;
 		if (fileinfomode&FILEINFO_SIGNATURE) {
 			md5_init(&filectx);
 		}
-		do {
+		printf("%s:\n",fname);
+		if (fchunks==0) {
+			printf("\tno chunks - empty file\n");
+		}
+		for (indx=0 ; indx<fchunks ; indx++) {
 			wptr = reqbuff;
 			put32bit(&wptr,CLTOMA_FUSE_READ_CHUNK);
 			if (masterversion>VERSION2INT(3,0,3)) {
@@ -2742,9 +2752,6 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 				}
 				protover = 0;
 			}
-			if (indx==0) {
-				printf("%s:\n",fname);
-			}
 			fleng = get64bit(&rptr);
 			chunkid = get64bit(&rptr);
 			version = get32bit(&rptr);
@@ -2820,8 +2827,7 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 				}
 			}
 			free(buff);
-			indx++;
-		} while (indx<((fleng+MFSCHUNKMASK)>>MFSCHUNKBITS));
+		}
 		close_master_conn(0);
 		if (fileinfomode&FILEINFO_SIGNATURE) {
 			md5_final(currentdigest,&filectx);

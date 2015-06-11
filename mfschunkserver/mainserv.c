@@ -177,7 +177,7 @@ int mainserv_connect(uint32_t fwdip,uint16_t fwdport,uint32_t timeout) {
 		return -1;
 	}
 	if (tcpnumtoconnect(fwdsock,fwdip,fwdport,timeout)<0) {
-		mfs_errlog(LOG_WARNING,"connect failed, error");
+		mfs_arg_errlog(LOG_WARNING,"connect to %u.%u.%u.%u:%u failed, error",(fwdip>>24)&0xFF,(fwdip>>16)&0xFF,(fwdip>>8)&0xFF,fwdip&0xFF,fwdport);
 		tcpclose(fwdsock);
 		return -1;
 	}

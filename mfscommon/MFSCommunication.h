@@ -136,7 +136,9 @@
 #define ERROR_EINTR           46        // Interrupted system call
 #define ERROR_ECANCELED       47        // Operation canceled
 
-#define ERROR_MAX             48
+#define ERROR_ENOENT_NOCACHE  48	// No such file or directory (do not store in cache)
+
+#define ERROR_MAX             49
 
 #define ERROR_STRINGS \
 	"OK", \
@@ -187,6 +189,7 @@
 	"Resource temporarily unavailable", \
 	"Interrupted system call", \
 	"Operation canceled", \
+	"No such file or directory (not cacheable)", \
 	"Unknown MFS error"
 
 /* type for readdir command */
@@ -344,6 +347,10 @@
 // getdir:
 #define GETDIR_FLAG_WITHATTR   0x01
 #define GETDIR_FLAG_ADDTOCACHE 0x02
+
+// truncate:
+#define TRUNCATE_FLAG_OPENED   0x01
+#define TRUNCATE_FLAG_UPDATE   0x02
 
 // register sesflags:
 #define SESFLAG_READONLY       0x01	// meaning is obvious
@@ -1153,6 +1160,7 @@
 #define CLTOMA_FUSE_TRUNCATE (PROTO_BASE+464)
 // msgid:32 inode:32 [ opened:8 ] uid:32 gid:32 length:64 (version < 2.0.0)
 // msgid:32 inode:32 opened:8 uid:32 gcnt:32 gcnt * [ gid:32 ] length:64 (version >= 2.0.0)
+// msgid:32 inode:32 flags:8 uid:32 gcnt:32 gcnt * [ gid:32 ] length:64 (version >= 3.0.25)
 
 // 0x01D1
 #define MATOCL_FUSE_TRUNCATE (PROTO_BASE+465)

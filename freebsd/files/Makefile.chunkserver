@@ -1,27 +1,14 @@
 # Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
 # $FreeBSD$
 
-PORTNAME=	moosefs
-#PORTVERSION=	# set in 'include'
-#PORTREVISION=	# set in 'include'
-CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-chunkserver
 
 COMMENT=	Storing files data and synchronizing it among themselves
 
-.include "Makefile.common"
+LICENSE=	GPLv2
 
-USE_RC_SUBR=	mfschunkserver
-PLIST_SUB+=	MFS_WORKDIR="${MFS_WORKDIR}"
+MFS_COMPONENT=	chunkserver
 
-CONFIGURE_ARGS+=	--disable-mfsmaster \
-			--disable-mfsmetalogger \
-			--disable-mfscgiserv \
-			--disable-mfscgi \
-			--disable-mfscli \
-			--disable-mfsnetdump \
-			--disable-mfssupervisor \
-			--enable-mfschunkserver \
-			--disable-mfsmount
+MASTERDIR=	${.CURDIR}/../moosefs-master
 
-.include <bsd.port.mk>
+.include "${MASTERDIR}/Makefile"

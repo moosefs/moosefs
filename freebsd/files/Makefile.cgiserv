@@ -1,31 +1,14 @@
 # Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
 # $FreeBSD$
 
-PORTNAME=	moosefs
-#PORTVERSION=	# set in 'include'
-#PORTREVISION=	# set in 'include'
-CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-cgiserv
 
 COMMENT=	Simple cgi-capable web server for using with mfs cgi
 
-.include "Makefile.common"
+LICENSE=	GPLv2
 
-RUN_DEPENDS=	moosefs-cgi>0:${PORTSDIR}/sysutils/moosefs-cgi
+MFS_COMPONENT=	cgiserv
 
-USE_RC_SUBR=	mfscgiserv
-PLIST_SUB+=	MFS_WORKDIR="${MFS_WORKDIR}"
+MASTERDIR=	${.CURDIR}/../moosefs-master
 
-USES=		python:2.5+
-
-CONFIGURE_ARGS+=	--disable-mfsmaster \
-			--disable-mfsmetalogger \
-			--enable-mfscgiserv \
-			--disable-mfscgi \
-			--disable-mfscli \
-			--disable-mfsnetdump \
-			--disable-mfssupervisor \
-			--disable-mfschunkserver \
-			--disable-mfsmount
-
-.include <bsd.port.mk>
+.include "${MASTERDIR}/Makefile"

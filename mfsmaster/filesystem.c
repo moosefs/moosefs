@@ -7559,6 +7559,8 @@ int fs_strinit(void) {
 	trashnodes = 0;
 	sustainednodes = 0;
 	quotahead = NULL;
+	freelist = NULL;
+	freetail = &(freelist);
 	fsnodes_edgeid_init();
 	fsnodes_node_hash_init();
 	fsnodes_edge_hash_init();

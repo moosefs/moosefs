@@ -29,16 +29,11 @@ PORTNAMES="master chunkserver client metalogger cgi cgiserv cli netdump"
 
 PORTFILES="Makefile pkg-descr pkg-plist files"
 
-VERSION=2.0.71
+VERSION=2.0.72
 RELEASE=1
 
-if [ -f "$DISTFILEBASE" ]; then
-	SHA256=`sha256 "${DISTFILEBASE}" | cut -d' ' -f4`
-	SIZE=`stat -f %z "${DISTFILEBASE}"`
-else
-	SHA256=`sha256 "${DISTFILEBASE}/moosefs-${VERSION}-${RELEASE}.tar.gz" | cut -d' ' -f4`
-	SIZE=`stat -f %z "${DISTFILEBASE}/moosefs-${VERSION}-${RELEASE}.tar.gz"`
-fi
+cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^DISTNAME=.*$/DISTNAME=		\${PORTNAME}-\${PORTVERSION}-${RELEASE}/" | uniq > .tmp
+mv .tmp "${FILEBASEDIR}/files/Makefile.master"
 
 for portname in ${PORTNAMES}; do
 	portdir="${PORTBASE}/moosefs-${portname}"
@@ -54,9 +49,5 @@ for portname in ${PORTNAMES}; do
 			cp -R "${FILEBASEDIR}/files/${portfile}.${portname}" "${portdir}/${portfile}"
 		fi
 	done
-	cat "${FILEBASEDIR}/files/Makefile.common" | sed "s/^PORTVERSION=.*$/PORTVERSION=	${VERSION}/" > "${portdir}/Makefile.common"
-	(
-		echo "SHA256 (moosefs-${VERSION}-${RELEASE}.tar.gz) = $SHA256"
-		echo "SIZE (moosefs-${VERSION}-${RELEASE}.tar.gz) = $SIZE"
-	) > "${portdir}/distinfo"
+	make -C ${portdir} makesum
 done

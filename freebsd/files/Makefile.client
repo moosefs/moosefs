@@ -1,26 +1,14 @@
 # Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
 # $FreeBSD$
 
-PORTNAME=	moosefs
-#PORTVERSION=	# set in 'include'
-#PORTREVISION=	# set in 'include'
-CATEGORIES=	sysutils
 PKGNAMESUFFIX=	-client
 
 COMMENT=	Moosefs client tools
 
-.include "Makefile.common"
+LICENSE=	GPLv2
 
-USES=		fuse pkgconfig
+MFS_COMPONENT=	client
 
-CONFIGURE_ARGS+=	--disable-mfsmaster \
-			--disable-mfsmetalogger \
-			--disable-mfscgiserv \
-			--disable-mfscgi \
-			--disable-mfscli \
-			--disable-mfsnetdump \
-			--disable-mfssupervisor \
-			--disable-mfschunkserver \
-			--enable-mfsmount
+MASTERDIR=	${.CURDIR}/../moosefs-master
 
-.include <bsd.port.mk>
+.include "${MASTERDIR}/Makefile"

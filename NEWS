@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.72-1 (2015-06-15)
+
+  - (master) fixed free inodes list issue (segfault that can happen only during first 60 seconds after starting master with new metadata)
+
 * MooseFS 2.0.71-1 (2015-06-10)
 
   - (cs) fixed sending disk sizes after chunk deletions

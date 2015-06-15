@@ -1920,6 +1920,46 @@ uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip
 	return STATUS_OK;
 }
 
+uint8_t chunk_get_version_and_copies(uint64_t chunkid,uint32_t *version,uint8_t *count,uint8_t cs_data[100*7]) {
+	chunk *c;
+	slist *s;
+	uint8_t cnt;
+	uint32_t ip;
+	uint16_t port;
+	uint8_t *wptr;
+
+	c = chunk_find(chunkid);
+	if (c==NULL) {
+		return ERROR_NOCHUNK;
+	}
+	*version = c->version;
+	cnt=0;
+	wptr = cs_data;
+
+	for (s=c->slisthead ; s && cnt<100 ; s=s->next) {
+		if (cstab[s->csid].valid && s->valid!=DEL) {
+			if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+				put32bit(&wptr,ip);
+				put16bit(&wptr,port);
+				if (s->valid==VALID || s->valid==BUSY) {
+					put8bit(&wptr,CHECK_VALID);
+				} else if (s->valid==TDVALID || s->valid==TDBUSY) {
+					put8bit(&wptr,CHECK_MARKEDFORREMOVAL);
+				} else if (s->valid==WVER) {
+					put8bit(&wptr,CHECK_WRONGVERSION);
+				} else if (s->valid==TDWVER) {
+					put8bit(&wptr,CHECK_WV_AND_MFR);
+				} else {
+					put8bit(&wptr,CHECK_INVALID);
+				}
+				cnt++;
+			}
+		}
+	}
+	*count = cnt;
+	return STATUS_OK;
+}
+
 /* ---- */
 
 int chunk_mr_nextchunkid(uint64_t nchunkid) {
@@ -2688,6 +2728,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk in middle of operation %s, but no chunk server is busy - finish operation",c->chunkid,c->version,opstr[c->operation]);
 		c->operation = NONE;
 	}
+	goal = labelset_get_keeparch_goal(c->lsetid,c->archflag);
 	if (c->lockedto < now) {
 		if (tdb+bc>0 && c->operation==NONE) {
 			if (tdc+vc>0) {
@@ -2732,7 +2773,6 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 */
 //	syslog(LOG_WARNING,"chunk %016"PRIX64": ivc=%"PRIu32" , dc=%"PRIu32" , vc=%"PRIu32" , bc=%"PRIu32" , wvc=%"PRIu32" , tdv=%"PRIu32" , tdb=%"PRIu32" , tdw=%"PRIu32" , goal=%"PRIu8" , scount=%"PRIu16,c->chunkid,ivc,dc,vc,bc,wvc,tdc,tdb,tdw,c->goal,scount);
 
-		goal = labelset_get_keeparch_goal(c->lsetid,c->archflag);
 // step 2. check number of copies
 		if (tdc+vc+tdb+bc==0 && wvc+tdw>0 && c->fcount>0/* c->flisthead */) {
 			if ((tdw+wvc)>=goal) {

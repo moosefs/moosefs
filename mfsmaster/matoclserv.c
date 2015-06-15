@@ -774,7 +774,7 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 	uint32_t i;
 	uint32_t version;
 	uint8_t count;
-	uint8_t cs_data[100*10];
+	uint8_t cs_data[100*14];
 
 	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
 		status = ERROR_EROFS;
@@ -875,7 +875,7 @@ static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32
 	lwchunks *lwc;
 	uint32_t i;
 	uint8_t count;
-	uint8_t cs_data[100*10];
+	uint8_t cs_data[100*14];
 
 	status = fs_readchunk(inode,indx,canmodatime,&chunkid,&fleng);
 	if (status!=STATUS_OK) {
@@ -1092,7 +1092,7 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 	uint32_t version;
 	uint8_t *ptr;
 	uint8_t count;
-	uint8_t cs_data[100*10];
+	uint8_t cs_data[100*14];
 	matoclserventry *eptr;
 	swchunks *swc,**pswc;
 
@@ -3588,23 +3588,56 @@ void matoclserv_fuse_repair(matoclserventry *eptr,const uint8_t *data,uint32_t l
 
 void matoclserv_fuse_check(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode;
+	uint32_t indx;
+	uint64_t chunkid;
+	uint32_t version;
+	uint8_t cs_data[100*7];
+	uint8_t count;
 	uint32_t i,chunkcount[11];
 	uint32_t msgid;
 	uint8_t *ptr;
 	uint8_t status;
-	if (length!=8) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_CHECK - wrong size (%"PRIu32"/8)",length);
+	if (length!=8 && length!=12) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_CHECK - wrong size (%"PRIu32"/8|12)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
-	status = fs_checkfile(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,chunkcount);
-	if (status!=STATUS_OK) {
-		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,5);
+	if (length==12) {
+		indx = get32bit(&data);
+		status = fs_filechunk(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,indx,&chunkid);
+		if (status!=STATUS_OK) {
+			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,5);
+			put32bit(&ptr,msgid);
+			put8bit(&ptr,status);
+			return;
+		}
+		if (chunkid>0) {
+			status = chunk_get_version_and_copies(chunkid,&version,&count,cs_data);
+			if (status!=STATUS_OK) {
+				ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,5);
+				put32bit(&ptr,msgid);
+				put8bit(&ptr,status);
+				return;
+			}
+		} else {
+			version = 0;
+			count = 0;
+		}
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,16+count*7);
 		put32bit(&ptr,msgid);
-		put8bit(&ptr,status);
+		put64bit(&ptr,chunkid);
+		put32bit(&ptr,version);
+		memcpy(ptr,cs_data,count*7);
 	} else {
+		status = fs_checkfile(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,chunkcount);
+		if (status!=STATUS_OK) {
+			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,5);
+			put32bit(&ptr,msgid);
+			put8bit(&ptr,status);
+			return;
+		}
 		if (eptr->version>=VERSION2INT(1,6,23)) {
 			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,48);
 			put32bit(&ptr,msgid);

@@ -2984,7 +2984,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);
 	} else {
-		if ((off+size)>fileinfo->maxleng) {
+		if ((uint64_t)(off+size)>fileinfo->maxleng) {
 			fileinfo->maxleng = off+size;
 		}
 		pthread_mutex_unlock(&(fileinfo->lock));

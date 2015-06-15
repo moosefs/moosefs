@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.26-1 (2015-06-15)
+
+  - (master+tools) added reportig invalid chunks to mfsfileinfo
+  - (cs) added protection against using '.chunkdb' when folders were changed by user
+  - (master) fixed free inodes list issue (can happen only during first 60 seconds after starting master with new metadata)
+
 * MooseFS 3.0.25-1 (2015-06-11)
 
   - (cs) fixed sending disk sizes after chunk deletions

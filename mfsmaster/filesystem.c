@@ -5038,6 +5038,25 @@ void fs_readdir_data(uint32_t rootinode,uint8_t sesflags,uint32_t uid,uint32_t g
 	stats_readdir++;
 }
 
+uint8_t fs_filechunk(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t indx,uint64_t *chunkid) {
+	fsnode *p;
+	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
+		return ERROR_ENOENT;
+	}
+	if (p->type!=TYPE_FILE && p->type!=TYPE_TRASH && p->type!=TYPE_SUSTAINED) {
+		return ERROR_EPERM;
+	}
+	if (indx>MAX_INDEX) {
+		return ERROR_INDEXTOOBIG;
+	}
+	if (indx<p->data.fdata.chunks) {
+		*chunkid = p->data.fdata.chunktab[indx];
+	} else {
+		*chunkid = 0;
+	}
+	return STATUS_OK;
+}
+
 uint8_t fs_checkfile(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t chunkcount[11]) {
 	fsnode *p;
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
@@ -7867,6 +7886,8 @@ int fs_strinit(void) {
 	trashnodes = 0;
 	sustainednodes = 0;
 	quotahead = NULL;
+	freelist = NULL;
+	freetail = &(freelist);
 	fsnodes_edgeid_init();
 	fsnodes_node_hash_init();
 	fsnodes_edge_hash_init();

@@ -1189,10 +1189,6 @@ static chunk* hdd_chunk_create(folder *f,uint64_t chunkid,uint32_t version) {
 	c->filename = malloc(leng+39);
 	passert(c->filename);
 	memcpy(c->filename,f->path,leng);
-//	memcpy(c->filename+leng,"__/chunk_XXXXXXXXXXXXXXXX_XXXXXXXX.mfs");
-//	c->filename[leng]="0123456789ABCDEF"[(chunkid>>4)&15];
-//	c->filename[leng+1]="0123456789ABCDEF"[chunkid&15];
-//	sprintf(c->filename+leng,"%c%c/chunk_%016"PRIX64"_%08"PRIX32".mfs","0123456789ABCDEF"[(chunkid>>4)&15],"0123456789ABCDEF"[chunkid&15],chunkid,version);
 	sprintf(c->filename+leng,"%02X/chunk_%016"PRIX64"_%08"PRIX32".mfs",(unsigned int)(chunkid&255),chunkid,version);
 	c->blocks = 0;
 	c->validattr = 1;
@@ -4834,6 +4830,24 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen,uin
 	uint64_t chunkid;
 	uint32_t version;
 	uint16_t blocks;
+	uint16_t subf;
+	time_t foldersmaxtime;
+
+	foldersmaxtime = 0;
+	for (subf=0 ; subf<256 ; subf++) {
+		fullname[plen]="0123456789ABCDEF"[(subf>>4)&0xF];
+		fullname[plen+1]="0123456789ABCDEF"[subf&0xF];
+		fullname[plen+2]=0;
+		if (lstat(fullname,&sb)<0) {
+			return -1;
+		}
+		if (sb.st_atime > foldersmaxtime) {
+			foldersmaxtime = sb.st_atime;
+		}
+		if (sb.st_mtime > foldersmaxtime) {
+			foldersmaxtime = sb.st_mtime;
+		}
+	}
 
 	memcpy(fullname+plen,".chunkdb",8);
 	fullname[plen+8]='\0';
@@ -4843,6 +4857,11 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen,uin
 		return -1;
 	}
 	if (fstat(fd,&sb)<0) {
+		close(fd);
+		return -1;
+	}
+	if (sb.st_mtime < foldersmaxtime) { // somebody touched data subfolders, so '.chunkdb' might be not valid
+		syslog(LOG_NOTICE,"scanning folder %s: at least one of data subfolders has more recent atime/mtime than '.chunkdb' - fallback to standard scan",f->path);
 		close(fd);
 		return -1;
 	}
@@ -4985,8 +5004,8 @@ void* hdd_folder_scan(void *arg) {
 
 		if (todel==0) {
 			for (subf=0 ; subf<256 ; subf++) {
-				fullname[plen-3]="0123456789ABCDEF"[subf>>4];
-				fullname[plen-2]="0123456789ABCDEF"[subf&15];
+				fullname[plen-3]="0123456789ABCDEF"[(subf>>4)&0xF];
+				fullname[plen-2]="0123456789ABCDEF"[subf&0xF];
 				mkdir(fullname,0755);
 			}
 
@@ -5012,8 +5031,8 @@ void* hdd_folder_scan(void *arg) {
 					}
 					memcpy(oldfullname+oldplen,de->d_name,36);
 					memcpy(fullname+plen,de->d_name,36);
-					fullname[plen-3]="0123456789ABCDEF"[(namechunkid>>4)&15];
-					fullname[plen-2]="0123456789ABCDEF"[namechunkid&15];
+					fullname[plen-3]="0123456789ABCDEF"[(namechunkid>>4)&0xF];
+					fullname[plen-2]="0123456789ABCDEF"[namechunkid&0xF];
 					rename(oldfullname,fullname);
 				}
 				oldfullname[oldplen]='\0';
@@ -5029,8 +5048,8 @@ void* hdd_folder_scan(void *arg) {
 		lastperc = 0;
 		lasttime = time(NULL);
 		for (subf=0 ; subf<256 && scanterm==0 ; subf++) {
-			fullname[plen-3]="0123456789ABCDEF"[subf>>4];
-			fullname[plen-2]="0123456789ABCDEF"[subf&15];
+			fullname[plen-3]="0123456789ABCDEF"[(subf>>4)&0xF];
+			fullname[plen-2]="0123456789ABCDEF"[subf&0xF];
 			fullname[plen]='\0';
 	//		mkdir(fullname,0755);
 			dd = opendir(fullname);

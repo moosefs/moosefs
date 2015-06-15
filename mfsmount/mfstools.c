@@ -2565,12 +2565,13 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	int32_t rleng;
 	uint32_t fchunks;
 	uint32_t indx,cmd,leng,inode,version;
-	uint32_t chunks,copies,copy;
+	uint32_t chunks,copies,vcopies,copy;
+	char *strtype;
 	char csstrip[16];
 	uint32_t csip;
 	uint16_t csport;
 	uint8_t protover;
-	uint64_t fleng,chunkid;
+	uint64_t chunkid;
 	uint8_t crcblock[4096];
 	md5ctx filectx,chunkctx;
 	uint8_t chunkdigest[16],currentdigest[16];
@@ -2676,154 +2677,240 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 		}
 		for (indx=0 ; indx<fchunks ; indx++) {
 			wptr = reqbuff;
-			put32bit(&wptr,CLTOMA_FUSE_READ_CHUNK);
-			if (masterversion>VERSION2INT(3,0,3)) {
-				rleng = 21;
-				put32bit(&wptr,13);
+			if (masterversion<VERSION2INT(3,0,26)) {
+				put32bit(&wptr,CLTOMA_FUSE_READ_CHUNK);
+				if (masterversion>VERSION2INT(3,0,3)) {
+					rleng = 21;
+					put32bit(&wptr,13);
+				} else {
+					rleng = 20;
+					put32bit(&wptr,12);
+				}
+				put32bit(&wptr,0);
+				put32bit(&wptr,inode);
+				put32bit(&wptr,indx);
+				if (masterversion>VERSION2INT(3,0,3)) {
+					put8bit(&wptr,0); // canmodatime
+				}
+				if (tcpwrite(fd,reqbuff,rleng)!=rleng) {
+					printf("%s [%"PRIu32"]: master query: send error\n",fname,indx);
+					close_master_conn(1);
+					return -1;
+				}
+				if (tcpread(fd,reqbuff,8)!=8) {
+					printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
+					close_master_conn(1);
+					return -1;
+				}
+				rptr = reqbuff;
+				cmd = get32bit(&rptr);
+				leng = get32bit(&rptr);
+				if (cmd!=MATOCL_FUSE_READ_CHUNK) {
+					printf("%s [%"PRIu32"]: master query: wrong answer (type)\n",fname,indx);
+					close_master_conn(1);
+					return -1;
+				}
+				buff = malloc(leng);
+				if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+					printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
+					free(buff);
+					close_master_conn(1);
+					return -1;
+				}
+				rptr = buff;
+				cmd = get32bit(&rptr);	// queryid
+				if (cmd!=0) {
+					printf("%s [%"PRIu32"]: master query: wrong answer (queryid)\n",fname,indx);
+					free(buff);
+					close_master_conn(1);
+					return -1;
+				}
+				leng-=4;
+				if (leng==1) {
+					printf("%s [%"PRIu32"]: %s\n",fname,indx,mfsstrerr(*rptr));
+					free(buff);
+					close_master_conn(1);
+					return -1;
+				} else if (leng&1) {
+					protover = get8bit(&rptr);
+					if (protover!=1 && protover!=2) {
+						printf("%s [%"PRIu32"]: master query: unknown protocol id (%"PRIu8")\n",fname,indx,protover);
+						free(buff);
+						close_master_conn(1);
+						return -1;
+					}
+					if (leng<21 || (protover==1 && ((leng-21)%10)!=0) || (protover==2 && ((leng-21)%14)!=0)) {
+						printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
+						free(buff);
+						close_master_conn(1);
+						return -1;
+					}
+				} else {
+					if (leng<20 || ((leng-20)%6)!=0) {
+						printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
+						free(buff);
+						close_master_conn(1);
+						return -1;
+					}
+					protover = 0;
+				}
+				rptr += 8; // fleng
+				if (protover==2) {
+					copies = (leng-21)/14;
+				} else if (protover==1) {
+					copies = (leng-21)/10;
+				} else {
+					copies = (leng-20)/6;
+				}
 			} else {
-				rleng = 20;
+				put32bit(&wptr,CLTOMA_FUSE_CHECK);
 				put32bit(&wptr,12);
-			}
-			put32bit(&wptr,0);
-			put32bit(&wptr,inode);
-			put32bit(&wptr,indx);
-			if (masterversion>VERSION2INT(3,0,3)) {
-				put8bit(&wptr,0); // canmodatime
-			}
-			if (tcpwrite(fd,reqbuff,rleng)!=rleng) {
-				printf("%s [%"PRIu32"]: master query: send error\n",fname,indx);
-				close_master_conn(1);
-				return -1;
-			}
-			if (tcpread(fd,reqbuff,8)!=8) {
-				printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
-				close_master_conn(1);
-				return -1;
-			}
-			rptr = reqbuff;
-			cmd = get32bit(&rptr);
-			leng = get32bit(&rptr);
-			if (cmd!=MATOCL_FUSE_READ_CHUNK) {
-				printf("%s [%"PRIu32"]: master query: wrong answer (type)\n",fname,indx);
-				close_master_conn(1);
-				return -1;
-			}
-			buff = malloc(leng);
-			if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-				printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
-				free(buff);
-				close_master_conn(1);
-				return -1;
-			}
-			rptr = buff;
-			cmd = get32bit(&rptr);	// queryid
-			if (cmd!=0) {
-				printf("%s [%"PRIu32"]: master query: wrong answer (queryid)\n",fname,indx);
-				free(buff);
-				close_master_conn(1);
-				return -1;
-			}
-			leng-=4;
-			if (leng==1) {
-				printf("%s [%"PRIu32"]: %s\n",fname,indx,mfsstrerr(*rptr));
-				free(buff);
-				close_master_conn(1);
-				return -1;
-			} else if (leng&1) {
-				protover = get8bit(&rptr);
-				if (protover!=1 && protover!=2) {
-					printf("%s [%"PRIu32"]: master query: unknown protocol id (%"PRIu8")\n",fname,indx,protover);
+				put32bit(&wptr,0);
+				put32bit(&wptr,inode);
+				put32bit(&wptr,indx);
+				if (tcpwrite(fd,reqbuff,20)!=20) {
+					printf("%s [%"PRIu32"]: master query: send error\n",fname,indx);
+					close_master_conn(1);
+					return -1;
+				}
+				if (tcpread(fd,reqbuff,8)!=8) {
+					printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
+					close_master_conn(1);
+					return -1;
+				}
+				rptr = reqbuff;
+				cmd = get32bit(&rptr);
+				leng = get32bit(&rptr);
+				if (cmd!=MATOCL_FUSE_CHECK) {
+					printf("%s [%"PRIu32"]: master query: wrong answer (type)\n",fname,indx);
+					close_master_conn(1);
+					return -1;
+				}
+				buff = malloc(leng);
+				if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+					printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
 					free(buff);
 					close_master_conn(1);
 					return -1;
 				}
-				if (leng<21 || (protover==1 && ((leng-21)%10)!=0) || (protover==2 && ((leng-21)%14)!=0)) {
-					printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
+				rptr = buff;
+				cmd = get32bit(&rptr);	// queryid
+				if (cmd!=0) {
+					printf("%s [%"PRIu32"]: master query: wrong answer (queryid)\n",fname,indx);
 					free(buff);
 					close_master_conn(1);
 					return -1;
 				}
-			} else {
-				if (leng<20 || ((leng-20)%6)!=0) {
-					printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
+				leng-=4;
+				if (leng==1) {
+					printf("%s [%"PRIu32"]: %s\n",fname,indx,mfsstrerr(*rptr));
 					free(buff);
 					close_master_conn(1);
 					return -1;
+				} else {
+					if (leng<12 || ((leng-12)%7)!=0) {
+						printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
+						free(buff);
+						close_master_conn(1);
+						return -1;
+					}
+					protover = 255;
+					copies = (leng-12)/7;
 				}
-				protover = 0;
 			}
-			fleng = get64bit(&rptr);
 			chunkid = get64bit(&rptr);
 			version = get32bit(&rptr);
-			if (fleng>0) {
-				if (chunkid==0 && version==0) {
-					printf("\tchunk %"PRIu32": empty\n",indx);
-				} else {
-					printf("\tchunk %"PRIu32": %016"PRIX64"_%08"PRIX32" / (id:%"PRIu64" ver:%"PRIu32")\n",indx,chunkid,version,chunkid,version);
-					if (protover==2) {
-						copies = (leng-21)/14;
+			if (chunkid==0 && version==0) {
+				printf("\tchunk %"PRIu32": empty\n",indx);
+			} else {
+				printf("\tchunk %"PRIu32": %016"PRIX64"_%08"PRIX32" / (id:%"PRIu64" ver:%"PRIu32")\n",indx,chunkid,version,chunkid,version);
+				vcopies = 0;
+				wptr = (uint8_t*)rptr;
+				if (copies>0) {
+					qsort(wptr,copies,(protover==255)?7:(protover==2)?14:(protover==1)?10:6,ip_port_cmp);
+				}
+				firstdigest = 1;
+				checksumerror = 0;
+				for (copy=0 ; copy<copies ; copy++) {
+					snprintf(csstrip,16,"%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8,rptr[0],rptr[1],rptr[2],rptr[3]);
+					csstrip[15]=0;
+					csip = get32bit(&rptr);
+					csport = get16bit(&rptr);
+					strtype = "???";
+					if (protover==255) {
+						switch (get8bit(&rptr)) {
+							case CHECK_VALID:
+								strtype = "VALID";
+								vcopies++;
+								break;
+							case CHECK_MARKEDFORREMOVAL:
+								strtype = "MARKED FOR REMOVAL";
+								break;
+							case CHECK_WRONGVERSION:
+								strtype = "WRONG VERSION";
+								break;
+							case CHECK_WV_AND_MFR:
+								strtype = "WRONG VERSION , MARKED FOR REMOVAL";
+								break;
+							case CHECK_INVALID:
+								strtype = "INVALID";
+								break;
+							default:
+								strtype = "???";
+						}
+					} else if (protover==2) {
+						strtype = "VALID";
+						vcopies++;
+						rptr+=8;
 					} else if (protover==1) {
-						copies = (leng-21)/10;
+						strtype = "VALID";
+						vcopies++;
+						rptr+=4;
 					} else {
-						copies = (leng-20)/6;
+						strtype = "VALID";
+						vcopies++;
 					}
-					if (leng>0) {
-						wptr = (uint8_t*)rptr;
-						qsort(wptr,copies,(protover==2)?14:(protover==1)?10:6,ip_port_cmp);
-						firstdigest = 1;
-						checksumerror = 0;
-						for (copy=0 ; copy<copies ; copy++) {
-							snprintf(csstrip,16,"%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8,rptr[0],rptr[1],rptr[2],rptr[3]);
-							csstrip[15]=0;
-							csip = get32bit(&rptr);
-							csport = get16bit(&rptr);
-							if (protover==2) {
-								rptr+=8;
-							} else if (protover==1) {
-								rptr+=4;
+					if (fileinfomode&(FILEINFO_CRC|FILEINFO_SIGNATURE)) {
+						if (get_checksum_block(csstrip,csip,csport,chunkid,version,crcblock)==0) {
+							md5_init(&chunkctx);
+							md5_update(&chunkctx,crcblock,4096);
+							if ((fileinfomode&FILEINFO_SIGNATURE) && firstdigest) {
+								md5_update(&filectx,crcblock,4096);
 							}
-							if (fileinfomode&(FILEINFO_CRC|FILEINFO_SIGNATURE)) {
-								if (get_checksum_block(csstrip,csip,csport,chunkid,version,crcblock)==0) {
-									md5_init(&chunkctx);
-									md5_update(&chunkctx,crcblock,4096);
-									if ((fileinfomode&FILEINFO_SIGNATURE) && firstdigest) {
-										md5_update(&filectx,crcblock,4096);
-									}
-									md5_final(currentdigest,&chunkctx);
-									if (firstdigest) {
-										memcpy(chunkdigest,currentdigest,16);
-									} else {
-										if (memcmp(chunkdigest,currentdigest,16)!=0) {
-											checksumerror = 1;
-										}
-									}
-									firstdigest = 0;
-									if (fileinfomode&FILEINFO_CRC) {
-										digest_to_str(strdigest,currentdigest);
-										printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (checksum digest: %s)\n",copy+1,csstrip,csport,strdigest);
-									} else {
-										printf("\t\tcopy %"PRIu32": %s:%"PRIu16"\n",copy+1,csstrip,csport);
-									}
-								} else {
-									if (fileinfomode&FILEINFO_CRC) {
-										printf("\t\tcopy %"PRIu32": %s:%"PRIu16" - can't get checksum\n",copy+1,csstrip,csport);
-									} else {
-										printf("\t\tcopy %"PRIu32": %s:%"PRIu16"\n",copy+1,csstrip,csport);
-									}
-								}
+							md5_final(currentdigest,&chunkctx);
+							if (firstdigest) {
+								memcpy(chunkdigest,currentdigest,16);
 							} else {
-								printf("\t\tcopy %"PRIu32": %s:%"PRIu16"\n",copy+1,csstrip,csport);
+								if (memcmp(chunkdigest,currentdigest,16)!=0) {
+									checksumerror = 1;
+								}
+							}
+							firstdigest = 0;
+							if (fileinfomode&FILEINFO_CRC) {
+								digest_to_str(strdigest,currentdigest);
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s ; checksum digest: %s)\n",copy+1,csstrip,csport,strtype,strdigest);
+							} else {
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,csport,strtype);
+							}
+						} else {
+							if (fileinfomode&FILEINFO_CRC) {
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s) - can't get checksum\n",copy+1,csstrip,csport,strtype);
+							} else {
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,csport,strtype);
 							}
 						}
-						if (checksumerror) {
-							printf("\t\tcopies have different checksums !!!\n");
-						}
-						if ((fileinfomode&FILEINFO_SIGNATURE) && firstdigest) {
-							printf("\t\tcouldn't add this chunk to signature !!!\n");
-						}
 					} else {
-						printf("\t\tno valid copies !!!\n");
+						printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,csport,strtype);
 					}
+				}
+				if (checksumerror) {
+					printf("\t\tcopies have different checksums !!!\n");
+				}
+				if ((fileinfomode&FILEINFO_SIGNATURE) && firstdigest) {
+					printf("\t\tcouldn't add this chunk to signature !!!\n");
+				}
+				if (vcopies==0) {
+					printf("\t\tno valid copies !!!\n");
 				}
 			}
 			free(buff);

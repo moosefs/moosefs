@@ -1,3 +1,13 @@
+moosefs (3.0.26-1) unstable; urgency=medium
+
+  * (master+tools) added reportig invalid chunks to mfsfileinfo
+  * (cs) added protection against using '.chunkdb' when folders were changed by
+    user
+  * (master) fixed free inodes list issue (can happen only during first 60
+    seconds after starting master with new metadata)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 15 Jun 2015 13:00:00 +0200
+
 moosefs (3.0.25-1) unstable; urgency=medium
 
   * (cs) fixed sending disk sizes after chunk deletions

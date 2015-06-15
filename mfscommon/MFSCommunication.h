@@ -244,6 +244,13 @@
 // #define SET_OPENED_FLAG        0x0080
 // #define SET_DELETE_FLAG        0x0100
 
+// check.type:
+#define CHECK_VALID            0
+#define CHECK_MARKEDFORREMOVAL 1
+#define CHECK_WRONGVERSION     2
+#define CHECK_WV_AND_MFR       3
+#define CHECK_INVALID          4
+
 // flock.cmd:
 #define FLOCK_UNLOCK           0
 #define FLOCK_TRY_SHARED       1
@@ -1031,15 +1038,15 @@
 // 0x01B8
 #define CLTOMA_FUSE_CHECK (PROTO_BASE+440)
 // msgid:32 inode:32
+// msgid:32 inode:32 chunkindx:32 (version >= 3.0.26)
 
 // 0x01B9
 #define MATOCL_FUSE_CHECK (PROTO_BASE+441)
-// maxsize=48
-// msgid:32 status:8
-// up to version 1.6.22:
-//	msgid:32 N*[ copies:8 chunks:16 ]
-// since version 1.6.23:
-// 	msgid:32 11*[ chunks:32 ] - 0 copies, 1 copy, 2 copies, ..., 10+ copies
+// maxsize=1000
+// msgid:32 status:8 (common)
+// msgid:32 N*[ copies:8 chunks:16 ] (version < 1.6.23)
+// msgid:32 11*[ chunks:32 ] - 0 copies, 1 copy, 2 copies, ..., 10+ copies (version >= 1.6.23 and no chunkindx)
+// msgid:32 chunkid:64 version:32 N*[ ip:32 port:16 type:8 ] (version >= 3.0.26 and chunkindx present)
 
 
 // 0x01BA

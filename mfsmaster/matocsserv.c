@@ -892,8 +892,12 @@ int matocsserv_get_csdata(void *e,uint32_t *servip,uint16_t *servport,uint32_t *
 	if (eptr->mode!=KILL) {
 		*servip = eptr->servip;
 		*servport = eptr->servport;
-		*servver = eptr->version;
-		*servlabelmask = eptr->labelmask;
+		if (servver!=NULL) {
+			*servver = eptr->version;
+		}
+		if (servlabelmask!=NULL) {
+			*servlabelmask = eptr->labelmask;
+		}
 		return 0;
 	}
 	return -1;

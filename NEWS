@@ -1,6 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.27-1 (2015-06-17)
+* MooseFS 3.0.28-1 (2015-06-17)
+
+  - (master) fixed lock issue on empty (chunkid==0) chunk
+
+* MooseFS 3.0.27-1 (2015-06-16)
 
   - (master) fixed memory allocation size bug in chunk's "ftab"
 

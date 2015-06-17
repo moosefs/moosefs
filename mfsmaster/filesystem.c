@@ -5117,9 +5117,11 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint64_t *
 	if (indx<p->data.fdata.chunks) {
 		*chunkid = p->data.fdata.chunktab[indx];
 	}
-	status = chunk_read_check(ts,*chunkid);
-	if (status!=STATUS_OK) {
-		return status;
+	if (*chunkid>0) {
+		status = chunk_read_check(ts,*chunkid);
+		if (status!=STATUS_OK) {
+			return status;
+		}
 	}
 	*length = p->data.fdata.length;
 	if (p->atime!=ts && canmodatime) {

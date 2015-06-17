@@ -1057,7 +1057,7 @@ static inline void chunk_find_lsetid(chunk *c) {
 	mg = 0;
 	lsetid = 0;
 	v = 0;
-	for (i=0 ; i<c->ftab[0] ; i++) {
+	for (i=1 ; i<c->ftab[0] ; i++) {
 		if (c->ftab[i]>0) {
 			g = labelset_get_keepmax_goal(i);
 			if (g>mg) {
@@ -1103,10 +1103,10 @@ int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid) {
 				ftableng = newlsetid;
 			}
 			ftableng++;
-			c->ftab = malloc(sizeof(uint32_t)*ftableng);
+			c->ftab = malloc(sizeof(uint32_t)*(ftableng+1));
 			passert(c->ftab);
-			memset(c->ftab,0,sizeof(uint32_t)*ftableng);
-			c->ftab[0] = ftableng;
+			memset(c->ftab,0,sizeof(uint32_t)*(ftableng+1));
+			c->ftab[0] = ftableng+1;
 			massert(c->lsetid==prevlsetid,"wrong labels set");
 			c->ftab[prevlsetid] = c->fcount-1;
 			c->ftab[newlsetid] = 1;
@@ -1188,10 +1188,10 @@ static inline int chunk_add_file_int(chunk *c,uint8_t lsetid) {
 				ftableng = lsetid;
 			}
 			ftableng++;
-			c->ftab = malloc(sizeof(uint32_t)*ftableng);
+			c->ftab = malloc(sizeof(uint32_t)*(ftableng+1));
 			passert(c->ftab);
-			memset(c->ftab,0,sizeof(uint32_t)*ftableng);
-			c->ftab[0] = ftableng;
+			memset(c->ftab,0,sizeof(uint32_t)*(ftableng+1));
+			c->ftab[0] = ftableng+1;
 			c->ftab[c->lsetid] = c->fcount;
 			c->ftab[lsetid] = 1;
 			c->fcount++;

@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.27-1 (2015-06-17)
+
+  - (master) fixed memory allocation size bug in chunk's "ftab"
+
 * MooseFS 3.0.26-1 (2015-06-15)
 
   - (master+tools) added reportig invalid chunks to mfsfileinfo

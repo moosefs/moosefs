@@ -29,8 +29,11 @@ PORTNAMES="master chunkserver client metalogger cgi cgiserv cli netdump"
 
 PORTFILES="Makefile pkg-descr pkg-plist files"
 
-VERSION=3.0.28
+VERSION=3.0.29
 RELEASE=1
+
+cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^DISTNAME=.*$/DISTNAME=		\${PORTNAME}-\${PORTVERSION}-${RELEASE}/" | uniq > .tmp
+mv .tmp "${FILEBASEDIR}/files/Makefile.master"
 
 for portname in ${PORTNAMES}; do
 	portdir="${PORTBASE}/moosefs-${portname}"
@@ -46,6 +49,5 @@ for portname in ${PORTNAMES}; do
 			cp -R "${FILEBASEDIR}/files/${portfile}.${portname}" "${portdir}/${portfile}"
 		fi
 	done
-	cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^DISTNAME=.*$/DISTNAME=		\${PORTNAME}-\${PORTVERSION}-${RELEASE}/" | uniq > "${portdir}/Makefile.master"
 	make -C ${portdir} makesum
 done

@@ -1,3 +1,10 @@
+moosefs (3.0.29-1) unstable; urgency=medium
+
+  * (master) fixed truncate bug (freezing mount during truncate in some rare
+    scenarios)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 18 Jun 2015 13:00:00 +0200
+
 moosefs (3.0.28-1) unstable; urgency=medium
 
   * (master) fixed lock issue on empty (chunkid==0) chunk

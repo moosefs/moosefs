@@ -963,7 +963,7 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 
 	status = fs_try_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,flags,uid,gids,gid,auid,agid,fleng,attr,&indx,&prevchunkid,&chunkid);
 	if (status==ERROR_DELAYED) {
-		i = CHUNKHASH(prevchunkid);
+		i = CHUNKHASH(chunkid);
 		swc = malloc(sizeof(swchunks));
 		passert(swc);
 		swc->chunkid = chunkid;
@@ -1040,6 +1040,8 @@ void matoclserv_chunk_unlocked(uint64_t chunkid,void *cptr) {
 				locked = matoclserv_fuse_write_chunk_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->indx,lwc->canmodamtime);
 			} else if (lwc->type == FUSE_READ) {
 				locked = matoclserv_fuse_read_chunk_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->indx,lwc->canmodamtime);
+			} else {
+				locked = 0;
 			}
 			*plwc = lwc->next;
 			free(lwc);
@@ -1070,8 +1072,12 @@ void matoclserv_timeout_waiting_ops(void) {
 					ptr = matoclserv_createpacket(lwc->eptr,MATOCL_FUSE_TRUNCATE,5);
 					put32bit(&ptr,lwc->msgid);
 					put8bit(&ptr,lwc->status);
-				} else {
+				} else if (lwc->type == FUSE_WRITE) {
 					ptr = matoclserv_createpacket(lwc->eptr,MATOCL_FUSE_WRITE_CHUNK,5);
+					put32bit(&ptr,lwc->msgid);
+					put8bit(&ptr,lwc->status);
+				} else if (lwc->type == FUSE_READ) {
+					ptr = matoclserv_createpacket(lwc->eptr,MATOCL_FUSE_READ_CHUNK,5);
 					put32bit(&ptr,lwc->msgid);
 					put8bit(&ptr,lwc->status);
 				}

@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.29-1 (2015-06-18)
+
+  - (master) fixed truncate bug (freezing mount during truncate in some rare scenarios)
+
 * MooseFS 3.0.28-1 (2015-06-17)
 
   - (master) fixed lock issue on empty (chunkid==0) chunk

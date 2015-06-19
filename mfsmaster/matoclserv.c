@@ -3599,7 +3599,7 @@ void matoclserv_fuse_check(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	uint32_t version;
 	uint8_t cs_data[100*7];
 	uint8_t count;
-	uint32_t i,chunkcount[11];
+	uint32_t i,chunkcount[12];
 	uint32_t msgid;
 	uint8_t *ptr;
 	uint8_t status;
@@ -3644,7 +3644,13 @@ void matoclserv_fuse_check(matoclserventry *eptr,const uint8_t *data,uint32_t le
 			put8bit(&ptr,status);
 			return;
 		}
-		if (eptr->version>=VERSION2INT(1,6,23)) {
+		if (eptr->version>=VERSION2INT(3,0,30)) {
+			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,52);
+			put32bit(&ptr,msgid);
+			for (i=0 ; i<12 ; i++) {
+				put32bit(&ptr,chunkcount[i]);
+			}
+		} else if (eptr->version>=VERSION2INT(1,6,23)) {
 			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CHECK,48);
 			put32bit(&ptr,msgid);
 			for (i=0 ; i<11 ; i++) {
@@ -3982,7 +3988,7 @@ void matoclserv_fuse_setgoal(matoclserventry *eptr,const uint8_t *data,uint32_t 
 void matoclserv_fuse_geteattr(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode;
 	uint32_t msgid;
-	uint32_t feattrtab[16],deattrtab[16];
+	uint32_t feattrtab[32],deattrtab[32];
 	uint8_t i,fn,dn,gmode;
 	uint8_t *ptr;
 	uint8_t status;
@@ -3995,10 +4001,18 @@ void matoclserv_fuse_geteattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	inode = get32bit(&data);
 	gmode = get8bit(&data);
 	status = fs_geteattr(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,gmode,feattrtab,deattrtab);
+	if (eptr->version < VERSION2INT(3,0,30)) {
+		for (i=0 ; i<16 ; i++) {
+			feattrtab[i] += feattrtab[i+16];
+			feattrtab[i+16] = 0;
+			deattrtab[i] += deattrtab[i+16];
+			deattrtab[i+16] = 0;
+		}
+	}
 	fn=0;
 	dn=0;
 	if (status==STATUS_OK) {
-		for (i=0 ; i<16 ; i++) {
+		for (i=0 ; i<32 ; i++) {
 			if (feattrtab[i]) {
 				fn++;
 			}
@@ -4014,13 +4028,13 @@ void matoclserv_fuse_geteattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	} else {
 		put8bit(&ptr,fn);
 		put8bit(&ptr,dn);
-		for (i=0 ; i<16 ; i++) {
+		for (i=0 ; i<32 ; i++) {
 			if (feattrtab[i]) {
 				put8bit(&ptr,i);
 				put32bit(&ptr,feattrtab[i]);
 			}
 		}
-		for (i=0 ; i<16 ; i++) {
+		for (i=0 ; i<32 ; i++) {
 			if (deattrtab[i]) {
 				put8bit(&ptr,i);
 				put32bit(&ptr,deattrtab[i]);

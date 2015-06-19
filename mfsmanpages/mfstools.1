@@ -1,4 +1,4 @@
-.TH mfstools "1" "June 2015" "MooseFS 3.0.29-1" "This is part of MooseFS"
+.TH mfstools "1" "June 2015" "MooseFS 3.0.30-1" "This is part of MooseFS"
 .SH NAME
 mfstools \- perform MooseFS\-specific operations
 .SH SYNOPSIS
@@ -49,6 +49,9 @@ mfstools \- perform MooseFS\-specific operations
 .PP
 .B mfsmakesnapshot
 [\fB-o\fP] \fISOURCE\fP... \fIDESTINATION\fP
+.PP
+.B mfsrmsnapshot
+[\fB-f\fP] \fIOBJECT\fP...
 .PP
 .B mfsgetquota
 [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] 
@@ -147,6 +150,17 @@ If \fIDESTINATION\fP points to already existing file, error will be reported
 unless \fB-o\fP (overwrite) option is given. Note: if \fISOURCE\fP is
 a directory, it's copied as a whole; but if it's followed by trailing slash,
 only directory content is copied.
+.PP
+\fBmfsrmsnapshot\fP removes objects created as a result of
+\fBmfsmakesnapshot\fP (similarly to \fBrm -r\fP, but much faster). For safety
+reasons objects created via \fBmfsmakesnapshot\fP have the \fBsnapshot\fP
+attribute set (see \fBEXTRA ATTRIBUTES\fP) and only such objects can be removed
+using \fBmfsrmsnapshot\fP command. By default all files and directories inside
+specified directory must have this attribute set for the command to remove the
+whole directory; otherwise the command will not remove anything. This behavior
+can be overriden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
+remove only those files/directories that have \fBsnapshot\fP attribute set and
+will leave everything else untouched.
 .PP
 \fBmfsgetquota\fP, \fBmfssetquota\fP and \fBmfsdelquota\fP
 tools are used to check, define and delete quotas. Quota is set on a directory. It can be set in one 
@@ -272,6 +286,8 @@ it could be useful to turn it off.
 from being cached in kernel.
 .PP
 \fBnodatacache\fP This flag means, that data cache should be cleared every time a file is opened.
+.PP
+\fBsnapshot\fP This flag means that the object was created via a \fBmfsmakesnapshot\fP command
 .SH QUOTAS
 Quota is always set on a directory. Hard quota cannot be exceeded anytime.
 Soft quota can be exceeded for a period of time (7 days). Once a quota is exceeded in a

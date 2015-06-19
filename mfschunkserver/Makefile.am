@@ -1,7 +1,14 @@
-sbin_PROGRAMS=mfschunkserver mfschunktool
+sbin_PROGRAMS=mfschunkserver mfschunktool mfscsstatsdump
 
 AM_CPPFLAGS=-I$(top_srcdir)/mfscommon -DMFSMAXFILES=16384 -D_USE_PTHREADS $(PTHREAD_CPPFLAGS) -DAPPNAME=mfschunkserver -DUSE_CONNCACHE
 AM_LDFLAGS=$(PTHREAD_LIBS) $(ZLIB_LIBS)
+
+mfscsstatsdump_SOURCES=\
+	chartsdefs.h \
+	../mfscommon/statsdump.c \
+	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/crc.c ../mfscommon/crc.h \
+	../mfscommon/charts.c ../mfscommon/charts.h
 
 mfschunkserver_SOURCES= \
 	bgjobs.c bgjobs.h \

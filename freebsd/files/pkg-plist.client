@@ -5,6 +5,7 @@ bin/mfsdirinfo
 bin/mfsfileinfo
 bin/mfsfilerepair
 bin/mfsmakesnapshot
+bin/mfsrmsnapshot
 bin/mfsgetgoal
 bin/mfssetgoal
 bin/mfscopygoal
@@ -45,6 +46,7 @@ man/man1/mfsgetgoal.1.gz
 man/man1/mfsgetquota.1.gz
 man/man1/mfsgettrashtime.1.gz
 man/man1/mfsmakesnapshot.1.gz
+man/man1/mfsrmsnapshot.1.gz
 man/man1/mfsrgetgoal.1.gz
 man/man1/mfsrgettrashtime.1.gz
 man/man1/mfsrsetgoal.1.gz

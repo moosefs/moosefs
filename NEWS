@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.30-1 (2015-06-19)
+
+  - (master) added 'empty' chunk count to mfscheckfile (fixed mfsfileinfo on sparse files)
+  - (master) added 'mfsrmsnapshot' (remove whole directory created as a result of mfsmakesnapshot)
+  - (tools) fixed memory overrun error during mfssetgoal
+
 * MooseFS 3.0.29-1 (2015-06-18)
 
   - (master) fixed truncate bug (freezing mount during truncate in some rare scenarios)

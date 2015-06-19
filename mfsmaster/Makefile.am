@@ -1,7 +1,14 @@
-sbin_PROGRAMS=mfsmaster
+sbin_PROGRAMS=mfsmaster mfsstatsdump
 
 AM_CPPFLAGS=-I$(top_srcdir)/mfscommon -DMFSMAXFILES=16384 -DAPPNAME=mfsmaster
 AM_LDFLAGS=$(ZLIB_LIBS)
+
+mfsstatsdump_SOURCES=\
+	chartsdefs.h \
+	../mfscommon/statsdump.c \
+	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/crc.c ../mfscommon/crc.h \
+	../mfscommon/charts.c ../mfscommon/charts.h
 
 mfsmaster_SOURCES=\
 	itree.h itree.c \

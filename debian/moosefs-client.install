@@ -6,6 +6,7 @@ usr/bin/mfsdirinfo
 usr/bin/mfsfileinfo
 usr/bin/mfsfilerepair
 usr/bin/mfsmakesnapshot
+usr/bin/mfsrmsnapshot
 usr/bin/mfsgetgoal
 usr/bin/mfssetgoal
 usr/bin/mfscopygoal
@@ -33,6 +34,7 @@ usr/share/man/man1/mfsdirinfo.1
 usr/share/man/man1/mfsfileinfo.1
 usr/share/man/man1/mfsfilerepair.1
 usr/share/man/man1/mfsmakesnapshot.1
+usr/share/man/man1/mfsrmsnapshot.1
 usr/share/man/man1/mfsgetgoal.1
 usr/share/man/man1/mfssetgoal.1
 usr/share/man/man1/mfscopygoal.1

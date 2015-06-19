@@ -4,9 +4,12 @@ etc/mfs/mfsmaster.cfg.dist
 usr/sbin/mfsmaster
 usr/sbin/mfsmetarestore
 usr/sbin/mfsmetadump
+usr/sbin/mfsstatsdump
 var/lib/mfs/metadata.mfs.empty
 usr/share/man/man5/mfsexports.cfg.5
 usr/share/man/man5/mfstopology.cfg.5
 usr/share/man/man5/mfsmaster.cfg.5
 usr/share/man/man8/mfsmaster.8
 usr/share/man/man8/mfsmetarestore.8
+usr/share/man/man8/mfsmetadump.8
+usr/share/man/man8/mfsstatsdump.8

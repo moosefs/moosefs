@@ -53,6 +53,13 @@ int cfg_reload (void) {
 		mfs_arg_syslog(LOG_ERR,"cannot load config file: %s",cfgfname);
 		return 0;
 	}
+	while (paramhead!=NULL) {
+		tmp = paramhead;
+		paramhead = tmp->next;
+		free(tmp->name);
+		free(tmp->value);
+		free(tmp);
+	}
 	while (fgets(linebuff,999,fd)!=NULL) {
 		linebuff[999]=0;
 		if (linebuff[0]=='#') {

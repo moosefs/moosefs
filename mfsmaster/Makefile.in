@@ -90,7 +90,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-sbin_PROGRAMS = mfsmaster$(EXEEXT)
+sbin_PROGRAMS = mfsmaster$(EXEEXT) mfsstatsdump$(EXEEXT)
 subdir = mfsmaster
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_pthread.m4 \
@@ -143,6 +143,11 @@ am__v_lt_1 =
 mfsmaster_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(mfsmaster_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_mfsstatsdump_OBJECTS = ../mfscommon/statsdump.$(OBJEXT) \
+	../mfscommon/strerr.$(OBJEXT) ../mfscommon/crc.$(OBJEXT) \
+	../mfscommon/charts.$(OBJEXT)
+mfsstatsdump_OBJECTS = $(am_mfsstatsdump_OBJECTS)
+mfsstatsdump_LDADD = $(LDADD)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -205,8 +210,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(mfsmaster_SOURCES)
-DIST_SOURCES = $(mfsmaster_SOURCES)
+SOURCES = $(mfsmaster_SOURCES) $(mfsstatsdump_SOURCES)
+DIST_SOURCES = $(mfsmaster_SOURCES) $(mfsstatsdump_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -396,6 +401,13 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = -I$(top_srcdir)/mfscommon -DMFSMAXFILES=16384 -DAPPNAME=mfsmaster
 AM_LDFLAGS = $(ZLIB_LIBS)
+mfsstatsdump_SOURCES = \
+	chartsdefs.h \
+	../mfscommon/statsdump.c \
+	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/crc.c ../mfscommon/crc.h \
+	../mfscommon/charts.c ../mfscommon/charts.h
+
 mfsmaster_SOURCES = \
 	itree.h itree.c \
 	topology.h topology.c \
@@ -567,6 +579,18 @@ clean-sbinPROGRAMS:
 mfsmaster$(EXEEXT): $(mfsmaster_OBJECTS) $(mfsmaster_DEPENDENCIES) $(EXTRA_mfsmaster_DEPENDENCIES) 
 	@rm -f mfsmaster$(EXEEXT)
 	$(AM_V_CCLD)$(mfsmaster_LINK) $(mfsmaster_OBJECTS) $(mfsmaster_LDADD) $(LIBS)
+../mfscommon/statsdump.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/strerr.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/crc.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/charts.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+
+mfsstatsdump$(EXEEXT): $(mfsstatsdump_OBJECTS) $(mfsstatsdump_DEPENDENCIES) $(EXTRA_mfsstatsdump_DEPENDENCIES) 
+	@rm -f mfsstatsdump$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(mfsstatsdump_OBJECTS) $(mfsstatsdump_LDADD) $(LIBS)
 install-sbinSCRIPTS: $(sbin_SCRIPTS)
 	@$(NORMAL_INSTALL)
 	@list='$(sbin_SCRIPTS)'; test -n "$(sbindir)" || list=; \
@@ -610,6 +634,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/charts.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/crc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-cfg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-charts.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-clocks.Po@am__quote@
@@ -622,6 +648,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-random.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-strerr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/statsdump.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-bio.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-changelog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-chartsdata.Po@am__quote@

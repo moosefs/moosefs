@@ -1,0 +1,364 @@
+.TH mfsmetadump "8" "June 2015" "MooseFS 3.0.30-1" "This is part of MooseFS"
+.SH NAME
+mfsmetadump - dump MooseFS metadata info in human readable format
+.SH SYNOPSIS
+\fBmfsmetadump\fP \fImetadata_file\fP
+.SH DESCRIPTION
+\fBmfsmetadump\fP dumps MooseFS metadata info in human readable format. 
+Output consists of several sections with different types of information. Every section consist
+of header data - rows starting with hash (#) sign - and content data (may be empty).
+.SH FILE HEADER
+.TP 20
+header
+MooseFS version
+.TP
+version
+metadata file version
+.TP
+fileid
+metadata file id
+.SH SECTION HEADER
+.TP 20
+section header 
+section header (section type + version)
+.TP
+length
+length of section
+.TP
+section type
+name of section
+.TP
+version
+hexadecimal representation of section version
+.SH SESS SECTION
+.TP 20
+nextsessionid
+first free session id
+.TP
+statscount
+number of stats remembered in each session
+.TP 10
+SESSION
+line describing a single session
+.RS
+.IP s
+session id
+.IP p
+IP address
+.IP r
+root inode number
+.IP f
+session flags
+.IP g
+mingoal and maxgoal
+.IP t
+mintrashtime and maxtrashtime
+.IP m
+maproot uid,gid and mapall uid,gid
+.IP d
+disconnection time (optional)
+.IP c
+current hour stats data
+.IP l
+last hour stats data
+.IP i
+session name (usually local mount point)
+.RE
+.SH LABELS SECTION
+.TP 20
+section header 
+section header (section type + version)
+.TP
+length
+length of section
+.TP
+section type
+name of section (always LABS for labels)
+.TP
+version
+hexadecimal representation of section version
+.TP 10
+LABELDESC
+line with label description
+.RS
+.IP l
+label letter
+.IP n
+label description
+.RE
+.TP 10
+LABELSET line with one labels set used in system
+.RS
+.IP #
+labelset number
+.IP m
+creation mode
+.IP d
+arch delay
+.IP c
+create labels
+.IP k
+keep labels
+.IP a
+archive labels
+.RE
+.SH NODES SECTION
+.TP 20
+maxinode
+maximum inode number used by system
+.TP
+hashelements
+number of inodes in hash tabble
+.TP 10
+NODE 
+line with node (inode) description
+.RS
+.IP k
+node type (-,D,S,F,B,C,L,T,R)
+.RS
+.IP -
+file
+.IP D
+directory
+.IP S
+socket
+.IP F
+fifo
+.IP B
+block device
+.IP C
+character device
+.IP L
+symbolic link
+.IP T
+trash file
+.IP R
+sustained file (removed open file)
+.RE
+.IP i
+inode number
+.IP #
+labelset number (10+) or goal (1-9)
+.IP e
+flags
+.IP m
+mode
+.IP u
+uid
+.IP g
+gid
+.IP a,m,c
+atime, mtime and ctime timestamps
+.IP t
+trashtime
+.IP d
+rdevhi,rdevlo (only block and character devices)
+.IP p
+path (only symbolic links)
+.IP l
+file length (only files)
+.IP c
+chunk list (only files)
+.IP r
+sessions that have this file open (only files)
+.SH EDGES SECTION
+.TP 20
+nextedgeid
+next available edge id (descending)
+.TP 10
+EDGE
+line with edge description
+.RS
+.IP p
+parent inode number
+.IP c
+child inode number
+.IP i
+edge id
+.IP n
+edge name
+.RE
+.SH FREE SECTION
+.TP 20
+free nodes
+number of free (reusable) nodes
+.TP 10
+FREEID
+line with free inode description
+.RS
+.IP i
+inode number
+.IP f
+deletion timestamp
+.RE
+.SH QUOTA SECTION
+.TP 20
+quota nodes
+number of nodes with quota
+.TP 10
+QUOTA
+line with quota description
+.RS
+.IP i
+inode number
+.IP g
+grace period
+.IP e
+exceeded
+.IP f
+flags
+.IP s
+soft quota exceeded timestamp
+.IP si
+soft inode quota
+.IP hi
+hard inode quota
+.IP sl
+soft length quota
+.IP hl
+hard length quota
+.IP ss
+soft size quota
+.IP hs
+hard size quota
+.IP sr
+soft real size quota
+.IP hr
+hard real size quota
+.RE
+.SH XATR SECTION
+.TP 10
+XATTR
+line with xattr description
+.RS
+.IP i
+inode number
+.IP n
+xattr name
+.IP v
+xattr value
+.RE
+.SH POSIX ACL SECTION
+.TP 10
+POSIXACL
+line with acl description
+.RS
+.IP i
+inode number
+.IP t
+acl type
+.IP u
+user (file owner) permissions
+.IP g
+group permissions
+.IP o
+other permissions
+.IP m
+permission mask
+.IP n
+named permissions - list of objects:
+.RS
+.IP u(\fIU\fp):\fIP\fP
+permissions \fIP\fP for user with uid \fIU\fP
+.IP g(\fIG\fp):\fIP\fP
+permissions \fIP\fP for group with gid \fIG\fP
+.RE
+.RE
+.SH OPEN SECTION
+.TP 10
+OPENFILE
+line with open file description
+.RS
+.IP s
+session id
+.IP i
+inode number
+.RE
+.SH FLOCK SECTION
+.TP 10
+FLOCK
+line with flock-lock description
+.RS
+.IP i
+inode number
+.IP s
+session id
+.IP o
+lock owner (FUSE lock owner)
+.IP t
+lock type ('R' - shared lock, 'W' - exclusive lock)
+.RE
+.SH POSIX LOCK SECTION
+.TP 10
+POSIXLOCK
+line with posix-lock description
+.RS
+.IP i
+inode number
+.IP s
+session id
+.IP o
+lock owner (FUSE lock owner)
+.IP p
+local process id (owner pid)
+.IP r
+lock range in format <\fISTART\fP,\fIEND\fP)
+.IP t
+lock type ('R' - shared lock, 'W' - exclusive lock)
+.RE
+.SH CHUNKSERVERS SECTION
+.TP 20
+chunk servers
+number of chunkservers
+.TP 10
+CHUNCKSERVER
+line with chunk server description
+.RS
+.IP i
+server ip
+.IP p
+server port
+.IP #
+server id
+.IP m
+maintenance mode
+.RE
+.SH CHUNKS SECTION
+.TP 20
+nextchunkid
+first available chunk number
+.TP 10
+CHUNK
+line with chunk description
+.RS
+.IP i
+chunk number
+.IP v
+chunk version
+.IP t
+"locked to" timestamp
+.IP a
+archive flag
+.RE
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmaster (8)

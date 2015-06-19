@@ -686,12 +686,12 @@ uninstall-am: uninstall-cgidataDATA uninstall-nodist_binSCRIPTS \
 
 @INSTALL_CGISERV_TRUE@mfscgiserv: mfscgiserv.py
 @INSTALL_CGISERV_TRUE@	@echo "  CONV     mfscgiserv"
-@INSTALL_CGISERV_TRUE@	@sed -e "s#\%\%""CGIDIR""\%\%#$(CGIDIR)#" -e "s#\%\%""DATAPATH""\%\%#$(DATA_PATH)#" <mfscgiserv.py >mfscgiserv
+@INSTALL_CGISERV_TRUE@	@sed -e "s#\%\%""CGIDIR""\%\%#$(CGIDIR)#" -e "s#\%\%""DATAPATH""\%\%#$(DATA_PATH)#" < mfscgiserv.py > mfscgiserv
 @INSTALL_CGISERV_TRUE@	@chmod a+x mfscgiserv
 
 mfscli: mfscli.py
 	@echo "  CONV     mfscli"
-	@sed -e "s#\%\%""SBINDIR""\%\%#$(sbindir)#" -e "s# MFS_PRO_.*##" -e "s# MFS_CE_.*##" <mfscli.py >mfscli
+	@sed -e "s#\%\%""SBINDIR""\%\%#$(sbindir)#" < mfscli.py > mfscli
 	@chmod a+x mfscli
 
 clean-local:

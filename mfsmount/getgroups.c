@@ -343,8 +343,64 @@ void groups_rel(groups* g) {
 	zassert(pthread_mutex_unlock(&glock));
 }
 
+void* groups_cleanup_thread(void* arg) {
+	static uint32_t h = 0;
+	uint32_t i;
+	double t;
+	groups *g,*gn;
+	while (1) {
+		zassert(pthread_mutex_lock(&glock));
+		t = monotonic_seconds();
+		for (i=0 ; i<16 ; i++) {
+			for (g = groups_hashtab[h] ; g!=NULL ; g = gn) {
+				gn = g->next;
+				if (g->time + to < t && g->locked==0 && g->lcnt==0) {
+					groups_remove(g);
+				}
+			}
+			h++;
+			h%=HASHSIZE;
+		}
+		zassert(pthread_mutex_unlock(&glock));
+		usleep(10000);
+	}
+	return arg;
+}
+
+/*
+void* groups_debug_thread(void* arg) {
+	uint32_t i,j,k;
+	uint32_t l,u;
+	groups *g;
+	while (1) {
+		zassert(pthread_mutex_lock(&glock));
+		k = 0;
+		l = 0;
+		u = 0;
+		for (i=0 ; i<HASHSIZE ; i++) {
+			j = 0;
+			if (groups_hashtab[i]!=NULL) {
+				l++;
+			}
+			for (g = groups_hashtab[i] ; g!=NULL ; g = g->next) {
+				j++;
+				u++;
+				fprintf(stderr,"hashpos: %"PRIu32" ; pid: %"PRIu32" ; uid: %"PRIu32" ; gid: %"PRIu32" ; time: %.6lf ; lcnt: %"PRIu32" ; locked: %"PRIu32" ; gidcnt: %"PRIu32"\n",i,g->pid,g->uid,g->gid,g->time,g->lcnt,g->locked,g->gidcnt);
+			}
+			if (j>k) {
+				k=j;
+			}
+		}
+		fprintf(stderr,"malloc cnt: %"PRIu32" ; free cnt: %"PRIu32" ; maxchain: %"PRIu32" ; used hashtab entries: %"PRIu32" ; data entries: %"PRIu32" ; avgchain: %.2lf / %.2lf\n",mallocs,frees,k,l,u,(double)(u)/(double)(HASHSIZE),(double)(u)/(double)(l));
+		zassert(pthread_mutex_unlock(&glock));
+		sleep(5);
+	}
+	return arg;
+}
+*/
 void groups_init(double _to,int dm) {
 	uint32_t i;
+	pthread_t t;
 	debug_mode = dm;
 	zassert(pthread_mutex_init(&glock,NULL));
 	groups_hashtab = malloc(sizeof(groups*)*HASHSIZE);
@@ -353,6 +409,8 @@ void groups_init(double _to,int dm) {
 		groups_hashtab[i] = NULL;
 	}
 	to = _to;
+	pthread_create(&t,NULL,groups_cleanup_thread,NULL);
+//	pthread_create(&t,NULL,groups_debug_thread,NULL);
 }
 
 /*

@@ -34,13 +34,13 @@ nodist_cgiserv_SCRIPTS = \
 
 mfscgiserv: mfscgiserv.py
 	@echo "  CONV     mfscgiserv"
-	@sed -e "s#\%\%""CGIDIR""\%\%#$(CGIDIR)#" -e "s#\%\%""DATAPATH""\%\%#$(DATA_PATH)#" <mfscgiserv.py >mfscgiserv
+	@sed -e "s#\%\%""CGIDIR""\%\%#$(CGIDIR)#" -e "s#\%\%""DATAPATH""\%\%#$(DATA_PATH)#" < mfscgiserv.py > mfscgiserv
 	@chmod a+x mfscgiserv
 endif
 
 mfscli: mfscli.py
 	@echo "  CONV     mfscli"
-	@sed -e "s#\%\%""SBINDIR""\%\%#$(sbindir)#" -e "s# MFS_PRO_.*##" -e "s# MFS_CE_.*##" <mfscli.py >mfscli
+	@sed -e "s#\%\%""SBINDIR""\%\%#$(sbindir)#" < mfscli.py > mfscli
 	@chmod a+x mfscli
 
 clean-local:

@@ -20,7 +20,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	3.0.29
+Version:	3.0.30
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -261,11 +261,14 @@ exit 0
 %attr(755,root,root) %{_sbindir}/mfsmaster
 %attr(755,root,root) %{_sbindir}/mfsmetadump
 %attr(755,root,root) %{_sbindir}/mfsmetarestore
+%attr(755,root,root) %{_sbindir}/mfsstatsdump
 %{_mandir}/man5/mfsexports.cfg.5*
 %{_mandir}/man5/mfstopology.cfg.5*
 %{_mandir}/man5/mfsmaster.cfg.5*
 %{_mandir}/man8/mfsmaster.8*
 %{_mandir}/man8/mfsmetarestore.8*
+%{_mandir}/man8/mfsmetadump.8*
+%{_mandir}/man8/mfsstatsdump.8*
 %{mfsconfdir}/mfsexports.cfg.dist
 %{mfsconfdir}/mfstopology.cfg.dist
 %{mfsconfdir}/mfsmaster.cfg.dist
@@ -304,9 +307,11 @@ exit 0
 %doc NEWS README
 %attr(755,root,root) %{_sbindir}/mfschunkserver
 %attr(755,root,root) %{_sbindir}/mfschunktool
+%attr(755,root,root) %{_sbindir}/mfscsstatsdump
 %{_mandir}/man5/mfschunkserver.cfg.5*
 %{_mandir}/man5/mfshdd.cfg.5*
 %{_mandir}/man8/mfschunkserver.8*
+%{_mandir}/man8/mfscsstatsdump.8*
 %{mfsconfdir}/mfschunkserver.cfg.dist
 %{mfsconfdir}/mfshdd.cfg.dist
 %dir %{_localstatedir}/mfs
@@ -329,6 +334,7 @@ exit 0
 %attr(755,root,root) %{_bindir}/mfsfileinfo
 %attr(755,root,root) %{_bindir}/mfsfilerepair
 %attr(755,root,root) %{_bindir}/mfsmakesnapshot
+%attr(755,root,root) %{_bindir}/mfsrmsnapshot
 %attr(755,root,root) %{_bindir}/mfsgetgoal
 %attr(755,root,root) %{_bindir}/mfssetgoal
 %attr(755,root,root) %{_bindir}/mfscopygoal
@@ -357,6 +363,7 @@ exit 0
 %{_mandir}/man1/mfsfileinfo.1*
 %{_mandir}/man1/mfsfilerepair.1*
 %{_mandir}/man1/mfsmakesnapshot.1*
+%{_mandir}/man1/mfsrmsnapshot.1*
 %{_mandir}/man1/mfsgetgoal.1*
 %{_mandir}/man1/mfssetgoal.1*
 %{_mandir}/man1/mfscopygoal.1*
@@ -387,6 +394,7 @@ exit 0
 %defattr(644,root,root,755)
 %doc NEWS README
 %attr(755,root,root) %{_bindir}/mfscli
+%{_mandir}/man1/mfscli.1*
 
 
 
@@ -432,6 +440,9 @@ exit 0
 
 
 %changelog
+* Fri Jun 19 2015 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 3.0.30-1
+- added mfsstatsdumps and some man pages
+
 * Wed Oct 15 2014 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 2.0.40-1
 - fixed paths in systemd/*.service files
 

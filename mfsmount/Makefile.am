@@ -63,7 +63,7 @@ mfstools_links=\
 	mfscopygoal mfscopytrashtime \
 	mfsgeteattr mfsseteattr mfsdeleattr mfscopyeattr \
 	mfsgetquota mfssetquota mfsdelquota mfscopyquota \
-	mfsmakesnapshot mfsappendchunks mfsfilepaths
+	mfsmakesnapshot mfsrmsnapshot mfsappendchunks mfsfilepaths
 
 install-exec-hook:
 	for l in $(mfstools_links) ; do \

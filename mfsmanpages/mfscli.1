@@ -1,0 +1,377 @@
+.TH mfscli "1" "June 2015" "MooseFS 3.0.30-1" "This is part of MooseFS"
+.SH NAME
+mfscli - CGI in TXT mode
+.SH SYNOPSIS
+\fBmfscli\fP [\fB-pn28\fP] [\fB-H\fP \fImaster_host\fP] [\fB-P\fP \fImaster_port\fP] 
+[\fB-f\fP \fI0..3\fP] \fB-S(IN|IM|LI|IG|MU|IC|IL|CS|MB|HD|EX|MS|LD|LS|OF|AL|MO|QU|MC|CC)\fP 
+[\fB-s\fP \fIseparator\fP] [\fB-o\fP \fIorder_id\fP [\fB-r\fP]] [\fB-m\fP \fImode_id\fP] 
+[\fB-i\fP \fIid\fP] [\fB-a\fP \fIcount\fP] [\fB-b\fP \fIchart_data_columns\fP] [\fB-c\fP \fIcount\fP] [\fB-d\fP \fIchart_data_columns\fP]
+.PP
+\fBmfscli\fP [\fB-pn28\fP] [\fB-H\fP \fImaster_host\fP] [\fB-P\fP \fImaster_port\fP] 
+[\fB-f\fP \fI0..3\fP] 
+\fB-C\fP(\fBRC/\fP\fIip\fP\fB/\fP\fIport\fP|\fBBW/\fP\fIip\fP\fB/\fP\fIport\fP|\fBM[01]/\fP\fIip\fP\fB/\fP\fIport\fP|\fBRS/\fP\fIsessionid\fP)
+.PP
+\fBmfscli\fP \fB-h\fP
+.SH DESCRIPTION
+\fBmfscli\fP is a commandline counterpart to MooseFS's CGI interface. All the information available
+in CGI (except for graphs) can be obtained via CLI using different "monitoring options"
+.SH OPTIONS
+.TP
+\fB-h\fP
+print help message
+.TP
+\fB-p\fP
+force plain text format on tty devices
+.TP
+\fB-n\fP
+do not resolve ip adresses (default when output device is not tty)
+.TP
+\fB-s\fP \fIseparator\fP
+field separator to use in plain text format on tty devices (forces \fB-p\fP)
+.TP
+\fB-2\fP
+force 256-color terminal color codes
+.TP
+\fB-8\fP
+force 8-color terminal color codes
+.TP
+\fB-H\fP \fImaster_host\fP
+master address (default: mfsmaster)
+.TP
+\fB-P\fP \fImaster_port\fP
+master client port (default: 9421)
+.TP
+\fB-f\fP \fB0\fP..\fB3\fP
+set frame charset to be displayed as table frames in ttymode;
+.RS
+.IP 0
+simple ascii frames '+','-','|' (default)
+.IP 1
+thick unicode frames
+.IP 2
+thin unicode frames
+.IP 3
+double unicode frames (dos style)
+.RE
+.TP
+\fB-o\fP \fIorder_id\fP
+sort data by column specified by 'order id' (depends on data set)
+.TP
+\fB-r\fP
+reverse sort order
+.TP
+\fB-m\fP \fImode_id\fP
+show data specified by 'mode id' (depends on data set)
+.TP
+\fB-i\fP \fIid\fP
+sessionid for \fB-SOF\fP or inode for \fB-SAL\fP
+.TP
+\fB-a\fP \fIcount\fP
+how many chart entries should be shown for master
+.TP
+\fB-b\fP \fIchart_data_columns\fP
+define chart columns for master; prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice
+.TP
+\fB-c\fP \fIcount\fP
+how many chart entries should be shown for chunkserver
+.TP
+\fB-d\fP \fIchart_data_columns\fP
+define chart columns for chunkserver; prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice
+.SH MONITORING OPTIONS
+.TP
+\fB-SIN\fP
+show full master info
+.TP
+\fB-SIM\fP
+show only masters states
+.TP
+\fB-SLI\fP
+show only licence info
+.TP
+\fB-SIG\fP
+show only general master (leader) info
+.TP
+\fB-SMU\fP
+show only master memory usage
+.TP
+\fB-SIC\fP
+show only chunks info (goal/copies matrices)
+.TP
+\fB-SIL\fP
+show only loop info (with messages)
+.TP
+\fB-SCS\fP
+show connected chunk servers
+.TP
+\fB-SMB\fP
+show connected metadata backup servers
+.TP
+\fB-SHD\fP
+show hdd data
+.TP
+\fB-SEX\fP
+show exports
+.TP
+\fB-SMS\fP
+show active mounts
+.TP
+\fB-SRS\fP
+show resources (labels,open files,acquired locks)
+.TP
+\fB-SLD\fP
+show label descriptions
+.TP
+\fB-SLS\fP
+show label sets
+.TP
+\fB-SOF\fP
+show only open files
+.TP
+\fB-SAL\fP
+show only acquired locks
+.TP
+\fB-SMO\fP
+show operation counters
+.TP
+\fB-SQU\fP
+show quota info
+.TP
+\fB-SMC\fP
+show master charts data
+.TP
+\fB-SCC\fP
+show chunkserver charts data
+.SH MASTER CHART DATA COLUMNS
+.TP 14
+ucpu
+User cpu usage
+.TP
+scpu
+System cpu usage
+.TP
+delete
+Number of chunk deletions
+.TP
+replicate
+Number of chunk replications
+.TP
+statfs
+Number of statfs operations
+.TP
+getattr
+Number of getattr operations
+.TP
+setattr
+Number of setattr operations
+.TP
+lookup
+Number of lookup operations
+.TP
+mkdir
+Number of mkdir operations
+.TP
+rmdir
+Number of rmdir operations
+.TP
+symlink
+Number of symlink operations
+.TP
+readlink
+Number of readlink operations
+.TP
+mknod
+Number of mknod operations
+.TP
+unlink
+Number of unlink operations
+.TP
+rename
+Number of rename operations
+.TP
+link
+Number of link operations
+.TP
+readdir
+Number of readdir operations
+.TP
+open
+Number of open operations
+.TP
+read
+Number of read operations
+.TP
+write
+Number of write operations
+.TP
+memoryrss
+Resident memory usage
+.TP
+prcvd
+Received packets
+.TP
+psent
+Sent packets
+.TP
+brcvd
+Received bytes
+.TP
+bsent
+Sent bytes
+.TP
+memoryvirt
+Virtual memory usage
+.TP
+cpu
+Total cpu usage (scpu + ucpu)
+.SH CHUNKSERVER CHART DATA COLUMNS
+.TP 14
+ucpu
+User cpu usage
+.TP 
+scpu
+System cpu usage
+.TP
+masterin
+Data received from master
+.TP
+masterout
+Data sent to master
+.TP
+csrepin
+Data received by replicator
+.TP
+csrepout
+Data sent by replicator
+.TP
+csservin
+Data received by csserv
+.TP
+csservout
+Data sent by csserv
+.TP
+hdrbytesr
+Bytes read (headers)
+.TP 
+hdrbytesw
+Bytes written (headers)
+.TP
+hdrllopr
+Low level reads (headers)
+.TP
+hdrllopw
+Low level writes (headers)
+.TP
+databytesr
+Bytes read (data)
+.TP
+databytesw
+Bytes written (data)
+.TP
+datallopr
+Low level reads (data)
+.TP
+datallopw
+Low level writes (data)
+.TP
+hlopr
+High level reads
+.TP
+hlopw
+High level writes
+.TP
+rtime
+Read time
+.TP
+wtime
+Write time
+.TP
+repl
+Replicate chunk ops
+.TP
+create
+Create chunk ops
+.TP
+delete
+Delete chunk ops
+.TP
+version
+Set version ops
+.TP
+duplicate
+Duplicate ops
+.TP
+truncate
+Truncate ops
+.TP
+duptrunc
+Duplicate+truncate ops
+.TP
+test
+Test chunk ops
+.TP
+load
+Server load
+.TP
+memoryrss
+Resident memory usage
+.TP
+memoryvirt
+Virtual memory usage
+.TP
+cpu
+Total cpu usage (scpu + ucpu)
+.SH COMMANDS
+.TP
+\fB-CRC/\fP\fIip\fP\fB/\fP\fIport\fP
+remove selected chunkserver from list of active chunkservers
+.TP
+\fB-CBW/\fP\fIip\fP\fB/\fP\fIport\fP
+send selected chunkserver back to work state (from grace state)
+.TP
+\fB-CM1/\fP\fIip\fP\fB/\fP\fIport\fP
+switch selected chunkserver to maintenance mode
+.TP
+\fB-CM0/\fP\fIip\fP\fB/\fP\fIport\fP
+switch selected chunkserver to standard mode (from maintenance mode)
+.TP
+\fB-CRS/\fP\fIsessionid\fP
+remove selected session
+.SH EXAMPLES
+.IP "\fBmfscli -SIC -2\fP"
+shows table with chunk state matrix (number of chunks for each combination of valid copies and goal set by user) using extended terminal colors (256-colors)
+.IP "\fBmfscli -SCS -f 1\fP"
+shows table with all chunkservers using unicode thick frames
+.IP "\fBmfscli -SMS -p -s ','\fP"
+shows current sessions (mounts) using plain text format and coma as a separator
+.IP "\fBmfscli -SOF -i 123\fP"
+shows files open by processes using session (mount) with id 123
+.IP "\fBmfscli -SMC -a 10 -b cpu,memoryrss,delete,replicate\fP"
+shows master cpu usage, amount of resident memory used by master,
+number of chunk deletions and number of chunk replications during last ten minutes
+.IP "\fBmfscli -SCC -c 15 -d 192.168.1.10:9422:cpu,192.168.1.11:9422:cpu\fP"
+shows cpu usage of chunkservers located on machines with IP 192.168.1.10 and 192.168.1.11
+during last fifteen minutes
+.IP "\fBmfscli -SCC -d $(mfscli -SCS -p -s ',' | grep '^chunk' | awk -F ',' 'BEGIN {s=""""} {printf ""%s%s:%s:mem"",s,$2,$3 ; s="",""}')\fP
+shows resident memory usage of all connected chunkservers
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmaster (8)

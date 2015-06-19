@@ -1,0 +1,162 @@
+.TH mfsstatsdump "8" "June 2015" "MooseFS 3.0.30-1" "This is part of MooseFS"
+.SH NAME
+mfsstatsdump \- dump usage data from master stats file in csv or png format
+.SH SYNOPSIS
+.B mfsstatsdump 
+[\fB-i\fP \fIstats_file\fP] [\fB-r\fP \fIrange\fP] [\fB-f\fP \fIfields\fP] [\fB-s\fP \fIseparator\fP] [\fB-p\fP \fIpng_filename\fP [\fB-x\fP \fIchart_width\fP] [\fB-y\fP \fIchart_height\fP]] [\fB-hHd\fP]
+.SH DESCRIPTION
+\fBmfsstatsdump\fP dumps usage data from master stats file.
+These are the same data that are used to make CGI charts. Output can be either in text format (csv)
+or in graphical format (png). That means \fB-p\fP, \fB-x\fP and \fB-y\fP options are mutually exlusive with
+\fB-h\fP, \fB-H\fP and \fB-d\fP options.
+.SH OPTIONS
+.TP
+\fB-i\fP
+name of mfs binary stats file (default: stats.mfs)
+.TP
+\fB-r\fP
+range type: 0 - short range (minute)
+1 - medium range (6 minutes)
+2 - long range (30 minutes)
+3 - very long range (day)
+.TP
+\fB-f\fP
+field names separated by ',' (see FIELDS section); at least one field is mandatory; if an asterisk (*) is used,
+all fields are dumped
+.TP
+\fB-s\fP
+specify column separator (default: tabulator)
+.TP
+\fB-p\fP
+optional PNG filename (field name will be added before .png; YYYY -> YYYY_FIELD.png, YYYY.png -> YYYY_FIELD.png)
+.TP
+\fB-x\fP
+PNG chart width (default: 1600)
+.TP
+\fB-y\fP
+PNG chart height (should be divisible by 20 - if not then it will be adjusted; default:320)
+.TP
+\fB-h\fP
+"human-readable" numbers using base 2 prefixes (IEC 60027)
+.TP
+\fB-H\fP
+"human-readable" numbers using base 10 prefixes (SI)
+.TP
+\fB-d\fP
+show timestamps in YYYY-MM-DD HH:MM format
+.SH FIELDS
+.TP 14
+ucpu
+User cpu usage
+.TP
+scpu
+System cpu usage
+.TP
+delete
+Number of chunk deletions
+.TP
+replicate
+Number of chunk replications
+.TP
+statfs
+Number of statfs operations
+.TP
+getattr
+Number of getattr operations
+.TP
+setattr
+Number of setattr operations
+.TP
+lookup
+Number of lookup operations
+.TP
+mkdir
+Number of mkdir operations
+.TP
+rmdir
+Number of rmdir operations
+.TP
+symlink
+Number of symlink operations
+.TP
+readlink
+Number of readlink operations
+.TP
+mknod
+Number of mknod operations
+.TP
+unlink
+Number of unlink operations
+.TP
+rename
+Number of rename operations
+.TP
+link
+Number of link operations
+.TP
+readdir
+Number of readdir operations
+.TP
+open
+Number of open operations
+.TP
+read
+Number of read operations
+.TP
+write
+Number of write operations
+.TP
+memoryrss
+Resident memory usage
+.TP
+prcvd
+Received packets
+.TP
+psent
+Sent packets
+.TP
+brcvd
+Received bytes
+.TP
+bsent
+Sent bytes
+.TP
+memoryvirt
+Virtual memory usage
+.TP
+cpu
+Total cpu usage (in csv sum of scpu and ucpu, in png show both in differnet colors)
+.TP
+mem
+Total memory usage (in csv is the same as memoryvirt, in png shows both memoryrss and memoryvirt using two colors)
+.SH OUTPUT
+Text output - text (csv) file where first column is a timestamp (or date if \fB-d\fP option
+was specified), the following column are what was specified with the \fB-f\fP options, formatted
+according to used options (none, \fB-s\fP and \fB-h\fP or \fB-H\fP)
+.PP
+Graphical output - one png file with a chart is created for every 
+field specified with the \fB-f\fP option, according to the naming scheme declared 
+with the \fB-p\fP option. Size may be adjusted with \fB-x\fP and \fB-y\fP options.
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR moosefs (7)

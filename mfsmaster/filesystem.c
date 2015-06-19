@@ -139,12 +139,10 @@ typedef struct _fsnode {
 	unsigned xattrflag:1;
 	unsigned aclpermflag:1;
 	unsigned acldefflag:1;
-	unsigned type:4;
+	unsigned flags:5;
 	unsigned lsetid:8;
-	unsigned spare:4;
-	unsigned flags:4;
+	unsigned type:4;
 	unsigned mode:12;
-//	uint16_t mode;	// only 12 lowest bits are used for mode, in unix standard upper 4 are used for object type, but since there is field "type" this bits can be used as extra flags
 	uint32_t uid;
 	uint32_t gid;
 	uint32_t trashtime;
@@ -2366,11 +2364,11 @@ static inline void fsnodes_readdirdata(uint32_t rootinode,uint32_t uid,uint32_t 
 	}
 }
 
-static inline void fsnodes_checkfile(fsnode *p,uint32_t chunkcount[11]) {
+static inline void fsnodes_checkfile(fsnode *p,uint32_t chunkcount[12]) {
 	uint32_t i;
 	uint64_t chunkid;
 	uint8_t count;
-	for (i=0 ; i<11 ; i++) {
+	for (i=0 ; i<12 ; i++) {
 		chunkcount[i]=0;
 	}
 	for (i=0 ; i<p->data.fdata.chunks ; i++) {
@@ -2381,6 +2379,8 @@ static inline void fsnodes_checkfile(fsnode *p,uint32_t chunkcount[11]) {
 				count=10;
 			}
 			chunkcount[count]++;
+		} else {
+			chunkcount[11]++;
 		}
 	}
 }
@@ -2890,12 +2890,12 @@ static inline void fsnodes_gettrashtime_recursive(fsnode *node,uint8_t gmode,bst
 	}
 }
 
-static inline void fsnodes_geteattr_recursive(fsnode *node,uint8_t gmode,uint32_t feattrtab[16],uint32_t deattrtab[16]) {
+static inline void fsnodes_geteattr_recursive(fsnode *node,uint8_t gmode,uint32_t feattrtab[32],uint32_t deattrtab[32]) {
 	fsedge *e;
 
 	fsnodes_keep_alive_check();
 	if (node->type!=TYPE_DIRECTORY) {
-		feattrtab[(node->flags)&(EATTR_NOOWNER|EATTR_NOACACHE|EATTR_NODATACACHE)]++;
+		feattrtab[(node->flags)&(EATTR_NOOWNER|EATTR_NOACACHE|EATTR_NODATACACHE|EATTR_SNAPSHOT)]++;
 	} else {
 		deattrtab[(node->flags)]++;
 		if (gmode==GMODE_RECURSIVE) {
@@ -3172,6 +3172,51 @@ static inline void fsnodes_chgarch_recursive(fsnode *node,uint32_t ts,uint32_t u
 	}
 }
 
+static inline uint8_t fsnodes_remove_snapshot_test(fsedge *e,uint32_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t mr) {
+	fsnode *n;
+	fsedge *ie;
+	uint8_t status;
+	n = e->child;
+	fsnodes_keep_alive_check();
+	if (n->type == TYPE_DIRECTORY) {
+		if (mr==1 || fsnodes_access_ext(n,uid,gids,gid,MODE_MASK_W|MODE_MASK_X,sesflags)) {
+			for (ie = n->data.ddata.children ; ie ; ie=ie->nextchild) {
+				status = fsnodes_remove_snapshot_test(ie,sesflags,uid,gids,gid,mr);
+				if (status!=STATUS_OK) {
+					return status;
+				}
+			}
+		} else {
+			return ERROR_EACCES;
+		}
+	}
+	if ((n->flags & EATTR_SNAPSHOT) == 0) {
+		return ERROR_EPERM;
+	}
+	return STATUS_OK;
+}
+
+static inline void fsnodes_remove_snapshot(uint32_t ts,fsedge *e,uint32_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t mr) {
+	fsnode *n;
+	fsedge *ie,*ien;
+	n = e->child;
+	fsnodes_keep_alive_check();
+	if (n->type == TYPE_DIRECTORY) {
+		if (mr==1 || fsnodes_access_ext(n,uid,gids,gid,MODE_MASK_W|MODE_MASK_X,sesflags)) {
+			for (ie = n->data.ddata.children ; ie ; ie=ien) {
+				ien = ie->nextchild;
+				fsnodes_remove_snapshot(ts,ie,sesflags,uid,gids,gid,mr);
+			}
+		}
+		if (n->data.ddata.children!=NULL) {
+			return;
+		}
+	}
+	if (n->flags & EATTR_SNAPSHOT) {
+		fsnodes_unlink(ts,e);
+	}
+}
+
 static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentnode,uint32_t nleng,const uint8_t *name,uint8_t smode,uint8_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t cumask,uint8_t mr) {
 	fsedge *e;
 	fsnode *dstnode;
@@ -3299,6 +3344,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 				dstnode->ctime = ts;
 			}
 		}
+		dstnode->flags |= EATTR_SNAPSHOT;
 	} else { // new element
 		if (srcnode->type==TYPE_FILE || srcnode->type==TYPE_DIRECTORY || srcnode->type==TYPE_SYMLINK || srcnode->type==TYPE_BLOCKDEV || srcnode->type==TYPE_CHARDEV || srcnode->type==TYPE_SOCKET || srcnode->type==TYPE_FIFO) {
 			statsrecord psr,nsr;
@@ -3328,6 +3374,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 					dstnode->xattrflag = xattr_copy(srcnode->id,dstnode->id);
 				}
 			}
+			dstnode->flags |= EATTR_SNAPSHOT;
 			if (srcnode->type==TYPE_DIRECTORY) {
 				if (rec) {
 					for (e = srcnode->data.ddata.children ; e ; e=e->nextchild) {
@@ -4806,70 +4853,110 @@ uint8_t fs_univ_snapshot(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_
 	uint64_t common_realsize;
 	fsnode *sp;
 	fsnode *dwd;
+	fsedge *e;
 	uint8_t status;
 	if ((sesflags&SESFLAG_METARESTORE)==0 && (sesflags&SESFLAG_READONLY)) {
 		return ERROR_EROFS;
 	}
-	if (fsnodes_node_find_ext(rootinode,sesflags,&inode_src,NULL,&sp,0)==0 || fsnodes_node_find_ext(rootinode,sesflags,&parent_dst,NULL,&dwd,0)==0) {
-		return ERROR_ENOENT;
-	}
-	if ((sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_access_ext(sp,uid,gids,gid,MODE_MASK_R,sesflags))) {
-		return ERROR_EACCES;
-	}
-	if (dwd->type!=TYPE_DIRECTORY) {
-		return ERROR_EPERM;
-	}
-	if (sp->type==TYPE_DIRECTORY) {
-		if (sp==dwd || fsnodes_isancestor(sp,dwd)) {
+	if (smode & SNAPSHOT_MODE_DELETE) { // remove mode
+		if (inode_src!=0) {
 			return ERROR_EINVAL;
 		}
-	}
-	if ((sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_access_ext(dwd,uid,gids,gid,MODE_MASK_W|MODE_MASK_X,sesflags))) {
-		return ERROR_EACCES;
-	}
+		if (fsnodes_node_find_ext(rootinode,sesflags,&parent_dst,NULL,&dwd,0)==0) {
+			return ERROR_ENOENT;
+		}
+		if (dwd->type!=TYPE_DIRECTORY) {
+			return ERROR_EPERM;
+		}
+		if ((sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_access_ext(dwd,uid,gids,gid,MODE_MASK_W|MODE_MASK_X,sesflags))) {
+			return ERROR_EACCES;
+		}
+		if (fsnodes_namecheck(nleng_dst,name_dst)<0) {
+			return ERROR_EINVAL;
+		}
+		e = fsnodes_lookup(dwd,nleng_dst,name_dst);
+		if (!e) {
+			return ERROR_ENOENT;
+		}
+		if ((sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_sticky_access(dwd,e->child,uid))) {
+			return ERROR_EPERM;
+		}
+		fsnodes_keep_alive_begin();
+		if ((smode & SNAPSHOT_MODE_FORCE_REMOVAL) == 0) {
+			status = fsnodes_remove_snapshot_test(e,sesflags,uid,gids,gid,((sesflags&SESFLAG_METARESTORE)==0)?0:1);
+			if (status!=STATUS_OK) {
+				return status;
+			}
+		}
 
-	fsnodes_keep_alive_begin();
-	status = fsnodes_snapshot_test(sp,sp,dwd,nleng_dst,name_dst,smode & SNAPSHOT_MODE_CAN_OVERWRITE);
-	if (status!=STATUS_OK) {
-		return status;
+		fsnodes_remove_snapshot(ts,e,sesflags,uid,gids,gid,((sesflags&SESFLAG_METARESTORE)==0)?0:1);
+	} else {
+		if (inode_src==0) {
+			return ERROR_EINVAL;
+		}
+		if (fsnodes_node_find_ext(rootinode,sesflags,&inode_src,NULL,&sp,0)==0 || fsnodes_node_find_ext(rootinode,sesflags,&parent_dst,NULL,&dwd,0)==0) {
+			return ERROR_ENOENT;
+		}
+		if ((sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_access_ext(sp,uid,gids,gid,MODE_MASK_R,sesflags))) {
+			return ERROR_EACCES;
+		}
+		if (dwd->type!=TYPE_DIRECTORY) {
+			return ERROR_EPERM;
+		}
+		if (sp->type==TYPE_DIRECTORY) {
+			if (sp==dwd || fsnodes_isancestor(sp,dwd)) {
+				return ERROR_EINVAL;
+			}
+		}
+		if ((sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_access_ext(dwd,uid,gids,gid,MODE_MASK_W|MODE_MASK_X,sesflags))) {
+			return ERROR_EACCES;
+		}
+		if (fsnodes_namecheck(nleng_dst,name_dst)<0) {
+			return ERROR_EINVAL;
+		}
+
+		fsnodes_keep_alive_begin();
+		status = fsnodes_snapshot_test(sp,sp,dwd,nleng_dst,name_dst,smode & SNAPSHOT_MODE_CAN_OVERWRITE);
+		if (status!=STATUS_OK) {
+			return status;
+		}
+
+		if ((sesflags&SESFLAG_METARESTORE)==0) {
+			fsnodes_get_stats(sp,&ssr);
+			common_inodes = 0;
+			common_length = 0;
+			common_size = 0;
+			common_realsize = 0;
+			if (fsnodes_snapshot_recursive_test_quota(sp,dwd,nleng_dst,name_dst,&common_inodes,&common_length,&common_size,&common_realsize)) {
+				return ERROR_QUOTA;
+			}
+			if (ssr.inodes>common_inodes) {
+				ssr.inodes -= common_inodes;
+			} else {
+				ssr.inodes = 0;
+			}
+			if (ssr.length>common_length) {
+				ssr.length -= common_length;
+			} else {
+				ssr.length = 0;
+			}
+			if (ssr.size>common_size) {
+				ssr.size -= common_size;
+			} else {
+				ssr.size = 0;
+			}
+			if (ssr.realsize>common_realsize) {
+				ssr.realsize -= common_realsize;
+			} else {
+				ssr.realsize = 0;
+			}
+			if (fsnodes_test_quota(dwd,ssr.inodes,ssr.length,ssr.size,ssr.realsize)) {
+				return ERROR_QUOTA;
+			}
+		}
+
+		fsnodes_snapshot(ts,sp,dwd,nleng_dst,name_dst,smode,sesflags,uid,gids,gid,cumask,((sesflags&SESFLAG_METARESTORE)==0)?0:1);
 	}
-
-	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		fsnodes_get_stats(sp,&ssr);
-		common_inodes = 0;
-		common_length = 0;
-		common_size = 0;
-		common_realsize = 0;
-		if (fsnodes_snapshot_recursive_test_quota(sp,dwd,nleng_dst,name_dst,&common_inodes,&common_length,&common_size,&common_realsize)) {
-			return ERROR_QUOTA;
-		}
-		if (ssr.inodes>common_inodes) {
-			ssr.inodes -= common_inodes;
-		} else {
-			ssr.inodes = 0;
-		}
-		if (ssr.length>common_length) {
-			ssr.length -= common_length;
-		} else {
-			ssr.length = 0;
-		}
-		if (ssr.size>common_size) {
-			ssr.size -= common_size;
-		} else {
-			ssr.size = 0;
-		}
-		if (ssr.realsize>common_realsize) {
-			ssr.realsize -= common_realsize;
-		} else {
-			ssr.realsize = 0;
-		}
-		if (fsnodes_test_quota(dwd,ssr.inodes,ssr.length,ssr.size,ssr.realsize)) {
-			return ERROR_QUOTA;
-		}
-	}
-
-	fsnodes_snapshot(ts,sp,dwd,nleng_dst,name_dst,smode,sesflags,uid,gids,gid,cumask,((sesflags&SESFLAG_METARESTORE)==0)?0:1);
-
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		changelog("%"PRIu32"|SNAPSHOT(%"PRIu32",%"PRIu32",%s,%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%s,%"PRIu16")",ts,inode_src,parent_dst,changelog_escape_name(nleng_dst,name_dst),smode,sesflags,uid,gids,changelog_escape_name(gids*4,(const uint8_t*)gid),cumask);
 	} else {
@@ -5513,11 +5600,11 @@ void fs_gettrashtime_store(void *fptr,void *dptr,uint8_t *buff) {
 	fsnodes_bst_free(droot);
 }
 
-uint8_t fs_geteattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t gmode,uint32_t feattrtab[16],uint32_t deattrtab[16]) {
+uint8_t fs_geteattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t gmode,uint32_t feattrtab[32],uint32_t deattrtab[32]) {
 	fsnode *p;
 	(void)sesflags;
-	memset(feattrtab,0,16*sizeof(uint32_t));
-	memset(deattrtab,0,16*sizeof(uint32_t));
+	memset(feattrtab,0,32*sizeof(uint32_t));
+	memset(deattrtab,0,32*sizeof(uint32_t));
 	if (!GMODE_ISVALID(gmode)) {
 		return ERROR_EINVAL;
 	}
@@ -5653,7 +5740,7 @@ uint8_t fs_univ_seteattr(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_
 	*sinodes = 0;
 	*ncinodes = 0;
 	*nsinodes = 0;
-	if (!SMODE_ISVALID(smode) || (eattr&(~(EATTR_NOOWNER|EATTR_NOACACHE|EATTR_NOECACHE|EATTR_NODATACACHE)))) {
+	if (!SMODE_ISVALID(smode) || (eattr&(~(EATTR_NOOWNER|EATTR_NOACACHE|EATTR_NOECACHE|EATTR_NODATACACHE|EATTR_SNAPSHOT)))) {
 		return ERROR_EINVAL;
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0 && (sesflags&SESFLAG_READONLY)) {

@@ -305,24 +305,27 @@
 
 // extraattr:
 
-#define EATTR_BITS             4
+#define EATTR_BITS             5
 
 #define EATTR_NOOWNER          0x01
 #define EATTR_NOACACHE         0x02
 #define EATTR_NOECACHE         0x04
 #define EATTR_NODATACACHE      0x08
+#define EATTR_SNAPSHOT         0x10
 
 #define EATTR_STRINGS \
 	"noowner", \
 	"noattrcache", \
 	"noentrycache", \
-	"nodatacache"
+	"nodatacache", \
+	"snapshot"
 
 #define EATTR_DESCRIPTIONS \
 	"every user (except root) sees object as his (her) own", \
 	"prevent standard object attributes from being stored in kernel cache", \
 	"prevent directory entries from being stored in kernel cache", \
-	"prevent file data from being kept in kernel cache"
+	"prevent file data from being kept in kernel cache", \
+	"node was created using makesnapshot command (or inside snapshot)"
 
 // mode attr (higher 4 bits of mode in node attr)
 #define MATTR_NOACACHE         0x01
@@ -408,8 +411,11 @@
 	"ext", \
 	"xfs"
 
+// snapshot mode: "smode" field in "CLTOMA_FUSE_SNAPSHOT"
 #define SNAPSHOT_MODE_CAN_OVERWRITE 1
 #define SNAPSHOT_MODE_CPLIKE_ATTR 2
+#define SNAPSHOT_MODE_FORCE_REMOVAL 4
+#define SNAPSHOT_MODE_DELETE 0x80
 
 // flags: "flags" fileld in "CLTOMA_FUSE_AQUIRE"
 #define WANT_READ 1

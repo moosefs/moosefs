@@ -1,0 +1,68 @@
+.TH mfsstatsdump "8" "June 2015" "MooseFS 3.0.30-1" "This is part of MooseFS"
+.SH NAME
+mfscsstatsdump \- dump usage data from chunkserver stats file in csv or png format
+.SH SYNOPSIS
+.B mfsstatsdump 
+[\fB-i\fP \fIstats_file\fP] [\fB-r\fP \fIrange\fP] [\fB-f\fP \fIfields\fP] [\fB-s\fP \fIseparator\fP] [\fB-p\fP \fIpng_filename\fP [\fB-x\fP \fIchart_width\fP] [\fB-y\fP \fIchart_height\fP]] [\fB-hHd\fP]
+.PP
+.B mfscsstatsdump 
+[\fB-i\fP \fIstats_file\fP] [\fB-r\fP \fIrange\fP] [\fB-f\fP \fIfields\fP] [\fB-s\fP \fIseparator\fP] [\fB-p\fP \fIpng_filename\fP [\fB-x\fI \fIchart_width\fP] [\fB-y\fP \fIchart_height\fP]] [\fB-hHd\fP]
+.SH DESCRIPTION
+\fBmfsstatsdump\fP and \fBmfscsstatsdump\fP sruty tuty
+.PP
+ala ma kota
+
+.SH OPTIONS
+.TP
+\fB-i\fP
+name of mfs binary stats file (default: stats.mfs)
+.TP
+\fB-r\fP
+range type (see below)
+.TP
+\fB-f\fP
+field names separated by ','
+.TP
+\fB-s\fP
+specify column separator (default: tabulator)
+.TP
+\fB-p\fP
+optional PNG filename (field name will be added before .png; YYYY -> YYYY_FIELD.png, YYYY.png -> YYYY_FIELD.png)
+.TP
+\fB-x\fP
+PNG chart width (default: 1600)
+.TP
+\fB-y\fP
+PNG chart height (should be divisible by 20 - if not then it will be adjusted; default:320)
+.TP
+\fB-h\fP
+"human-readable" numbers using base 2 prefixes (IEC 60027)
+.TP
+\fB-H\fP
+"human-readable" numbers using base 10 prefixes (SI)
+.TP
+\fB-d\fP
+show timestamps in YYYY-MM-DD HH:MM format
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfschunkserver (8),
+.BR mfsstatssump (8)

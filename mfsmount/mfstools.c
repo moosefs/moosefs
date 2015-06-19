@@ -577,7 +577,7 @@ static dev_t current_device = 0;
 static int current_master = -1;
 static uint32_t masterversion = 0;
 
-int open_master_conn(const char *name,uint32_t *inode,mode_t *mode,uint8_t needsamedev,uint8_t needrwfs) {
+int open_master_conn(const char *name,uint32_t *inode,mode_t *mode,uint64_t *leng,uint8_t needsamedev,uint8_t needrwfs) {
 	char rpath[PATH_MAX+1];
 	struct stat stb;
 	struct statvfs stvfsb;
@@ -615,6 +615,9 @@ int open_master_conn(const char *name,uint32_t *inode,mode_t *mode,uint8_t needs
 	*inode = pinode;
 	if (mode) {
 		*mode = stb.st_mode;
+	}
+	if (leng) {
+		*leng = stb.st_size;
 	}
 	if (current_master>=0) {
 	       	if (current_device==stb.st_dev) {
@@ -1339,10 +1342,10 @@ int file_paths(const char* fname) {
 	if (*p=='\0' && stat(fname,&st)<0 && errno==ENOENT) {
 		arginode = strtoul(fname,NULL,10);
 		p = getcwd(cwdbuff,MAXPATHLEN);
-		fd = open_master_conn(p,&inode,NULL,0,0);
+		fd = open_master_conn(p,&inode,NULL,NULL,0,0);
 		inode = arginode;
 	} else {
-		fd = open_master_conn(fname,&inode,NULL,0,0);
+		fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
 	}
 	if (fd<0) {
 		return -1;
@@ -1418,7 +1421,7 @@ int check_file(const char* fname) {
 	uint8_t copies;
 	uint32_t chunks;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,0);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
 	if (fd<0) {
 		return -1;
 	}
@@ -1505,7 +1508,7 @@ int check_file(const char* fname) {
 /*
 int copy_goal_src(const char *fname,void **params) {
 	int fd;
-	open_master_conn(fname,&inode,NULL,0,0);
+	open_master_conn(fname,&inode,NULL,NULL,0,0);
 	if (fd<0) {
 		return -1;
 	}
@@ -1668,7 +1671,7 @@ int get_goal(const char *fname,uint8_t *goal,uint8_t *create_mode,uint8_t *creat
 //	uint32_t labelmasks[9][MASKORGROUP];
 	uint32_t cnt;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,0);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
 	if (fd<0) {
 		return -1;
 	}
@@ -1802,7 +1805,7 @@ int get_trashtime(const char *fname,uint32_t *trashtime,uint8_t mode) {
 //	uint32_t trashtime;
 	uint32_t cnt;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,0);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
 	if (fd<0) {
 		return -1;
 	}
@@ -1906,7 +1909,7 @@ int get_eattr(const char *fname,uint8_t *eattr,uint8_t mode) {
 //	uint8_t eattr;
 	uint32_t cnt;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,0);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
 	if (fd<0) {
 		return -1;
 	}
@@ -2040,14 +2043,14 @@ int get_eattr(const char *fname,uint8_t *eattr,uint8_t mode) {
 }
 
 int set_goal(const char *fname,uint8_t goal,uint8_t create_mode,uint8_t create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t arch_delay,uint8_t mode) {
-	uint8_t reqbuff[25+2*9*4*MASKORGROUP],*wptr,*buff;
+	uint8_t reqbuff[28+3*9*4*MASKORGROUP],*wptr,*buff;
 	const uint8_t *rptr;
 	int32_t rleng;
 	uint32_t cmd,leng,inode,uid;
 	uint32_t changed,notchanged,notpermitted,quotaexceeded;
 	uint8_t i,og;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,1);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
 	if (fd<0) {
 		return -1;
 	}
@@ -2195,7 +2198,7 @@ int set_trashtime(const char *fname,uint32_t trashtime,uint8_t mode) {
 	uint32_t cmd,leng,inode,uid;
 	uint32_t changed,notchanged,notpermitted;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,1);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
 	if (fd<0) {
 		return -1;
 	}
@@ -2276,7 +2279,7 @@ int set_eattr(const char *fname,uint8_t eattr,uint8_t mode) {
 	uint32_t cmd,leng,inode,uid;
 	uint32_t changed,notchanged,notpermitted;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,1);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
 	if (fd<0) {
 		return -1;
 	}
@@ -2356,7 +2359,7 @@ int archive_control(const char *fname,uint8_t archcmd) {
 	const uint8_t *rptr;
 	uint32_t cmd,leng,inode,uid;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,1);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
 	if (fd<0) {
 		return -1;
 	}
@@ -2564,6 +2567,7 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	const uint8_t *rptr;
 	int32_t rleng;
 	uint32_t fchunks;
+	uint8_t fchunksvalid;
 	uint32_t indx,cmd,leng,inode,version;
 	uint32_t chunks,copies,vcopies,copy;
 	char *strtype;
@@ -2572,6 +2576,7 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	uint16_t csport;
 	uint8_t protover;
 	uint64_t chunkid;
+	uint64_t fleng;
 	uint8_t crcblock[4096];
 	md5ctx filectx,chunkctx;
 	uint8_t chunkdigest[16],currentdigest[16];
@@ -2579,7 +2584,7 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	uint8_t checksumerror;
 	char strdigest[33];
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,0);
+	fd = open_master_conn(fname,&inode,NULL,&fleng,0,0);
 	if (fd<0) {
 		return -1;
 	}
@@ -2626,7 +2631,7 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 		printf("%s: %s\n",fname,mfsstrerr(*rptr));
 		free(buff);
 		return -1;
-	} else if (leng%3!=0 && leng!=44) {
+	} else if ((leng%3!=0 || leng>33) && leng!=44 && leng!=48) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
 		free(buff);
 		return -1;
@@ -2635,7 +2640,8 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 		printf("%s:\n",fname);
 	}
 	fchunks = 0;
-	if (leng%3==0) {
+	fchunksvalid = 0;
+	if (leng%3==0 && leng<=33) {
 		for (cmd=0 ; cmd<leng ; cmd+=3) {
 			copies = get8bit(&rptr);
 			chunks = get16bit(&rptr);
@@ -2664,9 +2670,23 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 			}
 			fchunks += chunks;
 		}
+		if (leng==48) {
+			chunks = get32bit(&rptr);
+			if (chunks>0 && (fileinfomode&FILEINFO_QUICK)) {
+				printf(" empty (zero) chunks:   ");
+				print_number(" ","\n",chunks,1,0,1);
+			}
+			fchunks += chunks;
+			fchunksvalid = 1;
+		}
 	}
 	free(buff);
 	if ((fileinfomode&FILEINFO_QUICK)==0) {
+		if (fchunksvalid==0) { // in this case fchunks doesn't include 'empty' chunks, so use file size to fix 'fchunks' if necessary
+			if (fchunks < ((fleng+MFSCHUNKMASK)>>MFSCHUNKBITS)) {
+				fchunks = ((fleng+MFSCHUNKMASK)>>MFSCHUNKBITS);
+			}
+		}
 //	printf("masterversion: %08X\n",masterversion);
 		if (fileinfomode&FILEINFO_SIGNATURE) {
 			md5_init(&filectx);
@@ -2934,11 +2954,11 @@ int append_file(const char *fname,const char *afname) {
 	uint8_t addmaingroup;
 	mode_t dmode,smode;
 	int fd;
-	fd = open_master_conn(fname,&inode,&dmode,0,1);
+	fd = open_master_conn(fname,&inode,&dmode,NULL,0,1);
 	if (fd<0) {
 		return -1;
 	}
-	if (open_master_conn(afname,&ainode,&smode,1,1)<0) {
+	if (open_master_conn(afname,&ainode,&smode,NULL,1,1)<0) {
 		return -1;
 	}
 
@@ -3036,7 +3056,7 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 	uint32_t inodes,dirs,files,chunks;
 	uint64_t length,size,realsize;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,0);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
 	if (fd<0) {
 		return -1;
 	}
@@ -3157,7 +3177,7 @@ int file_repair(const char *fname) {
 	uint8_t addmaingroup;
 	uint32_t notchanged,erased,repaired;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,1);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
 	if (fd<0) {
 		return -1;
 	}
@@ -3258,7 +3278,7 @@ int eattr_control(const char *fname,uint8_t mode,uint8_t eattr) {
 //	uint32_t curinodes;
 //	uint64_t curlength,cursize,currealsize;
 	int fd;
-	fd = open_master_conn(fname,&inode,NULL,0,(mode<2)?1:0);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,(mode<2)?1:0);
 	if (fd<0) {
 		return -1;
 	}
@@ -3359,7 +3379,7 @@ int quota_control(const char *fname,uint8_t mode,uint8_t *qflags,uint32_t *grace
 	if (mode==2) {
 		*qflags = 0;
 	}
-	fd = open_master_conn(fname,&inode,NULL,0,(*qflags)?1:0);
+	fd = open_master_conn(fname,&inode,NULL,NULL,0,(*qflags)?1:0);
 	if (fd<0) {
 		return -1;
 	}
@@ -3480,7 +3500,7 @@ int delete_quota(const char *fname,uint8_t sflags,uint8_t hflags) {
 }
 */
 
-int make_snapshot(const char *dstdir,const char *dstbase,const char *srcname,uint32_t srcinode,uint8_t smode) {
+int snapshot_ctl(const char *dstdir,const char *dstbase,const char *srcname,uint32_t srcinode,uint8_t smode) {
 	uint8_t reqbuff[8+24+255+NGROUPS_MAX*4+4],*wptr,*buff;
 	const uint8_t *rptr;
 	uint32_t cmd,leng,dstinode,uid,gid;
@@ -3497,7 +3517,7 @@ int make_snapshot(const char *dstdir,const char *dstbase,const char *srcname,uin
 		printf("%s: name too long\n",dstbase);
 		return -1;
 	}
-	fd = open_master_conn(dstdir,&dstinode,NULL,0,1);
+	fd = open_master_conn(dstdir,&dstinode,NULL,NULL,0,1);
 	if (fd<0) {
 		return -1;
 	}
@@ -3593,7 +3613,22 @@ int make_snapshot(const char *dstdir,const char *dstbase,const char *srcname,uin
 	return 0;
 }
 
-int snapshot(const char *dstname,char * const *srcnames,uint32_t srcelements,uint8_t smode) {
+int remove_snapshot(const char *dstname,uint8_t smode) {
+	char dstpath[PATH_MAX+1],base[PATH_MAX+1],dir[PATH_MAX+1];
+
+	if (realpath(dstname,dstpath)==NULL) {
+		printf("%s: realpath error on %s: %s\n",dstname,dstpath,strerr(errno));
+	}
+	memcpy(dir,dstpath,PATH_MAX+1);
+	dirname_inplace(dir);
+	if (bsd_basename(dstpath,base)<0) {
+		printf("%s: basename error\n",dstpath);
+		return -1;
+	}
+	return snapshot_ctl(dir,base,NULL,0,smode | SNAPSHOT_MODE_DELETE);
+}
+
+int make_snapshot(const char *dstname,char * const *srcnames,uint32_t srcelements,uint8_t smode) {
 	char to[PATH_MAX+1],base[PATH_MAX+1],dir[PATH_MAX+1];
 	char src[PATH_MAX+1];
 	struct stat sst,dst;
@@ -3637,7 +3672,7 @@ int snapshot(const char *dstname,char * const *srcnames,uint32_t srcelements,uin
 			printf("directory %s does not exist\n",dstname);
 			return -1;
 		}
-		return make_snapshot(to,base,srcnames[0],sst.st_ino,smode);
+		return snapshot_ctl(to,base,srcnames[0],sst.st_ino,smode);
 	} else {	// dst exists
 		if (realpath(dstname,to)==NULL) {
 			printf("%s: realpath error on %s: %s\n",dstname,to,strerr(errno));
@@ -3666,7 +3701,7 @@ int snapshot(const char *dstname,char * const *srcnames,uint32_t srcelements,uin
 				printf("%s: basename error\n",to);
 				return -1;
 			}
-			return make_snapshot(dir,base,srcnames[0],sst.st_ino,smode);
+			return snapshot_ctl(dir,base,srcnames[0],sst.st_ino,smode);
 		} else {	// dst is a directory
 			status = 0;
 			for (i=0 ; i<srcelements ; i++) {
@@ -3699,7 +3734,7 @@ int snapshot(const char *dstname,char * const *srcnames,uint32_t srcelements,uin
 							continue;
 						}
 					}
-					if (make_snapshot(to,base,srcnames[i],sst.st_ino,smode)<0) {
+					if (snapshot_ctl(to,base,srcnames[i],sst.st_ino,smode)<0) {
 						status=-1;
 					}
 				} else {	// src is a directory
@@ -3715,7 +3750,7 @@ int snapshot(const char *dstname,char * const *srcnames,uint32_t srcelements,uin
 							status=-1;
 							continue;
 						}
-						if (make_snapshot(to,base,srcnames[i],sst.st_ino,smode)<0) {
+						if (snapshot_ctl(to,base,srcnames[i],sst.st_ino,smode)<0) {
 							status=-1;
 						}
 					} else {	// src is a directory and name has not trailing slash
@@ -3731,7 +3766,7 @@ int snapshot(const char *dstname,char * const *srcnames,uint32_t srcelements,uin
 							status=-1;
 							continue;
 						}
-						if (make_snapshot(dir,base,srcnames[i],sst.st_ino,smode)<0) {
+						if (snapshot_ctl(dir,base,srcnames[i],sst.st_ino,smode)<0) {
 							status=-1;
 						}
 					}
@@ -3755,6 +3790,7 @@ enum {
 	MFSDIRINFO,
 	MFSFILEREPAIR,
 	MFSMAKESNAPSHOT,
+	MFSRMSNAPSHOT,
 	MFSGETEATTR,
 	MFSSETEATTR,
 	MFSDELEATTR,
@@ -3871,6 +3907,10 @@ void usage(int f) {
 			fprintf(stderr,"make snapshot (lazy copy)\n\nusage: mfsmakesnapshot [-op] src [src ...] dst\n");
 			fprintf(stderr,"-o - allow to overwrite existing objects\n");
 			fprintf(stderr,"-c - 'cp' mode for attributes (create objects using current uid,gid,umask etc.)\n");
+			break;
+		case MFSRMSNAPSHOT:
+			fprintf(stderr,"remove snapshot (quick rm -r)\n\nusage: mfsrmsnapshot [-f] name [name ...]\n");
+			fprintf(stderr,"-f - remove as much as possible (according to access rights and snapshot flags)\n");
 			break;
 		case MFSGETEATTR:
 			fprintf(stderr,"get objects extra attributes\n\nusage: mfsgeteattr [-nhHkmgr] name [name ...]\n");
@@ -3991,6 +4031,7 @@ int main(int argc,char **argv) {
 			SYMLINK("mfsdirinfo")
 			SYMLINK("mfsfilerepair")
 			SYMLINK("mfsmakesnapshot")
+			SYMLINK("mfsrmsnapshot")
 			SYMLINK("mfsgeteattr")
 			SYMLINK("mfsseteattr")
 			SYMLINK("mfsdeleattr")
@@ -4082,6 +4123,8 @@ int main(int argc,char **argv) {
 		f=MFSFILEREPAIR;
 	} else if (CHECKNAME("mfsmakesnapshot")) {
 		f=MFSMAKESNAPSHOT;
+	} else if (CHECKNAME("mfsrmsnapshot")) {
+		f=MFSRMSNAPSHOT;
 	} else if (CHECKNAME("mfsfilepaths")) {
 		f=MFSFILEPATHS;
 	} else if (CHECKNAME("mfschkarchive")) {
@@ -4136,7 +4179,18 @@ int main(int argc,char **argv) {
 		if (argc<2) {
 			usage(f);
 		}
-		return snapshot(argv[argc-1],argv,argc-1,snapmode);
+		return make_snapshot(argv[argc-1],argv,argc-1,snapmode);
+	case MFSRMSNAPSHOT:
+		while ((ch=getopt(argc,argv,"f"))!=-1) {
+			switch (ch) {
+			case 'f':
+				snapmode |= SNAPSHOT_MODE_FORCE_REMOVAL;
+				break;
+			}
+		}
+		argc -= optind;
+		argv += optind;
+		break;
 	case MFSCOPYGOAL:
 	case MFSCOPYTRASHTIME:
 	case MFSCOPYEATTR:
@@ -4935,6 +4989,11 @@ int main(int argc,char **argv) {
 			break;
 		case MFSCLRARCHIVE:
 			if (archive_control(*argv,ARCHCTL_CLR)<0) {
+				status=1;
+			}
+			break;
+		case MFSRMSNAPSHOT:
+			if (remove_snapshot(*argv,snapmode)<0) {
 				status=1;
 			}
 			break;

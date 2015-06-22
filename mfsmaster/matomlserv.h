@@ -23,7 +23,7 @@
 
 #include <inttypes.h>
 
-uint32_t matomlserv_get_lastsupervisor(void);
+
 
 uint32_t matomlserv_mloglist_size(void);
 void matomlserv_mloglist_data(uint8_t *ptr);

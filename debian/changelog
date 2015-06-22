@@ -1,3 +1,10 @@
+moosefs (3.0.31-1) unstable; urgency=medium
+
+  * (master) changed metadata storing policy - when there are no followers,
+    then store metadata every hour (pro version only)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 22 Jun 2015 13:00:00 +0200
+
 moosefs (3.0.30-1) unstable; urgency=medium
 
   * (master) added 'empty' chunk count to mfscheckfile (fixed mfsfileinfo on

@@ -1,3 +1,13 @@
+moosefs (3.0.32-1) unstable; urgency=medium
+
+  * (master) added exports checksum
+  * (master) changed sessions parameters refresh policy (refresh all parameters
+    after 'exports' reload)
+  * (master) fixed truncate bug (close file without writing data may cause file
+    truncate - dangerous !!!, introduced in 3.0.25)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 23 Jun 2015 13:00:00 +0200
+
 moosefs (3.0.31-1) unstable; urgency=medium
 
   * (master) changed metadata storing policy - when there are no followers,

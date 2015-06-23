@@ -3035,9 +3035,11 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		if (fsync_before_close || write_cache_almost_full()) {
 			err = write_data_flush(fileinfo->data);
 		} else {
-			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-			fs_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE,ctx.uid,gids->gidcnt,gids->gidtab,maxleng,NULL);
-			groups_rel(gids);
+			if (master_version()>=VERSION2INT(3,0,32)) {
+				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+				fs_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE,ctx.uid,gids->gidcnt,gids->gidtab,maxleng,NULL);
+				groups_rel(gids);
+			}
 			err = write_data_chunk_wait(fileinfo->data);
 		}
 #ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.31], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.32], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -174,6 +174,9 @@ dnl AC_CHECK_HEADERS([sys/mman.h])
 
 # optional I/O functions
 AC_CHECK_FUNCS([pread pwrite readv writev])
+
+# optional sleep function
+AC_CHECK_FUNCS([nanosleep])
 
 # optional resource usage function and headers
 AC_CHECK_FUNCS([getrusage setitimer])

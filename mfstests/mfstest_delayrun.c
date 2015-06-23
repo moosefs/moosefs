@@ -24,18 +24,12 @@
 #include <stdlib.h>
 
 #include "delayrun.h"
+#include "portable.h"
 #include "clocks.h"
 
 #include "mfstest.h"
 
 uint32_t global_variable;
-
-void universal_usleep(uint64_t usec) {
-	struct timeval tv;
-	tv.tv_sec = usec/1000000;
-	tv.tv_usec = usec%1000000;
-	select(0, NULL, NULL, NULL, &tv);
-}
 
 void set_variable(void *arg) {
 	uint32_t *a = (uint32_t*)(arg);
@@ -55,27 +49,27 @@ int main(void) {
 
 	global_variable = 0xFFFFFFFF;
 	delay_run(set_variable,values,10000);
-	universal_usleep(20000);
+	portable_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,0);
 	delay_run(set_variable,values+2,30000);
 	delay_run(set_variable,values+3,50000);
 	delay_run(set_variable,values+1,10000);
 	mfstest_assert_uint32_eq(global_variable,0);
-	universal_usleep(20000);
+	portable_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,1);
-	universal_usleep(20000);
+	portable_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,2);
-	universal_usleep(20000);
+	portable_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,3);
 	delay_run(set_variable,values+6,60000);
-	universal_usleep(10000);
+	portable_usleep(10000);
 	delay_run(set_variable,values+4,10000);
-	universal_usleep(20000);
+	portable_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,4);
 	delay_run(set_variable,values+5,10000);
-	universal_usleep(20000);
+	portable_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,5);
-	universal_usleep(20000);
+	portable_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,6);
 
 	delay_term();

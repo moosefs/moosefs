@@ -285,115 +285,107 @@ static struct fuse_opt mfs_opts_stage2[] = {
 };
 
 static void usage(const char *progname) {
-	fprintf(stderr,
-"usage: %s mountpoint [options]\n"
-"\n", progname);
-	fprintf(stderr,
-"general options:\n"
-"    -o opt,[opt...]         mount options\n"
-"    -h   --help             print help\n"
-"    -V   --version          print version\n"
-"\n");
-	fprintf(stderr,
-"MFS options:\n"
-"    -c CFGFILE                  equivalent to '-o mfscfgfile=CFGFILE'\n"
-"    -m   --meta                 equivalent to '-o mfsmeta'\n"
-"    -H HOST                     equivalent to '-o mfsmaster=HOST'\n"
-"    -P PORT                     equivalent to '-o mfsport=PORT'\n"
-"    -B IP                       equivalent to '-o mfsbind=IP'\n"
-"    -L IP                       equivalent to '-o mfsproxy=IP'\n"
-"    -S PATH                     equivalent to '-o mfssubfolder=PATH'\n"
-"    -p   --password             similar to '-o mfspassword=PASSWORD', but show prompt and ask user for password\n"
-"    -n   --nostdopts            do not add standard MFS mount options: '-o " DEFAULT_OPTIONS ",fsname=MFS'\n");
-	fprintf(stderr,
-"    -o mfscfgfile=CFGFILE       load some mount options from external file (if not specified then use default file: " ETC_PATH "/mfs/mfsmount.cfg or " ETC_PATH "/mfsmount.cfg)\n"
-"    -o mfsdebug                 print some debugging information\n"
-"    -o mfsmeta                  mount meta filesystem (trash etc.)\n"
-"    -o mfsdelayedinit           connection with master is done in background - with this option mount can be run without network (good for being run from fstab / init scripts etc.)\n"
+	fprintf(stderr,"usage: %s mountpoint [options]\n",progname);
+	fprintf(stderr,"\n");
+	fprintf(stderr,"general options:\n");
+	fprintf(stderr,"    -o opt,[opt...]         mount options\n");
+	fprintf(stderr,"    -h   --help             print help\n");
+	fprintf(stderr,"    -V   --version          print version\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"MFS options:\n");
+	fprintf(stderr,"    -c CFGFILE                  equivalent to '-o mfscfgfile=CFGFILE'\n");
+	fprintf(stderr,"    -m   --meta                 equivalent to '-o mfsmeta'\n");
+	fprintf(stderr,"    -H HOST                     equivalent to '-o mfsmaster=HOST'\n");
+	fprintf(stderr,"    -P PORT                     equivalent to '-o mfsport=PORT'\n");
+	fprintf(stderr,"    -B IP                       equivalent to '-o mfsbind=IP'\n");
+	fprintf(stderr,"    -L IP                       equivalent to '-o mfsproxy=IP'\n");
+	fprintf(stderr,"    -S PATH                     equivalent to '-o mfssubfolder=PATH'\n");
+	fprintf(stderr,"    -p   --password             similar to '-o mfspassword=PASSWORD', but show prompt and ask user for password\n");
+	fprintf(stderr,"    -n   --nostdopts            do not add standard MFS mount options: '-o " DEFAULT_OPTIONS ",fsname=MFS'\n");
+	fprintf(stderr,"    -o mfscfgfile=CFGFILE       load some mount options from external file (if not specified then use default file: " ETC_PATH "/mfs/mfsmount.cfg or " ETC_PATH "/mfsmount.cfg)\n");
+	fprintf(stderr,"    -o mfsdebug                 print some debugging information\n");
+	fprintf(stderr,"    -o mfsmeta                  mount meta filesystem (trash etc.)\n");
+	fprintf(stderr,"    -o mfsdelayedinit           connection with master is done in background - with this option mount can be run without network (good for being run from fstab / init scripts etc.)\n");
 #ifdef __linux__
-"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 1)\n"
+	fprintf(stderr,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 1)\n");
 #else
-"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 0)\n"
+	fprintf(stderr,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 0)\n");
 #endif
 #if defined(DEFAULT_SUGID_CLEAR_MODE_EXT)
-"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: EXT)\n"
+	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: EXT)\n");
 #elif defined(DEFAULT_SUGID_CLEAR_MODE_BSD)
-"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: BSD)\n"
+	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: BSD)\n");
 #elif defined(DEFAULT_SUGID_CLEAR_MODE_OSX)
-"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: OSX)\n"
+	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: OSX)\n");
 #else
-"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: NEVER)\n"
+	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: NEVER)\n");
 #endif
-"    -o mfscachemode=CMODE       set cache mode (see below ; default: AUTO)\n"
-"    -o mfscachefiles            (deprecated) equivalent to '-o mfscachemode=YES'\n"
-// "    -o mfscachefiles            allow files data to be kept in cache (dangerous in network environment)\n"
-"    -o mfsattrcacheto=SEC       set attributes cache timeout in seconds (default: 1.0)\n"
-"    -o mfsxattrcacheto=SEC      set extended attributes (xattr) cache timeout in seconds (default: 30.0)\n"
-"    -o mfsentrycacheto=SEC      set file entry cache timeout in seconds (default: 0.0)\n"
-"    -o mfsdirentrycacheto=SEC   set directory entry cache timeout in seconds (default: 1.0)\n"
-"    -o mfsnegentrycacheto=SEC   set negative entry cache timeout in seconds (default: 1.0)\n"
-"    -o mfsgroupscacheto=SEC     set supplementary groups cache timeout in seconds (default: 300.0)\n"
-"    -o mfsrlimitnofile=N        on startup mfsmount tries to change number of descriptors it can simultaneously open (default: 100000)\n"
-"    -o mfsnice=N                on startup mfsmount tries to change his 'nice' value (default: -19)\n"
+	fprintf(stderr,"    -o mfscachemode=CMODE       set cache mode (see below ; default: AUTO)\n");
+	fprintf(stderr,"    -o mfscachefiles            (deprecated) equivalent to '-o mfscachemode=YES'\n");
+	fprintf(stderr,"    -o mfsattrcacheto=SEC       set attributes cache timeout in seconds (default: 1.0)\n");
+	fprintf(stderr,"    -o mfsxattrcacheto=SEC      set extended attributes (xattr) cache timeout in seconds (default: 30.0)\n");
+	fprintf(stderr,"    -o mfsentrycacheto=SEC      set file entry cache timeout in seconds (default: 0.0)\n");
+	fprintf(stderr,"    -o mfsdirentrycacheto=SEC   set directory entry cache timeout in seconds (default: 1.0)\n");
+	fprintf(stderr,"    -o mfsnegentrycacheto=SEC   set negative entry cache timeout in seconds (default: 1.0)\n");
+	fprintf(stderr,"    -o mfsgroupscacheto=SEC     set supplementary groups cache timeout in seconds (default: 300.0)\n");
+	fprintf(stderr,"    -o mfsrlimitnofile=N        on startup mfsmount tries to change number of descriptors it can simultaneously open (default: 100000)\n");
+	fprintf(stderr,"    -o mfsnice=N                on startup mfsmount tries to change his 'nice' value (default: -19)\n");
 #ifdef MFS_USE_MEMLOCK
-"    -o mfsmemlock               try to lock memory\n"
+	fprintf(stderr,"    -o mfsmemlock               try to lock memory\n");
 #endif
 #ifdef MFS_USE_MALLOPT
-"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 8)\n"
+	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 8)\n");
 #endif
-"    -o mfsfsyncbeforeclose      force fsync before last file close (safer but can be inefficient - especially in case of small files)\n"
-"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n"
-"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n"
-"    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n"
-"    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n"
-"    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n"
-"    -o mfsmaster=HOST           define mfsmaster location (default: " DEFAULT_MASTERNAME ")\n"
-"    -o mfsport=PORT             define mfsmaster port number (default: " DEFAULT_MASTER_CLIENT_PORT ")\n"
-"    -o mfsbind=IP               define source ip address for connections (default: NOT DEFINED - chosen automatically by OS)\n"
-"    -o mfsproxy=IP              define listen ip address of local master proxy for communication with tools (default: 127.0.0.1)\n"
-"    -o mfssubfolder=PATH        define subfolder to mount as root (default: /)\n"
-"    -o mfspassword=PASSWORD     authenticate to mfsmaster with password\n"
-"    -o mfsmd5pass=MD5           authenticate to mfsmaster using directly given md5 (only if mfspassword is not defined)\n"
-"    -o mfsdonotrememberpassword do not remember password in memory - more secure, but when session is lost then new session is created without password\n"
-"    -o mfspreflabels=LABELEXPR  specify prefered labels for choosing chunkservers during I/O\n"
-"    -o mfsnoxattrs              turn off xattr support\n"
+	fprintf(stderr,"    -o mfsfsyncbeforeclose      force fsync before last file close (safer but can be inefficient - especially in case of small files)\n");
+	fprintf(stderr,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
+	fprintf(stderr,"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n");
+	fprintf(stderr,"    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n");
+	fprintf(stderr,"    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n");
+	fprintf(stderr,"    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n");
+	fprintf(stderr,"    -o mfsmaster=HOST           define mfsmaster location (default: " DEFAULT_MASTERNAME ")\n");
+	fprintf(stderr,"    -o mfsport=PORT             define mfsmaster port number (default: " DEFAULT_MASTER_CLIENT_PORT ")\n");
+	fprintf(stderr,"    -o mfsbind=IP               define source ip address for connections (default: NOT DEFINED - chosen automatically by OS)\n");
+	fprintf(stderr,"    -o mfsproxy=IP              define listen ip address of local master proxy for communication with tools (default: 127.0.0.1)\n");
+	fprintf(stderr,"    -o mfssubfolder=PATH        define subfolder to mount as root (default: /)\n");
+	fprintf(stderr,"    -o mfspassword=PASSWORD     authenticate to mfsmaster with password\n");
+	fprintf(stderr,"    -o mfsmd5pass=MD5           authenticate to mfsmaster using directly given md5 (only if mfspassword is not defined)\n");
+	fprintf(stderr,"    -o mfsdonotrememberpassword do not remember password in memory - more secure, but when session is lost then new session is created without password\n");
+	fprintf(stderr,"    -o mfspreflabels=LABELEXPR  specify prefered labels for choosing chunkservers during I/O\n");
+	fprintf(stderr,"    -o mfsnoxattrs              turn off xattr support\n");
 #if FUSE_VERSION >= 26
-"    -o mfsnoposixlocks          turn off support for global posix locks (lockf + ioctl) - locks will work locally\n"
+	fprintf(stderr,"    -o mfsnoposixlocks          turn off support for global posix locks (lockf + ioctl) - locks will work locally\n");
 #endif
 #if FUSE_VERSION >= 29
-"    -o mfsnobsdlocks            turn off support for global BSD locks (flock) - locks will work locally\n"
+	fprintf(stderr,"    -o mfsnobsdlocks            turn off support for global BSD locks (flock) - locks will work locally\n");
 #endif
-"\n");
-	fprintf(stderr,
-"CMODE can be set to:\n"
-"    NO,NONE or NEVER            never allow files data to be kept in cache (safest but can reduce efficiency)\n"
-"    YES or ALWAYS               always allow files data to be kept in cache (dangerous)\n"
-"    AUTO                        file cache is managed by mfsmaster automatically (should be very safe and efficient)\n"
-"\n");
-	fprintf(stderr,
-"SMODE can be set to:\n"
-"    NEVER                       MFS will not change suid and sgid bit on chown\n"
-"    ALWAYS                      clear suid and sgid on every chown - safest operation\n"
-"    OSX                         standard behavior in OS X and Solaris (chown made by unprivileged user clear suid and sgid)\n"
-"    BSD                         standard behavior in *BSD systems (like in OSX, but only when something is really changed)\n"
-"    EXT                         standard behavior in most file systems on Linux (directories not changed, others: suid cleared always, sgid only when group exec bit is set)\n"
-"    XFS                         standard behavior in XFS on Linux (like EXT but directories are changed by unprivileged users)\n"
-"SMODE extra info:\n"
-"    btrfs,ext2,ext3,ext4,hfs[+],jfs,ntfs and reiserfs on Linux work as 'EXT'.\n"
-"    Only xfs on Linux works a little different. Beware that there is a strange\n"
-"    operation - chown(-1,-1) which is usually converted by a kernel into something\n"
-"    like 'chmod ug-s', and therefore can't be controlled by MFS as 'chown'\n"
-"\n");
-	fprintf(stderr,
-"LABELEXPR grammar:\n"
-"    LABELEXPR -> S ';' LABELEXPR | S\n"
-"    S -> S '+' M | M\n"
-"    M -> M L | L\n"
-"    L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']'\n"
-"\n"
-"    Subexpressions should be placed in priority order.\n"
-"    Up to nine subexpressions (priorities) can be specified.\n"
-"\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"CMODE can be set to:\n");
+	fprintf(stderr,"    NO,NONE or NEVER            never allow files data to be kept in cache (safest but can reduce efficiency)\n");
+	fprintf(stderr,"    YES or ALWAYS               always allow files data to be kept in cache (dangerous)\n");
+	fprintf(stderr,"    AUTO                        file cache is managed by mfsmaster automatically (should be very safe and efficient)\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"SMODE can be set to:\n");
+	fprintf(stderr,"    NEVER                       MFS will not change suid and sgid bit on chown\n");
+	fprintf(stderr,"    ALWAYS                      clear suid and sgid on every chown - safest operation\n");
+	fprintf(stderr,"    OSX                         standard behavior in OS X and Solaris (chown made by unprivileged user clear suid and sgid)\n");
+	fprintf(stderr,"    BSD                         standard behavior in *BSD systems (like in OSX, but only when something is really changed)\n");
+	fprintf(stderr,"    EXT                         standard behavior in most file systems on Linux (directories not changed, others: suid cleared always, sgid only when group exec bit is set)\n");
+	fprintf(stderr,"    XFS                         standard behavior in XFS on Linux (like EXT but directories are changed by unprivileged users)\n");
+	fprintf(stderr,"SMODE extra info:\n");
+	fprintf(stderr,"    btrfs,ext2,ext3,ext4,hfs[+],jfs,ntfs and reiserfs on Linux work as 'EXT'.\n");
+	fprintf(stderr,"    Only xfs on Linux works a little different. Beware that there is a strange\n");
+	fprintf(stderr,"    operation - chown(-1,-1) which is usually converted by a kernel into something\n");
+	fprintf(stderr,"    like 'chmod ug-s', and therefore can't be controlled by MFS as 'chown'\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"LABELEXPR grammar:\n");
+	fprintf(stderr,"    LABELEXPR -> S ';' LABELEXPR | S\n");
+	fprintf(stderr,"    S -> S '+' M | M\n");
+	fprintf(stderr,"    M -> M L | L\n");
+	fprintf(stderr,"    L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']'\n");
+	fprintf(stderr,"\n");
+	fprintf(stderr,"    Subexpressions should be placed in priority order.\n");
+	fprintf(stderr,"    Up to nine subexpressions (priorities) can be specified.\n");
+	fprintf(stderr,"\n");
 }
 
 static void mfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *outargs) {

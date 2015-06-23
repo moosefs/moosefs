@@ -26,7 +26,25 @@
 #define _PORTABLE_H_
 
 #include <sys/select.h>
+#include <time.h>
 #include <inttypes.h>
+
+#ifdef HAVE_NANOSLEEP
+
+static inline void portable_usleep (uint64_t usec) {
+	struct timespec req,rem;
+	int s;
+	req.tv_sec = usec / 1000000U;
+	req.tv_nsec = (usec % 1000000U) * 1000U;
+	do {
+		s = nanosleep(&req,&rem);
+		if (s<0) {
+			req = rem;
+		}
+	} while (s<0);
+}
+
+#else
 
 static inline void portable_usleep(uint64_t usec) {
 	struct timeval tv;
@@ -34,5 +52,7 @@ static inline void portable_usleep(uint64_t usec) {
 	tv.tv_usec = usec%1000000;
 	select(0, NULL, NULL, NULL, &tv);
 }
+
+#endif
 
 #endif

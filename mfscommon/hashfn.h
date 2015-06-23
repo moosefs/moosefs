@@ -22,6 +22,7 @@
 #define _HASHFN_H_
 
 #include <inttypes.h>
+#include "datapack.h"
 
 static uint32_t hash_primes_tab[]={0,
 	         5U,         7U,        13U,        19U,        31U,        43U,        61U,        73U,
@@ -111,6 +112,88 @@ static inline uint64_t hash64(uint64_t key) {
 	key = key ^ (key >> 28);
 	key = key + (key << 31);
 	return key;
+}
+
+
+/* buff to hash value functions */
+
+/* buff -> 32bit ; FNV1a */
+
+#define FNV32_INIT (UINT32_C(0x811c9dc5))
+
+static inline uint32_t fnv32(const uint8_t *buf, uint32_t len, uint32_t hash) {
+	const uint8_t *bufend = buf + len;
+
+	while (buf < bufend) {
+		hash ^= (uint32_t)buf[0];
+		hash *= UINT32_C(0x01000193);
+		buf++;
+	}
+
+	return hash;
+}
+
+/* buff -> 64bit ; FNV1a */
+
+#define FNV64_INIT (UINT64_C(0xcbf29ce484222325))
+
+static inline uint64_t fnv64(const uint8_t *buf, uint32_t len, uint64_t hash) {
+	const uint8_t *bufend = buf + len;
+
+	while (buf < bufend) {
+		hash ^= (uint64_t)buf[0];
+		hash *= UINT64_C(0x100000001b3);
+		buf++;
+	}
+
+	return hash;
+}
+
+/* buff -> 32bit ; Murmur3 */
+
+static inline uint32_t murmur3_32(const uint8_t *buf, uint32_t len, uint32_t hash) {
+	static const uint32_t c1 = 0xcc9e2d51;
+	static const uint32_t c2 = 0x1b873593;
+	static const uint32_t r1 = 15;
+	static const uint32_t r2 = 13;
+	static const uint32_t m = 5;
+	static const uint32_t n = 0xe6546b64;
+	uint32_t i;
+	uint32_t k;
+
+	for (i = 0 ; i < len / 4 ; i++) {
+		k = get32bit(&buf);
+		k *= c1;
+		k = (k << r1) | (k >> (32 - r1));
+		k *= c2;
+
+		hash ^= k;
+		hash = ((hash << r2) | (hash >> (32 - r2))) * m + n;
+	}
+
+	k = 0;
+	switch (len & 3) {
+		case 3:
+			k ^= buf[2] << 16;
+		case 2:
+			k ^= buf[1] << 8;
+		case 1:
+			k ^= buf[0];
+
+			k *= c1;
+			k = (k << r1) | (k >> (32 - r1));
+			k *= c2;
+			hash ^= k;
+	}
+
+	hash ^= len;
+	hash ^= (hash >> 16);
+	hash *= 0x85ebca6b;
+	hash ^= (hash >> 13);
+	hash *= 0xc2b2ae35;
+	hash ^= (hash >> 16);
+
+	return hash;
 }
 
 #endif

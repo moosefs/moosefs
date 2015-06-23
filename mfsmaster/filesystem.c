@@ -4097,10 +4097,6 @@ uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 		return ERROR_EPERM;
 	}
 	if (flags & TRUNCATE_FLAG_UPDATE) {
-		if (length>p->data.fdata.length) {
-			fsnodes_setlength(p,length);
-			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",0)",(uint32_t)main_time(),inode,length);
-		}
 		return STATUS_OK;
 	}
 	if (length>p->data.fdata.length) {
@@ -4194,7 +4190,7 @@ uint8_t fs_mr_unlock(uint64_t chunkid) {
 	return chunk_mr_unlock(chunkid);
 }
 
-uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35]) {
+uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35]) {
 	fsnode *p;
 	uint32_t ts = main_time();
 
@@ -4202,11 +4198,18 @@ uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint3
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
 		return ERROR_ENOENT;
 	}
-	fsnodes_setlength(p,length);
-	changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",1)",ts,inode,p->data.fdata.length);
-	p->ctime = p->mtime = ts;
+	if (flags & TRUNCATE_FLAG_UPDATE) {
+		if (length>p->data.fdata.length) {
+			fsnodes_setlength(p,length);
+			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",0)",ts,inode,p->data.fdata.length);
+		}
+	} else {
+		fsnodes_setlength(p,length);
+		changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",1)",ts,inode,p->data.fdata.length);
+		p->ctime = p->mtime = ts;
+		stats_setattr++;
+	}
 	fsnodes_fill_attr(p,NULL,uid,gid,auid,agid,sesflags,attr);
-	stats_setattr++;
 	return STATUS_OK;
 }
 

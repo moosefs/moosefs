@@ -18,16 +18,13 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
-#ifndef _EXPORTS_H_
-#define _EXPORTS_H_
+#ifndef _IPTOSESID_H_
+#define _IPTOSESID_H_
 
 #include <inttypes.h>
 
-uint32_t exports_info_size(uint8_t versmode);
-void exports_info_data(uint8_t versmode,uint8_t *buff);
-uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime);
-void exports_reload(void);
-uint64_t exports_checksum(void);
-int exports_init(void);
+void iptosesid_add(uint32_t ip,uint32_t sessionid);
+uint8_t iptosesid_check(uint32_t ip);
+uint32_t iptosesid_get(uint32_t ip);
 
 #endif

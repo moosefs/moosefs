@@ -38,6 +38,7 @@
 
 #include "massert.h"
 #include "getgroups.h"
+#include "portable.h"
 #include "clocks.h"
 
 
@@ -362,7 +363,7 @@ void* groups_cleanup_thread(void* arg) {
 			h%=HASHSIZE;
 		}
 		zassert(pthread_mutex_unlock(&glock));
-		usleep(10000);
+		portable_usleep(10000);
 	}
 	return arg;
 }

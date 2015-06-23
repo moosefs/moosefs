@@ -24,6 +24,7 @@ mfsmaster_SOURCES=\
 	posixlocks.c posixlocks.h \
 	openfiles.c openfiles.h \
 	csdb.c csdb.h \
+	iptosesid.c iptosesid.h \
 	labelsets.c labelsets.h \
 	sessions.c sessions.h \
 	metadata.c metadata.h \

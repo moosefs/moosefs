@@ -1209,9 +1209,9 @@ def state_color(stateid,sync):
 		else:
 			return 6
 	elif stateid==STATE_ELECT:
-		return 4
-	elif stateid==STATE_LEADER:
 		return 3
+	elif stateid==STATE_LEADER:
+		return 4
 	else:
 		return 1
 
@@ -1658,6 +1658,7 @@ def resolve_inodes_paths(leaderconn,inodes):
 # find leader
 leaderispro = 0
 leaderfound = 0
+leader_exports_checksum = None
 followerfound = 0
 electfound = 0
 leaderconn = None
@@ -1679,6 +1680,7 @@ for mhost,mport in masterlist:
 	lastsaveseconds = 0
 	lastsavestatus = 0
 	metaversion = 0
+	exports_checksum = None
 	try:
 		conn = Master(mhost,mport)
 		try:
@@ -1721,7 +1723,7 @@ for mhost,mport in masterlist:
 				else:
 					statestr = "UPGRADE THIS UNIT !!!"
 					statecolor = 2
-			elif length==121:
+			elif length==121 or length==129:
 				version = struct.unpack(">HBB",data[:4])
 				conn.set_version(version)
 				memusage,syscpu,usercpu = struct.unpack(">QQQ",data[4:28])
@@ -1731,6 +1733,8 @@ for mhost,mport in masterlist:
 				if conn.version_at_least(2,0,14):
 					lastsaveseconds = lastsaveseconds / 1000.0
 				workingstate,nextstate,stablestate,sync,leaderip,changetime,metaversion = struct.unpack(">BBBBLLQ",data[101:121])
+				if length==129:
+					exports_checksum = struct.unpack(">Q",data[121:129])[0]
 				if workingstate==0xFF and nextstate==0xFF and stablestate==0xFF and sync==0xFF:
 					if leaderfound==0:
 						leaderconn = conn
@@ -1755,6 +1759,7 @@ for mhost,mport in masterlist:
 						leaderconn = conn
 						leaderinfo = data
 						leaderfound = 1
+						leader_exports_checksum = exports_checksum
 		except Exception:
 			statestr = "BUSY"
 			statecolor = 7
@@ -1771,7 +1776,7 @@ for mhost,mport in masterlist:
 	if conn and conn!=leaderconn:
 		del conn
 	masterlistver.append((mhost,mport,version))
-	masterlistinfo.append((sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus))
+	masterlistinfo.append((sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exports_checksum))
 
 if leaderfound and leaderconn.version_less_than(1,6,10):
 	if cgimode:
@@ -2443,7 +2448,7 @@ if "IN" in sectionset:
 			if cgimode:
 				out = []
 				out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfsmasters" cellspacing="0">""")
-				out.append("""	<tr><th colspan="10">Metadata Servers (masters)</th></tr>""")
+				out.append("""	<tr><th colspan="11">Metadata Servers (masters)</th></tr>""")
 				out.append("""	<tr>""")
 				out.append("""		<th class="acid_tab_enumerate">#</th>""")
 				out.append("""		<th>ip</th>""")
@@ -2455,14 +2460,15 @@ if "IN" in sectionset:
 				out.append("""		<th>last successful metadata save</th>""")
 				out.append("""		<th>last metadata save duration</th>""")
 				out.append("""		<th>last metadata save status</th>""")
+				out.append("""		<th>exports checksum</th>""")
 				out.append("""	</tr>""")
 			elif ttymode:
-				tab = Tabble("Metadata Servers",9,"r")
-				tab.header("ip","version","state","metadata version","RAM used","CPU used","last meta save","last save duration","last save status")
+				tab = Tabble("Metadata Servers",10,"r")
+				tab.header("ip","version","state","metadata version","RAM used","CPU used","last meta save","last save duration","last save status","exports checksum")
 			else:
-				tab = Tabble("metadata servers",9)
+				tab = Tabble("metadata servers",10)
 			masterstab = []
-			for sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus in masterlistinfo:
+			for sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exports_checksum in masterlistinfo:
 				if IMorder==1:
 					sf = sortip
 				elif IMorder==2:
@@ -2481,15 +2487,17 @@ if "IN" in sectionset:
 					sf = lastsaveseconds
 				elif IMorder==9:
 					sf = lastsavestatus
+				elif IMorder==10:
+					sf = exports_checksum
 				else:
 					sf = 0
-				masterstab.append((sf,sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus))
+				masterstab.append((sf,sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exports_checksum))
 
 			masterstab.sort()
 			if IMrev:
 				masterstab.reverse()
 
-			for sf,sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus in masterstab:
+			for sf,sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exports_checksum in masterstab:
 				if cgimode:
 					if leaderconn!=None and leaderconn.is_pro() and not strver.endswith(" PRO"):
 						verclass = "BADVERSION"
@@ -2518,6 +2526,10 @@ if "IN" in sectionset:
 						out.append("""		<td align="center">-</td><td align="center">-</td>""")
 					if lastsuccessfulstore>0 or lastsavestatus>0:
 						out.append("""		<td align="center"><span class="%s">%s</span></td>""" % ("SUCCESS" if lastsavestatus==0 or lastsavestatus==1 else "WARNING" if lastsavestatus==2 else "ERROR","Saved in background" if lastsavestatus==0 else "Downloaded from other master" if lastsavestatus==1 else "Saved in foreground" if lastsavestatus==2 else "Unknown status: %u" % lastsavestatus))
+					else:
+						out.append("""		<td align="center">-</td>""")
+					if exports_checksum!=None:
+						out.append("""		<td align="center"><span class="%s">%016X</span></td>""" % (("ERROR" if exports_checksum != leader_exports_checksum else "SUCCESS"),exports_checksum))
 					else:
 						out.append("""		<td align="center">-</td>""")
 					out.append("""	</tr>""")
@@ -2549,6 +2561,10 @@ if "IN" in sectionset:
 						clist.append("-")
 					if lastsuccessfulstore>0 or lastsavestatus>0:
 						clist.append(("Saved in background","4") if lastsavestatus==0 else ("Downloaded from other master","4") if lastsavestatus==1 else ("Saved in foreground","2") if lastsavestatus==2 else ("Unknown status: %u" % lastsavestatus,"1"))
+					else:
+						clist.append("-")
+					if exports_checksum!=None:
+						clist.append((("%016X" % exports_checksum),("1" if exports_checksum != leader_exports_checksum else "4")))
 					else:
 						clist.append("-")
 					tab.append(*clist)

@@ -12,6 +12,7 @@ mfstest_datapack_CFLAGS=
 
 mfstest_clocks_SOURCES=\
 	mfstest_clocks.c mfstest.h \
+	../mfscommon/portable.h \
 	../mfscommon/clocks.h ../mfscommon/clocks.c
 
 mfstest_clocks_CFLAGS=
@@ -25,6 +26,7 @@ mfstest_crc32_CFLAGS=
 
 mfstest_delayrun_SOURCES=\
 	mfstest_delayrun.c mfstest.h \
+	../mfscommon/portable.h \
 	../mfscommon/delayrun.h ../mfscommon/delayrun.c \
 	../mfscommon/clocks.h ../mfscommon/clocks.c \
 	../mfscommon/strerr.h ../mfscommon/strerr.c

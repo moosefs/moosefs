@@ -41,6 +41,8 @@
 #include "cfg.h"
 #include "slogger.h"
 #include "massert.h"
+#include "crc.h"
+#include "hashfn.h"
 
 typedef struct _exports {
 	uint32_t pleng;
@@ -66,7 +68,50 @@ typedef struct _exports {
 } exports;
 
 static exports *exports_records;
+static uint64_t exports_csum;
 static char *ExportsFileName;
+
+uint64_t exports_entry_checksum(exports *e) {
+	uint64_t csum;
+	uint8_t edata[56];
+	uint8_t *ptr;
+	uint32_t crc,murmur;
+
+	ptr = edata;
+	put32bit(&ptr,e->fromip);
+	put32bit(&ptr,e->toip);
+	put32bit(&ptr,e->minversion);
+	if (e->needpassword) {
+		memcpy(ptr,e->passworddigest,16);
+	} else {
+		memset(ptr,0,16);
+	}
+	ptr+=16;
+	put8bit(&ptr,(e->alldirs<<3) + (e->needpassword<<2) + (e->meta<<1) + e->rootredefined);
+	put8bit(&ptr,e->sesflags);
+	put8bit(&ptr,e->mingoal);
+	put8bit(&ptr,e->maxgoal);
+	put32bit(&ptr,e->mintrashtime);
+	put32bit(&ptr,e->maxtrashtime);
+	put32bit(&ptr,e->rootuid);
+	put32bit(&ptr,e->rootgid);
+	put32bit(&ptr,e->mapalluid);
+	put32bit(&ptr,e->mapallgid);
+	crc = mycrc32(0xFFFFFFFF,edata,56);
+	murmur = murmur3_32(edata,56,0);
+	if (e->pleng>0) {
+		crc = mycrc32(crc,e->path,e->pleng);
+		murmur = murmur3_32(e->path,e->pleng,murmur);
+	}
+	csum = crc;
+	csum <<= 32;
+	csum |= murmur;
+	return csum;
+}
+
+uint64_t exports_checksum(void) {
+	return exports_csum;
+}
 
 char* exports_strsep(char **stringp, const char *delim) {
 	char *s;
@@ -150,16 +195,18 @@ void exports_info_data(uint8_t versmode,uint8_t *buff) {
 	}
 }
 
-uint8_t exports_check(uint32_t ip,uint32_t version,uint8_t meta,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime) {
+uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime) {
 	const uint8_t *p;
 	uint32_t pleng,i;
 	uint8_t rndstate;
+	uint8_t meta;
 	int ok,nopass;
 	md5ctx md5c;
 	uint8_t entrydigest[16];
 	exports *e,*f;
 
 //	syslog(LOG_NOTICE,"check exports for: %u.%u.%u.%u:%s",(ip>>24)&0xFF,(ip>>16)&0xFF,(ip>>8)&0xFF,ip&0xFF,path);
+	meta = (path==NULL)?1:0;
 
 	if (meta==0) {
 		p = path;
@@ -1027,6 +1074,10 @@ void exports_loadexports(void) {
 	fclose(fd);
 	exports_freelist(exports_records);
 	exports_records = newexports;
+	exports_csum = 0;
+	for (arec=exports_records ; arec!=NULL ; arec=arec->next) {
+		exports_csum += exports_entry_checksum(arec);
+	}
 	mfs_syslog(LOG_NOTICE,"exports file has been loaded");
 }
 
@@ -1069,7 +1120,7 @@ int exports_init(void) {
 		fprintf(stderr,"no exports defined !!!\n");
 		return -1;
 	}
-	main_reload_register(exports_reload);
+//	main_reload_register(exports_reload); // reload called by matoclserv_reload_sessions
 	main_destruct_register(exports_term);
 	return 0;
 }

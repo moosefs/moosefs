@@ -26,15 +26,9 @@
 #include <string.h>
 
 #include "clocks.h"
+#include "portable.h"
 
 #include "mfstest.h"
-
-void universal_usleep(uint64_t usec) {
-	struct timeval tv;
-	tv.tv_sec = usec/1000000;
-	tv.tv_usec = usec%1000000;
-	select(0, NULL, NULL, NULL, &tv);
-}
 
 int main(void) {
 	double st,en;
@@ -52,7 +46,7 @@ int main(void) {
 	st = monotonic_seconds();
 	stusec = monotonic_useconds();
 	stnsec = monotonic_nseconds();
-	universal_usleep(10000);
+	portable_usleep(10000);
 	en = monotonic_seconds();
 	enusec = monotonic_useconds();
 	ennsec = monotonic_nseconds();

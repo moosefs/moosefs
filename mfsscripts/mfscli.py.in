@@ -2741,7 +2741,7 @@ if "IN" in sectionset:
 					tab.append("all chunk copies",allcopies)
 					tab.append("regular chunk copies",tdcopies)
 					print(tab)
-			elif length==101 or length==121:
+			elif length==101 or length==121 or length==129:
 				v1,v2,v3,memusage,syscpu,usercpu,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies,lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">HBBQQQQQQLQLLLLLLLLLB",leaderinfo[:101])
 				strver,sortver = version_str_and_sort((v1,v2,v3))
 				syscpu/=10000000.0

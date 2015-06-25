@@ -283,9 +283,10 @@ int meta_load(bio *fd,uint8_t fver) {
 		metaversion = get64bit(&ptr);
 		nextsessionid = get32bit(&ptr);
 		sessions_set_nextsessionid(nextsessionid);
-		metafileid = main_time();
-		metafileid <<= 32;
-		metafileid |= rndu32();
+		metafileid = 0;
+//		metafileid = main_time();
+//		metafileid <<= 32;
+//		metafileid |= rndu32();
 	} else {
 		metaversion = get64bit(&ptr);
 		metafileid = get64bit(&ptr);
@@ -924,9 +925,10 @@ int meta_loadfile(const char *filename) {
 		chunk_newfs();
 		sessions_new();
 		metaversion = 1;
-		metafileid = main_time();
-		metafileid <<= 32;
-		metafileid |= rndu32();
+		metafileid = 0;
+//		metafileid = main_time();
+//		metafileid <<= 32;
+//		metafileid |= rndu32();
 		return 0;
 	}
 	if (memcmp(hdr,MFSSIGNATURE "M ",5)==0 && hdr[5]>='1' && hdr[5]<='9' && hdr[6]=='.' && hdr[7]>='0' && hdr[7]<='9') {
@@ -1331,6 +1333,32 @@ void meta_reload(void) {
 	}
 }
 
+void meta_check_fileid(void) {
+	if (metafileid==0) {
+		uint32_t now = main_time();
+		metafileid = now;
+		metafileid <<= 32;
+		metafileid |= rndu32();
+		changelog("%"PRIu32"|SETMETAID(%"PRIu64")",now,metafileid);
+	}
+}
+
+void meta_metaidsync(void) {
+	if (metafileid>0) {
+		changelog("%"PRIu32"|SETMETAID(%"PRIu64")",main_time(),metafileid);
+	}
+}
+
+uint8_t meta_mr_setmetaid(uint64_t metaid) {
+	if (metafileid==0 || metafileid==metaid) {
+		metaversion++;
+		metafileid = metaid;
+		return STATUS_OK;
+	} else {
+		return ERROR_EINVAL;
+	}
+}
+
 
 int meta_init(void) {
 	metaversion = 0;
@@ -1387,8 +1415,10 @@ int meta_init(void) {
 	meta_reload();
 	main_reload_register(meta_reload);
 	main_time_register(3600,0,meta_dostoreall);
+	main_time_register(3600,1800,meta_metaidsync);
 	main_destruct_register(meta_term);
 	fs_renumerate_edge_test();
+	meta_check_fileid();
 	return 0;
 }
 

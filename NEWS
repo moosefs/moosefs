@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.33-1 (2015-06-25)
+
+  - (master) added metaid synchronization between masters (pro version only)
+  - (cgi+cli) fixed "Metadata Info" table (intr. in 3.0.32).
+
 * MooseFS 3.0.32-1 (2015-06-23)
 
   - (master) added exports checksum
@@ -701,7 +706,7 @@ This file lists noteworthy changes in MooseFS.
   - (master+tools) added building files from particular chunks (manual file recovery)
   - (cs) join master tasks queue and client tasks queue into one tasks queue.
   - (cgi+cli) added chunkserver 'load' charts.
-  - (cgi+cli) added 'load' column in chunkservers tabble
+  - (cgi+cli) added 'load' column in chunkservers table
   - (master+cs) simple chunkserver overload detection
   - (master) 'grace' state for chunkservers - after overload detection given chunkserver is in 'grace' state for some time - new chunks are not created on that server in this state
   - (cgi+cli+master) turn off 'grace' state

@@ -921,6 +921,15 @@ int do_setgoal(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return fs_mr_setgoal(ts,inode,uid,goal,smode,ci,nci,npi);
 }
 
+int do_setmetaid(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint64_t metaid;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU64(metaid,ptr);
+	EAT(ptr,filename,lv,')');
+	return meta_mr_setmetaid(metaid);
+}
+
 int do_setpath(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode;
 	static uint8_t *path = NULL;
@@ -1315,6 +1324,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 		case HASHCODE('S','E','T','G'):
 			if (strncmp(ptr,"SETGOAL",7)==0) {
 				return do_setgoal(filename,lv,ts,ptr+7);
+			}
+			break;
+		case HASHCODE('S','E','T','M'):
+			if (strncmp(ptr,"SETMETAID",9)==0) {
+				return do_setmetaid(filename,lv,ts,ptr+9);
 			}
 			break;
 		case HASHCODE('S','E','T','P'):

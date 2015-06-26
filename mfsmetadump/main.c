@@ -660,10 +660,11 @@ int sessions_load(FILE *fd,uint8_t mver) {
 	uint32_t recsize;
 	uint32_t i,nextsessionid,sessionid;
 	uint32_t ileng,peerip,rootinode,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected;
+	uint64_t exportscsum;
 	uint8_t sesflags,mingoal,maxgoal;
 	char strip[16];
 
-	if (mver>0x12) {
+	if (mver>0x13) {
 		fprintf(stderr,"loading sessions: unsupported format\n");
 		return -1;
 	}
@@ -699,8 +700,10 @@ int sessions_load(FILE *fd,uint8_t mver) {
 	}
 	if (mver<0x11) {
 		recsize = 43+statsinfile*8;
-	} else {
+	} else if (mver<0x13) {
 		recsize = 47+statsinfile*8;
+	} else {
+		recsize = 55+statsinfile*8;
 	}
 	fsesrecord = malloc(recsize);
 	if (fsesrecord==NULL) {
@@ -720,6 +723,11 @@ int sessions_load(FILE *fd,uint8_t mver) {
 			free(fsesrecord);
 			return 0;
 		}
+		if (mver>=0x13) {
+			exportscsum = get64bit(&ptr);
+		} else {
+			exportscsum = 0;
+		}
 		ileng = get32bit(&ptr);
 		peerip = get32bit(&ptr);
 		rootinode = get32bit(&ptr);
@@ -733,7 +741,10 @@ int sessions_load(FILE *fd,uint8_t mver) {
 		mapalluid = get32bit(&ptr);
 		mapallgid = get32bit(&ptr);
 		makestrip(strip,peerip);
-		if (mver>=0x11) {
+		if (mver>=0x13) {
+			disconnected = get32bit(&ptr);
+			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
+		} else if (mver>=0x11) {
 			disconnected = get32bit(&ptr);
 			printf("SESSION|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
 		} else {

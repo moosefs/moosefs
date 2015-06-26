@@ -29,7 +29,7 @@ PORTNAMES="master chunkserver client metalogger cgi cgiserv cli netdump"
 
 PORTFILES="Makefile pkg-descr pkg-plist files"
 
-VERSION=3.0.33
+VERSION=3.0.34
 RELEASE=1
 
 cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^DISTNAME=.*$/DISTNAME=		\${PORTNAME}-\${PORTVERSION}-${RELEASE}/" | uniq > .tmp
@@ -49,5 +49,7 @@ for portname in ${PORTNAMES}; do
 			cp -R "${FILEBASEDIR}/files/${portfile}.${portname}" "${portdir}/${portfile}"
 		fi
 	done
-	make -C ${portdir} makesum
+	if [ "x${portname}" == "xmaster" ]; then
+		make -C ${portdir} makesum
+	fi
 done

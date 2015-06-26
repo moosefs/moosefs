@@ -2269,6 +2269,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				if (eptr->sesdata==NULL || sessions_get_peerip(eptr->sesdata)==0) { // no such session or session created by entries in metadata
 					status = ERROR_BADSESSIONID;
 				} else {
+//					syslog(LOG_NOTICE,"session exports checksum: %016"PRIX64" ; current exports checksum: %016"PRIX64,sessions_get_exportscsum(eptr->sesdata),exports_checksum());
 //					syslog(LOG_WARNING,"session reconnect: ip:%u.%u.%u.%u (%08X) ; session_peerip(%08X)",(eptr->peerip>>24)&0xFF,(eptr->peerip>>16)&0xFF,(eptr->peerip>>8)&0xFF,eptr->peerip&0xFF,eptr->peerip,sessions_get_peerip(eptr->sesdata));
 					if (sessions_get_exportscsum(eptr->sesdata)!=exports_checksum() || ((sessions_get_sesflags(eptr->sesdata)&SESFLAG_DYNAMICIP)==0 && eptr->peerip!=sessions_get_peerip(eptr->sesdata))) {
 						status = ERROR_EPERM; // masters < 2.1.0 returned ERROR_EACCES, so ERROR_EPERM means that client can use register with sessionid

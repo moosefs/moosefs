@@ -142,7 +142,6 @@ enum {IO_NONE,IO_READ,IO_WRITE,IO_READONLY,IO_WRITEONLY};
 typedef struct _finfo {
 	uint8_t mode;
 	uint8_t uselocks;
-	uint64_t maxleng;
 	void *data;
 	pthread_mutex_t lock;
 #ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
@@ -1092,7 +1091,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	}
 	type = mfs_attr_get_type(attr);
 	if (type==TYPE_FILE) {
-		maxfleng = write_data_getmaxfleng(inode);
+		maxfleng = write_data_inode_getmaxfleng(inode);
 	} else {
 		maxfleng = 0;
 	}
@@ -1235,7 +1234,7 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		return;
 	}
 	if (mfs_attr_get_type(attr)==TYPE_FILE) {
-		maxfleng = write_data_getmaxfleng(ino);
+		maxfleng = write_data_inode_getmaxfleng(ino);
 	} else {
 		maxfleng = 0;
 	}
@@ -1439,12 +1438,13 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		}
 		status = mfs_errorconv(status);
 		// read_inode_ops(ino);
-		read_inode_set_length(ino,stbuf->st_size,1);
 		if (status!=0) {
 			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s:0%04o,%ld,%ld,%lu,%lu,%llu]): %s",(unsigned long int)ino,to_set,modestr+1,(unsigned int)(stbuf->st_mode & 07777),(long int)stbuf->st_uid,(long int)stbuf->st_gid,(unsigned long int)(stbuf->st_atime),(unsigned long int)(stbuf->st_mtime),(unsigned long long int)(stbuf->st_size),strerr(status));
 			fuse_reply_err(req, status);
 			return;
 		}
+		write_data_inode_setmaxfleng(ino,stbuf->st_size);
+		read_inode_set_length(ino,stbuf->st_size,1);
 	}
 	if (status!=0) {	// should never happend but better check than sorry
 		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s:0%04o,%ld,%ld,%lu,%lu,%llu]): %s",(unsigned long int)ino,to_set,modestr+1,(unsigned int)(stbuf->st_mode & 07777),(long int)stbuf->st_uid,(long int)stbuf->st_gid,(unsigned long int)(stbuf->st_atime),(unsigned long int)(stbuf->st_mtime),(unsigned long long int)(stbuf->st_size),strerr(status));
@@ -1453,7 +1453,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 	}
 	dcache_setattr(ino,attr);
 	if (mfs_attr_get_type(attr)==TYPE_FILE) {
-		maxfleng = write_data_getmaxfleng(ino);
+		maxfleng = write_data_inode_getmaxfleng(ino);
 	} else {
 		maxfleng = 0;
 	}
@@ -2277,7 +2277,6 @@ static finfo* mfs_newfileinfo(uint8_t accmode,uint32_t inode) {
 	fileinfo->lastuse = now;
 	fileinfo->next = NULL;
 #endif
-	fileinfo->maxleng = 0;
 	pthread_mutex_unlock(&(fileinfo->lock)); // make helgrind happy
 	return fileinfo;
 }
@@ -2984,9 +2983,6 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);
 	} else {
-		if ((uint64_t)(off+size)>fileinfo->maxleng) {
-			fileinfo->maxleng = off+size;
-		}
 		pthread_mutex_unlock(&(fileinfo->lock));
 		if (debug_mode) {
 			fprintf(stderr,"%llu bytes have been written to inode %lu (offset:%llu)\n",(unsigned long long int)size,(unsigned long int)ino,(unsigned long long int)off);
@@ -3001,7 +2997,6 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	finfo *fileinfo = (finfo*)(unsigned long)(fi->fh);
 	int err;
 	uint8_t uselocks;
-	uint64_t maxleng;
 	groups *gids;
 	struct fuse_ctx ctx;
 
@@ -3030,14 +3025,13 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 #ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
 		fileinfo->ops_in_progress++;
 #endif
-		maxleng = fileinfo->maxleng;
 		pthread_mutex_unlock(&(fileinfo->lock));
 		if (fsync_before_close || write_cache_almost_full()) {
 			err = write_data_flush(fileinfo->data);
 		} else {
 			if (master_version()>=VERSION2INT(3,0,32)) {
 				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-				fs_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE,ctx.uid,gids->gidcnt,gids->gidtab,maxleng,NULL);
+				fs_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE,ctx.uid,gids->gidcnt,gids->gidtab,write_data_getmaxfleng(fileinfo->data),NULL);
 				groups_rel(gids);
 			}
 			err = write_data_chunk_wait(fileinfo->data);

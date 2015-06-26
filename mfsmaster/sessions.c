@@ -303,7 +303,6 @@ int sessions_load(bio *fd,uint8_t mver) {
 			asesdata->nsocks = 0;
 			asesdata->infopeerip = asesdata->peerip;
 			asesdata->infoversion = 0;
-			asesdata->exportscsum = 0;
 			for (i=0 ; i<SESSION_STATS ; i++) {
 				asesdata->currentopstats[i] = (i<statsinfile)?get32bit(&ptr):0;
 			}
@@ -682,19 +681,15 @@ static inline void* sessions_create_session(uint64_t exportscsum,uint32_t rootin
 	sesdata->mintrashtime = mintrashtime;
 	sesdata->maxtrashtime = maxtrashtime;
 	sesdata->peerip = peerip;
+	while (ileng>0 && info[ileng-1]==0) {
+		ileng--;
+	}
 	if (ileng>0) {
-		if (info[ileng-1]==0) {
-			sesdata->info = malloc(ileng);
-			passert(sesdata->info);
-			memcpy(sesdata->info,info,ileng);
-			sesdata->ileng = ileng-1;
-		} else {
-			sesdata->info = malloc(ileng+1);
-			passert(sesdata->info);
-			memcpy(sesdata->info,info,ileng);
-			sesdata->info[ileng]=0;
-			sesdata->ileng = ileng;
-		}
+		sesdata->info = malloc(ileng+1);
+		passert(sesdata->info);
+		memcpy(sesdata->info,info,ileng);
+		sesdata->info[ileng]=0;
+		sesdata->ileng = ileng;
 	} else {
 		sesdata->info = NULL;
 		sesdata->ileng = 0;
@@ -734,19 +729,15 @@ static inline void sessions_change_session(session *sesdata,uint64_t exportscsum
 	if (sesdata->info!=NULL) {
 		free(sesdata->info);
 	}
+	while (ileng>0 && info[ileng-1]==0) {
+		ileng--;
+	}
 	if (ileng>0) {
-		if (info[ileng-1]==0) {
-			sesdata->info = malloc(ileng);
-			passert(sesdata->info);
-			memcpy(sesdata->info,info,ileng);
-			sesdata->ileng = ileng-1;
-		} else {
-			sesdata->info = malloc(ileng+1);
-			passert(sesdata->info);
-			memcpy(sesdata->info,info,ileng);
-			sesdata->info[ileng]=0;
-			sesdata->ileng = ileng;
-		}
+		sesdata->info = malloc(ileng+1);
+		passert(sesdata->info);
+		memcpy(sesdata->info,info,ileng);
+		sesdata->info[ileng]=0;
+		sesdata->ileng = ileng;
 	} else {
 		sesdata->info = NULL;
 		sesdata->ileng = 0;

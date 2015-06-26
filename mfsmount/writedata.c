@@ -1662,7 +1662,18 @@ int write_data_chunk_wait(void *vid) {
 	return write_data_do_chunk_wait((inodedata*)vid);
 }
 
-uint64_t write_data_getmaxfleng(uint32_t inode) {
+void write_data_inode_setmaxfleng(uint32_t inode,uint64_t maxfleng) {
+	inodedata* ind;
+	ind = write_find_inodedata(inode);
+	if (ind) {
+		zassert(pthread_mutex_lock(&(ind->lock)));
+		ind->maxfleng = maxfleng;
+		zassert(pthread_mutex_unlock(&(ind->lock)));
+		write_free_inodedata(ind);
+	}
+}
+
+uint64_t write_data_inode_getmaxfleng(uint32_t inode) {
 	uint64_t maxfleng;
 	inodedata* ind;
 	ind = write_find_inodedata(inode);
@@ -1674,6 +1685,19 @@ uint64_t write_data_getmaxfleng(uint32_t inode) {
 	} else {
 		maxfleng = 0;
 	}
+	return maxfleng;
+}
+
+uint64_t write_data_getmaxfleng(void *vid) {
+	uint64_t maxfleng;
+	inodedata* ind;
+	if (vid==NULL) {
+		return 0;
+	}
+	ind = (inodedata*)vid;
+	zassert(pthread_mutex_lock(&(ind->lock)));
+	maxfleng = ind->maxfleng;
+	zassert(pthread_mutex_unlock(&(ind->lock)));
 	return maxfleng;
 }
 

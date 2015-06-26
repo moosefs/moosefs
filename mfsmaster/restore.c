@@ -743,6 +743,7 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
 	uint64_t exportscsum;
+	uint32_t ileng;
 	static uint8_t *info = NULL;
 	static uint32_t infosize = 0;
 
@@ -777,11 +778,11 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(peerip,ptr);
 	EAT(ptr,filename,lv,',');
-	GETPATH(info,infosize,ptr,filename,lv,')');
+	GETDATA(info,ileng,infosize,ptr,filename,lv,')');
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(sessionid,ptr);
-	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,infosize,sessionid);
+	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng,sessionid);
 }
 
 int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -789,12 +790,14 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
 	uint64_t exportscsum;
+	uint32_t ileng;
 	static uint8_t *info = NULL;
 	static uint32_t infosize = 0;
 
 	(void)ts;
 	EAT(ptr,filename,lv,'(');
 	GETU32(sessionid,ptr);
+	EAT(ptr,filename,lv,',');
 	if (*ptr=='#') {
 		EAT(ptr,filename,lv,'#');
 		GETU64(exportscsum,ptr);
@@ -802,7 +805,6 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	} else {
 		exportscsum = 0;
 	}
-	EAT(ptr,filename,lv,',');
 	GETU32(rootinode,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(sesflags,ptr);
@@ -825,9 +827,9 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,',');
 	GETU32(peerip,ptr);
 	EAT(ptr,filename,lv,',');
-	GETPATH(info,infosize,ptr,filename,lv,')');
+	GETDATA(info,ileng,infosize,ptr,filename,lv,')');
 	EAT(ptr,filename,lv,')');
-	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,infosize);
+	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
 }
 
 int do_sesdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -1585,7 +1587,7 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 int restore_net(uint64_t lv,const char *ptr) {
 	uint8_t status;
 	if (lv!=meta_version()) {
-		syslog(LOG_WARNING,"desync - invalid meta version (version in packet: %"PRIu64" / expected: %"PRIu64")",lv,meta_version());
+		syslog(LOG_WARNING,"desync - invalid meta version (version in packet: %"PRIu64" / expected: %"PRIu64" / packet data: %s)",lv,meta_version(),ptr);
 		return -1;
 	}
 	status = restore_line("NET",lv,ptr);

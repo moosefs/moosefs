@@ -1343,11 +1343,6 @@ void meta_check_fileid(void) {
 	}
 }
 
-void meta_metaidsync(void) {
-	if (metafileid>0) {
-		changelog("%"PRIu32"|SETMETAID(%"PRIu64")",main_time(),metafileid);
-	}
-}
 
 uint8_t meta_mr_setmetaid(uint64_t metaid) {
 	if (metafileid==0 || metafileid==metaid) {
@@ -1415,7 +1410,6 @@ int meta_init(void) {
 	meta_reload();
 	main_reload_register(meta_reload);
 	main_time_register(3600,0,meta_dostoreall);
-	main_time_register(3600,1800,meta_metaidsync);
 	main_destruct_register(meta_term);
 	fs_renumerate_edge_test();
 	meta_check_fileid();

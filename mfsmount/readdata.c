@@ -477,8 +477,10 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 	} else {
 		if (rreq->mode==BREAK) {
 			breakmode = 1;
+			rreq->mode = FREE;
+		} else { // REFRESH
+			rreq->mode = NEW;
 		}
-		rreq->mode = NEW;
 	}
 	ind->inqueue--;
 	if (status) {
@@ -528,7 +530,7 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 				zassert(pthread_cond_broadcast(&(ind->closecond)));
 			}
 		} else {
-			if (rreq->mode!=READY) {
+			if (breakmode==0 && rreq->mode!=READY) {
 				rreq->rleng = 0;
 				rreq->mode = READY;
 				if (rreq->waiting) {
@@ -958,8 +960,9 @@ void* read_worker(void *arg) {
 				if (tcpnumtoconnect(fd,ip,port,(cnt%2)?(300*(1<<(cnt>>1))):(200*(1<<(cnt>>1))))<0) {
 					cnt++;
 					if (cnt>=10) {
+						int err = errno;
 						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"readworker: can't connect to (%s:%"PRIu16"): %s",csstrip,port,strerr(errno));
+						syslog(LOG_WARNING,"readworker: can't connect to (%s:%"PRIu16"): %s",csstrip,port,strerr(err));
 					}
 					close(fd);
 					fd=-1;
@@ -1117,9 +1120,10 @@ void* read_worker(void *arg) {
 				i = write(fd,sendbuff+sent,tosend-sent);
 				if (i<0) { // error
 					if (ERRNO_ERROR && errno!=EINTR) {
+						int err = errno;
 						read_prepare_ip(csstrip,ip);
 						status = EIO;
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: write to (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(errno),currentpos,rleng,trycnt+1);
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: write to (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
 						zassert(pthread_mutex_lock(&(ind->lock)));
 						rreq->waitingworker=0;
 						zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -1202,8 +1206,9 @@ void* read_worker(void *arg) {
 						break;
 					}
 					if (i<0) {
+						int err = errno;
 						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: read from (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(errno),currentpos,rleng,trycnt+1);
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: read from (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
 						status = EIO;
 						break;
 					}
@@ -1282,8 +1287,9 @@ void* read_worker(void *arg) {
 						break;
 					}
 					if (i<0) {
+						int err = errno;
 						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") got error status (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
 						status = EIO;
 						break;
 					}

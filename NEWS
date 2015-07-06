@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.35-1 (2015-07-06)
+
+  - (mount) fixed state automaton in read module (in very rare cases zeros might be read instead of data - intr. in 3.0.23)
+
 * MooseFS 3.0.34-1 (2015-06-26)
 
   - (master) fixed small follower-desync issue (pro version only - intr. in 3.0.33)

@@ -1,3 +1,10 @@
+moosefs (3.0.35-1) unstable; urgency=medium
+
+  * (mount) fixed state automaton in read module (in very rare cases zeros
+    might be read instead of data - intr. in 3.0.23)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 06 Jul 2015 13:00:00 +0200
+
 moosefs (3.0.34-1) unstable; urgency=medium
 
   * (master) fixed small follower-desync issue (pro version only - intr. in

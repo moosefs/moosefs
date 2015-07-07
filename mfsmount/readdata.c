@@ -1705,7 +1705,11 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 #ifdef RDEBUG
 			fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" , rreq->modified:%.6lf , rreq->offset: %"PRIu64" , rreq->leng: %"PRIu32" , firstbyte: %"PRIu64" , lastbyte: %"PRIu64"\n",monotonic_seconds(),ind->inode,rreq->modified,rreq->offset,rreq->leng,firstbyte,lastbyte);
 #endif
-			if (rreq->modified+BUFFER_VALIDITY_TIMEOUT<now) { // buffer too old
+			if (rreq->mode==BREAK || rreq->mode==FREE) {
+#ifdef RDEBUG
+				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" bad request mode (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
+#endif
+			} else if (rreq->modified+BUFFER_VALIDITY_TIMEOUT<now) { // buffer too old
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" data too old: free rreq (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 #endif
@@ -1956,7 +1960,7 @@ void read_inode_dirty_region(uint32_t inode,uint64_t offset,uint32_t size,const 
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: read_inode_dirty_region: rreq (before): (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 #endif
-				if (rreq->mode!=FREE && ((rreq->offset < offset + size) && (rreq->offset + rreq->leng > offset))) {
+				if (rreq->mode!=FREE && rreq->mode!=BREAK && ((rreq->offset < offset + size) && (rreq->offset + rreq->leng > offset))) {
 					if (rreq->mode==READY || rreq->mode==FILLED) { // already filled, exchange data
 						if (rreq->offset > offset) {
 							if (rreq->offset + rreq->leng > offset + size) {
@@ -2072,76 +2076,74 @@ void read_inode_set_length(uint32_t inode,uint64_t newlength,uint8_t active) {
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: read_inode_set_length: rreq (before): (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 #endif
-				if (rreq->mode!=FREE) {
-					if (rreq->mode==READY) {
-						if (active) {
-							if (newlength < rreq->offset + rreq->rleng) {
-								if (newlength < rreq->offset) {
+				if (rreq->mode==READY) {
+					if (active) {
+						if (newlength < rreq->offset + rreq->rleng) {
+							if (newlength < rreq->offset) {
 #ifdef RDEBUG
-									fprintf(stderr,"%.6lf: read_inode_set_length: block is filled (%"PRIu64":%"PRIu32") / newlength: %"PRIu64", case 1: - set rleng to 0\n",monotonic_seconds(),rreq->offset,rreq->rleng,newlength);
+								fprintf(stderr,"%.6lf: read_inode_set_length: block is filled (%"PRIu64":%"PRIu32") / newlength: %"PRIu64", case 1: - set rleng to 0\n",monotonic_seconds(),rreq->offset,rreq->rleng,newlength);
 #endif
-									rreq->rleng = 0;
-								} else {
+								rreq->rleng = 0;
+							} else {
 #ifdef RDEBUG
-									fprintf(stderr,"%.6lf: read_inode_set_length: block is filled (%"PRIu64":%"PRIu32") / newlength: %"PRIu64", case 2: - set rleng to %"PRIu32"\n",monotonic_seconds(),rreq->offset,rreq->rleng,newlength,(uint32_t)(newlength - rreq->offset));
+								fprintf(stderr,"%.6lf: read_inode_set_length: block is filled (%"PRIu64":%"PRIu32") / newlength: %"PRIu64", case 2: - set rleng to %"PRIu32"\n",monotonic_seconds(),rreq->offset,rreq->rleng,newlength,(uint32_t)(newlength - rreq->offset));
 #endif
-									rreq->rleng = newlength - rreq->offset;
-								}
-							} else if (newlength > rreq->offset + rreq->rleng) {
-								if (newlength > rreq->offset + rreq->leng) {
-#ifdef RDEBUG
-									fprintf(stderr,"%.6lf: read_inode_set_length: block is filled (%"PRIu64":%"PRIu32") / newlength: %"PRIu64", case 3: - clear data from rleng, set rleng to %"PRIu32"\n",monotonic_seconds(),rreq->offset,rreq->rleng,newlength,rreq->leng);
-#endif
-									memset(rreq->data + rreq->rleng,0,rreq->leng - rreq->rleng);
-									rreq->rleng = rreq->leng;
-								} else {
-#ifdef RDEBUG
-									fprintf(stderr,"%.6lf: read_inode_set_length: block is filled (%"PRIu64":%"PRIu32") / newlength: %"PRIu64", case 4: - clear data from rleng, set rleng to %"PRIu32"\n",monotonic_seconds(),rreq->offset,rreq->rleng,newlength,(uint32_t)(newlength - rreq->offset));
-#endif
-									memset(rreq->data + rreq->rleng,0,newlength - (rreq->offset + rreq->rleng));
-									rreq->rleng = newlength - rreq->offset;
-								}
+								rreq->rleng = newlength - rreq->offset;
 							}
-						} else {
-							if (rreq->lcnt==0) { // nobody wants it anymore, so delete it
-								*(rreq->prev) = rreq->next;
-								if (rreq->next) {
-									rreq->next->prev = rreq->prev;
-								} else {
-									ind->reqtail = rreq->prev;
-								}
+						} else if (newlength > rreq->offset + rreq->rleng) {
+							if (newlength > rreq->offset + rreq->leng) {
+#ifdef RDEBUG
+								fprintf(stderr,"%.6lf: read_inode_set_length: block is filled (%"PRIu64":%"PRIu32") / newlength: %"PRIu64", case 3: - clear data from rleng, set rleng to %"PRIu32"\n",monotonic_seconds(),rreq->offset,rreq->rleng,newlength,rreq->leng);
+#endif
+								memset(rreq->data + rreq->rleng,0,rreq->leng - rreq->rleng);
+								rreq->rleng = rreq->leng;
+							} else {
+#ifdef RDEBUG
+								fprintf(stderr,"%.6lf: read_inode_set_length: block is filled (%"PRIu64":%"PRIu32") / newlength: %"PRIu64", case 4: - clear data from rleng, set rleng to %"PRIu32"\n",monotonic_seconds(),rreq->offset,rreq->rleng,newlength,(uint32_t)(newlength - rreq->offset));
+#endif
+								memset(rreq->data + rreq->rleng,0,newlength - (rreq->offset + rreq->rleng));
+								rreq->rleng = newlength - rreq->offset;
+							}
+						}
+					} else {
+						if (rreq->lcnt==0) { // nobody wants it anymore, so delete it
+							*(rreq->prev) = rreq->next;
+							if (rreq->next) {
+								rreq->next->prev = rreq->prev;
+							} else {
+								ind->reqtail = rreq->prev;
+							}
 #ifdef HAVE___SYNC_OP_AND_FETCH
-								__sync_sub_and_fetch(&reqbufftotalsize,rreq->leng);
+							__sync_sub_and_fetch(&reqbufftotalsize,rreq->leng);
 #else
-								zassert(pthread_mutex_lock(&buffsizelock));
-								reqbufftotalsize -= rreq->leng;
-								zassert(pthread_mutex_unlock(&buffsizelock));
+							zassert(pthread_mutex_lock(&buffsizelock));
+							reqbufftotalsize -= rreq->leng;
+							zassert(pthread_mutex_unlock(&buffsizelock));
 #endif
-								close(rreq->pipe[0]);
-								close(rreq->pipe[1]);
-								free(rreq->data);
-								free(rreq);
-								rreq = NULL;
-							} else { // somebody wants it, so clear it
-								rreq->mode = NEW;
-								if (ind->inqueue<MAXREQINQUEUE) {
-									rreq->mode = INQUEUE;
-									read_enqueue(rreq);
-									ind->inqueue++;
-								}
+							close(rreq->pipe[0]);
+							close(rreq->pipe[1]);
+							free(rreq->data);
+							free(rreq);
+							rreq = NULL;
+						} else { // somebody wants it, so clear it
+							rreq->mode = NEW;
+							if (ind->inqueue<MAXREQINQUEUE) {
+								rreq->mode = INQUEUE;
+								read_enqueue(rreq);
+								ind->inqueue++;
 							}
 						}
-					} else if (rreq->mode==BUSY || rreq->mode==FILLED) {
+					}
+				} else if (rreq->mode==BUSY || rreq->mode==FILLED) {
 #ifdef RDEBUG
-						fprintf(stderr,"%.6lf: read_inode_set_length: block is busy - refresh\n",monotonic_seconds());
+					fprintf(stderr,"%.6lf: read_inode_set_length: block is busy - refresh\n",monotonic_seconds());
 #endif
-						rreq->mode = REFRESH;
-						if (rreq->waitingworker) {
-							if (write(rreq->pipe[1]," ",1)!=1) {
-								syslog(LOG_ERR,"can't write to pipe !!!");
-							}
-							rreq->waitingworker=0;
+					rreq->mode = REFRESH;
+					if (rreq->waitingworker) {
+						if (write(rreq->pipe[1]," ",1)!=1) {
+							syslog(LOG_ERR,"can't write to pipe !!!");
 						}
+						rreq->waitingworker=0;
 					}
 				}
 #ifdef RDEBUG

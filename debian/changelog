@@ -1,3 +1,9 @@
+moosefs (3.0.37-1) unstable; urgency=medium
+
+  * (mount) performance fixes in read module
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 08 Jul 2015 13:00:00 +0200
+
 moosefs (3.0.36-1) unstable; urgency=medium
 
   * (mount) fixed bug in read module (intr. in 3.0.35)

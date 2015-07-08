@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.37-1 (2015-07-08)
+
+  - (mount) performance fixes in read module
+
 * MooseFS 3.0.36-1 (2015-07-07)
 
   - (mount) fixed bug in read module (intr. in 3.0.35)

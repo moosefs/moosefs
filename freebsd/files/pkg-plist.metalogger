@@ -1,6 +1,5 @@
 @unexec if cmp -s %D/etc/mfs/mfsmetalogger.cfg.dist %D/etc/mfs/mfsmetalogger.cfg; then rm -f %D/etc/mfs/mfsmetalogger.cfg; fi
 etc/mfs/mfsmetalogger.cfg.dist
-etc/rc.d/mfsmetalogger
 sbin/mfsmetalogger
 man/man5/mfsmetalogger.cfg.5.gz
 man/man8/mfsmetalogger.8.gz

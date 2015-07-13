@@ -95,7 +95,9 @@ span.ENDANGEREDBOX {background: #F50; width:8px; height:8px; display: inline-blo
 span.MISSINGBOX {background:#F00; width:8px; height:8px; display: inline-block;}
 
 span.SUCCESS {color: #080;}
-span.WARNING {color: #E80;}
+span.OK {color: #080;}
+span.NOTICE {color: #EA0;}
+span.WARNING {color: #F50;}
 span.ERROR {color: #F00;}
 
 span.NOTEXCEEDED {color: #080;}

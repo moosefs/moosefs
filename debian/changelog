@@ -1,3 +1,10 @@
+moosefs (3.0.38-1) unstable; urgency=medium
+
+  * (master+cgi+cli) added check for servers with disks marked for removal (if
+    disks can be safely removed)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 13 Jul 2015 13:00:00 +0200
+
 moosefs (3.0.37-1) unstable; urgency=medium
 
   * (mount) performance fixes in read module

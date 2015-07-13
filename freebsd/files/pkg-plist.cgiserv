@@ -1,4 +1,3 @@
-etc/rc.d/mfscgiserv
 sbin/mfscgiserv
 man/man8/mfscgiserv.8.gz
 @owner mfs

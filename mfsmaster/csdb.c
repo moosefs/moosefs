@@ -263,7 +263,7 @@ uint32_t csdb_servlist_size(void) {
 			i++;
 		}
 	}
-	return i*(4+4+2+2+8+8+4+8+8+4+4+4+4+4);
+	return i*(4+4+2+2+8+8+4+8+8+4+4+4+4+4+1);
 }
 
 void csdb_servlist_data(uint8_t *ptr) {
@@ -283,8 +283,8 @@ void csdb_servlist_data(uint8_t *ptr) {
 			if (csptr->eptr) {
 				uint32_t version,chunkscount,tdchunkscount,errorcounter,load,labelmask;
 				uint64_t usedspace,totalspace,tdusedspace,tdtotalspace;
-				uint8_t hlstatus;
-				matocsserv_getservdata(csptr->eptr,&version,&usedspace,&totalspace,&chunkscount,&tdusedspace,&tdtotalspace,&tdchunkscount,&errorcounter,&load,&hlstatus,&labelmask);
+				uint8_t hlstatus,mfrstatus;
+				matocsserv_getservdata(csptr->eptr,&version,&usedspace,&totalspace,&chunkscount,&tdusedspace,&tdtotalspace,&tdchunkscount,&errorcounter,&load,&hlstatus,&labelmask,&mfrstatus);
 				if (hlstatus==1) {
 					gracetime = 0;
 				} else if (hlstatus==2) {
@@ -304,6 +304,7 @@ void csdb_servlist_data(uint8_t *ptr) {
 				put32bit(&ptr,load);
 				put32bit(&ptr,gracetime);
 				put32bit(&ptr,labelmask);
+				put8bit(&ptr,mfrstatus);
 			} else {
 				put32bit(&ptr,0x01000000);
 				put32bit(&ptr,csptr->ip);
@@ -319,6 +320,7 @@ void csdb_servlist_data(uint8_t *ptr) {
 				put32bit(&ptr,0);
 				put32bit(&ptr,gracetime);
 				put32bit(&ptr,0);
+				put8bit(&ptr,0);
 			}
 			if (csptr->maintenance) {
 				*p |= 2;

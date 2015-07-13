@@ -193,11 +193,37 @@ typedef struct _csopchunk {
 	struct _csopchunk *next;
 } csopchunk;
 
+/* csdata.mfs_state */
+/* UNKNOWN_HARD - unknown after disconnect or creation */
+/* UNKNOWN_SOFT - unknown, loop in progress */
+/* CAN_BE_REMOVED - can be removed, whole loop has passed */
+/* REPL_IN_PROGRESS - chunks still needs to be replicated, can't be removed */
+/* WAS_IN_PROGRESS - was in REPL_IN_PROGRESS during previous loop */
+enum {UNKNOWN_HARD,UNKNOWN_SOFT,CAN_BE_REMOVED,REPL_IN_PROGRESS,WAS_IN_PROGRESS};
+
+// state automaton:
+//
+//  1 - Chunk with number of valid copies less than goal (servers with chunks marked for removal only)
+//  2 - Chunkserver disconnection (all servers)
+//  3 - Loop end (all servers)
+//
+//                            1                 2              3
+//  UNKNOWN_HARD     | REPL_IN_PROGRESS | UNKNOWN_HARD | UNKNOWN_SOFT
+//  UNKNOWN_SOFT     | REPL_IN_PROGRESS | UNKNOWN_HARD | CAN_BE_REMOVED
+//  CAN_BE_REMOVED   | REPL_IN_PROGRESS | UNKNOWN_HARD | CAN_BE_REMOVED
+//  REPL_IN_PROGRESS | REPL_IN_PROGRESS | UNKNOWN_HARD | WAS_IN_PROGRESS
+//  WAS_IN_PROGRESS  | REPL_IN_PROGRESS | UNKNOWN_HARD | CAN_BE_REMOVED
+//
+//  UNKNOWN_HARD,UNKNOWN_SOFT        - Unknown state
+//  CAN_BE_REMOVED                   - Can be removed
+//  REPL_IN_PROGRESS,WAS_IN_PROGRESS - In progress
+
 typedef struct _csdata {
 	void *ptr;
 	csopchunk *opchunks;
 	uint8_t valid;
-	uint8_t registered;
+	unsigned registered:1;
+	unsigned mfr_state:3;
 	uint8_t newchunkdelay;
 	uint8_t lostchunkdelay;
 	uint32_t next;
@@ -2011,6 +2037,28 @@ int chunk_mr_chunkdel(uint64_t chunkid,uint32_t version) {
 	return STATUS_OK;
 }
 
+static inline void chunk_mfr_state_check(chunk *c) {
+	slist *s;
+	uint8_t goal,vc,tdc;
+	goal = labelset_get_keeparch_goal(c->lsetid,c->archflag);
+	vc = 0;
+	tdc = 0;
+	for (s=c->slisthead ; s ; s=s->next) {
+		if (s->valid==VALID || s->valid==BUSY) {
+			vc++;
+		} else if (s->valid==TDVALID || s->valid==TDBUSY) {
+			tdc++;
+		}
+	}
+	if (vc < goal && tdc > 0) {
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->valid==TDVALID || s->valid==TDBUSY) {
+				cstab[s->csid].mfr_state = REPL_IN_PROGRESS;
+			}
+		}
+	}
+}
+
 void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 	chunk *c;
 	slist *s;
@@ -2074,6 +2122,9 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 	s->next = c->slisthead;
 	c->slisthead = s;
 	c->needverincrease = 1;
+	if (version&0x80000000) {
+		chunk_mfr_state_check(c);
+	}
 }
 
 void chunk_damaged(uint16_t csid,uint64_t chunkid) {
@@ -2112,6 +2163,7 @@ void chunk_damaged(uint16_t csid,uint64_t chunkid) {
 			s->version = 0;
 			c->needverincrease = 1;
 			chunk_priority_queue_check(c,1);
+			chunk_mfr_state_check(c);
 			return;
 		}
 	}
@@ -2162,7 +2214,25 @@ void chunk_lost(uint16_t csid,uint64_t chunkid) {
 		chunk_delete(c);
 	} else {
 		chunk_priority_queue_check(c,1);
+		chunk_mfr_state_check(c);
 	}
+}
+
+uint8_t chunk_get_mfrstatus(uint16_t csid) {
+	if (csid<MAXCSCOUNT) {
+		switch (cstab[csid].mfr_state) {
+			case UNKNOWN_HARD:
+			case UNKNOWN_SOFT:
+				return 0;
+			case CAN_BE_REMOVED:
+				return 2;
+			case REPL_IN_PROGRESS:
+			case WAS_IN_PROGRESS:
+				return 1;
+
+		}
+	}
+	return 0;
 }
 
 static inline void chunk_server_remove_csid(uint16_t csid) {
@@ -2218,6 +2288,7 @@ uint16_t chunk_server_connected(void *ptr) {
 	cstab[csid].opchunks = NULL;
 	cstab[csid].valid = 1;
 	cstab[csid].registered = 0;
+	cstab[csid].mfr_state = UNKNOWN_HARD;
 	csregisterinprogress += 1;
 	return csid;
 }
@@ -2255,6 +2326,10 @@ void chunk_server_disconnected(uint16_t csid) {
 		}
 	}
 	cstab[csid].opchunks = NULL;
+
+	for (csid = csusedhead ; csid < MAXCSCOUNT ; csid = cstab[csid].next) {
+		cstab[csid].mfr_state = UNKNOWN_HARD;
+	}
 }
 
 void chunk_server_disconnection_loop(void) {
@@ -2729,6 +2804,13 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 		c->operation = NONE;
 	}
 	goal = labelset_get_keeparch_goal(c->lsetid,c->archflag);
+	if (vc + bc < goal && tdc + tdb > 0) {
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->valid == TDVALID || s->valid == TDBUSY) {
+				cstab[s->csid].mfr_state = REPL_IN_PROGRESS;
+			}
+		}
+	}
 	if (c->lockedto < now) {
 		if (tdb+bc>0 && c->operation==NONE) {
 			if (tdc+vc>0) {
@@ -3496,7 +3578,7 @@ static inline void chunk_clean_priority_queues(void) {
 
 void chunk_jobs_main(void) {
 	uint32_t i,j,l,h,t,lc,hashsteps;
-	uint16_t scount;
+	uint16_t scount,csid;
 	uint16_t fullservers;
 	chunk *c,*cn;
 	uint32_t now;
@@ -3576,6 +3658,22 @@ void chunk_jobs_main(void) {
 		if (jobshpos>=chunkrehashpos) {
 			chunk_do_jobs(NULL,JOBS_EVERYLOOP,0,now,0);	// every loop tasks
 			jobshpos=0;
+			for (csid = csusedhead ; csid < MAXCSCOUNT ; csid = cstab[csid].next) {
+				switch (cstab[csid].mfr_state) {
+					case CAN_BE_REMOVED:
+					case UNKNOWN_SOFT:
+					case WAS_IN_PROGRESS:
+						cstab[csid].mfr_state = CAN_BE_REMOVED;
+						break;
+					case REPL_IN_PROGRESS:
+						cstab[csid].mfr_state = WAS_IN_PROGRESS;
+						break;
+					/* case UNKNOWN_HARD: */
+					default:
+						cstab[csid].mfr_state = UNKNOWN_SOFT;
+						break;
+				}
+			}
 		} else {
 			c = chunkhashtab[jobshpos>>HASHTAB_LOBITS][jobshpos&HASHTAB_MASK];
 			while (c) {
@@ -4088,8 +4186,10 @@ int chunk_strinit(void) {
 	for (i=0 ; i<MAXCSCOUNT ; i++) {
 		cstab[i].next = i+1;
 		cstab[i].prev = i-1;
+		cstab[i].opchunks = NULL;
 		cstab[i].valid = 0;
 		cstab[i].registered = 0;
+		cstab[i].mfr_state = UNKNOWN_HARD;
 		cstab[i].newchunkdelay = 0;
 		cstab[i].lostchunkdelay = 0;
 	}

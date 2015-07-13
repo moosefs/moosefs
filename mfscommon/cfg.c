@@ -68,7 +68,7 @@ int cfg_reload (void) {
 		i = 0;
 		while (linebuff[i]==' ' || linebuff[i]=='\t') i++;
 		nps = i;
-		while (linebuff[i]>32 && linebuff[i]<127) {
+		while (linebuff[i]>32 && linebuff[i]<127 && linebuff[i]!='=')  {
 			i++;
 		}
 		npe = i;

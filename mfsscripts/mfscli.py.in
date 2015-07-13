@@ -1482,7 +1482,7 @@ class Session:
 
 
 class ChunkServer:
-	def __init__(self,ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels):
+	def __init__(self,ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,mfrstatus):
 		self.ip = (ip1,ip2,ip3,ip4)
 		self.version = (v1,v2,v3)
 		self.strip = "%u.%u.%u.%u" % (ip1,ip2,ip3,ip4)
@@ -1502,6 +1502,7 @@ class ChunkServer:
 		self.load = load
 		self.gracetime = gracetime
 		self.labels = labels
+		self.mfrstatus = mfrstatus
 
 
 class DataProvider:
@@ -1589,33 +1590,40 @@ class DataProvider:
 		if self.chunkservers==None:
 			self.chunkservers=[]
 			data,length = leaderconn.command(CLTOMA_CSERV_LIST,MATOCL_CSERV_LIST)
-			if leaderconn.version_at_least(2,1,0) and (length%68)==0:
+			if leaderconn.version_at_least(3,0,38) and (length%69)==0:
+				n = length//69
+				for i in range(n):
+					d = data[i*69:(i+1)*69]
+					flags,v1,v2,v3,ip1,ip2,ip3,ip4,port,csid,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,mfrstatus = struct.unpack(">BBBBBBBBHHQQLQQLLLLLB",d)
+					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,mfrstatus)
+					self.chunkservers.append(cs)
+			elif leaderconn.version_at_least(2,1,0) and (length%68)==0:
 				n = length//68
 				for i in range(n):
 					d = data[i*68:(i+1)*68]
 					flags,v1,v2,v3,ip1,ip2,ip3,ip4,port,csid,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels = struct.unpack(">BBBBBBBBHHQQLQQLLLLL",d)
-					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels)
+					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,None)
 					self.chunkservers.append(cs)
 			elif leaderconn.version_at_least(1,7,25) and leaderconn.version_less_than(2,1,0) and (length%64)==0:
 				n = length//64
 				for i in range(n):
 					d = data[i*64:(i+1)*64]
 					flags,v1,v2,v3,ip1,ip2,ip3,ip4,port,csid,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime = struct.unpack(">BBBBBBBBHHQQLQQLLLL",d)
-					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,None)
+					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,None,None)
 					self.chunkservers.append(cs)
 			elif leaderconn.version_at_least(1,6,28) and leaderconn.version_less_than(1,7,25) and (length%62)==0:
 				n = length//62
 				for i in range(n):
 					d = data[i*62:(i+1)*62]
 					disconnected,v1,v2,v3,ip1,ip2,ip3,ip4,port,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime = struct.unpack(">BBBBBBBBHQQLQQLLLL",d)
-					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,1 if disconnected else 0,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,None)
+					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,1 if disconnected else 0,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,None,None)
 					self.chunkservers.append(cs)
 			elif leaderconn.version_less_than(1,6,28) and (length%54)==0:
 				n = length//54
 				for i in range(n):
 					d = data[i*54:(i+1)*54]
 					disconnected,v1,v2,v3,ip1,ip2,ip3,ip4,port,used,total,chunks,tdused,tdtotal,tdchunks,errcnt = struct.unpack(">BBBBBBBBHQQLQQLL",d)
-					cs = ChunkServer(ip1,ip2,ip3,ip4,port,None,v1,v2,v3,1 if disconnected else 0,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,None,None,None)
+					cs = ChunkServer(ip1,ip2,ip3,ip4,port,None,v1,v2,v3,1 if disconnected else 0,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,None,None,None,None)
 					self.chunkservers.append(cs)
 		return self.chunkservers
 
@@ -3746,7 +3754,9 @@ if "CS" in sectionset:
 			if cgimode:
 				out = []
 				out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfscs" cellspacing="0">""")
-				if leaderconn.version_at_least(2,1,0):
+				if leaderconn.version_at_least(3,0,38):
+					out.append("""  <tr><th colspan="19">Chunk Servers</th></tr>""")
+				elif leaderconn.version_at_least(2,1,0):
 					out.append("""  <tr><th colspan="18">Chunk Servers</th></tr>""")
 				elif leaderconn.version_at_least(2,0,11):
 					out.append("""	<tr><th colspan="17">Chunk Servers</th></tr>""")
@@ -3771,20 +3781,30 @@ if "CS" in sectionset:
 				if leaderconn.version_at_least(2,0,11):
 					out.append("""		<th rowspan="2">maintenance</th>""")
 				out.append("""		<th colspan="4">'regular' hdd space</th>""")
-				out.append("""		<th colspan="4">'marked for removal' hdd space</th>""")
+				if leaderconn.version_at_least(3,0,38):
+					out.append("""		<th colspan="5">'marked for removal' hdd space</th>""")
+				else:
+					out.append("""		<th colspan="4">'marked for removal' hdd space</th>""")
 				out.append("""	</tr>""")
 				out.append("""	<tr>""")
 				out.append("""		<th>chunks</th>""")
 				out.append("""		<th>used</th>""")
 				out.append("""		<th>total</th>""")
 				out.append("""		<th class="PROGBAR">% used</th>""")
+				if leaderconn.version_at_least(3,0,38):
+					out.append("""		<th>status</th>""")
 				out.append("""		<th>chunks</th>""")
 				out.append("""		<th>used</th>""")
 				out.append("""		<th>total</th>""")
 				out.append("""		<th class="PROGBAR">% used</th>""")
 				out.append("""	</tr>""")
 			elif ttymode:
-				if leaderconn.version_at_least(2,1,0):
+				if leaderconn.version_at_least(3,0,38):
+					tab = Tabble("Chunk Servers",16,"r")
+					tab.header("","","","","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",5))
+					tab.header("ip/host","port","id","labels","version","load","maintenance",("---","",9))
+					tab.header("","","","","","","","chunks","used","total","% used","status","chunks","used","total","% used")
+				elif leaderconn.version_at_least(2,1,0):
 					tab = Tabble("Chunk Servers",15,"r")
 					tab.header("","","","","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",4))
 					tab.header("ip/host","port","id","labels","version","load","maintenance",("---","",8))
@@ -3810,7 +3830,9 @@ if "CS" in sectionset:
 					tab.header("ip/host","port","version",("---","",8))
 					tab.header("","","","chunks","used","total","% used","chunks","used","total","% used")
 			else:
-				if leaderconn.version_at_least(2,1,0):
+				if leaderconn.version_at_least(3,0,38):
+					tab = Tabble("chunk servers",14)
+				elif leaderconn.version_at_least(2,1,0):
 					tab = Tabble("chunk servers",13)
 				elif leaderconn.version_at_least(2,0,11):
 					tab = Tabble("chunk servers",12)
@@ -3865,7 +3887,7 @@ if "CS" in sectionset:
 				else:
 					sf = 0
 				if (cs.flags&1)==0:
-					servers.append((sf,cs.host,cs.sortip,cs.strip,cs.port,cs.csid,cs.sortver,cs.strver,cs.flags,cs.used,cs.total,cs.chunks,cs.tdused,cs.tdtotal,cs.tdchunks,cs.errcnt,cs.load,cs.gracetime,cs.labels))
+					servers.append((sf,cs.host,cs.sortip,cs.strip,cs.port,cs.csid,cs.sortver,cs.strver,cs.flags,cs.used,cs.total,cs.chunks,cs.tdused,cs.tdtotal,cs.tdchunks,cs.errcnt,cs.load,cs.gracetime,cs.labels,cs.mfrstatus))
 				else:
 					dservers.append((sf,cs.host,cs.sortip,cs.strip,cs.port,cs.csid,cs.flags))
 			servers.sort()
@@ -3877,7 +3899,7 @@ if "CS" in sectionset:
 				avgpercent = (usedsum*100.0)/totalsum
 			else:
 				avgpercent = 0
-			for sf,host,sortip,strip,port,csid,sortver,strver,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels in servers:
+			for sf,host,sortip,strip,port,csid,sortver,strver,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,mfrstatus in servers:
 				if cgimode:
 					if leaderconn.is_pro() and not strver.endswith(" PRO"):
 						verclass = "BADVERSION"
@@ -3940,6 +3962,15 @@ if "CS" in sectionset:
 						out.append("""		<td align="center"><span class="sortkey">%.10f </span><div class="PROGBOX" style="width:200px;"><div class="PROGCOVER" style="width:%.2f%%;"></div><div class="PROGAVG" style="width:%.2f%%"></div><div class="PROGVALUE"><a style="cursor:default" title="%.4f%% = (avg%s%%)">%.2f</a></div></div></td>""" % (usedpercent,100.0-usedpercent,avgpercent,usedpercent,diffstr,usedpercent))
 					else:
 						out.append("""		<td align="center"><span class="sortkey">-1 </span><div class="PROGBOX" style="width:200px;"><div class="PROGCOVER" style="width:100%;"></div><div class="PROGVALUE">-</div></div></td>""")
+					if leaderconn.version_at_least(3,0,38):
+						if tdchunks==0:
+							out.append("""		<td align="center">-</td>""")
+						elif mfrstatus==1 or mfrstatus==0:
+							out.append("""		<td align="center"><a style="cursor:default" title="disks can not be safely removed - please wait"><span class="NOTICE">NOT&nbsp;READY</span></a></td>""")
+						elif mfrstatus==2:
+							out.append("""		<td align="center"><a style="cursor:default" title="all disks marked for removal can be safely removed"><span class="OK">READY</span></a></td>""")
+						else:
+							out.append("""		<td align="center"><a style="cursor:default" title="wait for chunk loop finish to stabilize state">UNKNOWN</a></td>""")
 					out.append("""		<td align="right">%u</td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td>""" % (tdchunks,tdused,decimal_number(tdused),humanize_number(tdused,"&nbsp;"),tdtotal,decimal_number(tdtotal),humanize_number(tdtotal,"&nbsp;")))
 					if (tdtotal>0):
 						usedpercent = (tdused*100.0)/tdtotal
@@ -3977,7 +4008,17 @@ if "CS" in sectionset:
 							data.append("off")
 						else:
 							data.append("on")
-					data.extend([chunks,humanize_number(used," "),humanize_number(total," "),regperc,tdchunks,humanize_number(tdused," "),humanize_number(tdtotal," "),tdperc])
+					data.extend([chunks,humanize_number(used," "),humanize_number(total," "),regperc])
+					if leaderconn.version_at_least(3,0,38):
+						if tdchunks==0:
+							data.append("-")
+						elif mfrstatus==1 or mfrstatus==0:
+							data.append(("NOT READY",'3'))
+						elif mfrstatus==2:
+							data.append(("READY",'4'))
+						else:
+							data.append("UNKNOWN")
+					data.extend([tdchunks,humanize_number(tdused," "),humanize_number(tdtotal," "),tdperc])
 					tab.append(*data)
 				else:
 					data = [host,port]
@@ -4001,7 +4042,17 @@ if "CS" in sectionset:
 							data.append("standard_mode")
 						else:
 							data.append("maintenance_mode")
-					data.extend([chunks,used,total,tdchunks,tdused,tdtotal])
+					data.extend([chunks,used,total])
+					if leaderconn.version_at_least(3,0,38):
+						if tdchunks==0:
+							data.append("-")
+						elif mfrstatus==1 or mfrstatus==0:
+							data.append("NOT READY")
+						elif mfrstatus==2:
+							data.append("READY")
+						else:
+							data.append("UNKNOWN")
+					data.extend([tdchunks,tdused,tdtotal])
 					tab.append(*data)
 			if len(dservers)>0:
 				if cgimode:
@@ -4218,39 +4269,12 @@ if "HD" in sectionset:
 		hostlist = []
 		for cs in dataprovider.get_chunkservers():
 			if (cs.flags&1)==0:
-				hostlist.append((cs.ip,cs.port,cs.version))
-#				hostlist.append(cs.version[0],cs.version[1],cs.version[2],cs.ip[0],cs.ip[1],cs.ip[2],cs.ip[3],cs.port)
-
-#		data,length = leaderconn.command(CLTOMA_CSERV_LIST,MATOCL_CSERV_LIST)
-#		if leaderconn.version_at_least(1,7,25) and (length%64)==0:
-#			n = length//64
-#			servers = []
-#			for i in range(n):
-#				d = data[i*64:(i+1)*64]
-#				flags,v1,v2,v3,ip1,ip2,ip3,ip4,port = struct.unpack(">BBBBBBBBH",d[:10])
-#				if (flags&1)==0:
-#					hostlist.append((v1,v2,v3,ip1,ip2,ip3,ip4,port))
-#		elif leaderconn.version_at_least(1,6,28) and leaderconn.version_less_than(1,7,25) and (length%62)==0:
-#			n = length//62
-#			servers = []
-#			for i in range(n):
-#				d = data[i*62:(i+1)*62]
-#				disconnected,v1,v2,v3,ip1,ip2,ip3,ip4,port = struct.unpack(">BBBBBBBBH",d[:10])
-#				if disconnected==0:
-#					hostlist.append((v1,v2,v3,ip1,ip2,ip3,ip4,port))
-#		elif leaderconn.version_less_than(1,6,28) and (length%54)==0:
-#			n = length//54
-#			servers = []
-#			for i in range(n):
-#				d = data[i*54:(i+1)*54]
-#				disconnected,v1,v2,v3,ip1,ip2,ip3,ip4,port = struct.unpack(">BBBBBBBBH",d[:10])
-#				if disconnected==0:
-#					hostlist.append((v1,v2,v3,ip1,ip2,ip3,ip4,port))
+				hostlist.append((cs.ip,cs.port,cs.version,cs.mfrstatus))
 
 		# get hdd lists one by one
 		hdd = []
 		shdd = []
-		for (ip1,ip2,ip3,ip4),port,version in hostlist:
+		for (ip1,ip2,ip3,ip4),port,version,mfrstatus in hostlist:
 #		for v1,v2,v3,ip1,ip2,ip3,ip4,port in hostlist:
 			hostip = "%u.%u.%u.%u" % (ip1,ip2,ip3,ip4)
 			hostkey = "%s:%u" % (hostip,port)
@@ -4258,44 +4282,6 @@ if "HD" in sectionset:
 			if port>0:
 				if version<=(1,6,8):
 					hdd.append((None,hostkey,"0","version too old","version too old",0,0,0,0,0,0,[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]))
-#					conn = MFSConn(hostip,port)
-#					data,length = conn.command(CLTOCS_HDD_LIST_V1,CSTOCL_HDD_LIST_V1)
-#					while length>0:
-#						if sys.version_info[0]<3:
-#							plen = ord(data[0])
-#							hddpath = data[1:plen+1]
-#						else:
-#							plen = data[0]
-#							hddpath = data[1:plen+1]
-#							try:
-#								hddpath = hddpath.decode('ascii')
-#							except UnicodeDecodeError:
-#								pass
-#						hostpath = "%s:%u:%s" % (hoststr,port,hddpath)
-#						ippath = "%s:%u:%s" % (hostip,port,hddpath)
-#						sortippath = "%03u_%03u_%03u_%03u:%05u:%s" % (ip1,ip2,ip3,ip4,port,hddpath)
-#						flags,errchunkid,errtime,used,total,chunkscnt = struct.unpack(">BQLQQL",data[plen+1:plen+34])
-#						length -= plen+34
-#						data = data[plen+34:]
-#						sf = (ip1,ip2,ip3,ip4,port,data[1:plen+1])
-#						if HDorder==1:
-#							sf = (ip1,ip2,ip3,ip4,port,data[1:plen+1])
-#						elif HDorder==2:
-#							sf = chunkscnt
-#						elif HDorder==3:
-#							sf = errtime
-#						elif HDorder==4:
-#							sf = -flags
-#						elif HDorder==20:
-#							sf = used
-#						elif HDorder==21:
-#							sf = total
-#						elif HDorder==22:
-#							if total>0:
-#								sf = (1.0*used)/total
-#							else:
-#								sf = 0
-#						hdd.append((sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0]))
 				else:
 					conn = MFSConn(hostip,port)
 					data,length = conn.command(CLTOCS_HDD_LIST,CSTOCL_HDD_LIST)
@@ -4415,9 +4401,9 @@ if "HD" in sectionset:
 							else:
 								sf = 0
 						if flags&4 and not cgimode and ttymode:
-							shdd.append((sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes))
+							shdd.append((sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes,mfrstatus))
 						else:
-							hdd.append((sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes))
+							hdd.append((sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes,mfrstatus))
 
 		if len(hdd)>0 or len(shdd)>0:
 			if cgimode:
@@ -4508,7 +4494,7 @@ if "HD" in sectionset:
 			usedsum = {}
 			totalsum = {}
 			hostavg = {}
-			for sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes in hdd+shdd:
+			for sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes,mfrstatus in hdd+shdd:
 				if hostkey not in usedsum:
 					usedsum[hostkey]=0
 					totalsum[hostkey]=0
@@ -4518,19 +4504,22 @@ if "HD" in sectionset:
 					totalsum[hostkey]+=total
 					if totalsum[hostkey]>0:
 						hostavg[hostkey] = (usedsum[hostkey] * 100.0) / totalsum[hostkey]
-			for sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes in hdd+shdd:
-				if flags==1:
-					status = 'marked for removal'
-				elif flags==2:
-					status = 'damaged'
-				elif flags==3:
-					status = 'damaged, marked for removal'
-				elif flags==4 or flags==6:
-					status = 'scanning'
-				elif flags==5 or flags==7:
-					status = 'marked for removal, scanning'
-				else:
-					status = 'ok'
+			for sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes,mfrstatus in hdd+shdd:
+				statuslist = []
+				if (flags&2) and (flags&4)==0:
+					statuslist.append('damaged')
+				if flags&1:
+					if mfrstatus==1:
+						statuslist.append('marked for removal (not ready)')
+					elif mfrstatus==2:
+						statuslist.append('marked for removal (ready)')
+					else:
+						statuslist.append('marked for removal')
+				if flags&4:
+					statuslist.append('scanning')
+				if flags==0:
+					statuslist.append('ok')
+				status = ", ".join(statuslist)
 				if errtime==0 and errchunkid==0:
 					lerror = 'no errors'
 				else:

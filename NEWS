@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.38-1 (2015-07-13)
+
+  - (master+cgi+cli) added check for servers with disks marked for removal (if disks can be safely removed)
+
 * MooseFS 3.0.37-1 (2015-07-08)
 
   - (mount) performance fixes in read module

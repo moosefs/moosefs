@@ -446,7 +446,7 @@ def mylock(filename):
 			posix.close(fd)
 			return -2
 	posix.ftruncate(fd,0)
-	if sys.version<'3':
+	if sys.version_info[0]<3:
 		posix.write(fd,"%u" % posix.getpid())
 	else:
 		posix.write(fd,("%u" % posix.getpid()).encode('utf-8'))
@@ -554,7 +554,10 @@ if __name__=="__main__":
 		except OSError:
 			e = sys.exc_info()[1]
 			raise Exception("fork error: %s [%d]" % (e.strerror, e.errno))
-			posix.write(pipefd[1],'0')
+			if sys.version_info[0]<3:
+				posix.write(pipefd[1],'0')
+			else:
+				posix.write(pipefd[1],bytes(1))
 		if pid>0:
 			os._exit(0)
 
@@ -571,7 +574,10 @@ if __name__=="__main__":
 			os.dup2(0,1)
 			os.dup2(0,2)
 
-			posix.write(pipefd[1],'0')
+			if sys.version_info[0]<3:
+				posix.write(pipefd[1],'0')
+			else:
+				posix.write(pipefd[1],bytes(1))
 
 		posix.close(pipefd[0])
 		posix.close(pipefd[1])
@@ -592,5 +598,8 @@ if __name__=="__main__":
 		loop(server,HTTP)
 
 	else:
-		posix.write(pipefd[1],'0')
+		if sys.version_info[0]<3:
+			posix.write(pipefd[1],'0')
+		else:
+			posix.write(pipefd[1],bytes(1))
 		os._exit(0)

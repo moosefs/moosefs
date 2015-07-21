@@ -86,6 +86,11 @@ import subprocess
 
 cgimode = 1 if 'GATEWAY_INTERFACE' in os.environ else 0
 
+try:
+	xrange
+except NameError:
+	xrange = range
+
 #parse parameters and auxilinary functions
 if cgimode:
 	try:
@@ -932,9 +937,9 @@ def state_color(stateid,sync):
 		else:
 			return 6
 	elif stateid==STATE_ELECT:
-		return 4
-	elif stateid==STATE_LEADER:
 		return 3
+	elif stateid==STATE_LEADER:
+		return 4
 	else:
 		return 1
 
@@ -1024,7 +1029,7 @@ def print_exception():
 
 def version_convert(version):
 	if version>=(2,0,0):
-		return ((version[0],version[1],version[2]/2),version[2]&1)
+		return ((version[0],version[1],version[2]//2),version[2]&1)
 	elif version>=(1,7,0):
 		return (version,1)
 	elif version>(0,0,0):
@@ -2996,7 +3001,7 @@ if "IN" in sectionset:
 			if ((leaderconn.version_at_least(2,0,71) and leaderconn.version_less_than(3,0,0)) or leaderconn.version_at_least(3,0,25)):
 				data,length = leaderconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS,struct.pack(">B",1))
 				if length%17==0:
-					n = length/17
+					n = length//17
 					for x in xrange(n):
 						chunkid,inode,indx,mtype = struct.unpack(">QLLB",data[x*17:x*17+17])
 						inodes.add(inode)
@@ -3005,7 +3010,7 @@ if "IN" in sectionset:
 			else:
 				data,length = leaderconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS)
 				if length%16==0:
-					n = length/16
+					n = length//16
 					for x in xrange(n):
 						chunkid,inode,indx = struct.unpack(">QLL",data[x*16:x*16+16])
 						inodes.add(inode)

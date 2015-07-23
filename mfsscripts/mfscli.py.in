@@ -98,6 +98,11 @@ import subprocess
 
 cgimode = 1 if 'GATEWAY_INTERFACE' in os.environ else 0
 
+try:
+	xrange
+except NameError:
+	xrange = range
+
 #parse parameters and auxilinary functions
 if cgimode:
 	try:
@@ -320,12 +325,12 @@ else: # CLI mode
 	cccharts = {}
 	for name,no,mode,desc in mcchartslist:
 		mccharts[name] = (no,mode,desc)
-	for name,abrlist in mcchartsabr.iteritems():
+	for name,abrlist in mcchartsabr.items():
 		for abr in abrlist:
 			mccharts[abr] = mccharts[name]
 	for name,no,mode,desc in ccchartslist:
 		cccharts[name] = (no,mode,desc)
-	for name,abrlist in ccchartsabr.iteritems():
+	for name,abrlist in ccchartsabr.items():
 		for abr in abrlist:
 			cccharts[abr] = cccharts[name]
 
@@ -1323,7 +1328,7 @@ def print_exception():
 
 def version_convert(version):
 	if version>=(2,0,0):
-		return ((version[0],version[1],version[2]/2),version[2]&1)
+		return ((version[0],version[1],version[2]//2),version[2]&1)
 	elif version>=(1,7,0):
 		return (version,1)
 	elif version>(0,0,0):
@@ -3612,7 +3617,7 @@ if "IN" in sectionset:
 			if ((leaderconn.version_at_least(2,0,71) and leaderconn.version_less_than(3,0,0)) or leaderconn.version_at_least(3,0,25)):
 				data,length = leaderconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS,struct.pack(">B",1))
 				if length%17==0:
-					n = length/17
+					n = length//17
 					for x in xrange(n):
 						chunkid,inode,indx,mtype = struct.unpack(">QLLB",data[x*17:x*17+17])
 						inodes.add(inode)
@@ -3621,7 +3626,7 @@ if "IN" in sectionset:
 			else:
 				data,length = leaderconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS)
 				if length%16==0:
-					n = length/16
+					n = length//16
 					for x in xrange(n):
 						chunkid,inode,indx = struct.unpack(">QLL",data[x*16:x*16+16])
 						inodes.add(inode)
@@ -5840,13 +5845,13 @@ if "RS" in sectionset:
 				data,length = leaderconn.command(CLTOMA_LIST_OPEN_FILES,MATOCL_LIST_OPEN_FILES,struct.pack(">L",OFsessionid))
 				openfiles = []
 				if OFsessionid==0:
-					n = length/8
+					n = length//8
 					for x in xrange(n):
 						sessionid,inode = struct.unpack(">LL",data[x*8:x*8+8])
 						openfiles.append((sessionid,inode))
 						inodes.add(inode)
 				else:
-					n = length/4
+					n = length//4
 					for x in xrange(n):
 						inode = struct.unpack(">L",data[x*4:x*4+4])[0]
 						openfiles.append((OFsessionid,inode))
@@ -5999,12 +6004,12 @@ if "RS" in sectionset:
 				data,length = leaderconn.command(CLTOMA_LIST_ACQUIRED_LOCKS,MATOCL_LIST_ACQUIRED_LOCKS,struct.pack(">L",ALinode))
 				locks = []
 				if ALinode==0:
-					n = length/37
+					n = length//37
 					for x in xrange(n):
 						inode,sessionid,owner,pid,start,end,ctype = struct.unpack(">LLQLQQB",data[x*37:x*37+37])
 						locks.append((inode,sessionid,owner,pid,start,end,ctype))
 				else:
-					n = length/33
+					n = length//33
 					for x in xrange(n):
 						sessionid,owner,pid,start,end,ctype = struct.unpack(">LQLQQB",data[x*33:x*33+33])
 						locks.append((ALinode,sessionid,owner,pid,start,end,ctype))

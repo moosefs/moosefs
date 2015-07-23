@@ -44,8 +44,8 @@ void hdd_diskinfo_data(uint8_t *buff);
 uint32_t hdd_diskinfo_monotonic_size(void);
 void hdd_diskinfo_monotonic_data(uint8_t *buff);
 /* lock/unlock pair */
-void hdd_get_chunks_begin();
-void hdd_get_chunks_end();
+void hdd_get_chunks_begin(uint8_t partialmode);
+void hdd_get_chunks_end(void);
 uint32_t hdd_get_chunks_next_list_count();
 void hdd_get_chunks_next_list_data(uint8_t *buff);
 //uint32_t hdd_get_chunks_count();

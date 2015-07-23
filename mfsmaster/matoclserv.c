@@ -969,7 +969,7 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 	swchunks *swc;
 	lwchunks *lwc;
 	uint64_t chunkid;
-	uint8_t locked;
+//	uint8_t locked;
 
 	status = fs_try_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,flags,uid,gids,gid,auid,agid,fleng,attr,&indx,&prevchunkid,&chunkid);
 	if (status==ERROR_DELAYED) {
@@ -993,8 +993,8 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 		return 0;
 	}
 	if (status==ERROR_LOCKED || status==ERROR_CHUNKBUSY) {
-		locked = 1;
-		i = CHUNKHASH(chunkid);
+//		locked = 1;
+		i = CHUNKHASH(prevchunkid);
 		lwc = malloc(sizeof(lwchunks)+sizeof(uint32_t)*gids);
 		passert(lwc);
 		lwc->chunkid = prevchunkid;
@@ -1017,8 +1017,9 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 		lwc->next = NULL;
 		*(lwchunkshashtail[i]) = lwc;
 		lwchunkshashtail[i] = &(lwc->next);
-	} else {
-		locked = 0;
+		return 1;
+//	} else {
+//		locked = 0;
 	}
 	if (status==STATUS_OK) {
 		status = fs_do_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,flags,uid,gid[0],auid,agid,fleng,attr);
@@ -1034,7 +1035,7 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 		memcpy(ptr,attr,35);
 	}
 	sessions_inc_stats(eptr->sesdata,2);
-	return locked;
+	return 0;
 }
 
 void matoclserv_chunk_unlocked(uint64_t chunkid,void *cptr) {

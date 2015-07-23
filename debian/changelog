@@ -1,3 +1,11 @@
+moosefs (3.0.39-1) unstable; urgency=medium
+
+  * (master) fixed truncate bug (wrong behaviour when chunk was locked - not
+    dangerous)
+  * (cgi+cli) fixed python3 incompatibilities
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 23 Jul 2015 13:00:00 +0200
+
 moosefs (3.0.38-1) unstable; urgency=medium
 
   * (master+cgi+cli) added check for servers with disks marked for removal (if

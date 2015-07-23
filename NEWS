@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.39-1 (2015-07-23)
+
+  - (master) fixed truncate bug (wrong behaviour when chunk was locked - not dangerous)
+  - (cgi+cli) fixed python3 incompatibilities
+
 * MooseFS 3.0.38-1 (2015-07-13)
 
   - (master+cgi+cli) added check for servers with disks marked for removal (if disks can be safely removed)

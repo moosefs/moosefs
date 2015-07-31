@@ -58,6 +58,7 @@
 #include "negentrycache.h"
 #include "xattrcache.h"
 // #include "dircache.h"
+#include "invalidator.h"
 
 #if MFS_ROOT_ID != FUSE_ROOT_ID
 #error FUSE_ROOT_ID is not equal to MFS_ROOT_ID
@@ -837,17 +838,6 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 		if (nleng==2 && name[0]=='.' && name[1]=='.') {
 			nleng=1;
 		}
-//		if (strcmp(name,MASTER_NAME)==0) {
-//			memset(&e, 0, sizeof(e));
-//			e.ino = MASTER_INODE;
-//			e.generation = 1;
-//			e.attr_timeout = 3600.0;
-//			e.entry_timeout = 3600.0;
-//			mfs_attr_to_stat(MASTER_INODE,masterattr,&e.attr);
-//			fuse_reply_entry(req, &e);
-//			mfs_stats_inc(OP_LOOKUP);
-//			return ;
-//		}
 		if (strcmp(name,MASTERINFO_NAME)==0) {
 			memset(&e, 0, sizeof(e));
 			e.ino = MASTERINFO_INODE;
@@ -1076,11 +1066,45 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //	}
 	mfs_makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(&ctx,"lookup (%lu,%s)%s: OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,icacheflag?" (using open dir cache)":"",e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-	fuse_reply_entry(req, &e);
+	invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
+	if (fuse_reply_entry(req, &e) == -ENOENT) {
+		invalidator_forget(e.ino,1);
+	}
 	if (debug_mode) {
 		fprintf(stderr,"lookup: positive answer timeouts (attr:%.3lf,entry:%.3lf)\n",e.attr_timeout,e.entry_timeout);
 	}
 }
+
+void mfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
+	struct fuse_ctx ctx;
+
+	if (debug_mode) {
+		ctx = *(fuse_req_ctx(req));
+		oplog_printf(&ctx,"forget (%lu,%lu)",(unsigned long int)ino,nlookup);
+		fprintf(stderr,"forget (%lu,%lu)\n",(unsigned long int)ino,nlookup);
+	}
+	invalidator_forget(ino,nlookup);
+	fuse_reply_none(req);
+}
+
+#if FUSE_VERSION >= 29
+
+void mfs_forget_multi(fuse_req_t req, size_t count, struct fuse_forget_data *forgets) {
+	struct fuse_ctx ctx;
+
+	if (debug_mode) {
+		ctx = *(fuse_req_ctx(req));
+		oplog_printf(&ctx,"forget_multi (%lu entries)",(unsigned long int)count);
+		fprintf(stderr,"forget_multi (%lu entries)\n",(unsigned long int)count);
+	}
+	while (count>0) {
+		count--;
+		invalidator_forget(forgets[count].ino,forgets[count].nlookup);
+	}
+	fuse_reply_none(req);
+}
+
+#endif
 
 void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	uint64_t maxfleng;
@@ -1497,7 +1521,10 @@ void mfs_mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode,
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"mknod (%lu,%s,%s:0%04o,0x%08lX): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,modestr,(unsigned int)mode,(unsigned long int)rdev,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		fuse_reply_entry(req, &e);
+		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
+		if (fuse_reply_entry(req, &e) == -ENOENT) {
+			invalidator_forget(e.ino,1);
+		}
 	}
 }
 
@@ -1625,7 +1652,10 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"mkdir (%lu,%s,d%s:0%04o): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		fuse_reply_entry(req, &e);
+		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
+		if (fuse_reply_entry(req, &e) == -ENOENT) {
+			invalidator_forget(e.ino,1);
+		}
 	}
 }
 
@@ -1737,7 +1767,10 @@ void mfs_symlink(fuse_req_t req, const char *path, fuse_ino_t parent, const char
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"symlink (%s,%lu,%s): OK (%.1lf,%lu,%.1lf,%s)",path,(unsigned long int)parent,name,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		fuse_reply_entry(req, &e);
+		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
+		if (fuse_reply_entry(req, &e) == -ENOENT) {
+			invalidator_forget(e.ino,1);
+		}
 	}
 }
 
@@ -1909,7 +1942,10 @@ void mfs_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char *
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"link (%lu,%lu,%s): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)ino,(unsigned long int)newparent,newname,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		fuse_reply_entry(req, &e);
+		invalidator_insert(newparent,newname,newnleng,e.ino,e.entry_timeout);
+		if (fuse_reply_entry(req, &e) == -ENOENT) {
+			invalidator_forget(e.ino,1);
+		}
 	}
 }
 
@@ -2365,8 +2401,10 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	mfs_makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s,%lu)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned long int)fi->keep_cache);
+	invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
+		invalidator_forget(e.ino,1);
 	}
 }
 

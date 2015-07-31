@@ -32,6 +32,10 @@ void mfs_statfs(fuse_req_t req);
 #endif
 void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask);
 void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
+void mfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup);
+#if FUSE_VERSION >= 29
+void mfs_forget_multi(fuse_req_t req, size_t count, struct fuse_forget_data *forgets);
+#endif
 void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
 void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set, struct fuse_file_info *fi);
 void mfs_mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, dev_t rdev);

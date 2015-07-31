@@ -94,10 +94,10 @@ typedef struct _threc {
 
 typedef struct _acquired_file {
 	uint32_t inode;
-	uint32_t cnt;
+	unsigned cnt:31; // open/close count
+	unsigned dentry:1; // inode exists in dentry cache (can't be removed/reused)
 	struct _acquired_file *next;
 } acquired_file;
-
 
 #define DEFAULT_OUTPUT_BUFFSIZE 0x1000
 #define DEFAULT_INPUT_BUFFSIZE 0x10000
@@ -381,6 +381,50 @@ void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes) {
 	pthread_mutex_unlock(&fdlock);
 }
 */
+
+void fs_add_entry(uint32_t inode) {
+	acquired_file *afptr,**afpptr;
+	pthread_mutex_lock(&aflock);
+	afpptr = &afhead;
+	while ((afptr=*afpptr)) {
+		if (afptr->inode == inode) {
+			afptr->dentry = 1;
+			pthread_mutex_unlock(&aflock);
+			return;
+		}
+		if (afptr->inode > inode) {
+			break;
+		}
+		afpptr = &(afptr->next);
+	}
+	afptr = (acquired_file*)malloc(sizeof(acquired_file));
+	afptr->inode = inode;
+	afptr->cnt = 0;
+	afptr->dentry = 1;
+	afptr->next = *afpptr;
+	*afpptr = afptr;
+	pthread_mutex_unlock(&aflock);
+}
+
+void fs_forget_entry(uint32_t inode) {
+	acquired_file *afptr,**afpptr;
+	pthread_mutex_lock(&aflock);
+	afpptr = &afhead;
+	while ((afptr=*afpptr)) {
+		if (afptr->inode == inode) {
+			afptr->dentry = 0;
+			if (afptr->cnt==0) {
+				*afpptr = afptr->next;
+				free(afptr);
+			}
+			pthread_mutex_unlock(&aflock);
+			return;
+		}
+		afpptr = &(afptr->next);
+	}
+	pthread_mutex_unlock(&aflock);
+}
+
 void fs_inc_acnt(uint32_t inode) {
 	acquired_file *afptr,**afpptr;
 	pthread_mutex_lock(&aflock);
@@ -399,6 +443,7 @@ void fs_inc_acnt(uint32_t inode) {
 	afptr = (acquired_file*)malloc(sizeof(acquired_file));
 	afptr->inode = inode;
 	afptr->cnt = 1;
+	afptr->dentry = 0;
 	afptr->next = *afpptr;
 	*afpptr = afptr;
 	pthread_mutex_unlock(&aflock);
@@ -410,11 +455,12 @@ void fs_dec_acnt(uint32_t inode) {
 	afpptr = &afhead;
 	while ((afptr=*afpptr)) {
 		if (afptr->inode == inode) {
-			if (afptr->cnt<=1) {
+			if (afptr->cnt>0) {
+				afptr->cnt--;
+			}
+			if (afptr->cnt==0 && afptr->dentry==0) {
 				*afpptr = afptr->next;
 				free(afptr);
-			} else {
-				afptr->cnt--;
 			}
 			pthread_mutex_unlock(&aflock);
 			return;

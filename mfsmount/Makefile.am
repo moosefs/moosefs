@@ -14,6 +14,7 @@ mfsmount_SOURCES=\
 	negentrycache.c negentrycache.h \
 	xattrcache.c xattrcache.h \
 	chunkloccache.c chunkloccache.h \
+	invalidator.c invalidator.h \
 	getgroups.c getgroups.h \
 	mfs_fuse.c mfs_fuse.h \
 	mfs_meta_fuse.c mfs_meta_fuse.h \

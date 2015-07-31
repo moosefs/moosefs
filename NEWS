@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.74-1 (2015-07-31)
+
+  - (master+mount) added using fuse's forgets in inode number reusage (fixes very rare EBUSY case when inode number is reused after unlink of directory which is still open or used as a current working directory)
+
 * MooseFS 2.0.73-1 (2015-07-21)
 
   - (cgi+cli) fixed incompatibilities with python 3

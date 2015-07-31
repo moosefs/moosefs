@@ -132,7 +132,7 @@ static quotanode *quotahead;
 static uint32_t QuotaTimeLimit;
 
 typedef struct _fsnode {
-	uint32_t id;
+	uint32_t inode;
 	uint32_t ctime,mtime,atime;
 	unsigned xattrflag:1;
 	unsigned aclpermflag:1;
@@ -176,7 +176,7 @@ typedef struct _fsnode {
 } fsnode;
 
 typedef struct _freenode {
-	uint32_t id;
+	uint32_t inode;
 	uint32_t ftime;
 	struct _freenode *next;
 } freenode;
@@ -759,31 +759,44 @@ uint32_t fsnodes_get_next_id() {
 	return i;
 }
 
-void fsnodes_free_id(uint32_t id,uint32_t ts) {
+void fsnodes_free_id(uint32_t inode,uint32_t ts) {
 	freenode *n;
 	n = freenode_malloc();
-	n->id = id;
+	n->inode = inode;
 	n->ftime = ts;
 	n->next = NULL;
 	*freetail = n;
 	freetail = &(n->next);
 }
 
-uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes) {
-	uint32_t fi,pos,mask;
+uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint32_t sustainedinodes) {
+	uint32_t si,fi,pos,mask;
 	freenode *n,*an;
+	freenode *sn,**snt;
 	fi = 0;
+	si = 0;
 	n = freelist;
-	while (n && n->ftime+86400<ts) {
-		fi++;
-		pos = (n->id >> 5);
-		mask = 1<<(n->id&0x1F);
-		freebitmask[pos] &= ~mask;
-		if (pos<searchpos) {
-			searchpos = pos;
+	sn = NULL;
+	snt = &sn;
+	while (n && n->ftime+MFS_INODE_REUSE_DELAY<ts) {
+		if (((sesflags&SESFLAG_METARESTORE)==0 || sustainedinodes>0) && of_isfileopened(n->inode)) {
+			si++;
+			an = n->next;
+			n->ftime = ts;
+			n->next = NULL;
+			*snt = n;
+			snt = &(n->next);
+		} else {
+			fi++;
+			pos = (n->inode >> 5);
+			mask = 1<<(n->inode&0x1F);
+			freebitmask[pos] &= ~mask;
+			if (pos<searchpos) {
+				searchpos = pos;
+			}
+			an = n->next;
+			freenode_free(n);
 		}
-		an = n->next;
-		freenode_free(n);
 		n = an;
 	}
 	if (n) {
@@ -792,25 +805,30 @@ uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes) {
 		freelist = NULL;
 		freetail = &(freelist);
 	}
+	if (sn) {
+		*freetail = sn;
+		freetail = snt;
+	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		if (fi>0) {
-			changelog("%" PRIu32 "|FREEINODES():%" PRIu32,ts,fi);
+		if (fi>0 || si>0) {
+			changelog("%" PRIu32 "|FREEINODES():%" PRIu32 ",%" PRIu32,ts,fi,si);
 		}
 	} else {
 		meta_version_inc();
-		if (freeinodes!=fi) {
-			return 1;
+		if (freeinodes!=fi || sustainedinodes!=si) {
+//			syslog(LOG_NOTICE,"freeinodes mismatch: freeinodes: %"PRIu32" ; sustainedinodes: %"PRIu32" ; fi: %"PRIu32" ; si: %"PRIu32,freeinodes,sustainedinodes,fi,si);
+			return ERROR_MISMATCH;
 		}
 	}
 	return 0;
 }
 
 void fsnodes_freeinodes(void) {
-	fs_univ_freeinodes(main_time(),0,0);
+	fs_univ_freeinodes(main_time(),0,0,0);
 }
 
-uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t freeinodes) {
-	return fs_univ_freeinodes(ts,SESFLAG_METARESTORE,freeinodes);
+uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t freeinodes,uint32_t sustainedinodes) {
+	return fs_univ_freeinodes(ts,SESFLAG_METARESTORE,freeinodes,sustainedinodes);
 }
 
 void fsnodes_init_freebitmask (void) {
@@ -822,10 +840,10 @@ void fsnodes_init_freebitmask (void) {
 	searchpos = 0;
 }
 
-void fsnodes_used_inode (uint32_t id) {
+void fsnodes_used_inode (uint32_t inode) {
 	uint32_t pos,mask;
-	pos = id>>5;
-	mask = 1<<(id&0x1F);
+	pos = inode>>5;
+	mask = 1<<(inode&0x1F);
 	freebitmask[pos]|=mask;
 }
 
@@ -932,7 +950,7 @@ static inline fsedge* fsnodes_edge_find(fsnode *node,uint16_t nleng,const uint8_
 	if (edgehashsize==0) {
 		return NULL;
 	}
-	hashval = fsnodes_hash(node->id,nleng,name);
+	hashval = fsnodes_hash(node->inode,nleng,name);
 	hash = hashval & (edgehashsize-1);
 	if (edgerehashpos<edgehashsize) {
 		fsnodes_edge_hash_move();
@@ -998,7 +1016,7 @@ static inline void fsnodes_edge_add(fsedge *e) {
 			}
 		}
 	}
-	e->hashval = fsnodes_hash(e->parent->id,e->nleng,e->name);
+	e->hashval = fsnodes_hash(e->parent->inode,e->nleng,e->name);
 	hash = (e->hashval) & (edgehashsize-1);
 	if (edgerehashpos<edgehashsize) {
 		fsnodes_edge_hash_move();
@@ -1085,7 +1103,7 @@ static inline void fsnodes_node_hash_move(void) {
 		phptralt = nodehashtab[noderehashpos >> HASHTAB_LOBITS] + (noderehashpos & HASHTAB_MASK);
 		*phptralt = NULL;
 		while ((p=*phptr)!=NULL) {
-			hash = hash32(p->id) & mask;
+			hash = hash32(p->inode) & mask;
 			if (hash==noderehashpos) {
 				*phptralt = p;
 				*phptr = p->next;
@@ -1100,14 +1118,14 @@ static inline void fsnodes_node_hash_move(void) {
 	} while (moved<HASHTAB_MOVEFACTOR);
 }
 
-static inline fsnode* fsnodes_node_find(uint32_t id) {
+static inline fsnode* fsnodes_node_find(uint32_t inode) {
 	fsnode *p;
 	uint32_t hash;
 
 	if (nodehashsize==0) {
 		return NULL;
 	}
-	hash = hash32(id) & (nodehashsize-1);
+	hash = hash32(inode) & (nodehashsize-1);
 	if (noderehashpos<nodehashsize) {
 		fsnodes_node_hash_move();
 		if (hash >= noderehashpos) {
@@ -1115,7 +1133,7 @@ static inline fsnode* fsnodes_node_find(uint32_t id) {
 		}
 	}
 	for (p=nodehashtab[hash>>HASHTAB_LOBITS][hash&HASHTAB_MASK] ; p ; p=p->next) {
-		if (p->id==id) {
+		if (p->inode==inode) {
 			return p;
 		}
 	}
@@ -1129,7 +1147,7 @@ static inline void fsnodes_node_delete(fsnode *p) {
 	if (nodehashsize==0) {
 		return;
 	}
-	hash = hash32(p->id) & (nodehashsize-1);
+	hash = hash32(p->inode) & (nodehashsize-1);
 	if (noderehashpos<nodehashsize) {
 		fsnodes_node_hash_move();
 		if (hash >= noderehashpos) {
@@ -1172,7 +1190,7 @@ static inline void fsnodes_node_add(fsnode *p) {
 			}
 		}
 	}
-	hash = hash32(p->id) & (nodehashsize-1);
+	hash = hash32(p->inode) & (nodehashsize-1);
 	if (noderehashpos<nodehashsize) {
 		fsnodes_node_hash_move();
 		if (hash >= noderehashpos) {
@@ -1362,7 +1380,7 @@ static inline void fsnodes_check_quotanode(quotanode *qn,uint32_t ts) {
 		chg = 1;
 	}
 	if (chg) {
-		changelog("%"PRIu32"|QUOTA(%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64")",ts,qn->node->id,qn->exceeded,qn->flags,qn->stimestamp,qn->sinodes,qn->hinodes,qn->slength,qn->hlength,qn->ssize,qn->hsize,qn->srealsize,qn->hrealsize);
+		changelog("%"PRIu32"|QUOTA(%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64")",ts,qn->node->inode,qn->exceeded,qn->flags,qn->stimestamp,qn->sinodes,qn->hinodes,qn->slength,qn->hlength,qn->ssize,qn->hsize,qn->srealsize,qn->hrealsize);
 	}
 }
 
@@ -1615,7 +1633,7 @@ static inline int fsnodes_access_ext(fsnode *node,uint32_t uid,uint32_t gids,uin
 		return 1;
 	}
 	if (node->aclpermflag) {
-		return posix_acl_perm(node->id,uid,gids,gid,node->uid,node->gid,modemask);
+		return posix_acl_perm(node->inode,uid,gids,gid,node->uid,node->gid,modemask);
 	} else if (uid==node->uid || (node->flags&EATTR_NOOWNER)) {
 		nodemode = ((node->mode)>>6) & 7;
 	} else if (sesflags&SESFLAG_IGNOREGID) {
@@ -1655,7 +1673,7 @@ static inline uint32_t fsnodes_nlink(uint32_t rootinode,fsnode *node) {
 	fsnode *p;
 	uint32_t nlink;
 	nlink = 0;
-	if (node->id!=rootinode) {
+	if (node->inode!=rootinode) {
 		if (rootinode==MFS_ROOT_ID) {
 			for (e=node->parents ; e ; e=e->nextparent) {
 				nlink++;
@@ -1664,7 +1682,7 @@ static inline uint32_t fsnodes_nlink(uint32_t rootinode,fsnode *node) {
 			for (e=node->parents ; e ; e=e->nextparent) {
 				p = e->parent;
 				while (p) {
-					if (rootinode==p->id) {
+					if (rootinode==p->inode) {
 						nlink++;
 						p = NULL;
 					} else if (p->parents) {
@@ -1682,20 +1700,20 @@ static inline uint32_t fsnodes_nlink(uint32_t rootinode,fsnode *node) {
 static inline void fsnodes_get_parents(uint32_t rootinode,fsnode *node,uint8_t *buff) {
 	fsedge *e;
 	fsnode *p;
-	if (node->id!=rootinode) {
+	if (node->inode!=rootinode) {
 		if (rootinode==MFS_ROOT_ID) {
 			for (e=node->parents ; e ; e=e->nextparent) {
-				put32bit(&buff,e->parent->id);
+				put32bit(&buff,e->parent->inode);
 			}
 		} else {
 			for (e=node->parents ; e ; e=e->nextparent) {
 				p = e->parent;
 				while (p) {
-					if (rootinode==p->id) {
-						if (e->parent->id==rootinode) {
+					if (rootinode==p->inode) {
+						if (e->parent->inode==rootinode) {
 							put32bit(&buff,MFS_ROOT_ID);
 						} else {
-							put32bit(&buff,e->parent->id);
+							put32bit(&buff,e->parent->inode);
 						}
 						p = NULL;
 					} else if (p->parents) {
@@ -1715,12 +1733,12 @@ static inline uint32_t fsnodes_get_paths_size(uint32_t rootinode,fsnode *node) {
 	uint32_t totalpsize;
 	uint32_t psize;
 	totalpsize = 0;
-	if (node->id!=rootinode) {
+	if (node->inode!=rootinode) {
 		for (e=node->parents ; e ; e=e->nextparent) {
 			psize = e->nleng;
 			p = e->parent;
 			while (p) {
-				if (rootinode==p->id) {
+				if (rootinode==p->inode) {
 					totalpsize += psize + 4;
 					p = NULL;
 				} else if (p->parents) {
@@ -1741,12 +1759,12 @@ static inline void fsnodes_get_paths_data(uint32_t rootinode,fsnode *node,uint8_
 	uint32_t psize;
 	uint8_t *b;
 
-	if (node->id!=rootinode) {
+	if (node->inode!=rootinode) {
 		for (e=node->parents ; e ; e=e->nextparent) {
 			psize = e->nleng;
 			p = e->parent;
 			while (p) {
-				if (rootinode==p->id) {
+				if (rootinode==p->inode) {
 					put32bit(&buff,psize);
 					b = buff;
 					buff += psize;
@@ -1755,7 +1773,7 @@ static inline void fsnodes_get_paths_data(uint32_t rootinode,fsnode *node,uint8_
 					memcpy(b+psize,e->name,e->nleng);
 					p = e->parent;
 					while (p) {
-						if (rootinode==p->id) {
+						if (rootinode==p->inode) {
 							p = NULL;
 						} else if (p->parents) {
 							psize--;
@@ -1808,7 +1826,7 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 		flags |= MATTR_NOXATTR;
 	}
 	if (node->aclpermflag) {
-		mode = (posix_acl_getmode(node->id) & 0777) | (node->mode & 07000);
+		mode = (posix_acl_getmode(node->inode) & 0777) | (node->mode & 07000);
 	} else {
 		mode = node->mode & 07777;
 	}
@@ -2033,7 +2051,7 @@ static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nlen
 	if (type==TYPE_FILE) {
 		filenodes++;
 	}
-	p->id = fsnodes_get_next_id();
+	p->inode = fsnodes_get_next_id();
 	p->xattrflag = 0;
 	p->aclpermflag = 0;
 	p->acldefflag = 0;
@@ -2091,7 +2109,7 @@ static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nlen
 	fsnodes_link(ts,node,p,nleng,name);
 	if (node->acldefflag) {
 		uint8_t aclcopied;
-		aclcopied = posix_acl_copydefaults(node->id,p->id,(type==TYPE_DIRECTORY)?1:0,mode);
+		aclcopied = posix_acl_copydefaults(node->inode,p->inode,(type==TYPE_DIRECTORY)?1:0,mode);
 		if (aclcopied&1) {
 			p->aclpermflag = 1;
 		}
@@ -2237,7 +2255,7 @@ static inline void fsnodes_getdetacheddata(fsedge *start,uint8_t *dbuff) {
 				dbuff++;
 			}
 		}
-		put32bit(&dbuff,e->child->id);
+		put32bit(&dbuff,e->child->inode);
 	}
 }
 
@@ -2273,8 +2291,8 @@ static inline void fsnodes_readdirdata(uint32_t rootinode,uint32_t uid,uint32_t 
 			dbuff[0]=1;
 			dbuff[1]='.';
 			dbuff+=2;
-			if (p->id!=rootinode) {
-				put32bit(&dbuff,p->id);
+			if (p->inode!=rootinode) {
+				put32bit(&dbuff,p->inode);
 			} else {
 				put32bit(&dbuff,MFS_ROOT_ID);
 			}
@@ -2293,7 +2311,7 @@ static inline void fsnodes_readdirdata(uint32_t rootinode,uint32_t uid,uint32_t 
 				dbuff[1]='.';
 				dbuff[2]='.';
 				dbuff+=3;
-				if (p->id==rootinode) { // root node should returns self as its parent
+				if (p->inode==rootinode) { // root node should returns self as its parent
 					put32bit(&dbuff,MFS_ROOT_ID);
 					if (withattr) {
 						fsnodes_fill_attr(p,p,uid,gid,auid,agid,sesflags,dbuff);
@@ -2304,8 +2322,8 @@ static inline void fsnodes_readdirdata(uint32_t rootinode,uint32_t uid,uint32_t 
 						put8bit(&dbuff,'d');
 					}
 				} else {
-					if (p->parents && p->parents->parent->id!=rootinode) {
-						put32bit(&dbuff,p->parents->parent->id);
+					if (p->parents && p->parents->parent->inode!=rootinode) {
+						put32bit(&dbuff,p->parents->parent->inode);
 					} else {
 						put32bit(&dbuff,MFS_ROOT_ID);
 					}
@@ -2337,7 +2355,7 @@ static inline void fsnodes_readdirdata(uint32_t rootinode,uint32_t uid,uint32_t 
 				dbuff++;
 				memcpy(dbuff,e->name,e->nleng);
 				dbuff+=e->nleng;
-				put32bit(&dbuff,e->child->id);
+				put32bit(&dbuff,e->child->inode);
 				if (withattr) {
 					fsnodes_fill_attr(e->child,p,uid,gid,auid,agid,sesflags,dbuff);
 					dbuff+=35;
@@ -2423,7 +2441,7 @@ static inline uint8_t fsnodes_appendchunks(uint32_t ts,fsnode *dstobj,fsnode *sr
 		dstobj->data.fdata.chunktab[i+dstchunks] = chunkid;
 		if (chunkid>0) {
 			if (chunk_add_file(chunkid,dstobj->goal)!=STATUS_OK) {
-				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcobj->id,i);
+				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcobj->inode,i);
 			}
 		}
 	}
@@ -2492,7 +2510,7 @@ static inline void fsnodes_setlength(fsnode *obj,uint64_t length) {
 		chunkid = obj->data.fdata.chunktab[i];
 		if (chunkid>0) {
 			if (chunk_delete_file(chunkid,obj->goal)!=STATUS_OK) {
-				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,obj->id,i);
+				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,obj->inode,i);
 			}
 		}
 		obj->data.fdata.chunktab[i]=0;
@@ -2535,7 +2553,7 @@ static inline void fsnodes_remove_node(uint32_t ts,fsnode *toremove) {
 			chunkid = toremove->data.fdata.chunktab[i];
 			if (chunkid>0) {
 				if (chunk_delete_file(chunkid,toremove->goal)!=STATUS_OK) {
-					syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,toremove->id,i);
+					syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,toremove->inode,i);
 				}
 			}
 		}
@@ -2548,17 +2566,17 @@ static inline void fsnodes_remove_node(uint32_t ts,fsnode *toremove) {
 			symlink_free(toremove->data.sdata.path,toremove->data.sdata.pleng);
 		}
 	}
-	fsnodes_free_id(toremove->id,ts);
+	fsnodes_free_id(toremove->inode,ts);
 	if (toremove->xattrflag) {
-		xattr_removeinode(toremove->id);
+		xattr_removeinode(toremove->inode);
 	}
 	if (toremove->aclpermflag) {
-		posix_acl_remove(toremove->id,POSIX_ACL_ACCESS);
+		posix_acl_remove(toremove->inode,POSIX_ACL_ACCESS);
 	}
 	if (toremove->acldefflag) {
-		posix_acl_remove(toremove->id,POSIX_ACL_DEFAULT);
+		posix_acl_remove(toremove->inode,POSIX_ACL_DEFAULT);
 	}
-	dcm_modify(toremove->id,0);
+	dcm_modify(toremove->inode,0);
 	switch (toremove->type) {
 		case TYPE_DIRECTORY:
 			fsnode_dir_free(toremove);
@@ -2588,7 +2606,7 @@ static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 
 	child = e->child;
 	if (child->parents->nextparent==NULL) { // last link
-		if (child->type==TYPE_FILE && (child->trashtime>0 || of_isfileopened(child->id))) {	// go to trash or sustained ? - get path
+		if (child->type==TYPE_FILE && (child->trashtime>0 || of_isfileopened(child->inode))) {	// go to trash or sustained ? - get path
 			fsnodes_getpath(e,&pleng,&path);
 		}
 	}
@@ -2620,7 +2638,7 @@ static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 				child->parents = e;
 				trashspace += child->data.fdata.length;
 				trashnodes++;
-			} else if (of_isfileopened(child->id)) {
+			} else if (of_isfileopened(child->inode)) {
 				child->type = TYPE_SUSTAINED;
 				e = fsedge_malloc(pleng);
 				passert(e);
@@ -2663,7 +2681,7 @@ static inline int fsnodes_purge(uint32_t ts,fsnode *p) {
 	if (p->type==TYPE_TRASH) {
 		trashspace -= p->data.fdata.length;
 		trashnodes--;
-		if (of_isfileopened(p->id)) {
+		if (of_isfileopened(p->inode)) {
 			p->type = TYPE_SUSTAINED;
 			sustainedspace += p->data.fdata.length;
 			sustainednodes++;
@@ -2799,19 +2817,19 @@ static inline void fsnodes_getgoal_recursive(fsnode *node,uint8_t gmode,uint32_t
 	fsnodes_keep_alive_check();
 	if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
 		if (node->goal>9) {
-			syslog(LOG_WARNING,"inode %"PRIu32": goal>9 !!! - fixing",node->id);
+			syslog(LOG_WARNING,"inode %"PRIu32": goal>9 !!! - fixing",node->inode);
 			fsnodes_changefilegoal(node,9);
 		} else if (node->goal<1) {
-			syslog(LOG_WARNING,"inode %"PRIu32": goal<1 !!! - fixing",node->id);
+			syslog(LOG_WARNING,"inode %"PRIu32": goal<1 !!! - fixing",node->inode);
 			fsnodes_changefilegoal(node,1);
 		}
 		fgtab[node->goal]++;
 	} else if (node->type==TYPE_DIRECTORY) {
 		if (node->goal>9) {
-			syslog(LOG_WARNING,"inode %"PRIu32": goal>9 !!! - fixing",node->id);
+			syslog(LOG_WARNING,"inode %"PRIu32": goal>9 !!! - fixing",node->inode);
 			node->goal=9;
 		} else if (node->goal<1) {
-			syslog(LOG_WARNING,"inode %"PRIu32": goal<1 !!! - fixing",node->id);
+			syslog(LOG_WARNING,"inode %"PRIu32": goal<1 !!! - fixing",node->inode);
 			node->goal=1;
 		}
 		dgtab[node->goal]++;
@@ -3158,7 +3176,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 						dstnode->data.fdata.chunktab[i] = chunkid;
 						if (chunkid>0) {
 							if (chunk_add_file(chunkid,dstnode->goal)!=STATUS_OK) {
-								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcnode->id,i);
+								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcnode->inode,i);
 							}
 						}
 					}
@@ -3239,7 +3257,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 				dstnode->atime = srcnode->atime;
 				dstnode->mtime = srcnode->mtime;
 				if (srcnode->xattrflag) {
-					dstnode->xattrflag = xattr_copy(srcnode->id,dstnode->id);
+					dstnode->xattrflag = xattr_copy(srcnode->inode,dstnode->inode);
 				}
 			}
 			if (srcnode->type==TYPE_DIRECTORY) {
@@ -3258,7 +3276,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 						dstnode->data.fdata.chunktab[i] = chunkid;
 						if (chunkid>0) {
 							if (chunk_add_file(chunkid,dstnode->goal)!=STATUS_OK) {
-								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcnode->id,i);
+								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcnode->inode,i);
 							}
 						}
 					}
@@ -3809,7 +3827,7 @@ uint8_t fs_getrootinode(uint32_t *rootinode,const uint8_t *path) {
 			name++;
 		}
 		if (*name=='\0') {
-			*rootinode = p->id;
+			*rootinode = p->inode;
 			return STATUS_OK;
 		}
 		nleng=0;
@@ -3889,7 +3907,7 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 			if (parent==rootinode) {
 				*inode = MFS_ROOT_ID;
 			} else {
-				*inode = wd->id;
+				*inode = wd->inode;
 			}
 			fsnodes_fill_attr(wd,wd,uid,gid[0],auid,agid,sesflags,attr);
 			stats_lookup++;
@@ -3901,14 +3919,14 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 				fsnodes_fill_attr(wd,wd,uid,gid[0],auid,agid,sesflags,attr);
 			} else {
 				if (wd->parents) {
-					if (wd->parents->parent->id==rootinode) {
+					if (wd->parents->parent->inode==rootinode) {
 						*inode = MFS_ROOT_ID;
 					} else {
-						*inode = wd->parents->parent->id;
+						*inode = wd->parents->parent->inode;
 					}
 					fsnodes_fill_attr(wd->parents->parent,wd,uid,gid[0],auid,agid,sesflags,attr);
 				} else {
-					*inode=MFS_ROOT_ID; // rn->id;
+					*inode=MFS_ROOT_ID; // rn->inode;
 					fsnodes_fill_attr(rn,wd,uid,gid[0],auid,agid,sesflags,attr);
 				}
 			}
@@ -3923,7 +3941,7 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 	if (!e) {
 		return ERROR_ENOENT;
 	}
-	*inode = e->child->id;
+	*inode = e->child->inode;
 	fsnodes_fill_attr(e->child,wd,uid,gid[0],auid,agid,sesflags,attr);
 	stats_lookup++;
 	return STATUS_OK;
@@ -4172,7 +4190,7 @@ uint8_t fs_setattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 			}
 		}
 		if (p->aclpermflag) {
-			posix_acl_setmode(p->id,attrmode);
+			posix_acl_setmode(p->inode,attrmode);
 			p->mode &= 00070;
 			attrmode &= 07707;
 			p->mode |= attrmode;
@@ -4205,7 +4223,7 @@ uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_
 	}
 	p->mode = mode;
 	if (p->aclpermflag) {
-		posix_acl_setmode(p->id,mode);
+		posix_acl_setmode(p->inode,mode);
 	}
 	p->uid = uid;
 	p->gid = gid;
@@ -4304,12 +4322,12 @@ uint8_t fs_univ_symlink(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t
 	sr.length = pleng;
 	fsnodes_add_stats(wd,&sr);
 
-	*inode = p->id;
+	*inode = p->inode;
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		if (attr) {
 			fsnodes_fill_attr(p,wd,uid,gid[0],auid,agid,sesflags,attr);
 		}
-		changelog("%"PRIu32"|SYMLINK(%"PRIu32",%s,%s,%"PRIu32",%"PRIu32"):%"PRIu32,(uint32_t)main_time(),parent,changelog_escape_name(nleng,name),changelog_escape_name(pleng,newpath),uid,gid[0],p->id);
+		changelog("%"PRIu32"|SYMLINK(%"PRIu32",%s,%s,%"PRIu32",%"PRIu32"):%"PRIu32,(uint32_t)main_time(),parent,changelog_escape_name(nleng,name),changelog_escape_name(pleng,newpath),uid,gid[0],p->inode);
 	} else {
 		meta_version_inc();
 	}
@@ -4368,12 +4386,12 @@ uint8_t fs_univ_create(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 	if (type==TYPE_BLOCKDEV || type==TYPE_CHARDEV) {
 		p->data.devdata.rdev = rdev;
 	}
-	*inode = p->id;
+	*inode = p->inode;
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		if (attr) {
 			fsnodes_fill_attr(p,wd,uid,gid[0],auid,agid,sesflags,attr);
 		}
-		changelog("%"PRIu32"|CREATE(%"PRIu32",%s,%"PRIu8",%"PRIu16",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32"):%"PRIu32,(uint32_t)main_time(),parent,changelog_escape_name(nleng,name),type,mode,cumask,uid,gid[0],rdev,p->id);
+		changelog("%"PRIu32"|CREATE(%"PRIu32",%s,%"PRIu8",%"PRIu16",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32"):%"PRIu32,(uint32_t)main_time(),parent,changelog_escape_name(nleng,name),type,mode,cumask,uid,gid[0],rdev,p->inode);
 	} else {
 		meta_version_inc();
 	}
@@ -4461,10 +4479,10 @@ uint8_t fs_univ_unlink(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 		}
 	}
 	if (inode) {
-		*inode = e->child->id;
+		*inode = e->child->inode;
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		changelog("%"PRIu32"|UNLINK(%"PRIu32",%s):%"PRIu32,ts,parent,changelog_escape_name(nleng,name),e->child->id);
+		changelog("%"PRIu32"|UNLINK(%"PRIu32",%s):%"PRIu32,ts,parent,changelog_escape_name(nleng,name),e->child->inode);
 	} else {
 		meta_version_inc();
 	}
@@ -4587,12 +4605,12 @@ uint8_t fs_univ_move(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t pa
 	}
 	fsnodes_remove_edge(ts,se);
 	fsnodes_link(ts,dwd,node,nleng_dst,name_dst);
-	*inode = node->id;
+	*inode = node->inode;
 	if (attr) {
 		fsnodes_fill_attr(node,dwd,uid,gid[0],auid,agid,sesflags,attr);
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		changelog("%"PRIu32"|MOVE(%"PRIu32",%s,%"PRIu32",%s):%"PRIu32,ts,parent_src,changelog_escape_name(nleng_src,name_src),parent_dst,changelog_escape_name(nleng_dst,name_dst),node->id);
+		changelog("%"PRIu32"|MOVE(%"PRIu32",%s,%"PRIu32",%s):%"PRIu32,ts,parent_src,changelog_escape_name(nleng_src,name_src),parent_dst,changelog_escape_name(nleng_dst,name_dst),node->inode);
 	} else {
 		meta_version_inc();
 	}
@@ -4922,7 +4940,7 @@ void fs_readdir_data(uint32_t rootinode,uint8_t sesflags,uint32_t uid,uint32_t g
 
 	if (p->atime!=ts) {
 		p->atime = ts;
-		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,p->id);
+		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,p->inode);
 	}
 	fsnodes_readdirdata(rootinode,uid,gid,auid,agid,sesflags,p,e,maxentries,nedgeid,dbuff,flags&GETDIR_FLAG_WITHATTR);
 	stats_readdir++;
@@ -5856,7 +5874,7 @@ void fs_getquotainfo_data(uint8_t * buff) {
 //	put32bit(&buff,QuotaTimeLimit);
 	for (qn=quotahead ; qn ; qn=qn->next) {
 		psr = &(qn->node->data.ddata.stats);
-		put32bit(&buff,qn->node->id);
+		put32bit(&buff,qn->node->inode);
 		size=fsnodes_getpath_size(qn->node->parents);
 		put32bit(&buff,size+1);
 		put8bit(&buff,'/');
@@ -6041,25 +6059,25 @@ uint32_t fs_test_log_inconsistency(fsedge *e,const char *iname,char *buff,uint32
 	uint32_t leng;
 	leng=0;
 	if (e->parent) {
-		syslog(LOG_ERR,"structure error - %s inconsistency (edge: %"PRIu32",%s -> %"PRIu32")",iname,e->parent->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+		syslog(LOG_ERR,"structure error - %s inconsistency (edge: %"PRIu32",%s -> %"PRIu32")",iname,e->parent->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 		if (leng<size) {
-			leng += snprintf(buff+leng,size-leng,"structure error - %s inconsistency (edge: %"PRIu32",%s -> %"PRIu32")\n",iname,e->parent->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+			leng += snprintf(buff+leng,size-leng,"structure error - %s inconsistency (edge: %"PRIu32",%s -> %"PRIu32")\n",iname,e->parent->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 		}
 	} else {
 		if (e->child->type==TYPE_TRASH) {
-			syslog(LOG_ERR,"structure error - %s inconsistency (edge: TRASH,%s -> %"PRIu32")",iname,changelog_escape_name(e->nleng,e->name),e->child->id);
+			syslog(LOG_ERR,"structure error - %s inconsistency (edge: TRASH,%s -> %"PRIu32")",iname,changelog_escape_name(e->nleng,e->name),e->child->inode);
 			if (leng<size) {
-				leng += snprintf(buff+leng,size-leng,"structure error - %s inconsistency (edge: TRASH,%s -> %"PRIu32")\n",iname,changelog_escape_name(e->nleng,e->name),e->child->id);
+				leng += snprintf(buff+leng,size-leng,"structure error - %s inconsistency (edge: TRASH,%s -> %"PRIu32")\n",iname,changelog_escape_name(e->nleng,e->name),e->child->inode);
 			}
 		} else if (e->child->type==TYPE_SUSTAINED) {
-			syslog(LOG_ERR,"structure error - %s inconsistency (edge: SUSTAINED,%s -> %"PRIu32")",iname,changelog_escape_name(e->nleng,e->name),e->child->id);
+			syslog(LOG_ERR,"structure error - %s inconsistency (edge: SUSTAINED,%s -> %"PRIu32")",iname,changelog_escape_name(e->nleng,e->name),e->child->inode);
 			if (leng<size) {
-				leng += snprintf(buff+leng,size-leng,"structure error - %s inconsistency (edge: SUSTAINED,%s -> %"PRIu32")\n",iname,changelog_escape_name(e->nleng,e->name),e->child->id);
+				leng += snprintf(buff+leng,size-leng,"structure error - %s inconsistency (edge: SUSTAINED,%s -> %"PRIu32")\n",iname,changelog_escape_name(e->nleng,e->name),e->child->inode);
 			}
 		} else {
-			syslog(LOG_ERR,"structure error - %s inconsistency (edge: NULL,%s -> %"PRIu32")",iname,changelog_escape_name(e->nleng,e->name),e->child->id);
+			syslog(LOG_ERR,"structure error - %s inconsistency (edge: NULL,%s -> %"PRIu32")",iname,changelog_escape_name(e->nleng,e->name),e->child->inode);
 			if (leng<size) {
-				leng += snprintf(buff+leng,size-leng,"structure error - %s inconsistency (edge: NULL,%s -> %"PRIu32")\n",iname,changelog_escape_name(e->nleng,e->name),e->child->id);
+				leng += snprintf(buff+leng,size-leng,"structure error - %s inconsistency (edge: NULL,%s -> %"PRIu32")\n",iname,changelog_escape_name(e->nleng,e->name),e->child->inode);
 			}
 		}
 	}
@@ -6148,9 +6166,9 @@ void fs_test_files() {
 					if (chunkid>0) {
 						switch(chunk_fileloop_task(chunkid,f->goal,j>lengchunks?1:0)) {
 							case CHUNK_FLOOP_NOTFOUND:
-								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->id,j);
+								syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,f->inode,j);
 								if (leng<MSGBUFFSIZE) {
-									leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")\n",chunkid,f->id,j);
+									leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")\n",chunkid,f->inode,j);
 								}
 								notfoundchunks++;
 								if ((notfoundchunks%1000)==0) {
@@ -6161,21 +6179,21 @@ void fs_test_files() {
 								break;
 							case CHUNK_FLOOP_DELETED:
 								f->data.fdata.chunktab[j] = 0;
-								changelog("%"PRIu32"|SETFILECHUNK(%"PRIu32",%"PRIu32",0)",(uint32_t)main_time(),f->id,j);
-								syslog(LOG_NOTICE,"inode: %"PRIu32" ; index: %"PRIu32" - removed not existing chunk exceeding file size (chunkid: %016"PRIX64")",f->id,j,chunkid);
+								changelog("%"PRIu32"|SETFILECHUNK(%"PRIu32",%"PRIu32",0)",(uint32_t)main_time(),f->inode,j);
+								syslog(LOG_NOTICE,"inode: %"PRIu32" ; index: %"PRIu32" - removed not existing chunk exceeding file size (chunkid: %016"PRIX64")",f->inode,j,chunkid);
 								break;
 							case CHUNK_FLOOP_MISSING_NOCOPY:
-								missing_log_insert(chunkid,f->id,j,0);
+								missing_log_insert(chunkid,f->inode,j,0);
 								valid = 0;
 								mchunks++;
 								break;
 							case CHUNK_FLOOP_MISSING_INVALID:
-								missing_log_insert(chunkid,f->id,j,1);
+								missing_log_insert(chunkid,f->inode,j,1);
 								valid = 0;
 								mchunks++;
 								break;
 							case CHUNK_FLOOP_MISSING_WRONGVERSION:
-								missing_log_insert(chunkid,f->id,j,2);
+								missing_log_insert(chunkid,f->inode,j,2);
 								valid = 0;
 								mchunks++;
 								break;
@@ -6207,14 +6225,14 @@ void fs_test_files() {
 			for (e=f->parents ; e ; e=e->nextparent) {
 				if (e->child != f) {
 					if (e->parent) {
-						syslog(LOG_ERR,"structure error - edge->child/child->edges (node: %"PRIu32" ; edge: %"PRIu32",%s -> %"PRIu32")",f->id,e->parent->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+						syslog(LOG_ERR,"structure error - edge->child/child->edges (node: %"PRIu32" ; edge: %"PRIu32",%s -> %"PRIu32")",f->inode,e->parent->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 						if (leng<MSGBUFFSIZE) {
-							leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - edge->child/child->edges (node: %"PRIu32" ; edge: %"PRIu32",%s -> %"PRIu32")\n",f->id,e->parent->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+							leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - edge->child/child->edges (node: %"PRIu32" ; edge: %"PRIu32",%s -> %"PRIu32")\n",f->inode,e->parent->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 						}
 					} else {
-						syslog(LOG_ERR,"structure error - edge->child/child->edges (node: %"PRIu32" ; edge: NULL,%s -> %"PRIu32")",f->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+						syslog(LOG_ERR,"structure error - edge->child/child->edges (node: %"PRIu32" ; edge: NULL,%s -> %"PRIu32")",f->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 						if (leng<MSGBUFFSIZE) {
-							leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - edge->child/child->edges (node: %"PRIu32" ; edge: NULL,%s -> %"PRIu32")\n",f->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+							leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - edge->child/child->edges (node: %"PRIu32" ; edge: NULL,%s -> %"PRIu32")\n",f->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 						}
 					}
 				} else if (e->nextchild) {
@@ -6239,14 +6257,14 @@ void fs_test_files() {
 				for (e=f->data.ddata.children ; e ; e=e->nextchild) {
 					if (e->parent != f) {
 						if (e->parent) {
-							syslog(LOG_ERR,"structure error - edge->parent/parent->edges (node: %"PRIu32" ; edge: %"PRIu32",%s -> %"PRIu32")",f->id,e->parent->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+							syslog(LOG_ERR,"structure error - edge->parent/parent->edges (node: %"PRIu32" ; edge: %"PRIu32",%s -> %"PRIu32")",f->inode,e->parent->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 							if (leng<MSGBUFFSIZE) {
-								leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - edge->parent/parent->edges (node: %"PRIu32" ; edge: %"PRIu32",%s -> %"PRIu32")\n",f->id,e->parent->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+								leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - edge->parent/parent->edges (node: %"PRIu32" ; edge: %"PRIu32",%s -> %"PRIu32")\n",f->inode,e->parent->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 							}
 						} else {
-							syslog(LOG_ERR,"structure error - edge->parent/parent->edges (node: %"PRIu32" ; edge: NULL,%s -> %"PRIu32")",f->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+							syslog(LOG_ERR,"structure error - edge->parent/parent->edges (node: %"PRIu32" ; edge: NULL,%s -> %"PRIu32")",f->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 							if (leng<MSGBUFFSIZE) {
-								leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - edge->parent/parent->edges (node: %"PRIu32" ; edge: NULL,%s -> %"PRIu32")\n",f->id,changelog_escape_name(e->nleng,e->name),e->child->id);
+								leng += snprintf(msgbuff+leng,MSGBUFFSIZE-leng,"structure error - edge->parent/parent->edges (node: %"PRIu32" ; edge: NULL,%s -> %"PRIu32")\n",f->inode,changelog_escape_name(e->nleng,e->name),e->child->inode);
 							}
 						}
 					} else if (e->nextchild) {
@@ -6325,7 +6343,7 @@ uint8_t fs_univ_emptysustained(uint32_t ts,uint8_t sesflags,uint32_t freeinodes)
 	while (e) {
 		p = e->child;
 		e = e->nextchild;
-		if (of_isfileopened(p->id)==0) {
+		if (of_isfileopened(p->inode)==0) {
 //		if (p->data.fdata.sessionids==NULL) {
 			fsnodes_purge(ts,p);
 			fi++;
@@ -6459,9 +6477,9 @@ static inline void fs_storeedge(fsedge *e,bio *fd) {
 	if (e->parent==NULL) {
 		put32bit(&ptr,0);
 	} else {
-		put32bit(&ptr,e->parent->id);
+		put32bit(&ptr,e->parent->inode);
 	}
-	put32bit(&ptr,e->child->id);
+	put32bit(&ptr,e->child->inode);
 	put64bit(&ptr,e->edgeid);
 	put16bit(&ptr,e->nleng);
 	memcpy(ptr,e->name,e->nleng);
@@ -6728,7 +6746,7 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 	}
 	ptr = unodebuff;
 	put8bit(&ptr,f->type);
-	put32bit(&ptr,f->id);
+	put32bit(&ptr,f->inode);
 	put8bit(&ptr,f->goal);
 	put8bit(&ptr,f->flags);
 	put16bit(&ptr,f->mode);
@@ -6917,7 +6935,7 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	p->aclpermflag = 0;
 	p->acldefflag = 0;
 	p->type = type;
-	p->id = get32bit(&ptr);
+	p->inode = get32bit(&ptr);
 	p->goal = get8bit(&ptr);
 	if (mver<=0x11) {
 		uint16_t flagsmode = get16bit(&ptr);
@@ -7034,13 +7052,13 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 
 		while (sessionids) {
 			sessionid = get32bit(&ptr);
-			of_mr_acquire(sessionid,p->id);
+			of_mr_acquire(sessionid,p->inode);
 			sessionids--;
 		}
 	}
 	p->parents = NULL;
 	fsnodes_node_add(p);
-	fsnodes_used_inode(p->id);
+	fsnodes_used_inode(p->inode);
 	nodes++;
 	if (type==TYPE_DIRECTORY) {
 		dirnodes++;
@@ -7120,9 +7138,9 @@ int fs_lostnode(fsnode *p) {
 	i=0;
 	do {
 		if (i==0) {
-			l = snprintf((char*)artname,40,"lost_node_%"PRIu32,p->id);
+			l = snprintf((char*)artname,40,"lost_node_%"PRIu32,p->inode);
 		} else {
-			l = snprintf((char*)artname,40,"lost_node_%"PRIu32".%"PRIu32,p->id,i);
+			l = snprintf((char*)artname,40,"lost_node_%"PRIu32".%"PRIu32,p->inode,i);
 		}
 		if (!fsnodes_nameisused(root,l,artname)) {
 			fsnodes_link(0,root,p,l,artname);
@@ -7145,8 +7163,8 @@ int fs_checknodes(int ignoreflag) {
 					fputc('\n',stderr);
 					nl=0;
 				}
-				fprintf(stderr,"found orphaned inode: %"PRIu32"\n",p->id);
-				syslog(LOG_ERR,"found orphaned inode: %"PRIu32,p->id);
+				fprintf(stderr,"found orphaned inode: %"PRIu32"\n",p->inode);
+				syslog(LOG_ERR,"found orphaned inode: %"PRIu32,p->inode);
 				if (ignoreflag) {
 					if (fs_lostnode(p)<0) {
 						return -1;
@@ -7257,7 +7275,7 @@ uint8_t fs_storefree(bio *fd) {
 			l=0;
 			ptr=wbuff;
 		}
-		put32bit(&ptr,n->id);
+		put32bit(&ptr,n->inode);
 		put32bit(&ptr,n->ftime);
 		l++;
 	}
@@ -7327,7 +7345,7 @@ int fs_loadfree(bio *fd,uint8_t mver) {
 		nodeid = get32bit(&ptr);
 		ftime = get32bit(&ptr);
 		n = freenode_malloc();
-		n->id = nodeid;
+		n->inode = nodeid;
 		n->ftime = ftime;
 		n->next = NULL;
 		*freetail = n;
@@ -7370,7 +7388,7 @@ uint8_t fs_storequota(bio *fd) {
 				l=0;
 				ptr=wbuff;
 			}
-			put32bit(&ptr,qn->node->id);
+			put32bit(&ptr,qn->node->inode);
 			put8bit(&ptr,qn->exceeded);
 			put8bit(&ptr,qn->flags);
 			put32bit(&ptr,qn->stimestamp);
@@ -7398,7 +7416,7 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 	const uint8_t *ptr;
 	quotanode *qn;
 	fsnode *fn;
-	uint32_t l,t,id;
+	uint32_t l,t,inode;
 	uint8_t nl=1;
 
 	(void)mver;
@@ -7447,15 +7465,15 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 			}
 			ptr = rbuff;
 		}
-		id = get32bit(&ptr);
-		fn = fsnodes_node_find(id);
+		inode = get32bit(&ptr);
+		fn = fsnodes_node_find(inode);
 		if (fn==NULL || fn->type!=TYPE_DIRECTORY) {
 			if (nl) {
 				fputc('\n',stderr);
 				nl=0;
 			}
-			fprintf(stderr,"quota defined for %s inode: %"PRIu32"\n",(fn==NULL)?"non existing":"not directory",id);
-			syslog(LOG_ERR,"quota defined for %s inode: %"PRIu32,(fn==NULL)?"non existing":"not directory",id);
+			fprintf(stderr,"quota defined for %s inode: %"PRIu32"\n",(fn==NULL)?"non existing":"not directory",inode);
+			syslog(LOG_ERR,"quota defined for %s inode: %"PRIu32,(fn==NULL)?"non existing":"not directory",inode);
 			if (ignoreflag) {
 				ptr+=62;
 			} else {
@@ -7489,7 +7507,7 @@ void fs_new(void) {
 	fsnodes_init_freebitmask();
 	root = fsnode_dir_malloc();
 	passert(root);
-	root->id = MFS_ROOT_ID;
+	root->inode = MFS_ROOT_ID;
 	root->xattrflag = 0;
 	root->aclpermflag = 0;
 	root->acldefflag = 0;
@@ -7508,7 +7526,7 @@ void fs_new(void) {
 	root->data.ddata.nlink = 2;
 	root->parents = NULL;
 	fsnodes_node_add(root);
-	fsnodes_used_inode(root->id);
+	fsnodes_used_inode(root->inode);
 	nodes=1;
 	dirnodes=1;
 	filenodes=0;

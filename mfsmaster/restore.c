@@ -398,12 +398,18 @@ int do_emptysustained(const char *filename,uint64_t lv,uint32_t ts,const char *p
 }
 
 int do_freeinodes(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t freeinodes;
+	uint32_t sustainedinodes,freeinodes;
 	EAT(ptr,filename,lv,'(');
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(freeinodes,ptr);
-	return fs_mr_freeinodes(ts,freeinodes);
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU32(sustainedinodes,ptr);
+	} else {
+		sustainedinodes = 0;
+	}
+	return fs_mr_freeinodes(ts,freeinodes,sustainedinodes);
 }
 
 int do_incversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

@@ -94,10 +94,10 @@ typedef struct _threc {
 
 typedef struct _acquired_file {
 	uint32_t inode;
-	uint32_t cnt;
+	unsigned cnt:31; // open/close count
+	unsigned dentry:1; // inode exists in dentry cache (can't be removed/reused)
 	struct _acquired_file *next;
 } acquired_file;
-
 
 #define DEFAULT_OUTPUT_BUFFSIZE 0x1000
 #define DEFAULT_INPUT_BUFFSIZE 0x10000
@@ -382,6 +382,50 @@ void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes) {
 	pthread_mutex_unlock(&fdlock);
 }
 */
+
+void fs_add_entry(uint32_t inode) {
+	acquired_file *afptr,**afpptr;
+	pthread_mutex_lock(&aflock);
+	afpptr = &afhead;
+	while ((afptr=*afpptr)) {
+		if (afptr->inode == inode) {
+			afptr->dentry = 1;
+			pthread_mutex_unlock(&aflock);
+			return;
+		}
+		if (afptr->inode > inode) {
+			break;
+		}
+		afpptr = &(afptr->next);
+	}
+	afptr = (acquired_file*)malloc(sizeof(acquired_file));
+	afptr->inode = inode;
+	afptr->cnt = 0;
+	afptr->dentry = 1;
+	afptr->next = *afpptr;
+	*afpptr = afptr;
+	pthread_mutex_unlock(&aflock);
+}
+
+void fs_forget_entry(uint32_t inode) {
+	acquired_file *afptr,**afpptr;
+	pthread_mutex_lock(&aflock);
+	afpptr = &afhead;
+	while ((afptr=*afpptr)) {
+		if (afptr->inode == inode) {
+			afptr->dentry = 0;
+			if (afptr->cnt==0) {
+				*afpptr = afptr->next;
+				free(afptr);
+			}
+			pthread_mutex_unlock(&aflock);
+			return;
+		}
+		afpptr = &(afptr->next);
+	}
+	pthread_mutex_unlock(&aflock);
+}
+
 void fs_inc_acnt(uint32_t inode) {
 	acquired_file *afptr,**afpptr;
 	pthread_mutex_lock(&aflock);
@@ -400,6 +444,7 @@ void fs_inc_acnt(uint32_t inode) {
 	afptr = (acquired_file*)malloc(sizeof(acquired_file));
 	afptr->inode = inode;
 	afptr->cnt = 1;
+	afptr->dentry = 0;
 	afptr->next = *afpptr;
 	*afpptr = afptr;
 	pthread_mutex_unlock(&aflock);
@@ -411,11 +456,12 @@ void fs_dec_acnt(uint32_t inode) {
 	afpptr = &afhead;
 	while ((afptr=*afpptr)) {
 		if (afptr->inode == inode) {
-			if (afptr->cnt<=1) {
+			if (afptr->cnt>0) {
+				afptr->cnt--;
+			}
+			if (afptr->cnt==0 && afptr->dentry==0) {
 				*afpptr = afptr->next;
 				free(afptr);
-			} else {
-				afptr->cnt--;
 			}
 			pthread_mutex_unlock(&aflock);
 			return;
@@ -1901,7 +1947,7 @@ uint8_t fs_access(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint16
 	return ret;
 }
 
-uint8_t fs_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[35]) {
+uint8_t fs_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[35],uint16_t *lflags,uint8_t *csdataver,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -1944,15 +1990,47 @@ uint8_t fs_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid
 		ret = ERROR_IO;
 	} else if (i==1) {
 		ret = rptr[0];
-	} else if (i!=39) {
+	} else if (i==39) {
+		*inode = get32bit(&rptr);
+		memcpy(attr,rptr,35);
+		*lflags = 0xFFFF;
+		ret = STATUS_OK;
+	} else if (i>=41) {
+		*inode = get32bit(&rptr);
+		memcpy(attr,rptr,35);
+		rptr+=35;
+		*lflags = get16bit(&rptr);
+		ret = STATUS_OK;
+		if ((*lflags) & LOOKUP_CHUNK_ZERO_DATA) {
+			if (i>=54) {
+				*csdataver = get8bit(&rptr);
+				*chunkid = get64bit(&rptr);
+				*version = get32bit(&rptr);
+				*csdata = rptr;
+				*csdatasize = i-54;
+				if ((*csdataver)!=2 || ((i-54)%14)!=0) {
+					ret = ERROR_IO;
+				}
+			} else {
+				ret = ERROR_IO;
+			}
+		} else {
+			*csdataver = 0;
+			*chunkid = 0;
+			*version = 0;
+			*csdata = NULL;
+			*csdatasize = 0;
+		}
+		if (ret == ERROR_IO) {
+			pthread_mutex_lock(&fdlock);
+			disconnect = 1;
+			pthread_mutex_unlock(&fdlock);
+		}
+	} else {
 		pthread_mutex_lock(&fdlock);
 		disconnect = 1;
 		pthread_mutex_unlock(&fdlock);
 		ret = ERROR_IO;
-	} else {
-		*inode = get32bit(&rptr);
-		memcpy(attr,rptr,35);
-		ret = STATUS_OK;
 	}
 	return ret;
 }

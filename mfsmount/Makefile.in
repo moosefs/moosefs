@@ -111,13 +111,14 @@ am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	mfsmount-dirattrcache.$(OBJEXT) \
 	mfsmount-symlinkcache.$(OBJEXT) \
 	mfsmount-negentrycache.$(OBJEXT) mfsmount-xattrcache.$(OBJEXT) \
-	mfsmount-chunkloccache.$(OBJEXT) mfsmount-getgroups.$(OBJEXT) \
-	mfsmount-mfs_fuse.$(OBJEXT) mfsmount-mfs_meta_fuse.$(OBJEXT) \
-	mfsmount-mastercomm.$(OBJEXT) mfsmount-masterproxy.$(OBJEXT) \
-	mfsmount-csorder.$(OBJEXT) mfsmount-readdata.$(OBJEXT) \
-	mfsmount-writedata.$(OBJEXT) mfsmount-csdb.$(OBJEXT) \
-	mfsmount-stats.$(OBJEXT) mfsmount-oplog.$(OBJEXT) \
-	mfsmount-main.$(OBJEXT) ../mfscommon/mfsmount-clocks.$(OBJEXT) \
+	mfsmount-fdcache.$(OBJEXT) mfsmount-invalidator.$(OBJEXT) \
+	mfsmount-getgroups.$(OBJEXT) mfsmount-mfs_fuse.$(OBJEXT) \
+	mfsmount-mfs_meta_fuse.$(OBJEXT) mfsmount-mastercomm.$(OBJEXT) \
+	mfsmount-masterproxy.$(OBJEXT) mfsmount-csorder.$(OBJEXT) \
+	mfsmount-readdata.$(OBJEXT) mfsmount-writedata.$(OBJEXT) \
+	mfsmount-csdb.$(OBJEXT) mfsmount-stats.$(OBJEXT) \
+	mfsmount-oplog.$(OBJEXT) mfsmount-main.$(OBJEXT) \
+	../mfscommon/mfsmount-clocks.$(OBJEXT) \
 	../mfscommon/mfsmount-delayrun.$(OBJEXT) \
 	../mfscommon/mfsmount-pcqueue.$(OBJEXT) \
 	../mfscommon/mfsmount-crc.$(OBJEXT) \
@@ -407,7 +408,8 @@ mfsmount_SOURCES = \
 	symlinkcache.c symlinkcache.h \
 	negentrycache.c negentrycache.h \
 	xattrcache.c xattrcache.h \
-	chunkloccache.c chunkloccache.h \
+	fdcache.c fdcache.h \
+	invalidator.c invalidator.h \
 	getgroups.c getgroups.h \
 	mfs_fuse.c mfs_fuse.h \
 	mfs_meta_fuse.c mfs_meta_fuse.h \
@@ -633,11 +635,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-strerr.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunkloccache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csdb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csorder.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirattrcache.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-fdcache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-getgroups.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-invalidator.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-labelparser.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-mastercomm.Po@am__quote@
@@ -748,19 +751,33 @@ mfsmount-xattrcache.obj: xattrcache.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-xattrcache.obj `if test -f 'xattrcache.c'; then $(CYGPATH_W) 'xattrcache.c'; else $(CYGPATH_W) '$(srcdir)/xattrcache.c'; fi`
 
-mfsmount-chunkloccache.o: chunkloccache.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-chunkloccache.o -MD -MP -MF $(DEPDIR)/mfsmount-chunkloccache.Tpo -c -o mfsmount-chunkloccache.o `test -f 'chunkloccache.c' || echo '$(srcdir)/'`chunkloccache.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-chunkloccache.Tpo $(DEPDIR)/mfsmount-chunkloccache.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chunkloccache.c' object='mfsmount-chunkloccache.o' libtool=no @AMDEPBACKSLASH@
+mfsmount-fdcache.o: fdcache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-fdcache.o -MD -MP -MF $(DEPDIR)/mfsmount-fdcache.Tpo -c -o mfsmount-fdcache.o `test -f 'fdcache.c' || echo '$(srcdir)/'`fdcache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-fdcache.Tpo $(DEPDIR)/mfsmount-fdcache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fdcache.c' object='mfsmount-fdcache.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-chunkloccache.o `test -f 'chunkloccache.c' || echo '$(srcdir)/'`chunkloccache.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-fdcache.o `test -f 'fdcache.c' || echo '$(srcdir)/'`fdcache.c
 
-mfsmount-chunkloccache.obj: chunkloccache.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-chunkloccache.obj -MD -MP -MF $(DEPDIR)/mfsmount-chunkloccache.Tpo -c -o mfsmount-chunkloccache.obj `if test -f 'chunkloccache.c'; then $(CYGPATH_W) 'chunkloccache.c'; else $(CYGPATH_W) '$(srcdir)/chunkloccache.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-chunkloccache.Tpo $(DEPDIR)/mfsmount-chunkloccache.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chunkloccache.c' object='mfsmount-chunkloccache.obj' libtool=no @AMDEPBACKSLASH@
+mfsmount-fdcache.obj: fdcache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-fdcache.obj -MD -MP -MF $(DEPDIR)/mfsmount-fdcache.Tpo -c -o mfsmount-fdcache.obj `if test -f 'fdcache.c'; then $(CYGPATH_W) 'fdcache.c'; else $(CYGPATH_W) '$(srcdir)/fdcache.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-fdcache.Tpo $(DEPDIR)/mfsmount-fdcache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fdcache.c' object='mfsmount-fdcache.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-chunkloccache.obj `if test -f 'chunkloccache.c'; then $(CYGPATH_W) 'chunkloccache.c'; else $(CYGPATH_W) '$(srcdir)/chunkloccache.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-fdcache.obj `if test -f 'fdcache.c'; then $(CYGPATH_W) 'fdcache.c'; else $(CYGPATH_W) '$(srcdir)/fdcache.c'; fi`
+
+mfsmount-invalidator.o: invalidator.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-invalidator.o -MD -MP -MF $(DEPDIR)/mfsmount-invalidator.Tpo -c -o mfsmount-invalidator.o `test -f 'invalidator.c' || echo '$(srcdir)/'`invalidator.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-invalidator.Tpo $(DEPDIR)/mfsmount-invalidator.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='invalidator.c' object='mfsmount-invalidator.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-invalidator.o `test -f 'invalidator.c' || echo '$(srcdir)/'`invalidator.c
+
+mfsmount-invalidator.obj: invalidator.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-invalidator.obj -MD -MP -MF $(DEPDIR)/mfsmount-invalidator.Tpo -c -o mfsmount-invalidator.obj `if test -f 'invalidator.c'; then $(CYGPATH_W) 'invalidator.c'; else $(CYGPATH_W) '$(srcdir)/invalidator.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-invalidator.Tpo $(DEPDIR)/mfsmount-invalidator.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='invalidator.c' object='mfsmount-invalidator.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-invalidator.obj `if test -f 'invalidator.c'; then $(CYGPATH_W) 'invalidator.c'; else $(CYGPATH_W) '$(srcdir)/invalidator.c'; fi`
 
 mfsmount-getgroups.o: getgroups.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-getgroups.o -MD -MP -MF $(DEPDIR)/mfsmount-getgroups.Tpo -c -o mfsmount-getgroups.o `test -f 'getgroups.c' || echo '$(srcdir)/'`getgroups.c

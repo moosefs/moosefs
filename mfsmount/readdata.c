@@ -90,9 +90,11 @@ typedef struct cblock_s {
 
 #define MAXREQINQUEUE 16
 
-#define MREQ_CACHE_SIZE 256
+#define MREQ_HASH_SIZE 0x20000
 
-#define MREQ_TIMEOUT 1.0
+#define MREQ_TIMEOUT 3600.0
+
+#define MREQ_MAX_CHAIN_LENG 5
 
 enum {NEW,INQUEUE,BUSY,REFRESH,BREAK,FILLED,READY,FREE};
 
@@ -253,12 +255,12 @@ static void *jqueue; //,*dqueue;
 
 /* master request cache */
 
-static inline void read_invalidate_masterdata(uint32_t inode,uint32_t chindx) {
+static inline void read_invalidate_chunkdata(uint32_t inode,uint32_t chindx) {
 	uint32_t hash;
 	mreqcache *mrc;
 
 	zassert(pthread_mutex_lock(&mreq_cache_lock));
-	hash = ((inode * 0x4A599F6D + chindx) * 0xB15831CB) % MREQ_CACHE_SIZE;
+	hash = ((inode * 0x4A599F6D + chindx) * 0xB15831CB) % MREQ_HASH_SIZE;
 	for (mrc = mreq_cache[hash] ; mrc ; mrc=mrc->next) {
 		if (mrc->inode==inode && mrc->chindx==chindx) {
 			if (mrc->state==MR_READY) {
@@ -271,13 +273,49 @@ static inline void read_invalidate_masterdata(uint32_t inode,uint32_t chindx) {
 	zassert(pthread_mutex_unlock(&mreq_cache_lock));
 }
 
-static inline uint8_t read_get_masterdata(inodedata *ind,cspri chain[100],uint16_t *chainelements,uint32_t chindx,uint64_t *mfleng,uint64_t *chunkid,uint32_t *version) {
+void read_inject_chunkdata(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint8_t csdataver,uint8_t *csdata,uint32_t csdatasize) {
+	uint32_t hash;
+	mreqcache *mrc;
+	double now;
+
+	now = monotonic_seconds();
+	zassert(pthread_mutex_lock(&mreq_cache_lock));
+	hash = ((inode * 0x4A599F6D + chindx) * 0xB15831CB) % MREQ_HASH_SIZE;
+	for (mrc = mreq_cache[hash] ; mrc != NULL ; mrc = mrc->next) {
+		if (mrc->inode==inode && mrc->chindx==chindx) { // as for now - just ignore it
+			zassert(pthread_mutex_unlock(&mreq_cache_lock));
+			return;
+		} 
+	}
+	mrc = malloc(sizeof(mreqcache));
+	memset(mrc,0,sizeof(mreqcache));
+	mrc->time = now;
+	mrc->inode = inode;
+	mrc->chindx = chindx;
+	mrc->chunkid = chunkid;
+	mrc->version = version;
+	mrc->csdataver = csdataver;
+	mrc->csdatasize = csdatasize;
+	mrc->csdata = malloc(csdatasize);
+	memcpy(mrc->csdata,csdata,csdatasize);
+	mrc->reqwaiting = 0;
+	mrc->status = STATUS_OK;
+	mrc->state = MR_READY;
+	zassert(pthread_cond_init(&(mrc->reqcond),NULL));
+	mrc->next = mreq_cache[hash];
+	mreq_cache[hash] = mrc;
+	zassert(pthread_mutex_unlock(&mreq_cache_lock));
+}
+
+static inline uint8_t read_get_chunkdata(inodedata *ind,cspri chain[100],uint16_t *chainelements,uint32_t chindx,uint64_t *mfleng,uint64_t *chunkid,uint32_t *version) {
 	uint32_t hash;
 	mreqcache *mrc,**mrcp;
+	mreqcache **oldestreq;
+	double oldestreqtime;
 	const uint8_t *csdata;
 	uint8_t canmodatime;
 	uint8_t flengisvalid;
-	uint32_t inode;
+	uint32_t inode,hchainleng;
 	double now;
 
 //	zassert(pthread_mutex_lock(&(ind->lock)));
@@ -288,8 +326,11 @@ static inline uint8_t read_get_masterdata(inodedata *ind,cspri chain[100],uint16
 
 	now = monotonic_seconds();
 	zassert(pthread_mutex_lock(&mreq_cache_lock));
-	hash = ((inode * 0x4A599F6D + chindx) * 0xB15831CB) % MREQ_CACHE_SIZE;
+	hash = ((inode * 0x4A599F6D + chindx) * 0xB15831CB) % MREQ_HASH_SIZE;
 	mrcp = mreq_cache+hash;
+	oldestreq = NULL;
+	oldestreqtime = now;
+	hchainleng = 0;
 	while ((mrc = *mrcp)) {
 		if (mrc->inode==inode && mrc->chindx==chindx) {
 			if (mrc->state==MR_INIT) { // request in progress - ignore other fields
@@ -333,19 +374,39 @@ static inline uint8_t read_get_masterdata(inodedata *ind,cspri chain[100],uint16
 			}
 			free(mrc);
 		} else {
+			if (mrc->state==MR_READY) {
+				if (oldestreq==NULL || mrc->time < oldestreqtime) {
+					oldestreq = mrcp;
+					oldestreqtime = mrc->time;
+				}
+				hchainleng++;
+			}
 			mrcp = &(mrc->next);
 		}
 	}
 	if (mrc==NULL) {
-		mrc = malloc(sizeof(mreqcache));
-		memset(mrc,0,sizeof(mreqcache));
-		mrc->inode = inode;
-		mrc->chindx = chindx;
-		mrc->state = MR_INIT;
-		mrc->reqwaiting = 0;
-		zassert(pthread_cond_init(&(mrc->reqcond),NULL));
-		mrc->next = mreq_cache[hash];
-		mreq_cache[hash] = mrc;
+		if (hchainleng > MREQ_MAX_CHAIN_LENG && oldestreq!=NULL) { // chain too long - reuse oldest entry
+			mrc = *oldestreq;
+			if (mrc->csdata) {
+				free(mrc->csdata);
+			}
+			mrc->inode = inode;
+			mrc->chindx = chindx;
+			mrc->csdata = NULL;
+			mrc->csdatasize = 0;
+			mrc->state = MR_INIT;
+			mrc->reqwaiting = 0;
+		} else {
+			mrc = malloc(sizeof(mreqcache));
+			memset(mrc,0,sizeof(mreqcache));
+			mrc->inode = inode;
+			mrc->chindx = chindx;
+			mrc->state = MR_INIT;
+			mrc->reqwaiting = 0;
+			zassert(pthread_cond_init(&(mrc->reqcond),NULL));
+			mrc->next = mreq_cache[hash];
+			mreq_cache[hash] = mrc;
+		}
 	} else {
 		if (mrc->csdata) {
 			free(mrc->csdata);
@@ -748,7 +809,7 @@ void* read_worker(void *arg) {
 			continue;
 		}
 
-		rdstatus = read_get_masterdata(ind,chain,&chainelements,chindx,&mfleng,&chunkid,&version); // unlocks (ind->lock)
+		rdstatus = read_get_chunkdata(ind,chain,&chainelements,chindx,&mfleng,&chunkid,&version); // unlocks (ind->lock)
 
 #if 0
 		now = monotonic_seconds();
@@ -931,7 +992,7 @@ void* read_worker(void *arg) {
 			} else {
 				rreq->mode = INQUEUE;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
-				read_invalidate_masterdata(inode,chindx);
+				read_invalidate_chunkdata(inode,chindx);
 				read_delayed_enqueue(rreq,60000000);
 			}
 			continue;
@@ -983,7 +1044,7 @@ void* read_worker(void *arg) {
 			} else {
 				rreq->mode = INQUEUE;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
-				read_invalidate_masterdata(inode,chindx);
+				read_invalidate_chunkdata(inode,chindx);
 				read_delayed_enqueue(rreq,10000+((trycnt<30)?((trycnt-1)*300000):10000000));
 			}
 			continue;
@@ -1396,11 +1457,11 @@ void* read_worker(void *arg) {
 			ind->trycnt++;
 			if (ind->trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
-				read_invalidate_masterdata(inode,chindx);
+				read_invalidate_chunkdata(inode,chindx);
 				read_job_end(rreq,status,0);
 			} else {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
-				read_invalidate_masterdata(inode,chindx);
+				read_invalidate_chunkdata(inode,chindx);
 				read_job_end(rreq,0,10000+((ind->trycnt<30)?((ind->trycnt-1)*300000):10000000));
 			}
 		} else {
@@ -1440,9 +1501,9 @@ void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t read
 	zassert(pthread_cond_init(&worker_term_cond,NULL));
 	worker_term_waiting = 0;
 
-	mreq_cache = malloc(sizeof(mreqcache*)*MREQ_CACHE_SIZE);
+	mreq_cache = malloc(sizeof(mreqcache*)*MREQ_HASH_SIZE);
 	passert(mreq_cache);
-	for (i=0 ; i<MREQ_CACHE_SIZE ; i++) {
+	for (i=0 ; i<MREQ_HASH_SIZE ; i++) {
 		mreq_cache[i]=NULL;
 	}
 
@@ -1513,7 +1574,7 @@ void read_data_term(void) {
 	free(indhash);
 	zassert(pthread_mutex_unlock(&glock));
 	zassert(pthread_mutex_lock(&mreq_cache_lock));
-	for (i=0 ; i<MREQ_CACHE_SIZE ; i++) {
+	for (i=0 ; i<MREQ_HASH_SIZE ; i++) {
 		for (mrc = mreq_cache[i] ; mrc ; mrc = mrcn) {
 			mrcn = mrc->next;
 			zassert(pthread_cond_destroy(&(mrc->reqcond)));
@@ -2410,7 +2471,7 @@ void read_inode_set_length(uint32_t inode,uint64_t newlength,uint8_t active) {
 	zassert(pthread_mutex_unlock(&glock));
 }
 
-void* read_data_new(uint32_t inode) {
+void* read_data_new(uint32_t inode,uint64_t fleng) {
 	uint32_t indh = IDHASH(inode);
 	inodedata *ind;
 
@@ -2419,9 +2480,9 @@ void* read_data_new(uint32_t inode) {
 	ind = malloc(sizeof(inodedata));
 	passert(ind);
 	ind->inode = inode;
-	ind->flengisvalid = 0;
+	ind->flengisvalid = 1; // SINCE 3.0.40 always 1 - OBSOLETE
 	ind->seqdata = 0;
-	ind->fleng = 0;
+	ind->fleng = fleng;
 	ind->status = 0;
 	ind->trycnt = 0;
 	ind->inqueue = 0;

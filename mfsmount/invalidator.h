@@ -18,24 +18,16 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
-#ifndef _WRITEDATA_H_
-#define _WRITEDATA_H_
+#ifndef _INVALIDATOR_H_
+#define _INVALIDATOR_H_
 
 #include <inttypes.h>
+#include <fuse_lowlevel.h>
 
-void write_data_init(uint32_t cachesize,uint32_t retries);
-void write_data_term(void);
-void* write_data_new(uint32_t inode,uint64_t fleng);
-int write_data_end(void *vid);
-int write_data_chunk_wait(void *vid);
-int write_data_flush(void *vid);
-void write_data_inode_setmaxfleng(uint32_t inode,uint64_t maxfleng);
-uint64_t write_data_inode_getmaxfleng(uint32_t inode);
-uint64_t write_data_getmaxfleng(void *vid);
-int write_data_flush_inode(uint32_t inode);
-int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *buff);
-void write_inode_dont_modify_mtime(uint32_t inode);
-uint8_t write_cache_almost_full(void);
-// uint64_t write_data_get_maxfleng(uint32_t inode);
+void invalidator_insert(uint32_t parent,const char *name,uint8_t nleng,uint32_t inode,double timeout);
+void invalidator_forget(uint32_t inode,uint64_t nlookup);
+void invalidator_term(void);
+void invalidator_on(void);
+void invalidator_init(struct fuse_chan *ch);
 
 #endif

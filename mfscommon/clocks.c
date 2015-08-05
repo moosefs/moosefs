@@ -27,7 +27,7 @@
 #    define HAVE_MACH_ABSOLUTE_TIME 1
 #    define HAVE_MACH_TIMEBASE_INFO 1
 #  endif
-#  if defined(__linux__) || defined(__FreeBSD__)
+#  if defined(__linux__) || defined(__FreeBSD__) || defined(WIN32)
 #    define HAVE_CLOCK_GETTIME 1
 #  endif
 #  if defined(__posix__)

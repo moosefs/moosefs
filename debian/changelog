@@ -1,3 +1,13 @@
+moosefs (3.0.40-1) unstable; urgency=medium
+
+  * (master+mount) added using fuse's forgets in inode number reusage (fixes
+    very rare EBUSY case when inode number is reused after unlink of directory
+    which is still open or used as a current working directory)
+  * (master+mount) sped up reading of small files
+  * (mount) increased chunk location cache (sped up reading files)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 05 Aug 2015 13:00:00 +0200
+
 moosefs (3.0.39-1) unstable; urgency=medium
 
   * (master) fixed truncate bug (wrong behaviour when chunk was locked - not

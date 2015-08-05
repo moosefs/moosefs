@@ -75,7 +75,7 @@
 // matoclserventry.mode
 enum {KILL,DATA,FINISH};
 // chunklis.type
-enum {FUSE_WRITE,FUSE_READ,FUSE_TRUNCATE};
+enum {FUSE_WRITE,FUSE_READ,FUSE_TRUNCATE,FUSE_CREATE};
 
 // #define SESSION_STATS 16
 
@@ -1153,10 +1153,15 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 	if (eptr->mode!=DATA) {
 		return;
 	}
-	if (status==STATUS_OK) {
+	if (status==STATUS_OK && type!=FUSE_CREATE) {
 		dcm_modify(inode,sessions_get_id(eptr->sesdata));
 	}
 	switch (type) {
+	case FUSE_CREATE:
+		if (status==STATUS_OK) { // just unlock this chunk
+			fs_writeend(inode,0,chunkid,0);
+		}
+		return;
 	case FUSE_WRITE:
 		if (status==STATUS_OK) {
 			if (eptr->version>=VERSION2INT(3,0,10)) {
@@ -2532,6 +2537,10 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	const uint8_t *name;
 	uint32_t newinode;
 	uint8_t attr[35];
+	uint16_t lflags;
+	uint8_t accmode;
+	uint8_t validchunk;
+	uint64_t chunkid;
 	uint32_t msgid;
 	uint8_t *ptr;
 	uint8_t status;
@@ -2570,17 +2579,71 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		agid = gid[0];
 		sessions_ugid_remap(eptr->sesdata,&uid,gid);
 	}
-	status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr);
-	if (status==ERROR_ENOENT_NOCACHE && eptr->version<VERSION2INT(3,0,25)) {
-		status = ERROR_ENOENT;
-	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,(status!=STATUS_OK)?5:43);
-	put32bit(&ptr,msgid);
-	if (status!=STATUS_OK) {
-		put8bit(&ptr,status);
+	if (eptr->version>=VERSION2INT(3,0,40)) {
+		uint8_t sesflags = sessions_get_sesflags(eptr->sesdata);
+		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,&accmode,&validchunk,&chunkid);
+		if (status==STATUS_OK) {
+			uint32_t version;
+			uint8_t count;
+			uint8_t cs_data[100*14];
+			lflags = (accmode & LOOKUP_ACCESS_BITS);
+			if ((lflags&(LOOKUP_ACCESS_MODE_R|LOOKUP_ACCESS_MODE_W))!=0) { // can be read and/or written
+				if (dcm_open(inode,sessions_get_id(eptr->sesdata))==0) {
+					if (sesflags&SESFLAG_ATTRBIT) {
+						attr[0]&=(0xFF^MATTR_ALLOWDATACACHE);
+					} else {
+						attr[1]&=(0xFF^(MATTR_ALLOWDATACACHE<<4));
+					}
+				}
+				if (validchunk) {
+					if (chunkid>0) {
+						status = chunk_get_version_and_csdata(2,chunkid,eptr->peerip,&version,&count,cs_data);
+						if (status==STATUS_OK) {
+							lflags |= LOOKUP_CHUNK_ZERO_DATA;
+						}
+					} else {
+						version = 0;
+						count = 0;
+						lflags |= LOOKUP_CHUNK_ZERO_DATA;
+					}
+				}
+			}
+			if (lflags & LOOKUP_CHUNK_ZERO_DATA) {
+				ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,58+count*14);
+				put32bit(&ptr,msgid);
+				put32bit(&ptr,newinode);
+				memcpy(ptr,attr,35);
+				ptr+=35;
+				put16bit(&ptr,lflags);
+				put8bit(&ptr,2);
+				put64bit(&ptr,chunkid);
+				put32bit(&ptr,version);
+				memcpy(ptr,cs_data,count*14);
+			} else {
+				ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,45);
+				put32bit(&ptr,msgid);
+				put32bit(&ptr,newinode);
+				memcpy(ptr,attr,35);
+				ptr+=35;
+				put16bit(&ptr,lflags);
+			}
+		}
 	} else {
-		put32bit(&ptr,newinode);
-		memcpy(ptr,attr,35);
+		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,NULL,NULL,NULL);
+		if (status==ERROR_ENOENT_NOCACHE && eptr->version<VERSION2INT(3,0,25)) {
+			status = ERROR_ENOENT;
+		}
+		if (status==STATUS_OK) {
+			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,43);
+			put32bit(&ptr,msgid);
+			put32bit(&ptr,newinode);
+			memcpy(ptr,attr,35);
+		}
+	}
+	if (status!=STATUS_OK) {
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,5);
+		put32bit(&ptr,msgid);
+		put8bit(&ptr,status);
 	}
 	sessions_inc_stats(eptr->sesdata,3);
 }
@@ -3318,7 +3381,6 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	uint32_t msgid;
 	uint8_t *ptr;
 	uint8_t status;
-	int allowcache;
 	if (length<17) {
 		syslog(LOG_NOTICE,"CLTOMA_FUSE_OPEN - wrong size (%"PRIu32"/17+N*4)",length);
 		eptr->mode = KILL;
@@ -3354,8 +3416,7 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 		of_openfile(sessions_get_id(eptr->sesdata),inode);
 	}
 	if (eptr->version>=VERSION2INT(1,6,9) && status==STATUS_OK) {
-		allowcache = dcm_open(inode,sessions_get_id(eptr->sesdata));
-		if (allowcache==0) {
+		if (dcm_open(inode,sessions_get_id(eptr->sesdata))==0) {
 			if (sesflags&SESFLAG_ATTRBIT) {
 				attr[0]&=(0xFF^MATTR_ALLOWDATACACHE);
 			} else {
@@ -3432,6 +3493,31 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	sesflags = sessions_get_sesflags(eptr->sesdata);
 	status = fs_mknod(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,TYPE_FILE,mode,cumask,uid,gids,gid,auid,agid,0,&newinode,attr);
 	if (status==STATUS_OK) {
+		uint64_t prevchunkid,chunkid,fleng;
+		uint8_t opflag;
+		swchunks *swc;
+		/* create first chunk */
+		if (fs_writechunk(newinode,0,0,&prevchunkid,&chunkid,&fleng,&opflag)==STATUS_OK) {
+			massert(prevchunkid==0,"chunk created after mknod - prevchunkid should be always zero");
+			if (opflag) {
+				i = CHUNKHASH(chunkid);
+				swc = malloc(sizeof(swchunks));
+				passert(swc);
+				swc->eptr = eptr;
+				swc->inode = newinode;
+				swc->indx = 0;
+				swc->prevchunkid = prevchunkid;
+				swc->chunkid = chunkid;
+				swc->msgid = 0;
+				swc->fleng = fleng;
+				swc->type = FUSE_CREATE;
+				swc->next = swchunkshash[i];
+				swchunkshash[i] = swc;
+			} else {
+				fs_writeend(newinode,0,chunkid,0); // no operation? - just unlock this chunk
+			}
+		}
+		/* open file */
 		of_openfile(sessions_get_id(eptr->sesdata),newinode);
 		allowcache = dcm_open(newinode,sessions_get_id(eptr->sesdata));
 		if (allowcache==0) {

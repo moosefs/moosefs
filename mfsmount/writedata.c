@@ -273,7 +273,7 @@ inodedata* write_find_inodedata(uint32_t inode) {
 	return NULL;
 }
 
-inodedata* write_get_inodedata(uint32_t inode) {
+inodedata* write_get_inodedata(uint32_t inode,uint64_t fleng) {
 	uint32_t indh = IDHASH(inode);
 	inodedata *ind;
 //	int pfd[2];
@@ -290,7 +290,7 @@ inodedata* write_get_inodedata(uint32_t inode) {
 	ind = malloc(sizeof(inodedata));
 	ind->inode = inode;
 	ind->cacheblockcount = 0;
-	ind->maxfleng = 0;
+	ind->maxfleng = fleng;
 	ind->status = 0;
 //	ind->trycnt = 0;
 	ind->chunkscnt = 0;
@@ -1561,9 +1561,9 @@ int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *data) {
 	return 0;
 }
 
-void* write_data_new(uint32_t inode) {
+void* write_data_new(uint32_t inode,uint64_t fleng) {
 	inodedata* ind;
-	ind = write_get_inodedata(inode);
+	ind = write_get_inodedata(inode,fleng);
 	if (ind==NULL) {
 		return NULL;
 	}

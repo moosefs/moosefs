@@ -18,14 +18,16 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
-#ifndef _CHUNKLOC_CACHE_H_
-#define _CHUNKLOC_CACHE_H_
+#ifndef _FDCACHE_H_
+#define _FDCACHE_H_
 
 #include <inttypes.h>
+#include <fuse_lowlevel.h>
 
-void chunkloc_cache_insert(uint32_t inode,uint32_t pos,uint64_t chunkid,uint32_t chunkversion,uint8_t csdatasize,const uint8_t *csdata);
-int chunkloc_cache_search(uint32_t inode,uint32_t pos,uint64_t *chunkid,uint32_t *chunkversion,uint8_t *csdatasize,const uint8_t **csdata);
-void chunkloc_cache_init(void);
-void chunkloc_cache_term(void);
+void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t lflags,uint8_t csdataver,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize);
+void* fdcache_acquire(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t *lflags);
+void fdcache_release(void *vfdce);
+void fdcache_inject_chunkdata(void *vfdce);
+void fdcache_init(void);
 
 #endif

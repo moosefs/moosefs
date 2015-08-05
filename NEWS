@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.40-1 (2015-08-05)
+
+  - (master+mount) added using fuse's forgets in inode number reusage (fixes very rare EBUSY case when inode number is reused after unlink of directory which is still open or used as a current working directory)
+  - (master+mount) sped up reading of small files
+  - (mount) increased chunk location cache (sped up reading files)
+
 * MooseFS 3.0.39-1 (2015-07-23)
 
   - (master) fixed truncate bug (wrong behaviour when chunk was locked - not dangerous)

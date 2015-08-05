@@ -65,7 +65,7 @@
 #include "mastercomm.h"
 #include "masterproxy.h"
 #include "csorder.h"
-#include "chunkloccache.h"
+#include "invalidator.h"
 #include "symlinkcache.h"
 #include "negentrycache.h"
 //#include "dircache.h"
@@ -93,47 +93,48 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn);
 
 static struct fuse_lowlevel_ops mfs_meta_oper = {
 	.init           = mfs_fsinit,
-	.statfs		= mfs_meta_statfs,
-	.lookup		= mfs_meta_lookup,
-	.getattr	= mfs_meta_getattr,
-	.setattr	= mfs_meta_setattr,
-	.unlink		= mfs_meta_unlink,
-	.rename		= mfs_meta_rename,
-	.opendir	= mfs_meta_opendir,
-	.readdir	= mfs_meta_readdir,
-	.releasedir	= mfs_meta_releasedir,
-	.open		= mfs_meta_open,
-	.release	= mfs_meta_release,
-	.read		= mfs_meta_read,
-	.write		= mfs_meta_write,
-//	.access		= mfs_meta_access
+	.statfs         = mfs_meta_statfs,
+	.lookup         = mfs_meta_lookup,
+	.getattr        = mfs_meta_getattr,
+	.setattr        = mfs_meta_setattr,
+	.unlink         = mfs_meta_unlink,
+	.rename         = mfs_meta_rename,
+	.opendir        = mfs_meta_opendir,
+	.readdir        = mfs_meta_readdir,
+	.releasedir     = mfs_meta_releasedir,
+	.open           = mfs_meta_open,
+	.release        = mfs_meta_release,
+	.read           = mfs_meta_read,
+	.write          = mfs_meta_write,
+//	.access         = mfs_meta_access,
 };
 
 static struct fuse_lowlevel_ops mfs_oper = {
 	.init           = mfs_fsinit,
-	.statfs		= mfs_statfs,
-	.lookup		= mfs_lookup,
-	.getattr	= mfs_getattr,
-	.setattr	= mfs_setattr,
-	.mknod		= mfs_mknod,
-	.unlink		= mfs_unlink,
-	.mkdir		= mfs_mkdir,
-	.rmdir		= mfs_rmdir,
-	.symlink	= mfs_symlink,
-	.readlink	= mfs_readlink,
-	.rename		= mfs_rename,
-	.link		= mfs_link,
-	.opendir	= mfs_opendir,
-	.readdir	= mfs_readdir,
-	.releasedir	= mfs_releasedir,
-	.create		= mfs_create,
-	.open		= mfs_open,
-	.release	= mfs_release,
-	.flush		= mfs_flush,
-	.fsync		= mfs_fsync,
-	.read		= mfs_read,
-	.write		= mfs_write,
-	.access		= mfs_access,
+	.statfs         = mfs_statfs,
+	.lookup         = mfs_lookup,
+	.forget         = mfs_forget,
+	.getattr        = mfs_getattr,
+	.setattr        = mfs_setattr,
+	.mknod          = mfs_mknod,
+	.unlink         = mfs_unlink,
+	.mkdir          = mfs_mkdir,
+	.rmdir          = mfs_rmdir,
+	.symlink        = mfs_symlink,
+	.readlink       = mfs_readlink,
+	.rename         = mfs_rename,
+	.link           = mfs_link,
+	.opendir        = mfs_opendir,
+	.readdir        = mfs_readdir,
+	.releasedir     = mfs_releasedir,
+	.create         = mfs_create,
+	.open           = mfs_open,
+	.release        = mfs_release,
+	.flush          = mfs_flush,
+	.fsync          = mfs_fsync,
+	.read           = mfs_read,
+	.write          = mfs_write,
+	.access         = mfs_access,
 	.getxattr       = mfs_getxattr,
 	.setxattr       = mfs_setxattr,
 	.listxattr      = mfs_listxattr,
@@ -144,6 +145,7 @@ static struct fuse_lowlevel_ops mfs_oper = {
 #endif
 #if FUSE_VERSION >= 29
 	.flock          = mfs_flock,
+	.forget_multi   = mfs_forget_multi,
 #endif
 };
 
@@ -534,6 +536,9 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	int *piped = (int*)userdata;
 	char s;
+	if (conn->proto_major>7 || (conn->proto_major==7 && conn->proto_minor>=12)) {
+		invalidator_on();
+	}
 	conn->max_write = 131072;
 	conn->max_readahead = 131072;
 #if defined(FUSE_CAP_BIG_WRITES) || defined(FUSE_CAP_DONT_MASK) || defined(FUSE_CAP_FLOCK_LOCKS) || defined(FUSE_CAP_POSIX_LOCKS)
@@ -763,7 +768,6 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	syslog(LOG_NOTICE,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
 
 	conncache_init(200);
-	chunkloc_cache_init();
 	symlink_cache_init();
 	negentry_cache_init(mfsopts.negentrycacheto);
 //	dir_cache_init();
@@ -773,14 +777,12 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
-		chunkloc_cache_term();
 		return 1;
 	}
 
 //	fs_term();
 //	negentry_cache_term();
 //	symlink_cache_term();
-//	chunkloc_cache_term();
 //	return 1;
 
 	if (mfsopts.meta==0) {
@@ -810,7 +812,6 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
-		chunkloc_cache_term();
 		return 1;
 	}
 
@@ -842,7 +843,6 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
-		chunkloc_cache_term();
 		return 1;
 	}
 
@@ -871,7 +871,6 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
-		chunkloc_cache_term();
 		return 1;
 	}
 
@@ -886,6 +885,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		}
 	}
 
+	invalidator_init(ch);
+
 	if (mt) {
 		err = fuse_session_loop_mt(se);
 	} else {
@@ -899,6 +900,9 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 			close(piped[1]);
 		}
 	}
+
+	invalidator_term();
+
 	fuse_remove_signal_handlers(se);
 	fuse_session_remove_chan(ch);
 	fuse_session_destroy(se);
@@ -914,7 +918,6 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //	dir_cache_term();
 	negentry_cache_term();
 	symlink_cache_term();
-	chunkloc_cache_term();
 	return err ? 1 : 0;
 }
 

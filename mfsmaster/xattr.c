@@ -60,7 +60,6 @@ typedef struct _xattr_inode_entry {
 static xattr_inode_entry **xattr_inode_hash;
 static xattr_data_entry **xattr_data_hash;
 
-
 static inline uint32_t xattr_inode_hash_fn(uint32_t inode) {
 	return ((inode*0x72B5F387U)&(XATTR_INODE_HASH_SIZE-1));
 }

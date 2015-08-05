@@ -129,62 +129,49 @@ void posix_acl_setmode(uint32_t inode,uint16_t mode) {
 	}
 }
 
-int posix_acl_perm(uint32_t inode,uint32_t auid,uint32_t agids,uint32_t *agid,uint32_t fuid,uint32_t fgid,uint16_t modemask) {
+uint8_t posix_acl_accmode(uint32_t inode,uint32_t auid,uint32_t agids,uint32_t *agid,uint32_t fuid,uint32_t fgid) {
+	static uint8_t modetoaccmode[8] = MODE_TO_ACCMODE;
 	acl_node *acn;
 	int f;
 	uint16_t i;
 	uint32_t j;
+	uint8_t modemask;
 
 	if (auid==0) {
-		return 0xFFFF;
+		return modetoaccmode[7];
 	}
 	acn = posix_acl_find(inode,POSIX_ACL_ACCESS);
 	if (acn==NULL) {
-		return 0;
+		return modetoaccmode[0];
 	}
 	if (auid==fuid) {
-		if ((acn->userperm & modemask) == modemask) {
-			return 1;
-		} else {
-			return 0;
-		}
+		return modetoaccmode[acn->userperm & 0x7];
 	} else {
 		for (i=0 ; i<acn->namedusers ; i++) {
 			if (auid==acn->acltab[i].id) {
-				if ((acn->acltab[i].perm & acn->mask & modemask) == modemask) {
-					return 1;
-				} else {
-					return 0;
-				}
+				return modetoaccmode[acn->acltab[i].perm & acn->mask & 0x7];
 			}
 		}
 		f = 0;
+		modemask = 0;
 		for (j=0 ; j<agids ; j++) {
 			if (agid[j]==fgid) {
-				if ((acn->groupperm & acn->mask & modemask) == modemask) {
-					return 1;
-				}
+				modemask |= modetoaccmode[acn->groupperm & acn->mask & 0x7];
 				f = 1;
 			}
 		}
 		for (i=acn->namedusers ; i<acn->namedusers+acn->namedgroups ; i++) {
 			for (j=0 ; j<agids ; j++) {
 				if (agid[j]==acn->acltab[i].id) {
-					if ((acn->acltab[i].perm & acn->mask & modemask) == modemask) {
-						return 1;
-					}
+					modemask |= modetoaccmode[acn->acltab[i].perm & acn->mask & 0x7];
 					f = 1;
 				}
 			}
 		}
 		if (f==1) {
-			return 0;
+			return modemask;
 		}
-		if ((acn->otherperm & modemask) == modemask) {
-			return 1;
-		} else {
-			return 0;
-		}
+		return modetoaccmode[acn->otherperm & 0x7];
 	}
 }
 

@@ -14,7 +14,8 @@ mfsmount_SOURCES=\
 	symlinkcache.c symlinkcache.h \
 	negentrycache.c negentrycache.h \
 	xattrcache.c xattrcache.h \
-	chunkloccache.c chunkloccache.h \
+	fdcache.c fdcache.h \
+	invalidator.c invalidator.h \
 	getgroups.c getgroups.h \
 	mfs_fuse.c mfs_fuse.h \
 	mfs_meta_fuse.c mfs_meta_fuse.h \

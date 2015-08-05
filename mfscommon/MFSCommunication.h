@@ -231,6 +231,21 @@
 //
 // SET_CURRENTTIME_FLAG - version > 2.1.12
 
+// lookup.lflags (acl's must be checked separatelly - A:r,B:w doesn't give user belonging to A and B both r and w rights)
+#define LOOKUP_ACCESS_MODE_0   0x0001
+#define LOOKUP_ACCESS_MODE_X   0x0002
+#define LOOKUP_ACCESS_MODE_W   0x0004
+#define LOOKUP_ACCESS_MODE_WX  0x0008
+#define LOOKUP_ACCESS_MODE_R   0x0010
+#define LOOKUP_ACCESS_MODE_RX  0x0020
+#define LOOKUP_ACCESS_MODE_RW  0x0040
+#define LOOKUP_ACCESS_MODE_RWX 0x0080
+#define LOOKUP_ACCESS_BITS     0x00FF
+#define LOOKUP_CHUNK_ZERO_DATA 0x0100
+
+// combinations of MODE_MASK to LOOKUP_ACCESS_MODE
+#define MODE_TO_ACCMODE {0x01,0x03,0x05,0x0F,0x11,0x33,0x55,0xFF}
+
 // #define SET_GOAL_FLAG          0x0001
 #define SET_INVAL_FLAG         0x01
 #define SET_MODE_FLAG          0x02
@@ -869,7 +884,8 @@
 // 0x0197
 #define MATOCL_FUSE_LOOKUP (PROTO_BASE+407)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:35B
+// msgid:32 inode:32 attr:35B - (master version or client version < 3.0.40)
+// msgid:32 inode:32 attr:35B lflags:16 [ protocolid:8 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 labelmask:32 ] ] - (master and client both versions >= 3.0.40 - protocolid==2 ; chunk 0 data only for one-chunk files with unlocked chunk)
 
 // 0x0198
 #define CLTOMA_FUSE_GETATTR (PROTO_BASE+408)

@@ -23,7 +23,7 @@
 
 uint16_t posix_acl_getmode(uint32_t inode);
 void posix_acl_setmode(uint32_t inode,uint16_t mode);
-int posix_acl_perm(uint32_t inode,uint32_t auid,uint32_t agids,uint32_t *agid,uint32_t fuid,uint32_t fgid,uint16_t modemask);
+uint8_t posix_acl_accmode(uint32_t inode,uint32_t auid,uint32_t agids,uint32_t *agid,uint32_t fuid,uint32_t fgid);
 void posix_acl_remove(uint32_t inode,uint8_t acltype);
 uint8_t posix_acl_copydefaults(uint32_t parent,uint32_t inode,uint8_t directory,uint16_t mode);
 int posix_acl_set(uint32_t inode,uint8_t acltype,uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t mask,uint16_t namedusers,uint16_t namedgroups,const uint8_t *aclblob);

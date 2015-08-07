@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.42-1 (2015-08-07)
+
+  - (mount) added support for negative answers in 'removexattr' from xattr cache
+
 * MooseFS 3.0.41-1 (2015-08-06)
 
   - (master) added creating first chunk after file creation

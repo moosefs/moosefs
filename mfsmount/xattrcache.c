@@ -197,9 +197,15 @@ void* xattr_cache_get(uint32_t node,uint32_t uid,uint32_t gid,uint32_t nleng,con
 	if (xce==NULL) {
 		v = NULL;
 	} else {
-		*value = xce->value->value;
-		*vleng = xce->vleng;
-		*status = xce->status;
+		if (value) {
+			*value = xce->value->value;
+		}
+		if (vleng) {
+			*vleng = xce->vleng;
+		}
+		if (status) {
+			*status = xce->status;
+		}
 		v = xce->value;
 		xattr_cache_value_inc(v);
 	}
@@ -209,7 +215,12 @@ void* xattr_cache_get(uint32_t node,uint32_t uid,uint32_t gid,uint32_t nleng,con
 
 void xattr_cache_set(uint32_t node,uint32_t uid,uint32_t gid,uint32_t nleng,const uint8_t *name,const uint8_t *value,uint32_t vleng,int status) {
 	int64_t utimestamp = monotonic_useconds();
+	xattr_cache_entry *xce;
 	zassert(pthread_mutex_lock(&glock));
+	xce = xattr_cache_find(node,uid,gid,nleng,name);
+	if (xce!=NULL) {
+		xattr_cache_remove_entry(xce);
+	}
 	xattr_cache_new(node,uid,gid,nleng,name,value,vleng,status,utimestamp+xattr_cache_timeout);
 	zassert(pthread_mutex_unlock(&glock));
 }

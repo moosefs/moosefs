@@ -2446,6 +2446,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		negentry_cache_remove(parent,nleng,(const uint8_t*)name);
 		if (no_xattrs==0 && xattr_cache_on) { // Linux asks for this xattr before every write, so after create we can safely assume that there is no such attribute, and set it in xattr cache (improve efficiency on small files)
 			xattr_cache_set(inode,ctx.uid,ctx.gid,8+1+10,(const uint8_t*)"security.capability",NULL,0,ERROR_ENOATTR);
+			xattr_cache_set(inode,ctx.uid,ctx.gid,8+1+3,(const uint8_t*)"security.ima",NULL,0,ERROR_ENOATTR);
 		}
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
@@ -3888,6 +3889,7 @@ void mfs_setxattr (fuse_req_t req, fuse_ino_t ino, const char *name, const char 
 		return;
 	}
 	oplog_printf(&ctx,"setxattr (%lu,%s,%llu,%d): OK",(unsigned long int)ino,name,(unsigned long long int)size,flags);
+	xattr_cache_set(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,(const uint8_t*)value,(uint32_t)size,STATUS_OK);
 	fuse_reply_err(req,0);
 }
 
@@ -4118,9 +4120,11 @@ void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 	uint32_t nleng;
 	int status;
+	uint8_t usecache;
 	struct fuse_ctx ctx;
 	groups *gids;
 	uint8_t aclxattr;
+	void *xattr_value_release;
 
 	if (no_xattrs) {
 		fuse_reply_err(req,ENOSYS);
@@ -4165,28 +4169,55 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 		fuse_reply_err(req,EINVAL);
 		return;
 	}
+	xattr_value_release = NULL;
+	usecache = 0;
 	if (xattr_cache_on) {
-		xattr_cache_del(ino,nleng,(const uint8_t*)name);
-	}
-	if (aclxattr) {
-		status = fs_setacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
-	} else {
-		if (full_permissions) {
-			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-			status = fs_removexattr(ino,0,ctx.uid,gids->gidcnt,gids->gidtab,nleng,(const uint8_t*)name);
-			groups_rel(gids);
-		} else {
-			uint32_t gidtmp = ctx.gid;
-			status = fs_removexattr(ino,0,ctx.uid,1,&gidtmp,nleng,(const uint8_t*)name);
+		xattr_value_release = xattr_cache_get(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,NULL,NULL,&status);
+		if (xattr_value_release) {
+			if (status==ERROR_ENOATTR) {
+				usecache = 1;
+			}
+			xattr_cache_rel(xattr_value_release);
 		}
+	}
+	if (usecache == 0) {
+		if (aclxattr) {
+			status = fs_setacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
+		} else {
+			if (full_permissions) {
+				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+				status = fs_removexattr(ino,0,ctx.uid,gids->gidcnt,gids->gidtab,nleng,(const uint8_t*)name);
+				groups_rel(gids);
+			} else {
+				uint32_t gidtmp = ctx.gid;
+				status = fs_removexattr(ino,0,ctx.uid,1,&gidtmp,nleng,(const uint8_t*)name);
+			}
+		}
+	}
+	if (xattr_cache_on && (status==STATUS_OK || status==ERROR_ENOATTR)) {
+		xattr_cache_set(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,NULL,0,ERROR_ENOATTR);
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {
-		oplog_printf(&ctx,"removexattr (%lu,%s): %s",(unsigned long int)ino,name,strerr(status));
+		oplog_printf(&ctx,"removexattr (%lu,%s)%s: %s",(unsigned long int)ino,name,usecache?" (using cache)":"",strerr(status));
 		fuse_reply_err(req,status);
 	} else {
 		oplog_printf(&ctx,"removexattr (%lu,%s): OK",(unsigned long int)ino,name);
 		fuse_reply_err(req,0);
+	}
+	if (usecache) {
+		if (aclxattr) {
+			status = fs_setacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
+		} else {
+			if (full_permissions) {
+				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+				status = fs_removexattr(ino,0,ctx.uid,gids->gidcnt,gids->gidtab,nleng,(const uint8_t*)name);
+				groups_rel(gids);
+			} else {
+				uint32_t gidtmp = ctx.gid;
+				status = fs_removexattr(ino,0,ctx.uid,1,&gidtmp,nleng,(const uint8_t*)name);
+			}
+		}
 	}
 }
 

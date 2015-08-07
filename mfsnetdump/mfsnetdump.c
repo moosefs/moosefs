@@ -28,7 +28,10 @@
 #include "MFSCommunication.h"
 
 typedef struct _userdata {
-	uint8_t bytesskip;
+	uint8_t linktype;
+	uint8_t mfsportsonly;
+	uint8_t showmfsnops;
+	uint8_t showconnections;
 	uint32_t maxdatainpacket;
 } userdata;
 
@@ -280,13 +283,37 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 	uint8_t ccode,display;
 	const char *commandstr;
 	connection *c,**cp;
+	uint32_t bytesskip;
+	uint16_t linktype;
 
-//	printf("%ld.%06u: capleng = %u ; leng = %u (%u + %u)\n",(long)(header->ts.tv_sec),(unsigned)(header->ts.tv_usec),header->caplen,header->len,ud->bytesskip,header->len-ud->bytesskip);
-	if (ud->bytesskip>=header->caplen) { // no data
+	bytesskip = 0;
+	linktype = ud->linktype;
+	while (1) {
+		if (linktype==DLT_EN10MB) {
+			bytesskip += 14;
+			break;
+		} else if (linktype==DLT_NULL) {
+			bytesskip += 4;
+			break;
+		} else if (linktype==DLT_RAW) {
+			break;
+		} else if (linktype==DLT_LINUX_SLL) {
+			bytesskip += 16;
+			break;
+		} else if (linktype==DLT_PKTAP) {
+			linktype = packet[bytesskip+8]+256U*packet[bytesskip+9]; // using all four octets doesn't make sense
+			bytesskip += packet[bytesskip]+256U*packet[bytesskip+1]; // using all four octets doesn't make sense
+		} else {
+			return; // unsupported linktype
+		}
+	}
+
+//	printf("%ld.%06u: capleng = %u ; leng = %u (%u + %u)\n",(long)(header->ts.tv_sec),(unsigned)(header->ts.tv_usec),header->caplen,header->len,bytesskip,header->len-bytesskip);
+	if (bytesskip>=header->caplen) { // no data
 		return;
 	}
-	ip = packet+ud->bytesskip;
-	iplen = header->caplen-ud->bytesskip;
+	ip = packet+bytesskip;
+	iplen = header->caplen-bytesskip;
 //	hexdump(ip,iplen);
 //	printf("\n");
 	if ((ip[0]&0xF0)!=0x40) {
@@ -317,15 +344,24 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 	dstip = ((ip[16]*256U+ip[17])*256U+ip[18])*256U+ip[19];
 	srcport = tcp[0]*256U+tcp[1];
 	dstport = tcp[2]*256U+tcp[3];
+	if (ud->mfsportsonly) {
+		if ((srcport < 9419 || srcport > 9422) && (dstport < 9419 || dstport > 9422)) {
+			return; // not standard mfs port
+		}
+	}
 	seqno = ((tcp[4]*256U+tcp[5])*256U+tcp[6])*256U+tcp[7];
 	cp = packet_find(srcip,srcport,dstip,dstport);
 	if (tcp[13]&0x2) { // SYN
-		print_info(&(header->ts),ip,srcport,dstport);
-		printf(COLOR_NEWCONN "... new connection ..." COLOR_CLEAR "\n");
+		if (ud->showconnections) {
+			print_info(&(header->ts),ip,srcport,dstport);
+			printf(COLOR_NEWCONN "... new connection ..." COLOR_CLEAR "\n");
+		}
 	}
 	if (tcp[13]&0x5) { // RST | FIN
-		print_info(&(header->ts),ip,srcport,dstport);
-		printf(COLOR_CLOSECONN "... close connection ..." COLOR_CLEAR "\n");
+		if (ud->showconnections) {
+			print_info(&(header->ts),ip,srcport,dstport);
+			printf(COLOR_CLOSECONN "... close connection ..." COLOR_CLEAR "\n");
+		}
 		if (cp!=NULL) {
 			c = *cp;
 			*cp = c->next;
@@ -356,6 +392,9 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 		mfscmd = ((payload[0]*256U+payload[1])*256U+payload[2])*256U+payload[3];
 		mfslen = ((payload[4]*256U+payload[5])*256U+payload[6])*256U+payload[7];
 		commandstr = commands_find(mfscmd,&ccode,&display);
+		if (ud->showmfsnops==0 && mfscmd==ANTOAN_NOP) {
+			display = 0;
+		}
 		if (commandstr && mfslen<=100000000) {
 			if (display) {
 				print_info(&(header->ts),ip,srcport,dstport);
@@ -426,7 +465,7 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 }
 
 void usage(const char *appname) {
-	fprintf(stderr,"usage: %s [-r pcap_file] [-i interface] [-f pcap_filter] [-c packet_count] [-s max_bytes_to_show] [-e commands] [-o commands]\n\t-e: do not display this commands\n\t-o: when present only this commands will be displayed\n",appname);
+	fprintf(stderr,"usage: %s [-xym] [-r pcap_file] [-i interface] [-f pcap_filter] [-c packet_count] [-s max_bytes_to_show] [-e commands] [-o commands]\n\t-e: do not display this commands\n\t-o: when present only this commands will be displayed\n\t-x: ignore maintenance packets like 'ANTOAN_NOP'\n\t-y: do not show SYN/FIN packets\n\t-m: show packets from/to all ports instead of standard mfs ports (9419-9422)\n",appname);
 }
 
 int main(int argc, char **argv) {
@@ -451,17 +490,17 @@ int main(int argc, char **argv) {
 	pcapfile = NULL;
 	packetcnt = -1;
 	udm.maxdatainpacket = 128;
+	udm.showconnections = 1;
+	udm.mfsportsonly = 1;
+	udm.showmfsnops = 0;
 
-	while ((ch = getopt(argc, argv, "ms:i:f:c:e:o:r:h?")) != -1) {
+	while ((ch = getopt(argc, argv, "ms:i:f:c:e:o:r:hxyn?")) != -1) {
 		switch (ch) {
 			case 's':
 				udm.maxdatainpacket = strtoul(optarg,NULL,0);
 				break;
 			case 'm':
-				if (filter) {
-					free(filter);
-				}
-				filter = strdup("port 9419 or port 9420 or port 9421 or port 9422");
+				udm.mfsportsonly = 0;
 				break;
 			case 'i':
 				if (dev) {
@@ -484,6 +523,15 @@ int main(int argc, char **argv) {
 			case 'o':
 				commands_onlyuse(optarg);
 				break;
+			case 'x':
+				commands_exclude("ANTOMA_REGISTER,MATOAN_STATE,CSTOMA_SPACE,CLTOMA_FUSE_SUSTAINED_INODES,CSTOMA_CURRENT_LOAD,MATOCS_MANAGER_OFFSET_TIME");
+				break;
+			case 'y':
+				udm.showconnections = 0;
+				break;
+			case 'n':
+				udm.showmfsnops = 1;
+				break;
 			case 'r':
 				if (pcapfile) {
 					free(pcapfile);
@@ -501,7 +549,11 @@ int main(int argc, char **argv) {
 		goto err;
 	}
 	if (dev==NULL && pcapfile==NULL) {
-		dev = pcap_lookupdev(errbuf);
+		if (pcap_lookupnet("any",&devnet, &devmask, errbuf)<0) { // 'any' device is supported?
+			dev = pcap_lookupdev(errbuf);
+		} else {
+			dev = strdup("any");
+		}
 		if (dev == NULL) {
 			fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
 			goto err;
@@ -538,14 +590,10 @@ int main(int argc, char **argv) {
 	}
 
 	datalink = pcap_datalink(handle);
-	if (datalink == DLT_EN10MB) {
-		udm.bytesskip = 14;
-	} else if (datalink == DLT_NULL) {
-		udm.bytesskip = 4;
-	} else if (datalink == DLT_RAW) {
-		udm.bytesskip = 0;
+	if (datalink == DLT_EN10MB || datalink == DLT_NULL || datalink == DLT_LINUX_SLL || datalink == DLT_PKTAP || datalink == DLT_RAW) {
+		udm.linktype = datalink;
 	} else {
-		fprintf(stderr, "%s is not an Ethernet (type: %s)\n", dev, pcap_datalink_val_to_name(datalink));
+		fprintf(stderr, "device '%s' uses unsupported datalink type: %s\n", dev, pcap_datalink_val_to_name(datalink));
 		goto err;
 	}
 

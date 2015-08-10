@@ -289,20 +289,31 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 	bytesskip = 0;
 	linktype = ud->linktype;
 	while (1) {
-		if (linktype==DLT_EN10MB) {
+		if (0) {
+#ifdef DLT_EN10MB
+		} else if (linktype==DLT_EN10MB) {
 			bytesskip += 14;
 			break;
+#endif
+#ifdef DLT_NULL
 		} else if (linktype==DLT_NULL) {
 			bytesskip += 4;
 			break;
+#endif
+#ifdef DLT_RAW
 		} else if (linktype==DLT_RAW) {
 			break;
+#endif
+#ifdef DLT_LINUX_SLL
 		} else if (linktype==DLT_LINUX_SLL) {
 			bytesskip += 16;
 			break;
+#endif
+#ifdef DLT_PKTAP
 		} else if (linktype==DLT_PKTAP) {
 			linktype = packet[bytesskip+8]+256U*packet[bytesskip+9]; // using all four octets doesn't make sense
 			bytesskip += packet[bytesskip]+256U*packet[bytesskip+1]; // using all four octets doesn't make sense
+#endif
 		} else {
 			return; // unsupported linktype
 		}
@@ -590,7 +601,23 @@ int main(int argc, char **argv) {
 	}
 
 	datalink = pcap_datalink(handle);
-	if (datalink == DLT_EN10MB || datalink == DLT_NULL || datalink == DLT_LINUX_SLL || datalink == DLT_PKTAP || datalink == DLT_RAW) {
+	if (0
+#ifdef DLT_EN10MB
+		|| datalink == DLT_EN10MB
+#endif
+#ifdef DLT_NULL
+		|| datalink == DLT_NULL
+#endif
+#ifdef DLT_RAW
+		|| datalink == DLT_RAW
+#endif
+#ifdef DLT_LINUX_SLL
+		|| datalink == DLT_LINUX_SLL
+#endif
+#ifdef DLT_PKTAP
+		|| datalink == DLT_PKTAP
+#endif
+	) {
 		udm.linktype = datalink;
 	} else {
 		fprintf(stderr, "device '%s' uses unsupported datalink type: %s\n", dev, pcap_datalink_val_to_name(datalink));

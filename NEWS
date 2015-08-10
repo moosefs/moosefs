@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.43-1 (2015-08-10)
+
+  - (netdump) added support for device 'any' with LINUX_SLL and PKTAP frames
+
 * MooseFS 3.0.42-1 (2015-08-07)
 
   - (mount) added support for negative answers in 'removexattr' from xattr cache

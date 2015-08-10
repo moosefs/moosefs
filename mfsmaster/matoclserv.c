@@ -240,6 +240,7 @@ static swchunks* swchunkshash[CHUNKHASHSIZE];
 // from config
 static char *ListenHost;
 static char *ListenPort;
+static uint8_t CreateFirstChunk;
 //static uint32_t SessionSustainTime;
 //static uint32_t Timeout;
 
@@ -3493,28 +3494,30 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	sesflags = sessions_get_sesflags(eptr->sesdata);
 	status = fs_mknod(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,TYPE_FILE,mode,cumask,uid,gids,gid,auid,agid,0,&newinode,attr);
 	if (status==STATUS_OK) {
-		uint64_t prevchunkid,chunkid,fleng;
-		uint8_t opflag;
-		swchunks *swc;
-		/* create first chunk */
-		if (fs_writechunk(newinode,0,0,&prevchunkid,&chunkid,&fleng,&opflag)==STATUS_OK) {
-			massert(prevchunkid==0,"chunk created after mknod - prevchunkid should be always zero");
-			if (opflag) {
-				i = CHUNKHASH(chunkid);
-				swc = malloc(sizeof(swchunks));
-				passert(swc);
-				swc->eptr = eptr;
-				swc->inode = newinode;
-				swc->indx = 0;
-				swc->prevchunkid = prevchunkid;
-				swc->chunkid = chunkid;
-				swc->msgid = 0;
-				swc->fleng = fleng;
-				swc->type = FUSE_CREATE;
-				swc->next = swchunkshash[i];
-				swchunkshash[i] = swc;
-			} else {
-				fs_writeend(newinode,0,chunkid,0); // no operation? - just unlock this chunk
+		if (CreateFirstChunk) {
+			uint64_t prevchunkid,chunkid,fleng;
+			uint8_t opflag;
+			swchunks *swc;
+			/* create first chunk */
+			if (fs_writechunk(newinode,0,0,&prevchunkid,&chunkid,&fleng,&opflag)==STATUS_OK) {
+				massert(prevchunkid==0,"chunk created after mknod - prevchunkid should be always zero");
+				if (opflag) {
+					i = CHUNKHASH(chunkid);
+					swc = malloc(sizeof(swchunks));
+					passert(swc);
+					swc->eptr = eptr;
+					swc->inode = newinode;
+					swc->indx = 0;
+					swc->prevchunkid = prevchunkid;
+					swc->chunkid = chunkid;
+					swc->msgid = 0;
+					swc->fleng = fleng;
+					swc->type = FUSE_CREATE;
+					swc->next = swchunkshash[i];
+					swchunkshash[i] = swc;
+				} else {
+					fs_writeend(newinode,0,chunkid,0); // no operation? - just unlock this chunk
+				}
 			}
 		}
 		/* open file */
@@ -3569,19 +3572,26 @@ void matoclserv_fuse_write_chunk(matoclserventry *eptr,const uint8_t *data,uint3
 	uint32_t indx;
 	uint32_t msgid;
 	uint8_t canmodmtime;
+	uint8_t cont;
 
-	if (length!=12 && length!=13) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_WRITE_CHUNK - wrong size (%"PRIu32"/12|13)",length);
+	if (length!=12 && length!=13 && length!=14) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_WRITE_CHUNK - wrong size (%"PRIu32"/12|13|14)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	indx = get32bit(&data);
-	if (length==13) {
+	if (length>=13) {
 		canmodmtime = get8bit(&data);
 	} else {
 		canmodmtime = 1;
+	}
+#warning todo
+	if (length==14) {
+		cont = get8bit(&data);
+	} else {
+		cont = 0;
 	}
 	matoclserv_fuse_write_chunk_common(eptr,msgid,inode,indx,canmodmtime);
 }
@@ -6198,6 +6208,8 @@ int matoclserv_init(void) {
 		ListenHost = cfg_getstr("MATOCU_LISTEN_HOST","*"); // deprecated option
 		ListenPort = cfg_getstr("MATOCU_LISTEN_PORT",DEFAULT_MASTER_CLIENT_PORT); // deprecated option
 	}
+
+	CreateFirstChunk = 0;
 
 	starting = 12;
 	lsock = tcpsocket();

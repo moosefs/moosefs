@@ -1,3 +1,9 @@
+moosefs (3.0.43-1) unstable; urgency=medium
+
+  * (netdump) added support for device 'any' with LINUX_SLL and PKTAP frames
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 10 Aug 2015 13:00:00 +0200
+
 moosefs (3.0.42-1) unstable; urgency=medium
 
   * (mount) added support for negative answers in 'removexattr' from xattr

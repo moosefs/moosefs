@@ -61,7 +61,7 @@ static pthread_mutex_t hashlock[FDCACHE_HASHSIZE];
 
 void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t lflags,uint8_t csdataver,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize) {
 	uint32_t h;
-	double now;
+	double now,maxct;
 	fdcacheentry *fdce,**fdcep;
 	fdcacheentry *ffdce;
 
@@ -72,16 +72,21 @@ void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],u
 	h = FDCACHE_HASH(inode);
 	zassert(pthread_mutex_lock(hashlock+h));
 	ffdce = NULL;
+	maxct = 0.0;
 	fdcep = fdhashtab + h;
 	while ((fdce = *fdcep)) {
-		if (fdce->inode==inode && fdce->uid==ctx->uid && fdce->gid==ctx->gid && fdce->pid==ctx->pid) {
-			ffdce = fdce;
-			fdcep = &(fdce->next);
 #ifdef HAVE___SYNC_FETCH_AND_OP
-		} else if (fdce->createtime + FDCACHE_TIMEOUT < now && __sync_fetch_and_or(&(fdce->locked),0)==0) {
+		if (__sync_fetch_and_or(&(fdce->locked),0)==1) { // just ignore this entry
 #else
-		} else if (fdce->createtime + FDCACHE_TIMEOUT < now && fdce->locked==0) {
+		if (fdce->locked) {
 #endif
+			fdcep = &(fdce->next);
+		} else if (fdce->inode==inode && fdce->uid==ctx->uid && fdce->gid==ctx->gid && fdce->pid==ctx->pid) {
+			if (ffdce==NULL || fdce->createtime > maxct) {
+				ffdce = fdce;
+			}
+			fdcep = &(fdce->next);
+		} else if (fdce->createtime + FDCACHE_TIMEOUT < now) {
 			*fdcep = fdce->next;
 			fdcache_free(fdce);
 		} else {
@@ -94,6 +99,7 @@ void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],u
 		fdce->gid = ctx->gid;
 		fdce->pid = ctx->pid;
 		fdce->inode = inode;
+		fdce->locked = 0;
 		fdce->next = fdhashtab[h];
 		fdhashtab[h] = fdce;
 	} else {
@@ -101,7 +107,6 @@ void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],u
 	}
 	fdce->createtime = now;
 	memcpy(fdce->attr,attr,35);
-	fdce->locked = 0;
 	fdce->lflags = lflags;
 	fdce->csdataver = csdataver;
 	fdce->chunkid = chunkid;

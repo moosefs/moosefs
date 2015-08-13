@@ -460,6 +460,10 @@
 #define MFS_XATTR_SIZE_MAX 65536
 #define MFS_XATTR_LIST_MAX 65536
 
+// CLTOMA_FUSE_READ_CHUNK,CLTOMA_FUSE_WRITE_CHUNK,CLTOMA_FUSE_WRITE_CHUNK_END - chunkopflags
+#define CHUNKOPFLAG_CANMODTIME 1
+#define CHUNKOPFLAG_CONTINUEOP 2
+
 #define MODULE_TYPE_UNKNOWN 0
 #define MODULE_TYPE_MASTER 1
 #define MODULE_TYPE_CHUNKSERVER 2
@@ -1014,7 +1018,7 @@
 // 0x01B0
 #define CLTOMA_FUSE_READ_CHUNK (PROTO_BASE+432)
 // msgid:32 inode:32 chunkindx:32 - version < 3.0.4
-// msgid:32 inode:32 chunkindx:32 canmodatime:8
+// msgid:32 inode:32 chunkindx:32 chunkopflags:8
 
 // 0x01B1
 #define MATOCL_FUSE_READ_CHUNK (PROTO_BASE+433)
@@ -1027,7 +1031,7 @@
 // 0x01B2
 #define CLTOMA_FUSE_WRITE_CHUNK (PROTO_BASE+434)
 // msgid:32 inode:32 chunkindx:32 - version < 3.0.4
-// msgid:32 inode:32 chunkindx:32 canmodmtime:8
+// msgid:32 inode:32 chunkindx:32 chunkopflags:8
 
 // 0x01B3
 #define MATOCL_FUSE_WRITE_CHUNK (PROTO_BASE+435)
@@ -1039,7 +1043,8 @@
 
 // 0x01B4
 #define CLTOMA_FUSE_WRITE_CHUNK_END (PROTO_BASE+436)
-// msgid:32 chunkid:64 inode:32 length:64
+// msgid:32 chunkid:64 inode:32 length:64 - version < 3.0.4
+// msgid:32 chunkid:64 inode:32 length:64 chunkopflags:8
 
 // 0x01B5
 #define MATOCL_FUSE_WRITE_CHUNK_END (PROTO_BASE+437)

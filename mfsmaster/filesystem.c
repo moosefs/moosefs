@@ -5192,7 +5192,7 @@ uint8_t fs_opencheck(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 	return STATUS_OK;
 }
 
-uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint64_t *chunkid,uint64_t *length) {
+uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t *chunkid,uint64_t *length) {
 	int status;
 	fsnode *p;
 	uint32_t ts = main_time();
@@ -5219,7 +5219,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint64_t *
 		}
 	}
 	*length = p->data.fdata.length;
-	if (p->atime!=ts && canmodatime) {
+	if (p->atime!=ts && (chunkopflags&CHUNKOPFLAG_CANMODTIME)) {
 		p->atime = ts;
 		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
 	}
@@ -5227,7 +5227,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint64_t *
 	return STATUS_OK;
 }
 
-uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint64_t *prevchunkid,uint64_t *chunkid,uint64_t *length,uint8_t *opflag) {
+uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t *prevchunkid,uint64_t *chunkid,uint64_t *length,uint8_t *opflag) {
 	int status;
 	uint32_t i;
 	uint64_t ochunkid,nchunkid,nlength,lengdiff;
@@ -5304,7 +5304,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint64_t 
 	}
 	ochunkid = p->data.fdata.chunktab[indx];
 	*prevchunkid = ochunkid;
-	status = chunk_multi_modify(&nchunkid,ochunkid,p->lsetid,opflag);
+	status = chunk_multi_modify((chunkopflags&CHUNKOPFLAG_CONTINUEOP)?1:0,&nchunkid,ochunkid,p->lsetid,opflag);
 	if (status!=STATUS_OK) {
 		return status;
 	}
@@ -5316,8 +5316,8 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint64_t 
 	}
 	*chunkid = nchunkid;
 	*length = p->data.fdata.length;
-	changelog("%"PRIu32"|WRITE(%"PRIu32",%"PRIu32",%"PRIu8",%u):%"PRIu64,ts,inode,indx,*opflag,canmodmtime?1:0,nchunkid);
-	if ((p->mtime!=ts || p->ctime!=ts) && canmodmtime) {
+	changelog("%"PRIu32"|WRITE(%"PRIu32",%"PRIu32",%"PRIu8",%u):%"PRIu64,ts,inode,indx,*opflag,(chunkopflags&CHUNKOPFLAG_CANMODTIME)?1:0,nchunkid);
+	if ((p->mtime!=ts || p->ctime!=ts) && (chunkopflags&CHUNKOPFLAG_CANMODTIME)) {
 		p->mtime = p->ctime = ts;
 	}
 //	syslog(LOG_NOTICE,"write end: inode: %u ; indx: %u ; chunktab[indx]: %"PRIu64" ; chunks: %u",inode,indx,p->data.fdata.chunktab[indx],p->data.fdata.chunks);
@@ -5429,7 +5429,7 @@ uint8_t fs_mr_rollback(uint32_t inode,uint32_t indx,uint64_t prevchunkid,uint64_
 	return fs_univ_rollback(1,inode,indx,prevchunkid,chunkid);
 }
 
-uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t canmodmtime) {
+uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t chunkopflags) {
 	uint32_t ts = main_time();
 	if (length>0) {
 		fsnode *p;
@@ -5452,10 +5452,10 @@ uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t canm
 				return ERROR_QUOTA;
 			}
 			fsnodes_setlength(p,length);
-			if (canmodmtime) {
+			if (chunkopflags & CHUNKOPFLAG_CANMODTIME) {
 				p->mtime = p->ctime = ts;
 			}
-			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",%u)",ts,inode,length,canmodmtime?1:0);
+			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",%u)",ts,inode,length,(chunkopflags & CHUNKOPFLAG_CANMODTIME)?1:0);
 		}
 //		{
 //			uint32_t i;

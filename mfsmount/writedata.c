@@ -105,6 +105,8 @@ typedef struct chunkdata_s {
 	uint16_t trycnt;
 	uint8_t waitingworker;
 	uint8_t chunkready;
+	uint8_t unbreakable;
+	uint8_t continueop;
 	int pipe[2];
 	cblock *datachainhead,*datachaintail;
 	struct inodedata_s *parent;
@@ -382,6 +384,8 @@ chunkdata* write_new_chunkdata(inodedata *ind,uint32_t chindx) {
 	chd->datachaintail = NULL;
 	chd->waitingworker = 0;
 	chd->chunkready = 0;
+	chd->unbreakable = 0;
+	chd->continueop = 0;
 	chd->trycnt = 0;
 	chd->parent = ind;
 	chd->next = NULL;
@@ -625,6 +629,8 @@ void* write_worker(void *arg) {
 	uint8_t wrstatus;
 	uint8_t canmodmtime;
 	uint8_t chunkready;
+	uint8_t unbreakable;
+	uint8_t continueop;
 	int status;
 	char csstrip[16];
 	uint8_t waitforstatus;
@@ -694,6 +700,7 @@ void* write_worker(void *arg) {
 		}
 		canmodmtime = ind->canmodmtime;
 		chunkready = chd->chunkready;
+		continueop = chd->continueop;
 
 		zassert(pthread_mutex_unlock(&(ind->lock)));
 
@@ -705,7 +712,7 @@ void* write_worker(void *arg) {
 		// syslog(LOG_NOTICE,"file: %"PRIu32", index: %"PRIu16" - debug1",ind->inode,chindx);
 		// get chunk data from master
 //		start = monotonic_seconds();
-		wrstatus = fs_writechunk(ind->inode,chindx,canmodmtime,&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
+		wrstatus = fs_writechunk(ind->inode,chindx,(canmodmtime?CHUNKOPFLAG_CANMODTIME:0)|(continueop?CHUNKOPFLAG_CONTINUEOP:0),&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
 		if (wrstatus!=STATUS_OK) {
 			if (wrstatus!=ERROR_LOCKED && wrstatus!=ERROR_EAGAIN) {
 				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
@@ -728,13 +735,13 @@ void* write_worker(void *arg) {
 							write_job_end(chd,EIO,0);
 						}
 					} else {
-						write_delayed_enqueue(chd,10000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
+						write_delayed_enqueue(chd,1000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
 					}
 				}
 			} else {
 				if (chd->trycnt<=2) {
 					chd->trycnt++;
-					write_delayed_enqueue(chd,10000);
+					write_delayed_enqueue(chd,1000);
 				} else if (chd->trycnt<=6) {
 					chd->trycnt++;
 					write_delayed_enqueue(chd,100000);
@@ -755,9 +762,18 @@ void* write_worker(void *arg) {
 
 		if (csdata==NULL || csdatasize==0 || chainelements==0) {
 			chainelements = 0;
-			fs_writeend(chunkid,ind->inode,0,canmodmtime);
-			syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies",ind->inode,chindx,chunkid,version);
+			zassert(pthread_mutex_lock(&(ind->lock)));
 			chd->trycnt+=6;
+			unbreakable = chd->unbreakable;
+			if (chd->trycnt>=maxretries) {
+				unbreakable = 0; // unlock chunk on error
+			}
+			chd->continueop = unbreakable;
+			zassert(pthread_mutex_unlock(&(ind->lock)));
+			if (unbreakable==0) {
+				fs_writeend(chunkid,ind->inode,0,canmodmtime?CHUNKOPFLAG_CANMODTIME:0);
+			}
+			syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies",ind->inode,chindx,chunkid,version);
 			if (chd->trycnt>=maxretries) {
 				write_job_end(chd,ENXIO,0);
 			} else {
@@ -890,12 +906,21 @@ void* write_worker(void *arg) {
 			}
 		}
 		if (fd<0) {
-			fs_writeend(chunkid,ind->inode,0,canmodmtime);
+			zassert(pthread_mutex_lock(&(ind->lock)));
 			chd->trycnt++;
+			unbreakable = chd->unbreakable;
+			if (chd->trycnt>=maxretries) {
+				unbreakable = 0; // unlock chunk on error
+			}
+			chd->continueop = unbreakable;
+			zassert(pthread_mutex_unlock(&(ind->lock)));
+			if (unbreakable==0) {
+				fs_writeend(chunkid,ind->inode,0,canmodmtime?CHUNKOPFLAG_CANMODTIME:0);
+			}
 			if (chd->trycnt>=maxretries) {
 				write_job_end(chd,EIO,0);
 			} else {
-				write_delayed_enqueue(chd,10000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
+				write_delayed_enqueue(chd,1000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
 			}
 			continue;
 		}
@@ -1274,18 +1299,47 @@ void* write_worker(void *arg) {
 		syslog(LOG_NOTICE,"worker %lu sent %"PRIu32" blocks (%"PRIu32" partial) of chunk %016"PRIX64"_%08"PRIX32", received status for %"PRIu32" blocks (%"PRIu32" lost), bw: %.6lfMB/s ( %"PRIu32" B / %.6lf s ), chain: %s",(unsigned long)arg,nextwriteid-1,partialblocks,chunkid,version,nextwriteid-1-waitforstatus,waitforstatus,(double)bytessent/workingtime,bytessent,workingtime,debugchain);
 #endif
 
-		for (cnt=0 ; cnt<10 ; cnt++) {
-			zassert(pthread_mutex_lock(&(ind->lock)));	// make helgrind happy
-			canmodmtime = ind->canmodmtime;
-			zassert(pthread_mutex_unlock(&(ind->lock)));
-			westatus = fs_writeend(chunkid,ind->inode,mfleng,canmodmtime);
-			if (westatus==ERROR_ENOENT || westatus==ERROR_QUOTA) { // can't change -> do not repeat
-				break;
-			} else if (westatus!=STATUS_OK) {
-				portable_usleep(100000+(10000<<cnt));
-			} else {
-				break;
+		if (status!=0 || wrstatus!=STATUS_OK) {
+			if (wrstatus!=STATUS_OK) {	// convert MFS status to OS errno
+				if (wrstatus==ERROR_NOSPACE) {
+					status=ENOSPC;
+				} else {
+					status=EIO;
+				}
 			}
+		} else if (nextwriteid-1 == waitforstatus) { // nothing has been written - treat it as EIO
+			status=EIO;
+		}
+
+		zassert(pthread_mutex_lock(&(ind->lock)));	// make helgrind happy
+		canmodmtime = ind->canmodmtime;
+		unbreakable = chd->unbreakable;
+		if (status!=0) {
+			chd->trycnt++;
+			if (chd->trycnt>=maxretries) {
+				unbreakable = 0;
+			}
+		} else {
+			unbreakable = 0; // operation finished
+		}
+		chd->continueop = unbreakable;
+		zassert(pthread_mutex_unlock(&(ind->lock)));
+		if (unbreakable==0) {
+			for (cnt=0 ; cnt<10 ; cnt++) {
+				westatus = fs_writeend(chunkid,ind->inode,mfleng,canmodmtime?CHUNKOPFLAG_CANMODTIME:0);
+				if (westatus==ERROR_ENOENT || westatus==ERROR_QUOTA) { // can't change -> do not repeat
+					break;
+				} else if (westatus!=STATUS_OK) {
+					portable_usleep(100000+(10000<<cnt));
+					zassert(pthread_mutex_lock(&(ind->lock)));	// make helgrind happy
+					canmodmtime = ind->canmodmtime;
+					zassert(pthread_mutex_unlock(&(ind->lock)));
+				} else {
+					break;
+				}
+			}
+		} else {
+			westatus = STATUS_OK;
 		}
 
 		if (westatus==ERROR_ENOENT) {
@@ -1294,30 +1348,15 @@ void* write_worker(void *arg) {
 			write_job_end(chd,EDQUOT,0);
 		} else if (westatus!=STATUS_OK) {
 			write_job_end(chd,ENXIO,0);
-		} else if (status!=0 || wrstatus!=STATUS_OK) {
-			if (wrstatus!=STATUS_OK) {	// convert MFS status to OS errno
-				if (wrstatus==ERROR_NOSPACE) {
-					status=ENOSPC;
-				} else {
-					status=EIO;
-				}
-			}
-			chd->trycnt++;
-			if (chd->trycnt>=maxretries) {
-				write_job_end(chd,status,0);
-			} else {
-				write_job_end(chd,0,10000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
-			}
 		} else {
-			read_inode_set_length(ind->inode,mfleng,0);
-			if (nextwriteid-1 == waitforstatus) { // nothing has been written
-				chd->trycnt++;
+			if (status!=0) {
 				if (chd->trycnt>=maxretries) {
-					write_job_end(chd,EIO,0);
+					write_job_end(chd,status,0);
 				} else {
-					write_job_end(chd,0,10000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
+					write_job_end(chd,0,1000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
 				}
 			} else {
+				read_inode_set_length(ind->inode,mfleng,0);
 				write_job_end(chd,0,0);
 			}
 		}
@@ -1596,6 +1635,9 @@ static int write_data_do_chunk_wait(inodedata *ind) {
 		}
 	} while (ind->status==0 && chd!=NULL);
 	ind->chunkwaiting--;
+	for (chd = ind->chunks ; chd!=NULL ; chd=chd->next) {
+		chd->unbreakable = 1;
+	}
 	ret = ind->status;
 	zassert(pthread_mutex_unlock(&(ind->lock)));
 #ifdef WDEBUG

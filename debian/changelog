@@ -1,3 +1,12 @@
+moosefs (3.0.44-1) unstable; urgency=medium
+
+  * (master+mount) fixed synchronization between mounts (write+close on one and
+    then read this data on another)
+  * (mount) fixed chunk localization cache (snapshot case - on snapshot chunkid
+    may change)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 13 Aug 2015 13:00:00 +0200
+
 moosefs (3.0.43-1) unstable; urgency=medium
 
   * (netdump) added support for device 'any' with LINUX_SLL and PKTAP frames

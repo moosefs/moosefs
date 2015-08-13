@@ -2984,7 +2984,7 @@ uint8_t fs_release(uint32_t inode) {
 }
 */
 
-uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
+uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -3005,7 +3005,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint8_t *c
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
 	if (masterversion>VERSION2INT(3,0,3)) {
-		put8bit(&wptr,canmodatime);
+		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_READ_CHUNK,&i);
 	if (rptr==NULL) {
@@ -3044,7 +3044,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t canmodatime,uint8_t *c
 	return ret;
 }
 
-uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
+uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -3065,7 +3065,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint8_t *
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
 	if (masterversion>VERSION2INT(3,0,3)) {
-		put8bit(&wptr,canmodmtime);
+		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_WRITE_CHUNK,&i);
 	if (rptr==NULL) {
@@ -3104,7 +3104,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t canmodmtime,uint8_t *
 	return ret;
 }
 
-uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t canmodmtime) {
+uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t chunkopflags) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -3122,7 +3122,7 @@ uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t canm
 	put32bit(&wptr,inode);
 	put64bit(&wptr,length);
 	if (masterversion>VERSION2INT(3,0,3)) {
-		put8bit(&wptr,canmodmtime);
+		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_WRITE_CHUNK_END,&i);
 	if (rptr==NULL) {

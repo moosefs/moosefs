@@ -26,7 +26,6 @@
 
 void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries);
 void read_data_term(void);
-void read_inject_chunkdata(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint8_t csdataver,uint8_t *csdata,uint32_t csdatasize);
 int read_data(void *vid, uint64_t offset, uint32_t *size, void **rhead,struct iovec **iov,uint32_t *iovcnt);
 void read_data_free_buff(void *vid,void *vrhead,struct iovec *iov);
 void read_inode_dirty_region(uint32_t inode,uint64_t offset,uint32_t size,const char *buff);

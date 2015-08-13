@@ -193,6 +193,7 @@ struct mfsopts {
 	double direntrycacheto;
 	double negentrycacheto;
 	double groupscacheto;
+	double fsyncmintime;
 	int fsyncbeforeclose;
 };
 
@@ -266,6 +267,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfsnegentrycacheto=%lf", negentrycacheto, 0),
 	MFS_OPT("mfsgroupscacheto=%lf", groupscacheto, 0),
 //	MFS_OPT("mfsaclsupport", xattraclsupport, 1),
+	MFS_OPT("mfsfsyncmintime=%lf", fsyncmintime, 0),
 	MFS_OPT("mfsfsyncbeforeclose", fsyncbeforeclose, 1),
 
 	FUSE_OPT_KEY("-m",             KEY_META),
@@ -338,7 +340,7 @@ static void usage(const char *progname) {
 #ifdef MFS_USE_MALLOPT
 	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 8)\n");
 #endif
-	fprintf(stderr,"    -o mfsfsyncbeforeclose      force fsync before last file close (safer but can be inefficient - especially in case of small files)\n");
+	fprintf(stderr,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 1.0 - it mainly means that we don't want to do auto-fsync before closing small files)\n");
 	fprintf(stderr,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
 	fprintf(stderr,"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n");
 	fprintf(stderr,"    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n");
@@ -819,7 +821,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		mfs_meta_init(mfsopts.debug,mfsopts.entrycacheto,mfsopts.attrcacheto);
 		se = fuse_lowlevel_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), (void*)piped);
 	} else {
-		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncbeforeclose,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
+		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
 		se = fuse_lowlevel_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
 	}
 	if (se==NULL) {
@@ -1128,6 +1130,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.negentrycacheto = 1.0;
 	mfsopts.groupscacheto = 300.0;
 	mfsopts.fsyncbeforeclose = 0;
+	mfsopts.fsyncmintime = 1.0;
 
 	custom_cfg = 0;
 
@@ -1268,6 +1271,10 @@ int main(int argc, char *argv[]) {
 
 	if (mfsopts.nostdmountoptions==0) {
 		fuse_opt_add_arg(&args, "-o" DEFAULT_OPTIONS);
+	}
+
+	if (mfsopts.fsyncbeforeclose) {
+		mfsopts.fsyncmintime=0.0;
 	}
 
 	if (csorder_init(mfsopts.preferedlabels)<0) {

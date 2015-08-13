@@ -1407,7 +1407,7 @@ int chunk_read_check(uint32_t ts,uint64_t chunkid) {
 	return STATUS_OK;
 }
 
-int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
+int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
 	uint16_t csids[MAXCSCOUNT];
 	static void **chosen = NULL;
 	static uint32_t chosenleng = 0;
@@ -1492,7 +1492,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 		if (oc==NULL) {
 			return ERROR_NOCHUNK;
 		}
-		if (mr==0 && oc->lockedto>=ts) {
+		if (mr==0 && oc->lockedto>=ts && continueop==0) {
 			return ERROR_LOCKED;
 		}
 		if (oc->fcount==1) {
@@ -1630,12 +1630,12 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 	return STATUS_OK;
 }
 
-int chunk_multi_modify(uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
-	return chunk_univ_multi_modify(main_time(),0,nchunkid,ochunkid,lsetid,opflag);
+int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
+	return chunk_univ_multi_modify(main_time(),0,continueop,nchunkid,ochunkid,lsetid,opflag);
 }
 
 int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t opflag) {
-	return chunk_univ_multi_modify(ts,1,nchunkid,ochunkid,lsetid,&opflag);
+	return chunk_univ_multi_modify(ts,1,0,nchunkid,ochunkid,lsetid,&opflag);
 }
 
 int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid) {

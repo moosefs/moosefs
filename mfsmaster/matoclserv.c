@@ -225,7 +225,7 @@ typedef struct _lwchunks {
 	uint32_t *gid; // TRUNCATE
 	uint32_t auid; // TRUNCATE
 	uint32_t agid; // TRUNCATE
-	uint8_t canmodamtime; // WRITE,READ
+	uint8_t chunkopflags; // WRITE,READ
 	uint8_t flags; // TRUNCATE
 	uint8_t type;
 	uint8_t status;
@@ -773,7 +773,7 @@ int matoclserv_open_check(matoclserventry *eptr,uint32_t fid) {
 */
 
 
-static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint32_t msgid,uint32_t inode,uint32_t indx,uint8_t canmodmtime) {
+static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint32_t msgid,uint32_t inode,uint32_t indx,uint8_t chunkopflags) {
 	uint8_t *ptr;
 	uint8_t status;
 	uint64_t fleng;
@@ -790,7 +790,7 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
 		status = ERROR_EROFS;
 	} else {
-		status = fs_writechunk(inode,indx,canmodmtime,&prevchunkid,&chunkid,&fleng,&opflag);
+		status = fs_writechunk(inode,indx,chunkopflags,&prevchunkid,&chunkid,&fleng,&opflag);
 	}
 	if (status!=STATUS_OK) {
 		if (status==ERROR_LOCKED || status==ERROR_CHUNKBUSY) {
@@ -803,7 +803,7 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 			lwc->msgid = msgid;
 			lwc->inode = inode;
 			lwc->indx = indx;
-			lwc->canmodamtime = canmodmtime;
+			lwc->chunkopflags = chunkopflags;
 			lwc->type = FUSE_WRITE;
 			lwc->status = status;
 			lwc->next = NULL;
@@ -877,7 +877,7 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 	return 0;
 }
 
-static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32_t msgid,uint32_t inode,uint32_t indx,uint8_t canmodatime) {
+static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32_t msgid,uint32_t inode,uint32_t indx,uint8_t chunkopflags) {
 	uint8_t *ptr;
 	uint8_t status;
 	uint64_t chunkid;
@@ -888,7 +888,7 @@ static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32
 	uint8_t count;
 	uint8_t cs_data[100*14];
 
-	status = fs_readchunk(inode,indx,canmodatime,&chunkid,&fleng);
+	status = fs_readchunk(inode,indx,chunkopflags,&chunkid,&fleng);
 	if (status!=STATUS_OK) {
 		if (status==ERROR_LOCKED || status==ERROR_CHUNKBUSY) {
 			i = CHUNKHASH(chunkid);
@@ -900,7 +900,7 @@ static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32
 			lwc->msgid = msgid;
 			lwc->inode = inode;
 			lwc->indx = indx;
-			lwc->canmodamtime = canmodatime;
+			lwc->chunkopflags = chunkopflags;
 			lwc->type = FUSE_READ;
 			lwc->status = status;
 			lwc->next = NULL;
@@ -1049,9 +1049,9 @@ void matoclserv_chunk_unlocked(uint64_t chunkid,void *cptr) {
 			if (lwc->type == FUSE_TRUNCATE) {
 				locked = matoclserv_fuse_truncate_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->flags,lwc->uid,lwc->gids,lwc->gid,lwc->auid,lwc->agid,lwc->fleng);
 			} else if (lwc->type == FUSE_WRITE) {
-				locked = matoclserv_fuse_write_chunk_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->indx,lwc->canmodamtime);
+				locked = matoclserv_fuse_write_chunk_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->indx,lwc->chunkopflags);
 			} else if (lwc->type == FUSE_READ) {
-				locked = matoclserv_fuse_read_chunk_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->indx,lwc->canmodamtime);
+				locked = matoclserv_fuse_read_chunk_common(lwc->eptr,lwc->msgid,lwc->inode,lwc->indx,lwc->chunkopflags);
 			} else {
 				locked = 0;
 			}
@@ -3548,7 +3548,7 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 void matoclserv_fuse_read_chunk(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode;
 	uint32_t indx;
-	uint8_t canmodatime;
+	uint8_t chunkopflags;
 	uint32_t msgid;
 
 	if (length!=12 && length!=13) {
@@ -3560,22 +3560,21 @@ void matoclserv_fuse_read_chunk(matoclserventry *eptr,const uint8_t *data,uint32
 	inode = get32bit(&data);
 	indx = get32bit(&data);
 	if (length==13) {
-		canmodatime = get8bit(&data);
+		chunkopflags = get8bit(&data);
 	} else {
-		canmodatime = 1;
+		chunkopflags = CHUNKOPFLAG_CANMODTIME;
 	}
-	matoclserv_fuse_read_chunk_common(eptr,msgid,inode,indx,canmodatime);
+	matoclserv_fuse_read_chunk_common(eptr,msgid,inode,indx,chunkopflags);
 }
 
 void matoclserv_fuse_write_chunk(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode;
 	uint32_t indx;
 	uint32_t msgid;
-	uint8_t canmodmtime;
-	uint8_t cont;
+	uint8_t chunkopflags;
 
-	if (length!=12 && length!=13 && length!=14) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_WRITE_CHUNK - wrong size (%"PRIu32"/12|13|14)",length);
+	if (length!=12 && length!=13) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_WRITE_CHUNK - wrong size (%"PRIu32"/12|13)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -3583,17 +3582,11 @@ void matoclserv_fuse_write_chunk(matoclserventry *eptr,const uint8_t *data,uint3
 	inode = get32bit(&data);
 	indx = get32bit(&data);
 	if (length>=13) {
-		canmodmtime = get8bit(&data);
+		chunkopflags = get8bit(&data);
 	} else {
-		canmodmtime = 1;
+		chunkopflags = CHUNKOPFLAG_CANMODTIME;
 	}
-#warning todo
-	if (length==14) {
-		cont = get8bit(&data);
-	} else {
-		cont = 0;
-	}
-	matoclserv_fuse_write_chunk_common(eptr,msgid,inode,indx,canmodmtime);
+	matoclserv_fuse_write_chunk_common(eptr,msgid,inode,indx,chunkopflags);
 }
 
 void matoclserv_fuse_write_chunk_end(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -3603,7 +3596,7 @@ void matoclserv_fuse_write_chunk_end(matoclserventry *eptr,const uint8_t *data,u
 	uint64_t fleng;
 	uint64_t chunkid;
 	uint8_t status;
-	uint8_t canmodmtime;
+	uint8_t chunkopflags;
 //	chunklist *cl,**acl;
 	if (length!=24 && length!=25) {
 		syslog(LOG_NOTICE,"CLTOMA_FUSE_WRITE_CHUNK_END - wrong size (%"PRIu32"/24|25)",length);
@@ -3615,14 +3608,14 @@ void matoclserv_fuse_write_chunk_end(matoclserventry *eptr,const uint8_t *data,u
 	inode = get32bit(&data);
 	fleng = get64bit(&data);
 	if (length==25) {
-		canmodmtime = get8bit(&data);
+		chunkopflags = get8bit(&data);
 	} else {
-		canmodmtime = 1;
+		chunkopflags = CHUNKOPFLAG_CANMODTIME;
 	}
 	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
 		status = ERROR_EROFS;
 	} else {
-		status = fs_writeend(inode,fleng,chunkid,canmodmtime);
+		status = fs_writeend(inode,fleng,chunkid,chunkopflags);
 	}
 	dcm_modify(inode,sessions_get_id(eptr->sesdata));
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_WRITE_CHUNK_END,5);

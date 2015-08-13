@@ -22,6 +22,7 @@ mfsmount_SOURCES=\
 	mastercomm.c mastercomm.h \
 	masterproxy.c masterproxy.h \
 	csorder.c csorder.h \
+	readchunkdata.c readchunkdata.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
 	csdb.c csdb.h \

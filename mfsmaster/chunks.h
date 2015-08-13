@@ -67,7 +67,7 @@ int chunk_univ_archflag(uint64_t chunkid,uint8_t archflag,uint32_t *archflagchan
 chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t lsetid,uint8_t aftereof,uint8_t archflag);
 
 int chunk_read_check(uint32_t ts,uint64_t chunkid);
-int chunk_multi_modify(uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag);
+int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag);
 int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid);
 //int chunk_multi_reinitialize(uint64_t chunkid);
 int chunk_repair(uint8_t lsetid,uint64_t ochunkid,uint32_t *nversion);

@@ -146,6 +146,7 @@ typedef struct _finfo {
 	uint8_t uselocks;
 	void *rdata;
 	void *wdata;
+	double create;
 	pthread_mutex_t lock;
 #ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
 	uint32_t ops_in_progress;
@@ -169,7 +170,7 @@ static int mkdir_copy_sgid = 0;
 static int sugid_clear_mode = 0;
 static int xattr_cache_on = 0;
 static int xattr_acl_support = 0;
-static int fsync_before_close = 0;
+static double fsync_before_close_min_time = 10.0;
 static int no_xattrs = 0;
 static int no_posix_locks = 0;
 static int no_bsd_locks = 0;
@@ -800,7 +801,6 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 	groups *gids;
 	int mmode;
 	uint16_t lflags;
-	void *fdrec;
 
 	ctx = *(fuse_req_ctx(req));
 	if (debug_mode) {
@@ -831,8 +831,9 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 		return;
 	}
 
-	fdrec = fdcache_acquire(&ctx,ino,NULL,&lflags);
-	if (fdrec==NULL) {
+	if (fdcache_find(&ctx,ino,NULL,&lflags)) {
+		status = (lflags & (1<<(mmode&0x7)))?STATUS_OK:ERROR_EACCES;
+	} else {
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
 			status = fs_access(ino,ctx.uid,gids->gidcnt,gids->gidtab,mmode);
@@ -841,9 +842,6 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 			uint32_t gidtmp = ctx.gid;
 			status = fs_access(ino,ctx.uid,1,&gidtmp,mmode);
 		}
-	} else {
-		status = (lflags & (1<<(mmode&0x7)))?STATUS_OK:ERROR_EACCES;
-		fdcache_release(fdrec);
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {
@@ -1272,14 +1270,11 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		status = 0;
 		icacheflag = 1;
 	} else {
-		void *fdrec;
 		mfs_stats_inc(OP_GETATTR);
-		fdrec = fdcache_acquire(&ctx,ino,attr,NULL);
-		if (fdrec==NULL) {
-			status = fs_getattr(ino,(fi!=NULL)?1:0,ctx.uid,ctx.gid,attr);
-		} else {
+		if (fdcache_find(&ctx,ino,attr,NULL)) {
 			status = STATUS_OK;
-			fdcache_release(fdrec);
+		} else {
+			status = fs_getattr(ino,(fi!=NULL)?1:0,ctx.uid,ctx.gid,attr);
 		}
 		status = mfs_errorconv(status);
 		icacheflag = 0;
@@ -1471,7 +1466,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 					if (trycnt>=30) {
 						break;
 					}
-					portable_usleep(10000+((trycnt<30)?((trycnt-1)*300000):10000000));
+					portable_usleep(1000+((trycnt<30)?((trycnt-1)*300000):10000000));
 				} else {
 					portable_usleep(10000);
 				}
@@ -1490,7 +1485,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 					if (trycnt>=30) {
 						break;
 					}
-					portable_usleep(10000+((trycnt<30)?((trycnt-1)*300000):10000000));
+					portable_usleep(1000+((trycnt<30)?((trycnt-1)*300000):10000000));
 				} else {
 					portable_usleep(10000);
 				}
@@ -2305,10 +2300,10 @@ static void mfs_real_removefileinfo(finfo* fileinfo) {
 
 static finfo* mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng) {
 	finfo *fileinfo;
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
-	finfo **fileinfoptr;
 	double now;
 	now = monotonic_seconds();
+#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+	finfo **fileinfoptr;
 	pthread_mutex_lock(&finfo_list_lock);
 	fileinfoptr = &finfo_head;
 	while ((fileinfo=*fileinfoptr)) {
@@ -2349,6 +2344,7 @@ static finfo* mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng) {
 		fileinfo->wdata = NULL;
 	}
 #endif
+	fileinfo->create = now;
 #ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
 	fileinfo->ops_in_progress = 0;
 	fileinfo->lastuse = now;
@@ -2519,6 +2515,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	uint8_t oflags,mmode;
 	uint16_t lflags;
 	void *fdrec;
+	uint8_t found;
 	uint8_t attr[35];
 	uint8_t mattr;
 	int status;
@@ -2632,8 +2629,16 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		oflags |= WANT_READ | WANT_WRITE;
 		mmode = MODE_MASK_R | MODE_MASK_W;
 	}
-	fdrec = fdcache_acquire(&ctx,ino,attr,&lflags);
-	if (fdrec==NULL) {
+	fdrec = fdcache_acquire(&ctx,ino,attr,&lflags,&found);
+	if (found) {
+		status = (lflags & (1<<(mmode&0x7)))?STATUS_OK:ERROR_EACCES;
+		if (fdrec!=NULL) {
+			if (status==STATUS_OK) {
+				fdcache_inject_chunkdata(ino,fdrec);
+			}
+			fdcache_release(fdrec);
+		}
+	} else {
 		if (full_permissions) {
 			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,2); // allow group refresh again (see: getxattr for "com.apple.quarantine")
 			status = fs_opencheck(ino,ctx.uid,gids->gidcnt,gids->gidtab,oflags,attr);
@@ -2642,12 +2647,6 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 			uint32_t gidtmp = ctx.gid;
 			status = fs_opencheck(ino,ctx.uid,1,&gidtmp,oflags,attr);
 		}
-	} else {
-		status = (lflags & (1<<(mmode&0x7)))?STATUS_OK:ERROR_EACCES;
-		if (status==STATUS_OK && (lflags & LOOKUP_CHUNK_ZERO_DATA)) {
-			fdcache_inject_chunkdata(fdrec);
-		}
-		fdcache_release(fdrec);
 	}
 
 	status = mfs_errorconv(status);
@@ -3092,20 +3091,26 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	err = 0;
 //	fuse_reply_err(req,err);
 
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	uselocks = __sync_or_and_fetch(&(fileinfo->uselocks),0);
+#else
+	pthread_mutex_lock(&(fileinfo->lock));
+	uselocks = fileinfo->uselocks;
+	pthread_mutex_unlock(&(fileinfo->lock));
+#endif
+
 	pthread_mutex_lock(&(fileinfo->lock));
 	if (fileinfo->mode==IO_WRITE || fileinfo->mode==IO_WRITEONLY) {
 #ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
 		fileinfo->ops_in_progress++;
 #endif
 		pthread_mutex_unlock(&(fileinfo->lock));
-		if (fsync_before_close || write_cache_almost_full()) {
+		if ((uselocks&2) || master_version()<=VERSION2INT(3,0,42) || fileinfo->create + fsync_before_close_min_time < monotonic_seconds() || write_cache_almost_full()) {
 			err = write_data_flush(fileinfo->wdata);
 		} else {
-			if (master_version()>=VERSION2INT(3,0,32)) {
-				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-				fs_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE,ctx.uid,gids->gidcnt,gids->gidtab,write_data_getmaxfleng(fileinfo->wdata),NULL);
-				groups_rel(gids);
-			}
+			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+			fs_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE,ctx.uid,gids->gidcnt,gids->gidtab,write_data_getmaxfleng(fileinfo->wdata),NULL);
+			groups_rel(gids);
 			err = write_data_chunk_wait(fileinfo->wdata);
 		}
 #ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
@@ -3118,13 +3123,6 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		pthread_mutex_unlock(&(fileinfo->lock));
 	}
 
-#ifdef HAVE___SYNC_OP_AND_FETCH
-	uselocks = __sync_or_and_fetch(&(fileinfo->uselocks),0);
-#else
-	pthread_mutex_lock(&(fileinfo->lock));
-	uselocks = fileinfo->uselocks;
-	pthread_mutex_unlock(&(fileinfo->lock));
-#endif
 	if (uselocks&2) {
 		fs_posixlock(ino,0,fi->lock_owner,POSIX_LOCK_CMD_SET,POSIX_LOCK_UNLCK,0,UINT64_MAX,0,NULL,NULL,NULL,NULL);
 	}
@@ -4221,7 +4219,7 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 	}
 }
 
-void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,int fsync_before_close_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
+void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
 	const char* sugid_clear_mode_strings[] = {SUGID_CLEAR_MODE_STRINGS};
 	debug_mode = debug_mode_in;
 	keep_cache = keep_cache_in;
@@ -4233,7 +4231,7 @@ void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout
 	xattr_cache_init(xattr_cache_timeout_in);
 	xattr_cache_on = (xattr_cache_timeout_in>0.0)?1:0;
 	xattr_acl_support = xattr_acl_support_in;
-	fsync_before_close = fsync_before_close_in;
+	fsync_before_close_min_time = fsync_before_close_min_time_in;
 	no_xattrs = no_xattrs_in;
 	no_posix_locks = no_posix_locks_in;
 	no_bsd_locks = no_bsd_locks_in;

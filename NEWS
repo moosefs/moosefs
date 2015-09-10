@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.75-1 (2015-09-10)
+
+  - (mount) fixed data-cache issue (delete only directories from kerenel dentry cache)
+  - (mount) inserting into xattr cache "nonexistent" xattr "security.capability" after file creation. (speed up writing small files)
+  - (master) fixed scenario causing deleting chunks from chunkservers marked for removal
+
 * MooseFS 2.0.74-1 (2015-07-31)
 
   - (master+mount) added using fuse's forgets in inode number reusage (fixes very rare EBUSY case when inode number is reused after unlink of directory which is still open or used as a current working directory)

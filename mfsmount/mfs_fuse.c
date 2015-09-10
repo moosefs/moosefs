@@ -1066,9 +1066,13 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //	}
 	mfs_makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(&ctx,"lookup (%lu,%s)%s: OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,icacheflag?" (using open dir cache)":"",e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-	invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
+	if (type==TYPE_DIRECTORY) {
+		invalidator_insert(parent,name,nleng,inode,direntry_cache_timeout);
+	}
 	if (fuse_reply_entry(req, &e) == -ENOENT) {
-		invalidator_forget(e.ino,1);
+		if (type==TYPE_DIRECTORY) {
+			invalidator_forget(e.ino,1);
+		}
 	}
 	if (debug_mode) {
 		fprintf(stderr,"lookup: positive answer timeouts (attr:%.3lf,entry:%.3lf)\n",e.attr_timeout,e.entry_timeout);
@@ -1521,10 +1525,7 @@ void mfs_mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode,
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"mknod (%lu,%s,%s:0%04o,0x%08lX): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,modestr,(unsigned int)mode,(unsigned long int)rdev,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
-		if (fuse_reply_entry(req, &e) == -ENOENT) {
-			invalidator_forget(e.ino,1);
-		}
+		fuse_reply_entry(req, &e);
 	}
 }
 
@@ -1652,7 +1653,7 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"mkdir (%lu,%s,d%s:0%04o): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
+		invalidator_insert(parent,name,nleng,inode,direntry_cache_timeout);
 		if (fuse_reply_entry(req, &e) == -ENOENT) {
 			invalidator_forget(e.ino,1);
 		}
@@ -1767,10 +1768,7 @@ void mfs_symlink(fuse_req_t req, const char *path, fuse_ino_t parent, const char
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"symlink (%s,%lu,%s): OK (%.1lf,%lu,%.1lf,%s)",path,(unsigned long int)parent,name,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
-		if (fuse_reply_entry(req, &e) == -ENOENT) {
-			invalidator_forget(e.ino,1);
-		}
+		fuse_reply_entry(req, &e);
 	}
 }
 
@@ -1942,10 +1940,7 @@ void mfs_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char *
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"link (%lu,%lu,%s): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)ino,(unsigned long int)newparent,newname,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(newparent,newname,newnleng,e.ino,e.entry_timeout);
-		if (fuse_reply_entry(req, &e) == -ENOENT) {
-			invalidator_forget(e.ino,1);
-		}
+		fuse_reply_entry(req, &e);
 	}
 }
 
@@ -2341,6 +2336,9 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 			return;
 		}
 		negentry_cache_remove(parent,nleng,(const uint8_t*)name);
+		if (xattr_cache_on) { // Linux asks for this xattr before every write, so after create we can safely assume that there is no such attribute, and set it in xattr cache (improve efficiency on small files)
+			xattr_cache_set(inode,ctx.uid,ctx.gid,8+1+10,(const uint8_t*)"security.capability",NULL,0,ERROR_ENOATTR);
+		}
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
 //		}
@@ -2401,10 +2399,8 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	mfs_makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s,%lu)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned long int)fi->keep_cache);
-	invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
-		invalidator_forget(e.ino,1);
 	}
 }
 

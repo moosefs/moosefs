@@ -2427,28 +2427,40 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 
 // step 7b. if chunk has one copy on each server and some of them have status TODEL then delete one of it
 	if (extrajob==0 && vc+tdc>=scount && vc<c->goal && tdc>0 && vc+tdc>1) {
-		uint8_t prevdone;
-//		syslog(LOG_WARNING,"vc+tdc (%"PRIu32") >= scount (%"PRIu32") and vc (%"PRIu32") < goal (%"PRIu32") and tdc (%"PRIu32") > 0 and vc+tdc > 1 - delete",vc+tdc,scount,vc,c->goal,tdc);
-		prevdone = 0;
-		for (s=c->slisthead ; s && prevdone==0 ; s=s->next) {
+		uint8_t tdcr = 0;
+		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid==TDVALID) {
-				if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
-					chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
-					c->allvalidcopies--;
-					c->needverincrease = 1;
-					s->valid = DEL;
-					stats_deletions++;
-					matocsserv_send_deletechunk(cstab[s->csid].ptr,c->chunkid,0);
-					inforec.done.del_diskclean++;
-					tdc--;
-					dc++;
-					prevdone = 1;
-				} else {
-					inforec.notdone.del_diskclean++;
+				if (matocsserv_has_avail_space(cstab[s->csid].ptr)) {
+					tdcr++;
 				}
 			}
 		}
-		return;
+		if (vc+tdcr>=scount) {
+			uint8_t prevdone;
+	//		syslog(LOG_WARNING,"vc+tdc (%"PRIu32") >= scount (%"PRIu32") and vc (%"PRIu32") < goal (%"PRIu32") and tdc (%"PRIu32") > 0 and vc+tdc > 1 - delete",vc+tdc,scount,vc,c->goal,tdc);
+			prevdone = 0;
+			for (s=c->slisthead ; s && prevdone==0 ; s=s->next) {
+				if (s->valid==TDVALID) {
+					if (matocsserv_has_avail_space(cstab[s->csid].ptr) && matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
+						chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						c->allvalidcopies--;
+						c->needverincrease = 1;
+						s->valid = DEL;
+						stats_deletions++;
+						matocsserv_send_deletechunk(cstab[s->csid].ptr,c->chunkid,0);
+						inforec.done.del_diskclean++;
+						tdc--;
+						dc++;
+						prevdone = 1;
+					} else {
+						inforec.notdone.del_diskclean++;
+					}
+				}
+			}
+			if (prevdone) {
+				return;
+			}
+		}
 	}
 
 //step 8. if chunk has number of copies less than goal then make another copy of this chunk

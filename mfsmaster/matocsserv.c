@@ -1010,6 +1010,11 @@ uint8_t matocsserv_can_create_chunks(void *e,double tolerance) {
 	return eptr->cancreatechunks;
 }
 
+uint8_t matocsserv_has_avail_space(void *e) {
+	matocsserventry *eptr = (matocsserventry *)e;
+	return (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && (eptr->totalspace - eptr->usedspace) > (eptr->totalspace/100))?1:0;
+}
+
 double matocsserv_replication_write_counter(void *e,uint32_t now) {
 	matocsserventry *eptr = (matocsserventry *)e;
 	double a;

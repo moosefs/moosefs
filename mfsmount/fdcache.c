@@ -22,6 +22,8 @@
 #include "config.h"
 #endif
 
+#define BUCKETS_MT_MMAP_ALLOC 1
+
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
@@ -32,7 +34,7 @@
 #include "readchunkdata.h"
 #include "massert.h"
 #include "clocks.h"
-#include "buckets.h"
+#include "buckets_mt.h"
 
 #include "fdcache.h"
 
@@ -62,8 +64,8 @@ typedef struct _fdcacheentry {
 	struct _fdcacheentry *next;
 } fdcacheentry;
 
-CREATE_BUCKET_ALLOCATOR(fdcachecd,fdcachechunkdata,500)
-CREATE_BUCKET_ALLOCATOR(fdcachee,fdcacheentry,500)
+CREATE_BUCKET_MT_ALLOCATOR(fdcachecd,fdcachechunkdata,500)
+CREATE_BUCKET_MT_ALLOCATOR(fdcachee,fdcacheentry,500)
 
 static fdcacheentry *fdhashtab[FDCACHE_HASHSIZE];
 static pthread_mutex_t hashlock[FDCACHE_HASHSIZE];
@@ -108,6 +110,9 @@ void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],u
 	while ((fdce = *fdcep)) {
 		if (fdce->createtime + FDCACHE_TIMEOUT < now) {
 			*fdcep = fdce->next;
+			if (fdce->chunkdata) {
+				fdcache_chunkdata_unref(fdce->chunkdata);
+			}
 			fdcachee_free(fdce);
 		} else {
 			if (fdce->inode==inode && fdce->uid==ctx->uid && fdce->gid==ctx->gid && fdce->pid==ctx->pid) {
@@ -222,10 +227,12 @@ void fdcache_inject_chunkdata(uint32_t inode,void *vfdccd) {
 
 void fdcache_init(void) {
 	uint32_t i;
+
 	(void)fdcachee_free_all; // just calm down the compiler about unused functions
 	(void)fdcachee_getusage;
-	(void)fdcachecd_free_all; // just calm down the compiler about unused functions
+	(void)fdcachecd_free_all;
 	(void)fdcachecd_getusage;
+
 	for (i=0 ; i<FDCACHE_HASHSIZE ; i++) {
 		fdhashtab[i] = NULL;
 		zassert(pthread_mutex_init(hashlock+i,NULL));

@@ -51,6 +51,7 @@ void matocsserv_write_counters(void *e,uint8_t x);
 uint8_t matocsserv_is_privileged(void *e,uint8_t dstflag);
 void matocsserv_want_to_be_privileged(void *dst,void *src);
 
+uint8_t matocsserv_has_avail_space(void *e);
 double matocsserv_get_usage(void *e);
 
 double matocsserv_replication_write_counter(void *e,uint32_t now);

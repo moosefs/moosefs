@@ -1,5 +1,13 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.45-1 (2015-09-10)
+
+  - (mount) fixed cache for extra inode data (usage of non thread-safe allocation functions - leads to hangups on lookup/open etc.)
+  - (mount) fixed data-cache issue (delete only directories from kerenel dentry cache)
+  - (mount) inserting into xattr cache "nonexistent" xattr "security.capability" after file creation. (speed up writing small files)
+  - (master) fixed scenario causing deleting chunks from chunkservers marked for removal
+  - (cgi+cli) fixed color of reported exports checksum for non-pro masters
+
 * MooseFS 3.0.44-1 (2015-08-13)
 
   - (master+mount) fixed synchronization between mounts (write+close on one and then read this data on another)

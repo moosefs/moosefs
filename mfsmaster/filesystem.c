@@ -3988,7 +3988,7 @@ uint8_t fs_access(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t ui
 	return fsnodes_access_ext(p,uid,gids,gid,modemask,sesflags)?STATUS_OK:ERROR_EACCES;
 }
 
-uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint32_t *inode,uint8_t attr[35],uint8_t *accmode,uint8_t *validchunk,uint64_t *chunkid) {
+uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint32_t *inode,uint8_t attr[35],uint8_t *accmode,uint8_t *filenode,uint8_t *validchunk,uint64_t *chunkid) {
 	fsnode *wd,*rn,*p;
 	fsedge *e;
 
@@ -4049,6 +4049,9 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 	}
 	p = e->child;
 	*inode = p->inode;
+	if (filenode) {
+		*filenode = (p->type==TYPE_FILE || p->type==TYPE_TRASH || p->type==TYPE_SUSTAINED)?1:0;
+	}
 	fsnodes_fill_attr(p,wd,uid,gid[0],auid,agid,sesflags,attr);
 	if (accmode!=NULL) {
 		*accmode = fsnodes_accessmode(p,uid,gids,gid,sesflags);

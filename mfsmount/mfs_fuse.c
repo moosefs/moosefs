@@ -1126,9 +1126,13 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //	}
 	mfs_makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(&ctx,"lookup (%lu,%s)%s: OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,icacheflag?" (using open dir cache)":"",e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-	invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
+	if (type==TYPE_DIRECTORY) {
+		invalidator_insert(parent,name,nleng,inode,direntry_cache_timeout);
+	}
 	if (fuse_reply_entry(req, &e) == -ENOENT) {
-		invalidator_forget(e.ino,1);
+		if (type==TYPE_DIRECTORY) {
+			invalidator_forget(e.ino,1);
+		}
 	}
 	if (debug_mode) {
 		fprintf(stderr,"lookup: positive answer timeouts (attr:%.3lf,entry:%.3lf)\n",e.attr_timeout,e.entry_timeout);
@@ -1613,10 +1617,7 @@ void mfs_mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode,
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"mknod (%lu,%s,%s:0%04o,0x%08lX): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,modestr,(unsigned int)mode,(unsigned long int)rdev,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
-		if (fuse_reply_entry(req, &e) == -ENOENT) {
-			invalidator_forget(e.ino,1);
-		}
+		fuse_reply_entry(req, &e);
 	}
 }
 
@@ -1744,7 +1745,7 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"mkdir (%lu,%s,d%s:0%04o): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
+		invalidator_insert(parent,name,nleng,inode,direntry_cache_timeout);
 		if (fuse_reply_entry(req, &e) == -ENOENT) {
 			invalidator_forget(e.ino,1);
 		}
@@ -1859,10 +1860,7 @@ void mfs_symlink(fuse_req_t req, const char *path, fuse_ino_t parent, const char
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"symlink (%s,%lu,%s): OK (%.1lf,%lu,%.1lf,%s)",path,(unsigned long int)parent,name,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
-		if (fuse_reply_entry(req, &e) == -ENOENT) {
-			invalidator_forget(e.ino,1);
-		}
+		fuse_reply_entry(req, &e);
 	}
 }
 
@@ -2034,10 +2032,7 @@ void mfs_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char *
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"link (%lu,%lu,%s): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)ino,(unsigned long int)newparent,newname,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(newparent,newname,newnleng,e.ino,e.entry_timeout);
-		if (fuse_reply_entry(req, &e) == -ENOENT) {
-			invalidator_forget(e.ino,1);
-		}
+		fuse_reply_entry(req, &e);
 	}
 }
 
@@ -2504,10 +2499,8 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	mfs_makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s,%lu)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned long int)fi->keep_cache);
-	invalidator_insert(parent,name,nleng,e.ino,e.entry_timeout);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
-		invalidator_forget(e.ino,1);
 	}
 }
 
@@ -2652,7 +2645,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	status = mfs_errorconv(status);
 
 	if (status!=0) {
-		oplog_printf(&ctx,"open (%lu): %s",(unsigned long int)ino,strerr(status));
+		oplog_printf(&ctx,"open (%lu)%s: %s",(unsigned long int)ino,(found)?" (using cached data from lookup)":"",strerr(status));
 		fuse_reply_err(req, status);
 		return ;
 	}
@@ -2661,9 +2654,9 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	fileinfo = mfs_newfileinfo(fi->flags & O_ACCMODE,ino,mfs_attr_get_fleng(attr));
 	fi->fh = (unsigned long)fileinfo;
 	if (keep_cache==1) {
-		fi->keep_cache=1;
+		fi->keep_cache = 1;
 	} else if (keep_cache==2) {
-		fi->keep_cache=0;
+		fi->keep_cache = 0;
 	} else {
 		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 	}
@@ -2671,11 +2664,10 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fprintf(stderr,"open (%lu) ok -> keep cache: %lu\n",(unsigned long int)ino,(unsigned long int)fi->keep_cache);
 	}
 	fi->direct_io = 0;
-	oplog_printf(&ctx,"open (%lu): OK (%lu,%lu)",(unsigned long int)ino,(unsigned long int)fi->direct_io,(unsigned long int)fi->keep_cache);
+	oplog_printf(&ctx,"open (%lu)%s: OK (%lu,%lu)",(unsigned long int)ino,(found)?" (using cached data from lookup)":"",(unsigned long int)fi->direct_io,(unsigned long int)fi->keep_cache);
 	if (fuse_reply_open(req, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
-	}
-	if (fdrec) {
+	} else if (found) {
 		uint32_t gidtmp = 0;
 		fs_opencheck(ino,0,1,&gidtmp,oflags,attr); // just send "opencheck" to make sure that master knows that this file is open
 	}

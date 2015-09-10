@@ -2540,6 +2540,7 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t attr[35];
 	uint16_t lflags;
 	uint8_t accmode;
+	uint8_t filenode;
 	uint8_t validchunk;
 	uint64_t chunkid;
 	uint32_t msgid;
@@ -2582,14 +2583,14 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	}
 	if (eptr->version>=VERSION2INT(3,0,40)) {
 		uint8_t sesflags = sessions_get_sesflags(eptr->sesdata);
-		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,&accmode,&validchunk,&chunkid);
+		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,&accmode,&filenode,&validchunk,&chunkid);
 		if (status==STATUS_OK) {
 			uint32_t version;
 			uint8_t count;
 			uint8_t cs_data[100*14];
 			lflags = (accmode & LOOKUP_ACCESS_BITS);
-			if ((lflags&(LOOKUP_ACCESS_MODE_R|LOOKUP_ACCESS_MODE_W))!=0) { // can be read and/or written
-				if (dcm_open(inode,sessions_get_id(eptr->sesdata))==0) {
+			if (filenode && (lflags&(LOOKUP_ACCESS_MODE_R|LOOKUP_ACCESS_MODE_W))!=0) { // can be read and/or written
+				if (dcm_open(newinode,sessions_get_id(eptr->sesdata))==0) {
 					if (sesflags&SESFLAG_ATTRBIT) {
 						attr[0]&=(0xFF^MATTR_ALLOWDATACACHE);
 					} else {
@@ -2630,7 +2631,7 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			}
 		}
 	} else {
-		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,NULL,NULL,NULL);
+		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,NULL,NULL,NULL,NULL);
 		if (status==ERROR_ENOENT_NOCACHE && eptr->version<VERSION2INT(3,0,25)) {
 			status = ERROR_ENOENT;
 		}
@@ -3450,7 +3451,6 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t *ptr;
 	uint8_t status;
 	uint8_t sesflags;
-	int allowcache;
 	if (length<19) {
 		syslog(LOG_NOTICE,"CLTOMA_FUSE_CREATE - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
@@ -3522,8 +3522,7 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		}
 		/* open file */
 		of_openfile(sessions_get_id(eptr->sesdata),newinode);
-		allowcache = dcm_open(newinode,sessions_get_id(eptr->sesdata));
-		if (allowcache==0) {
+		if (dcm_open(newinode,sessions_get_id(eptr->sesdata))==0) {
 			if (sesflags&SESFLAG_ATTRBIT) {
 				attr[0]&=(0xFF^MATTR_ALLOWDATACACHE);
 			} else {

@@ -1017,9 +1017,18 @@ void matocsserv_privileged_cleanup(void) {
 	matocsserv_want_to_be_privileged(NULL,NULL);
 }
 
+uint8_t matocsserv_has_avail_space(void *e) {
+	matocsserventry *eptr = (matocsserventry *)e;
+	return (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && (eptr->totalspace - eptr->usedspace) > (eptr->totalspace/100))?1:0;
+}
+
 double matocsserv_get_usage(void *e) {
 	matocsserventry *eptr = (matocsserventry *)e;
-	return (double)(eptr->usedspace) / (double)(eptr->totalspace);
+	if (eptr->totalspace>0) {
+		return (double)(eptr->usedspace) / (double)(eptr->totalspace);
+	} else {
+		return 1.0;
+	}
 }
 
 double matocsserv_replication_write_counter(void *e,uint32_t now) {

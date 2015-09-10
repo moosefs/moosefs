@@ -1753,6 +1753,7 @@ for mhost,mport in masterlist:
 						leaderconn = conn
 						leaderinfo = data
 						leaderfound = 1
+						leader_exports_checksum = exports_checksum
 					statestr = "-"
 					statecolor = 0
 				elif stablestate==0 or workingstate!=nextstate:

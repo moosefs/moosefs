@@ -433,6 +433,7 @@ mfsmount_SOURCES = \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/datapack.h ../mfscommon/massert.h \
 	../mfscommon/mfsstrerr.h ../mfscommon/portable.h \
+	../mfscommon/buckets_mt.h \
 	../mfscommon/MFSCommunication.h
 
 mfstools_SOURCES = \

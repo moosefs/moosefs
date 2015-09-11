@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.76-1 (2015-09-11)
+
+  - (mount) fixed rare bug in writing module (unrecoverable write error could lead to infinite loop during write)
+
 * MooseFS 2.0.75-1 (2015-09-10)
 
   - (mount) fixed data-cache issue (delete only directories from kerenel dentry cache)

@@ -1,3 +1,10 @@
+moosefs (2.0.76-1) unstable; urgency=medium
+
+  * (mount) fixed rare bug in writing module (unrecoverable write error could
+    lead to infinite loop during write)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 11 Sep 2015 13:00:00 +0200
+
 moosefs (2.0.75-1) unstable; urgency=medium
 
   * (mount) fixed data-cache issue (delete only directories from kerenel dentry

@@ -381,6 +381,7 @@ void write_job_end(inodedata *id,int status,uint32_t delay) {
 			write_cb_release(id,fcb);
 		}
 		id->datachainhead=NULL;
+		id->datachaintail=NULL;
 		id->inqueue=0;
 
 		if (id->flushwaiting>0) {

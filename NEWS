@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.46-1 (2015-09-15)
+
+  - (mount) fixed chunk-data cache bug (repeated network timeouts could lead to reading freeze)
+
 * MooseFS 3.0.45-1 (2015-09-10)
 
   - (mount) fixed cache for extra inode data (usage of non thread-safe allocation functions - leads to hangups on lookup/open etc.)

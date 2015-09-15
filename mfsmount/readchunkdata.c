@@ -282,7 +282,7 @@ void read_chunkdata_invalidate (uint32_t inode,uint32_t chindx) {
 	for (mrc = mreq_cache[hash] ; mrc ; mrc=mrc->next) {
 		if (mrc->inode==inode && mrc->chindx==chindx) {
 			if (mrc->state==MR_READY) {
-				mrc->state=MR_INVALID;
+				mrc->state = MR_INVALID;
 			}
 			zassert(pthread_mutex_unlock(&mreq_cache_lock));
 			return;
@@ -333,11 +333,11 @@ uint8_t read_chunkdata_check(uint32_t inode,uint32_t chindx,uint64_t chunkid,uin
 	hash = ((inode * 0x4A599F6D + chindx) * 0xB15831CB) % MREQ_HASH_SIZE;
 	for (mrc = mreq_cache[hash] ; mrc != NULL ; mrc = mrc->next) {
 		if (mrc->inode==inode && mrc->chindx==chindx) {
-			while (mrc->state!=MR_READY) {
+			while (mrc->state!=MR_READY && mrc->state!=MR_INVALID) {
 				mrc->reqwaiting = 1;
 				zassert(pthread_cond_wait(&(mrc->reqcond),&mreq_cache_lock));
 			}
-			if (mrc->status!=STATUS_OK || mrc->chunkid!=chunkid || mrc->version!=version) {
+			if (mrc->state==MR_INVALID || mrc->status!=STATUS_OK || mrc->chunkid!=chunkid || mrc->version!=version) {
 				zassert(pthread_mutex_unlock(&mreq_cache_lock));
 				return 0;
 			} else {
@@ -404,7 +404,7 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 					*chainelements = 0;
 				}
 				if (mrc->state==MR_READY && mrc->lastrefresh + MREQ_REFRESH < now) {
-					mrc->state=MR_REFRESH;
+					mrc->state = MR_REFRESH;
 					mrc->canmodatime = *canmodatime;
 					if (mrc->canmodatime==2) {
 						*canmodatime = 1;

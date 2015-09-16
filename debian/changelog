@@ -1,3 +1,9 @@
+moosefs (3.0.47-1) unstable; urgency=medium
+
+  * (mount) fixed memory leak in readchunkdata module
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 16 Sep 2015 13:00:00 +0200
+
 moosefs (3.0.46-1) unstable; urgency=medium
 
   * (mount) fixed chunk-data cache bug (repeated network timeouts could lead to

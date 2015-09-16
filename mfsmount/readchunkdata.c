@@ -142,13 +142,20 @@ static inline void read_chunkdata_refresh(mreqcache *mrc) {
 		mrc->csdataver = csdataver;
 		mrc->chunkid = chunkid;
 		mrc->version = version;
-		mrc->csdatasize = csdatasize;
-		if (mrc->csdatasize>0) {
-			mrc->csdata = malloc(mrc->csdatasize);
-			passert(mrc->csdata);
+		if (mrc->csdatasize==csdatasize && csdatasize>0) {
 			memcpy(mrc->csdata,csdata,mrc->csdatasize);
 		} else {
-			mrc->csdata = NULL;
+			mrc->csdatasize = csdatasize;
+			if (mrc->csdata) {
+				free(mrc->csdata);
+			}
+			if (mrc->csdatasize>0) {
+				mrc->csdata = malloc(mrc->csdatasize);
+				passert(mrc->csdata);
+				memcpy(mrc->csdata,csdata,mrc->csdatasize);
+			} else {
+				mrc->csdata = NULL;
+			}
 		}
 		mrc->mfleng = mfleng;
 	} else {
@@ -369,6 +376,7 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 	while ((mrc = *mrcp)) {
 		if (mrc->state==MR_READY && (mrc->time + MREQ_TIMEOUT < now || mrc->status!=STATUS_OK)) {
 			*mrcp = mrc->next;
+			zassert(pthread_cond_destroy(&(mrc->reqcond)));
 			if (mrc->csdata) {
 				free(mrc->csdata);
 			}
@@ -433,32 +441,25 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 			if (mrc->csdata) {
 				free(mrc->csdata);
 			}
-			mrc->inode = inode;
-			mrc->chindx = chindx;
-			mrc->csdata = NULL;
-			mrc->csdatasize = 0;
-			mrc->state = MR_INIT;
-			mrc->reqwaiting = 0;
 		} else {
 			mrc = malloc(sizeof(mreqcache));
 			memset(mrc,0,sizeof(mreqcache));
-			mrc->inode = inode;
-			mrc->chindx = chindx;
-			mrc->state = MR_INIT;
-			mrc->reqwaiting = 0;
 			zassert(pthread_cond_init(&(mrc->reqcond),NULL));
 			mrc->next = mreq_cache[hash];
 			mreq_cache[hash] = mrc;
 		}
+		mrc->inode = inode;
+		mrc->chindx = chindx;
 	} else {
 		if (mrc->csdata) {
 			free(mrc->csdata);
 		}
-		mrc->csdata = NULL;
-		mrc->csdatasize = 0;
-		mrc->state = MR_INIT;
-		mrc->reqwaiting = 0;
 	}
+	mrc->csdata = NULL;
+	mrc->csdatasize = 0;
+	mrc->state = MR_INIT;
+	mrc->reqwaiting = 0;
+
 	mrc->canmodatime = *canmodatime;
 	if (mrc->canmodatime==2) {
 		*canmodatime = 1;

@@ -2315,7 +2315,11 @@ static finfo* mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng) {
 	pthread_mutex_init(&(fileinfo->lock),NULL);
 	pthread_mutex_lock(&(fileinfo->lock)); // make helgrind happy
 	fileinfo->fleng = fleng;
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	__sync_and_and_fetch(&(fileinfo->uselocks),0);
+#else
 	fileinfo->uselocks = 0;
+#endif
 #ifdef __FreeBSD__
 	/* old FreeBSD fuse reads whole file when opening with O_WRONLY|O_APPEND,
 	 * so can't open it write-only */

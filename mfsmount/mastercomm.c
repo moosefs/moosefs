@@ -66,6 +66,7 @@ typedef struct _threc {
 	uint8_t status;		// receive status
 	uint8_t rcvd;		// packet was received
 	uint8_t waiting;	// thread is waiting for answer
+	uint8_t receiving;
 
 	uint32_t rcvd_cmd;
 
@@ -132,18 +133,28 @@ static uint32_t srcip=0;
 static uint8_t fterm;
 
 void fs_getmasterlocation(uint8_t loc[14]) {
+	pthread_mutex_lock(&fdlock);
 	put32bit(&loc,masterip);
 	put16bit(&loc,masterport);
 	put32bit(&loc,sessionid);
 	put32bit(&loc,masterversion);
+	pthread_mutex_unlock(&fdlock);
 }
 
 uint32_t master_version(void) {
-	return masterversion;
+	uint32_t mver;
+	pthread_mutex_lock(&fdlock);
+	mver = masterversion;
+	pthread_mutex_unlock(&fdlock);
+	return mver;
 }
 
 uint32_t fs_getsrcip() {
-	return srcip;
+	uint32_t sip;
+	pthread_mutex_lock(&fdlock);
+	sip = srcip;
+	pthread_mutex_unlock(&fdlock);
+	return sip;
 }
 
 enum {
@@ -200,188 +211,6 @@ static inline const char* mfs_strerror(uint8_t status) {
 	}
 	return errtab[status];
 }
-/*
-void fs_lock_acnt(void) {
-	pthread_mutex_lock(&aflock);
-}
-
-void fs_unlock_acnt(void) {
-	pthread_mutex_unlock(&aflock);
-}
-
-uint32_t fs_get_acnt(uint32_t inode) {
-	acquired_file *afptr;
-	for (afptr=afhead ; afptr ; afptr=afptr->next) {
-		if (afptr->inode==inode) {
-			return (afptr->cnt);
-		}
-	}
-	return 0;
-}
-*/
-
-
-// attributes of inode have changed
-// #define MATOCL_FUSE_NOTIFY_ATTR 491
-// // msgid:32 N*[ inode:32 attr:35B ]
-//
-// // new entry has been added
-// #define MATOCL_FUSE_NOTIFY_LINK 492
-// // msgid:32 N*[ parent:32 name:NAME inode:32 attr:35B ]
-//
-// // entry has been deleted
-// #define MATOCL_FUSE_NOTIFY_UNLINK 493
-// // msgid:32 N*[ parent:32 name:NAME ]
-//
-// // whole directory needs to be removed
-// #define MATOCL_FUSE_NOTIFY_REMOVE 494
-// // msgid:32 N*[ inode:32 ]
-//
-
-/*
-void fs_notify_attr(const uint8_t *buff,uint32_t size) {
-	uint32_t inode;
-	while (size>=39) {
-		inode = get32bit(&buff);
-		dir_cache_attr(inode,buff);
-		buff += 35;
-		size -= 39;
-	}
-}
-
-void fs_notify_link(const uint8_t *buff,uint32_t size) {
-	uint32_t parent,inode;
-	uint32_t ts;
-	const uint8_t *name;
-	uint8_t nleng;
-	ts = get32bit(&buff);
-	size-=4;
-	while (size>=44) {
-		parent = get32bit(&buff);
-		nleng = get8bit(&buff);
-		if (size<44U+nleng) {
-			return;
-		}
-		name = buff;
-		buff += nleng;
-		inode = get32bit(&buff);
-		dir_cache_link(parent,nleng,name,inode,buff,ts);
-		buff += 35;
-		size -= 44U+nleng;
-	}
-}
-
-void fs_notify_unlink(const uint8_t *buff,uint32_t size) {
-	uint32_t ts;
-	uint32_t parent;
-	uint8_t nleng;
-	ts = get32bit(&buff);
-	size-=4;
-	while (size>=5) {
-		parent = get32bit(&buff);
-		nleng = get8bit(&buff);
-		if (size<5U+nleng) {
-			return;
-		}
-		dir_cache_unlink(parent,nleng,buff,ts);
-		buff += nleng;
-		size -= 5U+nleng;
-	}
-}
-
-void fs_notify_remove(const uint8_t *buff,uint32_t size) {
-	uint32_t inode;
-	while (size>=4) {
-		inode = get32bit(&buff);
-		dir_cache_remove(inode);
-		size -= 4;
-	}
-}
-
-void fs_notify_parent(const uint8_t *buff,uint32_t size) {
-	uint32_t inode,parent;
-	while (size>=8) {
-		inode = get32bit(&buff);
-		parent = get32bit(&buff);
-		dir_cache_parent(inode,parent);
-		size -= 8;
-	}
-}
-
-void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes) {
-	static uint8_t *notify_buff=NULL;
-	static uint32_t notify_buff_size=0;
-	uint32_t size;
-	uint8_t *ptr;
-
-	if (cnt==0) {
-		return;
-	}
-
-	size = 12+4*cnt;
-
-	if (size>DEFAULT_OUTPUT_BUFFSIZE) {
-#ifdef MMAP_ALLOC
-		if (notify_buff) {
-			munmap(notify_buff,notify_buff_size);
-		}
-		notify_buff = mmap(NULL,size,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-		if (notify_buff) {
-			free(notify_buff);
-		}
-		notify_buff = malloc(size);
-#endif
-		notify_buff_size = size;
-	} else if (notify_buff_size!=DEFAULT_OUTPUT_BUFFSIZE) {
-#ifdef MMAP_ALLOC
-		if (notify_buff) {
-			munmap(notify_buff,notify_buff_size);
-		}
-		notify_buff = mmap(NULL,DEFAULT_OUTPUT_BUFFSIZE,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-		if (notify_buff) {
-			free(notify_buff);
-		}
-		notify_buff = malloc(DEFAULT_OUTPUT_BUFFSIZE);
-#endif
-		notify_buff_size = DEFAULT_OUTPUT_BUFFSIZE;
-	}
-	if (notify_buff==NULL) {
-		notify_buff_size = 0;
-		disconnect=1;
-		return;
-	}
-
-	ptr = notify_buff;
-
-	put32bit(&ptr,CLTOMA_FUSE_DIR_REMOVED);
-	put32bit(&ptr,size-8);
-	put32bit(&ptr,0);
-
-	while (cnt) {
-		put32bit(&ptr,*inodes);
-		inodes++;
-		cnt--;
-	}
-
-	pthread_mutex_lock(&fdlock);
-	if (sessionlost || fd==-1 || masterversion<VERSION2INT(1,6,21)) {
-		pthread_mutex_unlock(&fdlock);
-		return;
-	}
-	if (tcptowrite(fd,notify_buff,size,1000)!=(int32_t)size) {
-		syslog(LOG_WARNING,"tcp send error: %s",strerr(errno));
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
-		return;
-	}
-	master_stats_add(MASTER_BYTESSENT,size);
-	master_stats_inc(MASTER_PACKETSSENT);
-	lastwrite = time(NULL);
-	pthread_mutex_unlock(&fdlock);
-}
-*/
 
 void fs_add_entry(uint32_t inode) {
 	acquired_file *afptr,**afpptr;
@@ -483,47 +312,19 @@ threc* fs_get_my_threc() {
 	}
 	rec = malloc(sizeof(threc));
 	rec->thid = mythid;
-/*
-#ifdef MMAP_ALLOC
-	rec->obuff = mmap(NULL,DEFAULT_OUTPUT_BUFFSIZE,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-	rec->ibuff = mmap(NULL,DEFAULT_INPUT_BUFFSIZE,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-	rec->obuff = malloc(DEFAULT_OUTPUT_BUFFSIZE);
-	rec->ibuff = malloc(DEFAULT_INPUT_BUFFSIZE);
-#endif
-	if (rec->obuff==NULL || rec->ibuff==NULL) {
-#ifdef MMAP_ALLOC
-		if (rec->obuff) {
-			munmap(rec->obuff,DEFAULT_OUTPUT_BUFFSIZE);
-		}
-		if (rec->ibuff) {
-			munmap(rec->ibuff,DEFAULT_INPUT_BUFFSIZE);
-		}
-#else
-		if (rec->obuff) {
-			free(rec->obuff);
-		}
-		if (rec->ibuff) {
-			free(rec->ibuff);
-		}
-#endif
-		free(rec);
-		pthread_mutex_unlock(&reclock);
-		return NULL;
-	}
-*/
 	pthread_mutex_init(&(rec->mutex),NULL);
 	pthread_cond_init(&(rec->cond),NULL);
 	rec->obuff = NULL;
 	rec->ibuff = NULL;
-	rec->obuffsize = 0;//DEFAULT_OUTPUT_BUFFSIZE;
-	rec->ibuffsize = 0;//DEFAULT_INPUT_BUFFSIZE;
+	rec->obuffsize = 0;
+	rec->ibuffsize = 0;
 	rec->odataleng = 0;
 	rec->idataleng = 0;
 	rec->sent = 0;
 	rec->status = 0;
 	rec->rcvd = 0;
 	rec->waiting = 0;
+	rec->receiving = 0;
 	rec->rcvd_cmd = 0;
 	if (threchead==NULL) {
 		rec->packetid = 1;
@@ -633,6 +434,16 @@ uint8_t* fs_createpacket(threc *rec,uint32_t cmd,uint32_t size) {
 	return ptr;
 }
 
+static inline void fs_disconnect(void) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+	__sync_fetch_and_or(&disconnect,1);
+#else
+	pthread_mutex_lock(&fdlock);
+	disconnect = 1;
+	pthread_mutex_unlock(&fdlock);
+#endif
+}
+
 const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answer_leng) {
 	uint32_t cnt;
 	static uint8_t notsup = ERROR_ENOTSUP;
@@ -653,7 +464,11 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		pthread_mutex_lock(&(rec->mutex));	// make helgrind happy
 		if (tcptowrite(fd,rec->obuff,rec->odataleng,1000)!=(int32_t)(rec->odataleng)) {
 			syslog(LOG_WARNING,"tcp send error: %s",strerr(errno));
+#ifdef HAVE___SYNC_FETCH_AND_OP
+			__sync_fetch_and_or(&disconnect,1);
+#else
 			disconnect = 1;
+#endif
 			pthread_mutex_unlock(&(rec->mutex));
 			pthread_mutex_unlock(&fdlock);
 			sleep(1+((cnt<30)?(cnt/3):10));
@@ -688,9 +503,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		}
 		if (rec->rcvd_cmd!=expected_cmd) {
 			pthread_mutex_unlock(&(rec->mutex));
-			pthread_mutex_lock(&fdlock);
-			disconnect = 1;
-			pthread_mutex_unlock(&fdlock);
+			fs_disconnect();
 			sleep(1+((cnt<30)?(cnt/3):10));
 			continue;
 		}
@@ -720,7 +533,11 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 		pthread_mutex_lock(&(rec->mutex));	// make helgrind happy
 		if (tcptowrite(fd,rec->obuff,rec->odataleng,1000)!=(int32_t)(rec->odataleng)) {
 			syslog(LOG_WARNING,"tcp send error: %s",strerr(errno));
+#ifdef HAVE___SYNC_FETCH_AND_OP
+			__sync_fetch_and_or(&disconnect,1);
+#else
 			disconnect = 1;
+#endif
 			pthread_mutex_unlock(&(rec->mutex));
 			pthread_mutex_unlock(&fdlock);
 			sleep(1+((cnt<30)?(cnt/3):10));
@@ -1485,7 +1302,11 @@ void fs_send_open_inodes(void) {
 		put32bit(&ptr,afptr->inode);
 	}
 	if (tcptowrite(fd,inodespacket,inodesleng,1000)!=inodesleng) {
-		disconnect=1;
+#ifdef HAVE___SYNC_FETCH_AND_OP
+		__sync_fetch_and_or(&disconnect,1);
+#else
+		disconnect = 1;
+#endif
 	} else {
 		master_stats_add(MASTER_BYTESSENT,inodesleng);
 		master_stats_inc(MASTER_PACKETSSENT);
@@ -1512,14 +1333,22 @@ void* fs_nop_thread(void *arg) {
 			pthread_mutex_unlock(&fdlock);
 			return NULL;
 		}
+#ifdef HAVE___SYNC_FETCH_AND_OP
+		if (__sync_fetch_and_or(&disconnect,0)==0 && fd>=0) {
+#else
 		if (disconnect==0 && fd>=0) {
+#endif
 			if (lastwrite+2<now) {	// NOP
 				ptr = hdr;
 				put32bit(&ptr,ANTOAN_NOP);
 				put32bit(&ptr,4);
 				put32bit(&ptr,0);
 				if (tcptowrite(fd,hdr,12,1000)!=12) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+					__sync_fetch_and_or(&disconnect,1);
+#else
 					disconnect=1;
+#endif
 				} else {
 					master_stats_add(MASTER_BYTESSENT,12);
 					master_stats_inc(MASTER_PACKETSSENT);
@@ -1549,10 +1378,10 @@ void* fs_receive_thread(void *arg) {
 	uint8_t hdr[12];
 	threc *rec;
 	uint32_t cmd,size,packetid;
-	uint32_t rcvd;
+	uint32_t rcvd,toread;
 //	static uint8_t *notify_buff=NULL;
 //	static uint32_t notify_buff_size=0;
-	int r;
+	int32_t r;
 
 	(void)arg;
 	for (;;) {
@@ -1562,11 +1391,15 @@ void* fs_receive_thread(void *arg) {
 			pthread_mutex_unlock(&fdlock);
 			return NULL;
 		}
+#ifdef HAVE___SYNC_FETCH_AND_OP
+		if (__sync_fetch_and_and(&disconnect,0)) {
+#else
 		if (disconnect) {
+			disconnect = 0;
+#endif
 //			dir_cache_remove_all();
 			tcpclose(fd);
-			fd=-1;
-			disconnect=0;
+			fd = -1;
 			// send to any threc status error and unlock them
 			pthread_mutex_lock(&reclock);
 			for (rec=threchead ; rec ; rec=rec->next) {
@@ -1606,12 +1439,12 @@ void* fs_receive_thread(void *arg) {
 		// syslog(LOG_NOTICE,"master: header size: %d",r);
 		if (r==0) {
 			syslog(LOG_WARNING,"master: connection lost (header)");
-			disconnect=1;
+			fs_disconnect();
 			continue;
 		}
 		if (r!=12) {
 			syslog(LOG_WARNING,"master: tcp recv error: %s (header)",strerr(errno));
-			disconnect=1;
+			fs_disconnect();
 			continue;
 		}
 		master_stats_add(MASTER_BYTESRCVD,12);
@@ -1623,7 +1456,7 @@ void* fs_receive_thread(void *arg) {
 		packetid = get32bit(&ptr);
 		if (size<4) {
 			syslog(LOG_WARNING,"master: packet too small");
-			disconnect=1;
+			fs_disconnect();
 			continue;
 		}
 		size -= 4;
@@ -1635,137 +1468,60 @@ void* fs_receive_thread(void *arg) {
 			if (cmd==ANTOAN_UNKNOWN_COMMAND || cmd==ANTOAN_BAD_COMMAND_SIZE) { // just ignore these packets with packetid==0
 				continue;
 			}
-/*
-			if (cmd==MATOCL_FUSE_NOTIFY_END && size==0) {
-				dir_cache_transaction_end();
-				continue;
-			}
-			if (cmd==MATOCL_FUSE_NOTIFY_ATTR || cmd==MATOCL_FUSE_NOTIFY_LINK || cmd==MATOCL_FUSE_NOTIFY_UNLINK || cmd==MATOCL_FUSE_NOTIFY_REMOVE || cmd==MATOCL_FUSE_NOTIFY_PARENT) {
-				if (size>DEFAULT_INPUT_BUFFSIZE) {
-#ifdef MMAP_ALLOC
-					if (notify_buff) {
-						munmap(notify_buff,notify_buff_size);
-					}
-					notify_buff = mmap(NULL,size,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-					if (notify_buff) {
-						free(notify_buff);
-					}
-					notify_buff = malloc(size);
-#endif
-					notify_buff_size = size;
-				} else if (notify_buff_size!=DEFAULT_INPUT_BUFFSIZE) {
-#ifdef MMAP_ALLOC
-					if (notify_buff) {
-						munmap(notify_buff,notify_buff_size);
-					}
-					notify_buff = mmap(NULL,DEFAULT_INPUT_BUFFSIZE,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-					if (notify_buff) {
-						free(notify_buff);
-					}
-					notify_buff = malloc(DEFAULT_INPUT_BUFFSIZE);
-#endif
-					notify_buff_size = DEFAULT_INPUT_BUFFSIZE;
-				}
-				if (notify_buff==NULL) {
-					notify_buff_size = 0;
-					disconnect=1;
-					continue;
-				}
-				if (size>0) {
-					r = tcptoread(fd,notify_buff,size,1000);
-					// syslog(LOG_NOTICE,"master: data size: %d",r);
-					if (r==0) {
-						syslog(LOG_WARNING,"master: connection lost (2)");
-						disconnect=1;
-						continue;
-					}
-					if (r!=(int32_t)(size)) {
-						syslog(LOG_WARNING,"master: tcp recv error: %s (2)",strerr(errno));
-						disconnect=1;
-						continue;
-					}
-					master_stats_add(MASTER_BYTESRCVD,size);
-				}
-				switch (cmd) {
-					case MATOCL_FUSE_NOTIFY_ATTR:
-						fs_notify_attr(notify_buff,size);
-						break;
-					case MATOCL_FUSE_NOTIFY_LINK:
-						fs_notify_link(notify_buff,size);
-						break;
-					case MATOCL_FUSE_NOTIFY_UNLINK:
-						fs_notify_unlink(notify_buff,size);
-						break;
-					case MATOCL_FUSE_NOTIFY_REMOVE:
-						fs_notify_remove(notify_buff,size);
-						break;
-					case MATOCL_FUSE_NOTIFY_PARENT:
-						fs_notify_parent(notify_buff,size);
-						break;
-				}
-				continue;
-			}
-*/
 		}
 		rec = fs_get_threc_by_id(packetid);
 		if (rec==NULL) {
 			syslog(LOG_WARNING,"master: got unexpected queryid");
-			disconnect=1;
+			fs_disconnect();
 			continue;
 		}
 		pthread_mutex_lock(&(rec->mutex));	// make helgrind happy
+		if (rec->receiving) {
+			pthread_mutex_unlock(&(rec->mutex));
+			fs_disconnect();
+			continue;
+		}
 		fs_input_buffer_init(rec,size);
 		if (rec->ibuff==NULL) {
 			pthread_mutex_unlock(&(rec->mutex));
-			disconnect=1;
+			fs_disconnect();
 			continue;
 		}
+		rec->receiving = 1;
+		pthread_mutex_unlock(&(rec->mutex));
 		// syslog(LOG_NOTICE,"master: expected data size: %"PRIu32,size);
 		rcvd = 0;
-		while (size-rcvd>65536) {
-			r = tcptoread(fd,rec->ibuff+rcvd,65536,RECEIVE_TIMEOUT*1000);
+		while (size-rcvd>0) {
+			toread = size-rcvd;
+			if (toread>65536) {
+				toread = 65536;
+			}
+			r = tcptoread(fd,rec->ibuff+rcvd,toread,RECEIVE_TIMEOUT*1000);
 			// syslog(LOG_NOTICE,"master: data size: %d",r);
 			if (r==0) {
 				syslog(LOG_WARNING,"master: connection lost (data)");
-				pthread_mutex_unlock(&(rec->mutex));
-				disconnect=1;
 				break;
 			}
-			if (r!=65536) {
+			if (r!=(int32_t)toread) {
 				syslog(LOG_WARNING,"master: tcp recv error: %s (data)",strerr(errno));
-				pthread_mutex_unlock(&(rec->mutex));
-				disconnect=1;
 				break;
 			}
-			master_stats_add(MASTER_BYTESRCVD,65536);
-			rcvd += 65536;
+			master_stats_add(MASTER_BYTESRCVD,toread);
+			rcvd += toread;
 		}
-		if (disconnect) {
+		if (size-rcvd>0) { // exit from previous loop by break = error
+			pthread_mutex_lock(&(rec->mutex));
+			rec->receiving = 0;
+			pthread_mutex_unlock(&(rec->mutex));
+			fs_disconnect();
 			continue;
 		}
-		if (size-rcvd>0) {
-			r = tcptoread(fd,rec->ibuff+rcvd,size-rcvd,RECEIVE_TIMEOUT*1000);
-			// syslog(LOG_NOTICE,"master: data size: %d",r);
-			if (r==0) {
-				syslog(LOG_WARNING,"master: connection lost (data)");
-				pthread_mutex_unlock(&(rec->mutex));
-				disconnect=1;
-				continue;
-			}
-			if (r!=(int32_t)(size-rcvd)) {
-				syslog(LOG_WARNING,"master: tcp recv error: %s (data)",strerr(errno));
-				pthread_mutex_unlock(&(rec->mutex));
-				disconnect=1;
-				continue;
-			}
-			master_stats_add(MASTER_BYTESRCVD,size-rcvd);
-		}
+		pthread_mutex_lock(&(rec->mutex));
 		rec->sent = 0;
 		rec->status = 0;
 		rec->idataleng = size;
 		rec->rcvd_cmd = cmd;
+		rec->receiving = 0;
 		// syslog(LOG_NOTICE,"master: unlock: %"PRIu32,rec->packetid);
 		rec->rcvd = 1;
 		if (rec->waiting) {
@@ -1783,7 +1539,11 @@ int fs_init_master_connection(const char *bindhostname,const char *masterhostnam
 	sessionlost = bgregister?1:0;
 	sessionid = 0;
 	metaid = 0;
+#ifdef HAVE___SYNC_FETCH_AND_OP
+	__sync_fetch_and_and(&disconnect,0);
+#else
 	disconnect = 0;
+#endif
 	donotsendsustainedinodes = 0;
 
 	if (bindhostname) {
@@ -1912,7 +1672,7 @@ uint8_t fs_access(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint16
 	uint32_t i;
 	uint8_t ret;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0) || gids==0) {
+	if (master_version()<VERSION2INT(2,0,0) || gids==0) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_ACCESS,13);
 		if (wptr==NULL) {
 			return ERROR_IO;
@@ -1954,7 +1714,7 @@ uint8_t fs_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_LOOKUP,13+nleng);
 		packetver = 0;
 	} else {
@@ -2022,14 +1782,10 @@ uint8_t fs_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid
 			*csdatasize = 0;
 		}
 		if (ret == ERROR_IO) {
-			pthread_mutex_lock(&fdlock);
-			disconnect = 1;
-			pthread_mutex_unlock(&fdlock);
+			fs_disconnect();
 		}
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -2042,7 +1798,7 @@ uint8_t fs_getattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gid,uint8
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(1,6,28)) {
+	if (master_version()<VERSION2INT(1,6,28)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETATTR,12);
 		packetver = 0;
 	} else {
@@ -2064,9 +1820,7 @@ uint8_t fs_getattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gid,uint8
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=35) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		memcpy(attr,rptr,35);
@@ -2082,13 +1836,13 @@ uint8_t fs_setattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(1,6,25)) {
+	if (master_version()<VERSION2INT(1,6,25)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETATTR,31);
 		packetver = 0;
-	} else if (masterversion<VERSION2INT(1,6,28)) {
+	} else if (master_version()<VERSION2INT(1,6,28)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETATTR,32);
 		packetver = 1;
-	} else if (masterversion<VERSION2INT(2,0,0)) {
+	} else if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETATTR,33);
 		packetver = 2;
 	} else {
@@ -2134,9 +1888,7 @@ uint8_t fs_setattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=35) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		memcpy(attr,rptr,35);
@@ -2152,7 +1904,7 @@ uint8_t fs_truncate(uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gids,uint
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_TRUNCATE,21);
 		packetver = 0;
 	} else {
@@ -2188,9 +1940,7 @@ uint8_t fs_truncate(uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gids,uint
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=35) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		if (attr!=NULL) {
@@ -2219,16 +1969,12 @@ uint8_t fs_readlink(uint32_t inode,const uint8_t **path) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i<4) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		pleng = get32bit(&rptr);
 		if (i!=4+pleng || pleng==0 || rptr[pleng-1]!=0) {
-			pthread_mutex_lock(&fdlock);
-			disconnect = 1;
-			pthread_mutex_unlock(&fdlock);
+			fs_disconnect();
 			ret = ERROR_IO;
 		} else {
 			*path = rptr;
@@ -2249,7 +1995,7 @@ uint8_t fs_symlink(uint32_t parent,uint8_t nleng,const uint8_t *name,const uint8
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
 	pleng = strlen((const char *)path)+1;
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SYMLINK,pleng+nleng+17);
 		packetver = 0;
 	} else {
@@ -2289,9 +2035,7 @@ uint8_t fs_symlink(uint32_t parent,uint8_t nleng,const uint8_t *name,const uint8
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=39) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		*inode = get32bit(&rptr);
@@ -2333,7 +2077,7 @@ uint8_t fs_mknod(uint32_t parent,uint8_t nleng,const uint8_t *name,uint8_t type,
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
 
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		mode &= ~cumask;
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_MKNOD,20+nleng);
 		packetver = 0;
@@ -2348,7 +2092,7 @@ uint8_t fs_mknod(uint32_t parent,uint8_t nleng,const uint8_t *name,uint8_t type,
 	put8bit(&wptr,nleng);
 	memcpy(wptr,name,nleng);
 	wptr+=nleng;
-	if (masterversion<VERSION2INT(1,7,32)) {
+	if (master_version()<VERSION2INT(1,7,32)) {
 		type = fsnodes_type_back_convert(type);
 	}
 	put8bit(&wptr,type);
@@ -2380,9 +2124,7 @@ uint8_t fs_mknod(uint32_t parent,uint8_t nleng,const uint8_t *name,uint8_t type,
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=39) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		*inode = get32bit(&rptr);
@@ -2399,11 +2141,11 @@ uint8_t fs_mkdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mode
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(1,6,25)) {
+	if (master_version()<VERSION2INT(1,6,25)) {
 		mode &= ~cumask;
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_MKDIR,15+nleng);
 		packetver = 0;
-	} else if (masterversion<VERSION2INT(2,0,0)) {
+	} else if (master_version()<VERSION2INT(2,0,0)) {
 		mode &= ~cumask;
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_MKDIR,16+nleng);
 		packetver = 1;
@@ -2448,9 +2190,7 @@ uint8_t fs_mkdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mode
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=39) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		*inode = get32bit(&rptr);
@@ -2467,7 +2207,7 @@ uint8_t fs_unlink(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_UNLINK,13+nleng);
 		packetver = 0;
 	} else {
@@ -2504,9 +2244,7 @@ uint8_t fs_unlink(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -2519,7 +2257,7 @@ uint8_t fs_rmdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_RMDIR,13+nleng);
 		packetver = 0;
 	} else {
@@ -2556,9 +2294,7 @@ uint8_t fs_rmdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -2571,7 +2307,7 @@ uint8_t fs_rename(uint32_t parent_src,uint8_t nleng_src,const uint8_t *name_src,
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_RENAME,18+nleng_src+nleng_dst);
 		packetver = 0;
 	} else {
@@ -2614,9 +2350,7 @@ uint8_t fs_rename(uint32_t parent_src,uint8_t nleng_src,const uint8_t *name_src,
 		*inode = 0;
 		memset(attr,0,35);
 	} else if (i!=39) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		*inode = get32bit(&rptr);
@@ -2633,7 +2367,7 @@ uint8_t fs_link(uint32_t inode_src,uint32_t parent_dst,uint8_t nleng_dst,const u
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_LINK,17+nleng_dst);
 		packetver = 0;
 	} else {
@@ -2671,9 +2405,7 @@ uint8_t fs_link(uint32_t inode_src,uint32_t parent_dst,uint8_t nleng_dst,const u
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=39) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		*inode = get32bit(&rptr);
@@ -2718,7 +2450,7 @@ uint8_t fs_readdir(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint8
 	uint8_t packetver;
 	uint8_t flags;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_READDIR,13);
 		packetver = 0;
 	} else {
@@ -2796,9 +2528,7 @@ uint8_t fs_check(uint32_t inode,uint8_t dbuff[22]) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i%3!=0) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		for (copies=0 ; copies<11 ; copies++) {
@@ -2833,10 +2563,10 @@ uint8_t fs_create(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mod
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(1,7,25)) {
+	if (master_version()<VERSION2INT(1,7,25)) {
 		return ERROR_ENOTSUP;
 	}
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		mode &= ~cumask;
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_CREATE,15+nleng);
 		packetver = 0;
@@ -2881,9 +2611,7 @@ uint8_t fs_create(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mod
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=39) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		fs_inc_acnt((*inode = get32bit(&rptr)));
@@ -2903,7 +2631,7 @@ uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uin
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0) || gids==0) {
+	if (master_version()<VERSION2INT(2,0,0) || gids==0) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_OPEN,13);
 		packetver = 0;
 	} else {
@@ -2943,9 +2671,7 @@ uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uin
 		}
 		ret = STATUS_OK;
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	if (ret) {	// release on error
@@ -2975,9 +2701,7 @@ uint8_t fs_release(uint32_t inode) {
 	} else if (i==1) {
 		ret = ptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -2994,7 +2718,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *
 	*csdata = NULL;
 	*csdatasize = 0;
 
-	if (masterversion>VERSION2INT(3,0,3)) {
+	if (master_version()>VERSION2INT(3,0,3)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,9);
 	} else {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,8);
@@ -3004,7 +2728,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *
 	}
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
-	if (masterversion>VERSION2INT(3,0,3)) {
+	if (master_version()>VERSION2INT(3,0,3)) {
 		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_READ_CHUNK,&i);
@@ -3031,9 +2755,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *
 			}
 		}
 		if (ret!=STATUS_OK) {
-			pthread_mutex_lock(&fdlock);
-			disconnect = 1;
-			pthread_mutex_unlock(&fdlock);
+			fs_disconnect();
 		} else {
 			*length = get64bit(&rptr);
 			*chunkid = get64bit(&rptr);
@@ -3054,7 +2776,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t 
 	*csdata = NULL;
 	*csdatasize = 0;
 
-	if (masterversion>VERSION2INT(3,0,3)) {
+	if (master_version()>VERSION2INT(3,0,3)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK,9);
 	} else {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK,8);
@@ -3064,7 +2786,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t 
 	}
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
-	if (masterversion>VERSION2INT(3,0,3)) {
+	if (master_version()>VERSION2INT(3,0,3)) {
 		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_WRITE_CHUNK,&i);
@@ -3091,9 +2813,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t 
 			}
 		}
 		if (ret!=STATUS_OK) {
-			pthread_mutex_lock(&fdlock);
-			disconnect = 1;
-			pthread_mutex_unlock(&fdlock);
+			fs_disconnect();
 		} else {
 			*length = get64bit(&rptr);
 			*chunkid = get64bit(&rptr);
@@ -3110,7 +2830,7 @@ uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t chun
 	uint32_t i;
 	uint8_t ret;
 	threc *rec = fs_get_my_threc();
-	if (masterversion>VERSION2INT(3,0,3)) {
+	if (master_version()>VERSION2INT(3,0,3)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK_END,21);
 	} else {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK_END,20);
@@ -3121,7 +2841,7 @@ uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t chun
 	put64bit(&wptr,chunkid);
 	put32bit(&wptr,inode);
 	put64bit(&wptr,length);
-	if (masterversion>VERSION2INT(3,0,3)) {
+	if (master_version()>VERSION2INT(3,0,3)) {
 		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_WRITE_CHUNK_END,&i);
@@ -3130,9 +2850,7 @@ uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t chun
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3158,9 +2876,7 @@ uint8_t fs_flock(uint32_t inode,uint32_t reqid,uint64_t owner,uint8_t cmd) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3224,9 +2940,7 @@ uint8_t fs_posixlock(uint32_t inode,uint32_t reqid,uint64_t owner,uint8_t cmd,ui
 		}
 		ret = STATUS_OK;
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3298,9 +3012,7 @@ uint8_t fs_getdetachedattr(uint32_t inode,uint8_t attr[35]) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i!=35) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		memcpy(attr,rptr,35);
@@ -3327,16 +3039,12 @@ uint8_t fs_gettrashpath(uint32_t inode,const uint8_t **path) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i<4) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		pleng = get32bit(&rptr);
 		if (i!=4+pleng || pleng==0 || rptr[pleng-1]!=0) {
-			pthread_mutex_lock(&fdlock);
-			disconnect = 1;
-			pthread_mutex_unlock(&fdlock);
+			fs_disconnect();
 			ret = ERROR_IO;
 		} else {
 			*path = rptr;
@@ -3368,9 +3076,7 @@ uint8_t fs_settrashpath(uint32_t inode,const uint8_t *path) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3393,9 +3099,7 @@ uint8_t fs_undel(uint32_t inode) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3418,9 +3122,7 @@ uint8_t fs_purge(uint32_t inode) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3434,7 +3136,7 @@ uint8_t fs_getacl(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint3
 	threc *rec = fs_get_my_threc();
 	*namedacls = NULL;
 	*namedaclssize = 0;
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		return ERROR_ENOTSUP;
 	}
 	wptr = fs_createpacket(rec,CLTOMA_FUSE_GETACL,14+4*gids);
@@ -3459,9 +3161,7 @@ uint8_t fs_getacl(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint3
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i<12) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		*userperm = get16bit(&rptr);
@@ -3483,7 +3183,7 @@ uint8_t fs_setacl(uint32_t inode,uint32_t uid,uint8_t acltype,uint16_t userperm,
 	uint32_t i;
 	uint8_t ret;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		return ERROR_ENOTSUP;
 	}
 	wptr = fs_createpacket(rec,CLTOMA_FUSE_SETACL,21+namedaclssize);
@@ -3506,9 +3206,7 @@ uint8_t fs_setacl(uint32_t inode,uint32_t uid,uint8_t acltype,uint16_t userperm,
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3523,10 +3221,10 @@ uint8_t fs_getxattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uin
 	threc *rec = fs_get_my_threc();
 	*vbuff = NULL;
 	*vleng = 0;
-	if (masterversion<VERSION2INT(1,7,0)) {
+	if (master_version()<VERSION2INT(1,7,0)) {
 		return ERROR_ENOTSUP;
 	}
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETXATTR,15+nleng);
 		packetver = 0;
 	} else {
@@ -3568,17 +3266,13 @@ uint8_t fs_getxattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uin
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i<4) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		*vleng = get32bit(&rptr);
 		*vbuff = (mode==MFS_XATTR_GETA_DATA)?rptr:NULL;
 		if ((mode==MFS_XATTR_GETA_DATA && i!=(*vleng)+4) || (mode==MFS_XATTR_LENGTH_ONLY && i!=4)) {
-			pthread_mutex_lock(&fdlock);
-			disconnect = 1;
-			pthread_mutex_unlock(&fdlock);
+			fs_disconnect();
 			ret = ERROR_IO;
 		} else {
 			ret = STATUS_OK;
@@ -3594,10 +3288,10 @@ uint8_t fs_listxattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,ui
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(1,7,0)) {
+	if (master_version()<VERSION2INT(1,7,0)) {
 		return ERROR_ENOTSUP;
 	}
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETXATTR,15);
 		packetver = 0;
 	} else {
@@ -3637,17 +3331,13 @@ uint8_t fs_listxattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,ui
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i<4) {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	} else {
 		*dleng = get32bit(&rptr);
 		*dbuff = (mode==MFS_XATTR_GETA_DATA)?rptr:NULL;
 		if ((mode==MFS_XATTR_GETA_DATA && i!=(*dleng)+4) || (mode==MFS_XATTR_LENGTH_ONLY && i!=4)) {
-			pthread_mutex_lock(&fdlock);
-			disconnect = 1;
-			pthread_mutex_unlock(&fdlock);
+			fs_disconnect();
 			ret = ERROR_IO;
 		} else {
 			ret = STATUS_OK;
@@ -3663,13 +3353,13 @@ uint8_t fs_setxattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uin
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(1,7,0)) {
+	if (master_version()<VERSION2INT(1,7,0)) {
 		return ERROR_ENOTSUP;
 	}
 	if (mode>=MFS_XATTR_REMOVE) {
 		return ERROR_EINVAL;
 	}
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETXATTR,19+nleng+vleng);
 		packetver = 0;
 	} else {
@@ -3714,9 +3404,7 @@ uint8_t fs_setxattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uin
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3729,10 +3417,10 @@ uint8_t fs_removexattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,
 	uint8_t ret;
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
-	if (masterversion<VERSION2INT(1,7,0)) {
+	if (master_version()<VERSION2INT(1,7,0)) {
 		return ERROR_ENOTSUP;
 	}
-	if (masterversion<VERSION2INT(2,0,0)) {
+	if (master_version()<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETXATTR,19+nleng);
 		packetver = 0;
 	} else {
@@ -3775,9 +3463,7 @@ uint8_t fs_removexattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;
@@ -3830,9 +3516,7 @@ uint8_t fs_append(uint32_t inode,uint32_t ainode,uint32_t uid,uint32_t gid) {
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		pthread_mutex_lock(&fdlock);
-		disconnect = 1;
-		pthread_mutex_unlock(&fdlock);
+		fs_disconnect();
 		ret = ERROR_IO;
 	}
 	return ret;

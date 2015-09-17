@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.48-1 (2015-09-17)
+
+  - (mount) minor changes in mastercomm module (disconnection handle)
+
 * MooseFS 3.0.47-1 (2015-09-16)
 
   - (mount) fixed memory leak in readchunkdata module

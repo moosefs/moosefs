@@ -1166,14 +1166,15 @@ void* read_worker(void *arg) {
 		rreq->currentpos = currentpos;
 		if (status!=0) {
 			ind->trycnt++;
-			if (ind->trycnt>=maxretries) {
+			trycnt = ind->trycnt;
+			if (trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				read_chunkdata_invalidate(inode,chindx);
 				read_job_end(rreq,status,0);
 			} else {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				read_chunkdata_invalidate(inode,chindx);
-				read_job_end(rreq,0,1000+((ind->trycnt<30)?((ind->trycnt-1)*300000):10000000));
+				read_job_end(rreq,0,1000+((trycnt<30)?((trycnt-1)*300000):10000000));
 			}
 		} else {
 			zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -1466,7 +1467,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 				ind->seqdata = 0;
 			}
 		}
-		if (ind->readahead > 1 && reqbufftotalsize >= (maxreadaheadsize / 2) + ((maxreadaheadsize * 1) / (ind->readahead * 2))) {
+		if (ind->readahead > 1 && rbuffsize >= (maxreadaheadsize / 2) + ((maxreadaheadsize * 1) / (ind->readahead * 2))) {
 			ind->readahead--;
 			ind->seqdata = 0;
 		}

@@ -364,6 +364,7 @@ static void usage(const char *progname) {
 #endif
 	fprintf(stderr,"\n");
 	fprintf(stderr,"CMODE can be set to:\n");
+	fprintf(stderr,"    DIRECT                      forces direct io (bypasses cache)\n");
 	fprintf(stderr,"    NO,NONE or NEVER            never allow files data to be kept in cache (safest but can reduce efficiency)\n");
 	fprintf(stderr,"    YES or ALWAYS               always allow files data to be kept in cache (dangerous)\n");
 	fprintf(stderr,"    AUTO                        file cache is managed by mfsmaster automatically (should be very safe and efficient)\n");
@@ -1187,6 +1188,8 @@ int main(int argc, char *argv[]) {
 		mfsopts.keepcache=1;
 	} else if (strcasecmp(mfsopts.cachemode,"NO")==0 || strcasecmp(mfsopts.cachemode,"NONE")==0 || strcasecmp(mfsopts.cachemode,"NEVER")==0) {
 		mfsopts.keepcache=2;
+	} else if (strcasecmp(mfsopts.cachemode,"DIRECT")==0) {
+		mfsopts.keepcache=3;
 	} else {
 		fprintf(stderr,"unrecognized cachemode option\nsee: %s -h for help\n",argv[0]);
 		return 1;

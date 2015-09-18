@@ -1,4 +1,4 @@
-.TH mfsmount "8" "September 2015" "MooseFS 3.0.48-1" "This is part of MooseFS"
+.TH mfsmount "8" "September 2015" "MooseFS 3.0.49-1" "This is part of MooseFS"
 .SH NAME
 mfsmount \- mount Moose File System
 .SH SYNOPSIS
@@ -182,9 +182,12 @@ standard behavior in most file systems on Linux (directories not changed, others
 \fBXFS\fP
 standard behavior in XFS on Linux (like EXT but directories are changed by unprivileged users)
 .SH DATA CACHE MODES
-There are three cache modes: \fBNO\fP, \fBYES\fP and \fBAUTO\fP. Default option
+There are four cache modes: \fBDIRECT\fP, \fBNO\fP, \fBYES\fP and \fBAUTO\fP. Default option
 is \fBAUTO\fP and you shuldn't change it unless you really know what you are
 doing. In \fBAUTO\fP mode data cache is managed automatically by mfsmaster.
+.TP
+\fBDIRECT\fP
+forces direct io (bypasses cache)
 .TP
 \fBNO\fP,\fBNONE\fP or \fBNEVER\fP
 never allow files data to be kept in cache (safest but can reduce efficiency)

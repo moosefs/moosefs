@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.49-1 (2015-09-18)
+
+  - (mount) added DIRECT as a cachemode (force using direct io - also disables cache - mainly for FreeBSD)
+
 * MooseFS 3.0.48-1 (2015-09-17)
 
   - (mount) minor changes in mastercomm module (disconnection handle)

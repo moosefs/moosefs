@@ -1,3 +1,10 @@
+moosefs (3.0.49-1) unstable; urgency=medium
+
+  * (mount) added DIRECT as a cachemode (force using direct io - also disables
+    cache - mainly for FreeBSD)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 18 Sep 2015 13:00:00 +0200
+
 moosefs (3.0.48-1) unstable; urgency=medium
 
   * (mount) minor changes in mastercomm module (disconnection handle)

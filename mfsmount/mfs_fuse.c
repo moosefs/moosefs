@@ -2486,11 +2486,12 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	fi->fh = (unsigned long)fileinfo;
 	if (keep_cache==1) {
 		fi->keep_cache=1;
-	} else if (keep_cache==2) {
+	} else if (keep_cache==2 || keep_cache==3) {
 		fi->keep_cache=0;
 	} else {
 		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 	}
+	fi->direct_io = (keep_cache==3)?1:0;
 	if (debug_mode) {
 		fprintf(stderr,"create (%lu) ok -> keep cache: %lu\n",(unsigned long int)inode,(unsigned long int)fi->keep_cache);
 	}
@@ -2659,15 +2660,15 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	fi->fh = (unsigned long)fileinfo;
 	if (keep_cache==1) {
 		fi->keep_cache = 1;
-	} else if (keep_cache==2) {
+	} else if (keep_cache==2 || keep_cache==3) {
 		fi->keep_cache = 0;
 	} else {
 		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 	}
+	fi->direct_io = (keep_cache==3)?1:0;
 	if (debug_mode) {
 		fprintf(stderr,"open (%lu) ok -> keep cache: %lu\n",(unsigned long int)ino,(unsigned long int)fi->keep_cache);
 	}
-	fi->direct_io = 0;
 	oplog_printf(&ctx,"open (%lu)%s: OK (%lu,%lu)",(unsigned long int)ino,(found)?" (using cached data from lookup)":"",(unsigned long int)fi->direct_io,(unsigned long int)fi->keep_cache);
 	if (fuse_reply_open(req, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
@@ -4240,7 +4241,7 @@ void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout
 	fdcache_init();
 	mfs_aclstorage_init();
 	if (debug_mode) {
-		fprintf(stderr,"cache parameters: file_keep_cache=%s direntry_cache_timeout=%.2lf entry_cache_timeout=%.2lf attr_cache_timeout=%.2lf xattr_cache_timeout_in=%.2lf (%s)\n",(keep_cache==1)?"always":(keep_cache==2)?"never":"auto",direntry_cache_timeout,entry_cache_timeout,attr_cache_timeout,xattr_cache_timeout_in,xattr_cache_on?"on":"off");
+		fprintf(stderr,"cache parameters: file_keep_cache=%s direntry_cache_timeout=%.2lf entry_cache_timeout=%.2lf attr_cache_timeout=%.2lf xattr_cache_timeout_in=%.2lf (%s)\n",(keep_cache==1)?"always":(keep_cache==2)?"never":(keep_cache==3)?"direct":"auto",direntry_cache_timeout,entry_cache_timeout,attr_cache_timeout,xattr_cache_timeout_in,xattr_cache_on?"on":"off");
 		fprintf(stderr,"mkdir copy sgid=%d\nsugid clear mode=%s\n",mkdir_copy_sgid_in,(sugid_clear_mode_in<SUGID_CLEAR_MODE_OPTIONS)?sugid_clear_mode_strings[sugid_clear_mode_in]:"???");
 	}
 	mfs_statsptr_init();

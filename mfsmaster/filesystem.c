@@ -1790,6 +1790,8 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 	}
 	if ((node->flags&EATTR_NODATACACHE)==0) {
 		flags |= MATTR_ALLOWDATACACHE;
+	} else {
+		flags |= MATTR_DIRECTMODE;
 	}
 	if (node->xattrflag==0 && node->aclpermflag==0 && node->acldefflag==0) {
 		flags |= MATTR_NOXATTR;

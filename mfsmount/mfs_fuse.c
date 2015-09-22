@@ -2484,16 +2484,21 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	mattr = mfs_attr_get_mattr(attr);
 	fileinfo = mfs_newfileinfo(fi->flags & O_ACCMODE,inode,0);
 	fi->fh = (unsigned long)fileinfo;
-	if (keep_cache==1) {
-		fi->keep_cache=1;
-	} else if (keep_cache==2 || keep_cache==3) {
-		fi->keep_cache=0;
+	if (mattr&MATTR_DIRECTMODE) {
+		fi->keep_cache = 0;
+		fi->direct_io = 1;
 	} else {
-		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
+		if (keep_cache==1) {
+			fi->keep_cache=1;
+		} else if (keep_cache==2 || keep_cache==3) {
+			fi->keep_cache=0;
+		} else {
+			fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
+		}
+		fi->direct_io = (keep_cache==3)?1:0;
 	}
-	fi->direct_io = (keep_cache==3)?1:0;
 	if (debug_mode) {
-		fprintf(stderr,"create (%lu) ok -> keep cache: %lu\n",(unsigned long int)inode,(unsigned long int)fi->keep_cache);
+		fprintf(stderr,"create (%lu) ok -> use %s io ; %s data cache\n",(unsigned long int)inode,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear");
 	}
 	dcache_invalidate_attr(parent);
 	memset(&e, 0, sizeof(e));
@@ -2658,18 +2663,23 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	mattr = mfs_attr_get_mattr(attr);
 	fileinfo = mfs_newfileinfo(fi->flags & O_ACCMODE,ino,mfs_attr_get_fleng(attr));
 	fi->fh = (unsigned long)fileinfo;
-	if (keep_cache==1) {
-		fi->keep_cache = 1;
-	} else if (keep_cache==2 || keep_cache==3) {
+	if (mattr&MATTR_DIRECTMODE) {
 		fi->keep_cache = 0;
+		fi->direct_io = 1;
 	} else {
-		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
+		if (keep_cache==1) {
+			fi->keep_cache=1;
+		} else if (keep_cache==2 || keep_cache==3) {
+			fi->keep_cache=0;
+		} else {
+			fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
+		}
+		fi->direct_io = (keep_cache==3)?1:0;
 	}
-	fi->direct_io = (keep_cache==3)?1:0;
 	if (debug_mode) {
-		fprintf(stderr,"open (%lu) ok -> keep cache: %lu\n",(unsigned long int)ino,(unsigned long int)fi->keep_cache);
+		fprintf(stderr,"open (%lu) ok -> use %s io ; %s data cache\n",(unsigned long int)ino,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear");
 	}
-	oplog_printf(&ctx,"open (%lu)%s: OK (%lu,%lu)",(unsigned long int)ino,(found)?" (using cached data from lookup)":"",(unsigned long int)fi->direct_io,(unsigned long int)fi->keep_cache);
+	oplog_printf(&ctx,"open (%lu)%s: OK (%u,%u)",(unsigned long int)ino,(found)?" (using cached data from lookup)":"",(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache);
 	if (fuse_reply_open(req, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
 	} else if (found) {

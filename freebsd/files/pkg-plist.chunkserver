@@ -1,7 +1,5 @@
-@unexec if cmp -s %D/etc/mfs/mfschunkserver.cfg.dist %D/etc/mfs/mfschunkserver.cfg; then rm -f %D/etc/mfs/mfschunkserver.cfg; fi
-@unexec if cmp -s %D/etc/mfs/mfshdd.cfg.dist %D/etc/mfs/mfshdd.cfg; then rm -f %D/etc/mfs/mfshdd.cfg; fi
-etc/mfs/mfschunkserver.cfg.dist
-etc/mfs/mfshdd.cfg.dist
+@sample etc/mfs/mfschunkserver.cfg.sample
+@sample etc/mfs/mfshdd.cfg.sample
 sbin/mfschunkserver
 sbin/mfschunktool
 sbin/mfscsstatsdump
@@ -9,8 +7,6 @@ man/man5/mfschunkserver.cfg.5.gz
 man/man5/mfshdd.cfg.5.gz
 man/man8/mfschunkserver.8.gz
 man/man8/mfscsstatsdump.8.gz
-@exec  if [ ! -f %D/etc/mfs/mfschunkserver.cfg ]; then /bin/cp %D/etc/mfs/mfschunkserver.cfg.dist %D/etc/mfs/mfschunkserver.cfg; fi
-@exec  if [ ! -f %D/etc/mfs/mfshdd.cfg ]; then /bin/cp %D/etc/mfs/mfshdd.cfg.dist %D/etc/mfs/mfshdd.cfg; fi
 @owner mfs
 @group mfs
 @dir %%MFS_WORKDIR%%/mfs

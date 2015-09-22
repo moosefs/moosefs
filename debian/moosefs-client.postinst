@@ -4,14 +4,7 @@ set -e
 
 case "${1}" in
 	configure)
-		if ! getent passwd mfs > /dev/null 2>&1
-		then
-			mkdir -p /var/lib/mfs
-			chmod 0755 /var/lib/mfs
-			adduser --quiet --system --group --no-create-home --home /var/lib/mfs mfs
-			chown -R mfs:mfs /var/lib/mfs
-		fi
-		for fname in mfsmetalogger; do
+		for fname in mfsmount; do
 			if [ -f /etc/mfs/${fname}.cfg.dist ]; then
 				rm -f /etc/mfs/${fname}.cfg.dist
 			fi

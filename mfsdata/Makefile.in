@@ -504,11 +504,11 @@ install-data-hook:
 @CREATE_DATA_DIR_TRUE@			fi ; \
 @CREATE_DATA_DIR_TRUE@		fi ; \
 @CREATE_DATA_DIR_TRUE@	fi
-@BUILD_CHUNKSERVER_TRUE@	$(INSTALL_DATA) $(builddir)/mfschunkserver.cfg $(DESTDIR)$(sysconfdir)/mfs/mfschunkserver.cfg.dist
-@BUILD_CHUNKSERVER_TRUE@	$(INSTALL_DATA) $(srcdir)/mfshdd.cfg $(DESTDIR)$(sysconfdir)/mfs/mfshdd.cfg.dist
-@BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmaster.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmaster.cfg.dist
-@BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsexports.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsexports.cfg.dist
-@BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfstopology.cfg $(DESTDIR)$(sysconfdir)/mfs/mfstopology.cfg.dist
+@BUILD_CHUNKSERVER_TRUE@	$(INSTALL_DATA) $(builddir)/mfschunkserver.cfg $(DESTDIR)$(sysconfdir)/mfs/mfschunkserver.cfg.sample
+@BUILD_CHUNKSERVER_TRUE@	$(INSTALL_DATA) $(srcdir)/mfshdd.cfg $(DESTDIR)$(sysconfdir)/mfs/mfshdd.cfg.sample
+@BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmaster.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmaster.cfg.sample
+@BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsexports.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsexports.cfg.sample
+@BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfstopology.cfg $(DESTDIR)$(sysconfdir)/mfs/mfstopology.cfg.sample
 @BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(srcdir)/metadata.mfs $(DESTDIR)$(DATA_PATH)/metadata.mfs.empty
 @BUILD_MASTER_TRUE@	if [ "`id -u`" = "0" ]; then \
 @BUILD_MASTER_TRUE@		if id -u $(DEFAULT_USER) 2> /dev/null > /dev/null ; then \
@@ -517,8 +517,8 @@ install-data-hook:
 @BUILD_MASTER_TRUE@			fi ; \
 @BUILD_MASTER_TRUE@		fi ; \
 @BUILD_MASTER_TRUE@	fi
-@BUILD_MOUNT_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmount.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmount.cfg.dist
-@BUILD_METALOGGER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmetalogger.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmetalogger.cfg.dist
+@BUILD_MOUNT_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmount.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmount.cfg.sample
+@BUILD_METALOGGER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmetalogger.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmetalogger.cfg.sample
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

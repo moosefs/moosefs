@@ -11,6 +11,11 @@ case "${1}" in
 			adduser --quiet --system --group --no-create-home --home /var/lib/mfs mfs
 			chown -R mfs:mfs /var/lib/mfs
 		fi
+		for fname in mfschunkserver mfshdd; do
+			if [ -f /etc/mfs/${fname}.cfg.dist ]; then
+				rm -f /etc/mfs/${fname}.cfg.dist
+			fi
+		done
 		;;
 
 	abort-upgrade|abort-remove|abort-deconfigure)

@@ -1,6 +1,6 @@
-etc/mfs/mfsexports.cfg.dist
-etc/mfs/mfstopology.cfg.dist
-etc/mfs/mfsmaster.cfg.dist
+etc/mfs/mfsexports.cfg.sample
+etc/mfs/mfstopology.cfg.sample
+etc/mfs/mfsmaster.cfg.sample
 usr/sbin/mfsmaster
 usr/sbin/mfsmetarestore
 usr/sbin/mfsmetadump

@@ -342,11 +342,12 @@
 	"prevent file data from being kept in kernel cache", \
 	"node was created using makesnapshot command (or inside snapshot)"
 
-// mode attr (higher 4 bits of mode in node attr)
+// mode attr / attribute flags
 #define MATTR_NOACACHE         0x01
 #define MATTR_NOECACHE         0x02
 #define MATTR_ALLOWDATACACHE   0x04
 #define MATTR_NOXATTR          0x08
+#define MATTR_DIRECTMODE       0x10
 
 // quota:
 #define QUOTA_FLAG_SINODES     0x01

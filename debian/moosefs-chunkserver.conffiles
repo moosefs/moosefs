@@ -1,2 +1,2 @@
-etc/mfs/mfschunkserver.cfg.dist
-etc/mfs/mfshdd.cfg.dist
+etc/mfs/mfschunkserver.cfg.sample
+etc/mfs/mfshdd.cfg.sample

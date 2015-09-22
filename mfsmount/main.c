@@ -330,7 +330,7 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfsxattrcacheto=SEC      set extended attributes (xattr) cache timeout in seconds (default: 30.0)\n");
 	fprintf(stderr,"    -o mfsentrycacheto=SEC      set file entry cache timeout in seconds (default: 0.0)\n");
 	fprintf(stderr,"    -o mfsdirentrycacheto=SEC   set directory entry cache timeout in seconds (default: 1.0)\n");
-	fprintf(stderr,"    -o mfsnegentrycacheto=SEC   set negative entry cache timeout in seconds (default: 1.0)\n");
+	fprintf(stderr,"    -o mfsnegentrycacheto=SEC   set negative entry cache timeout in seconds (default: 0.0)\n");
 	fprintf(stderr,"    -o mfsgroupscacheto=SEC     set supplementary groups cache timeout in seconds (default: 300.0)\n");
 	fprintf(stderr,"    -o mfsrlimitnofile=N        on startup mfsmount tries to change number of descriptors it can simultaneously open (default: 100000)\n");
 	fprintf(stderr,"    -o mfsnice=N                on startup mfsmount tries to change his 'nice' value (default: -19)\n");
@@ -1128,7 +1128,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.xattrcacheto = 30.0;
 	mfsopts.entrycacheto = 0.0;
 	mfsopts.direntrycacheto = 1.0;
-	mfsopts.negentrycacheto = 1.0;
+	mfsopts.negentrycacheto = 0.0;
 	mfsopts.groupscacheto = 300.0;
 	mfsopts.fsyncbeforeclose = 0;
 	mfsopts.fsyncmintime = 1.0;

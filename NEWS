@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.50-1 (2015-09-22)
+
+  - (master+mount) for files with EATTR_NODATACACHE mounts will always use direct io
+  - (all) changed suffix of sample configuration files from '.dist' to '.sample'
+
 * MooseFS 3.0.49-1 (2015-09-18)
 
   - (mount) added DIRECT as a cachemode (force using direct io - also disables cache - mainly for FreeBSD)

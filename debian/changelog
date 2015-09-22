@@ -1,3 +1,12 @@
+moosefs (3.0.50-1) unstable; urgency=medium
+
+  * (master+mount) for files with EATTR_NODATACACHE mounts will always use
+    direct io
+  * (all) changed suffix of sample configuration files from '.dist' to
+    '.sample'
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 22 Sep 2015 13:00:00 +0200
+
 moosefs (3.0.49-1) unstable; urgency=medium
 
   * (mount) added DIRECT as a cachemode (force using direct io - also disables

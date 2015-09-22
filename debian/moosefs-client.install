@@ -1,4 +1,4 @@
-etc/mfs/mfsmount.cfg.dist
+etc/mfs/mfsmount.cfg.sample
 usr/bin/mfsmount
 usr/bin/mfsappendchunks
 usr/bin/mfscheckfile

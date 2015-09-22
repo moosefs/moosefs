@@ -11,6 +11,11 @@ case "${1}" in
 			adduser --quiet --system --group --no-create-home --home /var/lib/mfs mfs
 			chown -R mfs:mfs /var/lib/mfs
 		fi
+		for fname in mfsexports mfstopology mfsmaster; do
+			if [ -f /etc/mfs/${fname}.cfg.dist ]; then
+				rm -f /etc/mfs/${fname}.cfg.dist
+			fi
+		done
 		if [ ! -f /var/lib/mfs/metadata.mfs -a ! -f /var/lib/mfs/metadata.mfs.back -a -f /var/lib/mfs/metadata.mfs.empty ]; then
 			cp /var/lib/mfs/metadata.mfs.empty /var/lib/mfs/metadata.mfs
 			chown -R mfs:mfs /var/lib/mfs

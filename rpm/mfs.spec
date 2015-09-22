@@ -20,7 +20,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	3.0.49
+Version:	3.0.50
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -176,8 +176,11 @@ exit 0
 
 %post master
 for fname in mfsexports mfstopology mfsmaster; do
-	if [ -f %{mfsconfdir}/${fname}.cfg.dist -a ! -f %{mfsconfdir}/${fname}.cfg ]; then
-		cp %{mfsconfdir}/${fname}.cfg.dist %{mfsconfdir}/${fname}.cfg
+	if [ -f %{mfsconfdir}/${fname}.cfg.dist ]; then
+		rm -f %{mfsconfdir}/${fname}.cfg.dist
+	fi
+	if [ -f %{mfsconfdir}/${fname}.cfg.sample -a ! -f %{mfsconfdir}/${fname}.cfg ]; then
+		cp %{mfsconfdir}/${fname}.cfg.sample %{mfsconfdir}/${fname}.cfg
 	fi
 done
 if [ ! -f %{_localstatedir}/mfs/metadata.mfs -a ! -f %{_localstatedir}/mfs/metadata.mfs.back -a -f %{_localstatedir}/mfs/metadata.mfs.empty ]; then
@@ -200,8 +203,11 @@ exit 0
 
 %post metalogger
 for fname in mfsmetalogger; do
-	if [ -f %{mfsconfdir}/${fname}.cfg.dist -a ! -f %{mfsconfdir}/${fname}.cfg ]; then
-		cp %{mfsconfdir}/${fname}.cfg.dist %{mfsconfdir}/${fname}.cfg
+	if [ -f %{mfsconfdir}/${fname}.cfg.dist ]; then
+		rm -f %{mfsconfdir}/${fname}.cfg.dist
+	fi
+	if [ -f %{mfsconfdir}/${fname}.cfg.sample -a ! -f %{mfsconfdir}/${fname}.cfg ]; then
+		cp %{mfsconfdir}/${fname}.cfg.sample %{mfsconfdir}/${fname}.cfg
 	fi
 done
 chown -R %{_username}:%{_groupname} %{_localstatedir}/mfs
@@ -220,8 +226,11 @@ exit 0
 
 %post chunkserver
 for fname in mfschunkserver mfshdd; do
-	if [ -f %{mfsconfdir}/${fname}.cfg.dist -a ! -f %{mfsconfdir}/${fname}.cfg ]; then
-		cp %{mfsconfdir}/${fname}.cfg.dist %{mfsconfdir}/${fname}.cfg
+	if [ -f %{mfsconfdir}/${fname}.cfg.dist ]; then
+		rm -f %{mfsconfdir}/${fname}.cfg.dist
+	fi
+	if [ -f %{mfsconfdir}/${fname}.cfg.sample -a ! -f %{mfsconfdir}/${fname}.cfg ]; then
+		cp %{mfsconfdir}/${fname}.cfg.sample %{mfsconfdir}/${fname}.cfg
 	fi
 done
 chown -R %{_username}:%{_groupname} %{_localstatedir}/mfs
@@ -232,9 +241,14 @@ exit 0
 
 
 %post client
-if [ -f %{mfsconfdir}/mfsmount.cfg.dist -a ! -f %{mfsconfdir}/mfsmount.cfg ]; then
-	cp %{mfsconfdir}/mfsmount.cfg.dist %{mfsconfdir}/mfsmount.cfg
-fi
+for fname in mfsmount; do
+	if [ -f %{mfsconfdir}/${fname}.cfg.dist ]; then
+		rm -f %{mfsconfdir}/${fname}.cfg.dist
+	fi
+	if [ -f %{mfsconfdir}/${fname}.cfg.sample -a ! -f %{mfsconfdir}/${fname}.cfg ]; then
+		cp %{mfsconfdir}/${fname}.cfg.sample %{mfsconfdir}/${fname}.cfg
+	fi
+done
 exit 0
 
 
@@ -269,9 +283,9 @@ exit 0
 %{_mandir}/man8/mfsmetarestore.8*
 %{_mandir}/man8/mfsmetadump.8*
 %{_mandir}/man8/mfsstatsdump.8*
-%{mfsconfdir}/mfsexports.cfg.dist
-%{mfsconfdir}/mfstopology.cfg.dist
-%{mfsconfdir}/mfsmaster.cfg.dist
+%{mfsconfdir}/mfsexports.cfg.sample
+%{mfsconfdir}/mfstopology.cfg.sample
+%{mfsconfdir}/mfsmaster.cfg.sample
 %dir %{_localstatedir}/mfs
 %{_localstatedir}/mfs/metadata.mfs.empty
 %if %{_with_sysv}
@@ -290,7 +304,7 @@ exit 0
 %attr(755,root,root) %{_sbindir}/mfsmetalogger
 %{_mandir}/man5/mfsmetalogger.cfg.5*
 %{_mandir}/man8/mfsmetalogger.8*
-%{mfsconfdir}/mfsmetalogger.cfg.dist
+%{mfsconfdir}/mfsmetalogger.cfg.sample
 %dir %{_localstatedir}/mfs
 %if %{_with_sysv}
 %attr(754,root,root) %{_initrddir}/moosefs-metalogger
@@ -312,8 +326,8 @@ exit 0
 %{_mandir}/man5/mfshdd.cfg.5*
 %{_mandir}/man8/mfschunkserver.8*
 %{_mandir}/man8/mfscsstatsdump.8*
-%{mfsconfdir}/mfschunkserver.cfg.dist
-%{mfsconfdir}/mfshdd.cfg.dist
+%{mfsconfdir}/mfschunkserver.cfg.sample
+%{mfsconfdir}/mfshdd.cfg.sample
 %dir %{_localstatedir}/mfs
 %if %{_with_sysv}
 %attr(754,root,root) %{_initrddir}/moosefs-chunkserver
@@ -385,7 +399,7 @@ exit 0
 %{_mandir}/man1/mfsfilepaths.1*
 %{_mandir}/man1/mfstools.1*
 %{_mandir}/man8/mfsmount.8*
-%{mfsconfdir}/mfsmount.cfg.dist
+%{mfsconfdir}/mfsmount.cfg.sample
 
 
 

@@ -43,15 +43,12 @@
 
 #define MREQ_TIMEOUT 3600.0
 
-#define MREQ_REFRESH 1.0
-
 #define MREQ_MAX_CHAIN_LENG 5
 
 enum {MR_INIT,MR_READY,MR_REFRESH,MR_INVALID};
 
 typedef struct mreqcache_s {
 	double time;
-	double lastrefresh;
 	uint64_t mfleng;
 	uint32_t inode;
 	uint32_t chindx;
@@ -167,7 +164,7 @@ static inline void read_chunkdata_refresh(mreqcache *mrc) {
 		mrc->mfleng = 0;
 	}
 
-	mrc->time = mrc->lastrefresh = monotonic_seconds();
+	mrc->time = monotonic_seconds();
 	mrc->state = MR_READY;
 	if (mrc->reqwaiting) {
 		zassert(pthread_cond_broadcast(&(mrc->reqcond)));
@@ -315,7 +312,6 @@ void read_chunkdata_inject (uint32_t inode,uint32_t chindx,uint64_t chunkid,uint
 	mrc = malloc(sizeof(mreqcache));
 	memset(mrc,0,sizeof(mreqcache));
 	mrc->time = now;
-	mrc->lastrefresh = now - MREQ_REFRESH;
 	mrc->inode = inode;
 	mrc->chindx = chindx;
 	mrc->chunkid = chunkid;
@@ -411,7 +407,7 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 				} else {
 					*chainelements = 0;
 				}
-				if (mrc->state==MR_READY && mrc->lastrefresh + MREQ_REFRESH < now) {
+				if (mrc->state==MR_READY) {
 					mrc->state = MR_REFRESH;
 					mrc->canmodatime = *canmodatime;
 					if (mrc->canmodatime==2) {

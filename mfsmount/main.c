@@ -340,7 +340,7 @@ static void usage(const char *progname) {
 #ifdef MFS_USE_MALLOPT
 	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 8)\n");
 #endif
-	fprintf(stderr,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 1.0 - it mainly means that we don't want to do auto-fsync before closing small files)\n");
+	fprintf(stderr,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)\n");
 	fprintf(stderr,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
 	fprintf(stderr,"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n");
 	fprintf(stderr,"    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n");
@@ -1131,7 +1131,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.negentrycacheto = 0.0;
 	mfsopts.groupscacheto = 300.0;
 	mfsopts.fsyncbeforeclose = 0;
-	mfsopts.fsyncmintime = 1.0;
+	mfsopts.fsyncmintime = 0.0;
 
 	custom_cfg = 0;
 

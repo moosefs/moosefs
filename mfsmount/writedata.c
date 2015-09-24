@@ -1291,7 +1291,7 @@ void* write_worker(void *arg) {
 
 		cl=0;
 		for (cnt=0 ; cnt<chainelements ; cnt++) {
-			cl+=snprintf(debugchain+cl,200-cl,"%u.%u.%u.%u:%u->",(chainip[cnt]>>24)&255,(chainip[cnt]>>16)&255,(chainip[cnt]>>8)&255,chainip[cnt]&255,chainport[cnt]);
+			cl+=snprintf(debugchain+cl,200-cl,"%u.%u.%u.%u:%u->",(chain[cnt].ip>>24)&255,(chain[cnt].ip>>16)&255,(chain[cnt].ip>>8)&255,chain[cnt].ip&255,chain[cnt].port);
 		}
 		if (cl>=2) {
 			debugchain[cl-2]='\0';

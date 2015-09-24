@@ -283,10 +283,14 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 	uint8_t breakmode;
 #ifdef RDEBUG
 	uint64_t rbuffsize;
+	uint8_t pmode;
 #endif
 
 	ind = rreq->ind;
 	zassert(pthread_mutex_lock(&(ind->lock)));
+#ifdef RDEBUG
+	pmode = rreq->mode;
+#endif
 	breakmode = 0;
 	if (rreq->mode==FILLED) {
 		rreq->mode = READY;
@@ -308,6 +312,9 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 		ind->status = status;
 	}
 	status = ind->status;
+#ifdef RDEBUG
+	fprintf(stderr,"%.6lf: readworker end (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" - rreq->mode: %s->%s\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,ind->inode,read_data_modename(pmode),read_data_modename(rreq->mode));
+#endif
 
 	if (ind->closing || status!=STATUS_OK || breakmode) {
 #ifdef RDEBUG
@@ -568,6 +575,10 @@ void* read_worker(void *arg) {
 
 		rdstatus = read_chunkdata_get(inode,&canmodatime,chain,&chainelements,chindx,&mfleng,&chunkid,&version);
 
+#ifdef RDEBUG
+		fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; read_chunkdata_get: mfleng: %"PRIu64" ; chunkid: %"PRIu64" ; version: %"PRIu32" ; status:%"PRIu8"\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,mfleng,chunkid,version,rdstatus);
+#endif
+
 		zassert(pthread_mutex_lock(&(ind->lock)));
 		ind->canmodatime = canmodatime;
 		zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -801,12 +812,27 @@ void* read_worker(void *arg) {
 			mfleng = ind->fleng;
 
 			if (reqsend && gotstatus) {
-				rreq->mode = FILLED;
-				rreq->modified = monotonic_seconds();
-				if (rreq->waiting>0) {
-					zassert(pthread_cond_broadcast(&(rreq->cond)));
-				}
 				zassert(pthread_mutex_unlock(&(ind->lock)));
+				if (read_chunkdata_check(inode,chindx,chunkid,version)==0) {
+					zassert(pthread_mutex_lock(&(ind->lock)));
+#ifdef RDEBUG
+					fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; read_chunkdata_check: chunkid: %"PRIu64" ; version: %"PRIu32" - chunk changed\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,chunkid,version);
+#endif
+					currentpos = 0;
+					rreq->mode = REFRESH;
+					zassert(pthread_mutex_unlock(&(ind->lock)));
+				} else {
+					zassert(pthread_mutex_lock(&(ind->lock)));
+#ifdef RDEBUG
+					fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; read_chunkdata_check: chunkid: %"PRIu64" ; version: %"PRIu32" - chunk ok\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,chunkid,version);
+#endif
+					rreq->mode = FILLED;
+					rreq->modified = monotonic_seconds();
+					if (rreq->waiting>0) {
+						zassert(pthread_cond_broadcast(&(rreq->cond)));
+					}
+					zassert(pthread_mutex_unlock(&(ind->lock)));
+				}
 				break;
 			}
 
@@ -1146,13 +1172,6 @@ void* read_worker(void *arg) {
 
 		if (status==EINTR) {
 			status=0;
-		}
-
-		if (read_chunkdata_check(inode,chindx,chunkid,version)==0) {
-			zassert(pthread_mutex_lock(&(ind->lock)));
-			currentpos = 0;
-			rreq->mode = REFRESH;
-			zassert(pthread_mutex_unlock(&(ind->lock)));
 		}
 
 #ifdef WORKER_DEBUG

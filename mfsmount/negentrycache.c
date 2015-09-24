@@ -278,6 +278,9 @@ void negentry_cache_term(void) {
 	uint8_t i;
 	uint32_t hi;
 
+	if (NegEntryTimeOut<=0.0) {
+		return;
+	}
 	pthread_mutex_lock(&necachelock);
 	for (hi=0 ; hi<HASH_BUCKETS ; hi++) {
 		hb = negentryhash + hi;

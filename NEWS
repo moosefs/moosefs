@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.77-1 (2015-09-25)
+
+  - (mount) removed using fuse notify/forget mechanism in kernel with fuse api 7.23+ (due to unexpected kernel behaviour - getcwd returns ENOENT)
+
 * MooseFS 2.0.76-1 (2015-09-11)
 
   - (mount) fixed rare bug in writing module (unrecoverable write error could lead to infinite loop during write)

@@ -1,3 +1,10 @@
+moosefs (2.0.77-1) unstable; urgency=medium
+
+  * (mount) removed using fuse notify/forget mechanism in kernel with fuse api
+    7.23+ (due to unexpected kernel behaviour - getcwd returns ENOENT)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 25 Sep 2015 13:00:00 +0200
+
 moosefs (2.0.76-1) unstable; urgency=medium
 
   * (mount) fixed rare bug in writing module (unrecoverable write error could

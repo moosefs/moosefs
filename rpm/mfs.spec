@@ -20,7 +20,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	2.0.76
+Version:	2.0.77
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons

@@ -505,7 +505,7 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	int *piped = (int*)userdata;
 	char s;
-	if (conn->proto_major>7 || (conn->proto_major==7 && conn->proto_minor>=12)) {
+	if (conn->proto_major==7 && conn->proto_minor>=12 && conn->proto_minor<=22) {
 		invalidator_on();
 	}
 	conn->max_write = 131072;

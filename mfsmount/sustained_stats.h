@@ -18,16 +18,16 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
-#ifndef _INVALIDATOR_H_
-#define _INVALIDATOR_H_
+#ifndef _SUSTAINED_STATS_H_
+#define _SUSTAINED_STATS_H_
 
 #include <inttypes.h>
-#include <fuse_lowlevel.h>
 
-void invalidator_insert(uint32_t parent,const char *name,uint8_t nleng,uint32_t inode,double timeout);
-void invalidator_forget(uint32_t inode,uint64_t nlookup);
-void invalidator_term(void);
-void invalidator_on(void);
-void invalidator_init(struct fuse_chan *ch);
+//void sstats_activate(uint32_t inode);
+//void sstats_deactivate(uint32_t inode);
+int sstats_get(uint32_t inode,uint8_t attr[35],uint8_t forceok);
+void sstats_set(uint32_t inode,const uint8_t attr[35],uint8_t createflag);
+void sstats_term(void);
+int sstats_init(void);
 
 #endif

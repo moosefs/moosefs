@@ -4083,7 +4083,13 @@ if "CS" in sectionset:
 					out.append("""		<th class="acid_tab_skip">remove</th>""")
 					out.append("""	</tr>""")
 				elif ttymode:
-					if leaderconn.version_at_least(2,1,0):
+					if leaderconn.version_at_least(3,0,38):
+						tab.append(("---","",16))
+						tab.append(("disconnected servers","1c",16))
+						tab.append(("---","",16))
+						tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c"),("change maintenance command","c",6),("remove command","c",6))
+						tab.append(("---","",16))
+					elif leaderconn.version_at_least(2,1,0):
 						tab.append(("---","",15))
 						tab.append(("disconnected servers","1c",15))
 						tab.append(("---","",15))
@@ -4161,7 +4167,10 @@ if "CS" in sectionset:
 							mm = "on"
 							mmcmd = "%s -H %s -P %u -CM0/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
 						data.append(mm)
-						data.append((mmcmd,"l",5))
+						if leaderconn.version_at_least(3,0,38):
+							data.append((mmcmd,"l",6))
+						else:
+							data.append((mmcmd,"l",5))
 						if leaderconn.version_at_least(2,1,0):
 							data.append(("%s -H %s -P %u -CRC/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port),"l",6))
 						else:

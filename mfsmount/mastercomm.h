@@ -33,6 +33,7 @@ void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes);
 //int fs_direct_read(int rfd,uint8_t *buff,uint32_t size);
 void fs_add_entry(uint32_t inode);
 void fs_forget_entry(uint32_t inode);
+// uint8_t fs_is_sustained_entry(uint32_t inode);
 
 void fs_statfs(uint64_t *totalspace,uint64_t *availspace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes);
 uint8_t fs_access(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t modemask);

@@ -63,6 +63,9 @@
 #define REPORT_LOAD_FREQ 60
 #define REPORT_SPACE_FREQ 1
 
+// force disconnection X seconds after term signal
+#define FORCE_DISCONNECTION_TO 5.0
+
 // mode
 enum {FREE,CONNECTING,DATA,KILL,CLOSE};
 
@@ -122,8 +125,15 @@ typedef struct masterconn {
 } masterconn;
 
 static masterconn *masterconnsingleton=NULL;
-
 static idlejob *idlejobs=NULL;
+static uint8_t csidvalid = 0;
+static void *reconnect_hook;
+static void *manager_time_hook;
+static double wantexittime = 0.0;
+
+static uint64_t stats_bytesout=0;
+static uint64_t stats_bytesin=0;
+
 
 // from config
 // static uint32_t BackLogsNumber;
@@ -133,12 +143,6 @@ static char *BindHost;
 static uint32_t Timeout;
 static uint16_t ChunkServerId = 0;
 static uint64_t MetaFileId = 0;
-static uint8_t csidvalid = 0;
-static void *reconnect_hook;
-static void *manager_time_hook;
-
-static uint64_t stats_bytesout=0;
-static uint64_t stats_bytesin=0;
 
 // static FILE *logfd;
 
@@ -1503,12 +1507,15 @@ void masterconn_serve(struct pollfd *pdesc) {
 			eptr->mode = KILL;
 		}
 	}
+	if (wantexittime>0.0 && wantexittime+FORCE_DISCONNECTION_TO < now) {
+		eptr->mode = KILL;
+	}
 	masterconn_disconnection_check();
 }
 
 void masterconn_reconnect(void) {
 	masterconn *eptr = masterconnsingleton;
-	if (eptr->mode==FREE) {
+	if (eptr->mode==FREE && wantexittime==0.0) {
 		masterconn_initconnect(eptr);
 	}
 }
@@ -1580,6 +1587,10 @@ void masterconn_reload(void) {
 	masterconn_parselabels();
 }
 
+void masterconn_wantexit(void) {
+	wantexittime = monotonic_seconds();
+}
+
 int masterconn_init(void) {
 	uint32_t ReconnectionDelay;
 	masterconn *eptr;
@@ -1619,6 +1630,8 @@ int masterconn_init(void) {
 	}
 //	logfd = NULL;
 
+	wantexittime = 0.0;
+
 	if (masterconn_initconnect(eptr)<0) {
 		return -1;
 	}
@@ -1629,7 +1642,7 @@ int masterconn_init(void) {
 	reconnect_hook = main_time_register(ReconnectionDelay,rndu32_ranged(ReconnectionDelay),masterconn_reconnect);
 	main_destruct_register(masterconn_term);
 	main_poll_register(masterconn_desc,masterconn_serve);
-//	main_wantexit_register(masterconn_wantexit);
+	main_wantexit_register(masterconn_wantexit);
 //	main_canexit_register(masterconn_canexit);
 	main_reload_register(masterconn_reload);
 	return 0;

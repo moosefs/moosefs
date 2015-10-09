@@ -1524,7 +1524,7 @@ void matoclserv_mass_resolve_paths(matoclserventry *eptr,const uint8_t *data,uin
 	uint32_t totalsize;
 	uint32_t psize;
 	uint8_t *ptr;
-	uint8_t status;
+
 	if ((length%4)!=0) {
 		syslog(LOG_NOTICE,"CLTOMA_MASS_RESOLVE_PATHS - wrong size (%"PRIu32"/N*4)",length);
 		eptr->mode = KILL;
@@ -1549,13 +1549,11 @@ void matoclserv_mass_resolve_paths(matoclserventry *eptr,const uint8_t *data,uin
 	while (length>0) {
 		i = get32bit(&data);
 		if (i>0) {
-			status = fs_get_paths_size(MFS_ROOT_ID,i,&psize);
-			if (status==STATUS_OK) {
-				inodetab[j] = i;
-				psizetab[j] = psize;
-				j++;
-				totalsize += 8 + psize;
-			}
+			fs_get_paths_size(MFS_ROOT_ID,i,&psize);
+			inodetab[j] = i;
+			psizetab[j] = psize;
+			j++;
+			totalsize += 8 + psize;
 		}
 		length--;
 	}

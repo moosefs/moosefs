@@ -1,3 +1,19 @@
+moosefs (3.0.52-1) unstable; urgency=medium
+
+  * (mount) added new mechanism for sustaining working directories (replaces
+    mechanism added in 3.0.40)
+  * (cs) force disconnection from master couple seconds after term signal
+    (frozen I/O threads can prevent CS from termination)
+  * (cs) when RO/RW status or total blocks changes then device is automatically
+    marked as damaged
+  * (master) added support for root inode end deleted inodes in
+    MASS_RESOLVE_PATHS
+  * (cli) fixed error displaying disconnected chunkservers
+  * (rpm) added network-online.target to Wants and After in systemd service
+    files (startup issues after reboot)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 09 Oct 2015 13:00:00 +0200
+
 moosefs (3.0.51-1) unstable; urgency=medium
 
   * (mount) fixed segfault during umount

@@ -111,7 +111,8 @@ am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	mfsmount-dirattrcache.$(OBJEXT) \
 	mfsmount-symlinkcache.$(OBJEXT) \
 	mfsmount-negentrycache.$(OBJEXT) mfsmount-xattrcache.$(OBJEXT) \
-	mfsmount-fdcache.$(OBJEXT) mfsmount-invalidator.$(OBJEXT) \
+	mfsmount-fdcache.$(OBJEXT) mfsmount-sustained_inodes.$(OBJEXT) \
+	mfsmount-sustained_stats.$(OBJEXT) \
 	mfsmount-getgroups.$(OBJEXT) mfsmount-mfs_fuse.$(OBJEXT) \
 	mfsmount-mfs_meta_fuse.$(OBJEXT) mfsmount-mastercomm.$(OBJEXT) \
 	mfsmount-masterproxy.$(OBJEXT) mfsmount-csorder.$(OBJEXT) \
@@ -409,7 +410,8 @@ mfsmount_SOURCES = \
 	negentrycache.c negentrycache.h \
 	xattrcache.c xattrcache.h \
 	fdcache.c fdcache.h \
-	invalidator.c invalidator.h \
+	sustained_inodes.c sustained_inodes.h \
+	sustained_stats.c sustained_stats.h \
 	getgroups.c getgroups.h \
 	mfs_fuse.c mfs_fuse.h \
 	mfs_meta_fuse.c mfs_meta_fuse.h \
@@ -642,7 +644,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirattrcache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-fdcache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-getgroups.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-invalidator.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-labelparser.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-mastercomm.Po@am__quote@
@@ -654,6 +655,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-readchunkdata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-readdata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-stats.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-sustained_inodes.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-sustained_stats.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-symlinkcache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-writedata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-xattrcache.Po@am__quote@
@@ -768,19 +771,33 @@ mfsmount-fdcache.obj: fdcache.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-fdcache.obj `if test -f 'fdcache.c'; then $(CYGPATH_W) 'fdcache.c'; else $(CYGPATH_W) '$(srcdir)/fdcache.c'; fi`
 
-mfsmount-invalidator.o: invalidator.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-invalidator.o -MD -MP -MF $(DEPDIR)/mfsmount-invalidator.Tpo -c -o mfsmount-invalidator.o `test -f 'invalidator.c' || echo '$(srcdir)/'`invalidator.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-invalidator.Tpo $(DEPDIR)/mfsmount-invalidator.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='invalidator.c' object='mfsmount-invalidator.o' libtool=no @AMDEPBACKSLASH@
+mfsmount-sustained_inodes.o: sustained_inodes.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-sustained_inodes.o -MD -MP -MF $(DEPDIR)/mfsmount-sustained_inodes.Tpo -c -o mfsmount-sustained_inodes.o `test -f 'sustained_inodes.c' || echo '$(srcdir)/'`sustained_inodes.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-sustained_inodes.Tpo $(DEPDIR)/mfsmount-sustained_inodes.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sustained_inodes.c' object='mfsmount-sustained_inodes.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-invalidator.o `test -f 'invalidator.c' || echo '$(srcdir)/'`invalidator.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-sustained_inodes.o `test -f 'sustained_inodes.c' || echo '$(srcdir)/'`sustained_inodes.c
 
-mfsmount-invalidator.obj: invalidator.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-invalidator.obj -MD -MP -MF $(DEPDIR)/mfsmount-invalidator.Tpo -c -o mfsmount-invalidator.obj `if test -f 'invalidator.c'; then $(CYGPATH_W) 'invalidator.c'; else $(CYGPATH_W) '$(srcdir)/invalidator.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-invalidator.Tpo $(DEPDIR)/mfsmount-invalidator.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='invalidator.c' object='mfsmount-invalidator.obj' libtool=no @AMDEPBACKSLASH@
+mfsmount-sustained_inodes.obj: sustained_inodes.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-sustained_inodes.obj -MD -MP -MF $(DEPDIR)/mfsmount-sustained_inodes.Tpo -c -o mfsmount-sustained_inodes.obj `if test -f 'sustained_inodes.c'; then $(CYGPATH_W) 'sustained_inodes.c'; else $(CYGPATH_W) '$(srcdir)/sustained_inodes.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-sustained_inodes.Tpo $(DEPDIR)/mfsmount-sustained_inodes.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sustained_inodes.c' object='mfsmount-sustained_inodes.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-invalidator.obj `if test -f 'invalidator.c'; then $(CYGPATH_W) 'invalidator.c'; else $(CYGPATH_W) '$(srcdir)/invalidator.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-sustained_inodes.obj `if test -f 'sustained_inodes.c'; then $(CYGPATH_W) 'sustained_inodes.c'; else $(CYGPATH_W) '$(srcdir)/sustained_inodes.c'; fi`
+
+mfsmount-sustained_stats.o: sustained_stats.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-sustained_stats.o -MD -MP -MF $(DEPDIR)/mfsmount-sustained_stats.Tpo -c -o mfsmount-sustained_stats.o `test -f 'sustained_stats.c' || echo '$(srcdir)/'`sustained_stats.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-sustained_stats.Tpo $(DEPDIR)/mfsmount-sustained_stats.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sustained_stats.c' object='mfsmount-sustained_stats.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-sustained_stats.o `test -f 'sustained_stats.c' || echo '$(srcdir)/'`sustained_stats.c
+
+mfsmount-sustained_stats.obj: sustained_stats.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-sustained_stats.obj -MD -MP -MF $(DEPDIR)/mfsmount-sustained_stats.Tpo -c -o mfsmount-sustained_stats.obj `if test -f 'sustained_stats.c'; then $(CYGPATH_W) 'sustained_stats.c'; else $(CYGPATH_W) '$(srcdir)/sustained_stats.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-sustained_stats.Tpo $(DEPDIR)/mfsmount-sustained_stats.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sustained_stats.c' object='mfsmount-sustained_stats.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-sustained_stats.obj `if test -f 'sustained_stats.c'; then $(CYGPATH_W) 'sustained_stats.c'; else $(CYGPATH_W) '$(srcdir)/sustained_stats.c'; fi`
 
 mfsmount-getgroups.o: getgroups.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-getgroups.o -MD -MP -MF $(DEPDIR)/mfsmount-getgroups.Tpo -c -o mfsmount-getgroups.o `test -f 'getgroups.c' || echo '$(srcdir)/'`getgroups.c

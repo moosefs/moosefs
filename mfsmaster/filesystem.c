@@ -1701,6 +1701,10 @@ static inline uint32_t fsnodes_get_paths_size(uint32_t rootinode,fsnode *node) {
 	fsnode *p;
 	uint32_t totalpsize;
 	uint32_t psize;
+
+	if (node->inode==rootinode) {
+		return 1;
+	}
 	totalpsize = 0;
 	if (node->inode!=rootinode) {
 		for (e=node->parents ; e ; e=e->nextparent) {
@@ -1728,6 +1732,10 @@ static inline void fsnodes_get_paths_data(uint32_t rootinode,fsnode *node,uint8_
 	uint32_t psize;
 	uint8_t *b;
 
+	if (node->inode==rootinode) {
+		buff[0]='/';
+		return;
+	}
 	if (node->inode!=rootinode) {
 		for (e=node->parents ; e ; e=e->nextparent) {
 			psize = e->nleng;
@@ -3873,7 +3881,7 @@ uint8_t fs_get_paths_size(uint32_t rootinode,uint32_t inode,uint32_t *psize) {
 	fsnode *p;
 
 	if (fsnodes_node_find_ext(rootinode,0,&inode,NULL,&p,0)==0) {
-		*psize = 0;
+		*psize = 9+4;
 		return ERROR_ENOENT;
 	}
 
@@ -3904,6 +3912,9 @@ void fs_get_paths_data(uint32_t rootinode,uint32_t inode,uint8_t *buff) {
 		} else {
 			fsnodes_get_paths_data(rootinode,p,buff);
 		}
+	} else {
+		put32bit(&buff,9);
+		memcpy(buff,"(deleted)",9);
 	}
 }
 

@@ -28,6 +28,7 @@ Description: MooseFS data server
 Package: moosefs-client
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: fuse-utils
 Description: MooseFS client
  MooseFS clients: mfsmount and mfstools.
 

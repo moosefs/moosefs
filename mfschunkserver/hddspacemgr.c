@@ -57,6 +57,7 @@
 #include "massert.h"
 #include "random.h"
 #include "clocks.h"
+#include "strerr.h"
 #include "portable.h"
 #include "sockets.h"
 
@@ -218,6 +219,8 @@ typedef struct folder {
 	uint64_t leavefree;
 	uint64_t avail;
 	uint64_t total;
+	fsblkcnt_t lastblocks;
+	uint8_t isro;
 	hddstats cstat;
 	hddstats monotonic;
 	hddstats stats[STATSHISTORY];
@@ -1218,6 +1221,29 @@ static void hdd_chunk_testmove(chunk *c) {
 
 // no locks - locked by caller
 static inline void hdd_refresh_usage(folder *f) {
+	struct statvfs fsinfo;
+	uint8_t isro;
+
+	if (statvfs(f->path,&fsinfo)<0) {
+		syslog(LOG_NOTICE,"disk: %s ; statvfs arror (%s) - mark it as damaged",f->path,strerr(errno));
+		f->damaged = 1;
+		return;
+	}
+
+	isro = (fsinfo.f_flag & ST_RDONLY)?1:0;
+	if (f->lastblocks==0) {
+		f->lastblocks = fsinfo.f_blocks;
+		f->isro = isro;
+	} else if (f->lastblocks != fsinfo.f_blocks) {
+		syslog(LOG_NOTICE,"disk: %s ; number of total blocks has been changed (%llu -> %llu) - mark it as damaged",f->path,(unsigned long long int)(f->lastblocks),(unsigned long long int)(fsinfo.f_blocks));
+		f->damaged = 1;
+		return;
+	} else if (f->isro != isro) {
+		syslog(LOG_NOTICE,"disk: %s ; unit read-only flag has been changed (%s->%s) - mark it as damaged",f->path,(f->isro)?"RO":"RW",isro?"RO":"RW");
+		f->damaged = 1;
+		return;
+	}
+
 	if (f->sizelimit) {
 		uint32_t knownblocks;
 		uint32_t knowncount;
@@ -1248,12 +1274,6 @@ static inline void hdd_refresh_usage(folder *f) {
 		f->total = f->sizelimit;
 		f->avail = (calcsize>f->sizelimit)?0:f->sizelimit-calcsize;
 	} else {
-		struct statvfs fsinfo;
-
-		if (statvfs(f->path,&fsinfo)<0) {
-			f->avail = 0ULL;
-			f->total = 0ULL;
-		}
 		f->avail = (uint64_t)(fsinfo.f_frsize)*(uint64_t)(fsinfo.f_bavail);
 		f->total = (uint64_t)(fsinfo.f_frsize)*(uint64_t)(fsinfo.f_blocks-(fsinfo.f_bfree-fsinfo.f_bavail));
 	//	f->total = (uint64_t)(fsinfo.f_frsize)*(uint64_t)(fsinfo.f_blocks);
@@ -5634,6 +5654,8 @@ int hdd_parseline(char *hddcfgline) {
 				f->damaged = 0;
 				f->avail = 0ULL;
 				f->total = 0ULL;
+				f->lastblocks = 0;
+				f->isro = 0;
 				if (f->chunktab) {
 					free(f->chunktab);
 				}
@@ -5692,6 +5714,8 @@ int hdd_parseline(char *hddcfgline) {
 	}
 	f->avail = 0ULL;
 	f->total = 0ULL;
+	f->lastblocks = 0;
+	f->isro = 0;
 	f->chunkcount = 0;
 	f->chunktabsize = 0;
 	f->chunktab = NULL;

@@ -1,3 +1,11 @@
+moosefs (3.0.53-1) unstable; urgency=medium
+
+  * (cs) fixed typo (cnunk)
+  * (mount) create in deleted directory returns EACCES only in OS X (ENOENT in
+    other systems)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 13 Oct 2015 13:00:00 +0200
+
 moosefs (3.0.52-1) unstable; urgency=medium
 
   * (mount) added new mechanism for sustaining working directories (replaces

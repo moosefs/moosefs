@@ -2925,7 +2925,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
 				if (s->valid==WVER || s->valid==TDWVER || s->valid==INVALID || s->valid==DEL) {
 					if (s->valid==DEL) {
-						syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": cnunk hasn't been deleted since previous loop - retry",c->chunkid,c->version);
+						syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk hasn't been deleted since previous loop - retry",c->chunkid,c->version);
 					}
 					switch (s->valid) {
 						case WVER:

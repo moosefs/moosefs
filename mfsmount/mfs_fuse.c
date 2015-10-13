@@ -2575,9 +2575,12 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		status = fs_create(parent,nleng,(const uint8_t*)name,mode&07777,cumask,ctx.uid,1,&gidtmp,&inode,attr);
 	}
 	if (status!=ERROR_ENOTSUP) {
+#if defined(__APPLE__)
+		// due to bug in os x - create in deleted directory goes into infinite loop when it gets ENOENT, so we should change it to different error - we use EACCES
 		if (status==ERROR_ENOENT && sstats_get(parent,attr,0)==STATUS_OK) {
 			status=ERROR_EACCES;
 		}
+#endif
 		status = mfs_errorconv(status);
 		if (status!=0) {
 			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(status));

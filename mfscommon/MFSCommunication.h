@@ -663,7 +663,7 @@
 #define MATOCS_CHUNKOP (PROTO_BASE+152)
 // all chunk operations
 // newversion>0 && length==0xFFFFFFFF && copychunkid==0              -> change version
-// newversion>0 && length==0xFFFFFFFF && copycnunkid>0               -> duplicate
+// newversion>0 && length==0xFFFFFFFF && copychunkid>0               -> duplicate
 // newversion>0 && length>=0 && length<=MFSCHUNKSIZE && copychunkid==0  -> truncate
 // newversion>0 && length>=0 && length<=MFSCHUNKSIZE && copychunkid>0   -> duplicate and truncate
 // newversion==0 && length==0                                        -> delete

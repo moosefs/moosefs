@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.53-1 (2015-10-13)
+
+  - (cs) fixed typo (cnunk)
+  - (mount) create in deleted directory returns EACCES only in OS X (ENOENT in other systems)
+
 * MooseFS 3.0.52-1 (2015-10-09)
 
   - (mount) added new mechanism for sustaining working directories (replaces mechanism added in 3.0.40)

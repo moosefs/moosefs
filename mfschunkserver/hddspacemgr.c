@@ -3983,7 +3983,7 @@ static int hdd_int_delete(uint64_t chunkid,uint32_t version) {
 
 /* all chunk operations in one call */
 // newversion>0 && length==0xFFFFFFFF && copychunkid==0   -> change version
-// newversion>0 && length==0xFFFFFFFF && copycnunkid>0    -> duplicate
+// newversion>0 && length==0xFFFFFFFF && copychunkid>0    -> duplicate
 // newversion>0 && length<=MFSCHUNKSIZE && copychunkid==0    -> truncate
 // newversion>0 && length<=MFSCHUNKSIZE && copychunkid>0     -> duplicate and truncate
 // newversion==0 && length==0                             -> delete

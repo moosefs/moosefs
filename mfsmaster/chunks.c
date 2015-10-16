@@ -2075,16 +2075,16 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 
 	if (c==NULL) {
 		if (chunkid>nextchunkid+UINT64_C(1000000000)) {
-			syslog(LOG_WARNING,"chunkserver has nonexistent chunk (%016"PRIX64"_%08"PRIX32"), id looks wrong - just ignore it",chunkid,version);
+			syslog(LOG_WARNING,"chunkserver has nonexistent chunk (%016"PRIX64"_%08"PRIX32"), id looks wrong - just ignore it",chunkid,(version&0x7FFFFFFF));
 			return;
 		}
-		syslog(LOG_WARNING,"chunkserver has nonexistent chunk (%016"PRIX64"_%08"PRIX32"), so create it for future deletion",chunkid,version);
+		syslog(LOG_WARNING,"chunkserver has nonexistent chunk (%016"PRIX64"_%08"PRIX32"), so create it for future deletion",chunkid,(version&0x7FFFFFFF));
 		if (chunkid>=nextchunkid) {
 			nextchunkid=chunkid+1;
 //			changelog("%"PRIu32"|NEXTCHUNKID(%"PRIu64")",main_time(),nextchunkid);
 		}
 		c = chunk_new(chunkid);
-		c->version = version;
+		c->version = (version&0x7FFFFFFF);
 		c->lockedto = (uint32_t)main_time()+UNUSED_DELETE_TIMEOUT;
 		changelog("%"PRIu32"|CHUNKADD(%"PRIu64",%"PRIu32",%"PRIu32")",main_time(),c->chunkid,c->version,c->lockedto);
 	}
@@ -2920,7 +2920,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	}
 
 // step 3.0. delete invalid copies
-	if (extrajob == 0) {
+	if (extrajob==0 && (tdc+vc+tdb+bc>0 || (c->fcount==0 && c->lockedto<now))) {
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
 				if (s->valid==WVER || s->valid==TDWVER || s->valid==INVALID || s->valid==DEL) {

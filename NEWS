@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.54-1 (2015-10-16)
+
+  - (master) fixed setting version of new chunks registered as 'marked for removal'
+  - (master) added stronger condition for deleting invalid chunks
+  - (cs) changed condition for number of blocks to change to mark disk as damaged (allow changes up to 10%)
+
 * MooseFS 3.0.53-1 (2015-10-13)
 
   - (cs) fixed typo (cnunk)

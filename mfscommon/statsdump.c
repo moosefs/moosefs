@@ -462,7 +462,7 @@ void statsdump_gencsv(int32_t *stats,uint32_t rmask,char sep,uint8_t flags) {
 }
 
 int main (int argc,char **argv) {
-	char ch;
+	int ch;
 	char *ifile;
 	char *pfile;
 	char sep;

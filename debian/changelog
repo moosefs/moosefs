@@ -1,3 +1,13 @@
+moosefs (3.0.54-1) unstable; urgency=medium
+
+  * (master) fixed setting version of new chunks registered as 'marked for
+    removal'
+  * (master) added stronger condition for deleting invalid chunks
+  * (cs) changed condition for number of blocks to change to mark disk as
+    damaged (allow changes up to 10%)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 16 Oct 2015 13:00:00 +0200
+
 moosefs (3.0.53-1) unstable; urgency=medium
 
   * (cs) fixed typo (cnunk)

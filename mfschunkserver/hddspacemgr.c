@@ -1234,14 +1234,16 @@ static inline void hdd_refresh_usage(folder *f) {
 	if (f->lastblocks==0) {
 		f->lastblocks = fsinfo.f_blocks;
 		f->isro = isro;
-	} else if (f->lastblocks != fsinfo.f_blocks) {
-		syslog(LOG_NOTICE,"disk: %s ; number of total blocks has been changed (%llu -> %llu) - mark it as damaged",f->path,(unsigned long long int)(f->lastblocks),(unsigned long long int)(fsinfo.f_blocks));
+	} else if (f->lastblocks * 9 > fsinfo.f_blocks * 10 || f->lastblocks * 10 < fsinfo.f_blocks * 9) {
+		syslog(LOG_NOTICE,"disk: %s ; number of total blocks has been changed significantly (%llu -> %llu) - mark it as damaged",f->path,(unsigned long long int)(f->lastblocks),(unsigned long long int)(fsinfo.f_blocks));
 		f->damaged = 1;
 		return;
 	} else if (f->isro != isro) {
 		syslog(LOG_NOTICE,"disk: %s ; unit read-only flag has been changed (%s->%s) - mark it as damaged",f->path,(f->isro)?"RO":"RW",isro?"RO":"RW");
 		f->damaged = 1;
 		return;
+	} else if (f->lastblocks != fsinfo.f_blocks) {
+		f->lastblocks = fsinfo.f_blocks;
 	}
 
 	if (f->sizelimit) {

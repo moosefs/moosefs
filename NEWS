@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.55-1 (2015-10-20)
+
+  - (cs,master) added 1 second timeout when connecting to master
+
 * MooseFS 3.0.54-1 (2015-10-16)
 
   - (master) fixed setting version of new chunks registered as 'marked for removal'

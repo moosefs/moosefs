@@ -1,3 +1,10 @@
+moosefs (3.0.56-1) unstable; urgency=medium
+
+  * (mount) fixed reading scenario: (read from empty chunk -> write chunk ->
+    read this chunk again)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 26 Oct 2015 12:00:00 +0100
+
 moosefs (3.0.55-1) unstable; urgency=medium
 
   * (cs,master) added 1 second timeout when connecting to master

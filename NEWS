@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.56-1 (2015-10-26)
+
+  - (mount) fixed reading scenario: (read from empty chunk -> write chunk -> read this chunk again)
+
 * MooseFS 3.0.55-1 (2015-10-20)
 
   - (cs,master) added 1 second timeout when connecting to master

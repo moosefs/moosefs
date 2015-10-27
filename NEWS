@@ -1,8 +1,24 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.80-1 (2015-10-27)
+
+  - (cs,master,metalogger) added 1 second timeout when connecting to master
+  - (cs) force disconnection from master couple seconds after term signal (frozen I/O threads can prevent CS from termination)
+  - (systemd) fixed typo in mfscgiserv service file
+  - (macosx) fixed packages to be compatible with OS X 10.11+
+
+* MooseFS 2.0.79-1 (2015-10-16)
+
+  - (master) fixed setting version of new chunks registered as 'marked for removal'
+  - (master) added stronger condition for deleting invalid chunks
+
+* MooseFS 2.0.78-1 (2015-10-09)
+
+  - (rpm) added network-online.target to Wants and After in systemd service files (startup issues after reboot)
+
 * MooseFS 2.0.77-1 (2015-09-25)
 
-  - (mount) removed using fuse notify/forget mechanism in kernel with fuse api 7.23+ (due to unexpected kernel behaviour - getcwd returns ENOENT)
+  - (mount) removed using fuse notify/forget mechanism in kernel with fuse api 7.23+ (due to unexpected kernel behaviour - getcwd returned ENOENT in kernels 3.18+)
 
 * MooseFS 2.0.76-1 (2015-09-11)
 

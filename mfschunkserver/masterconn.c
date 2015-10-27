@@ -63,6 +63,9 @@
 #define REPORT_LOAD_FREQ 60
 #define REPORT_SPACE_FREQ 1
 
+// force disconnection X seconds after term signal
+#define FORCE_DISCONNECTION_TO 5.0
+
 // mode
 enum {FREE,CONNECTING,DATA,KILL,CLOSE};
 
@@ -99,7 +102,7 @@ typedef struct masterconn {
 	uint8_t mode;
 	int sock;
 	int32_t pdescpos;
-	double lastread,lastwrite;
+	double lastread,lastwrite,conntime;
 	uint8_t input_hdr[8];
 	uint8_t *input_startptr;
 	uint32_t input_bytesleft;
@@ -121,8 +124,14 @@ typedef struct masterconn {
 } masterconn;
 
 static masterconn *masterconnsingleton=NULL;
-
 static idlejob *idlejobs=NULL;
+static uint8_t csidvalid = 0;
+static void *reconnect_hook;
+static void *manager_time_hook;
+static double wantexittime = 0.0;
+
+static uint64_t stats_bytesout=0;
+static uint64_t stats_bytesin=0;
 
 // from config
 // static uint32_t BackLogsNumber;
@@ -132,12 +141,6 @@ static char *BindHost;
 static uint32_t Timeout;
 static uint16_t ChunkServerId = 0;
 static uint64_t MetaFileId = 0;
-static uint8_t csidvalid = 0;
-static void *reconnect_hook;
-static void *manager_time_hook;
-
-static uint64_t stats_bytesout=0;
-static uint64_t stats_bytesin=0;
 
 // static FILE *logfd;
 
@@ -1097,9 +1100,18 @@ int masterconn_initconnect(masterconn *eptr) {
 		masterconn_connected(eptr);
 	} else {
 		eptr->mode = CONNECTING;
+		eptr->conntime = monotonic_seconds();
 		syslog(LOG_NOTICE,"connecting ...");
 	}
 	return 0;
+}
+
+void masterconn_connecttimeout(masterconn *eptr) {
+	syslog(LOG_WARNING,"connection timed out");
+	tcpclose(eptr->sock);
+	eptr->sock = -1;
+	eptr->mode = FREE;
+	eptr->masteraddrvalid = 0;
 }
 
 void masterconn_connecttest(masterconn *eptr) {
@@ -1421,6 +1433,8 @@ void masterconn_serve(struct pollfd *pdesc) {
 	if (eptr->mode==CONNECTING) {
 		if (eptr->sock>=0 && eptr->pdescpos>=0 && (pdesc[eptr->pdescpos].revents & (POLLOUT | POLLHUP | POLLERR))) { // FD_ISSET(eptr->sock,wset)) {
 			masterconn_connecttest(eptr);
+		} else if (eptr->conntime+1.0 < now) {
+			masterconn_connecttimeout(eptr);
 		}
 	} else {
 		if (eptr->pdescpos>=0) {
@@ -1446,12 +1460,15 @@ void masterconn_serve(struct pollfd *pdesc) {
 			eptr->mode = KILL;
 		}
 	}
+	if (wantexittime>0.0 && wantexittime+FORCE_DISCONNECTION_TO < now) {
+		eptr->mode = KILL;
+	}
 	masterconn_disconnection_check();
 }
 
 void masterconn_reconnect(void) {
 	masterconn *eptr = masterconnsingleton;
-	if (eptr->mode==FREE) {
+	if (eptr->mode==FREE && wantexittime==0.0) {
 		masterconn_initconnect(eptr);
 	}
 }
@@ -1522,6 +1539,10 @@ void masterconn_reload(void) {
 	main_time_change(reconnect_hook,ReconnectionDelay,0);
 }
 
+void masterconn_wantexit(void) {
+	wantexittime = monotonic_seconds();
+}
+
 int masterconn_init(void) {
 	uint32_t ReconnectionDelay;
 	masterconn *eptr;
@@ -1559,6 +1580,8 @@ int masterconn_init(void) {
 	}
 //	logfd = NULL;
 
+	wantexittime = 0.0;
+
 	if (masterconn_initconnect(eptr)<0) {
 		return -1;
 	}
@@ -1569,7 +1592,7 @@ int masterconn_init(void) {
 	reconnect_hook = main_time_register(ReconnectionDelay,rndu32_ranged(ReconnectionDelay),masterconn_reconnect);
 	main_destruct_register(masterconn_term);
 	main_poll_register(masterconn_desc,masterconn_serve);
-//	main_wantexit_register(masterconn_wantexit);
+	main_wantexit_register(masterconn_wantexit);
 //	main_canexit_register(masterconn_canexit);
 	main_reload_register(masterconn_reload);
 	return 0;

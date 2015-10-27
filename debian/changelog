@@ -1,7 +1,33 @@
+moosefs (2.0.80-1) unstable; urgency=medium
+
+  * (cs,master,metalogger) added 1 second timeout when connecting to master
+  * (cs) force disconnection from master couple seconds after term signal
+    (frozen I/O threads can prevent CS from termination)
+  * (systemd) fixed typo in mfscgiserv service file
+  * (macosx) fixed packages to be compatible with OS X 10.11+
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 27 Oct 2015 12:00:00 +0100
+
+moosefs (2.0.79-1) unstable; urgency=medium
+
+  * (master) fixed setting version of new chunks registered as 'marked for
+    removal'
+  * (master) added stronger condition for deleting invalid chunks
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 16 Oct 2015 13:00:00 +0200
+
+moosefs (2.0.78-1) unstable; urgency=medium
+
+  * (rpm) added network-online.target to Wants and After in systemd service
+    files (startup issues after reboot)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 09 Oct 2015 13:00:00 +0200
+
 moosefs (2.0.77-1) unstable; urgency=medium
 
   * (mount) removed using fuse notify/forget mechanism in kernel with fuse api
-    7.23+ (due to unexpected kernel behaviour - getcwd returns ENOENT)
+    7.23+ (due to unexpected kernel behaviour - getcwd returned ENOENT in
+    kernels 3.18+)
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 25 Sep 2015 13:00:00 +0200
 

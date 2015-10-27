@@ -1591,7 +1591,7 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 //			changelog("%"PRIu32"|NEXTCHUNKID(%"PRIu64")",main_time(),nextchunkid);
 		}
 		c = chunk_new(chunkid);
-		c->version = version;
+		c->version = (version&0x7FFFFFFF);
 		c->lockedto = (uint32_t)main_time()+UNUSED_DELETE_TIMEOUT;
 		changelog("%"PRIu32"|CHUNKADD(%"PRIu64",%"PRIu32",%"PRIu32")",main_time(),c->chunkid,c->version,c->lockedto);
 	}
@@ -1607,12 +1607,12 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 		s->version = version&0x7FFFFFFF;
 	} else {
 		if (version&0x80000000) {
-			s->valid=TDVALID;
+			s->valid = TDVALID;
 			s->version = c->version;
 			chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies);
 			c->allvalidcopies++;
 		} else {
-			s->valid=VALID;
+			s->valid = VALID;
 			s->version = c->version;
 			chunk_state_change(c->goal,c->goal,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
 			c->allvalidcopies++;
@@ -2279,13 +2279,12 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 	}
 
 // step 3a. delete invalid copies
-
-	if (extrajob == 0) {
+	if (extrajob==0 && (tdc+vc+tdb+bc>0 || (c->fcount==0 && c->lockedto<now))) {
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
 				if (s->valid==INVALID || s->valid==DEL) {
 					if (s->valid==DEL) {
-						syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": cnunk hasn't been deleted since previous loop - retry",c->chunkid,c->version);
+						syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk hasn't been deleted since previous loop - retry",c->chunkid,c->version);
 					}
 					s->valid = DEL;
 					stats_deletions++;
@@ -2305,7 +2304,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 	}
 
 // step 3b. check for unfinished replications
-	if (extrajob == 0) {
+	if (extrajob==0) {
 		if (c->operation==REPLICATE && c->lockedto<now) {
 			syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk hasn't been replicated since previous loop - retry",c->chunkid,c->version);
 			for (s=c->slisthead ; s ; s=s->next) {
@@ -2321,7 +2320,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,double minusage
 						c->regularvalidcopies--;
 						bc--;
 					}
-					s->valid=INVALID;
+					s->valid = INVALID;
 					s->version = 0;	// after unfinished operation can't be shure what version chunk has
 					chunk_delopchunk(s->csid,c->chunkid);
 					ivc++;

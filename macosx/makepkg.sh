@@ -15,10 +15,20 @@ else
 	EXTRA=""
 fi
 
+if [ `uname -r | cut -d'.' -f1` -gt 14 ]; then 
+	PREFIX="/usr/local"
+else
+	PREFIX="/usr"
+fi
+
 VERSION=`cat configure.ac | awk '/^AC_INIT/ {split($0,v,"[][]");} /^release=/ {split($0,r,"="); printf "%s-%u",v[4],r[2];}'`
 PKGVERSION=`echo $VERSION | tr '-' '.'`
 
-./configure -C --prefix=/usr --sysconfdir=/private/etc
+if [ -d "/tmp/moosefs" ]; then
+	rm -rf "/tmp/moosefs"
+fi
+
+./configure -C --prefix=$PREFIX --sysconfdir=/private/etc
 make
 make install DESTDIR=/tmp/moosefs/
 pkgbuild --root /tmp/moosefs/ --identifier com.moosefs --version $PKGVERSION --ownership recommended ../moosefs${EXTRA}-${VERSION}.pkg

@@ -134,7 +134,6 @@ static double wantexittime = 0.0;
 static uint64_t stats_bytesout=0;
 static uint64_t stats_bytesin=0;
 
-
 // from config
 // static uint32_t BackLogsNumber;
 static char *MasterHost;

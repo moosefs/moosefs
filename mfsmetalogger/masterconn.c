@@ -75,7 +75,7 @@ typedef struct masterconn {
 	uint8_t mode;
 	int sock;
 	int32_t pdescpos;
-	double lastread,lastwrite;
+	double lastread,lastwrite,conntime;
 	uint8_t input_hdr[8];
 	uint8_t *input_startptr;
 	uint32_t input_bytesleft;
@@ -679,9 +679,18 @@ int masterconn_initconnect(masterconn *eptr) {
 		masterconn_connected(eptr);
 	} else {
 		eptr->mode = CONNECTING;
+		eptr->conntime = monotonic_seconds();
 		syslog(LOG_NOTICE,"connecting ...");
 	}
 	return 0;
+}
+
+void masterconn_connecttimeout(masterconn *eptr) {
+	syslog(LOG_WARNING,"connection timed out");
+	tcpclose(eptr->sock);
+	eptr->sock = -1;
+	eptr->mode = FREE;
+	eptr->masteraddrvalid = 0;
 }
 
 void masterconn_connecttest(masterconn *eptr) {
@@ -979,6 +988,8 @@ void masterconn_serve(struct pollfd *pdesc) {
 	if (eptr->mode==CONNECTING) {
 		if (eptr->sock>=0 && eptr->pdescpos>=0 && (pdesc[eptr->pdescpos].revents & (POLLOUT | POLLHUP | POLLERR))) { // FD_ISSET(eptr->sock,wset)) {
 			masterconn_connecttest(eptr);
+		} else if (eptr->conntime+1.0 < now) {
+			masterconn_connecttimeout(eptr);
 		}
 	} else {
 		if (eptr->pdescpos>=0) {

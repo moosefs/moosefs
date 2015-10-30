@@ -1,9 +1,13 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.58-1 (2015-10-30)
+
+  - (mount) added condition for requests in read data (request should begin before EOF)
+  - (systemd) fixed typo in mfscgiserv service file
+
 * MooseFS 3.0.57-1 (2015-10-27)
 
   - (metalogger) added 1 second timeout when connecting to master
-  - (systemd) fixed typo in mfscgiserv service file
   - (macosx) fixed packages to be compatible with OS X 10.11+
 
 * MooseFS 3.0.56-1 (2015-10-26)

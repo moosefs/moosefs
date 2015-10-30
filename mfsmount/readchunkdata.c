@@ -295,7 +295,7 @@ void read_chunkdata_invalidate (uint32_t inode,uint32_t chindx) {
 	zassert(pthread_mutex_unlock(&mreq_cache_lock));
 }
 
-void read_chunkdata_inject (uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint8_t csdataver,uint8_t *csdata,uint32_t csdatasize) {
+void read_chunkdata_inject (uint32_t inode,uint32_t chindx,uint64_t mfleng,uint64_t chunkid,uint32_t version,uint8_t csdataver,uint8_t *csdata,uint32_t csdatasize) {
 	uint32_t hash;
 	mreqcache *mrc;
 	double now;
@@ -313,6 +313,7 @@ void read_chunkdata_inject (uint32_t inode,uint32_t chindx,uint64_t chunkid,uint
 	memset(mrc,0,sizeof(mreqcache));
 	mrc->time = now;
 	mrc->inode = inode;
+	mrc->mfleng = mfleng;
 	mrc->chindx = chindx;
 	mrc->chunkid = chunkid;
 	mrc->version = version;
@@ -329,7 +330,7 @@ void read_chunkdata_inject (uint32_t inode,uint32_t chindx,uint64_t chunkid,uint
 	zassert(pthread_mutex_unlock(&mreq_cache_lock));
 }
 
-uint8_t read_chunkdata_check(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version) { // after read check if chunk doeasn't change, and if so then repeat reading
+uint8_t read_chunkdata_check(uint32_t inode,uint32_t chindx,uint64_t mfleng,uint64_t chunkid,uint32_t version) { // after read check if chunk doeasn't change, and if so then repeat reading
 	uint32_t hash;
 	mreqcache *mrc;
 	zassert(pthread_mutex_lock(&mreq_cache_lock));
@@ -340,7 +341,7 @@ uint8_t read_chunkdata_check(uint32_t inode,uint32_t chindx,uint64_t chunkid,uin
 				mrc->reqwaiting = 1;
 				zassert(pthread_cond_wait(&(mrc->reqcond),&mreq_cache_lock));
 			}
-			if (mrc->state==MR_INVALID || mrc->status!=STATUS_OK || mrc->chunkid!=chunkid || mrc->version!=version) {
+			if (mrc->state==MR_INVALID || mrc->status!=STATUS_OK || mrc->mfleng>mfleng || mrc->chunkid!=chunkid || mrc->version!=version) {
 				zassert(pthread_mutex_unlock(&mreq_cache_lock));
 				return 0;
 			} else {
@@ -476,7 +477,9 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 	}
 	*chunkid = mrc->chunkid;
 	*version = mrc->version;
-	*mfleng = mrc->mfleng;
+	if (mrc->mfleng > *mfleng) {
+		*mfleng = mrc->mfleng;
+	}
 	if (mrc->csdata && mrc->csdatasize>0) {
 		*chainelements = csorder_sort(chain,mrc->csdataver,mrc->csdata,mrc->csdatasize,0);
 	} else {

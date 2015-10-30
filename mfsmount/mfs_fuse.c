@@ -1153,6 +1153,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 		}
 		mfs_stats_inc(OP_DIRCACHE_LOOKUP);
 		status = 0;
+		lflags = 0xFFFF;
 		icacheflag = 1;
 //		oplog_printf(&ctx,"lookup (%lu,%s) (using open dir cache): OK (%lu)",(unsigned long int)parent,name,(unsigned long int)inode);
 	} else {
@@ -1172,9 +1173,6 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 		} else {
 			uint32_t gidtmp = ctx.gid;
 			status = fs_lookup(parent,nleng,(const uint8_t*)name,ctx.uid,1,&gidtmp,&inode,attr,&lflags,&csdataver,&chunkid,&version,&csdata,&csdatasize);
-		}
-		if (status==STATUS_OK && lflags!=0xFFFF) { // store extra data in cache
-			fdcache_insert(&ctx,inode,attr,lflags,csdataver,chunkid,version,csdata,csdatasize);
 		}
 		if (status==ERROR_ENOENT_NOCACHE) {
 			status = ERROR_ENOENT;
@@ -1233,7 +1231,10 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	if (maxfleng>(uint64_t)(e.attr.st_size)) {
 		e.attr.st_size=maxfleng;
 	}
-	if (mfs_attr_get_type(attr)==TYPE_FILE) {
+	if (lflags!=0xFFFF) { // store extra data in cache
+		fdcache_insert(&ctx,inode,attr,lflags,csdataver,e.attr.st_size,chunkid,version,csdata,csdatasize);
+	}
+	if (type==TYPE_FILE) {
 		read_inode_set_length(inode,e.attr.st_size,0);
 	}
 //	if (type==TYPE_FILE && debug_mode) {

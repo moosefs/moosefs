@@ -634,7 +634,7 @@ void* read_worker(void *arg) {
 				memset(rreq->data,0,rreq->rleng);
 			}
 			zassert(pthread_mutex_unlock(&(ind->lock)));
-			if (read_chunkdata_check(inode,chindx,chunkid,version)==0) {
+			if (read_chunkdata_check(inode,chindx,mfleng,chunkid,version)==0) {
 				zassert(pthread_mutex_lock(&(ind->lock)));
 
 #ifdef RDEBUG
@@ -828,7 +828,7 @@ void* read_worker(void *arg) {
 
 			if (reqsend && gotstatus) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
-				if (read_chunkdata_check(inode,chindx,chunkid,version)==0) {
+				if (read_chunkdata_check(inode,chindx,mfleng,chunkid,version)==0) {
 					zassert(pthread_mutex_lock(&(ind->lock)));
 #ifdef RDEBUG
 					fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; read_chunkdata_check: chunkid: %"PRIu64" ; version: %"PRIu32" - chunk changed\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,chunkid,version);
@@ -1333,6 +1333,8 @@ rrequest* read_new_request(inodedata *ind,uint64_t *offset,uint64_t blockend) {
 	uint32_t chindx;
 	int pfd[2];
 
+	sassert(blockend>*offset);
+
 	chunkoffset = *offset;
 	chindx = chunkoffset>>MFSCHUNKBITS;
 	chunkend = chindx;
@@ -1451,9 +1453,9 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 	rrequest *rreq,*rreqn;
 	rlist *rl,*rhead,**rtail;
 	uint64_t rbuffsize;
+	uint64_t blockstart,blockend;
 	uint64_t firstbyte;
 	uint64_t lastbyte;
-	uint64_t addoffset;
 	uint32_t cnt;
 	uint32_t edges,i,reqno;
 	uint8_t added,raok;
@@ -1587,6 +1589,8 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 		if (edges>2) {
 			qsort(etab,edges,sizeof(uint64_t),read_data_offset_cmp);
 		}
+		sassert(etab[0]==firstbyte);
+		sassert(etab[edges-1]==lastbyte);
 #ifdef RDEBUG
 		for (i=0 ; i<edges-1 ; i++) {
 			fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" ; read(%"PRIu64":%"PRIu64") ; range %u : (%"PRIu64":%"PRIu64")\n",monotonic_seconds(),ind->inode,firstbyte,lastbyte,i,etab[i],etab[i+1]);
@@ -1615,9 +1619,9 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 						if (ind->readahead && i==edges-2) {
 							// request next block of data
 							if (rreq->next==NULL && rbuffsize<maxreadaheadsize) {
-								uint64_t blockstart,blockend;
 								blockstart = rreq->offset+rreq->leng;
 								blockend = blockstart + (readahead * (1<<((ind->readahead-1)*2)));
+								sassert(blockend>blockstart);
 								raok = 1;
 								for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
 									if (rreq->mode!=BREAK && rreq->mode!=FREE) {
@@ -1638,6 +1642,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 								// and another one if necessary
 									if ((blockstart % MFSCHUNKSIZE) == 0 && rreq->next!=NULL && rreq->next->next==NULL && rbuffsize<maxreadaheadsize) {
 										blockend = blockstart + (readahead * (1<<((ind->readahead-1)*2)));
+										sassert(blockend>blockstart);
 										raok = 1;
 										for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
 											if (rreq->mode!=BREAK && rreq->mode!=FREE) {
@@ -1664,9 +1669,10 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 				}
 			}
 			if (added==0) { // new request
-				addoffset = etab[i];
-				while (addoffset < etab[i+1]) {
-					rreq = read_new_request(ind,&addoffset,etab[i+1]);
+				blockstart = etab[i];
+				blockend = etab[i+1];
+				while (blockstart < blockend) {
+					rreq = read_new_request(ind,&blockstart,blockend);
 					rl = malloc(sizeof(rlist));
 					passert(rl);
 					rl->rreq = rreq;
@@ -1676,27 +1682,28 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 					*rtail = rl;
 					rtail = &(rl->next);
 					rreq->lcnt++;
-					if (addoffset==etab[i+1] && ind->readahead && rbuffsize<maxreadaheadsize && i==edges-2) {
-						uint64_t blockend;
-						blockend = etab[i+1] + (readahead * (1<<((ind->readahead-1)*2)))/2;
+					if (blockstart==blockend && ind->readahead && rbuffsize<maxreadaheadsize && i==edges-2) {
+						blockend = blockstart + (readahead * (1<<((ind->readahead-1)*2)))/2;
+						sassert(blockend>blockstart);
 						raok = 1;
 						for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
 							if (rreq->mode!=BREAK && rreq->mode!=FREE) {
-								if (!(blockend <= rreq->offset || addoffset >= rreq->offset+rreq->leng)) {
+								if (!(blockend <= rreq->offset || blockstart >= rreq->offset+rreq->leng)) {
 									raok = 0;
 								}
 							}
 						}
 						if (raok) {
 #ifdef RDEBUG
-							fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" (after new block) add new read-ahead rreq (%"PRIu64":%"PRIu64"/%"PRId64")\n",monotonic_seconds(),ind->inode,etab[i+1],blockend,blockend-etab[i+1]);
+							fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" (after new block) add new read-ahead rreq (%"PRIu64":%"PRIu64"/%"PRId64")\n",monotonic_seconds(),ind->inode,blockstart,blockend,blockend-blockstart);
 #endif
 							if (blockend<=ind->fleng) {
-								(void)read_new_request(ind,&addoffset,blockend);
-							} else if (lastbyte<ind->fleng) {
-								(void)read_new_request(ind,&addoffset,ind->fleng);
+								(void)read_new_request(ind,&blockstart,blockend);
+							} else if (blockstart<ind->fleng) {
+								(void)read_new_request(ind,&blockstart,ind->fleng);
 							}
 						}
+						break;
 					}
 				}
 			}

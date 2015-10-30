@@ -46,6 +46,7 @@ typedef struct _fdcachechunkdata {
 	uint16_t lcnt;
 	uint8_t csdataver;
 	uint32_t hash;
+	uint64_t mfleng;
 	uint64_t chunkid;
 	uint32_t version;
 	uint32_t csdatasize;
@@ -70,7 +71,7 @@ CREATE_BUCKET_MT_ALLOCATOR(fdcachee,fdcacheentry,500)
 static fdcacheentry *fdhashtab[FDCACHE_HASHSIZE];
 static pthread_mutex_t hashlock[FDCACHE_HASHSIZE];
 
-static inline fdcachechunkdata* fdcache_chunkdata_new(uint32_t hash,uint8_t csdataver,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize) {
+static inline fdcachechunkdata* fdcache_chunkdata_new(uint32_t hash,uint8_t csdataver,uint64_t mfleng,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize) {
 	fdcachechunkdata *fdccd;
 
 	if (csdatasize>10*14) { // more than 10 copies of chunk ??? - just ignore such data
@@ -81,6 +82,7 @@ static inline fdcachechunkdata* fdcache_chunkdata_new(uint32_t hash,uint8_t csda
 	fdccd->lcnt = 1;
 	fdccd->csdataver = csdataver;
 	fdccd->hash = hash;
+	fdccd->mfleng = mfleng;
 	fdccd->chunkid = chunkid;
 	fdccd->version = version;
 	fdccd->csdatasize = csdatasize;
@@ -96,7 +98,7 @@ static inline void fdcache_chunkdata_unref(fdcachechunkdata *fdccd) {
 	}
 }
 
-void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t lflags,uint8_t csdataver,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize) {
+void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t lflags,uint8_t csdataver,uint64_t mfleng,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize) {
 	uint32_t h;
 	double now;
 	uint8_t f;
@@ -120,7 +122,7 @@ void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],u
 					fdcache_chunkdata_unref(fdce->chunkdata);
 				}
 				if (lflags & LOOKUP_CHUNK_ZERO_DATA) {
-					fdce->chunkdata = fdcache_chunkdata_new(h,csdataver,chunkid,version,csdata,csdatasize);
+					fdce->chunkdata = fdcache_chunkdata_new(h,csdataver,mfleng,chunkid,version,csdata,csdatasize);
 				} else {
 					fdce->chunkdata = NULL;
 				}
@@ -142,7 +144,7 @@ void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],u
 		memcpy(fdce->attr,attr,35);
 		fdce->lflags = lflags;
 		if (lflags & LOOKUP_CHUNK_ZERO_DATA) {
-			fdce->chunkdata = fdcache_chunkdata_new(h,csdataver,chunkid,version,csdata,csdatasize);
+			fdce->chunkdata = fdcache_chunkdata_new(h,csdataver,mfleng,chunkid,version,csdata,csdatasize);
 		} else {
 			fdce->chunkdata = NULL;
 		}
@@ -221,7 +223,7 @@ void fdcache_release(void *vfdccd) {
 void fdcache_inject_chunkdata(uint32_t inode,void *vfdccd) {
 	fdcachechunkdata *fdccd = (fdcachechunkdata*)vfdccd;
 	if (fdccd!=NULL) {
-		read_chunkdata_inject(inode,0,fdccd->chunkid,fdccd->version,fdccd->csdataver,fdccd->csdata,fdccd->csdatasize);
+		read_chunkdata_inject(inode,0,fdccd->mfleng,fdccd->chunkid,fdccd->version,fdccd->csdataver,fdccd->csdata,fdccd->csdatasize);
 	}
 }
 

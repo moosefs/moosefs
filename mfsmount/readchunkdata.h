@@ -28,8 +28,8 @@
 void read_chunkdata_init (void);
 void read_chunkdata_term (void);
 void read_chunkdata_invalidate (uint32_t inode,uint32_t chindx);
-void read_chunkdata_inject (uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint8_t csdataver,uint8_t *csdata,uint32_t csdatasize);
-uint8_t read_chunkdata_check(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version);
+void read_chunkdata_inject (uint32_t inode,uint32_t chindx,uint64_t mfleng,uint64_t chunkid,uint32_t version,uint8_t csdataver,uint8_t *csdata,uint32_t csdatasize);
+uint8_t read_chunkdata_check(uint32_t inode,uint32_t chindx,uint64_t mfleng,uint64_t chunkid,uint32_t version);
 uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],uint16_t *chainelements,uint32_t chindx,uint64_t *mfleng,uint64_t *chunkid,uint32_t *version);
 
 #endif

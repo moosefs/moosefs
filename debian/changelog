@@ -1,7 +1,14 @@
+moosefs (3.0.58-1) unstable; urgency=medium
+
+  * (mount) added condition for requests in read data (request should begin
+    before EOF)
+  * (systemd) fixed typo in mfscgiserv service file
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 30 Oct 2015 12:00:00 +0100
+
 moosefs (3.0.57-1) unstable; urgency=medium
 
   * (metalogger) added 1 second timeout when connecting to master
-  * (systemd) fixed typo in mfscgiserv service file
   * (macosx) fixed packages to be compatible with OS X 10.11+
 
  -- MooseFS Team <contact@moosefs.com>  Tue, 27 Oct 2015 12:00:00 +0100

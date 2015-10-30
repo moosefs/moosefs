@@ -24,7 +24,7 @@
 #include <inttypes.h>
 #include <fuse_lowlevel.h>
 
-void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t lflags,uint8_t csdataver,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize);
+void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t lflags,uint8_t csdataver,uint64_t mfleng,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize);
 uint8_t fdcache_find(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t *lflags);
 void* fdcache_acquire(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t *lflags,uint8_t *found);
 void fdcache_release(void *vfdccd);

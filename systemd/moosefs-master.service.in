@@ -9,7 +9,8 @@ ExecStart=@SBIN_PATH@/mfsmaster start
 ExecStop=@SBIN_PATH@/mfsmaster stop
 ExecReload=@SBIN_PATH@/mfsmaster reload
 PIDFile=@DATA_PATH@/.mfsmaster.lock
-Restart=always
+TimeoutStopSec=1800
+Restart=no
 
 [Install]
 WantedBy=multi-user.target

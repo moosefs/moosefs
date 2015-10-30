@@ -1,9 +1,14 @@
+moosefs (2.0.81-1) unstable; urgency=medium
+
+  * (systemd) fixed typo in mfscgiserv service file
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 30 Oct 2015 12:00:00 +0100
+
 moosefs (2.0.80-1) unstable; urgency=medium
 
   * (cs,master,metalogger) added 1 second timeout when connecting to master
   * (cs) force disconnection from master couple seconds after term signal
     (frozen I/O threads can prevent CS from termination)
-  * (systemd) fixed typo in mfscgiserv service file
   * (macosx) fixed packages to be compatible with OS X 10.11+
 
  -- MooseFS Team <contact@moosefs.com>  Tue, 27 Oct 2015 12:00:00 +0100

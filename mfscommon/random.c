@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
+#include "clocks.h"
+
 static uint8_t i,j;
 static uint8_t p[256];
 
@@ -35,7 +37,7 @@ int rnd_init(void) {
 	register uint8_t x;
 	uint16_t l;
 
-	srandom(time(NULL));
+	srandom(time(NULL)+monotonic_useconds());
 	for (l=0 ; l<64 ; l++) {
 		key[l] = random();
 		vkey[l] = random();

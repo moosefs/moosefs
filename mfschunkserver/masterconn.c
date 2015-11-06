@@ -416,8 +416,8 @@ void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length)
 	uint8_t atype;
 	uint64_t metafileid;
 	uint16_t csid;
-	if (length!=17 && length!=9 && length!=7 && length!=5 && length!=1) {
-		syslog(LOG_NOTICE,"MATOCS_MASTER_ACK - wrong size (%"PRIu32"/1|5|7|9|17)",length);
+	if (length!=17 && length!=15 && length!=9 && length!=7 && length!=5 && length!=1) {
+		syslog(LOG_NOTICE,"MATOCS_MASTER_ACK - wrong size (%"PRIu32"/1|5|7|9|15|17)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -488,7 +488,7 @@ void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length)
 			syslog(LOG_NOTICE,"masterconn: follower doesn't know who is the leader, reconnect to another master");
 		}
 		eptr->mode = CLOSE;
-	} else if (atype==2 && length==7) {
+	} else if (atype==2 && (length==7 || length==15)) {
 #ifdef MFSDEBUG
 		syslog(LOG_NOTICE,"masterconn: wait for acceptance");
 #endif
@@ -499,6 +499,17 @@ void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length)
 		eptr->masterversion = get32bit(&data);
 		if (Timeout==0) {
 			eptr->timeout = get16bit(&data);
+		} else {
+			data+=2;
+		}
+		if (length>=15) {
+			metafileid = get64bit(&data);
+			if (metafileid>0 && MetaFileId>0 && metafileid!=MetaFileId) { // wrong MFS instance - abort
+				syslog(LOG_WARNING,"MATOCS_MASTER_ACK - wrong meta data id. Can't connect to master");
+				eptr->registerstate = REGISTERED; // do not switch to register ver. 5
+				eptr->mode = KILL;
+				return;
+			}
 		}
 	} else {
 		syslog(LOG_NOTICE,"MATOCS_MASTER_ACK - bad type/length: %u/%u",atype,length);

@@ -146,6 +146,7 @@ static uint32_t freecacheblocks;
 static uint32_t cacheblockcount;
 
 static uint32_t maxretries;
+static uint32_t minlogretry;
 
 static inodedata **idhash;
 
@@ -715,16 +716,22 @@ void* write_worker(void *arg) {
 		wrstatus = fs_writechunk(ind->inode,chindx,(canmodmtime?CHUNKOPFLAG_CANMODTIME:0)|(continueop?CHUNKOPFLAG_CONTINUEOP:0),&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
 		if (wrstatus!=STATUS_OK) {
 			if (wrstatus!=ERROR_LOCKED && wrstatus!=ERROR_EAGAIN) {
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 				if (wrstatus==ERROR_ENOENT) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,EBADF,0);
 				} else if (wrstatus==ERROR_QUOTA) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,EDQUOT,0);
 				} else if (wrstatus==ERROR_NOSPACE) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,ENOSPC,0);
 				} else if (wrstatus==ERROR_CHUNKLOST) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,ENXIO,0);
 				} else {
+					if (chd->trycnt >= minlogretry) {
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
+					}
 					chd->trycnt++;
 					if (chd->trycnt>=maxretries) {
 						if (wrstatus==ERROR_NOCHUNKSERVERS) {
@@ -773,7 +780,9 @@ void* write_worker(void *arg) {
 			if (unbreakable==0) {
 				fs_writeend(chunkid,ind->inode,0,canmodmtime?CHUNKOPFLAG_CANMODTIME:0);
 			}
-			syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies",ind->inode,chindx,chunkid,version);
+			if (chd->trycnt >= minlogretry) {
+				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies",ind->inode,chindx,chunkid,version);
+			}
 			if (chd->trycnt>=maxretries) {
 				write_job_end(chd,ENXIO,0);
 			} else {
@@ -888,8 +897,13 @@ void* write_worker(void *arg) {
 				if (tcpnumtoconnect(fd,ip,port,(cnt%2)?(300*(1<<(cnt>>1))):(200*(1<<(cnt>>1))))<0) {
 					cnt++;
 					if (cnt>=10) {
-						write_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"writeworker: can't connect to (%s:%"PRIu16"): %s",csstrip,port,strerr(errno));
+						int err = errno;
+						zassert(pthread_mutex_lock(&(ind->lock)));
+						if (chd->trycnt >= minlogretry) {
+							write_prepare_ip(csstrip,ip);
+							syslog(LOG_WARNING,"writeworker: can't connect to (%s:%"PRIu16"): %s",csstrip,port,strerr(err));
+						}
+						zassert(pthread_mutex_unlock(&(ind->lock)));
 					}
 					close(fd);
 					fd=-1;
@@ -995,8 +1009,10 @@ void* write_worker(void *arg) {
 			} else {
 				lrdiff = now - lastrcvd;
 				if (lrdiff>=CHUNKSERVER_ACTIVITY_TIMEOUT) {
-					write_prepare_ip(csstrip,ip);
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: connection with (%s:%"PRIu16") was timed out (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,waitforstatus,chd->trycnt+1);
+					if (chd->trycnt >= minlogretry) {
+						write_prepare_ip(csstrip,ip);
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: connection with (%s:%"PRIu16") was timed out (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,waitforstatus,chd->trycnt+1);
+					}
 					zassert(pthread_mutex_unlock(&(ind->lock)));
 					break;
 				}
@@ -1137,8 +1153,10 @@ void* write_worker(void *arg) {
 
 			if (i<0) {
 				if (ERRNO_ERROR && errno!=EINTR) {
-					write_prepare_ip(csstrip,ip);
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: write to (%s:%"PRIu16") error: %s / NEGWRITE (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,strerr(errno),waitforstatus,chd->trycnt+1);
+					if (chd->trycnt >= minlogretry) {
+						write_prepare_ip(csstrip,ip);
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: write to (%s:%"PRIu16") error: %s / NEGWRITE (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,strerr(errno),waitforstatus,chd->trycnt+1);
+					}
 					status=EIO;
 					break;
 				}
@@ -1150,7 +1168,9 @@ void* write_worker(void *arg) {
 			pfd[1].revents = 0;
 			if (poll(pfd,2,100)<0) { /* correct timeout - in msec */
 				if (errno!=EINTR) {
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: poll error: %s (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,strerr(errno),waitforstatus,chd->trycnt+1);
+					if (chd->trycnt >= minlogretry) {
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: poll error: %s (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,strerr(errno),waitforstatus,chd->trycnt+1);
+					}
 					status=EIO;
 					break;
 				}
@@ -1162,33 +1182,43 @@ void* write_worker(void *arg) {
 			if (pfd[1].revents&POLLIN) {	// used just to break poll - so just read all data from pipe to empty it
 				i = read(chd->pipe[0],pipebuff,1024);
 				if (i<0) { // mainly to make happy static code analyzers
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: read pipe error: %s (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,strerr(errno),waitforstatus,chd->trycnt+1);
+					if (chd->trycnt >= minlogretry) {
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: read pipe error: %s (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,strerr(errno),waitforstatus,chd->trycnt+1);
+					}
 				}
 			}
 			if (pfd[0].revents&POLLHUP) {
-				write_prepare_ip(csstrip,ip);
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: connection with (%s:%"PRIu16") was reset by peer / POLLHUP (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,waitforstatus,chd->trycnt+1);
+				if (chd->trycnt >= minlogretry) {
+					write_prepare_ip(csstrip,ip);
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: connection with (%s:%"PRIu16") was reset by peer / POLLHUP (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,waitforstatus,chd->trycnt+1);
+				}
 				status=EIO;
 				break;
 			}
 			if (pfd[0].revents&POLLERR) {
-				write_prepare_ip(csstrip,ip);
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: connection with (%s:%"PRIu16") got error status / POLLERR (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,waitforstatus,chd->trycnt+1);
+				if (chd->trycnt >= minlogretry) {
+					write_prepare_ip(csstrip,ip);
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: connection with (%s:%"PRIu16") got error status / POLLERR (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,waitforstatus,chd->trycnt+1);
+				}
 				status=EIO;
 				break;
 			}
 			if (pfd[0].revents&POLLIN) {
 				i = read(fd,recvbuff+rcvd,21-rcvd);
 				if (i==0) { 	// connection reset by peer or read error
-					write_prepare_ip(csstrip,ip);
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: connection with (%s:%"PRIu16") was reset by peer / ZEROREAD (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,waitforstatus,chd->trycnt+1);
+					if (chd->trycnt >= minlogretry) {
+						write_prepare_ip(csstrip,ip);
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: connection with (%s:%"PRIu16") was reset by peer / ZEROREAD (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,waitforstatus,chd->trycnt+1);
+					}
 					status=EIO;
 					break;
 				}
 				if (i<0) {
 					if (errno!=EINTR) {
-						write_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: read from (%s:%"PRIu16") error: %s (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,strerr(errno),waitforstatus,chd->trycnt+1);
+						if (chd->trycnt >= minlogretry) {
+							write_prepare_ip(csstrip,ip);
+							syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: read from (%s:%"PRIu16") error: %s (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,csstrip,port,strerr(errno),waitforstatus,chd->trycnt+1);
+						}
 						status=EIO;
 						break;
 					} else {
@@ -1222,7 +1252,9 @@ void* write_worker(void *arg) {
 						break;
 					}
 					if (recstatus!=STATUS_OK) {
-						syslog(LOG_WARNING,"writeworker: write error: %s",mfsstrerr(recstatus));
+						if (chd->trycnt >= minlogretry) {
+							syslog(LOG_WARNING,"writeworker: write error: %s",mfsstrerr(recstatus));
+						}
 						wrstatus=recstatus;
 						break;
 					}
@@ -1363,13 +1395,14 @@ void* write_worker(void *arg) {
 	}
 }
 
-void write_data_init (uint32_t cachesize,uint32_t retries) {
+void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t logretry) {
 	uint32_t i;
 //	sigset_t oldset;
 //	sigset_t newset;
 
 	cacheblockcount = (cachesize/MFSBLOCKSIZE);
 	maxretries = retries;
+	minlogretry = logretry;
 	if (cacheblockcount<10) {
 		cacheblockcount=10;
 	}

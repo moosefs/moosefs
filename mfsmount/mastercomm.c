@@ -255,21 +255,6 @@ void fs_forget_entry(uint32_t inode) {
 	pthread_mutex_unlock(&aflock);
 }
 
-/*
-uint8_t fs_is_sustained_entry(uint32_t inode) {
-	acquired_file *afptr;
-	pthread_mutex_lock(&aflock);
-	for (afptr = afhead ; afptr!=NULL && afptr->inode<=inode ; afptr=afptr->next) {
-		if (afptr->inode == inode) {
-			pthread_mutex_unlock(&aflock);
-			return 1;
-		}
-	}
-	pthread_mutex_unlock(&aflock);
-	return 0;
-}
-*/
-
 void fs_inc_acnt(uint32_t inode) {
 	acquired_file *afptr,**afpptr;
 	pthread_mutex_lock(&aflock);

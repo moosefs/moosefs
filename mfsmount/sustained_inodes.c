@@ -33,7 +33,7 @@
 
 // #define RINODES_DEBUG 1
 
-#define RINODES_CHECK_INTERVAL_MS 30000
+#define RINODES_CHECK_INTERVAL_100MS 300
 
 #ifdef RINODES_DEBUG
 #include <stdio.h>
@@ -409,14 +409,14 @@ void* sinodes_scanthread(void *arg) {
 	syslog(LOG_NOTICE,"my st_dev: %"PRIu32,mydevid);
 	i = 0;
 	while (1) {
-		if (i>RINODES_CHECK_INTERVAL_MS) {
+		if (i>RINODES_CHECK_INTERVAL_100MS) {
 			sinodes_all_pids();
 			sinodes_end();
 			i=0;
 		} else {
 			i++;
 		}
-		portable_usleep(1000);
+		portable_usleep(100000);
 #ifdef HAVE___SYNC_FETCH_AND_OP
 		if (__sync_fetch_and_or(&term,0)==1) {
 			return NULL;

@@ -1647,17 +1647,15 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 							return;
 						}
 					} else {
-						if (eptr->version >= VERSION2INT(2,0,33)) { // if chunkserver version >= 2.0.33
-								p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,17);
-							} else {
-								p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,9);
-							}
+						uint8_t mode;
+						mode = (eptr->version >= VERSION2INT(2,0,33))?1:0;
+							p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,mode?17:9);
 							if (p) {
 								put8bit(&p,0);
 								put32bit(&p,VERSHEX);
 								put16bit(&p,eptr->timeout);
 								put16bit(&p,csdb_get_csid(eptr->csptr));
-								if (eptr->version >= VERSION2INT(2,0,33)) {
+								if (mode) {
 									put64bit(&p,meta_get_fileid());
 								}
 							} else {

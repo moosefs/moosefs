@@ -1,3 +1,25 @@
+moosefs (3.0.59-1) unstable; urgency=medium
+
+  * (all) fixed debug symbols
+  * (master+supervisor) added metaid check (pro version only)
+  * (master) added rejection of followers with incorrect meta version (pro
+    version only)
+  * (mount) change type of data stored in kernel from pointers to indexes (more
+    robust)
+  * (cli) fixed show exports in plain mode
+  * (master) added sending metaid after switching from ELECT to LEADER (pro
+    version only)
+  * (master) removed option '-e' from GPL edition (only makes sense in pro
+    version)
+  * (master+cs) added sending metaid to cs in ELECT state (pro version only)
+  * (master) improved metaid generation method
+  * (mount) added mfsoomdisable option (Linux only, turned on by default)
+  * (mount) added minimum retry counter to log messages in I/O modules
+  * (mount) reduced memory consumption by reducing thread stack sizes
+  * (mount) changed default malloc arena count to 2 (Linux only)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 06 Nov 2015 12:00:00 +0100
+
 moosefs (3.0.58-1) unstable; urgency=medium
 
   * (mount) added condition for requests in read data (request should begin
@@ -230,6 +252,8 @@ moosefs (3.0.30-1) unstable; urgency=medium
   * (master) added 'mfsrmsnapshot' (remove whole directory created as a result
     of mfsmakesnapshot)
   * (tools) fixed memory overrun error during mfssetgoal
+  * (all) improved reloading cfg files (commented out options should be treated
+    the same as options set to default values)
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 19 Jun 2015 13:00:00 +0200
 

@@ -1,4 +1,4 @@
-.TH mfshdd.cfg "5" "October 2015" "MooseFS 3.0.58-1" "This is part of MooseFS"
+.TH mfshdd.cfg "5" "November 2015" "MooseFS 3.0.59-1" "This is part of MooseFS"
 .SH NAME
 mfshdd.cfg \- list of MooseFS storage directories for \fBmfschunkserver\fP
 .SH DESCRIPTION
@@ -8,12 +8,22 @@ used for MooseFS storage.
 .PP
 Syntax is:
 .TP
-[\fI*\fP]\fIPATH\fP [\fISPACE LIMIT\fP]
+[\fB*\fP|\fB<\fP|\fB>\fP|\fB~\fP]\fIPATH\fP [\fISPACE LIMIT\fP]
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
 .PP
-\fI*\fP means this directory (hard drive) is "marked for removal" 
-and all data will be replicated to other hard drives, usually on other chunkservers.
+Path can be prefixed with one or more special characters. These characters work as additional options.
+.RS
+.IP \fB*\fP
+means this directory (hard drive) is "marked for removal" 
+and all data will be replicated to other hard drives, usually on other chunkservers
+.IP \fB<\fP
+means that all data from this hard drive should be moved to other hard drives
+.IP \fB>\fP
+means that all data from other hard drives should be moved to this hard drive
+.IP \fB~\fP
+means that significant (more than 10% in less than minute) change of total blocks count will not mark this drive as damaged (usefull for compressed filesystems)
+.RE
 .PP
 \fIPATH\fP is path to the mounting point of storage directory, usually a single hard drive.
 .PP
@@ -21,7 +31,6 @@ and all data will be replicated to other hard drives, usually on other chunkserv
 how much space should be left unused on this device or how much space is to be used on this device.
 Definition format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B?, positive value means 
 how much space to use, negative value means how much space should be left unused.
-
 .SH COPYRIGHT
 Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 

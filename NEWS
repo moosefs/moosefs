@@ -1,5 +1,21 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.59-1 (2015-11-06)
+
+  - (all) fixed debug symbols
+  - (master+supervisor) added metaid check (pro version only)
+  - (master) added rejection of followers with incorrect meta version (pro version only)
+  - (mount) change type of data stored in kernel from pointers to indexes (more robust)
+  - (cli) fixed show exports in plain mode
+  - (master) added sending metaid after switching from ELECT to LEADER (pro version only)
+  - (master) removed option '-e' from GPL edition (only makes sense in pro version)
+  - (master+cs) added sending metaid to cs in ELECT state (pro version only)
+  - (master) improved metaid generation method
+  - (mount) added mfsoomdisable option (Linux only, turned on by default)
+  - (mount) added minimum retry counter to log messages in I/O modules
+  - (mount) reduced memory consumption by reducing thread stack sizes
+  - (mount) changed default malloc arena count to 2 (Linux only)
+
 * MooseFS 3.0.58-1 (2015-10-30)
 
   - (mount) added condition for requests in read data (request should begin before EOF)
@@ -143,6 +159,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added 'empty' chunk count to mfscheckfile (fixed mfsfileinfo on sparse files)
   - (master) added 'mfsrmsnapshot' (remove whole directory created as a result of mfsmakesnapshot)
   - (tools) fixed memory overrun error during mfssetgoal
+  - (all) improved reloading cfg files (commented out options should be treated the same as options set to default values)
 
 * MooseFS 3.0.29-1 (2015-06-18)
 

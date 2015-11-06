@@ -205,7 +205,7 @@ void* sstats_thread(void *arg) {
 			}
 		}
 		zassert(pthread_mutex_unlock(locktab+hash));
-		portable_usleep(2000);
+		portable_usleep(100000);
 #ifdef HAVE___SYNC_FETCH_AND_OP
 		if (__sync_fetch_and_or(&term,0)==1) {
 			return NULL;

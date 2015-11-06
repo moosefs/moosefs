@@ -214,6 +214,7 @@ typedef struct folder {
 #define REBALANCE_SRC 1
 #define REBALANCE_DST 2
 	unsigned int tmpbalancemode:2;
+	unsigned int ignoresize:1;
 	uint8_t scanprogress;
 	uint64_t sizelimit;
 	uint64_t leavefree;
@@ -1234,7 +1235,7 @@ static inline void hdd_refresh_usage(folder *f) {
 	if (f->lastblocks==0) {
 		f->lastblocks = fsinfo.f_blocks;
 		f->isro = isro;
-	} else if (f->lastblocks * 9 > fsinfo.f_blocks * 10 || f->lastblocks * 10 < fsinfo.f_blocks * 9) {
+	} else if (f->ignoresize==0 && (f->lastblocks * 9 > fsinfo.f_blocks * 10 || f->lastblocks * 10 < fsinfo.f_blocks * 9)) {
 		syslog(LOG_NOTICE,"disk: %s ; number of total blocks has been changed significantly (%llu -> %llu) - mark it as damaged",f->path,(unsigned long long int)(f->lastblocks),(unsigned long long int)(fsinfo.f_blocks));
 		f->damaged = 1;
 		return;
@@ -5393,7 +5394,7 @@ int hdd_size_parse(const char *str,uint64_t *ret) {
 
 int hdd_parseline(char *hddcfgline) {
 	uint32_t l,p;
-	int lfd,td,im,bm;
+	int lfd,td,bm,is;
 	int mfd;
 	char *pptr;
 	char *lockfname;
@@ -5454,14 +5455,14 @@ int hdd_parseline(char *hddcfgline) {
 		hddcfgline[l]='\0';
 	}
 	td = 0;
-	im = 0;
 	bm = REBALANCE_STD;
+	is = 0;
 	pptr = hddcfgline;
 	while (1) {
 		if (*pptr == '*') {
 			td = 1;
-		} else if (*pptr == '!') {
-			im = 1;
+		} else if (*pptr == '~') {
+			is = 1;
 		} else if (*pptr == '>') {
 			bm = REBALANCE_FORCE_DST;
 		} else if (*pptr == '<') {
@@ -5542,23 +5543,13 @@ int hdd_parseline(char *hddcfgline) {
 			filemetaid = get64bit(&rptr);
 			if (filemetaid!=metaid) {
 				if (metaid>0) {
-					if (im==0) {
-						mfs_arg_syslog(LOG_ERR,"hdd space manager: wrong meta id in file '%s' (0x%016"PRIX64",expected:0x%016"PRIX64") - shouldn't use this drive - use '!' in drive definition to ignore this (dangerous)",metaidfname,filemetaid,metaid);
-					} else {
-						mfs_arg_syslog(LOG_ERR,"hdd space manager: wrong meta id in file '%s' (0x%016"PRIX64",expected:0x%016"PRIX64") - forced to use this drive",metaidfname,filemetaid,metaid);
-					}
+					mfs_arg_syslog(LOG_ERR,"hdd space manager: wrong meta id (mfs instance id) in file '%s' (0x%016"PRIX64",expected:0x%016"PRIX64") - likely this is drive from different mfs instance (drive ignored, remove this file to skip this test)",metaidfname,filemetaid,metaid);
 				} else {
-					if (im==0) {
-						mfs_arg_syslog(LOG_ERR,"hdd space manager: chunkserver without meta id shouldn't use drive with defined meta id (file: '%s') - use '!' in drive definition to ignore this (dangerous)",metaidfname);
-					} else {
-						mfs_arg_syslog(LOG_ERR,"hdd space manager: chunkserver without meta id shouldn't use drive with defined meta id (file: '%s') - forced to ignore",metaidfname);
-					}
+					mfs_arg_syslog(LOG_ERR,"hdd space manager: chunkserver without meta id (mfs instance id) shouldn't use drive with defined meta id (file: '%s') - likely this is drive from different mfs instance (drive ignored, remove this file to skip this test)",metaidfname);
 				}
 				close(mfd);
 				free(metaidfname);
-				if (im==0) {
-					return -1;
-				}
+				return -1;
 			}
 			metaid = 0; // file exists and is correct (or forced do be ignored), so do not re create it
 		}
@@ -5614,7 +5605,7 @@ int hdd_parseline(char *hddcfgline) {
 			zassert(pthread_mutex_unlock(&folderlock));
 		}
 	}
-	if (im==0 && metaid>0) {
+	if (metaid>0) {
 		metaidfname = (char*)malloc(l+8);
 		passert(metaidfname);
 		memcpy(metaidfname,pptr,l);
@@ -5687,6 +5678,7 @@ int hdd_parseline(char *hddcfgline) {
 			}
 			f->todel = td;
 			f->balancemode = bm;
+			f->ignoresize = is;
 			zassert(pthread_mutex_unlock(&folderlock));
 			if (lfd>=0) {
 				close(lfd);
@@ -5698,6 +5690,7 @@ int hdd_parseline(char *hddcfgline) {
 	passert(f);
 	f->todel = td;
 	f->balancemode = bm;
+	f->ignoresize = is;
 	f->damaged = 0;
 	f->scanstate = SCST_SCANNEEDED;
 	f->scanprogress = 0;

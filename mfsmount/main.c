@@ -33,6 +33,10 @@
 #  define MFS_USE_MALLOPT 1
 #endif
 
+#if defined(__linux__)
+#include <linux/oom.h>
+#endif
+
 #include <fuse.h>
 #include <fuse_opt.h>
 #include <fuse_lowlevel.h>
@@ -165,6 +169,9 @@ struct mfsopts {
 #ifdef MFS_USE_MALLOPT
 	int limitarenas;
 #endif
+#if defined(__linux__) && defined(OOM_DISABLE)
+	int oomdisable;
+#endif
 	int nostdmountoptions;
 	int meta;
 	int debug;
@@ -186,6 +193,7 @@ struct mfsopts {
 	unsigned readaheadleng;
 	unsigned readaheadtrigger;
 	unsigned ioretries;
+	unsigned logretry;
 	double attrcacheto;
 	double xattrcacheto;
 	double entrycacheto;
@@ -240,11 +248,15 @@ static struct fuse_opt mfs_opts_stage2[] = {
 #ifdef MFS_USE_MALLOPT
 	MFS_OPT("mfslimitarenas=%u", limitarenas, 0),
 #endif
+#if defined(__linux__) && defined(OOM_DISABLE)
+	MFS_OPT("mfsoomdisable=%u", oomdisable, 0),
+#endif
 	MFS_OPT("mfswritecachesize=%u", writecachesize, 0),
 	MFS_OPT("mfsreadaheadsize=%u", readaheadsize, 0),
 	MFS_OPT("mfsreadaheadleng=%u", readaheadleng, 0),
 	MFS_OPT("mfsreadaheadtrigger=%u", readaheadtrigger, 0),
 	MFS_OPT("mfsioretries=%u", ioretries, 0),
+	MFS_OPT("mfslogretry=%u", logretry, 0),
 	MFS_OPT("mfsdebug", debug, 1),
 	MFS_OPT("mfsmeta", meta, 1),
 	MFS_OPT("mfsdelayedinit", delayedinit, 1),
@@ -337,7 +349,10 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfsmemlock               try to lock memory\n");
 #endif
 #ifdef MFS_USE_MALLOPT
-	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 8)\n");
+	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 2)\n");
+#endif
+#if defined(__linux__) && defined(OOM_DISABLE)
+	fprintf(stderr,"    -o mfsoomdisable=N          disable out of memory killer (default: 1)\n");
 #endif
 	fprintf(stderr,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)\n");
 	fprintf(stderr,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
@@ -345,6 +360,7 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n");
 	fprintf(stderr,"    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n");
 	fprintf(stderr,"    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n");
+	fprintf(stderr,"    -o mfslogretry=N            define minimal retry counter on which system will start log I/O messages (default: 5)\n");
 	fprintf(stderr,"    -o mfsmaster=HOST           define mfsmaster location (default: " DEFAULT_MASTERNAME ")\n");
 	fprintf(stderr,"    -o mfsport=PORT             define mfsmaster port number (default: " DEFAULT_MASTER_CLIENT_PORT ")\n");
 	fprintf(stderr,"    -o mfsbind=IP               define source ip address for connections (default: NOT DEFINED - chosen automatically by OS)\n");
@@ -594,11 +610,11 @@ int main_minthread_create(pthread_t *th,uint8_t detached,void *(*fn)(void *),voi
 		zassert(pthread_attr_init(thattr));
 #ifdef PTHREAD_STACK_MIN
 		mystacksize = PTHREAD_STACK_MIN;
-		if (mystacksize < 0x100000) {
-			mystacksize = 0x100000;
+		if (mystacksize < 0x20000) {
+			mystacksize = 0x20000;
 		}
 #else
-		mystacksize = 0x100000;
+		mystacksize = 0x20000;
 #endif
 		zassert(pthread_attr_setstacksize(thattr,mystacksize));
 		thattr_detached = detached + 1; // make it different
@@ -763,6 +779,20 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	}
 #endif /* glibc malloc tuning */
 
+#if defined(__linux__) && defined(OOM_DISABLE)
+	if (mfsopts.oomdisable) {
+		FILE *fd;
+		fd = fopen("/proc/self/oom_adj","w");
+		if (fd!=NULL) {
+			fprintf(fd,"%u\n",OOM_DISABLE);
+			fclose(fd);
+			syslog(LOG_NOTICE,"out of memory killer disabled");
+		} else {
+			syslog(LOG_NOTICE,"can't disable out of memory killer");
+		}
+	}
+#endif
+
 	syslog(LOG_NOTICE,"monotonic clock function: %s",monotonic_method());
 	syslog(LOG_NOTICE,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
 
@@ -787,8 +817,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	if (mfsopts.meta==0) {
 		csdb_init();
 		delay_init();
-		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries);
-		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries);
+		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries,mfsopts.logretry);
+		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries,mfsopts.logretry);
 	}
 
  	ch = fuse_mount(mp, args);
@@ -909,6 +939,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	fuse_session_destroy(se);
 	fuse_unmount(mp,ch);
 	if (mfsopts.meta==0) {
+		mfs_term();
 		write_data_term();
 		read_data_term();
 		delay_term();
@@ -1083,6 +1114,8 @@ int main(int argc, char *argv[]) {
 	strerr_init();
 	mycrc32_init();
 
+	setenv("FUSE_THREAD_STACK","524288",0); // works good with 262144 but not 131072, so for safety we will use 524288
+
 	mfsopts.masterhost = NULL;
 	mfsopts.masterport = NULL;
 	mfsopts.bindhost = NULL;
@@ -1097,7 +1130,10 @@ int main(int argc, char *argv[]) {
 	mfsopts.memlock = 0;
 #endif
 #ifdef MFS_USE_MALLOPT
-	mfsopts.limitarenas = 8;
+	mfsopts.limitarenas = 2;
+#endif
+#if defined(__linux__) && defined(OOM_DISABLE)
+	mfsopts.oomdisable = 1;
 #endif
 	mfsopts.nostdmountoptions = 0;
 	mfsopts.meta = 0;
@@ -1121,6 +1157,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.readaheadleng = 0;
 	mfsopts.readaheadtrigger = 0;
 	mfsopts.ioretries = 30;
+	mfsopts.logretry = 5;
 	mfsopts.passwordask = 0;
 	mfsopts.attrcacheto = 1.0;
 	mfsopts.xattrcacheto = 30.0;

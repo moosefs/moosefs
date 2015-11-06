@@ -3985,6 +3985,7 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr,const uint8_t *data,uint32_t 
 			if (fgtab[i]) {
 				if (labelset_is_simple_goal(i)) {
 					put8bit(&ptr,i);
+					put32bit(&ptr,fgtab[i]);
 				} else if (eptr->version>=VERSION2INT(3,0,9)) {
 					put8bit(&ptr,0);
 					put8bit(&ptr,labelset_get_create_mode(i));
@@ -4010,14 +4011,15 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr,const uint8_t *data,uint32_t 
 							put32bit(&ptr,arch_labelmasks[j][k]);
 						}
 					}
+					put32bit(&ptr,fgtab[i]);
 				}
-				put32bit(&ptr,fgtab[i]);
 			}
 		}
 		for (i=1 ; i<MAXLABELSETS ; i++) {
 			if (dgtab[i]) {
 				if (labelset_is_simple_goal(i)) {
 					put8bit(&ptr,i);
+					put32bit(&ptr,dgtab[i]);
 				} else if (eptr->version>=VERSION2INT(3,0,9)) {
 					put8bit(&ptr,0);
 					put8bit(&ptr,labelset_get_create_mode(i));
@@ -4043,8 +4045,8 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr,const uint8_t *data,uint32_t 
 							put32bit(&ptr,arch_labelmasks[j][k]);
 						}
 					}
+					put32bit(&ptr,dgtab[i]);
 				}
-				put32bit(&ptr,dgtab[i]);
 			}
 		}
 	}

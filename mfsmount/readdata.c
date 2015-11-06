@@ -191,6 +191,7 @@ static uint32_t readahead;
 static uint32_t readahead_trigger;
 
 static uint32_t maxretries;
+static uint32_t minlogretry;
 static uint64_t maxreadaheadsize;
 
 static uint64_t reqbufftotalsize;
@@ -584,20 +585,26 @@ void* read_worker(void *arg) {
 		zassert(pthread_mutex_unlock(&(ind->lock)));
 
 		if (rdstatus!=STATUS_OK) {
-			syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
 			if (rdstatus==ERROR_ENOENT) {
+				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
 				read_job_end(rreq,EBADF,0);
 			} else if (rdstatus==ERROR_QUOTA) {
+				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
 				read_job_end(rreq,EDQUOT,0);
 			} else if (rdstatus==ERROR_NOSPACE) {
+				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
 				read_job_end(rreq,ENOSPC,0);
 			} else if (rdstatus==ERROR_CHUNKLOST) {
+				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
 				read_job_end(rreq,ENXIO,0);
 			} else {
 				zassert(pthread_mutex_lock(&(ind->lock)));
+				if (ind->trycnt >= minlogretry) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
+				}
 				ind->trycnt++;
 				trycnt = ind->trycnt;
-				if (trycnt>=maxretries) {
+				if (trycnt >= maxretries) {
 					zassert(pthread_mutex_unlock(&(ind->lock)));
 					if (rdstatus==ERROR_NOCHUNKSERVERS) {
 						read_job_end(rreq,ENOSPC,0);
@@ -670,8 +677,10 @@ void* read_worker(void *arg) {
 		}
 #endif
 		if (/*csdata==NULL || csdatasize==0 || */chainelements==0) {
-			syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies",inode,chindx,chunkid,version);
 			zassert(pthread_mutex_lock(&(ind->lock)));
+			if (ind->trycnt >= minlogretry) {
+				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies",inode,chindx,chunkid,version);
+			}
 			ind->trycnt+=6;
 			if (ind->trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -716,8 +725,10 @@ void* read_worker(void *arg) {
 //			ind->lastip = ip;
 //			ind->lastport = port;
 		} else {
-			syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies (bad ip and/or port)",inode,chindx,chunkid,version);
 			zassert(pthread_mutex_lock(&(ind->lock)));
+			if (ind->trycnt >= minlogretry) {
+				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies (bad ip and/or port)",inode,chindx,chunkid,version);
+			}
 			ind->trycnt+=6;
 			if (ind->trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -757,8 +768,12 @@ void* read_worker(void *arg) {
 					cnt++;
 					if (cnt>=10) {
 						int err = errno;
-						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"readworker: can't connect to (%s:%"PRIu16"): %s",csstrip,port,strerr(err));
+						zassert(pthread_mutex_lock(&(ind->lock)));
+						if (ind->trycnt >= minlogretry) {
+							read_prepare_ip(csstrip,ip);
+							syslog(LOG_WARNING,"readworker: can't connect to (%s:%"PRIu16"): %s",csstrip,port,strerr(err));
+						}
+						zassert(pthread_mutex_unlock(&(ind->lock)));
 					}
 					close(fd);
 					fd=-1;
@@ -856,8 +871,10 @@ void* read_worker(void *arg) {
 			} else {
 				lrdiff = now - lastrcvd;
 				if (lrdiff>=CHUNKSERVER_ACTIVITY_TIMEOUT) {
-					read_prepare_ip(csstrip,ip);
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was timed out (lastrcvd:%.6lf,now:%.6lf,lrdiff:%.6lf received: %"PRIu32"/%"PRIu32", try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,lastrcvd,now,lrdiff,currentpos,(rreq?rreq->rleng:0),trycnt+1);
+					if (trycnt >= minlogretry) {
+						read_prepare_ip(csstrip,ip);
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was timed out (lastrcvd:%.6lf,now:%.6lf,lrdiff:%.6lf received: %"PRIu32"/%"PRIu32", try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,lastrcvd,now,lrdiff,currentpos,(rreq?rreq->rleng:0),trycnt+1);
+					}
 					if (rreq) {
 						status = EIO;
 					}
@@ -928,10 +945,12 @@ void* read_worker(void *arg) {
 				i = write(fd,sendbuff+sent,tosend-sent);
 				if (i<0) { // error
 					if (ERRNO_ERROR && errno!=EINTR) {
-						int err = errno;
-						read_prepare_ip(csstrip,ip);
+						if (trycnt >= minlogretry) {
+							int err = errno;
+							read_prepare_ip(csstrip,ip);
+							syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: write to (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
+						}
 						status = EIO;
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: write to (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
 						zassert(pthread_mutex_lock(&(ind->lock)));
 						rreq->waitingworker=0;
 						zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -956,7 +975,9 @@ void* read_worker(void *arg) {
 			pfd[1].revents = 0;
 			if (poll(pfd,2,100)<0) {
 				if (errno!=EINTR) {
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: poll error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,strerr(errno),currentpos,rleng,trycnt+1);
+					if (trycnt >= minlogretry) {
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: poll error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,strerr(errno),currentpos,rleng,trycnt+1);
+					}
 					status = EIO;
 					break;
 				}
@@ -972,7 +993,9 @@ void* read_worker(void *arg) {
 #endif
 				i = read(rreq->pipe[0],pipebuff,1024);
 				if (i<0) { // mainly to make happy static code analyzers
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: read pipe error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,strerr(errno),currentpos,rleng,trycnt+1);
+					if (trycnt >= minlogretry) {
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: read pipe error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,strerr(errno),currentpos,rleng,trycnt+1);
+					}
 				}
 			}
 			if (mode!=BUSY) {
@@ -992,14 +1015,18 @@ void* read_worker(void *arg) {
 				break;
 			}
 			if (pfd[0].revents&POLLHUP) {
-				read_prepare_ip(csstrip,ip);
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was reset by peer / POLLHUP (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+				if (trycnt >= minlogretry) {
+					read_prepare_ip(csstrip,ip);
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was reset by peer / POLLHUP (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+				}
 				status = EIO;
 				break;
 			}
 			if (pfd[0].revents&POLLERR) {
-				read_prepare_ip(csstrip,ip);
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") got error status / POLLERR (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+				if (trycnt >= minlogretry) {
+					read_prepare_ip(csstrip,ip);
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") got error status / POLLERR (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+				}
 				status = EIO;
 				break;
 			}
@@ -1008,15 +1035,19 @@ void* read_worker(void *arg) {
 				if (received < 8) {
 					i = read(fd,recvbuff+received,8-received);
 					if (i==0) {
-						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was reset by peer / ZEROREAD (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+						if (trycnt >= minlogretry) {
+							read_prepare_ip(csstrip,ip);
+							syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was reset by peer / ZEROREAD (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+						}
 						status = EIO;
 						break;
 					}
 					if (i<0 && ERRNO_ERROR) {
-						int err = errno;
-						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: read from (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
+						if (trycnt >= minlogretry) {
+							int err = errno;
+							read_prepare_ip(csstrip,ip);
+							syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: read from (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
+						}
 						status = EIO;
 						break;
 					}
@@ -1092,15 +1123,19 @@ void* read_worker(void *arg) {
 						}
 					}
 					if (i==0) {
-						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was reset by peer (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+						if (trycnt >= minlogretry) {
+							read_prepare_ip(csstrip,ip);
+							syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was reset by peer (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,currentpos,rleng,trycnt+1);
+						}
 						status = EIO;
 						break;
 					}
 					if (i<0 && ERRNO_ERROR) {
-						int err = errno;
-						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
+						if (trycnt >= minlogretry) {
+							int err = errno;
+							read_prepare_ip(csstrip,ip);
+							syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,strerr(err),currentpos,rleng,trycnt+1);
+						}
 						status = EIO;
 						break;
 					}
@@ -1133,7 +1168,9 @@ void* read_worker(void *arg) {
 								break;
 							}
 							if (recstatus!=STATUS_OK) {
-								syslog(LOG_WARNING,"readworker: read error: %s",mfsstrerr(recstatus));
+								if (trycnt >= minlogretry) {
+									syslog(LOG_WARNING,"readworker: read error: %s",mfsstrerr(recstatus));
+								}
 								status = EIO;
 								currentpos = 0; // start again from beginning
 								break;
@@ -1225,12 +1262,13 @@ void read_data_ranges_free(void* ptr) {
 }
 
 /* API | glock: INITIALIZED,UNLOCKED */
-void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries) {
+void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t logretry) {
         uint32_t i;
 //	sigset_t oldset;
 //	sigset_t newset;
 
 	maxretries = retries;
+	minlogretry = logretry;
 	readahead = readaheadleng;
 	readahead_trigger = readaheadtrigger;
 	maxreadaheadsize = readaheadsize;

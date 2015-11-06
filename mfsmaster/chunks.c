@@ -237,7 +237,8 @@ static uint32_t opsinprogress = 0;
 static uint16_t csregisterinprogress = 0;
 static uint8_t csreceivingchunks = 0;
 
-#define DANGER_PRIORITIES 6
+#define DANGER_PRIORITIES 7
+#define REPLICATION_DANGER_PRIORITIES 6
 
 static chunk** chunks_priority_queue[DANGER_PRIORITIES];
 static uint32_t chunks_priority_leng[DANGER_PRIORITIES];
@@ -828,8 +829,10 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 			j = 3;
 		} else if (vc < goal) { // next priority - standard undergoal chunks
 			j = 4;
-		} else { // latest priority - changed labels or overgoal
+		} else if (wronglabels) { // next priority - changed labels
 			j = 5;
+		} else { // lowest priority - overgoal
+			j = 6;
 		}
 		chunk_priority_enqueue(j,c);
 	}
@@ -3102,7 +3105,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							dc++;
 						} else {
 							prevdone=0;
-							chunk_priority_enqueue(5,c); // in such case only enqueue this chunk for future processing
+							chunk_priority_enqueue(6,c); // in such case only enqueue this chunk for future processing
 						}
 					}
 				}
@@ -3127,7 +3130,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						dc++;
 					} else {
 						prevdone=0;
-						chunk_priority_enqueue(5,c); // in such case only enqueue this chunk for future processing
+						chunk_priority_enqueue(6,c); // in such case only enqueue this chunk for future processing
 					}
 				}
 			}
@@ -3427,15 +3430,22 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	}
 
 	if (fullservers==0) {
+		uint8_t queues_empty;
+		queues_empty = 1;
 		for (i=0 ; i<DANGER_PRIORITIES ; i++) {
-			if (chunks_priority_leng[i]>0) { // we have pending undergaal chunks, so ignore chunkserver rebalance
-				return;
+			if (chunks_priority_leng[i]>0) {
+				if (i<REPLICATION_DANGER_PRIORITIES) {
+					return; // we have pending undergaal/wronglabeled chunks, so ignore chunkserver rebalance
+				} else {
+					queues_empty = 0;
+				}
 			}
 		}
-
-		if (c->ondangerlist) {
-			syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32": fixing 'ondangerlist' flag",c->chunkid,c->version);
-			c->ondangerlist = 0;
+		if (queues_empty) {
+			if (c->ondangerlist) {
+				syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32": fixing 'ondangerlist' flag",c->chunkid,c->version);
+				c->ondangerlist = 0;
+			}
 		}
 	}
 

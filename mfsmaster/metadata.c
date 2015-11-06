@@ -74,7 +74,6 @@ static uint64_t metafileid;
 
 static uint8_t ignoreflag = 0;
 static uint8_t allowautorestore = 0;
-static uint8_t emptystart = 0;
 static uint8_t verboselevel = 0;
 
 static uint32_t lastsuccessfulstore = 0;
@@ -273,7 +272,7 @@ int meta_load(bio *fd,uint8_t fver) {
 		sessions_set_nextsessionid(nextsessionid);
 		metafileid = main_time();
 		metafileid <<= 32;
-		metafileid |= rndu32();
+		metafileid |= rndu32() + monotonic_useconds();
 	} else {
 		metaversion = get64bit(&ptr);
 		metafileid = get64bit(&ptr);
@@ -647,7 +646,7 @@ int meta_storeall(int bg) {
 		fd = bio_file_open("metadata.mfs.back.tmp",BIO_WRITE,META_FILE_BUFFER_SIZE);
 //		fd = fopen("metadata.mfs.back.tmp","w");
 		if (fd==NULL) {
-			syslog(LOG_ERR,"can't open metadata file");
+			mfs_errlog(LOG_ERR,"metadata store child - open error");
 			// try to save in alternative location - just in case
 			estat = meta_emergency_saves();
 			if (i==0) { // background
@@ -950,9 +949,6 @@ int meta_loadall(void) {
 	struct stat st;
 	int i;
 
-	if (emptystart) {
-		return 0;
-	}
 	if (allowautorestore) {
 		// find best metadata file
 		bestver = 0;
@@ -1250,10 +1246,6 @@ void meta_allowautorestore(void) {
 	allowautorestore = 1;
 }
 
-void meta_emptystart(void) {
-	emptystart = 1;
-}
-
 void meta_incverboselevel(void) {
 	verboselevel++;
 }
@@ -1312,15 +1304,11 @@ int meta_init(void) {
 		mfs_syslog(LOG_ERR,"open-files init error");
 		return -1;
 	}
-	if (emptystart==0) {
-		fprintf(stderr,"loading metadata ...\n");
+	fprintf(stderr,"loading metadata ...\n");
 		if (meta_loadall()<0) {
 			return -1;
 		}
 		fprintf(stderr,"metadata file has been loaded\n");
-	} else {
-		fprintf(stderr,"starting without metadata\n");
-	}
 	meta_reload();
 	main_reload_register(meta_reload);
 	main_time_register(3600,0,meta_dostoreall);

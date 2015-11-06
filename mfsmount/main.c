@@ -65,7 +65,8 @@
 #include "mastercomm.h"
 #include "masterproxy.h"
 #include "chunkloccache.h"
-#include "invalidator.h"
+#include "sustained_inodes.h"
+#include "sustained_stats.h"
 #include "symlinkcache.h"
 #include "negentrycache.h"
 //#include "dircache.h"
@@ -112,7 +113,6 @@ static struct fuse_lowlevel_ops mfs_oper = {
 	.init           = mfs_fsinit,
 	.statfs         = mfs_statfs,
 	.lookup         = mfs_lookup,
-	.forget         = mfs_forget,
 	.getattr        = mfs_getattr,
 	.setattr        = mfs_setattr,
 	.mknod          = mfs_mknod,
@@ -138,9 +138,6 @@ static struct fuse_lowlevel_ops mfs_oper = {
 	.setxattr       = mfs_setxattr,
 	.listxattr      = mfs_listxattr,
 	.removexattr    = mfs_removexattr,
-#if FUSE_VERSION >= 29
-	.forget_multi   = mfs_forget_multi,
-#endif
 };
 
 struct mfsopts {
@@ -505,9 +502,6 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	int *piped = (int*)userdata;
 	char s;
-	if (conn->proto_major==7 && conn->proto_minor>=12 && conn->proto_minor<=22) {
-		invalidator_on();
-	}
 	conn->max_write = 131072;
 	conn->max_readahead = 131072;
 #if defined(FUSE_CAP_BIG_WRITES) || defined(FUSE_CAP_DONT_MASK)
@@ -846,7 +840,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		}
 	}
 
-	invalidator_init(ch);
+	sinodes_init(mp);
+	sstats_init();
 
 	if (mt) {
 		err = fuse_session_loop_mt(se);
@@ -862,7 +857,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		}
 	}
 
-	invalidator_term();
+	sstats_term();
+	sinodes_term();
 
 	fuse_remove_signal_handlers(se);
 	fuse_session_remove_chan(ch);

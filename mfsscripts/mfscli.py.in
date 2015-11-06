@@ -4574,6 +4574,8 @@ if "EX" in sectionset:
 						dline.extend(("-","-"))
 					if mintrashtime!=None and maxtrashtime!=None:
 						dline.extend((mintrashtime,maxtrashtime))
+					else:
+						dline.extend(("-","-"))
 				tab.append(*dline)
 		if cgimode:
 			out.append("""</table>""")

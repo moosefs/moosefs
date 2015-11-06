@@ -40,7 +40,7 @@
 #define STR(x) STR_AUX(x)
 const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 
-#define MODULE_OPTIONS_GETOPT "iaxe"
+#define MODULE_OPTIONS_GETOPT "iax"
 #define MODULE_OPTIONS_SWITCH \
 	case 'i': \
 		meta_setignoreflag(); \
@@ -48,14 +48,11 @@ const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 	case 'a': \
 		meta_allowautorestore(); \
 		break; \
-	case 'e': \
-		meta_emptystart(); \
-		break; \
 	case 'x': \
 		meta_incverboselevel(); \
 		break;
-#define MODULE_OPTIONS_SYNOPIS "[-i] [-a] [-e] [-x [-x]] "
-#define MODULE_OPTIONS_DESC "-i : ignore some metadata structure errors (attach orphans to root, ignore names without inode, etc.)\n-a : automatically restore metadata from change logs\n-e : start without metadata (download all from leader)\n-x : produce more verbose output\n-xx : even more verbose output\n"
+#define MODULE_OPTIONS_SYNOPIS "[-i] [-a] [-x [-x]] "
+#define MODULE_OPTIONS_DESC "-i : ignore some metadata structure errors (attach orphans to root, ignore names without inode, etc.)\n-a : automatically restore metadata from change logs\n-x : produce more verbose output\n-xx : even more verbose output\n"
 
 /* Run Tab */
 typedef int (*runfn)(void);

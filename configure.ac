@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [2.0.81], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [2.0.82], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -43,7 +43,7 @@ if test "$GCC" = "yes"; then
 	if test "$enable_addresssanitizer" = "yes" -o "$enable_gperftools" = "yes" -o "$enable_debug" = "yes" ; then
 		CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG  -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
 	else
-		CFLAGS="-O2 $CFLAGS -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
+		CFLAGS="-O2 $CFLAGS -g -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
 	fi
 	if test "$enable_addresssanitizer" = "yes"; then
 		CFLAGS="$CFLAGS -fsanitize=address"

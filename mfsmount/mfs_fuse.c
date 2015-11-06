@@ -53,12 +53,12 @@
 #include "strerr.h"
 #include "MFSCommunication.h"
 
+#include "sustained_stats.h"
 #include "dirattrcache.h"
 #include "symlinkcache.h"
 #include "negentrycache.h"
 #include "xattrcache.h"
 // #include "dircache.h"
-#include "invalidator.h"
 
 #if MFS_ROOT_ID != FUSE_ROOT_ID
 #error FUSE_ROOT_ID is not equal to MFS_ROOT_ID
@@ -486,6 +486,57 @@ static inline uint8_t mfs_attr_get_mattr(const uint8_t attr[35]) {
 	}
 }
 
+static void mfs_attr_modify(uint32_t to_set,uint8_t attr[35],struct stat *stbuf) {
+	uint8_t mattr;
+	uint16_t attrmode;
+	uint8_t attrtype;
+	uint32_t attruid,attrgid,attratime,attrmtime,attrctime;
+	const uint8_t *ptr;
+	uint8_t *wptr;
+	ptr = attr;
+	if (attr[0]<64) { // 1.7.29 and up
+		mattr = get8bit(&ptr);
+		attrmode = get16bit(&ptr);
+		attrtype = (attrmode>>12);
+	} else {
+		attrtype = get8bit(&ptr);
+		attrtype = fsnodes_type_convert(attrtype&0x7F);
+		attrmode = get16bit(&ptr);
+		mattr = attrmode >> 12;
+	}
+	attrmode &= 0x0FFF;
+	attruid = get32bit(&ptr);
+	attrgid = get32bit(&ptr);
+	attratime = get32bit(&ptr);
+	attrmtime = get32bit(&ptr);
+	attrctime = get32bit(&ptr);
+	if (to_set & FUSE_SET_ATTR_MODE) {
+		attrmode = stbuf->st_mode & 07777;
+	}
+	if (to_set & FUSE_SET_ATTR_UID) {
+		attruid = stbuf->st_uid;
+	}
+	if (to_set & FUSE_SET_ATTR_GID) {
+		attrgid = stbuf->st_gid;
+	}
+	if (to_set & FUSE_SET_ATTR_ATIME) {
+		attratime = stbuf->st_atime;
+	}
+	if (to_set & FUSE_SET_ATTR_MTIME) {
+		attratime = stbuf->st_mtime;
+	}
+	attrctime = time(NULL);
+	wptr = attr;
+	put8bit(&wptr,mattr);
+	attrmode |= ((uint16_t)attrtype)<<12;
+	put16bit(&wptr,attrmode);
+	put32bit(&wptr,attruid);
+	put32bit(&wptr,attrgid);
+	put32bit(&wptr,attratime);
+	put32bit(&wptr,attrmtime);
+	put32bit(&wptr,attrctime);
+}
+
 static void mfs_attr_to_stat(uint32_t inode,const uint8_t attr[35], struct stat *stbuf) {
 	uint16_t attrmode;
 	uint8_t attrtype;
@@ -757,11 +808,50 @@ static int mfs_node_access(uint8_t attr[32],uint32_t uid,uint32_t gid,int mask) 
 }
 */
 
+// simple access test for deleted cwd nodes - no ACL's
+int mfs_access_test(const uint8_t attr[35],int mmode,uint32_t uid,uint32_t gidcnt,uint32_t *gidtab) {
+	uint8_t modebits,gok;
+	uint16_t attrmode;
+	uint32_t attruid,attrgid;
+	const uint8_t *ptr;
+
+	if (uid==0) {
+		return 0;
+	}
+	ptr = attr+1;
+	attrmode = get16bit(&ptr);
+	attruid = get32bit(&ptr);
+	attrgid = get32bit(&ptr);
+	
+	if (uid == attruid) {
+		modebits = (attrmode >> 6) & 7;
+	} else {
+		gok = 0;
+		while (gidcnt>0) {
+			gidcnt--;
+			if (gidtab[gidcnt] == attrgid) {
+				modebits = (attrmode >> 3) & 7;
+				gok = 1;
+				break;
+			}
+		}
+		if (gok==0) {
+			modebits = attrmode & 7;
+		}
+	}
+	if ((mmode & modebits) == mmode) {
+		return 0;
+	}
+	return EACCES;
+}
+
 void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 	int status;
 	struct fuse_ctx ctx;
+	uint8_t attr[35];
 	groups *gids;
 	int mmode;
+	int force_mode;
 
 	ctx = *(fuse_req_ctx(req));
 	if (debug_mode) {
@@ -800,11 +890,44 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 		uint32_t gidtmp = ctx.gid;
 		status = fs_access(ino,ctx.uid,1,&gidtmp,mmode);
 	}
-	status = mfs_errorconv(status);
-	if (status!=0) {
-		oplog_printf(&ctx,"access (%lu,0x%X): %s",(unsigned long int)ino,mask,strerr(status));
+	force_mode = 0;
+	if (status==ERROR_ENOENT) {
+		if (ctx.pid == getpid()) {
+			force_mode = 1;
+		}
+		if (sstats_get(ino,attr,force_mode)==STATUS_OK) {
+			if (force_mode==0) {
+				force_mode = 2;
+			}
+		}
+	}
+	if (force_mode) {
+		if (force_mode == 1) {
+			if (debug_mode) {
+				fprintf(stderr,"special case: internal access (%lu,0x%X) - positive answer\n",(unsigned long int)ino,mask);
+			}
+			oplog_printf(&ctx,"special case: internal access (%lu,0x%X): OK",(unsigned long int)ino,mask);
+			status = 0;
+		} else {
+			if (debug_mode) {
+				fprintf(stderr,"special case: sustained access (%lu,0x%X) - using stored data\n",(unsigned long int)ino,mask);
+			}
+			if (full_permissions) {
+				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+				status = mfs_access_test(attr,mmode,ctx.uid,gids->gidcnt,gids->gidtab);
+				groups_rel(gids);
+			} else {
+				uint32_t gidtmp = ctx.gid;
+				status = mfs_access_test(attr,mmode,ctx.uid,1,&gidtmp);
+			}
+		}
 	} else {
-		oplog_printf(&ctx,"access (%lu,0x%X): OK",(unsigned long int)ino,mask);
+		status = mfs_errorconv(status);
+		if (status!=0) {
+			oplog_printf(&ctx,"access (%lu,0x%X): %s",(unsigned long int)ino,mask,strerr(status));
+		} else {
+			oplog_printf(&ctx,"access (%lu,0x%X): OK",(unsigned long int)ino,mask);
+		}
 	}
 	fuse_reply_err(req,status);
 }
@@ -1048,6 +1171,9 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	} else {
 		maxfleng = 0;
 	}
+	if (type==TYPE_DIRECTORY) {
+		sstats_set(inode,attr,1);
+	}
 	memset(&e, 0, sizeof(e));
 	e.ino = inode;
 	e.generation = 1;
@@ -1066,59 +1192,23 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //	}
 	mfs_makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(&ctx,"lookup (%lu,%s)%s: OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,icacheflag?" (using open dir cache)":"",e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-	if (type==TYPE_DIRECTORY) {
-		invalidator_insert(parent,name,nleng,inode,direntry_cache_timeout);
-	}
-	if (fuse_reply_entry(req, &e) == -ENOENT) {
-		if (type==TYPE_DIRECTORY) {
-			invalidator_forget(e.ino,1);
-		}
-	}
+	fuse_reply_entry(req, &e);
 	if (debug_mode) {
 		fprintf(stderr,"lookup: positive answer timeouts (attr:%.3lf,entry:%.3lf)\n",e.attr_timeout,e.entry_timeout);
 	}
 }
-
-void mfs_forget(fuse_req_t req, fuse_ino_t ino, unsigned long nlookup) {
-	struct fuse_ctx ctx;
-
-	if (debug_mode) {
-		ctx = *(fuse_req_ctx(req));
-		oplog_printf(&ctx,"forget (%lu,%lu)",(unsigned long int)ino,nlookup);
-		fprintf(stderr,"forget (%lu,%lu)\n",(unsigned long int)ino,nlookup);
-	}
-	invalidator_forget(ino,nlookup);
-	fuse_reply_none(req);
-}
-
-#if FUSE_VERSION >= 29
-
-void mfs_forget_multi(fuse_req_t req, size_t count, struct fuse_forget_data *forgets) {
-	struct fuse_ctx ctx;
-
-	if (debug_mode) {
-		ctx = *(fuse_req_ctx(req));
-		oplog_printf(&ctx,"forget_multi (%lu entries)",(unsigned long int)count);
-		fprintf(stderr,"forget_multi (%lu entries)\n",(unsigned long int)count);
-	}
-	while (count>0) {
-		count--;
-		invalidator_forget(forgets[count].ino,forgets[count].nlookup);
-	}
-	fuse_reply_none(req);
-}
-
-#endif
 
 void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	uint64_t maxfleng;
 	double attr_timeout;
 	struct stat o_stbuf;
 	uint8_t attr[35];
+	uint8_t type;
 	char attrstr[256];
 	int status;
 	uint8_t icacheflag;
 	struct fuse_ctx ctx;
+	int force_mode;
 	(void)fi;
 
 	ctx = *(fuse_req_ctx(req));
@@ -1206,6 +1296,7 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		}
 	} else 
 */
+	force_mode = 0;
 	if (usedircache && dcache_getattr(&ctx,ino,attr)) {
 		if (debug_mode) {
 			fprintf(stderr,"getattr: sending data from dircache\n");
@@ -1216,6 +1307,15 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	} else {
 		mfs_stats_inc(OP_GETATTR);
 		status = fs_getattr(ino,(fi!=NULL)?1:0,ctx.uid,ctx.gid,attr);
+		if (status==ERROR_ENOENT) {
+			if (ctx.pid==getpid()) {
+				force_mode = 1;
+			}
+			status = sstats_get(ino,attr,force_mode);
+			if (status==STATUS_OK && force_mode==0) {
+				force_mode = 2;
+			}
+		}
 		status = mfs_errorconv(status);
 		icacheflag = 0;
 	}
@@ -1224,22 +1324,26 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_err(req, status);
 		return;
 	}
-	if (mfs_attr_get_type(attr)==TYPE_FILE) {
+	type = mfs_attr_get_type(attr);
+	if (type==TYPE_FILE) {
 		maxfleng = write_data_getmaxfleng(ino);
 	} else {
 		maxfleng = 0;
+	}
+	if (type==TYPE_DIRECTORY && force_mode==0) {
+		sstats_set(ino,attr,1);
 	}
 	memset(&o_stbuf, 0, sizeof(struct stat));
 	mfs_attr_to_stat(ino,attr,&o_stbuf);
 	if (maxfleng>(uint64_t)(o_stbuf.st_size)) {
 		o_stbuf.st_size=maxfleng;
 	}
-	if (mfs_attr_get_type(attr)==TYPE_FILE) {
+	if (type==TYPE_FILE) {
 		read_inode_set_length(ino,o_stbuf.st_size,0);
 	}
-	attr_timeout = (mfs_attr_get_mattr(attr)&MATTR_NOACACHE)?0.0:attr_cache_timeout;
+	attr_timeout = ((mfs_attr_get_mattr(attr)&MATTR_NOACACHE) || force_mode)?0.0:attr_cache_timeout;
 	mfs_makeattrstr(attrstr,256,&o_stbuf);
-	oplog_printf(&ctx,"getattr (%lu)%s: OK (%.1lf,%s)",(unsigned long int)ino,icacheflag?" (using open dir cache)":"",attr_timeout,attrstr);
+	oplog_printf(&ctx,"getattr (%lu)%s: OK (%.1lf,%s)",(unsigned long int)ino,icacheflag?" (using open dir cache)":(force_mode==1)?" (internal getattr)":(force_mode==2)?" (sustained nodes)":"",attr_timeout,attrstr);
 	fuse_reply_attr(req, &o_stbuf, attr_timeout);
 }
 
@@ -1315,6 +1419,15 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			uint32_t gidtmp = ctx.gid;
 			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,1,&gidtmp,0,0,0,0,0,0,0,attr);	
 		}
+		if (status==ERROR_ENOENT) {
+			status = sstats_get(ino,attr,0);
+			if (status==STATUS_OK) {
+				mfs_attr_modify(to_set,attr,stbuf);
+			}
+		}
+		if (status==STATUS_OK) {
+			sstats_set(ino,attr,0);
+		}
 		status = mfs_errorconv(status);
 		if (status!=0) {
 			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s:0%04o,%ld,%ld,%lu,%lu,%llu]): %s",(unsigned long int)ino,to_set,modestr+1,(unsigned int)(stbuf->st_mode & 07777),(long int)stbuf->st_uid,(long int)stbuf->st_gid,(unsigned long int)(stbuf->st_atime),(unsigned long int)(stbuf->st_mtime),(unsigned long long int)(stbuf->st_size),strerr(status));
@@ -1350,6 +1463,15 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		} else {
 			uint32_t gidtmp = ctx.gid;
 			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,1,&gidtmp,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,sugid_clear_mode,attr);
+		}
+		if (status==ERROR_ENOENT) {
+			status = sstats_get(ino,attr,0);
+			if (status==STATUS_OK) {
+				mfs_attr_modify(to_set,attr,stbuf);
+			}
+		}
+		if (status==STATUS_OK) {
+			sstats_set(ino,attr,0);
 		}
 		status = mfs_errorconv(status);
 		if (status!=0) {
@@ -1639,6 +1761,7 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		oplog_printf(&ctx,"mkdir (%lu,%s,d%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(status));
 		fuse_reply_err(req, status);
 	} else {
+		sstats_set(inode,attr,1);
 		negentry_cache_remove(parent,nleng,(const uint8_t*)name);
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
@@ -1653,10 +1776,7 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"mkdir (%lu,%s,d%s:0%04o): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
-		invalidator_insert(parent,name,nleng,inode,direntry_cache_timeout);
-		if (fuse_reply_entry(req, &e) == -ENOENT) {
-			invalidator_forget(e.ino,1);
-		}
+		fuse_reply_entry(req, &e);
 	}
 }
 
@@ -1947,6 +2067,7 @@ void mfs_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char *
 void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	dirbuf *dirinfo;
 	int status;
+	uint8_t attr[35];
 	struct fuse_ctx ctx;
 	groups *gids;
 
@@ -1967,8 +2088,37 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	} else { // no acl means - we are using default permissions, so do not check supplementary groups
 		status = fs_access(ino,ctx.uid,1,&(ctx.gid),MODE_MASK_R);	// at least test rights
 	}
-	status = mfs_errorconv(status);
-	if (status!=0) {
+	if (status==ERROR_ENOENT && sstats_get(ino,attr,0)==STATUS_OK) {
+		if (full_permissions) {
+			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+			status = mfs_access_test(attr,MODE_MASK_R,ctx.uid,gids->gidcnt,gids->gidtab);
+			groups_rel(gids);
+		} else {
+			uint32_t gidtmp = ctx.gid;
+			status = mfs_access_test(attr,MODE_MASK_R,ctx.uid,1,&gidtmp);
+		}
+		if (status!=STATUS_OK) {
+			status = mfs_errorconv(status);
+			oplog_printf(&ctx,"opendir (%lu): %s",(unsigned long int)ino,strerr(status));
+			fuse_reply_err(req, status);
+		} else {
+			dirinfo = malloc(sizeof(dirbuf));
+			pthread_mutex_init(&(dirinfo->lock),NULL);
+			dirinfo->p = NULL;
+			dirinfo->size = 0;
+			dirinfo->dcache = NULL;
+			dirinfo->wasread = 2;
+			pthread_mutex_unlock(&(dirinfo->lock));	// make valgrind happy
+			fi->fh = (unsigned long)dirinfo;;
+			oplog_printf(&ctx,"sustained opendir (%lu): forced OK with empty directory",(unsigned long int)ino);
+			if (fuse_reply_open(req,fi) == -ENOENT) {
+				fi->fh = 0;
+				pthread_mutex_destroy(&(dirinfo->lock));
+				free(dirinfo);
+			}
+		}
+	} else if (status!=STATUS_OK) {
+		status = mfs_errorconv(status);
 		oplog_printf(&ctx,"opendir (%lu): %s",(unsigned long int)ino,strerr(status));
 		fuse_reply_err(req, status);
 	} else {
@@ -2329,6 +2479,12 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		status = fs_create(parent,nleng,(const uint8_t*)name,mode&07777,cumask,ctx.uid,1,&gidtmp,&inode,attr);
 	}
 	if (status!=ERROR_ENOTSUP) {
+#if defined(__APPLE__)
+		// due to bug in os x - create in deleted directory goes into infinite loop when it gets ENOENT, so we should change it to different error - we use EACCES
+		if (status==ERROR_ENOENT && sstats_get(parent,attr,0)==STATUS_OK) {
+			status=ERROR_EACCES;
+		}
+#endif
 		status = mfs_errorconv(status);
 		if (status!=0) {
 			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(status));
@@ -2401,6 +2557,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s,%lu)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned long int)fi->keep_cache);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
+		fi->fh = 0;
 	}
 }
 
@@ -2636,13 +2793,13 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		return;
 	}
 //	fuse_reply_err(req,0);
-	if (fileinfo!=NULL) {
-		mfs_removefileinfo(fileinfo);
-	}
 	dcache_invalidate_attr(ino);
 	fs_release(ino);
 	oplog_printf(&ctx,"release (%lu): OK",(unsigned long int)ino);
 	fuse_reply_err(req,0);
+	if (fileinfo!=NULL) {
+		mfs_removefileinfo(fileinfo);
+	}
 }
 
 void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi) {

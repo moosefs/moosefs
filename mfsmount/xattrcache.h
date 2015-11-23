@@ -25,6 +25,7 @@ void* xattr_cache_get(uint32_t node,uint32_t uid,uint32_t gid,uint32_t nleng,con
 void xattr_cache_set(uint32_t node,uint32_t uid,uint32_t gid,uint32_t nleng,const uint8_t *name,const uint8_t *value,uint32_t vleng,int status);
 void xattr_cache_del(uint32_t node,uint32_t nleng,const uint8_t *name);
 void xattr_cache_rel(void *vv);
+void xattr_cache_term(void);
 void xattr_cache_init(double timeout);
 
 #endif

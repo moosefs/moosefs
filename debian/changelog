@@ -1,3 +1,10 @@
+moosefs (3.0.60-1) unstable; urgency=medium
+
+  * (systemd) added TimeoutStartSec=1800 to master
+  * (master) fixed "parse error" message for broken network changelogs
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 23 Nov 2015 12:00:00 +0100
+
 moosefs (3.0.59-1) unstable; urgency=medium
 
   * (all) fixed debug symbols

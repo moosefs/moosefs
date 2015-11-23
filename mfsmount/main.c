@@ -767,7 +767,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 #ifdef MFS_USE_MALLOPT
 	if (mfsopts.limitarenas) {
 		if (!getenv("MALLOC_ARENA_MAX")) {
-			syslog(LOG_NOTICE,"setting glibc malloc arena max to 8");
+			syslog(LOG_NOTICE,"setting glibc malloc arena max to %u",mfsopts.limitarenas);
 			mallopt(M_ARENA_MAX, mfsopts.limitarenas);
 		}
 		if (!getenv("MALLOC_ARENA_TEST")) {
@@ -806,12 +806,14 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
+		conncache_term();
 		return 1;
 	}
 
 //	fs_term();
 //	negentry_cache_term();
 //	symlink_cache_term();
+//	conncache_term();
 //	return 1;
 
 	if (mfsopts.meta==0) {
@@ -841,6 +843,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
+		conncache_term();
 		return 1;
 	}
 
@@ -872,6 +875,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
+		conncache_term();
 		return 1;
 	}
 
@@ -900,6 +904,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
+		conncache_term();
 		return 1;
 	}
 
@@ -950,6 +955,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //	dir_cache_term();
 	negentry_cache_term();
 	symlink_cache_term();
+	conncache_term();
 	return err ? 1 : 0;
 }
 

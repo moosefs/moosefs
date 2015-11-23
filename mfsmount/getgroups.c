@@ -41,6 +41,8 @@
 #include "portable.h"
 #include "clocks.h"
 
+static pthread_t main_thread;
+static int keep_alive;
 
 uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 #if defined(__linux__)
@@ -349,7 +351,8 @@ void* groups_cleanup_thread(void* arg) {
 	uint32_t i;
 	double t;
 	groups *g,*gn;
-	while (1) {
+	int ka = 1;
+	while (ka) {
 		zassert(pthread_mutex_lock(&glock));
 		t = monotonic_seconds();
 		for (i=0 ; i<16 ; i++) {
@@ -362,6 +365,7 @@ void* groups_cleanup_thread(void* arg) {
 			h++;
 			h%=HASHSIZE;
 		}
+		ka = keep_alive;
 		zassert(pthread_mutex_unlock(&glock));
 		portable_usleep(10000);
 	}
@@ -399,9 +403,26 @@ void* groups_debug_thread(void* arg) {
 	return arg;
 }
 */
+
+void groups_term(void) {
+	uint32_t i;
+	zassert(pthread_mutex_lock(&glock));
+	keep_alive = 0;
+	zassert(pthread_mutex_unlock(&glock));
+	pthread_join(main_thread,NULL);
+	zassert(pthread_mutex_lock(&glock));
+	for (i=0 ; i<HASHSIZE ; i++) {
+		while (groups_hashtab[i]) {
+			groups_remove(groups_hashtab[i]);
+		}
+	}
+	free(groups_hashtab);
+	zassert(pthread_mutex_unlock(&glock));
+	zassert(pthread_mutex_destroy(&glock));
+}
+
 void groups_init(double _to,int dm) {
 	uint32_t i;
-	pthread_t t;
 	debug_mode = dm;
 	zassert(pthread_mutex_init(&glock,NULL));
 	groups_hashtab = malloc(sizeof(groups*)*HASHSIZE);
@@ -410,7 +431,8 @@ void groups_init(double _to,int dm) {
 		groups_hashtab[i] = NULL;
 	}
 	to = _to;
-	pthread_create(&t,NULL,groups_cleanup_thread,NULL);
+	keep_alive = 1;
+	pthread_create(&main_thread,NULL,groups_cleanup_thread,NULL);
 //	pthread_create(&t,NULL,groups_debug_thread,NULL);
 }
 

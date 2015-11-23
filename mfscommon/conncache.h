@@ -25,6 +25,7 @@
 
 void conncache_insert(uint32_t ip,uint16_t port,int fd);
 int conncache_get(uint32_t ip,uint16_t port);
+void conncache_term(void);
 int conncache_init(uint32_t capacity);
 
 #endif

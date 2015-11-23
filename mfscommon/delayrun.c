@@ -122,6 +122,7 @@ void delay_run (void (*fn)(void *),void *udata,uint64_t useconds) {
 	if (heapelements>=heapsize) {
 		heapsize *= 2;
 		heap = realloc(heap,sizeof(heapelem)*heapsize);
+		passert(heap);
 	}
 	heap[heapelements].fn = fn;
 	heap[heapelements].udata = udata;
@@ -158,6 +159,7 @@ void delay_init(void) {
 	exitflag = 0;
 	waiting = 0;
 	heap = malloc(sizeof(heapelem)*1024);
+	passert(heap);
 	heapelements = 0;
 	heapsize = 1024;
 	zassert(pthread_mutex_init(&dlock,NULL));

@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.60-1 (2015-11-23)
+
+  - (systemd) added TimeoutStartSec=1800 to master
+  - (master) fixed "parse error" message for broken network changelogs
+
 * MooseFS 3.0.59-1 (2015-11-06)
 
   - (all) fixed debug symbols

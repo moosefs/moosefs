@@ -647,7 +647,7 @@ void* read_worker(void *arg) {
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; read_chunkdata_check: chunkid: %"PRIu64" ; version: %"PRIu32" - chunk changed\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,chunkid,version);
 #endif
-				currentpos = 0;
+				rreq->currentpos = 0;
 				rreq->mode = REFRESH;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 			} else {

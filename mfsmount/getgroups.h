@@ -39,6 +39,7 @@ typedef struct groups {
 groups* groups_get_x(pid_t pid,uid_t uid,gid_t gid,uint8_t lockmode);
 #define groups_get(p,u,g) groups_get_x(p,u,g,0)
 void groups_rel(groups* g);
+void groups_term(void);
 void groups_init(double _to,int dm);
 
 #endif

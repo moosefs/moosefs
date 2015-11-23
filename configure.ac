@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.59], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.60], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -31,7 +31,7 @@ dnl AC_PROG_CXX(clang++ llvm-g++ g++)
 AC_PROG_LN_S
 AC_PROG_LIBTOOL
 
-AC_ARG_ENABLE([addresssanitizer], [AS_HELP_STRING([--enable-addresssanitizer], [Build with address sanitizer on (debug only)])], [ enable_addresssanitizer=yes ])
+AC_ARG_ENABLE([externalcflags], [AS_HELP_STRING([--enable-externalcflags], [Build with default CFLAGS])], [ enable_externalcflags=yes ])
 AC_ARG_ENABLE([gperftools], [AS_HELP_STRING([--enable-gperftools], [Build with google perftools on (debug only)])], [ enable_gperftools=yes ])
 AC_ARG_ENABLE([debug], [AS_HELP_STRING([--enable-debug], [Build version without optimizations])], [ enable_debug=yes ])
 
@@ -40,13 +40,12 @@ if test "X$MFS_FORCE_DEBUG" = "XYES"; then
 fi
 
 if test "$GCC" = "yes"; then
-	if test "$enable_addresssanitizer" = "yes" -o "$enable_gperftools" = "yes" -o "$enable_debug" = "yes" ; then
-		CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG  -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
-	else
-		CFLAGS="-O2 $CFLAGS -g -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
-	fi
-	if test "$enable_addresssanitizer" = "yes"; then
-		CFLAGS="$CFLAGS -fsanitize=address"
+	if test "$enable_externalcflags" != "yes" ; then
+		if test "$enable_gperftools" = "yes" -o "$enable_debug" = "yes" ; then
+			CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG  -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
+		else
+			CFLAGS="-O2 $CFLAGS -g -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
+		fi
 	fi
 	if test "$enable_gperftools" = "yes"; then
 		CPPFLAGS="$CPPFLAGS -DGPERFTOOLS"

@@ -144,6 +144,7 @@ int statsdump_parse (int32_t **stats,const char *opt) {
 	strcpy(str,opt);
 	*stats = realloc(*stats,(cnt+add+1)*sizeof(int32_t));
 	if ((*stats)==NULL) {
+		free(str);
 		fprintf(stderr,"memory allocation error\n");
 		return -1;
 	}
@@ -467,14 +468,12 @@ int main (int argc,char **argv) {
 	char *pfile;
 	char sep;
 	int32_t *stats;
-	uint8_t range;
 	uint8_t flags;
 	uint32_t rmask;
 	uint32_t pngwidth;
 	uint32_t pngheight;
 
 	ifile = NULL;
-	range = 0;
 	rmask = 0;
 	pfile = NULL;
 	stats = NULL;
@@ -497,8 +496,7 @@ int main (int argc,char **argv) {
 				break;
 			case 'r':
 				if (optarg[0]>='0' && optarg[0]<='3' && optarg[1]=='\0') {
-					range = optarg[0]-'0';
-					rmask = range;
+					rmask = optarg[0]-'0';
 					rmask = ((rmask&1)<<5)|((rmask&2)<<12)|((rmask&4)<<19)|((rmask&8)<<26);
 				} else {
 					usage(argv[0]);

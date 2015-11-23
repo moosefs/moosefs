@@ -2856,7 +2856,6 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 					csstrip[15]=0;
 					csip = get32bit(&rptr);
 					csport = get16bit(&rptr);
-					strtype = "???";
 					if (protover==255) {
 						switch (get8bit(&rptr)) {
 							case CHECK_VALID:

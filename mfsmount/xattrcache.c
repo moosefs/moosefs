@@ -237,6 +237,16 @@ void xattr_cache_rel(void *vv) {
 	zassert(pthread_mutex_unlock(&glock));
 }
 
+void xattr_cache_term(void) {
+	zassert(pthread_mutex_lock(&glock));
+	while (lruhead!=NULL) {
+		xattr_cache_remove_entry(lruhead);
+	}
+	free(hashtab);
+	zassert(pthread_mutex_unlock(&glock));
+	zassert(pthread_mutex_destroy(&glock));
+}
+
 void xattr_cache_init(double timeout) {
 	uint32_t i;
 	lruhead = NULL;

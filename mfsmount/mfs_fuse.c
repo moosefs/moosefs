@@ -208,21 +208,23 @@ void sinfo_freeall(void) {
 	uint32_t i;
 	sinfo *statsinfo;
 	pthread_mutex_lock(&sinfo_tab_lock);
-	for (i=0 ; i<sinfo_max ; i++) {
-		statsinfo = sinfo_tab[i];
-		if (statsinfo!=NULL) {
-			pthread_mutex_lock(&(statsinfo->lock));
-			if (statsinfo->valid) {
-				if (statsinfo->buff) {
-					free(statsinfo->buff);
+	if (sinfo_tab!=NULL) {
+		for (i=0 ; i<sinfo_max ; i++) {
+			statsinfo = sinfo_tab[i];
+			if (statsinfo!=NULL) {
+				pthread_mutex_lock(&(statsinfo->lock));
+				if (statsinfo->valid) {
+					if (statsinfo->buff) {
+						free(statsinfo->buff);
+					}
 				}
+				pthread_mutex_unlock(&(statsinfo->lock));
+				pthread_mutex_destroy(&(statsinfo->lock));
+				free(statsinfo);
 			}
-			pthread_mutex_unlock(&(statsinfo->lock));
-			pthread_mutex_destroy(&(statsinfo->lock));
-			free(statsinfo);
 		}
+		free(sinfo_tab);
 	}
-	free(sinfo_tab);
 	sinfo_first = sinfo_max = 1;
 	sinfo_size = 0;
 	sinfo_tab = NULL;
@@ -291,21 +293,23 @@ void dirbuf_freeall(void) {
 	uint32_t i;
 	dirbuf *dirinfo;
 	pthread_mutex_lock(&dirbuf_tab_lock);
-	for (i=0 ; i<dirbuf_max ; i++) {
-		dirinfo = dirbuf_tab[i];
-		if (dirinfo!=NULL) {
-			pthread_mutex_lock(&(dirinfo->lock));
-			if (dirinfo->valid) {
-				if (dirinfo->p) {
-					free((uint8_t*)(dirinfo->p));
+	if (dirbuf_tab!=NULL) {
+		for (i=0 ; i<dirbuf_max ; i++) {
+			dirinfo = dirbuf_tab[i];
+			if (dirinfo!=NULL) {
+				pthread_mutex_lock(&(dirinfo->lock));
+				if (dirinfo->valid) {
+					if (dirinfo->p) {
+						free((uint8_t*)(dirinfo->p));
+					}
 				}
+				pthread_mutex_unlock(&(dirinfo->lock));
+				pthread_mutex_destroy(&(dirinfo->lock));
+				free(dirinfo);
 			}
-			pthread_mutex_unlock(&(dirinfo->lock));
-			pthread_mutex_destroy(&(dirinfo->lock));
-			free(dirinfo);
 		}
+		free(dirbuf_tab);
 	}
-	free(dirbuf_tab);
 	dirbuf_first = dirbuf_max = 1;
 	dirbuf_size = 0;
 	dirbuf_tab = NULL;
@@ -319,8 +323,6 @@ static pthread_mutex_t finfo_tab_lock = PTHREAD_MUTEX_INITIALIZER;
 
 uint32_t finfo_new(void) {
 	uint32_t i;
-	double now;
-	now = monotonic_seconds();
 	pthread_mutex_lock(&finfo_tab_lock);
 	for (i=finfo_first ; i<finfo_max ; i++) {
 		if (finfo_tab[i]==NULL) {
@@ -376,24 +378,26 @@ void finfo_freeall(void) {
 	uint32_t i;
 	finfo *fileinfo;
 	pthread_mutex_lock(&finfo_tab_lock);
-	for (i=0 ; i<finfo_max ; i++) {
-		fileinfo = finfo_tab[i];
-		if (fileinfo!=NULL) {
-			pthread_mutex_lock(&(fileinfo->lock));
-			if (fileinfo->valid) {
-				if (fileinfo->rdata) {
-					read_data_end(fileinfo->rdata);
+	if (finfo_tab!=NULL) {
+		for (i=0 ; i<finfo_max ; i++) {
+			fileinfo = finfo_tab[i];
+			if (fileinfo!=NULL) {
+				pthread_mutex_lock(&(fileinfo->lock));
+				if (fileinfo->valid) {
+					if (fileinfo->rdata) {
+						read_data_end(fileinfo->rdata);
+					}
+					if (fileinfo->wdata) {
+						write_data_end(fileinfo->wdata);
+					}
 				}
-				if (fileinfo->wdata) {
-					write_data_end(fileinfo->wdata);
-				}
+				pthread_mutex_unlock(&(fileinfo->lock));
+				pthread_mutex_destroy(&(fileinfo->lock));
+				free(fileinfo);
 			}
-			pthread_mutex_unlock(&(fileinfo->lock));
-			pthread_mutex_destroy(&(fileinfo->lock));
-			free(fileinfo);
 		}
+		free(finfo_tab);
 	}
-	free(finfo_tab);
 	finfo_first = finfo_max = 1;
 	finfo_size = 0;
 	finfo_tab = NULL;
@@ -792,20 +796,24 @@ static void mfs_attr_modify(uint32_t to_set,uint8_t attr[35],struct stat *stbuf)
 	attrctime = get32bit(&ptr);
 	if (to_set & FUSE_SET_ATTR_MODE) {
 		attrmode = stbuf->st_mode & 07777;
+		attrctime = time(NULL);
 	}
 	if (to_set & FUSE_SET_ATTR_UID) {
 		attruid = stbuf->st_uid;
+		attrctime = time(NULL);
 	}
 	if (to_set & FUSE_SET_ATTR_GID) {
 		attrgid = stbuf->st_gid;
+		attrctime = time(NULL);
 	}
 	if (to_set & FUSE_SET_ATTR_ATIME) {
 		attratime = stbuf->st_atime;
+		attrctime = time(NULL);
 	}
 	if (to_set & FUSE_SET_ATTR_MTIME) {
 		attratime = stbuf->st_mtime;
+		attrctime = time(NULL);
 	}
-	attrctime = time(NULL);
 	wptr = attr;
 	put8bit(&wptr,mattr);
 	attrmode |= ((uint16_t)attrtype)<<12;
@@ -2815,7 +2823,6 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	int status;
 	struct fuse_ctx ctx;
 	groups *gids;
-	finfo *fileinfo;
 	uint32_t findex;
 
 	ctx = *(fuse_req_ctx(req));
@@ -2917,7 +2924,6 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 
 	mattr = mfs_attr_get_mattr(attr);
 	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,inode,0);
-	fileinfo = finfo_tab[findex];
 	fi->fh = findex;
 	if (mattr&MATTR_DIRECTMODE) {
 		fi->keep_cache = 0;
@@ -2960,7 +2966,6 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	int status;
 	struct fuse_ctx ctx;
 	groups *gids;
-	finfo *fileinfo;
 	uint32_t findex;
 
 	ctx = *(fuse_req_ctx(req));
@@ -3096,7 +3101,6 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 
 	mattr = mfs_attr_get_mattr(attr);
 	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,ino,mfs_attr_get_fleng(attr));
-	fileinfo = finfo_tab[findex];
 	fi->fh = findex;
 	if (mattr&MATTR_DIRECTMODE) {
 		fi->keep_cache = 0;
@@ -4670,6 +4674,10 @@ void mfs_term(void) {
 	sinfo_freeall();
 	dirbuf_freeall();
 	finfo_freeall();
+	xattr_cache_term();
+	if (full_permissions) {
+		groups_term();
+	}
 }
 
 void mfs_init(int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {

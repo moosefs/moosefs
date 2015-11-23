@@ -27,6 +27,7 @@
 #include "massert.h"
 #include "sockets.h"
 #include "hashfn.h"
+#include "portable.h"
 #include "main.h"
 
 #define CONN_CACHE_HASHSIZE 256
@@ -39,6 +40,9 @@ typedef struct _connentry {
 	struct _connentry *lrunext,**lruprev;
 	struct _connentry *hashnext,**hashprev;
 } connentry;
+
+static pthread_t main_thread;
+static int keep_alive;
 
 static connentry *conncachetab;
 static connentry *conncachehash[CONN_CACHE_HASHSIZE];
@@ -117,14 +121,16 @@ int conncache_get(uint32_t ip,uint16_t port) {
 
 void* conncache_keepalive_thread(void* arg) {
 	uint8_t nopbuff[8];
-	int i;
-	uint32_t p;
+	int i,ka;
+	uint32_t p,q;
 	connentry *ce;
 
-	for (;;) {
-		for (p=0 ; p<capacity ; p++) {
-			ce = conncachetab+p;
-			zassert(pthread_mutex_lock(&glock));
+	p = 0;
+	ka = 1;
+	while (ka) {
+		zassert(pthread_mutex_lock(&glock));
+		for (q=p ; q<capacity ; q+=200) {
+			ce = conncachetab+q;
 			if (ce->fd>=0) {
 #ifdef MFSDEBUG
 				syslog(LOG_NOTICE,"conncache: pos: %"PRIu32" ; desc: %d ; ip:%08X ; port:%u",p,ce->fd,ce->ip,ce->port);
@@ -148,15 +154,33 @@ void* conncache_keepalive_thread(void* arg) {
 					}
 				}
 			}
-			zassert(pthread_mutex_unlock(&glock));
 		}
-		sleep(2);
+		ka = keep_alive;
+		zassert(pthread_mutex_unlock(&glock));
+		portable_usleep(10000);
 	}
 	return arg;
 }
 
+void conncache_term(void) {
+	uint32_t p;
+	zassert(pthread_mutex_lock(&glock));
+	keep_alive = 0;
+	zassert(pthread_mutex_unlock(&glock));
+	pthread_join(main_thread,NULL);
+	zassert(pthread_mutex_lock(&glock));
+	// cleanup
+	for (p=0 ; p<capacity ; p++) {
+		if (conncachetab[p].fd>=0) {
+			tcpclose(conncachetab[p].fd);
+		}
+	}
+	free(conncachetab);
+	zassert(pthread_mutex_unlock(&glock));
+	zassert(pthread_mutex_destroy(&glock));
+}
+
 int conncache_init(uint32_t cap) {
-	pthread_t kathread;
 	uint32_t p;
 
 	capacity = cap;
@@ -174,8 +198,8 @@ int conncache_init(uint32_t cap) {
 	}
 	lruhead = NULL;
 	lrutail = &(lruhead);
-
-	if (main_minthread_create(&kathread,1,conncache_keepalive_thread,NULL)<0) {
+	keep_alive = 1;
+	if (main_minthread_create(&main_thread,1,conncache_keepalive_thread,NULL)<0) {
 		return -1;
 	}
 	return 1;

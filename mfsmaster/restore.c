@@ -1591,12 +1591,16 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 }
 
 int restore_net(uint64_t lv,const char *ptr) {
-	uint8_t status;
+	int status;
 	if (lv!=meta_version()) {
 		syslog(LOG_WARNING,"desync - invalid meta version (version in packet: %"PRIu64" / expected: %"PRIu64" / packet data: %s)",lv,meta_version(),ptr);
 		return -1;
 	}
 	status = restore_line("NET",lv,ptr);
+	if (status<0) {
+		syslog(LOG_WARNING,"desync - operation (%s) parse error",ptr);
+		return -1;
+	}
 	if (status!=STATUS_OK) {
 		syslog(LOG_WARNING,"desync - operation (%s) error: %d (%s)",ptr,status,mfsstrerr(status));
 		return -1;

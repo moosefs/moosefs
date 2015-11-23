@@ -2587,6 +2587,8 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			uint8_t count;
 			uint8_t cs_data[100*14];
 			lflags = (accmode & LOOKUP_ACCESS_BITS);
+			count = 0;
+			version = 0;
 			if (filenode && (lflags&(LOOKUP_ACCESS_MODE_R|LOOKUP_ACCESS_MODE_W))!=0) { // can be read and/or written
 				if ((sesflags&SESFLAG_ATTRBIT)==0 || (attr[0]&MATTR_DIRECTMODE)==0) {
 					if (dcm_open(newinode,sessions_get_id(eptr->sesdata))==0) {
@@ -2620,7 +2622,9 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 				put8bit(&ptr,2);
 				put64bit(&ptr,chunkid);
 				put32bit(&ptr,version);
-				memcpy(ptr,cs_data,count*14);
+				if (count>0) {
+					memcpy(ptr,cs_data,count*14);
+				}
 			} else {
 				ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,45);
 				put32bit(&ptr,msgid);

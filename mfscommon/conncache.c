@@ -155,6 +155,10 @@ void* conncache_keepalive_thread(void* arg) {
 				}
 			}
 		}
+		p++;
+		if (p>=200) {
+			p=0;
+		}
 		ka = keep_alive;
 		zassert(pthread_mutex_unlock(&glock));
 		portable_usleep(10000);
@@ -199,7 +203,7 @@ int conncache_init(uint32_t cap) {
 	lruhead = NULL;
 	lrutail = &(lruhead);
 	keep_alive = 1;
-	if (main_minthread_create(&main_thread,1,conncache_keepalive_thread,NULL)<0) {
+	if (main_minthread_create(&main_thread,0,conncache_keepalive_thread,NULL)<0) {
 		return -1;
 	}
 	return 1;

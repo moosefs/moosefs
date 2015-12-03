@@ -91,9 +91,8 @@ typedef struct cblock_s {
 
 #define MAXREQINQUEUE 16
 
-enum {NEW,INQUEUE,BUSY,REFRESH,BREAK,FILLED,READY,FREE};
+enum {NEW,INQUEUE,BUSY,REFRESH,BREAK,FILLED,READY,NOTNEEDED};
 
-#ifdef RDEBUG
 char* read_data_modename(uint8_t mode) {
 	switch (mode) {
 	case NEW:
@@ -110,12 +109,13 @@ char* read_data_modename(uint8_t mode) {
 		return "FILLED";
 	case READY:
 		return "READY";
-	case FREE:
-		return "FREE";
+	case NOTNEEDED:
+		return "NOTNEEDED";
 	}
 	return "<unknown>";
 }
 
+#ifdef RDEBUG
 void read_data_hexdump(uint8_t *buff,uint32_t leng) {
 	uint32_t i;
 	for (i=0 ; i<leng ; i++) {
@@ -190,6 +190,7 @@ static pthread_key_t rangesstorage;
 static uint32_t readahead;
 static uint32_t readahead_trigger;
 
+static uint64_t usectimeout;
 static uint32_t maxretries;
 static uint32_t minlogretry;
 static uint64_t maxreadaheadsize;
@@ -299,7 +300,7 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 	} else {
 		if (rreq->mode==BREAK) {
 			breakmode = 1;
-			rreq->mode = FREE;
+			rreq->mode = NOTNEEDED;
 		} else { // REFRESH
 			rreq->mode = NEW;
 		}
@@ -552,7 +553,16 @@ void* read_worker(void *arg) {
 		ind = rreq->ind;
 
 		zassert(pthread_mutex_lock(&(ind->lock)));
-		rreq->mode = BUSY;
+		if (rreq->mode == INQUEUE) {
+			rreq->mode = BUSY;
+		} else if (rreq->mode == BREAK) {
+			zassert(pthread_mutex_unlock(&(ind->lock)));
+			read_job_end(rreq,0,0);
+			continue;
+		} else {
+			syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - bad request state: %s (expected INQUEUE or BREAK)",ind->inode,rreq->chindx,read_data_modename(rreq->mode));
+			rreq->mode = BUSY;
+		}
 
 		chindx = rreq->chindx;
 		status = ind->status;
@@ -597,6 +607,9 @@ void* read_worker(void *arg) {
 			} else if (rdstatus==ERROR_CHUNKLOST) {
 				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
 				read_job_end(rreq,ENXIO,0);
+			} else if (rdstatus==ERROR_IO) {
+				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
+				read_job_end(rreq,EIO,0);
 			} else {
 				zassert(pthread_mutex_lock(&(ind->lock)));
 				if (ind->trycnt >= minlogretry) {
@@ -681,14 +694,15 @@ void* read_worker(void *arg) {
 			if (ind->trycnt >= minlogretry) {
 				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies",inode,chindx,chunkid,version);
 			}
-			ind->trycnt+=6;
+			ind->trycnt++;
 			if (ind->trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				read_job_end(rreq,ENXIO,0);
 			} else {
 				rreq->mode = INQUEUE;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
-				read_delayed_enqueue(rreq,60000000);
+				read_chunkdata_invalidate(inode,chindx);
+				read_delayed_enqueue(rreq,10000000);
 			}
 			continue;
 		}
@@ -729,7 +743,7 @@ void* read_worker(void *arg) {
 			if (ind->trycnt >= minlogretry) {
 				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - there are no valid copies (bad ip and/or port)",inode,chindx,chunkid,version);
 			}
-			ind->trycnt+=6;
+			ind->trycnt++;
 			if (ind->trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				read_job_end(rreq,ENXIO,0);
@@ -737,7 +751,7 @@ void* read_worker(void *arg) {
 				rreq->mode = INQUEUE;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				read_chunkdata_invalidate(inode,chindx);
-				read_delayed_enqueue(rreq,60000000);
+				read_delayed_enqueue(rreq,10000000);
 			}
 			continue;
 		}
@@ -1262,12 +1276,14 @@ void read_data_ranges_free(void* ptr) {
 }
 
 /* API | glock: INITIALIZED,UNLOCKED */
-void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t logretry) {
+void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t timeout,uint32_t logretry) {
         uint32_t i;
 //	sigset_t oldset;
 //	sigset_t newset;
 
 	maxretries = retries;
+	usectimeout = timeout;
+	usectimeout *= 1000000;
 	minlogretry = logretry;
 	readahead = readaheadleng;
 	readahead_trigger = readaheadtrigger;
@@ -1464,7 +1480,7 @@ static inline void read_rreq_not_needed(rrequest *rreq) {
 			free(rreq->data);
 			free(rreq);
 		} else if (rreq->mode==NEW || rreq->mode==READY) {
-			rreq->mode = FREE; // somenody still using it, so mark it for removal
+			rreq->mode = NOTNEEDED; // somebody still using it, so mark it for removal
 		}
 	} else {
 		if (rreq->lcnt==0) {
@@ -1556,14 +1572,15 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 		// cleanup unused requests
 		reqno = 0;
 		for (rreq = ind->reqhead ; rreq ; rreq=rreq->next) {
-			if (rreq->mode!=BREAK && rreq->mode!=FREE) {
+// #warning czemu akurat BREAK i NOTNEEDED ???
+			if (rreq->mode!=BREAK && rreq->mode!=NOTNEEDED) {
 				reqno++;
 			}
 		}
 		rreq = ind->reqhead;
 		while (rreq) {
 			rreqn = rreq->next;
-			if (rreq->mode==BREAK && rreq->mode==FREE) {
+			if (rreq->mode==BREAK || rreq->mode==NOTNEEDED) {
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" bad request mode (%"PRIu64":%"PRIu64"/%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->offset+rreq->leng,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 #endif
@@ -1597,7 +1614,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 		etab[edges++] = firstbyte;
 		etab[edges++] = lastbyte;
 		for (rreq = ind->reqhead ; rreq ; rreq=rreq->next) {
-			if (rreq->mode!=BREAK && rreq->mode!=FREE) {
+			if (rreq->mode!=BREAK && rreq->mode!=NOTNEEDED) {
 				if (rreq->offset > firstbyte && rreq->offset < lastbyte) {
 					for (i=0 ; i<edges && etab[i]!=rreq->offset ; i++) {}
 					if (i>=edges) {
@@ -1642,7 +1659,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 		for (i=0 ; i<edges-1 ; i++) {
 			added = 0;
 			for (rreq = ind->reqhead ; rreq && added==0 ; rreq=rreq->next) {
-				if (rreq->mode!=BREAK && rreq->mode!=FREE) {
+				if (rreq->mode!=BREAK && rreq->mode!=NOTNEEDED) {
 					if (rreq->offset+rreq->leng > etab[i] && rreq->offset < etab[i+1]) {
 						rl = malloc(sizeof(rlist));
 						passert(rl);
@@ -1662,7 +1679,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 								sassert(blockend>blockstart);
 								raok = 1;
 								for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
-									if (rreq->mode!=BREAK && rreq->mode!=FREE) {
+									if (rreq->mode!=BREAK && rreq->mode!=NOTNEEDED) {
 										if (!(blockend <= rreq->offset || blockstart >= rreq->offset+rreq->leng)) {
 											raok = 0;
 										}
@@ -1683,7 +1700,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 										sassert(blockend>blockstart);
 										raok = 1;
 										for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
-											if (rreq->mode!=BREAK && rreq->mode!=FREE) {
+											if (rreq->mode!=BREAK && rreq->mode!=NOTNEEDED) {
 												if (!(blockend <= rreq->offset || blockstart >= rreq->offset+rreq->leng)) {
 													raok = 0;
 												}
@@ -1725,7 +1742,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 						sassert(blockend>blockstart);
 						raok = 1;
 						for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
-							if (rreq->mode!=BREAK && rreq->mode!=FREE) {
+							if (rreq->mode!=BREAK && rreq->mode!=NOTNEEDED) {
 								if (!(blockend <= rreq->offset || blockstart >= rreq->offset+rreq->leng)) {
 									raok = 0;
 								}
@@ -1747,170 +1764,35 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 			}
 		}
 
-#if 0
-		rreq = ind->reqhead;
-		while (rreq && lastbyte>firstbyte) {
-			rreqn = rreq->next;
-#ifdef RDEBUG
-			fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" , rreq->modified:%.6lf , rreq->offset: %"PRIu64" , rreq->leng: %"PRIu32" , firstbyte: %"PRIu64" , lastbyte: %"PRIu64"\n",monotonic_seconds(),ind->inode,rreq->modified,rreq->offset,rreq->leng,firstbyte,lastbyte);
-#endif
-			if (rreq->mode==BREAK || rreq->mode==FREE) {
-#ifdef RDEBUG
-				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" bad request mode (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
-#endif
-			} else if (rreq->modified+BUFFER_VALIDITY_TIMEOUT<now) { // buffer too old
-#ifdef RDEBUG
-				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" data too old: free rreq (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
-#endif
-			} else if (lastbyte <= rreq->offset || firstbyte >= rreq->offset+rreq->leng) { // skip this block
-				// rreq:      |--|
-				// read: |--|
-				// read:           |--|
-			} else if (lastbyte > rreq->offset+rreq->leng && firstbyte < rreq->offset) // also skip this block (read split needed, but not implemented)
-				// rreq:      |--|
-				// read:    |-------|
-			} else if (lastbyte <= rreq->offset+rreq->leng && firstbyte < rreq->offset) {
-				// rreq:    |-------|
-				// read:  |---|
-				rl = malloc(sizeof(rlist));
-				passert(rl);
-				rl->rreq = rreq;
-				rl->offsetadd = firstbyte - rreq->offset;
-				rl->reqleng = (lastbyte - firstbyte);
-				rl->next = NULL;
-				*rtail = rl;
-				rtail = &(rl->next);
-				rreq->lcnt++;
-
-			} else if (firstbyte < rreq->offset) {
-				// read:      |---|
-				// read:          |---|
-				rl = malloc(sizeof(rlist));
-				passert(rl);
-				rl->rreq = rreq;
-				rl->offsetadd = firstbyte - rreq->offset;
-				rl->reqleng = (lastbyte - firstbyte);
-				rl->next = NULL;
-				*rtail = rl;
-				rtail = &(rl->next);
-				rreq->lcnt++;
-
-			} else if (firstbyte < rreq->offset || firstbyte >= rreq->offset+rreq->leng) { // all not sequential read cases
-#ifdef RDEBUG
-				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" case 0: free rreq (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
-#endif
-				// rreq:      |---------|
-				// read: |--|
-				// read: |-------|
-				// read: |-------------------|
-				// read:                  |--|
-				read_rreq_not_needed(rreq);
-			} else if (lastbyte <= rreq->offset+rreq->leng) {
-#ifdef RDEBUG
-				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" case 1: use rreq (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
-#endif
-				// rreq: |---------|
-				// read:    |---|
-				rl = malloc(sizeof(rlist));
-				passert(rl);
-				rl->rreq = rreq;
-				rl->offsetadd = firstbyte - rreq->offset;
-				rl->reqleng = (lastbyte - firstbyte);
-				rl->next = NULL;
-				*rtail = rl;
-				rtail = &(rl->next);
-				rreq->lcnt++;
-				if (ind->readahead) {
-					if (lastbyte > rreq->offset) {
-						// request next block of data
-						if (rreq->next==NULL && rbuffsize<maxreadaheadsize) {
-							uint64_t blockstart,blockend;
-							blockstart = rreq->offset+rreq->leng;
-							blockend = blockstart + (readahead * (1<<((ind->readahead-1)*2)));
-#ifdef RDEBUG
-							fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" (middle of existing block) add new read-ahead rreq (%"PRIu64":%"PRId64")\n",monotonic_seconds(),ind->inode,blockstart,blockend-blockstart);
-#endif
-							if (blockend<=ind->fleng) {
-								read_new_request(ind,&blockstart,blockend);
-							} else if (blockstart<ind->fleng) {
-								read_new_request(ind,&blockstart,ind->fleng);
-							}
-							// and another one if necessary
-							if ((blockstart % MFSCHUNKSIZE) == 0 && rreq->next!=NULL && rreq->next->next==NULL && rbuffsize<maxreadaheadsize) {
-								blockend = blockstart + (readahead * (1<<((ind->readahead-1)*2)));
-#ifdef RDEBUG
-								fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" (middle of existing block) add new extra read-ahead rreq (%"PRIu64":%"PRId64")\n",monotonic_seconds(),ind->inode,blockstart,blockend-blockstart);
-#endif
-								if (blockend<=ind->fleng) {
-									read_new_request(ind,&blockstart,blockend);
-								} else if (blockstart<ind->fleng) {
-									read_new_request(ind,&blockstart,ind->fleng);
-								}
-							}
-						}
-					}
-				}
-				lastbyte = 0;
-				firstbyte = 0;
-			} else {
-#ifdef RDEBUG
-				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" case 2: use tail of rreq (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
-#endif
-				// rreq: |---------|
-				// read:         |---|
-				rl = malloc(sizeof(rlist));
-				passert(rl);
-				rl->rreq = rreq;
-				rl->offsetadd = firstbyte - rreq->offset;
-				rl->reqleng = rreq->leng;
-				rl->next = NULL;
-				*rtail = rl;
-				rtail = &(rl->next);
-				rreq->lcnt++;
-				firstbyte = rreq->offset+rreq->leng;
-			}
-			rreq = rreqn;
-		}
-		while (lastbyte>firstbyte) {
-#ifdef RDEBUG
-			fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" add new rreq (%"PRIu64":%"PRId64")\n",monotonic_seconds(),ind->inode,firstbyte,(lastbyte-firstbyte));
-#endif
-			rreq = read_new_request(ind,&firstbyte,lastbyte);
-			rl = malloc(sizeof(rlist));
-			passert(rl);
-			rl->rreq = rreq;
-			rl->offsetadd = 0;
-			rl->reqleng = rreq->leng;
-			rl->next = NULL;
-			*rtail = rl;
-			rtail = &(rl->next);
-			rreq->lcnt++;
-			if (lastbyte==firstbyte && ind->readahead && rbuffsize<maxreadaheadsize) {
-				uint64_t blockend;
-				blockend = lastbyte + (readahead * (1<<((ind->readahead-1)*2)))/2;
-#ifdef RDEBUG
-				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" (after new block) add new read-ahead rreq (%"PRIu64":%"PRId64")\n",monotonic_seconds(),ind->inode,lastbyte,blockend-lastbyte);
-#endif
-				if (blockend<=ind->fleng) {
-					(void)read_new_request(ind,&firstbyte,blockend);
-				} else if (lastbyte<ind->fleng) {
-					(void)read_new_request(ind,&firstbyte,ind->fleng);
-				}
-			}
-		}
-#endif
-
 		*vrhead = rhead;
 
 		cnt = 0;
 		*size = 0;
 		for (rl = rhead ; rl ; rl=rl->next) {
-			while (rl->rreq->mode!=READY && rl->rreq->mode!=FILLED && ind->status==0 && ind->closing==0) {
+//#warning stan NOTNEEDED też jest dobry ?!
+//#warning chyba NOTNEEDED powinien zostać podzielony na NOTNEEDEDEMPTY i NOTNEEDEDDATA
+			while (rl->rreq->mode!=READY && rl->rreq->mode!=FILLED && rl->rreq->mode!=NOTNEEDED && ind->status==0 && ind->closing==0) {
 				rl->rreq->waiting++;
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" wait for data: %"PRIu64":%"PRIu32"\n",monotonic_seconds(),ind->inode,rl->rreq->offset,rl->rreq->leng);
 #endif
-				zassert(pthread_cond_wait(&(rl->rreq->cond),&(ind->lock)));
+				if (usectimeout>0) {
+					struct timespec ts;
+					struct timeval tv;
+					uint64_t usecto;
+					gettimeofday(&tv, NULL);
+					usecto = tv.tv_sec;
+					usecto *= 1000000;
+					usecto += tv.tv_usec;
+					usecto += usectimeout;
+					ts.tv_sec = usecto / 1000000;
+					ts.tv_nsec = (usecto % 1000000) * 1000;
+					if (pthread_cond_timedwait(&(rl->rreq->cond),&(ind->lock),&ts)==ETIMEDOUT) {
+						ind->status=EIO;
+					}
+				} else {
+					zassert(pthread_cond_wait(&(rl->rreq->cond),&(ind->lock)));
+				}
 				rl->rreq->waiting--;
 			}
 			if (ind->status==0) {
@@ -1993,7 +1875,7 @@ void read_data_free_buff(void *vid,void *vrhead,struct iovec *iov) {
 		rln = rl->next;
 		rreq = rl->rreq;
 		rreq->lcnt--;
-		if (rreq->lcnt==0 && rreq->mode==FREE) {
+		if (rreq->lcnt==0 && rreq->mode==NOTNEEDED) {
 			*(rreq->prev) = rreq->next;
 			if (rreq->next) {
 				rreq->next->prev = rreq->prev;
@@ -2042,7 +1924,7 @@ void read_inode_dirty_region(uint32_t inode,uint64_t offset,uint32_t size,const 
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: read_inode_dirty_region: rreq (before): (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 #endif
-				if (rreq->mode!=FREE && rreq->mode!=BREAK && ((rreq->offset < offset + size) && (rreq->offset + rreq->leng > offset))) {
+				if (rreq->mode!=NOTNEEDED && rreq->mode!=BREAK && ((rreq->offset < offset + size) && (rreq->offset + rreq->leng > offset))) {
 					if (rreq->mode==READY || rreq->mode==FILLED) { // already filled, exchange data
 						if (rreq->offset > offset) {
 							if (rreq->offset + rreq->leng > offset + size) {

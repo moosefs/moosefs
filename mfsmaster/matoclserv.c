@@ -2601,8 +2601,7 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 				}
 				if (validchunk) {
 					if (chunkid>0) {
-						status = chunk_get_version_and_csdata(2,chunkid,eptr->peerip,&version,&count,cs_data);
-						if (status==STATUS_OK) {
+						if (chunk_get_version_and_csdata(2,chunkid,eptr->peerip,&version,&count,cs_data)==STATUS_OK) {
 							lflags |= LOOKUP_CHUNK_ZERO_DATA;
 						}
 					} else {

@@ -1,3 +1,13 @@
+moosefs (3.0.61-1) unstable; urgency=medium
+
+  * (master) fixed lookup in case of missing chunks (lookup returned ENXIO in
+    such case)
+  * (mount) added mfstimeout option to force timeout for all I/O operations
+  * (autotools) fixed problem with 'undefined reference to
+    rpl_malloc/rpl_realloc'
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 03 Dec 2015 12:00:00 +0100
+
 moosefs (3.0.60-1) unstable; urgency=medium
 
   * (systemd) added TimeoutStartSec=1800 to master

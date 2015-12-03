@@ -145,6 +145,7 @@ static cblock *cacheblocks,*freecblockshead;
 static uint32_t freecacheblocks;
 static uint32_t cacheblockcount;
 
+static double optimeout;
 static uint32_t maxretries;
 static uint32_t minlogretry;
 
@@ -636,6 +637,7 @@ void* write_worker(void *arg) {
 	char csstrip[16];
 	uint8_t waitforstatus;
 	uint8_t donotstayidle;
+	double opbegin;
 	double start,now,lastrcvd,lastblock,lastsent;
 	double workingtime,lrdiff,lbdiff;
 	uint32_t wtotal;
@@ -710,6 +712,10 @@ void* write_worker(void *arg) {
 			continue;
 		}
 
+		if (optimeout>0.0) {
+			opbegin = monotonic_seconds();
+		}
+
 		// syslog(LOG_NOTICE,"file: %"PRIu32", index: %"PRIu16" - debug1",ind->inode,chindx);
 		// get chunk data from master
 //		start = monotonic_seconds();
@@ -728,6 +734,9 @@ void* write_worker(void *arg) {
 				} else if (wrstatus==ERROR_CHUNKLOST) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,ENXIO,0);
+				} else if (wrstatus==ERROR_IO) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
+					write_job_end(chd,EIO,0);
 				} else {
 					if (chd->trycnt >= minlogretry) {
 						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
@@ -997,6 +1006,11 @@ void* write_worker(void *arg) {
 			zassert(pthread_mutex_lock(&workerslock));
 			wtotal = workers_total;
 			zassert(pthread_mutex_unlock(&workerslock));
+
+			if (optimeout>0.0 && now - opbegin > optimeout) {
+				status = EIO;
+				break;
+			}
 			zassert(pthread_mutex_lock(&(ind->lock)));
 
 //			if (ind->status!=0) {
@@ -1346,7 +1360,10 @@ void* write_worker(void *arg) {
 		zassert(pthread_mutex_lock(&(ind->lock)));	// make helgrind happy
 		canmodmtime = ind->canmodmtime;
 		unbreakable = chd->unbreakable;
-		if (status!=0) {
+
+		if (optimeout>0.0 && monotonic_seconds() - opbegin > optimeout) {
+			unbreakable = 0;
+		} else if (status!=0) {
 			chd->trycnt++;
 			if (chd->trycnt>=maxretries) {
 				unbreakable = 0;
@@ -1357,27 +1374,35 @@ void* write_worker(void *arg) {
 		chd->continueop = unbreakable;
 		zassert(pthread_mutex_unlock(&(ind->lock)));
 		if (unbreakable==0) {
-			for (cnt=0 ; cnt<10 ; cnt++) {
-				westatus = fs_writeend(chunkid,ind->inode,mfleng,canmodmtime?CHUNKOPFLAG_CANMODTIME:0);
-				if (westatus==ERROR_ENOENT || westatus==ERROR_QUOTA) { // can't change -> do not repeat
-					break;
-				} else if (westatus!=STATUS_OK) {
-					portable_usleep(100000+(10000<<cnt));
-					zassert(pthread_mutex_lock(&(ind->lock)));	// make helgrind happy
-					canmodmtime = ind->canmodmtime;
-					zassert(pthread_mutex_unlock(&(ind->lock)));
-				} else {
-					break;
-				}
-			}
+//			for (cnt=0 ; cnt<10 ; cnt++) {
+			westatus = fs_writeend(chunkid,ind->inode,mfleng,canmodmtime?CHUNKOPFLAG_CANMODTIME:0);
+//				if (westatus==ERROR_ENOENT || westatus==ERROR_QUOTA) { // can't change -> do not repeat
+//					break;
+//				} else if (westatus!=STATUS_OK) {
+//					if (optimeout>0.0 && monotonic_seconds() - opbegin > optimeout) {
+//						westatus = ERROR_EIO;
+//						break;
+//					}
+//					portable_usleep(100000+(10000<<cnt));
+//					zassert(pthread_mutex_lock(&(ind->lock)));	// make helgrind happy
+//					canmodmtime = ind->canmodmtime;
+//					zassert(pthread_mutex_unlock(&(ind->lock)));
+//				} else {
+//					break;
+//				}
+//			}
 		} else {
 			westatus = STATUS_OK;
 		}
 
-		if (westatus==ERROR_ENOENT) {
+		if (optimeout>0.0 && monotonic_seconds() - opbegin > optimeout) {
+			write_job_end(chd,EIO,0);
+		} else if (westatus==ERROR_ENOENT) {
 			write_job_end(chd,EBADF,0);
 		} else if (westatus==ERROR_QUOTA) {
 			write_job_end(chd,EDQUOT,0);
+		} else if (westatus==ERROR_IO) {
+			write_job_end(chd,EIO,0);
 		} else if (westatus!=STATUS_OK) {
 			write_job_end(chd,ENXIO,0);
 		} else {
@@ -1395,13 +1420,18 @@ void* write_worker(void *arg) {
 	}
 }
 
-void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t logretry) {
+void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint32_t logretry) {
 	uint32_t i;
 //	sigset_t oldset;
 //	sigset_t newset;
 
 	cacheblockcount = (cachesize/MFSBLOCKSIZE);
 	maxretries = retries;
+	if (optimeout>0) {
+		optimeout = timeout;
+	} else {
+		optimeout = 0.0;
+	}
 	minlogretry = logretry;
 	if (cacheblockcount<10) {
 		cacheblockcount=10;

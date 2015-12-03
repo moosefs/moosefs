@@ -95,7 +95,7 @@ uint32_t master_version(void);
 // called before fork
 int fs_init_master_connection(const char *bindhostname,const char *masterhostname,const char *masterportname,uint8_t meta,const char *info,const char *subfolder,const uint8_t passworddigest[16],uint8_t donotrememberpassword,uint8_t bgregister);
 // called after fork
-void fs_init_threads(uint32_t retries);
+void fs_init_threads(uint32_t retries,uint32_t to);
 void fs_term(void);
 
 #endif

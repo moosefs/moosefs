@@ -1436,11 +1436,17 @@ void mainserv_serve(int sock) {
 }
 */
 
+void mainserv_term(void) {
+	/* to do: terminate thread */
+	conncache_term();
+}
+
 int mainserv_init(void) {
 	pthread_t rnthread;
 	if (conncache_init(250)<0) {
 		return -1;
 	}
+	main_destruct_register(mainserv_term);
 	read_nops_head = NULL;
 	read_nops_tail = &read_nops_head;
 	if (pthread_mutex_init(&read_nops_lock,NULL)<0) {

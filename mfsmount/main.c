@@ -33,7 +33,7 @@
 #  define MFS_USE_MALLOPT 1
 #endif
 
-#if defined(__linux__)
+#if defined(HAVE_LINUX_OOM_H)
 #include <linux/oom.h>
 #endif
 
@@ -193,6 +193,7 @@ struct mfsopts {
 	unsigned readaheadleng;
 	unsigned readaheadtrigger;
 	unsigned ioretries;
+	unsigned timeout;
 	unsigned logretry;
 	double attrcacheto;
 	double xattrcacheto;
@@ -256,6 +257,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfsreadaheadleng=%u", readaheadleng, 0),
 	MFS_OPT("mfsreadaheadtrigger=%u", readaheadtrigger, 0),
 	MFS_OPT("mfsioretries=%u", ioretries, 0),
+	MFS_OPT("mfstimeout=%u", timeout, 0),
 	MFS_OPT("mfslogretry=%u", logretry, 0),
 	MFS_OPT("mfsdebug", debug, 1),
 	MFS_OPT("mfsmeta", meta, 1),
@@ -360,6 +362,7 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n");
 	fprintf(stderr,"    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n");
 	fprintf(stderr,"    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n");
+	fprintf(stderr,"    -o mfstimeout=N             define maximum timeout in seconds before I/O error is returned (default: 0 - which means no timeout)\n");
 	fprintf(stderr,"    -o mfslogretry=N            define minimal retry counter on which system will start log I/O messages (default: 5)\n");
 	fprintf(stderr,"    -o mfsmaster=HOST           define mfsmaster location (default: " DEFAULT_MASTERNAME ")\n");
 	fprintf(stderr,"    -o mfsport=PORT             define mfsmaster port number (default: " DEFAULT_MASTER_CLIENT_PORT ")\n");
@@ -800,7 +803,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	symlink_cache_init();
 	negentry_cache_init(mfsopts.negentrycacheto);
 //	dir_cache_init();
-	fs_init_threads(mfsopts.ioretries);
+	fs_init_threads(mfsopts.ioretries,mfsopts.timeout);
 	if (masterproxy_init(mfsopts.proxyhost)<0) {
 		fs_term();
 //		dir_cache_term();
@@ -819,8 +822,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	if (mfsopts.meta==0) {
 		csdb_init();
 		delay_init();
-		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries,mfsopts.logretry);
-		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries,mfsopts.logretry);
+		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry);
+		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry);
 	}
 
  	ch = fuse_mount(mp, args);
@@ -1163,6 +1166,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.readaheadleng = 0;
 	mfsopts.readaheadtrigger = 0;
 	mfsopts.ioretries = 30;
+	mfsopts.timeout = 0;
 	mfsopts.logretry = 5;
 	mfsopts.passwordask = 0;
 	mfsopts.attrcacheto = 1.0;

@@ -24,7 +24,7 @@
 #include <sys/uio.h>
 #include <inttypes.h>
 
-void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t minlogretry);
+void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t timeout,uint32_t minlogretry);
 void read_data_term(void);
 int read_data(void *vid, uint64_t offset, uint32_t *size, void **rhead,struct iovec **iov,uint32_t *iovcnt);
 void read_data_free_buff(void *vid,void *vrhead,struct iovec *iov);

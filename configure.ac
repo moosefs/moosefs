@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.60], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.61], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -150,11 +150,15 @@ AC_FUNC_STRERROR_R
 AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_FORK
 AC_FUNC_LSTAT
-AC_FUNC_MALLOC
 AC_FUNC_MEMCMP
-AC_FUNC_REALLOC
 dnl AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_STAT
+
+dnl AC_FUNC_MALLOC
+dnl AC_FUNC_REALLOC
+# rpl_malloc/rpl_realloc problem AC_FUNC_MALLOC/AC_FUNC_REALLOC !!!
+AC_CHECK_FUNCS([malloc realloc])
+
 # required functions
 AC_CHECK_FUNCS([atexit bzero ftruncate getaddrinfo getpass gettimeofday memmove memset mkdir realpath poll socket strchr strdup strtol strtoul ftello fseeko],, [AC_MSG_ERROR([One of required functions was not found])])
 
@@ -198,6 +202,9 @@ AC_CHECK_FUNCS([clock_gettime])
 
 # optional getgroups headers
 AC_CHECK_HEADERS([sys/sysctl.h])
+
+# optional out of memory killer header
+AC_CHECK_HEADERS([linux/oom.h])
 
 # glibc tuning
 AC_CHECK_HEADERS([malloc.h])

@@ -29,6 +29,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/poll.h>
+#include <sys/time.h>
 #include <syslog.h>
 #include <time.h>
 #include <limits.h>
@@ -47,6 +48,8 @@
 #include "strerr.h"
 #include "md5.h"
 #include "datapack.h"
+#include "clocks.h"
+#include "portable.h"
 // #include "dircache.h"
 
 #define CONNECT_TIMEOUT 2000
@@ -115,6 +118,7 @@ static int donotsendsustainedinodes;
 static time_t lastwrite;
 static int sessionlost;
 
+static uint64_t usectimeout;
 static uint32_t maxretries;
 
 static pthread_t rpthid,npthid;
@@ -447,8 +451,12 @@ static inline void fs_disconnect(void) {
 const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answer_leng) {
 	uint32_t cnt;
 	static uint8_t notsup = ERROR_ENOTSUP;
+	uint64_t start,period,usecto;
 //	uint32_t size = rec->size;
 
+	if (usectimeout>0) {
+		start = monotonic_useconds();
+	}
 	for (cnt=0 ; cnt<maxretries ; cnt++) {
 		pthread_mutex_lock(&fdlock);
 		if (sessionlost==1) {
@@ -457,7 +465,17 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		}
 		if (fd==-1) {
 			pthread_mutex_unlock(&fdlock);
-			sleep(1+((cnt<30)?(cnt/3):10));
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
 			continue;
 		}
 		//syslog(LOG_NOTICE,"threc(%"PRIu32") - sending ...",rec->packetid);
@@ -471,7 +489,17 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 #endif
 			pthread_mutex_unlock(&(rec->mutex));
 			pthread_mutex_unlock(&fdlock);
-			sleep(1+((cnt<30)?(cnt/3):10));
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
 			continue;
 		}
 		rec->rcvd = 0;
@@ -485,7 +513,30 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		pthread_mutex_lock(&(rec->mutex));
 		while (rec->rcvd==0) {
 			rec->waiting = 1;
-			pthread_cond_wait(&(rec->cond),&(rec->mutex));
+			if (usectimeout>0) {
+				struct timespec ts;
+				struct timeval tv;
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					pthread_mutex_unlock(&(rec->mutex));
+					return NULL;
+				}
+				period = usectimeout - period;
+				gettimeofday(&tv, NULL);
+				usecto = tv.tv_sec;
+				usecto *= 1000000;
+				usecto += tv.tv_usec;
+				usecto += period;
+				ts.tv_sec = usecto / 1000000;
+				ts.tv_nsec = (usecto % 1000000) * 1000;
+				if (pthread_cond_timedwait(&(rec->cond),&(rec->mutex),&ts)==ETIMEDOUT) {
+					rec->waiting = 0;
+					pthread_mutex_unlock(&(rec->mutex));
+					return NULL;
+				}
+			} else {
+				pthread_cond_wait(&(rec->cond),&(rec->mutex));
+			}
 			rec->waiting = 0;
 		}
 		*answer_leng = rec->idataleng;
@@ -493,7 +544,17 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		// syslog(LOG_NOTICE,"master: command_info: %"PRIu32" ; reccmd: %"PRIu32,command_info,rec->cmd);
 		if (rec->status!=0) {
 			pthread_mutex_unlock(&(rec->mutex));
-			sleep(1+((cnt<30)?(cnt/3):10));
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
 			continue;
 		}
 		if (rec->rcvd_cmd==ANTOAN_UNKNOWN_COMMAND || rec->rcvd_cmd==ANTOAN_BAD_COMMAND_SIZE) {
@@ -504,7 +565,17 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		if (rec->rcvd_cmd!=expected_cmd) {
 			pthread_mutex_unlock(&(rec->mutex));
 			fs_disconnect();
-			sleep(1+((cnt<30)?(cnt/3):10));
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
 			continue;
 		}
 		pthread_mutex_unlock(&(rec->mutex));
@@ -516,8 +587,12 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 
 const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t *answer_leng) {
 	uint32_t cnt;
+	uint64_t start,period,usecto;
 //	uint32_t size = rec->size;
 
+	if (usectimeout>0) {
+		start = monotonic_useconds();
+	}
 	for (cnt=0 ; cnt<maxretries ; cnt++) {
 		pthread_mutex_lock(&fdlock);
 		if (sessionlost==1) {
@@ -526,7 +601,17 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 		}
 		if (fd==-1) {
 			pthread_mutex_unlock(&fdlock);
-			sleep(1+((cnt<30)?(cnt/3):10));
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
 			continue;
 		}
 		//syslog(LOG_NOTICE,"threc(%"PRIu32") - sending ...",rec->packetid);
@@ -540,7 +625,17 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 #endif
 			pthread_mutex_unlock(&(rec->mutex));
 			pthread_mutex_unlock(&fdlock);
-			sleep(1+((cnt<30)?(cnt/3):10));
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
 			continue;
 		}
 		rec->rcvd = 0;
@@ -554,7 +649,30 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 		pthread_mutex_lock(&(rec->mutex));
 		while (rec->rcvd==0) {
 			rec->waiting = 1;
-			pthread_cond_wait(&(rec->cond),&(rec->mutex));
+			if (usectimeout>0) {
+				struct timespec ts;
+				struct timeval tv;
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					pthread_mutex_unlock(&(rec->mutex));
+					return NULL;
+				}
+				period = usectimeout - period;
+				gettimeofday(&tv, NULL);
+				usecto = tv.tv_sec;
+				usecto *= 1000000;
+				usecto += tv.tv_usec;
+				usecto += period;
+				ts.tv_sec = usecto / 1000000;
+				ts.tv_nsec = (usecto % 1000000) * 1000;
+				if (pthread_cond_timedwait(&(rec->cond),&(rec->mutex),&ts)==ETIMEDOUT) {
+					rec->waiting = 0;
+					pthread_mutex_unlock(&(rec->mutex));
+					return NULL;
+				}
+			} else {
+				pthread_cond_wait(&(rec->cond),&(rec->mutex));
+			}
 			rec->waiting = 0;
 		}
 		*answer_leng = rec->idataleng;
@@ -562,7 +680,17 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 		// syslog(LOG_NOTICE,"master: command_info: %"PRIu32" ; reccmd: %"PRIu32,command_info,rec->cmd);
 		if (rec->status!=0) {
 			pthread_mutex_unlock(&(rec->mutex));
-			sleep(1+((cnt<30)?(cnt/3):10));
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
 			continue;
 		}
 		*received_cmd = rec->rcvd_cmd;
@@ -1571,9 +1699,11 @@ int fs_init_master_connection(const char *bindhostname,const char *masterhostnam
 }
 
 // called after fork
-void fs_init_threads(uint32_t retries) {
+void fs_init_threads(uint32_t retries,uint32_t timeout) {
 	pthread_attr_t thattr;
 	maxretries = retries;
+	usectimeout = timeout;
+	usectimeout *= 1000000; // sec -> usec
 	fterm = 0;
 	pthread_mutex_init(&reclock,NULL);
 	pthread_mutex_init(&fdlock,NULL);

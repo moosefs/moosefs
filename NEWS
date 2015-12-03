@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.61-1 (2015-12-03)
+
+  - (master) fixed lookup in case of missing chunks (lookup returned ENXIO in such case)
+  - (mount) added mfstimeout option to force timeout for all I/O operations
+  - (autotools) fixed problem with 'undefined reference to rpl_malloc/rpl_realloc'
+
 * MooseFS 3.0.60-1 (2015-11-23)
 
   - (systemd) added TimeoutStartSec=1800 to master

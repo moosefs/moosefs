@@ -288,7 +288,9 @@ void csdb_servlist_data(uint8_t *ptr) {
 				if (hlstatus==1) {
 					gracetime = 0;
 				} else if (hlstatus==2) {
-					gracetime = 0xFFFFFFFF;
+					gracetime = 0xC0000000;
+				} else if (hlstatus==3) {
+					gracetime = 0x80000000;
 				}
 				put32bit(&ptr,version&0xFFFFFF);
 				put32bit(&ptr,csptr->ip);

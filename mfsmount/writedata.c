@@ -480,9 +480,9 @@ void write_job_end(chunkdata *chd,int status,uint32_t delay) {
 		errno = status;
 		syslog(LOG_WARNING,"error writing file number %"PRIu32": %s",ind->inode,strerr(errno));
 		ind->status = status;
-		if (ind->chunkwaiting>0) {
+//		if (ind->chunkwaiting>0) {
 			zassert(pthread_cond_broadcast(&(ind->chunkcond)));
-		}
+//		}
 	}
 	if (status==0 && delay==0) {
 		chd->trycnt=0;	// on good write reset try counter
@@ -712,6 +712,7 @@ void* write_worker(void *arg) {
 			continue;
 		}
 
+		opbegin = 0; // make static code analysers happy
 		if (optimeout>0.0) {
 			opbegin = monotonic_seconds();
 		}
@@ -955,9 +956,9 @@ void* write_worker(void *arg) {
 			zassert(pthread_mutex_lock(&(ind->lock)));
 			if (chd->chunkready==0) {
 				chd->chunkready = 1;
-				if (ind->chunkwaiting>0) {
+//				if (ind->chunkwaiting>0) {
 					zassert(pthread_cond_broadcast(&(ind->chunkcond)));
-				}
+//				}
 			}
 			zassert(pthread_mutex_unlock(&(ind->lock)));
 		}
@@ -1681,7 +1682,7 @@ static int write_data_do_chunk_wait(inodedata *ind) {
 	s = monotonic_useconds();
 #endif
 	zassert(pthread_mutex_lock(&(ind->lock)));
-	ind->chunkwaiting++;
+//	ind->chunkwaiting++;
 	do {
 		chd=NULL;
 		if (ind->status==0) {
@@ -1697,7 +1698,7 @@ static int write_data_do_chunk_wait(inodedata *ind) {
 			}
 		}
 	} while (ind->status==0 && chd!=NULL);
-	ind->chunkwaiting--;
+//	ind->chunkwaiting--;
 	for (chd = ind->chunks ; chd!=NULL ; chd=chd->next) {
 		chd->unbreakable = 1;
 	}

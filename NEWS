@@ -1,6 +1,15 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.61-1 (2015-12-03)
+* MooseFS 3.0.62-1 (2015-12-11)
+
+  - (mount) fixed rare race condition in read (not dangerous)
+  - (mount) better read/write synchronization in read
+  - (cs) added ability to start with metaid read from connected hard drives (from .metaid file)
+  - (cs) added protection from using disks filled in more than 99.9% when there are other disks
+  - (master+cs+cli+cgi) added 'rebalance in progress' state to chunkservers (treated as heavy load state)
+  - (master) added ATIME_MODE option to set atime modification behaviour
+
+* MooseFS 3.0.61-1 (2015-11-30)
 
   - (master) fixed lookup in case of missing chunks (lookup returned ENXIO in such case)
   - (mount) added mfstimeout option to force timeout for all I/O operations

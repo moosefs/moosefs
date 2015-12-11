@@ -284,7 +284,8 @@ static damagedchunk *damagedchunks = NULL;
 static lostchunk *lostchunks = NULL;
 static newchunk *newchunks = NULL;
 static uint32_t errorcounter = 0;
-static int hddspacechanged = 0;
+static uint8_t hddspacechanged = 0;
+static uint8_t global_rebalance_is_on = 0;
 
 static pthread_t rebalancethread,foldersthread,delayedthread,testerthread;
 static uint8_t term = 0;
@@ -299,7 +300,7 @@ static pthread_mutex_t statslock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t doplock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t ndoplock = PTHREAD_MUTEX_INITIALIZER;
 
-// master reports = damaged chunks, lost chunks, errorcounter, hddspacechanged
+// master reports = damaged chunks, lost chunks, errorcounter, hddspacechanged, global_rebalance_is_on
 static pthread_mutex_t dclock = PTHREAD_MUTEX_INITIALIZER;
 
 // hashtab - only hash tab, chunks have their own separate locks
@@ -555,13 +556,17 @@ uint32_t hdd_errorcounter(void) {
 	return result;
 }
 
-int hdd_spacechanged(void) {
-	uint32_t result;
+uint8_t hdd_spacechanged(void) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+	return __sync_fetch_and_and(&hddspacechanged,0);
+#else
+	uint8_t res;
 	zassert(pthread_mutex_lock(&dclock));
-	result = hddspacechanged;
+	res = hddspacechanged;
 	hddspacechanged = 0;
 	zassert(pthread_mutex_unlock(&dclock));
-	return result;
+	return res;
+#endif
 }
 
 void hdd_stats(uint64_t *br,uint64_t *bw,uint32_t *opr,uint32_t *opw,uint32_t *dbr,uint32_t *dbw,uint32_t *dopr,uint32_t *dopw,uint64_t *rtime,uint64_t *wtime) {
@@ -1293,7 +1298,7 @@ static inline folder* hdd_getfolder() {
 	double minerr,err,expdist;
 //	double usage;
 	uint64_t totalsum,good_totalsum;
-	uint32_t folder_cnt,good_cnt;
+	uint32_t folder_cnt,good_cnt,notfull_cnt;
 	uint8_t onlygood;
 	uint64_t usectime;
 
@@ -1303,20 +1308,27 @@ static inline folder* hdd_getfolder() {
 	good_totalsum = 0;
 	folder_cnt = 0;
 	good_cnt = 0;
+	notfull_cnt = 0;
 	onlygood = 0;
+
 	for (f=folderhead ; f ; f=f->next) {
 		if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
-			if (usectime < f->rebalance_last_usec) { // wall clock move forward protection
-				f->rebalance_last_usec = usectime;
+			if (f->avail * UINT64_C(1000) >= f->total) { // space used <= 99.9%
+				notfull_cnt++;
 			}
-//			usage = f->total-f->avail;
-//			usage /= f->total;
-			if (f->rebalance_last_usec + REBALANCE_GRACE_PERIOD < usectime) {
-				good_cnt++;
-				good_totalsum += f->total;
+		}
+	}
+
+	for (f=folderhead ; f ; f=f->next) {
+		if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
+			if (notfull_cnt==0 || f->avail * UINT64_C(1000) >= f->total) { // space used <= 99.9%
+				if (f->rebalance_last_usec + REBALANCE_GRACE_PERIOD < usectime) {
+					good_cnt++;
+					good_totalsum += f->total;
+				}
+				totalsum += f->total;
+				folder_cnt++;
 			}
-			folder_cnt++;
-			totalsum += f->total;
 		}
 	}
 //	syslog(LOG_NOTICE,"good_cnt: %"PRIu32" ; folder_cnt: %"PRIu32" ; good_totalsum:%"PRIu64" ; totalsum:%"PRIu64,good_cnt,folder_cnt,good_totalsum,totalsum);
@@ -1328,20 +1340,20 @@ static inline folder* hdd_getfolder() {
 	minerr = 0.0; // make some old compilers happy
 	for (f=folderhead ; f ; f=f->next) {
 		if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
-//			usage = f->total-f->avail;
-//			usage /= f->total;
-			if (onlygood==0 || (f->rebalance_last_usec + REBALANCE_GRACE_PERIOD < usectime)) {
-				f->write_dist++;
-				if (f->write_first) {
-					err = 1.0;
-				} else {
-					expdist = totalsum;
-					expdist /= f->total;
-					err = (expdist + f->write_corr) / f->write_dist;
-				}
-				if (bf==NULL || err<minerr) {
-					minerr = err;
-					bf = f;
+			if (notfull_cnt==0 || f->avail * UINT64_C(1000) >= f->total) { // space used <= 99.9%
+				if (onlygood==0 || (f->rebalance_last_usec + REBALANCE_GRACE_PERIOD < usectime)) {
+					f->write_dist++;
+					if (f->write_first) {
+						err = 1.0;
+					} else {
+						expdist = totalsum;
+						expdist /= f->total;
+						err = (expdist + f->write_corr) / f->write_dist;
+					}
+					if (bf==NULL || err<minerr) {
+						minerr = err;
+						bf = f;
+					}
 				}
 			}
 		}
@@ -1724,9 +1736,13 @@ void hdd_check_folders(void) {
 	}
 	zassert(pthread_mutex_unlock(&folderlock));
 	if (changed) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+		__sync_fetch_and_or(&hddspacechanged,1);
+#else
 		zassert(pthread_mutex_lock(&dclock));
 		hddspacechanged = 1;
 		zassert(pthread_mutex_unlock(&dclock));
+#endif
 	}
 }
 
@@ -4280,6 +4296,18 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 	return STATUS_OK;
 }
 
+uint8_t hdd_is_rebalance_on(void) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+	return __sync_fetch_and_or(&global_rebalance_is_on,0);
+#else
+	uint8_t res;
+	zassert(pthread_mutex_lock(&dclock));
+	res = global_rebalance_is_on;
+	zassert(pthread_mutex_unlock(&dclock));
+	return res;
+#endif
+}
+
 void* hdd_rebalance_thread(void *arg) {
 	folder *f,*fdst,*fsrc;
 	double aboveminerr,belowminerr,err,expdist;
@@ -4497,9 +4525,13 @@ void* hdd_rebalance_thread(void *arg) {
 			fdst->rebalance_in_progress = 1;
 			zassert(pthread_mutex_unlock(&folderlock));
 			if (changed) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_or(&hddspacechanged,1);
+#else
 				zassert(pthread_mutex_lock(&dclock));
 				hddspacechanged = 1;
 				zassert(pthread_mutex_unlock(&dclock));
+#endif
 			}
 			st = monotonic_useconds();
 			(void)hdd_int_move(fsrc,fdst);
@@ -4510,6 +4542,13 @@ void* hdd_rebalance_thread(void *arg) {
 			fdst->rebalance_last_usec = en;
 			zassert(pthread_mutex_unlock(&folderlock));
 			rebalance_is_on = 1;
+#ifdef HAVE___SYNC_FETCH_AND_OP
+			__sync_fetch_and_or(&global_rebalance_is_on,1);
+#else
+			zassert(pthread_mutex_lock(&dclock));
+			global_rebalance_is_on = 1;
+			zassert(pthread_mutex_unlock(&dclock));
+#endif
 			if (perc<100 && en>st) {
 				en -= st;
 				st = en;
@@ -4523,9 +4562,13 @@ void* hdd_rebalance_thread(void *arg) {
 		} else {
 			zassert(pthread_mutex_unlock(&folderlock));
 			if (changed) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_or(&hddspacechanged,1);
+#else
 				zassert(pthread_mutex_lock(&dclock));
 				hddspacechanged = 1;
 				zassert(pthread_mutex_unlock(&dclock));
+#endif
 			}
 			if (rebalance_is_on) {
 				zassert(pthread_mutex_lock(&folderlock));
@@ -4538,6 +4581,13 @@ void* hdd_rebalance_thread(void *arg) {
 				rebalance_finished = monotonic_time;
 			}
 			rebalance_is_on = 0;
+#ifdef HAVE___SYNC_FETCH_AND_OP
+			__sync_fetch_and_and(&global_rebalance_is_on,0);
+#else
+			zassert(pthread_mutex_lock(&dclock));
+			global_rebalance_is_on = 0;
+			zassert(pthread_mutex_unlock(&dclock));
+#endif
 			sleep(1);
 		}
 	}
@@ -5021,9 +5071,13 @@ void* hdd_folder_scan(void *arg) {
 
 		scanterm = 0;
 
+#ifdef HAVE___SYNC_FETCH_AND_OP
+		__sync_fetch_and_or(&hddspacechanged,1);
+#else
 		zassert(pthread_mutex_lock(&dclock));
 		hddspacechanged = 1;
 		zassert(pthread_mutex_unlock(&dclock));
+#endif
 
 		if (todel==0) {
 			for (subf=0 ; subf<256 ; subf++) {
@@ -5107,9 +5161,13 @@ void* hdd_folder_scan(void *arg) {
 				zassert(pthread_mutex_lock(&folderlock));
 				f->scanprogress = currentperc;
 				zassert(pthread_mutex_unlock(&folderlock));
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_or(&hddspacechanged,1);
+#else
 				zassert(pthread_mutex_lock(&dclock));
 				hddspacechanged = 1; // report chunk count to master
 				zassert(pthread_mutex_unlock(&dclock));
+#endif
 				syslog(LOG_NOTICE,"scanning folder %s: %"PRIu8"%% (%"PRIu32"s)",f->path,lastperc,currenttime-begintime);
 			}
 		}
@@ -5541,15 +5599,14 @@ int hdd_parseline(char *hddcfgline) {
 		if (read(mfd,buff,8)==8) {
 			rptr = buff;
 			filemetaid = get64bit(&rptr);
-			if (filemetaid!=metaid) {
-				if (metaid>0) {
-					mfs_arg_syslog(LOG_ERR,"hdd space manager: wrong meta id (mfs instance id) in file '%s' (0x%016"PRIX64",expected:0x%016"PRIX64") - likely this is drive from different mfs instance (drive ignored, remove this file to skip this test)",metaidfname,filemetaid,metaid);
-				} else {
-					mfs_arg_syslog(LOG_ERR,"hdd space manager: chunkserver without meta id (mfs instance id) shouldn't use drive with defined meta id (file: '%s') - likely this is drive from different mfs instance (drive ignored, remove this file to skip this test)",metaidfname);
-				}
+			if (filemetaid!=metaid && metaid>0) {
+				mfs_arg_syslog(LOG_ERR,"hdd space manager: wrong meta id (mfs instance id) in file '%s' (0x%016"PRIX64",expected:0x%016"PRIX64") - likely this is drive from different mfs instance (drive ignored, remove this file to skip this test)",metaidfname,filemetaid,metaid);
 				close(mfd);
 				free(metaidfname);
 				return -1;
+			}
+			if (metaid==0 && filemetaid>0) {
+				masterconn_setmetaid(filemetaid);
 			}
 			metaid = 0; // file exists and is correct (or forced do be ignored), so do not re create it
 		}

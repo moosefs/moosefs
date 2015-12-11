@@ -1,3 +1,17 @@
+moosefs (3.0.62-1) unstable; urgency=medium
+
+  * (mount) fixed rare race condition in read (not dangerous)
+  * (mount) better read/write synchronization in read
+  * (cs) added ability to start with metaid read from connected hard drives
+    (from .metaid file)
+  * (cs) added protection from using disks filled in more than 99.9% when there
+    are other disks
+  * (master+cs+cli+cgi) added 'rebalance in progress' state to chunkservers
+    (treated as heavy load state)
+  * (master) added ATIME_MODE option to set atime modification behaviour
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 11 Dec 2015 12:00:00 +0100
+
 moosefs (3.0.61-1) unstable; urgency=medium
 
   * (master) fixed lookup in case of missing chunks (lookup returned ENXIO in
@@ -6,7 +20,7 @@ moosefs (3.0.61-1) unstable; urgency=medium
   * (autotools) fixed problem with 'undefined reference to
     rpl_malloc/rpl_realloc'
 
- -- MooseFS Team <contact@moosefs.com>  Thu, 03 Dec 2015 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Mon, 30 Nov 2015 12:00:00 +0100
 
 moosefs (3.0.60-1) unstable; urgency=medium
 

@@ -132,6 +132,7 @@ typedef struct _quotanode {
 
 static quotanode *quotahead;
 static uint32_t QuotaDefaultGracePeriod;
+static uint8_t AtimeMode;
 
 typedef struct _fsnode {
 	uint32_t inode;
@@ -4429,8 +4430,10 @@ uint8_t fs_readlink(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t 
 	*pleng = p->data.sdata.pleng;
 	*path = p->data.sdata.path;
 	if (p->atime!=ts) {
-		p->atime = ts;
-		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
+		if ((AtimeMode==ATIME_ALWAYS) || (((p->atime <= p->ctime && ts >= p->ctime) || (p->atime <= p->mtime && ts >= p->mtime) || (p->atime + 86400 < ts)) && AtimeMode==ATIME_RELATIVE_ONLY)) {
+			p->atime = ts;
+			changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
+		}
 	}
 	stats_readlink++;
 	return STATUS_OK;
@@ -5142,8 +5145,10 @@ void fs_readdir_data(uint32_t rootinode,uint8_t sesflags,uint32_t uid,uint32_t g
 	uint32_t ts = main_time();
 
 	if (p->atime!=ts) {
-		p->atime = ts;
-		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,p->inode);
+		if ((AtimeMode==ATIME_ALWAYS) || (((p->atime <= p->ctime && ts >= p->ctime) || (p->atime <= p->mtime && ts >= p->mtime) || (p->atime + 86400 < ts)) && AtimeMode==ATIME_RELATIVE_ONLY)) {
+			p->atime = ts;
+			changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,p->inode);
+		}
 	}
 	fsnodes_readdirdata(rootinode,uid,gid,auid,agid,sesflags,p,e,maxentries,nedgeid,dbuff,flags&GETDIR_FLAG_WITHATTR);
 	stats_readdir++;
@@ -5236,8 +5241,10 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t 
 	}
 	*length = p->data.fdata.length;
 	if (p->atime!=ts && (chunkopflags&CHUNKOPFLAG_CANMODTIME)) {
-		p->atime = ts;
-		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
+		if ((AtimeMode==ATIME_ALWAYS || AtimeMode==ATIME_FILES_ONLY) || (((p->atime <= p->ctime && ts >= p->ctime) || (p->atime <= p->mtime && ts >= p->mtime) || (p->atime + 86400 < ts)) && (AtimeMode==ATIME_RELATIVE_ONLY || AtimeMode==ATIME_FILES_AND_RELATIVE_ONLY))) {
+			p->atime = ts;
+			changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
+		}
 	}
 	stats_read++;
 	return STATUS_OK;
@@ -7988,6 +7995,11 @@ void fs_reload(void) {
 	} else {
 		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_DEFAULT_GRACE_PERIOD",7*86400);
 	}
+	AtimeMode = cfg_getuint8("ATIME_MODE",0);
+	if (AtimeMode>ATIME_NEVER) {
+		syslog(LOG_NOTICE,"unrecognized value for ATIME_MODE - using defaults");
+		AtimeMode = 0;
+	}
 }
 
 int fs_strinit(void) {
@@ -8009,11 +8021,7 @@ int fs_strinit(void) {
 	symlink_init();
 	chunktab_init();
 	test_start_time = main_time()+900;
-	if (cfg_isdefined("QUOTA_TIME_LIMIT") && !cfg_isdefined("QUOTA_DEFAULT_GRACE_PERIOD")) {
-		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400); // deprecated option
-	} else {
-		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_DEFAULT_GRACE_PERIOD",7*86400);
-	}
+	fs_reload();
 
 	main_reload_register(fs_reload);
 	main_msectime_register(100,0,fs_test_files);

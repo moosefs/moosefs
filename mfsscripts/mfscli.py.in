@@ -3952,7 +3952,12 @@ if "CS" in sectionset:
 						out.append("""		<td align="left">%s</td>""" % labelstr)
 					out.append("""		<td align="center"><span class="sortkey">%s </span><span class="%s">%s</span></td>""" % (sortver,verclass,strver))
 					if leaderconn.version_at_least(1,6,28):
-						if gracetime>0:
+						if gracetime>=0x80000000:
+							if gracetime>=0xC0000000:
+								out.append("""		<td align="right"><a style="cursor:default" title="server in heavy load state"><span class="GRACETIME">&lt;%u&gt;</span></a></td>""" % (gracetime,load))
+							else:
+								out.append("""		<td align="right"><a style="cursor:default" title="internal rebalance in progress"><span class="GRACETIME">(%u)</span></a></td>""" % (gracetime,load))
+						elif gracetime>0:
 							out.append("""		<td align="right"><a style="cursor:default" title="back after %u seconds" href="%s"><span class="GRACETIME">[%u]</span></a></td>""" % (gracetime,createlink({"CSbacktowork":("%s:%u" % (strip,port))}),load))
 						else:
 							out.append("""		<td align="right">%u</td>""" % (load))

@@ -454,6 +454,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 	uint64_t start,period,usecto;
 //	uint32_t size = rec->size;
 
+	start = 0; // make static code analysers happy
 	if (usectimeout>0) {
 		start = monotonic_useconds();
 	}
@@ -590,6 +591,7 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 	uint64_t start,period,usecto;
 //	uint32_t size = rec->size;
 
+	start = 0; // make static code analysers happy
 	if (usectimeout>0) {
 		start = monotonic_useconds();
 	}

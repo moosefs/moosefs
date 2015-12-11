@@ -53,8 +53,10 @@ void hdd_get_chunks_next_list_data(uint8_t *buff);
 
 //uint32_t get_changedchunkscount();
 //void fill_changedchunksinfo(uint8_t *buff);
-int hdd_spacechanged(void);
+uint8_t hdd_spacechanged(void);
 void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount,uint64_t *tdusedspace,uint64_t *tdtotalspace,uint32_t *tdchunkcount);
+
+uint8_t hdd_is_rebalance_on(void);
 
 /* I/O operations */
 int hdd_open(uint64_t chunkid,uint32_t version);

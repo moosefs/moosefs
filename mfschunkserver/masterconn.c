@@ -187,6 +187,10 @@ uint64_t masterconn_getmetaid(void) {
 	return MetaFileId;
 }
 
+void masterconn_setmetaid(uint64_t metaid) {
+	MetaFileId = metaid;
+}
+
 static inline void masterconn_setcsid(uint16_t csid,uint64_t metafileid) {
 	int fd;
 	uint8_t buff[10],*wptr;
@@ -604,12 +608,20 @@ void masterconn_send_error_occurred() {
 void masterconn_heavyload(uint32_t load,uint8_t hlstatus) {
 	masterconn *eptr = masterconnsingleton;
 	uint8_t *buff;
+	uint8_t hltosend;
 
 	if (eptr->registerstate==REGISTERED && eptr->mode==DATA && eptr->masterversion>=VERSION2INT(3,0,7)) {
 		if (hlstatus != eptr->hlstatus) {
+			hltosend = hlstatus;
+			if (hlstatus!=2 && hdd_is_rebalance_on()) {
+				hltosend = 3;
+			}
+			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==3) {
+				hltosend = 2;
+			}
 			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);
 			put32bit(&buff,load);
-			put8bit(&buff,hlstatus);
+			put8bit(&buff,hltosend);
 			eptr->hlstatus = hlstatus;
 		}
 	}
@@ -672,13 +684,21 @@ void masterconn_check_hdd_reports() {
 void masterconn_reportload(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t load;
+	uint8_t hltosend;
 	uint8_t *buff;
 	if (eptr->mode==DATA && eptr->masterversion>=VERSION2INT(1,6,28) && eptr->registerstate==REGISTERED) {
 		load = job_getload();
 		if (eptr->masterversion>=VERSION2INT(3,0,7)) {
+			hltosend = eptr->hlstatus;
+			if (hltosend!=2 && hdd_is_rebalance_on()) {
+				hltosend = 3;
+			}
+			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==3) {
+				hltosend = 2;
+			}
 			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);
 			put32bit(&buff,load);
-			put8bit(&buff,eptr->hlstatus);
+			put8bit(&buff,hltosend);
 		} else {
 			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,4);
 			put32bit(&buff,load);

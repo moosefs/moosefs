@@ -4915,19 +4915,25 @@ void matoclserv_fuse_gettrash(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t *ptr;
 	uint8_t status;
 	uint32_t dleng;
-	if (length!=4) {
+	uint32_t tid;
+	if (length!=4 && length!=8) {
 		syslog(LOG_NOTICE,"CLTOMA_FUSE_GETTRASH - wrong size (%"PRIu32"/4)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
-	status = fs_readtrash_size(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),&dleng);
+	if (length==8) {
+		tid = get32bit(&data);
+	} else {
+		tid = 0xFFFFFFFF;
+	}
+	status = fs_readtrash_size(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),tid,&dleng);
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETTRASH,(status!=STATUS_OK)?5:(4+dleng));
 	put32bit(&ptr,msgid);
 	if (status!=STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
-		fs_readtrash_data(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),ptr);
+		fs_readtrash_data(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),tid,ptr);
 	}
 }
 

@@ -273,6 +273,8 @@ else: # CLI mode
 			('brcvd',23,1,'Received bytes'),
 			('bsent',24,1,'Sent bytes'),
 			('memoryvirt',25,2,'Virtual memory usage'),
+			('usedspace',26,2,'RAW disk space usage'),
+			('totalspace',27,2,'RAW disk space connected'),
 			('cpu',100,0,'Cpu usage (total sys+user)')
 	]
 	mcchartsabr = {
@@ -6628,6 +6630,7 @@ if "MC" in sectionset:
 			charts = (
 				(100,'cpu','cpu usage (percent)'),
 				(101,'memory','memory usage (if available - rss + virt)'),
+				(102,'space','raw disk space usage (total / used)'),
 				(2,'dels','chunk deletions (per minute)'),
 				(3,'repl','chunk replications (per minute)'),
 				(4,'statfs','statfs operations (per minute)'),

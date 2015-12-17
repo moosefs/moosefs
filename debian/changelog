@@ -1,7 +1,14 @@
-moosefs (3.0.62-1) unstable; urgency=medium
+moosefs (3.0.63-1) unstable; urgency=medium
 
   * (mount) fixed rare race condition in read (not dangerous)
   * (mount) better read/write synchronization in read
+  * (master) new chart (used/total space)
+  * (master+mount) split trash into 4096 separate sub-trashes
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 17 Dec 2015 12:00:00 +0100
+
+moosefs (3.0.62-1) unstable; urgency=medium
+
   * (cs) added ability to start with metaid read from connected hard drives
     (from .metaid file)
   * (cs) added protection from using disks filled in more than 99.9% when there

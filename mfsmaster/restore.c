@@ -401,14 +401,19 @@ int do_chunkdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 }
 
 int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t sustainedinodes,freeinodes;
+	uint32_t sustainedinodes,freeinodes,tid;
 	EAT(ptr,filename,lv,'(');
+	if (*ptr!=')') {
+		GETU32(tid,ptr);
+	} else {
+		tid = 0xFFFFFFFF;
+	}
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(freeinodes,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(sustainedinodes,ptr);
-	return fs_mr_emptytrash(ts,freeinodes,sustainedinodes);
+	return fs_mr_emptytrash(ts,tid,freeinodes,sustainedinodes);
 }
 
 int do_emptysustained(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

@@ -78,6 +78,8 @@
 
 #define MFS_INODE_REUSE_DELAY 86400
 
+#define TRASH_BUCKETS 4096
+
 #define STATUS_OK              0	// OK
 
 #define ERROR_EPERM            1	// Operation not permitted
@@ -1130,7 +1132,8 @@
 
 // 0x01C2
 #define CLTOMA_FUSE_GETTRASH (PROTO_BASE+450)
-// msgid:32
+// msgid:32 (version < 3.0.63)
+// msgid:32 trash_id:32 (version >= 3.0.63)
 
 // 0x01C3
 #define MATOCL_FUSE_GETTRASH (PROTO_BASE+451)

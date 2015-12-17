@@ -49,8 +49,10 @@
 #define CHARTS_BYTESRCVD 23
 #define CHARTS_BYTESSENT 24
 #define CHARTS_MEMORY_VIRT 25
+#define CHARTS_USED_SPACE 26
+#define CHARTS_TOTAL_SPACE 27
 
-#define CHARTS 26
+#define CHARTS 28
 
 #define STRID(a,b,c,d) (((((uint8_t)a)*256U+(uint8_t)b)*256U+(uint8_t)c)*256U+(uint8_t)d)
 
@@ -82,11 +84,14 @@
 	{"brcvd"        ,STRID('B','R','C','V'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
 	{"bsent"        ,STRID('B','S','N','T'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
 	{"memoryvirt"   ,STRID('M','E','M','V'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"usedspace"    ,STRID('U','S','P','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"totalspace"   ,STRID('T','S','P','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{NULL           ,0                     ,0              ,0,0                 ,   0, 0}  \
 };
 
 #define CALCDEFS { \
 	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_MEMORY_VIRT,CHARTS_MEMORY_RSS))), \
+	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_TOTAL_SPACE,CHARTS_USED_SPACE))), \
 	CHARTS_DEFS_END \
 };
 
@@ -94,6 +99,7 @@
 #define ESTATDEFS { \
 	{"cpu"          ,STRID('T','C','P','U'),CHARTS_DIRECT(CHARTS_UCPU)        ,CHARTS_DIRECT(CHARTS_SCPU)            ,CHARTS_NONE                       ,CHARTS_MODE_ADD,1,CHARTS_SCALE_MICRO, 100,60}, \
 	{"mem"          ,STRID('T','M','E','M'),CHARTS_CALC(0)                    ,CHARTS_DIRECT(CHARTS_MEMORY_RSS)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"space"        ,STRID('S','P','A','C'),CHARTS_CALC(1)                    ,CHARTS_DIRECT(CHARTS_USED_SPACE)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{NULL           ,0                     ,CHARTS_NONE                       ,CHARTS_NONE                           ,CHARTS_NONE                       ,0              ,0,0                 ,   0, 0}  \
 };
 

@@ -32,7 +32,7 @@ uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_
 // int fs_copy(uint32_t ts,inode,parent,strlen(name),name);
 uint8_t fs_mr_create(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *name,uint8_t type,uint16_t mode,uint16_t cumask,uint32_t uid,uint32_t gid,uint32_t rdev,uint32_t inode);
 uint8_t fs_mr_session(uint32_t sessionid);
-uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t freeinodes,uint32_t sustainedinodes);
+uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t eid,uint32_t freeinodes,uint32_t sustainedinodes);
 uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t freeinodes);
 uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t freeinodes,uint32_t sustainedinodes);
 uint8_t fs_mr_link(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint32_t nleng_dst,uint8_t *name_dst);
@@ -151,8 +151,8 @@ uint8_t fs_readsustained_size(uint32_t rootinode,uint8_t sesflags,uint32_t *dbuf
 void fs_readsustained_data(uint32_t rootinode,uint8_t sesflags,uint8_t *dbuff);
 
 // TRASH
-uint8_t fs_readtrash_size(uint32_t rootinode,uint8_t sesflags,uint32_t *dbuffsize);
-void fs_readtrash_data(uint32_t rootinode,uint8_t sesflags,uint8_t *dbuff);
+uint8_t fs_readtrash_size(uint32_t rootinode,uint8_t sesflags,uint32_t tid,uint32_t *dbuffsize);
+void fs_readtrash_data(uint32_t rootinode,uint8_t sesflags,uint32_t tid,uint8_t *dbuff);
 uint8_t fs_gettrashpath(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t *pleng,const uint8_t **path);
 uint8_t fs_settrashpath(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t pleng,const uint8_t *path);
 uint8_t fs_purge(uint32_t rootinode,uint8_t sesflags,uint32_t inode);

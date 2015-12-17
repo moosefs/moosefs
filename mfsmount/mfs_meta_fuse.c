@@ -68,6 +68,10 @@ typedef struct _pathbuf {
 #define META_ROOT_INODE FUSE_ROOT_ID
 #define META_ROOT_MODE 0555
 
+#define META_SUBTRASH_INODE_MIN 0x7FFF0000
+#define META_SUBTRASH_INODE_MAX ((0x7FFF0000+TRASH_BUCKETS)-1)
+#define META_SUBTRASH_MODE 0700
+
 #define META_TRASH_INODE 0x7FFFFFF8
 #define META_TRASH_MODE 0700
 #define META_TRASH_NAME "trash"
@@ -105,7 +109,7 @@ static uint8_t masterinfoattr[35]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,
 static uint8_t masterinfoattr[35]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,10};
 #endif
 
-#define MIN_SPECIAL_INODE 0x7FFFFFF0
+#define MIN_SPECIAL_INODE 0x7FFF0000
 #define IS_SPECIAL_INODE(ino) ((ino)>=MIN_SPECIAL_INODE || (ino)==META_ROOT_INODE)
 
 // info - todo
@@ -240,17 +244,22 @@ static void mfs_meta_stat(uint32_t inode, struct stat *stbuf) {
 		stbuf->st_mode = S_IFDIR | META_ROOT_MODE ;
 		break;
 	case META_TRASH_INODE:
-		stbuf->st_nlink = 3;
+		stbuf->st_nlink = 3+TRASH_BUCKETS;
 		stbuf->st_mode = S_IFDIR | META_TRASH_MODE ;
 		break;
 	case META_UNDEL_INODE:
-		stbuf->st_nlink = 2;
+		stbuf->st_nlink = 2+TRASH_BUCKETS;
 		stbuf->st_mode = S_IFDIR | META_UNDEL_MODE ;
 		break;
 	case META_SUSTAINED_INODE:
 		stbuf->st_nlink = 2;
 		stbuf->st_mode = S_IFDIR | META_SUSTAINED_MODE ;
 		break;
+	default:
+		if (inode>=META_SUBTRASH_INODE_MIN && inode<=META_SUBTRASH_INODE_MAX) {
+			stbuf->st_nlink = 3;
+			stbuf->st_mode = S_IFDIR | META_SUBTRASH_MODE ;
+		}
 	}
 	stbuf->st_uid = 0;
 	stbuf->st_gid = 0;
@@ -415,7 +424,14 @@ void mfs_meta_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			inode = META_ROOT_INODE;
 		} else if (strcmp(name,META_UNDEL_NAME)==0) {
 			inode = META_UNDEL_INODE;
-		} else {
+		} else if (master_version()>=VERSION2INT(3,0,63)) { // subtrashes
+			inode = strtoul(name,NULL,16);
+			if (inode<TRASH_BUCKETS) {
+				inode += META_SUBTRASH_INODE_MIN;
+			} else {
+				inode = 0;
+			}
+		} else { // flat trash
 			inode = mfs_meta_name_to_inode(name);
 			if (inode>0) {
 				int status;
@@ -467,6 +483,34 @@ void mfs_meta_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			}
 		}
 		break;
+	default:
+		if (parent>=META_SUBTRASH_INODE_MIN && parent<=META_SUBTRASH_INODE_MAX) {
+			if (strcmp(name,".")==0) {
+				inode = parent;
+			} else if (strcmp(name,"..")==0) {
+				inode = META_TRASH_INODE;
+			} else if (strcmp(name,META_UNDEL_NAME)==0) {
+				inode = META_UNDEL_INODE;
+			} else {
+				inode = mfs_meta_name_to_inode(name);
+				if (inode>0) {
+					int status;
+					uint8_t attr[35];
+					status = fs_getdetachedattr(inode,attr);
+					status = mfs_errorconv(status);
+					if (status!=0) {
+						fuse_reply_err(req, status);
+					} else {
+						e.ino = inode;
+						e.attr_timeout = attr_cache_timeout;
+						e.entry_timeout = entry_cache_timeout;
+						mfs_attr_to_stat(inode,attr,&e.attr);
+						fuse_reply_entry(req,&e);
+					}
+					return;
+				}
+			}
+		}
 	}
 	if (inode==0) {
 		fuse_reply_err(req,ENOENT);
@@ -519,7 +563,7 @@ void mfs_meta_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to
 void mfs_meta_unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	int status;
 	uint32_t inode;
-	if (parent!=META_TRASH_INODE) {
+	if (!(parent==META_TRASH_INODE || (parent>=META_SUBTRASH_INODE_MIN && parent<=META_SUBTRASH_INODE_MAX))) {
 		fuse_reply_err(req,EACCES);
 		return;
 	}
@@ -541,7 +585,7 @@ void mfs_meta_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_i
 	int status;
 	uint32_t inode;
 	(void)newname;
-	if (parent!=META_TRASH_INODE && newparent!=META_UNDEL_INODE) {
+	if ((!(parent==META_TRASH_INODE || (parent>=META_SUBTRASH_INODE_MIN && parent<=META_SUBTRASH_INODE_MAX))) && newparent!=META_UNDEL_INODE) {
 		fuse_reply_err(req,EACCES);
 		return;
 	}
@@ -585,11 +629,19 @@ static uint32_t dir_metaentries_size(uint32_t ino) {
 	case META_ROOT_INODE:
 		return 4*6+1+2+strlen(META_TRASH_NAME)+strlen(META_SUSTAINED_NAME);
 	case META_TRASH_INODE:
-		return 3*6+1+2+strlen(META_UNDEL_NAME);
+		if (master_version()>=VERSION2INT(3,0,63)) {
+			return (3+TRASH_BUCKETS)*6+1+2+strlen(META_UNDEL_NAME)+(TRASH_BUCKETS*((TRASH_BUCKETS<=4096)?3:4));
+		} else {
+			return 3*6+1+2+strlen(META_UNDEL_NAME);
+		}
 	case META_UNDEL_INODE:
 		return 2*6+1+2;
 	case META_SUSTAINED_INODE:
 		return 2*6+1+2;
+	default:
+		if (ino>=META_SUBTRASH_INODE_MIN && ino<=META_SUBTRASH_INODE_MAX) {
+			return 3*6+1+2+strlen(META_UNDEL_NAME);
+		}
 	}
 	return 0;
 }
@@ -643,6 +695,22 @@ static void dir_metaentries_fill(uint8_t *buff,uint32_t ino) {
 		buff+=l;
 		put32bit(&buff,META_UNDEL_INODE);
 		put8bit(&buff,TYPE_DIRECTORY);
+		if (master_version()>=VERSION2INT(3,0,63)) {
+			uint32_t tid;
+			for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
+				if (TRASH_BUCKETS>4096) {
+					put8bit(&buff,4);
+					put8bit(&buff,"0123456789ABCDEF"[(tid>>12)&15]);
+				} else {
+					put8bit(&buff,3);
+				}
+				put8bit(&buff,"0123456789ABCDEF"[(tid>>8)&15]);
+				put8bit(&buff,"0123456789ABCDEF"[(tid>>4)&15]);
+				put8bit(&buff,"0123456789ABCDEF"[tid&15]);
+				put32bit(&buff,tid+META_SUBTRASH_INODE_MIN);
+				put8bit(&buff,TYPE_DIRECTORY);
+			}
+		}
 		return;
 	case META_UNDEL_INODE:
 		// .
@@ -670,6 +738,28 @@ static void dir_metaentries_fill(uint8_t *buff,uint32_t ino) {
 		put32bit(&buff,META_ROOT_INODE);
 		put8bit(&buff,TYPE_DIRECTORY);
 		return;
+	default:
+		if (ino>=META_SUBTRASH_INODE_MIN && ino<=META_SUBTRASH_INODE_MAX) {
+			// .
+			put8bit(&buff,1);
+			put8bit(&buff,'.');
+			put32bit(&buff,META_TRASH_INODE);
+			put8bit(&buff,TYPE_DIRECTORY);
+			// ..
+			put8bit(&buff,2);
+			put8bit(&buff,'.');
+			put8bit(&buff,'.');
+			put32bit(&buff,META_ROOT_INODE);
+			put8bit(&buff,TYPE_DIRECTORY);
+			// undel
+			l = strlen(META_UNDEL_NAME);
+			put8bit(&buff,l);
+			memcpy(buff,META_UNDEL_NAME,l);
+			buff+=l;
+			put32bit(&buff,META_UNDEL_INODE);
+			put8bit(&buff,TYPE_DIRECTORY);
+			return;
+		}
 	}
 }
 
@@ -741,14 +831,20 @@ static void dirbuf_meta_fill(dirbuf *b, uint32_t ino) {
 	b->p = NULL;
 	b->size = 0;
 	msize = dir_metaentries_size(ino);
-	if (ino==META_TRASH_INODE) {
-		status = fs_gettrash(&dbuff,&dsize);
+	if (ino==META_TRASH_INODE && master_version()<VERSION2INT(3,0,63)) {
+		status = fs_gettrash(0xFFFFFFFF,&dbuff,&dsize);
 		if (status!=STATUS_OK) {
 			return;
 		}
 		dcsize = dir_dataentries_size(dbuff,dsize);
 	} else if (ino==META_SUSTAINED_INODE) {
 		status = fs_getsustained(&dbuff,&dsize);
+		if (status!=STATUS_OK) {
+			return;
+		}
+		dcsize = dir_dataentries_size(dbuff,dsize);
+	} else if (ino>=META_SUBTRASH_INODE_MIN && ino<=META_SUBTRASH_INODE_MAX && master_version()>=VERSION2INT(3,0,63)) {
+		status = fs_gettrash(ino-META_SUBTRASH_INODE_MIN,&dbuff,&dsize);
 		if (status!=STATUS_OK) {
 			return;
 		}
@@ -775,7 +871,7 @@ static void dirbuf_meta_fill(dirbuf *b, uint32_t ino) {
 
 void mfs_meta_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	dirbuf *dirinfo;
-	if (ino==META_ROOT_INODE || ino==META_TRASH_INODE || ino==META_UNDEL_INODE || ino==META_SUSTAINED_INODE) {
+	if (ino==META_ROOT_INODE || ino==META_TRASH_INODE || ino==META_UNDEL_INODE || ino==META_SUSTAINED_INODE || (ino>=META_SUBTRASH_INODE_MIN && ino<=META_SUBTRASH_INODE_MAX)) {
 		dirinfo = malloc(sizeof(dirbuf));
 		pthread_mutex_init(&(dirinfo->lock),NULL);
 		dirinfo->p = NULL;

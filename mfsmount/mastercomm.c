@@ -68,7 +68,7 @@ typedef struct _threc {
 	uint8_t sent;		// packet was sent
 	uint8_t status;		// receive status
 	uint8_t rcvd;		// packet was received
-	uint8_t waiting;	// thread is waiting for answer
+//	uint8_t waiting;	// thread is waiting for answer
 	uint8_t receiving;
 
 	uint32_t rcvd_cmd;
@@ -327,7 +327,7 @@ threc* fs_get_my_threc() {
 	rec->sent = 0;
 	rec->status = 0;
 	rec->rcvd = 0;
-	rec->waiting = 0;
+//	rec->waiting = 0;
 	rec->receiving = 0;
 	rec->rcvd_cmd = 0;
 	if (threchead==NULL) {
@@ -458,7 +458,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 	if (usectimeout>0) {
 		start = monotonic_useconds();
 	}
-	for (cnt=0 ; cnt<maxretries ; cnt++) {
+	for (cnt=1 ; cnt<=maxretries ; cnt++) {
 		pthread_mutex_lock(&fdlock);
 		if (sessionlost==1) {
 			pthread_mutex_unlock(&fdlock);
@@ -513,7 +513,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		// syslog(LOG_NOTICE,"master: lock: %"PRIu32,rec->packetid);
 		pthread_mutex_lock(&(rec->mutex));
 		while (rec->rcvd==0) {
-			rec->waiting = 1;
+//			rec->waiting = 1;
 			if (usectimeout>0) {
 				struct timespec ts;
 				struct timeval tv;
@@ -531,14 +531,14 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 				ts.tv_sec = usecto / 1000000;
 				ts.tv_nsec = (usecto % 1000000) * 1000;
 				if (pthread_cond_timedwait(&(rec->cond),&(rec->mutex),&ts)==ETIMEDOUT) {
-					rec->waiting = 0;
+//					rec->waiting = 0;
 					pthread_mutex_unlock(&(rec->mutex));
 					return NULL;
 				}
 			} else {
 				pthread_cond_wait(&(rec->cond),&(rec->mutex));
 			}
-			rec->waiting = 0;
+//			rec->waiting = 0;
 		}
 		*answer_leng = rec->idataleng;
 		// syslog(LOG_NOTICE,"master: unlocked: %"PRIu32,rec->packetid);
@@ -595,7 +595,7 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 	if (usectimeout>0) {
 		start = monotonic_useconds();
 	}
-	for (cnt=0 ; cnt<maxretries ; cnt++) {
+	for (cnt=1 ; cnt<=maxretries ; cnt++) {
 		pthread_mutex_lock(&fdlock);
 		if (sessionlost==1) {
 			pthread_mutex_unlock(&fdlock);
@@ -650,7 +650,7 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 		// syslog(LOG_NOTICE,"master: lock: %"PRIu32,rec->packetid);
 		pthread_mutex_lock(&(rec->mutex));
 		while (rec->rcvd==0) {
-			rec->waiting = 1;
+//			rec->waiting = 1;
 			if (usectimeout>0) {
 				struct timespec ts;
 				struct timeval tv;
@@ -668,14 +668,14 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 				ts.tv_sec = usecto / 1000000;
 				ts.tv_nsec = (usecto % 1000000) * 1000;
 				if (pthread_cond_timedwait(&(rec->cond),&(rec->mutex),&ts)==ETIMEDOUT) {
-					rec->waiting = 0;
+//					rec->waiting = 0;
 					pthread_mutex_unlock(&(rec->mutex));
 					return NULL;
 				}
 			} else {
 				pthread_cond_wait(&(rec->cond),&(rec->mutex));
 			}
-			rec->waiting = 0;
+//			rec->waiting = 0;
 		}
 		*answer_leng = rec->idataleng;
 		// syslog(LOG_NOTICE,"master: unlocked: %"PRIu32,rec->packetid);
@@ -1537,9 +1537,9 @@ void* fs_receive_thread(void *arg) {
 				if (rec->sent) {
 					rec->status = 1;
 					rec->rcvd = 1;
-					if (rec->waiting) {
-						pthread_cond_signal(&(rec->cond));
-					}
+//					if (rec->waiting) {
+					pthread_cond_signal(&(rec->cond));
+//					}
 				}
 				pthread_mutex_unlock(&(rec->mutex));
 			}
@@ -1654,9 +1654,9 @@ void* fs_receive_thread(void *arg) {
 		rec->receiving = 0;
 		// syslog(LOG_NOTICE,"master: unlock: %"PRIu32,rec->packetid);
 		rec->rcvd = 1;
-		if (rec->waiting) {
-			pthread_cond_signal(&(rec->cond));
-		}
+//		if (rec->waiting) {
+		pthread_cond_signal(&(rec->cond));
+//		}
 		pthread_mutex_unlock(&(rec->mutex));
 	}
 }
@@ -3104,15 +3104,22 @@ uint8_t fs_getsustained(const uint8_t **dbuff,uint32_t *dbuffsize) {
 	return ret;
 }
 
-uint8_t fs_gettrash(const uint8_t **dbuff,uint32_t *dbuffsize) {
+uint8_t fs_gettrash(uint32_t tid,const uint8_t **dbuff,uint32_t *dbuffsize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
 	uint8_t ret;
 	threc *rec = fs_get_my_threc();
-	wptr = fs_createpacket(rec,CLTOMA_FUSE_GETTRASH,0);
+	if (master_version()>=VERSION2INT(3,0,63)) {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETTRASH,4);
+	} else {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETTRASH,0);
+	}
 	if (wptr==NULL) {
 		return ERROR_IO;
+	}
+	if (master_version()>=VERSION2INT(3,0,63)) {
+		put32bit(&wptr,tid);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_GETTRASH,&i);
 	if (rptr==NULL) {

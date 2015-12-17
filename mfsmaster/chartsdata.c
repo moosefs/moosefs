@@ -40,6 +40,7 @@
 #include "matoclserv.h"
 #include "memusage.h"
 #include "cpuusage.h"
+#include "matocsserv.h"
 
 #include "chartsdefs.h"
 
@@ -135,6 +136,7 @@ void chartsdata_refresh(void) {
 	uint64_t data[CHARTS];
 	uint32_t fsdata[16];
 	uint32_t i,del,repl; //,bin,bout,opr,opw,dbr,dbw,dopr,dopw,repl;
+	uint64_t total, avail;
 
 	for (i=0 ; i<CHARTS ; i++) {
 		data[i]=CHARTS_NODATA;
@@ -159,6 +161,10 @@ void chartsdata_refresh(void) {
 		data[CHARTS_STATFS+i]=fsdata[i];
 	}
 	matoclserv_stats(data+CHARTS_PACKETSRCVD);
+
+	matocsserv_getspace(&total,&avail);
+	data[CHARTS_USED_SPACE]=total-avail;
+	data[CHARTS_TOTAL_SPACE]=total;
 
 	charts_add(data,main_time()-60);
 }

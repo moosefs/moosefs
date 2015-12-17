@@ -1423,6 +1423,7 @@ void* write_worker(void *arg) {
 
 void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint32_t logretry) {
 	uint32_t i;
+	size_t mystacksize;
 //	sigset_t oldset;
 //	sigset_t newset;
 
@@ -1463,7 +1464,15 @@ void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint3
 	jqueue = queue_new(0);
 
         zassert(pthread_attr_init(&worker_thattr));
-        zassert(pthread_attr_setstacksize(&worker_thattr,0x100000));
+#ifdef PTHREAD_STACK_MIN
+	mystacksize = PTHREAD_STACK_MIN;
+	if (mystacksize < 0x20000) {
+		mystacksize = 0x20000;
+	}
+#else
+	mystacksize = 0x20000;
+#endif
+        zassert(pthread_attr_setstacksize(&worker_thattr,mystacksize));
 
 //	sigemptyset(&newset);
 //	sigaddset(&newset, SIGTERM);

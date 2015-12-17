@@ -221,6 +221,7 @@ void* read_chunkdata_worker(void *arg) {
 /* API | glock: INITIALIZED,UNLOCKED */
 void read_chunkdata_init (void) {
         uint32_t i;
+	size_t mystacksize;
 
 	zassert(pthread_mutex_init(&mreq_cache_lock,NULL));
 	zassert(pthread_mutex_init(&glock,NULL));
@@ -236,7 +237,16 @@ void read_chunkdata_init (void) {
 	jqueue = queue_new(0);
 
         zassert(pthread_attr_init(&worker_thattr));
-        zassert(pthread_attr_setstacksize(&worker_thattr,0x100000));
+
+#ifdef PTHREAD_STACK_MIN
+	mystacksize = PTHREAD_STACK_MIN;
+	if (mystacksize < 0x20000) {
+		mystacksize = 0x20000;
+	}
+#else
+	mystacksize = 0x20000;
+#endif
+        zassert(pthread_attr_setstacksize(&worker_thattr,mystacksize));
 
 	zassert(pthread_mutex_lock(&glock));
 	workers_avail = 0;
@@ -393,6 +403,9 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 				}
 				*chunkid = mrc->chunkid;
 				*version = mrc->version;
+				if (mrc->mfleng > *mfleng) {
+					*mfleng = mrc->mfleng;
+				}
 				if (mrc->csdata && mrc->csdatasize>0) {
 					*chainelements = csorder_sort(chain,mrc->csdataver,mrc->csdata,mrc->csdatasize,0);
 				} else {
@@ -403,6 +416,9 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 			} else if ((mrc->state==MR_READY || mrc->state==MR_REFRESH) && mrc->status==STATUS_OK && mrc->time + MREQ_TIMEOUT >= now) {
 				*chunkid = mrc->chunkid;
 				*version = mrc->version;
+				if (mrc->mfleng > *mfleng) {
+					*mfleng = mrc->mfleng;
+				}
 				if (mrc->csdata && mrc->csdatasize>0) {
 					*chainelements = csorder_sort(chain,mrc->csdataver,mrc->csdata,mrc->csdatasize,0);
 				} else {

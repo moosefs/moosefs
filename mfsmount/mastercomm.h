@@ -78,7 +78,7 @@ uint8_t fs_removexattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,
 //int fs_reinitchunk(uint32_t inode,uint32_t indx,uint64_t *chunkid);
 
 uint8_t fs_getsustained(const uint8_t **dbuff,uint32_t *dbuffsize);
-uint8_t fs_gettrash(const uint8_t **dbuff,uint32_t *dbuffsize);
+uint8_t fs_gettrash(uint32_t tid,const uint8_t **dbuff,uint32_t *dbuffsize);
 uint8_t fs_getdetachedattr(uint32_t inode,uint8_t attr[35]);
 uint8_t fs_gettrashpath(uint32_t inode,const uint8_t **path);
 uint8_t fs_settrashpath(uint32_t inode,const uint8_t *path);

@@ -424,7 +424,7 @@ void mfs_meta_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			inode = META_ROOT_INODE;
 		} else if (strcmp(name,META_UNDEL_NAME)==0) {
 			inode = META_UNDEL_INODE;
-		} else if (master_version()>=VERSION2INT(3,0,63)) { // subtrashes
+		} else if (master_version()>=VERSION2INT(3,0,64)) { // subtrashes
 			inode = strtoul(name,NULL,16);
 			if (inode<TRASH_BUCKETS) {
 				inode += META_SUBTRASH_INODE_MIN;
@@ -629,7 +629,7 @@ static uint32_t dir_metaentries_size(uint32_t ino) {
 	case META_ROOT_INODE:
 		return 4*6+1+2+strlen(META_TRASH_NAME)+strlen(META_SUSTAINED_NAME);
 	case META_TRASH_INODE:
-		if (master_version()>=VERSION2INT(3,0,63)) {
+		if (master_version()>=VERSION2INT(3,0,64)) {
 			return (3+TRASH_BUCKETS)*6+1+2+strlen(META_UNDEL_NAME)+(TRASH_BUCKETS*((TRASH_BUCKETS<=4096)?3:4));
 		} else {
 			return 3*6+1+2+strlen(META_UNDEL_NAME);
@@ -695,7 +695,7 @@ static void dir_metaentries_fill(uint8_t *buff,uint32_t ino) {
 		buff+=l;
 		put32bit(&buff,META_UNDEL_INODE);
 		put8bit(&buff,TYPE_DIRECTORY);
-		if (master_version()>=VERSION2INT(3,0,63)) {
+		if (master_version()>=VERSION2INT(3,0,64)) {
 			uint32_t tid;
 			for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
 				if (TRASH_BUCKETS>4096) {
@@ -831,7 +831,7 @@ static void dirbuf_meta_fill(dirbuf *b, uint32_t ino) {
 	b->p = NULL;
 	b->size = 0;
 	msize = dir_metaentries_size(ino);
-	if (ino==META_TRASH_INODE && master_version()<VERSION2INT(3,0,63)) {
+	if (ino==META_TRASH_INODE && master_version()<VERSION2INT(3,0,64)) {
 		status = fs_gettrash(0xFFFFFFFF,&dbuff,&dsize);
 		if (status!=STATUS_OK) {
 			return;
@@ -843,7 +843,7 @@ static void dirbuf_meta_fill(dirbuf *b, uint32_t ino) {
 			return;
 		}
 		dcsize = dir_dataentries_size(dbuff,dsize);
-	} else if (ino>=META_SUBTRASH_INODE_MIN && ino<=META_SUBTRASH_INODE_MAX && master_version()>=VERSION2INT(3,0,63)) {
+	} else if (ino>=META_SUBTRASH_INODE_MIN && ino<=META_SUBTRASH_INODE_MAX && master_version()>=VERSION2INT(3,0,64)) {
 		status = fs_gettrash(ino-META_SUBTRASH_INODE_MIN,&dbuff,&dsize);
 		if (status!=STATUS_OK) {
 			return;

@@ -3110,7 +3110,7 @@ uint8_t fs_gettrash(uint32_t tid,const uint8_t **dbuff,uint32_t *dbuffsize) {
 	uint32_t i;
 	uint8_t ret;
 	threc *rec = fs_get_my_threc();
-	if (master_version()>=VERSION2INT(3,0,63)) {
+	if (master_version()>=VERSION2INT(3,0,64)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETTRASH,4);
 	} else {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETTRASH,0);
@@ -3118,7 +3118,7 @@ uint8_t fs_gettrash(uint32_t tid,const uint8_t **dbuff,uint32_t *dbuffsize) {
 	if (wptr==NULL) {
 		return ERROR_IO;
 	}
-	if (master_version()>=VERSION2INT(3,0,63)) {
+	if (master_version()>=VERSION2INT(3,0,64)) {
 		put32bit(&wptr,tid);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_GETTRASH,&i);

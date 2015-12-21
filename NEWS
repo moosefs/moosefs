@@ -1,11 +1,14 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.64-1 (2015-12-21)
+
+  - (master+mount) split trash into 4096 separate sub-trashes
+
 * MooseFS 3.0.63-1 (2015-12-17)
 
   - (mount) fixed rare race condition in read (not dangerous)
   - (mount) better read/write synchronization in read
   - (master) new chart (used/total space)
-  - (master+mount) split trash into 4096 separate sub-trashes
 
 * MooseFS 3.0.62-1 (2015-12-11)
 

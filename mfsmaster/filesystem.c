@@ -3675,7 +3675,7 @@ uint8_t fs_readtrash_size(uint32_t rootinode,uint8_t sesflags,uint32_t tid,uint3
 	(void)sesflags;
 	if (tid>=TRASH_BUCKETS) {
 		*dbuffsize = 0;
-		for (tid=0 ; tid<=TRASH_BUCKETS ; tid++) {
+		for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
 			*dbuffsize += fsnodes_getdetached(trash[tid],NULL);
 		}
 	} else {
@@ -3690,7 +3690,7 @@ void fs_readtrash_data(uint32_t rootinode,uint8_t sesflags,uint32_t tid,uint8_t 
 	if (tid>=TRASH_BUCKETS) {
 		uint32_t pos;
 		pos = 0;
-		for (tid=0 ; tid<=TRASH_BUCKETS ; tid++) {
+		for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
 			pos += fsnodes_getdetached(trash[tid],dbuff+pos);
 		}
 	} else {

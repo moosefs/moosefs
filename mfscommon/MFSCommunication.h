@@ -1132,8 +1132,8 @@
 
 // 0x01C2
 #define CLTOMA_FUSE_GETTRASH (PROTO_BASE+450)
-// msgid:32 (version < 3.0.63)
-// msgid:32 trash_id:32 (version >= 3.0.63)
+// msgid:32 (version < 3.0.64)
+// msgid:32 trash_id:32 (version >= 3.0.64)
 
 // 0x01C3
 #define MATOCL_FUSE_GETTRASH (PROTO_BASE+451)

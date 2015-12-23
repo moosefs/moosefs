@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -575,7 +575,7 @@
 //      	( rver:8 ) usedspace:64 totalspace:64 chunks:32 tdusedspace:64 tdtotalspace:64 tdchunks:32
 // - version 6:
 //	rver==60:	// version 6 / BEGIN
-//		( rver:8 ) version:32 myip:32 myport:16 tcptimeout:16 csid:16 usedspace:64 totalspace:64 chunks:32 tdusedspace:64 tdtotalspace:64 tdchunks:32
+//		( rver:8 ) [ passcode:16B ] version:32 myip:32 myport:16 tcptimeout:16 csid:16 usedspace:64 totalspace:64 chunks:32 tdusedspace:64 tdtotalspace:64 tdchunks:32
 //	rver==61:	// version 6 / CHUNKS
 //		( rver:8 ) N*[chunkid:64 version:32]
 //	rver==62:	// version 6 / END

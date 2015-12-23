@@ -1,5 +1,12 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.65-1 (2015-12-23)
+
+  - (master+cs) added minimal version for master supervisors in chunkservers (pro version only)
+  - (cs) chunkserver can be started with empty mfshdd.cfg and work as a voter (pro version only)
+  - (master) mfsrmsnapshot will remove files without using trash
+  - (master+cs) added optional authorization
+
 * MooseFS 3.0.64-1 (2015-12-21)
 
   - (master+mount) split trash into 4096 separate sub-trashes

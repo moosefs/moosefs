@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -73,7 +73,7 @@
 #define MAXIDHOLE 10000
 
 static uint64_t metaversion;
-static uint64_t metafileid;
+static uint64_t metaid;
 
 static uint8_t ignoreflag = 0;
 static uint8_t allowautorestore = 0;
@@ -136,7 +136,7 @@ void meta_store(bio *fd) {
 
 	ptr = hdr;
 	put64bit(&ptr,metaversion);
-	put64bit(&ptr,metafileid);
+	put64bit(&ptr,metaid);
 	if (bio_write(fd,hdr,16)!=(size_t)16) {
 		syslog(LOG_NOTICE,"write error");
 		return;
@@ -192,7 +192,7 @@ void meta_store(bio *fd) {
 #define META_CHECK_BADHEADER 3
 #define META_CHECK_BADENDING 4
 
-uint8_t meta_check_metadatafile(const char *name,uint64_t *ver,uint64_t *fileid) {
+uint8_t meta_check_metadatafile(const char *name,uint64_t *ver,uint64_t *id) {
 	int fd;
 	int err;
 	uint8_t chkbuff[16];
@@ -201,7 +201,7 @@ uint8_t meta_check_metadatafile(const char *name,uint64_t *ver,uint64_t *fileid)
 	const uint8_t *ptr;
 
 	*ver = 0;
-	*fileid = 0;
+	*id = 0;
 	fd = open(name,O_RDONLY);
 	if (fd<0) {
 		if (errno==ENOENT) {
@@ -241,11 +241,11 @@ uint8_t meta_check_metadatafile(const char *name,uint64_t *ver,uint64_t *fileid)
 	if (fver<0x20) {
 		ptr = chkbuff+4;
 		*ver = get64bit(&ptr);
-//		*fileid = 0;
+//		*id = 0;
 	} else {
 		ptr = chkbuff;
 		*ver = get64bit(&ptr);
-		*fileid = get64bit(&ptr);
+		*id = get64bit(&ptr);
 	}
 	lseek(fd,-16,SEEK_END);
 	if (read(fd,chkbuff,16)!=16) {
@@ -282,13 +282,13 @@ int meta_load(bio *fd,uint8_t fver) {
 		metaversion = get64bit(&ptr);
 		nextsessionid = get32bit(&ptr);
 		sessions_set_nextsessionid(nextsessionid);
-		metafileid = 0;
-//		metafileid = main_time();
-//		metafileid <<= 32;
-//		metafileid |= rndu32();
+		metaid = 0;
+//		metaid = main_time();
+//		metaid <<= 32;
+//		metaid |= rndu32();
 	} else {
 		metaversion = get64bit(&ptr);
-		metafileid = get64bit(&ptr);
+		metaid = get64bit(&ptr);
 	}
 
 	if (fver<0x16) {
@@ -924,10 +924,10 @@ int meta_loadfile(const char *filename) {
 		chunk_newfs();
 		sessions_new();
 		metaversion = 1;
-		metafileid = 0;
-//		metafileid = main_time();
-//		metafileid <<= 32;
-//		metafileid |= rndu32();
+		metaid = 0;
+//		metaid = main_time();
+//		metaid <<= 32;
+//		metaid |= rndu32();
 		return 0;
 	}
 	if (memcmp(hdr,MFSSIGNATURE "M ",5)==0 && hdr[5]>='1' && hdr[5]<='9' && hdr[6]=='.' && hdr[7]>='0' && hdr[7]<='9') {
@@ -954,7 +954,7 @@ int meta_loadfile(const char *filename) {
 void meta_file_infos(void) {
 	DIR *dd;
 	struct dirent *dp;
-	uint64_t ver,fileid;
+	uint64_t ver,id;
 	uint8_t status;
 
 	dd = opendir(".");
@@ -963,10 +963,10 @@ void meta_file_infos(void) {
 	} else {
 		while ((dp = readdir(dd)) != NULL) {
 			if (strlen(dp->d_name)>8 && memcmp(dp->d_name,"metadata",8)==0) {
-				status = meta_check_metadatafile(dp->d_name,&ver,&fileid);
+				status = meta_check_metadatafile(dp->d_name,&ver,&id);
 				if (status==META_CHECK_OK) {
-					if (fileid!=0) {
-						mfs_arg_syslog(LOG_NOTICE," - found valid metadata file: %s (version: %"PRIu64" ; fileid: %"PRIX64")",dp->d_name,ver,fileid);
+					if (id!=0) {
+						mfs_arg_syslog(LOG_NOTICE," - found valid metadata file: %s (version: %"PRIu64" ; id: %"PRIX64")",dp->d_name,ver,id);
 					} else {
 						mfs_arg_syslog(LOG_NOTICE," - found valid metadata file: %s (version: %"PRIu64")",dp->d_name,ver);
 					}
@@ -976,8 +976,8 @@ void meta_file_infos(void) {
 					} else if (status==META_CHECK_BADHEADER) {
 						mfs_arg_syslog(LOG_NOTICE," - found invalid metadata file (wrong header): %s",dp->d_name);
 					} else if (status==META_CHECK_BADENDING) {
-						if (fileid!=0) {
-							mfs_arg_syslog(LOG_NOTICE," - found invalid metadata file (wrong ending): %s (version: %"PRIu64" ; fileid: %"PRIX64")",dp->d_name,ver,fileid);
+						if (id!=0) {
+							mfs_arg_syslog(LOG_NOTICE," - found invalid metadata file (wrong ending): %s (version: %"PRIu64" ; id: %"PRIX64")",dp->d_name,ver,id);
 						} else {
 							mfs_arg_syslog(LOG_NOTICE," - found invalid metadata file (wrong ending): %s (version: %"PRIu64")",dp->d_name,ver);
 						}
@@ -992,7 +992,7 @@ void meta_file_infos(void) {
 int meta_loadall(void) {
 	DIR *dd;
 	struct dirent *dp;
-	uint64_t bestver,ver,bestfileid,fileid,maxlastlv;
+	uint64_t bestver,ver,bestid,id,maxlastlv;
 	const char *bestfname;
 	uint32_t files,pos;
 	char **filenames;
@@ -1005,7 +1005,7 @@ int meta_loadall(void) {
 	if (allowautorestore) {
 		// find best metadata file
 		bestver = 0;
-		bestfileid = 0;
+		bestid = 0;
 		bestfname = NULL;
 		dd = opendir(".");
 		if (!dd) {
@@ -1013,11 +1013,11 @@ int meta_loadall(void) {
 		} else {
 			while ((dp = readdir(dd)) != NULL) {
 				if (strlen(dp->d_name)>8 && memcmp(dp->d_name,"metadata",8)==0) {
-					status = meta_check_metadatafile(dp->d_name,&ver,&fileid);
+					status = meta_check_metadatafile(dp->d_name,&ver,&id);
 					if (verboselevel>1) {
 						if (ver>0 && status==META_CHECK_OK) {
-							if (fileid!=0) {
-								mfs_arg_syslog(LOG_NOTICE,"found valid metadata file: %s (version: %"PRIu64" ; fileid: %"PRIX64")",dp->d_name,ver,fileid);
+							if (id!=0) {
+								mfs_arg_syslog(LOG_NOTICE,"found valid metadata file: %s (version: %"PRIu64" ; id: %"PRIX64")",dp->d_name,ver,id);
 							} else {
 								mfs_arg_syslog(LOG_NOTICE,"found valid metadata file: %s (version: %"PRIu64")",dp->d_name,ver);
 							}
@@ -1027,8 +1027,8 @@ int meta_loadall(void) {
 							} else if (status==META_CHECK_BADHEADER) {
 								mfs_arg_syslog(LOG_NOTICE,"found invalid metadata file (wrong header): %s",dp->d_name);
 							} else if (status==META_CHECK_BADENDING) {
-								if (fileid!=0) {
-									mfs_arg_syslog(LOG_NOTICE,"found invalid metadata file (wrong ending): %s (version: %"PRIu64" ; fileid: %"PRIX64")",dp->d_name,ver,fileid);
+								if (id!=0) {
+									mfs_arg_syslog(LOG_NOTICE,"found invalid metadata file (wrong ending): %s (version: %"PRIu64" ; id: %"PRIX64")",dp->d_name,ver,id);
 								} else {
 									mfs_arg_syslog(LOG_NOTICE,"found invalid metadata file (wrong ending): %s (version: %"PRIu64")",dp->d_name,ver);
 								}
@@ -1036,7 +1036,7 @@ int meta_loadall(void) {
 						}
 					}
 					if (status==META_CHECK_OK) {
-						if (bestfileid!=0 && fileid!=0 && bestfileid!=fileid) {
+						if (bestid!=0 && id!=0 && bestid!=id) {
 							if (ignoreflag) {
 								mfs_syslog(LOG_NOTICE,"found metadata file with different id number - ignoring");
 							} else {
@@ -1052,8 +1052,8 @@ int meta_loadall(void) {
 								free((char*)bestfname);
 							}
 							bestfname = strdup(dp->d_name);
-							if (fileid) {
-								bestfileid = fileid;
+							if (id) {
+								bestid = id;
 							}
 						}
 					}
@@ -1061,16 +1061,16 @@ int meta_loadall(void) {
 			}
 			closedir(dd);
 		}
-		if (bestfileid!=0) { // use emergency locations only if valid fileid has been found
+		if (bestid!=0) { // use emergency locations only if valid id has been found
 			hfname = meta_create_homedir_emergency_filename();
 			if (hfname) {
-				status = meta_check_metadatafile(hfname,&ver,&fileid);
+				status = meta_check_metadatafile(hfname,&ver,&id);
 				if (verboselevel>1) {
 					if (ver>0 && status==META_CHECK_OK) {
 						mfs_arg_syslog(LOG_NOTICE,"found valid metadata file: %s (version: %"PRIu64")",hfname,ver);
 					}
 				}
-				if (status==META_CHECK_OK && ver>bestver && fileid==bestfileid) {
+				if (status==META_CHECK_OK && ver>bestver && id==bestid) {
 					bestver = ver;
 					if (bestfname) {
 						free((char*)bestfname);
@@ -1081,13 +1081,13 @@ int meta_loadall(void) {
 			}
 			i = 0;
 			while ((fname = meta_emergency_locations[i++])!=NULL) {
-				status = meta_check_metadatafile(fname,&ver,&fileid);
+				status = meta_check_metadatafile(fname,&ver,&id);
 				if (verboselevel>1) {
 					if (ver>0 && status==META_CHECK_OK) {
 						mfs_arg_syslog(LOG_NOTICE,"found valid metadata file: %s (version: %"PRIu64")",fname,ver);
 					}
 				}
-				if (status==META_CHECK_OK && ver>bestver && fileid==bestfileid) {
+				if (status==META_CHECK_OK && ver>bestver && id==bestid) {
 					bestver = ver;
 					if (bestfname) {
 						free((char*)bestfname);
@@ -1102,8 +1102,8 @@ int meta_loadall(void) {
 			return -1;
 		}
 		if (verboselevel>0) {
-			if (bestfileid!=0) {
-				mfs_arg_syslog(LOG_NOTICE,"choosen most recent metadata file: %s (version: %"PRIu64" ; fileid: %"PRIX64")",bestfname,bestver,bestfileid);
+			if (bestid!=0) {
+				mfs_arg_syslog(LOG_NOTICE,"choosen most recent metadata file: %s (version: %"PRIu64" ; id: %"PRIX64")",bestfname,bestver,bestid);
 			} else {
 				mfs_arg_syslog(LOG_NOTICE,"choosen most recent metadata file: %s (version: %"PRIu64")",bestfname,bestver);
 			}
@@ -1247,7 +1247,7 @@ int meta_loadall(void) {
 			}
 		}
 	} else {
-		switch (meta_check_metadatafile("metadata.mfs",&ver,&fileid)) {
+		switch (meta_check_metadatafile("metadata.mfs",&ver,&id)) {
 			case META_CHECK_NOFILE:
 				mfs_syslog(LOG_ERR,"can't find metadata.mfs - try using option '-a'");
 				return -1;
@@ -1261,7 +1261,7 @@ int meta_loadall(void) {
 				mfs_syslog(LOG_ERR,"metadata.mfs has wrong ending - try using option '-a'");
 				return -1;
 		}
-		if (meta_check_metadatafile("metadata.mfs.back",&bestver,&bestfileid)==META_CHECK_OK && bestver>ver && bestfileid!=0 && fileid!=0 && bestfileid!=fileid) {
+		if (meta_check_metadatafile("metadata.mfs.back",&bestver,&bestid)==META_CHECK_OK && bestver>ver && bestid!=0 && id!=0 && bestid!=id) {
 			if (bestver>ver) {
 				mfs_syslog(LOG_ERR,"backup file is newer than current file - please check it manually - try using option '-a'");
 			} else {
@@ -1309,12 +1309,12 @@ void meta_info(uint32_t *lsstore,uint32_t *lstime,uint8_t *lsstat) {
 	*lsstat = laststorestatus;
 }
 
-uint64_t meta_get_fileid(void) {
-	return metafileid;
+uint64_t meta_get_id(void) {
+	return metaid;
 }
 
-void meta_set_fileid(uint64_t metaid) {
-	metafileid = metaid;
+void meta_set_id(uint64_t newmetaid) {
+	metaid = newmetaid;
 }
 
 void meta_reload(void) {
@@ -1325,21 +1325,21 @@ void meta_reload(void) {
 	}
 }
 
-void meta_check_fileid(void) {
-	if (metafileid==0) {
+void meta_check_id(void) {
+	if (metaid==0) {
 		uint32_t now = main_time();
-		metafileid = now;
-		metafileid <<= 32;
-		metafileid |= rndu32() + monotonic_useconds();
-		changelog("%"PRIu32"|SETMETAID(%"PRIu64")",now,metafileid);
+		metaid = now;
+		metaid <<= 32;
+		metaid |= rndu32() + monotonic_useconds();
+		changelog("%"PRIu32"|SETMETAID(%"PRIu64")",now,metaid);
 	}
 }
 
 
-uint8_t meta_mr_setmetaid(uint64_t metaid) {
-	if (metafileid==0 || metafileid==metaid) {
+uint8_t meta_mr_setmetaid(uint64_t newmetaid) {
+	if (metaid==0 || metaid==newmetaid) {
 		metaversion++;
-		metafileid = metaid;
+		metaid = newmetaid;
 		return STATUS_OK;
 	} else {
 		return ERROR_EINVAL;
@@ -1349,7 +1349,7 @@ uint8_t meta_mr_setmetaid(uint64_t metaid) {
 
 int meta_init(void) {
 	metaversion = 0;
-	metafileid = 0;
+	metaid = 0;
 	if (labelset_init()<0) {
 		mfs_syslog(LOG_ERR,"label sets init error");
 		return -1;
@@ -1400,7 +1400,7 @@ int meta_init(void) {
 	main_time_register(3600,0,meta_dostoreall);
 	main_destruct_register(meta_term);
 	fs_renumerate_edge_test();
-	meta_check_fileid();
+	meta_check_id();
 	return 0;
 }
 

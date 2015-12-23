@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -3214,6 +3214,7 @@ static inline void fsnodes_remove_snapshot(uint32_t ts,fsedge *e,uint32_t sesfla
 		}
 	}
 	if (n->flags & EATTR_SNAPSHOT) {
+		n->trashtime = 0;
 		fsnodes_unlink(ts,e);
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -56,6 +56,7 @@
 #include "hashfn.h"
 #include "clocks.h"
 #include "labelsets.h"
+#include "md5.h"
 
 #define MaxPacketSize CSTOMA_MAXPACKETSIZE
 
@@ -125,9 +126,9 @@ typedef struct matocsserventry {
 	uint8_t registered;
 
 	uint8_t privflag;
-//	uint8_t cancreatechunks;
 
-//	double carry;
+	uint8_t passwordrnd[32];
+
 	uint32_t dist;
 	uint8_t first;
 	double corr;
@@ -145,6 +146,7 @@ static int32_t lsockpdescpos;
 static char *ListenHost;
 static char *ListenPort;
 static uint32_t DefaultTimeout;
+static char *AuthCode = NULL;
 
 /* replications DB */
 
@@ -337,6 +339,21 @@ void matocsserv_replication_disconnected(void *srv) {
 
 /* replication DB END */
 
+uint8_t matocsserv_check_password(const uint8_t rndcode[32],const uint8_t csdigest[16]) {
+	md5ctx md5c;
+	uint8_t digest[16];
+
+	md5_init(&md5c);
+	md5_update(&md5c,rndcode,16);
+	md5_update(&md5c,(const uint8_t *)AuthCode,strlen(AuthCode));
+	md5_update(&md5c,rndcode+16,16);
+	md5_final(digest,&md5c);
+
+	if (memcmp(digest,csdigest,16)==0) {
+		return 1;
+	}
+	return 0;
+}
 
 void matocsserv_log_extra_info(void) {
 	matocsserventry *eptr;
@@ -1518,6 +1535,11 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 				eptr->mode=KILL;
 				return;
 			}
+			if (AuthCode) {
+				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 1) - authorization needed - packet version too old");
+				eptr->mode=KILL;
+				return;
+			}
 			eptr->servip = get32bit(&data);
 			eptr->servport = get16bit(&data);
 			eptr->usedspace = get64bit(&data);
@@ -1528,6 +1550,11 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 		} else if (rversion==2) {
 			if (length<47 || ((length-47)%12)!=0) {
 				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 2) - wrong size (%"PRIu32"/47+N*12)",length);
+				eptr->mode=KILL;
+				return;
+			}
+			if (AuthCode) {
+				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 2) - authorization needed - packet version too old");
 				eptr->mode=KILL;
 				return;
 			}
@@ -1546,6 +1573,11 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 				eptr->mode=KILL;
 				return;
 			}
+			if (AuthCode) {
+				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 3) - authorization needed - packet version too old");
+				eptr->mode=KILL;
+				return;
+			}
 			eptr->servip = get32bit(&data);
 			eptr->servport = get16bit(&data);
 			eptr->timeout = get16bit(&data);
@@ -1559,6 +1591,11 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 		} else if (rversion==4) {
 			if (length<53 || ((length-53)%12)!=0) {
 				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 4) - wrong size (%"PRIu32"/53+N*12)",length);
+				eptr->mode=KILL;
+				return;
+			}
+			if (AuthCode) {
+				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 4) - authorization needed - packet version too old");
 				eptr->mode=KILL;
 				return;
 			}
@@ -1579,11 +1616,36 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 				eptr->mode=KILL;
 				return;
 			}
-			if (rversion==60 && length!=55) {
-				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:BEGIN) - wrong size (%"PRIu32"/55)",length);
+			if (rversion==60 && length!=55 && length!=71) {
+				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:BEGIN) - wrong size (%"PRIu32"/55|71)",length);
 				eptr->mode=KILL;
 				return;
 			}
+			if (AuthCode) {
+					if (rversion==50) {
+						syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:BEGIN) - authorization needed - packet version too old");
+						eptr->mode=KILL;
+						return;
+					} else { // rversion==60
+						if (length==55) { // no authorization data
+							uint8_t *p;
+							p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,33);
+							put8bit(&p,3);
+							for (i=0 ; i<32 ; i++) {
+								eptr->passwordrnd[i] = rndu8();
+							}
+							memcpy(p,eptr->passwordrnd,32);
+							return;
+						} else { // length==71
+							if (matocsserv_check_password(eptr->passwordrnd,data)==0) {
+								syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:BEGIN) - access denied - check password");
+								eptr->mode = KILL;
+								return;
+							}
+							data+=16;
+						}
+					}
+				}
 			eptr->version = get32bit(&data);
 			eptr->servip = get32bit(&data);
 			eptr->servport = get16bit(&data);
@@ -1595,7 +1657,7 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 					return;
 				}
 				csid = 0;
-			} else {
+			} else { // rversion==60
 				if (eptr->timeout==0) {
 					eptr->timeout = DefaultTimeout;
 				} else if (eptr->timeout<10) {
@@ -1623,12 +1685,12 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 					eptr->mode=KILL;
 					return;
 				}
-				if ((eptr->csptr=csdb_new_connection(eptr->servip,eptr->servport,csid,eptr))==NULL) {
+			if ((eptr->csptr=csdb_new_connection(eptr->servip,eptr->servport,csid,eptr))==NULL) {
 					syslog(LOG_WARNING,"can't accept chunkserver (ip: %s / port: %"PRIu16")",eptr->servstrip,eptr->servport);
 					eptr->mode=KILL;
 					return;
 				}
-				if (rversion==50) {
+			if (rversion==50) {
 					syslog(LOG_NOTICE,"chunkserver register begin (packet version: 5) - ip: %s / port: %"PRIu16,eptr->servstrip,eptr->servport);
 				} else {
 					us = (double)(eptr->usedspace)/(double)(1024*1024*1024);
@@ -1648,7 +1710,7 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 						}
 					} else {
 						uint8_t mode;
-						mode = (eptr->version >= VERSION2INT(2,0,33))?1:0;
+					mode = (eptr->version >= VERSION2INT(2,0,33))?1:0;
 							p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,mode?17:9);
 							if (p) {
 								put8bit(&p,0);
@@ -1656,13 +1718,13 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 								put16bit(&p,eptr->timeout);
 								put16bit(&p,csdb_get_csid(eptr->csptr));
 								if (mode) {
-									put64bit(&p,meta_get_fileid());
+									put64bit(&p,meta_get_id());
 								}
 							} else {
 								eptr->mode = KILL;
 								return;
 							}
-					}
+				}
 				}
 				eptr->csid = chunk_server_connected(eptr);
 			return;
@@ -1672,6 +1734,15 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 					syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:CHUNKS) - wrong size (%"PRIu32"/1+N*12)",length);
 				} else {
 					syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:CHUNKS) - wrong size (%"PRIu32"/1+N*12)",length);
+				}
+				eptr->mode=KILL;
+				return;
+			}
+			if (eptr->csptr==NULL) {
+				if (rversion==51) {
+					syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:CHUNKS) - CHUNKS packet before proper BEGIN packet");
+				} else {
+					syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:CHUNKS) - CHUNKS packet before proper BEGIN packet");
 				}
 				eptr->mode=KILL;
 				return;
@@ -1706,6 +1777,11 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 				eptr->mode=KILL;
 				return;
 			}
+			if (eptr->csptr==NULL) {
+				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:END) - END packet before proper BEGIN packet");
+				eptr->mode=KILL;
+				return;
+			}
 			eptr->usedspace = get64bit(&data);
 			eptr->totalspace = get64bit(&data);
 			eptr->chunkscount = get32bit(&data);
@@ -1721,6 +1797,11 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 		} else if (rversion==62) {
 			if (length!=1) {
 				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:END) - wrong size (%"PRIu32"/1)",length);
+				eptr->mode=KILL;
+				return;
+			}
+			if (eptr->csptr==NULL) {
+				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:END) - END packet before proper BEGIN packet");
 				eptr->mode=KILL;
 				return;
 			}
@@ -2348,9 +2429,9 @@ void matocsserv_serve(struct pollfd *pdesc) {
 			eptr->registered = UNREGISTERED;
 
 			eptr->privflag = 0;
-//			eptr->cancreatechunks = 1;
 
-//			eptr->carry=(double)(rndu32())/(double)(0xFFFFFFFFU);
+			memset(eptr->passwordrnd,0,32);
+
 			eptr->dist = 0;
 			eptr->first = 1;
 			eptr->corr = 0.0;
@@ -2485,6 +2566,14 @@ void matocsserv_reload(void) {
 		DefaultTimeout=10;
 	}
 
+	if (AuthCode) {
+		free(AuthCode);
+		AuthCode = NULL;
+	}
+	if (cfg_isdefined("AUTH_CODE")) {
+		AuthCode = cfg_getstr("AUTH_CODE","");
+	}
+
 	oldListenHost = ListenHost;
 	oldListenPort = ListenPort;
 	ListenHost = cfg_getstr("MATOCS_LISTEN_HOST","*");
@@ -2535,6 +2624,9 @@ int matocsserv_init(void) {
 		DefaultTimeout=10;
 	}
 
+	if (cfg_isdefined("AUTH_CODE")) {
+		AuthCode = cfg_getstr("AUTH_CODE","");
+	}
 	ListenHost = cfg_getstr("MATOCS_LISTEN_HOST","*");
 	ListenPort = cfg_getstr("MATOCS_LISTEN_PORT",DEFAULT_MASTER_CS_PORT);
 

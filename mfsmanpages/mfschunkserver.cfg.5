@@ -1,4 +1,4 @@
-.TH mfschunkserver.cfg "5" "December 2015" "MooseFS 3.0.64-1" "This is part of MooseFS"
+.TH mfschunkserver.cfg "5" "January 2016" "MooseFS 3.0.65-1" "This is part of MooseFS"
 .SH NAME
 mfschunkserver.cfg \- main configuration file for \fBmfschunkserver\fP
 .SH DESCRIPTION
@@ -79,6 +79,9 @@ timeout in seconds for master connections; default is 60
 \fBMASTER_RECONNECTION_DELAY\fP
 delay in seconds before trying to reconnect to master after disconnection (default is 5)
 .TP
+\fBAUTH_CODE\fP
+authentication string (used only when master requires authorization)
+.TP
 \fBBIND_HOST\fP
 local address to use for connecting with master (default is \fB*\fP, i.e. default local address)
 .TP
@@ -91,7 +94,7 @@ port to listen on for client (mount) connections (default is 9422)
 \fBCSSERV_TIMEOUT\fP
 timeout (in seconds) for client (mount) connections (default is 5)
 .SH COPYRIGHT
-Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

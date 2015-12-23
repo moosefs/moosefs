@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -1460,7 +1460,7 @@ void matoclserv_module_info(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	put8bit(&ptr,VERSMID);
 	put8bit(&ptr,VERSMIN);
 	put16bit(&ptr,0);
-	put64bit(&ptr,meta_get_fileid());
+	put64bit(&ptr,meta_get_id());
 	put32bit(&ptr,0);
 	put16bit(&ptr,0);
 }
@@ -2072,7 +2072,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			} else if (length==77+12+ileng+pleng || length==77+12+16+ileng+pleng) {
 				sessionid = get32bit(&rptr);
 				expected_metaid = get64bit(&rptr);
-				if (expected_metaid != meta_get_fileid()) {
+				if (expected_metaid != meta_get_id()) {
 					sessionid = 0;
 				}
 			} else {
@@ -2125,7 +2125,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 			put32bit(&wptr,sessionid);
 			if (eptr->version>=VERSION2INT(3,0,11)) {
-				put64bit(&wptr,meta_get_fileid());
+				put64bit(&wptr,meta_get_id());
 			}
 			put8bit(&wptr,sesflags);
 			put32bit(&wptr,rootuid);
@@ -2184,7 +2184,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			} else if (length==73+12+ileng || length==73+12+16+ileng) {
 				sessionid = get32bit(&rptr);
 				expected_metaid = get64bit(&rptr);
-				if (expected_metaid != meta_get_fileid()) {
+				if (expected_metaid != meta_get_id()) {
 					sessionid = 0;
 				}
 			} else {
@@ -2230,7 +2230,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 			put32bit(&wptr,sessionid);
 			if (eptr->version>=VERSION2INT(3,0,11)) {
-				put64bit(&wptr,meta_get_fileid());
+				put64bit(&wptr,meta_get_id());
 			}
 			put8bit(&wptr,sesflags);
 			if (eptr->version>=VERSION2INT(1,6,26)) {
@@ -2264,7 +2264,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			status = STATUS_OK;
 			if (length>=81) {
 				expected_metaid = get64bit(&rptr);
-				if (expected_metaid!=meta_get_fileid()) {
+				if (expected_metaid!=meta_get_id()) {
 					status = ERROR_BADSESSIONID;
 				}
 			}
@@ -2301,7 +2301,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			status = STATUS_OK;
 			if (length>=77) {
 				expected_metaid = get64bit(&rptr);
-				if (expected_metaid!=meta_get_fileid()) {
+				if (expected_metaid!=meta_get_id()) {
 					status = ERROR_BADSESSIONID;
 				}
 			}

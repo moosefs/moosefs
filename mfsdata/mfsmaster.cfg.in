@@ -68,6 +68,11 @@
 # default timeout in seconds for master-chunkserver connection (default is 10)
 # MATOCS_TIMEOUT = 10
 
+# Optional authentication string. When defined - then only chunkservers with the same AUTH_CODE are allowed to connect to this master. When not defined (default) - then all chunkservers are allowed.
+# If you want to switch on chunkserver authentication, then first define AUTH_CODE in all your chunkservers (and reload/restart them) then uncomment this option and reload/restart master
+# After reload currently connected chunkservers are NOT disconnected. New AUTH_CODE will be used when chunkservers will make new connection.
+# AUTH_CODE = mfspassword
+
 ###############################################
 # CHUNKSERVER WORKING OPTIONS                 #
 ###############################################

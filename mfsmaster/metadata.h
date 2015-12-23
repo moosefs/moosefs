@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -35,10 +35,10 @@ int meta_downloadall(int socket);
 
 void meta_text_dump(FILE *fd);
 
-uint64_t meta_get_fileid(void);
-void meta_set_fileid(uint64_t metaid);
+uint64_t meta_get_id(void);
+void meta_set_id(uint64_t newmetaid);
 
-uint8_t meta_mr_setmetaid(uint64_t metaid);
+uint8_t meta_mr_setmetaid(uint64_t newmetaid);
 
 void meta_info(uint32_t *lsstore,uint32_t *lstime,uint8_t *lsstat);
 int meta_init(void);

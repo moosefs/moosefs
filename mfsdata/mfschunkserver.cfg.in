@@ -71,6 +71,9 @@
 # delay in seconds before next try to reconnect to master if not connected (default is 5)
 # MASTER_RECONNECTION_DELAY = 5
 
+# authentication string (used only when master requires authorization)
+# AUTH_CODE = mfspassword
+
 ###############################################
 # CLIENTS CONNECTION OPTIONS                  #
 ###############################################

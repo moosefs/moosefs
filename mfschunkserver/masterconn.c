@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -52,6 +52,7 @@
 #include "bgjobs.h"
 #include "csserv.h"
 #include "clocks.h"
+#include "md5.h"
 
 #define MaxPacketSize MATOCS_MAXPACKETSIZE
 
@@ -121,6 +122,9 @@ typedef struct masterconn {
 	uint8_t registerstate;
 	uint8_t new_register_mode;
 	uint8_t hlstatus;
+
+	uint8_t gotrndblob;
+	uint8_t rndblob[32];
 //	uint8_t accepted;
 } masterconn;
 
@@ -140,8 +144,9 @@ static char *MasterHost;
 static char *MasterPort;
 static char *BindHost;
 static uint32_t Timeout;
-static uint16_t ChunkServerId = 0;
-static uint64_t MetaFileId = 0;
+static uint16_t ChunkServerID = 0;
+static uint64_t MetaID = 0;
+static char *AuthCode = NULL;
 
 // static FILE *logfd;
 
@@ -160,18 +165,18 @@ static inline void masterconn_initcsid(void) {
 	if (csidvalid) {
 		return;
 	}
-	ChunkServerId = 0;
-	MetaFileId = 0;
+	ChunkServerID = 0;
+	MetaID = 0;
 	csidvalid = 1;
 	fd = open("chunkserverid.mfs",O_RDWR);
 	if (fd>=0) {
 		ret = read(fd,buff,10);
 		rptr = buff;
 		if (ret>=2) {
-			ChunkServerId = get16bit(&rptr);
+			ChunkServerID = get16bit(&rptr);
 		}
 		if (ret>=10) {
-			MetaFileId = get64bit(&rptr);
+			MetaID = get64bit(&rptr);
 		}
 		close(fd);
 	}
@@ -179,31 +184,31 @@ static inline void masterconn_initcsid(void) {
 
 uint16_t masterconn_getcsid(void) {
 	masterconn_initcsid();
-	return ChunkServerId;
+	return ChunkServerID;
 }
 
 uint64_t masterconn_getmetaid(void) {
 	masterconn_initcsid();
-	return MetaFileId;
+	return MetaID;
 }
 
 void masterconn_setmetaid(uint64_t metaid) {
-	MetaFileId = metaid;
+	MetaID = metaid;
 }
 
-static inline void masterconn_setcsid(uint16_t csid,uint64_t metafileid) {
+static inline void masterconn_setcsid(uint16_t csid,uint64_t metaid) {
 	int fd;
 	uint8_t buff[10],*wptr;
-	if (ChunkServerId!=csid || MetaFileId!=metafileid) {
+	if (ChunkServerID!=csid || MetaID!=metaid) {
 		if (csid>0) {
-			ChunkServerId = csid;
+			ChunkServerID = csid;
 		}
-		if (metafileid>0) {
-			MetaFileId = metafileid;
+		if (metaid>0) {
+			MetaID = metaid;
 		}
 		wptr = buff;
-		put16bit(&wptr,ChunkServerId);
-		put64bit(&wptr,MetaFileId);
+		put16bit(&wptr,ChunkServerID);
+		put64bit(&wptr,MetaID);
 		fd = open("chunkserverid.mfs",O_CREAT | O_TRUNC | O_RDWR,0666);
 		if (fd>=0) {
 			if (write(fd,buff,10)!=10) {
@@ -327,8 +332,20 @@ void masterconn_sendregister(masterconn *eptr) {
 		syslog(LOG_NOTICE,"register ver. 6 - init + space info");
 #endif
 		hdd_get_space(&usedspace,&totalspace,&chunkcount,&tdusedspace,&tdtotalspace,&tdchunkcount);
-		buff = masterconn_create_attached_packet(eptr,CSTOMA_REGISTER,1+4+4+2+2+2+8+8+4+8+8+4);
-		put8bit(&buff,60);
+		if (eptr->gotrndblob && AuthCode) {
+			md5ctx md5c;
+			buff = masterconn_create_attached_packet(eptr,CSTOMA_REGISTER,1+16+4+4+2+2+2+8+8+4+8+8+4);
+			put8bit(&buff,60);
+			md5_init(&md5c);
+			md5_update(&md5c,eptr->rndblob,16);
+			md5_update(&md5c,(const uint8_t *)AuthCode,strlen(AuthCode));
+			md5_update(&md5c,eptr->rndblob+16,16);
+			md5_final(buff,&md5c);
+			buff+=16;
+		} else {
+			buff = masterconn_create_attached_packet(eptr,CSTOMA_REGISTER,1+4+4+2+2+2+8+8+4+8+8+4);
+			put8bit(&buff,60);
+		}
 		put32bit(&buff,VERSHEX);
 		put32bit(&buff,myip);
 		put16bit(&buff,myport);
@@ -418,17 +435,17 @@ void masterconn_sendnextchunks(masterconn *eptr) {
 
 void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t atype;
-	uint64_t metafileid;
+	uint64_t metaid;
 	uint16_t csid;
-	if (length!=17 && length!=15 && length!=9 && length!=7 && length!=5 && length!=1) {
-		syslog(LOG_NOTICE,"MATOCS_MASTER_ACK - wrong size (%"PRIu32"/1|5|7|9|15|17)",length);
+	if (length!=33 && length!=17 && length!=15 && length!=9 && length!=7 && length!=5 && length!=1) {
+		syslog(LOG_NOTICE,"MATOCS_MASTER_ACK - wrong size (%"PRIu32"/1|5|7|9|15|17|33)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	atype = get8bit(&data);
 	if (atype==0) {
 		csid = 0;
-		metafileid = 0;
+		metaid = 0;
 		if (length>=5) {
 			eptr->masterversion = get32bit(&data);
 		}
@@ -441,16 +458,16 @@ void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length)
 			csid = get16bit(&data);
 		}
 		if (length>=17) {
-			metafileid = get64bit(&data);
-			if (metafileid>0 && MetaFileId>0 && metafileid!=MetaFileId) { // wrong MFS instance - abort
+			metaid = get64bit(&data);
+			if (metaid>0 && MetaID>0 && metaid!=MetaID) { // wrong MFS instance - abort
 				syslog(LOG_WARNING,"MATOCS_MASTER_ACK - wrong meta data id. Can't connect to master");
 				eptr->registerstate = REGISTERED; // do not switch to register ver. 5
 				eptr->mode = KILL;
 				return;
 			}
 		}
-		if (csid>0 || metafileid>0) {
-			masterconn_setcsid(csid,metafileid);
+		if (csid>0 || metaid>0) {
+			masterconn_setcsid(csid,metaid);
 		}
 		if (eptr->masterversion<VERSION2INT(2,0,0)) {
 			if (eptr->registerstate != REGISTERED) {
@@ -507,14 +524,27 @@ void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length)
 			data+=2;
 		}
 		if (length>=15) {
-			metafileid = get64bit(&data);
-			if (metafileid>0 && MetaFileId>0 && metafileid!=MetaFileId) { // wrong MFS instance - abort
+			metaid = get64bit(&data);
+			if (metaid>0 && MetaID>0 && metaid!=MetaID) { // wrong MFS instance - abort
 				syslog(LOG_WARNING,"MATOCS_MASTER_ACK - wrong meta data id. Can't connect to master");
 				eptr->registerstate = REGISTERED; // do not switch to register ver. 5
 				eptr->mode = KILL;
 				return;
 			}
 		}
+	} else if (atype==3 && length==33) {
+#ifdef MFSDEBUG
+		syslog(LOG_NOTICE,"masterconn: authorization needed");
+#endif
+		if (AuthCode==NULL) {
+			syslog(LOG_WARNING,"MATOCS_MASTER_ACK - master needs authorization, but password was not defined");
+			eptr->registerstate = REGISTERED; // do not switch to register ver. 5
+			eptr->mode = KILL;
+			return;
+		}
+		memcpy(eptr->rndblob,data,32);
+		eptr->gotrndblob = 1;
+		masterconn_sendregister(eptr);
 	} else {
 		syslog(LOG_NOTICE,"MATOCS_MASTER_ACK - bad type/length: %u/%u",atype,length);
 		eptr->mode = KILL;
@@ -1128,6 +1158,8 @@ void masterconn_connected(masterconn *eptr) {
 	eptr->conncnt++;
 	eptr->masterversion = 0;
 	eptr->hlstatus = 0;
+	eptr->gotrndblob = 0;
+	memset(eptr->rndblob,0,32);
 	eptr->registerstate = UNREGISTERED;
 
 	masterconn_sendregister(eptr);
@@ -1601,6 +1633,14 @@ void masterconn_reload(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t ReconnectionDelay;
 
+	if (AuthCode) {
+		free(AuthCode);
+		AuthCode = NULL;
+	}
+	if (cfg_isdefined("AUTH_CODE")) {
+		AuthCode = cfg_getstr("AUTH_CODE","");
+	}
+
 	free(MasterHost);
 	free(MasterPort);
 	free(BindHost);
@@ -1639,6 +1679,10 @@ int masterconn_init(void) {
 	masterconn_initcsid();
 
 	manager_time_hook = NULL;
+
+	if (cfg_isdefined("AUTH_CODE")) {
+		AuthCode = cfg_getstr("AUTH_CODE","");
+	}
 
 	ReconnectionDelay = cfg_getuint32("MASTER_RECONNECTION_DELAY",5);
 	MasterHost = cfg_getstr("MASTER_HOST",DEFAULT_MASTERNAME);

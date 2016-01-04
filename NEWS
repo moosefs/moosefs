@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.66-1 (2016-01-04)
+
+  - (mount) use direct I/O as a default mode on FreeBSD (due to keep_cache bug in kernel/fuse)
+
 * MooseFS 3.0.65-1 (2015-12-23)
 
   - (master+cs) added minimal version for master supervisors in chunkservers (pro version only)

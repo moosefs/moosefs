@@ -323,7 +323,7 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfsdebug                 print some debugging information\n");
 	fprintf(stderr,"    -o mfsmeta                  mount meta filesystem (trash etc.)\n");
 	fprintf(stderr,"    -o mfsdelayedinit           connection with master is done in background - with this option mount can be run without network (good for being run from fstab / init scripts etc.)\n");
-#ifdef __linux__
+#if defined(__linux__)
 	fprintf(stderr,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 1)\n");
 #else
 	fprintf(stderr,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 0)\n");
@@ -337,7 +337,11 @@ static void usage(const char *progname) {
 #else
 	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: NEVER)\n");
 #endif
+#if defined(__FreeBSD__)
+	fprintf(stderr,"    -o mfscachemode=CMODE       set cache mode (see below ; default: DIRECT)\n");
+#else
 	fprintf(stderr,"    -o mfscachemode=CMODE       set cache mode (see below ; default: AUTO)\n");
+#endif
 	fprintf(stderr,"    -o mfscachefiles            (deprecated) equivalent to '-o mfscachemode=YES'\n");
 	fprintf(stderr,"    -o mfsattrcacheto=SEC       set attributes cache timeout in seconds (default: 1.0)\n");
 	fprintf(stderr,"    -o mfsxattrcacheto=SEC      set extended attributes (xattr) cache timeout in seconds (default: 30.0)\n");
@@ -1226,7 +1230,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (mfsopts.cachemode==NULL) {
-		mfsopts.keepcache=(mfsopts.cachefiles)?1:0;
+#if defined(__FreeBSD__)
+		mfsopts.keepcache = 3;
+#else
+		mfsopts.keepcache = (mfsopts.cachefiles)?1:0;
+#endif
 	} else if (strcasecmp(mfsopts.cachemode,"AUTO")==0) {
 		mfsopts.keepcache=0;
 	} else if (strcasecmp(mfsopts.cachemode,"YES")==0 || strcasecmp(mfsopts.cachemode,"ALWAYS")==0) {

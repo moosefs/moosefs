@@ -1,3 +1,10 @@
+moosefs (3.0.66-1) unstable; urgency=medium
+
+  * (mount) use direct I/O as a default mode on FreeBSD (due to keep_cache bug
+    in kernel/fuse)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 04 Jan 2016 12:00:00 +0100
+
 moosefs (3.0.65-1) unstable; urgency=medium
 
   * (master+cs) added minimal version for master supervisors in chunkservers

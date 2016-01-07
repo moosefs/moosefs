@@ -35,8 +35,6 @@ void csdb_servlist_data(uint8_t *ptr);
 uint8_t csdb_remove_server(uint32_t ip,uint16_t port);
 uint8_t csdb_back_to_work(uint32_t ip,uint16_t port);
 uint8_t csdb_maintenance(uint32_t ip,uint16_t port,uint8_t onoff);
-// uint8_t csdb_fastreplication(uint32_t ip,uint16_t port,uint8_t onoff);
-// uint8_t csdb_find(uint32_t ip,uint16_t port,uint16_t csid);
 uint8_t csdb_have_all_servers(void);
 uint8_t csdb_have_more_than_half_servers(void);
 uint8_t csdb_replicate_undergoals(void);

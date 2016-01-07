@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.67-1 (2016-01-07)
+
+  - (cgi+cli) added much more info for master in ELECT state (pro version only)
+  - (master+cgi+cli) added temporarily removing chunkservers in master in ELECT state (pro version only)
+  - (cgi) fixed bug in ChunkServers list (heavy load/internal rebalance)
+
 * MooseFS 3.0.66-1 (2016-01-04)
 
   - (mount) use direct I/O as a default mode on FreeBSD (due to keep_cache bug in kernel/fuse)

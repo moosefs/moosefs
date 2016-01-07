@@ -64,6 +64,7 @@ typedef struct csdbentry {
 	uint32_t heavyloadts;		// last timestamp of heavy load state (load > thresholds)
 	uint32_t load;
 	uint8_t maintenance;
+	uint8_t tmpremoved;
 //	uint8_t fastreplication;
 	void *eptr;
 	struct csdbentry *next;
@@ -75,6 +76,7 @@ static uint32_t nextid;
 static uint32_t disconnected_servers;
 static uint32_t disconnected_servers_in_maintenance;
 static uint32_t servers;
+static uint32_t tmpremoved_servers;
 static uint32_t disconnecttime;
 static uint32_t loadsum;
 
@@ -130,6 +132,10 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 		if (csidptr->maintenance) {
 			disconnected_servers_in_maintenance--;
 		}
+		if (csidptr->tmpremoved) {
+			csidptr->tmpremoved = 0;
+			tmpremoved_servers--;
+		}
 		syslog(LOG_NOTICE,"csdb: found cs using ip:port and csid (%s:%"PRIu16",%"PRIu16")",strip,port,csid);
 		return csidptr;
 	}
@@ -144,6 +150,10 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 			disconnected_servers--;
 			if (csptr->maintenance) {
 				disconnected_servers_in_maintenance--;
+			}
+			if (csidptr->tmpremoved) {
+				csidptr->tmpremoved = 0;
+				tmpremoved_servers--;
 			}
 			return csptr;
 		}
@@ -171,6 +181,10 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 		if (csidptr->maintenance) {
 			disconnected_servers_in_maintenance--;
 		}
+		if (csidptr->tmpremoved) {
+			csidptr->tmpremoved = 0;
+			tmpremoved_servers--;
+		}
 		return csidptr;
 	}
 	syslog(LOG_NOTICE,"csdb: server not found (%s:%"PRIu16",%"PRIu16"), add it to database",strip,port,csid);
@@ -188,6 +202,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 	csptr->csid = csid;
 	csptr->heavyloadts = 0;
 	csptr->maintenance = 0;
+	csptr->tmpremoved = 0;
 //	csptr->fastreplication = 1;
 	csptr->load = 0;
 	csptr->eptr = eptr;
@@ -260,7 +275,9 @@ uint32_t csdb_servlist_size(void) {
 	i=0;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
-			i++;
+			if (csptr->tmpremoved==0) {
+				i++;
+			}
 		}
 	}
 	return i*(4+4+2+2+8+8+4+8+8+4+4+4+4+4+1);
@@ -274,6 +291,9 @@ void csdb_servlist_data(uint8_t *ptr) {
 	csdbentry *csptr;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
+			if (csptr->tmpremoved) {
+				continue;
+			}
 			if (csptr->heavyloadts+HeavyLoadGracePeriod>now) {
 				gracetime = csptr->heavyloadts+HeavyLoadGracePeriod-now; // seconds to be turned back to work
 			} else {
@@ -348,6 +368,9 @@ uint8_t csdb_remove_server(uint32_t ip,uint16_t port) {
 			if (csptr->maintenance) {
 				disconnected_servers_in_maintenance--;
 			}
+			if (csptr->tmpremoved) {
+				tmpremoved_servers--;
+			}
 			*cspptr = csptr->next;
 			free(csptr);
 			servers--;
@@ -384,6 +407,7 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 			csdbtab[csid] = csptr;
 			csptr->heavyloadts = 0;
 			csptr->maintenance = 0;
+			csptr->tmpremoved = 0;
 //			csptr->fastreplication = 1;
 			csptr->load = 0;
 			csptr->eptr = NULL;
@@ -406,6 +430,9 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 					}
 					if (csptr->maintenance) {
 						disconnected_servers_in_maintenance--;
+					}
+					if (csptr->tmpremoved) {
+						tmpremoved_servers--;
 					}
 					*cspptr = csptr->next;
 					free(csptr);
@@ -526,6 +553,7 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 	return ERROR_MISMATCH;
 }
 
+
 uint8_t csdb_back_to_work(uint32_t ip,uint16_t port) {
 	uint32_t hash;
 	csdbentry *csptr;
@@ -618,7 +646,7 @@ uint8_t csdb_have_all_servers(void) {
 }
 
 uint8_t csdb_have_more_than_half_servers(void) {
-	return ((servers==0)||(disconnected_servers<((servers+1)/2)))?1:0;
+	return ((servers-tmpremoved_servers==0)||((disconnected_servers-tmpremoved_servers)<(((servers-tmpremoved_servers)+1)/2)))?1:0;
 }
 
 uint8_t csdb_replicate_undergoals(void) {
@@ -644,21 +672,23 @@ uint16_t csdb_sort_servers(void) {
 	csdbentry **stab,*csptr;
 	uint32_t i,hash;
 
-	stab = malloc(sizeof(csdbentry*)*servers);
+	stab = malloc(sizeof(csdbentry*)*(servers-tmpremoved_servers));
 	i = 0;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
-			if (i<servers) {
-				stab[i] = csptr;
-				i++;
-			} else {
-				syslog(LOG_WARNING,"internal error: wrong chunk servers count !!!");
-				csptr->number = 0;
+			if (csptr->tmpremoved==0) {
+				if (i<servers) {
+					stab[i] = csptr;
+					i++;
+				} else {
+					syslog(LOG_WARNING,"internal error: wrong chunk servers count !!!");
+					csptr->number = 0;
+				}
 			}
 		}
 	}
 	qsort(stab,servers,sizeof(csdbentry*),csdb_compare);
-	for (i=0 ; i<servers ; i++) {
+	for (i=0 ; i<(servers-tmpremoved_servers) ; i++) {
 		stab[i]->number = i+1;
 	}
 	free(stab);
@@ -667,7 +697,7 @@ uint16_t csdb_sort_servers(void) {
 }
 
 uint16_t csdb_servers_count(void) {
-	return servers;
+	return servers-tmpremoved_servers;
 }
 
 uint16_t csdb_getnumber(void *v_csptr) {
@@ -884,6 +914,7 @@ void csdb_cleanup(void) {
 	nextid = 1;
 	disconnected_servers = 0;
 	disconnected_servers_in_maintenance = 0;
+	tmpremoved_servers = 0;
 	servers = 0;
 }
 
@@ -912,6 +943,7 @@ int csdb_init(void) {
 	disconnected_servers = 0;
 	disconnected_servers_in_maintenance = 0;
 	servers = 0;
+	tmpremoved_servers = 0;
 	disconnecttime = 0;
 	loadsum = 0;
 	main_reload_register(csdb_reload);

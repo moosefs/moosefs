@@ -73,6 +73,7 @@ MFS_CSSERV_COMMAND_REMOVE = 0
 MFS_CSSERV_COMMAND_BACKTOWORK = 1
 MFS_CSSERV_COMMAND_MAINTENANCEON = 2
 MFS_CSSERV_COMMAND_MAINTENANCEOFF = 3
+MFS_CSSERV_COMMAND_TMPREMOVE = 4
 
 MFS_SESSION_COMMAND_REMOVE = 0
 
@@ -1513,30 +1514,30 @@ class ChunkServer:
 
 
 class DataProvider:
-	def __init__(self,leaderconn):
-		self.leaderconn = leaderconn
+	def __init__(self,masterconn):
+		self.masterconn = masterconn
 		self.sessions = None
 		self.chunkservers = None
 	def get_sessions(self):
 		if self.sessions==None:
 			self.sessions=[]
-			if self.leaderconn.version_at_least(1,7,8):
-				data,length = self.leaderconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST,struct.pack(">B",2))
-			elif self.leaderconn.version_at_least(1,6,26):
-				data,length = self.leaderconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST,struct.pack(">B",1))
+			if self.masterconn.version_at_least(1,7,8):
+				data,length = self.masterconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST,struct.pack(">B",2))
+			elif self.masterconn.version_at_least(1,6,26):
+				data,length = self.masterconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST,struct.pack(">B",1))
 			else:
-				data,length = self.leaderconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST)
-			if self.leaderconn.version_less_than(1,6,21):
+				data,length = self.masterconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST)
+			if self.masterconn.version_less_than(1,6,21):
 				statscnt = 16
 				pos = 0
-			elif self.leaderconn.version_is(1,6,21):
+			elif self.masterconn.version_is(1,6,21):
 				statscnt = 21
 				pos = 0
 			else:
 				statscnt = struct.unpack(">H",data[0:2])[0]
 				pos = 2
 			while pos<length:
-				if self.leaderconn.version_at_least(1,7,8):
+				if self.masterconn.version_at_least(1,7,8):
 					sessionid,ip1,ip2,ip3,ip4,v1,v2,v3,openfiles,nsocks,expire,ileng = struct.unpack(">LBBBBHBBLBLL",data[pos:pos+25])
 					pos+=25
 				else:
@@ -1560,7 +1561,7 @@ class DataProvider:
 						path = path.decode('ascii')
 					except UnicodeDecodeError:
 						pass
-				if self.leaderconn.version_at_least(1,6,26):
+				if self.masterconn.version_at_least(1,6,26):
 					sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime = struct.unpack(">BLLLLBBLL",data[pos:pos+27])
 					pos+=27
 					if mingoal<=1 and maxgoal>=9:
@@ -1596,36 +1597,36 @@ class DataProvider:
 	def get_chunkservers(self):
 		if self.chunkservers==None:
 			self.chunkservers=[]
-			data,length = leaderconn.command(CLTOMA_CSERV_LIST,MATOCL_CSERV_LIST)
-			if leaderconn.version_at_least(3,0,38) and (length%69)==0:
+			data,length = masterconn.command(CLTOMA_CSERV_LIST,MATOCL_CSERV_LIST)
+			if masterconn.version_at_least(3,0,38) and (length%69)==0:
 				n = length//69
 				for i in range(n):
 					d = data[i*69:(i+1)*69]
 					flags,v1,v2,v3,ip1,ip2,ip3,ip4,port,csid,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,mfrstatus = struct.unpack(">BBBBBBBBHHQQLQQLLLLLB",d)
 					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,mfrstatus)
 					self.chunkservers.append(cs)
-			elif leaderconn.version_at_least(2,1,0) and (length%68)==0:
+			elif masterconn.version_at_least(2,1,0) and (length%68)==0:
 				n = length//68
 				for i in range(n):
 					d = data[i*68:(i+1)*68]
 					flags,v1,v2,v3,ip1,ip2,ip3,ip4,port,csid,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels = struct.unpack(">BBBBBBBBHHQQLQQLLLLL",d)
 					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,None)
 					self.chunkservers.append(cs)
-			elif leaderconn.version_at_least(1,7,25) and leaderconn.version_less_than(2,1,0) and (length%64)==0:
+			elif masterconn.version_at_least(1,7,25) and masterconn.version_less_than(2,1,0) and (length%64)==0:
 				n = length//64
 				for i in range(n):
 					d = data[i*64:(i+1)*64]
 					flags,v1,v2,v3,ip1,ip2,ip3,ip4,port,csid,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime = struct.unpack(">BBBBBBBBHHQQLQQLLLL",d)
 					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,None,None)
 					self.chunkservers.append(cs)
-			elif leaderconn.version_at_least(1,6,28) and leaderconn.version_less_than(1,7,25) and (length%62)==0:
+			elif masterconn.version_at_least(1,6,28) and masterconn.version_less_than(1,7,25) and (length%62)==0:
 				n = length//62
 				for i in range(n):
 					d = data[i*62:(i+1)*62]
 					disconnected,v1,v2,v3,ip1,ip2,ip3,ip4,port,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime = struct.unpack(">BBBBBBBBHQQLQQLLLL",d)
 					cs = ChunkServer(ip1,ip2,ip3,ip4,port,csid,v1,v2,v3,1 if disconnected else 0,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,None,None)
 					self.chunkservers.append(cs)
-			elif leaderconn.version_less_than(1,6,28) and (length%54)==0:
+			elif masterconn.version_less_than(1,6,28) and (length%54)==0:
 				n = length//54
 				for i in range(n):
 					d = data[i*54:(i+1)*54]
@@ -1635,10 +1636,10 @@ class DataProvider:
 		return self.chunkservers
 
 
-def resolve_inodes_paths(leaderconn,inodes):
+def resolve_inodes_paths(masterconn,inodes):
 	inodepaths = {}
 	if len(inodes)>0:
-		data,length = leaderconn.command(CLTOMA_MASS_RESOLVE_PATHS,MATOCL_MASS_RESOLVE_PATHS,struct.pack(">"+len(inodes)*"L",*inodes))
+		data,length = masterconn.command(CLTOMA_MASS_RESOLVE_PATHS,MATOCL_MASS_RESOLVE_PATHS,struct.pack(">"+len(inodes)*"L",*inodes))
 		pos = 0
 		while pos+8<=length:
 			inode,psize = struct.unpack(">LL",data[pos:pos+8])
@@ -1677,6 +1678,9 @@ leader_exports_checksum = None
 followerfound = 0
 electfound = 0
 leaderconn = None
+electconn = None
+electinfo = None
+elect_exports_checksum = None
 dataprovider = None
 leaderinfo = None
 masterlist = getmasteraddresses()
@@ -1768,8 +1772,11 @@ for mhost,mport in masterlist:
 						if sync==0:
 							statestr += " (DESYNC)"
 						followerfound = 1
-					if workingstate==STATE_ELECT:
+					if workingstate==STATE_ELECT and electfound==0:
 						electfound = 1
+						electconn = conn
+						electinfo = data
+						elect_exports_checksum = exports_checksum
 					if workingstate==STATE_LEADER and leaderfound==0:
 						leaderispro = 1
 						leaderconn = conn
@@ -1789,12 +1796,25 @@ for mhost,mport in masterlist:
 		strip = mhost
 		sortip = mhost
 	strver,sortver = version_str_and_sort(version)
-	if conn and conn!=leaderconn:
+	if conn and conn!=leaderconn and conn!=electconn:
 		del conn
 	masterlistver.append((mhost,mport,version))
 	masterlistinfo.append((sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exports_checksum))
 
-if leaderfound and leaderconn.version_less_than(1,6,10):
+if leaderfound:
+	masterconn = leaderconn
+	masterinfo = leaderinfo
+	masterispro = leaderispro
+	master_exports_checksum = leader_exports_checksum
+elif electfound:
+	masterconn = electconn
+	masterinfo = electinfo
+	masterispro = 1
+	master_exports_checksum = elect_exports_checksum
+else:
+	masterconn = None
+
+if leaderfound and masterconn.version_less_than(1,6,10):
 	if cgimode:
 		print("Content-Type: text/html; charset=UTF-8")
 		print("")
@@ -1806,21 +1826,21 @@ if leaderfound and leaderconn.version_less_than(1,6,10):
 		print("""<link rel="stylesheet" href="mfs.css" type="text/css" />""")
 		print("""</head>""")
 		print("""<body>""")
-		if leaderconn.version_unknown():
+		if masterconn.version_unknown():
 			print("""<h1 align="center">Can't detect MFS master version</h1>""")
 		else:
 			print("""<h1 align="center">MFS master version not supported (pre 1.6.10)</h1>""")
 		print("""</body>""")
 		print("""</html>""")
 	else:
-		if leaderconn.version_unknown():
+		if masterconn.version_unknown():
 			print("""Can't detect MFS master version""")
 		else:
 			print("""MFS master version not supported (pre 1.6.10)""")
 	sys.exit(1)
 
 
-dataprovider = DataProvider(leaderconn)
+dataprovider = DataProvider(masterconn)
 
 # commands
 if cgimode:
@@ -1836,13 +1856,13 @@ if cgimode:
 					csip = list(map(int,serverdata[0].split(".")))
 					csport = int(serverdata[1])
 					if len(csip)==4:
-						if leaderconn.version_less_than(1,6,28):
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBH",csip[0],csip[1],csip[2],csip[3],csport))
+						if masterconn.version_less_than(1,6,28):
+							data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBH",csip[0],csip[1],csip[2],csip[3],csport))
 							if length==0:
 								cmd_success = 1
 								status = 0
 						else:
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_REMOVE,csip[0],csip[1],csip[2],csip[3],csport))
+							data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_REMOVE,csip[0],csip[1],csip[2],csip[3],csport))
 							if length==1:
 								status = (struct.unpack(">B",data))[0]
 								cmd_success = 1
@@ -1852,54 +1872,51 @@ if cgimode:
 	elif "CSbacktowork" in fields:
 		cmd_success = 0
 		tracedata = ""
-		if leaderfound:
+		if leaderfound and masterconn.version_at_least(1,6,28):
 			try:
 				serverdata = fields.getvalue("CSbacktowork").split(":")
 				if len(serverdata)==2:
 					csip = list(map(int,serverdata[0].split(".")))
 					csport = int(serverdata[1])
 					if len(csip)==4:
-						if leaderconn.version_at_least(1,6,28):
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_BACKTOWORK,csip[0],csip[1],csip[2],csip[3],csport))
-							if length==1:
-								status = (struct.unpack(">B",data))[0]
-								cmd_success = 1
+						data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_BACKTOWORK,csip[0],csip[1],csip[2],csip[3],csport))
+						if length==1:
+							status = (struct.unpack(">B",data))[0]
+							cmd_success = 1
 			except Exception:
 				tracedata = traceback.format_exc()
 		url = createlink({"CSbacktowork":""})
 	elif "CSmaintenanceon" in fields:
 		cmd_success = 0
 		tracedata = ""
-		if leaderfound:
+		if leaderfound and masterconn.version_at_least(2,0,11):
 			try:
 				serverdata = fields.getvalue("CSmaintenanceon").split(":")
 				if len(serverdata)==2:
 					csip = list(map(int,serverdata[0].split(".")))
 					csport = int(serverdata[1])
 					if len(csip)==4:
-						if leaderconn.version_at_least(2,0,11):
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_MAINTENANCEON,csip[0],csip[1],csip[2],csip[3],csport))
-							if length==1:
-								status = (struct.unpack(">B",data))[0]
-								cmd_success = 1
+						data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_MAINTENANCEON,csip[0],csip[1],csip[2],csip[3],csport))
+						if length==1:
+							status = (struct.unpack(">B",data))[0]
+							cmd_success = 1
 			except Exception:
 				tracedata = traceback.format_exc()
 		url = createlink({"CSmaintenanceon":""})
 	elif "CSmaintenanceoff" in fields:
 		cmd_success = 0
 		tracedata = ""
-		if leaderfound:
+		if leaderfound and masterconn.version_at_least(2,0,11):
 			try:
 				serverdata = fields.getvalue("CSmaintenanceoff").split(":")
 				if len(serverdata)==2:
 					csip = list(map(int,serverdata[0].split(".")))
 					csport = int(serverdata[1])
 					if len(csip)==4:
-						if leaderconn.version_at_least(2,0,11):
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_MAINTENANCEOFF,csip[0],csip[1],csip[2],csip[3],csport))
-							if length==1:
-								status = (struct.unpack(">B",data))[0]
-								cmd_success = 1
+						data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_MAINTENANCEOFF,csip[0],csip[1],csip[2],csip[3],csport))
+						if length==1:
+							status = (struct.unpack(">B",data))[0]
+							cmd_success = 1
 			except Exception:
 				tracedata = traceback.format_exc()
 		url = createlink({"CSmaintenanceoff":""})
@@ -1909,7 +1926,7 @@ if cgimode:
 		if leaderfound:
 			try:
 				sessionid = int(fields.getvalue("MSremove"))
-				data,length = leaderconn.command(CLTOMA_SESSION_COMMAND,MATOCL_SESSION_COMMAND,struct.pack(">BL",MFS_SESSION_COMMAND_REMOVE,sessionid))
+				data,length = masterconn.command(CLTOMA_SESSION_COMMAND,MATOCL_SESSION_COMMAND,struct.pack(">BL",MFS_SESSION_COMMAND_REMOVE,sessionid))
 				if length==1:
 					status = (struct.unpack(">B",data))[0]
 					cmd_success = 1
@@ -1963,13 +1980,13 @@ else:
 					csip = list(map(int,cmddata[1].split(".")))
 					csport = int(cmddata[2])
 					if len(csip)==4:
-						if leaderconn.version_less_than(1,6,28):
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBH",csip[0],csip[1],csip[2],csip[3],csport))
+						if masterconn.version_less_than(1,6,28):
+							data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBH",csip[0],csip[1],csip[2],csip[3],csport))
 							if length==0:
 								cmd_success = 1
 								status = 0
 						else:
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_REMOVE,csip[0],csip[1],csip[2],csip[3],csport))
+							data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_REMOVE,csip[0],csip[1],csip[2],csip[3],csport))
 							if length==1:
 								status = (struct.unpack(">B",data))[0]
 								cmd_success = 1
@@ -1992,8 +2009,8 @@ else:
 					csip = list(map(int,cmddata[1].split(".")))
 					csport = int(cmddata[2])
 					if len(csip)==4:
-						if leaderconn.version_at_least(1,6,28):
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_BACKTOWORK,csip[0],csip[1],csip[2],csip[3],csport))
+						if masterconn.version_at_least(1,6,28):
+							data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_BACKTOWORK,csip[0],csip[1],csip[2],csip[3],csport))
 							if length==1:
 								status = (struct.unpack(">B",data))[0]
 								cmd_success = 1
@@ -2014,8 +2031,8 @@ else:
 					csip = list(map(int,cmddata[1].split(".")))
 					csport = int(cmddata[2])
 					if len(csip)==4:
-						if leaderconn.version_at_least(2,0,11):
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_MAINTENANCEON,csip[0],csip[1],csip[2],csip[3],csport))
+						if masterconn.version_at_least(2,0,11):
+							data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_MAINTENANCEON,csip[0],csip[1],csip[2],csip[3],csport))
 							if length==1:
 								status = (struct.unpack(">B",data))[0]
 								cmd_success = 1
@@ -2036,8 +2053,8 @@ else:
 					csip = list(map(int,cmddata[1].split(".")))
 					csport = int(cmddata[2])
 					if len(csip)==4:
-						if leaderconn.version_at_least(2,0,11):
-							data,length = leaderconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_MAINTENANCEOFF,csip[0],csip[1],csip[2],csip[3],csport))
+						if masterconn.version_at_least(2,0,11):
+							data,length = masterconn.command(CLTOMA_CSSERV_COMMAND,MATOCL_CSSERV_COMMAND,struct.pack(">BBBBBH",MFS_CSSERV_COMMAND_MAINTENANCEOFF,csip[0],csip[1],csip[2],csip[3],csport))
 							if length==1:
 								status = (struct.unpack(">B",data))[0]
 								cmd_success = 1
@@ -2056,7 +2073,7 @@ else:
 				cmd_success = 0
 				try:
 					sessionid = int(cmddata[1])
-					data,length = leaderconn.command(CLTOMA_SESSION_COMMAND,MATOCL_SESSION_COMMAND,struct.pack(">BL",MFS_SESSION_COMMAND_REMOVE,sessionid))
+					data,length = masterconn.command(CLTOMA_SESSION_COMMAND,MATOCL_SESSION_COMMAND,struct.pack(">BL",MFS_SESSION_COMMAND_REMOVE,sessionid))
 					if length==1:
 						status = (struct.unpack(">B",data))[0]
 						cmd_success = 1
@@ -2089,7 +2106,7 @@ if cgimode:
 		sectionsubset = ["IM","LI","IG","MU","IC","IL","MF","CS","MB","LD","LS","OF","AL"] # used only in climode - in cgimode turn on all subsections
 
 	if leaderfound:
-		if leaderconn.version_less_than(1,7,0):
+		if masterconn.version_less_than(1,7,0):
 			sectiondef={
 				"IN":"Info",
 				"CS":"Servers",
@@ -2100,8 +2117,8 @@ if cgimode:
 				"MC":"Master Charts",
 				"CC":"Server Charts"
 			}
-			sectionorder=["IN","CS","HD","EX","MS","MO","MC","CC"];
-		elif leaderconn.version_less_than(2,1,0):
+			sectionorder=["IN","CS","HD","EX","MS","MO","MC","CC"]
+		elif masterconn.version_less_than(2,1,0):
 			sectiondef={
 				"IN":"Info",
 				"CS":"Servers",
@@ -2113,7 +2130,7 @@ if cgimode:
 				"MC":"Master Charts",
 				"CC":"Server Charts"
 			}
-			sectionorder=["IN","CS","HD","EX","MS","MO","QU","MC","CC"];
+			sectionorder=["IN","CS","HD","EX","MS","MO","QU","MC","CC"]
 		else:
 			sectiondef={
 				"IN":"Info",
@@ -2127,12 +2144,29 @@ if cgimode:
 				"MC":"Master Charts",
 				"CC":"Server Charts"
 			}
-			sectionorder=["IN","CS","HD","EX","MS","MO","RS","QU","MC","CC"];
+			sectionorder=["IN","CS","HD","EX","MS","MO","RS","QU","MC","CC"]
+	elif electfound:
+		sectiondef = {
+			"IN":"Info",
+			"CS":"Servers",
+			"HD":"Disks",
+			"EX":"Exports",
+			"QU":"Quotas",
+			"MC":"Master Charts",
+			"CC":"Server Charts"
+		}
+		sectionorder=["IN","CS","HD","EX","QU","MC","CC"]
+	elif followerfound:
+		sectiondef = {
+			"IN":"Info",
+			"MC":"Master Charts"
+		}
+		sectionorder=["IN","MC"]
 	else:
 		sectiondef = {
 			"IN":"Info"
 		}
-		sectionorder=["IN"];
+		sectionorder=["IN"]
 
 	print("Content-Type: text/html; charset=UTF-8")
 	print("")
@@ -2236,8 +2270,6 @@ if leaderfound==0:
 		else:
 			print("Working master servers not found !!! - maybe you are using wrong port number or wrong dns name")
 	needseparator=1
-	sectionset = set(("IN",))
-	sectionsubset = ["IM"] # used only in climode - in cgimode turn on all subsections
 
 # parse cgi parameters
 if cgimode:
@@ -2395,9 +2427,9 @@ else:
 	# fix order id's
 	if CSorder>=2:
 		CSorder+=1
-	if leaderfound and leaderconn.version_less_than(1,7,25) and CSorder>=4:
+	if leaderfound and masterconn.version_less_than(1,7,25) and CSorder>=4:
 		CSorder+=1
-	if leaderfound and leaderconn.version_less_than(1,6,28) and CSorder>=5:
+	if leaderfound and masterconn.version_less_than(1,6,28) and CSorder>=5:
 		CSorder+=1
 	if CSorder>=6 and CSorder<=9:
 		CSorder+=4
@@ -2410,12 +2442,12 @@ else:
 	if HDorder>=13 and HDorder<=15:
 		HDorder+=7
 
-	if leaderfound and leaderconn.version_less_than(1,7,0) and EXorder>=10:
+	if leaderfound and masterconn.version_less_than(1,7,0) and EXorder>=10:
 		EXorder+=1
 
 	if MSorder>=3:
 		MSorder+=1
-	if leaderfound and leaderconn.version_less_than(1,7,0) and MSorder>=10:
+	if leaderfound and masterconn.version_less_than(1,7,0) and MSorder>=10:
 		MSorder+=1
 	if MSorder==0:
 		MSorder=2
@@ -2515,11 +2547,11 @@ if "IN" in sectionset:
 
 			for sf,sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exports_checksum in masterstab:
 				if cgimode:
-					if leaderconn!=None and leaderconn.is_pro() and not strver.endswith(" PRO"):
+					if masterconn!=None and masterconn.is_pro() and not strver.endswith(" PRO"):
 						verclass = "BADVERSION"
-					elif leaderconn!=None and leaderconn.sort_ver() > sortver:
+					elif masterconn!=None and masterconn.sort_ver() > sortver:
 						verclass = "LOWERVERSION"
-					elif leaderconn!=None and leaderconn.sort_ver() < sortver:
+					elif masterconn!=None and masterconn.sort_ver() < sortver:
 						verclass = "HIGHERVERSION"
 					else:
 						verclass = "OKVERSION"
@@ -2545,7 +2577,7 @@ if "IN" in sectionset:
 					else:
 						out.append("""		<td align="center">-</td>""")
 					if exports_checksum!=None:
-						out.append("""		<td align="center"><span class="%s">%016X</span></td>""" % (("ERROR" if exports_checksum != leader_exports_checksum else "SUCCESS"),exports_checksum))
+						out.append("""		<td align="center"><span class="%s">%016X</span></td>""" % (("ERROR" if exports_checksum != master_exports_checksum else "SUCCESS"),exports_checksum))
 					else:
 						out.append("""		<td align="center">-</td>""")
 					out.append("""	</tr>""")
@@ -2580,7 +2612,7 @@ if "IN" in sectionset:
 					else:
 						clist.append("-")
 					if exports_checksum!=None:
-						clist.append((("%016X" % exports_checksum),("1" if exports_checksum != leader_exports_checksum else "4")))
+						clist.append((("%016X" % exports_checksum),("1" if exports_checksum != master_exports_checksum else "4")))
 					else:
 						clist.append("-")
 					tab.append(*clist)
@@ -2610,9 +2642,9 @@ if "IN" in sectionset:
 					print("")
 			else:
 				needseparator=1
-			length = len(leaderinfo)
+			length = len(masterinfo)
 			if length==68:
-				v1,v2,v3,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies = struct.unpack(">HBBQQQLQLLLLLLL",leaderinfo)
+				v1,v2,v3,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies = struct.unpack(">HBBQQQLQLLLLLLL",masterinfo)
 				strver,sortver = version_str_and_sort((v1,v2,v3))
 				if cgimode:
 					out = []
@@ -2679,7 +2711,7 @@ if "IN" in sectionset:
 					tab.append("regular chunk copies",tdcopies)
 					print(tab)
 			elif length==76:
-				v1,v2,v3,memusage,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies = struct.unpack(">HBBQQQQLQLLLLLLL",leaderinfo)
+				v1,v2,v3,memusage,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies = struct.unpack(">HBBQQQQLQLLLLLLL",masterinfo)
 				strver,sortver = version_str_and_sort((v1,v2,v3))
 				if cgimode:
 					out = []
@@ -2758,11 +2790,11 @@ if "IN" in sectionset:
 					tab.append("regular chunk copies",tdcopies)
 					print(tab)
 			elif length==101 or length==121 or length==129:
-				v1,v2,v3,memusage,syscpu,usercpu,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies,lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">HBBQQQQQQLQLLLLLLLLLB",leaderinfo[:101])
+				v1,v2,v3,memusage,syscpu,usercpu,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies,lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">HBBQQQQQQLQLLLLLLLLLB",masterinfo[:101])
 				strver,sortver = version_str_and_sort((v1,v2,v3))
 				syscpu/=10000000.0
 				usercpu/=10000000.0
-				if leaderconn.version_at_least(2,0,14):
+				if masterconn.version_at_least(2,0,14):
 					lastsaveseconds = lastsaveseconds / 1000.0
 				if cgimode:
 					out = []
@@ -2902,7 +2934,7 @@ if "IN" in sectionset:
 		except Exception:
 			print_exception()
 
-	if "MU" in sectionsubset and leaderconn.version_at_least(1,7,16):
+	if "MU" in sectionsubset and masterconn.version_at_least(1,7,16):
 		if needseparator:
 			if cgimode:
 				print("""<br/>""")
@@ -2911,7 +2943,7 @@ if "IN" in sectionset:
 		else:
 			needseparator=1
 		try:
-			data,length = leaderconn.command(CLTOMA_MEMORY_INFO,MATOCL_MEMORY_INFO)
+			data,length = masterconn.command(CLTOMA_MEMORY_INFO,MATOCL_MEMORY_INFO)
 			if length>=176 and length%16==0:
 				memusage = struct.unpack(">QQQQQQQQQQQQQQQQQQQQQQ",data[:176])
 				memlabels = ["chunk hash","chunks","cs lists","edge hash","edges","node hash","nodes","deleted nodes","chunk tabs","symlinks","quota"]
@@ -3080,7 +3112,7 @@ if "IN" in sectionset:
 		except Exception:
 			print_exception()
 
-	if "IC" in sectionsubset:
+	if "IC" in sectionsubset and leaderfound:
 		if needseparator:
 			if cgimode:
 				print("""<br/>""")
@@ -3089,21 +3121,21 @@ if "IN" in sectionset:
 		else:
 			needseparator=1
 		try:
-			if leaderconn.version_less_than(1,7,0):
-				data,length = leaderconn.command(CLTOMA_CHUNKS_MATRIX,MATOCL_CHUNKS_MATRIX,struct.pack(">B",0))
+			if masterconn.version_less_than(1,7,0):
+				data,length = masterconn.command(CLTOMA_CHUNKS_MATRIX,MATOCL_CHUNKS_MATRIX,struct.pack(">B",0))
 				if length==484:
 					matrix = []
 					matrix.append([])
 					for i in range(11):
 						matrix[0].append(list(struct.unpack(">LLLLLLLLLLL",data[i*44:i*44+44])))
-					data,length = leaderconn.command(CLTOMA_CHUNKS_MATRIX,MATOCL_CHUNKS_MATRIX,struct.pack(">B",1))
+					data,length = masterconn.command(CLTOMA_CHUNKS_MATRIX,MATOCL_CHUNKS_MATRIX,struct.pack(">B",1))
 					if length==484:
 						matrix.append([])
 						for i in range(11):
 							matrix[1].append(list(struct.unpack(">LLLLLLLLLLL",data[i*44:i*44+44])))
 				progressstatus = 0
 			else:
-				data,length = leaderconn.command(CLTOMA_CHUNKS_MATRIX,MATOCL_CHUNKS_MATRIX)
+				data,length = masterconn.command(CLTOMA_CHUNKS_MATRIX,MATOCL_CHUNKS_MATRIX)
 				if length==969:
 					progressstatus = struct.unpack(">B",data[0:1])[0]
 					matrix = ([],[])
@@ -3275,7 +3307,7 @@ if "IN" in sectionset:
 		except Exception:
 			print_exception()
 
-	if "IL" in sectionsubset:
+	if "IL" in sectionsubset and leaderfound:
 		try:
 			if needseparator:
 				if cgimode:
@@ -3284,7 +3316,7 @@ if "IN" in sectionset:
 					print("")
 			else:
 				needseparator=1
-			data,length = leaderconn.command(CLTOMA_CHUNKSTEST_INFO,MATOCL_CHUNKSTEST_INFO)
+			data,length = masterconn.command(CLTOMA_CHUNKSTEST_INFO,MATOCL_CHUNKSTEST_INFO)
 			if length==52:
 				loopstart,loopend,del_invalid,ndel_invalid,del_unused,ndel_unused,del_dclean,ndel_dclean,del_ogoal,ndel_ogoal,rep_ugoal,nrep_ugoal,rebalnce = struct.unpack(">LLLLLLLLLLLLL",data)
 				if cgimode:
@@ -3499,11 +3531,11 @@ if "IN" in sectionset:
 					print("")
 			else:
 				needseparator=1
-			if (leaderconn.version_at_least(2,0,66) and leaderconn.version_less_than(3,0,0)) or leaderconn.version_at_least(3,0,19):
-				data,length = leaderconn.command(CLTOMA_FSTEST_INFO,MATOCL_FSTEST_INFO,struct.pack(">B",0))
+			if (masterconn.version_at_least(2,0,66) and masterconn.version_less_than(3,0,0)) or masterconn.version_at_least(3,0,19):
+				data,length = masterconn.command(CLTOMA_FSTEST_INFO,MATOCL_FSTEST_INFO,struct.pack(">B",0))
 				pver = 1
 			else:
-				data,length = leaderconn.command(CLTOMA_FSTEST_INFO,MATOCL_FSTEST_INFO)
+				data,length = masterconn.command(CLTOMA_FSTEST_INFO,MATOCL_FSTEST_INFO)
 				pver = 0
 			if length>=(36 + pver*8):
 				if pver==1:
@@ -3606,7 +3638,7 @@ if "IN" in sectionset:
 		except Exception:
 			print_exception()
 
-	if "MF" in sectionsubset and ((leaderconn.version_at_least(2,0,66) and leaderconn.version_less_than(3,0,0)) or leaderconn.version_at_least(3,0,19)):
+	if "MF" in sectionsubset and leaderfound and ((masterconn.version_at_least(2,0,66) and masterconn.version_less_than(3,0,0)) or masterconn.version_at_least(3,0,19)):
 		try:
 			if needseparator:
 				if cgimode:
@@ -3617,8 +3649,8 @@ if "IN" in sectionset:
 				needseparator=1
 			inodes = set()
 			missingchunks = []
-			if ((leaderconn.version_at_least(2,0,71) and leaderconn.version_less_than(3,0,0)) or leaderconn.version_at_least(3,0,25)):
-				data,length = leaderconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS,struct.pack(">B",1))
+			if ((masterconn.version_at_least(2,0,71) and masterconn.version_less_than(3,0,0)) or masterconn.version_at_least(3,0,25)):
+				data,length = masterconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS,struct.pack(">B",1))
 				if length%17==0:
 					n = length//17
 					for x in xrange(n):
@@ -3627,7 +3659,7 @@ if "IN" in sectionset:
 						missingchunks.append((chunkid,inode,indx,mtype))
 				mode = 1
 			else:
-				data,length = leaderconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS)
+				data,length = masterconn.command(CLTOMA_MISSING_CHUNKS,MATOCL_MISSING_CHUNKS)
 				if length%16==0:
 					n = length//16
 					for x in xrange(n):
@@ -3635,7 +3667,7 @@ if "IN" in sectionset:
 						inodes.add(inode)
 						missingchunks.append((chunkid,inode,indx,None))
 				mode = 0
-			inodepaths = resolve_inodes_paths(leaderconn,inodes)
+			inodepaths = resolve_inodes_paths(masterconn,inodes)
 			mcdata = []
 			mccnt = 0
 			for chunkid,inode,indx,mtype in missingchunks:
@@ -3762,15 +3794,15 @@ if "CS" in sectionset:
 			if cgimode:
 				out = []
 				out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfscs" cellspacing="0">""")
-				if leaderconn.version_at_least(3,0,38):
+				if masterconn.version_at_least(3,0,38):
 					out.append("""  <tr><th colspan="19">Chunk Servers</th></tr>""")
-				elif leaderconn.version_at_least(2,1,0):
+				elif masterconn.version_at_least(2,1,0):
 					out.append("""  <tr><th colspan="18">Chunk Servers</th></tr>""")
-				elif leaderconn.version_at_least(2,0,11):
+				elif masterconn.version_at_least(2,0,11):
 					out.append("""	<tr><th colspan="17">Chunk Servers</th></tr>""")
-				elif leaderconn.version_at_least(1,7,25):
+				elif masterconn.version_at_least(1,7,25):
 					out.append("""	<tr><th colspan="16">Chunk Servers</th></tr>""")
-				elif leaderconn.version_at_least(1,6,28):
+				elif masterconn.version_at_least(1,6,28):
 					out.append("""	<tr><th colspan="15">Chunk Servers</th></tr>""")
 				else:
 					out.append("""	<tr><th colspan="14">Chunk Servers</th></tr>""")
@@ -3779,17 +3811,17 @@ if "CS" in sectionset:
 				out.append("""		<th rowspan="2">host</th>""")
 				out.append("""		<th rowspan="2">ip</th>""")
 				out.append("""		<th rowspan="2">port</th>""")
-				if leaderconn.version_at_least(1,7,25):
+				if masterconn.version_at_least(1,7,25):
 					out.append("""		<th rowspan="2">id</th>""")
-				if leaderconn.version_at_least(2,1,0):
+				if masterconn.version_at_least(2,1,0):
 					out.append("""		<th rowspan="2">labels</th>""")
 				out.append("""		<th rowspan="2">version</th>""")
-				if leaderconn.version_at_least(1,6,28):
+				if masterconn.version_at_least(1,6,28):
 					out.append("""		<th rowspan="2">load</th>""")
-				if leaderconn.version_at_least(2,0,11):
+				if masterconn.version_at_least(2,0,11):
 					out.append("""		<th rowspan="2">maintenance</th>""")
 				out.append("""		<th colspan="4">'regular' hdd space</th>""")
-				if leaderconn.version_at_least(3,0,38):
+				if masterconn.version_at_least(3,0,38):
 					out.append("""		<th colspan="5">'marked for removal' hdd space</th>""")
 				else:
 					out.append("""		<th colspan="4">'marked for removal' hdd space</th>""")
@@ -3799,7 +3831,7 @@ if "CS" in sectionset:
 				out.append("""		<th>used</th>""")
 				out.append("""		<th>total</th>""")
 				out.append("""		<th class="PROGBAR">% used</th>""")
-				if leaderconn.version_at_least(3,0,38):
+				if masterconn.version_at_least(3,0,38):
 					out.append("""		<th>status</th>""")
 				out.append("""		<th>chunks</th>""")
 				out.append("""		<th>used</th>""")
@@ -3807,27 +3839,27 @@ if "CS" in sectionset:
 				out.append("""		<th class="PROGBAR">% used</th>""")
 				out.append("""	</tr>""")
 			elif ttymode:
-				if leaderconn.version_at_least(3,0,38):
+				if masterconn.version_at_least(3,0,38):
 					tab = Tabble("Chunk Servers",16,"r")
 					tab.header("","","","","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",5))
 					tab.header("ip/host","port","id","labels","version","load","maintenance",("---","",9))
 					tab.header("","","","","","","","chunks","used","total","% used","status","chunks","used","total","% used")
-				elif leaderconn.version_at_least(2,1,0):
+				elif masterconn.version_at_least(2,1,0):
 					tab = Tabble("Chunk Servers",15,"r")
 					tab.header("","","","","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",4))
 					tab.header("ip/host","port","id","labels","version","load","maintenance",("---","",8))
 					tab.header("","","","","","","","chunks","used","total","% used","chunks","used","total","% used")
-				elif leaderconn.version_at_least(2,0,11):
+				elif masterconn.version_at_least(2,0,11):
 					tab = Tabble("Chunk Servers",14,"r")
 					tab.header("","","","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",4))
 					tab.header("ip/host","port","id","version","load","maintenance",("---","",8))
 					tab.header("","","","","","","chunks","used","total","% used","chunks","used","total","% used")
-				elif leaderconn.version_at_least(1,7,25):
+				elif masterconn.version_at_least(1,7,25):
 					tab = Tabble("Chunk Servers",13,"r")
 					tab.header("","","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",4))
 					tab.header("ip/host","port","id","version","load",("---","",8))
 					tab.header("","","","","","chunks","used","total","% used","chunks","used","total","% used")
-				elif leaderconn.version_at_least(1,6,28):
+				elif masterconn.version_at_least(1,6,28):
 					tab = Tabble("Chunk Servers",12,"r")
 					tab.header("","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",4))
 					tab.header("ip/host","port","version","load",("---","",8))
@@ -3838,15 +3870,15 @@ if "CS" in sectionset:
 					tab.header("ip/host","port","version",("---","",8))
 					tab.header("","","","chunks","used","total","% used","chunks","used","total","% used")
 			else:
-				if leaderconn.version_at_least(3,0,38):
+				if masterconn.version_at_least(3,0,38):
 					tab = Tabble("chunk servers",14)
-				elif leaderconn.version_at_least(2,1,0):
+				elif masterconn.version_at_least(2,1,0):
 					tab = Tabble("chunk servers",13)
-				elif leaderconn.version_at_least(2,0,11):
+				elif masterconn.version_at_least(2,0,11):
 					tab = Tabble("chunk servers",12)
-				elif leaderconn.version_at_least(1,7,25):
+				elif masterconn.version_at_least(1,7,25):
 					tab = Tabble("chunk servers",11)
-				elif leaderconn.version_at_least(1,6,28):
+				elif masterconn.version_at_least(1,6,28):
 					tab = Tabble("chunk servers",10)
 				else:
 					tab = Tabble("chunk servers",9)
@@ -3909,15 +3941,15 @@ if "CS" in sectionset:
 				avgpercent = 0
 			for sf,host,sortip,strip,port,csid,sortver,strver,flags,used,total,chunks,tdused,tdtotal,tdchunks,errcnt,load,gracetime,labels,mfrstatus in servers:
 				if cgimode:
-					if leaderconn.is_pro() and not strver.endswith(" PRO"):
+					if masterconn.is_pro() and not strver.endswith(" PRO"):
 						verclass = "BADVERSION"
-					elif leaderconn.sort_ver() > sortver:
+					elif masterconn.sort_ver() > sortver:
 						verclass = "LOWERVERSION"
-					elif leaderconn.sort_ver() < sortver:
+					elif masterconn.sort_ver() < sortver:
 						verclass = "HIGHERVERSION"
 					else:
 						verclass = "OKVERSION"
-					if leaderconn.version_at_least(2,0,11):
+					if masterconn.version_at_least(2,0,11) and leaderfound:
 						if (flags&2)==0:
 							mm = "switch on"
 							mmurl = createlink({"CSmaintenanceon":("%s:%u" % (strip,port))})
@@ -3934,15 +3966,15 @@ if "CS" in sectionset:
 						out.append("""		<td align="left"><span class="%s">%s</span></td>""" % (cl,host))
 						out.append("""		<td align="center"><span class="sortkey">%s </span><span class="%s">%s</span></td>""" % (sortip,cl,strip))
 						out.append("""		<td align="center"><span class="%s">%u</span></td>""" % (cl,port))
-						if leaderconn.version_at_least(1,7,25):
+						if masterconn.version_at_least(1,7,25):
 							out.append("""		<td align="center"><span class="%s">%u</span></td>""" % (cl,csid))
 					else:
 						out.append("""		<td align="left">%s</td>""" % (host))
 						out.append("""		<td align="center"><span class="sortkey">%s </span>%s</td>""" % (sortip,strip))
 						out.append("""		<td align="center">%u</td>""" % (port))
-						if leaderconn.version_at_least(1,7,25):
+						if masterconn.version_at_least(1,7,25):
 							out.append("""		<td align="center">%u</td>""" % (csid))
-					if leaderconn.version_at_least(2,1,0):
+					if masterconn.version_at_least(2,1,0):
 						if labels==0:
 							labelstr = "-"
 						else:
@@ -3953,18 +3985,21 @@ if "CS" in sectionset:
 							labelstr = ",".join(labelstab)
 						out.append("""		<td align="left">%s</td>""" % labelstr)
 					out.append("""		<td align="center"><span class="sortkey">%s </span><span class="%s">%s</span></td>""" % (sortver,verclass,strver))
-					if leaderconn.version_at_least(1,6,28):
+					if masterconn.version_at_least(1,6,28):
 						if gracetime>=0x80000000:
 							if gracetime>=0xC0000000:
-								out.append("""		<td align="right"><a style="cursor:default" title="server in heavy load state"><span class="GRACETIME">&lt;%u&gt;</span></a></td>""" % (gracetime,load))
+								out.append("""		<td align="right"><a style="cursor:default" title="server in heavy load state"><span class="GRACETIME">&lt;%u&gt;</span></a></td>""" % (load))
 							else:
-								out.append("""		<td align="right"><a style="cursor:default" title="internal rebalance in progress"><span class="GRACETIME">(%u)</span></a></td>""" % (gracetime,load))
+								out.append("""		<td align="right"><a style="cursor:default" title="internal rebalance in progress"><span class="GRACETIME">(%u)</span></a></td>""" % (load))
 						elif gracetime>0:
 							out.append("""		<td align="right"><a style="cursor:default" title="back after %u seconds" href="%s"><span class="GRACETIME">[%u]</span></a></td>""" % (gracetime,createlink({"CSbacktowork":("%s:%u" % (strip,port))}),load))
 						else:
 							out.append("""		<td align="right">%u</td>""" % (load))
-					if leaderconn.version_at_least(2,0,11):
-						out.append("""		<td align="center"><a href="%s">%s</a></td>""" % (mmurl,mm))
+					if masterconn.version_at_least(2,0,11):
+						if leaderfound:
+							out.append("""		<td align="center"><a href="%s">%s</a></td>""" % (mmurl,mm))
+						else:
+							out.append("""          <td align="center">not available</td>""")
 					out.append("""		<td align="right">%u</td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td>""" % (chunks,used,decimal_number(used),humanize_number(used,"&nbsp;"),total,decimal_number(total),humanize_number(total,"&nbsp;")))
 					if (total>0):
 						usedpercent = (used*100.0)/total
@@ -3975,8 +4010,8 @@ if "CS" in sectionset:
 						out.append("""		<td align="center"><span class="sortkey">%.10f </span><div class="PROGBOX" style="width:200px;"><div class="PROGCOVER" style="width:%.2f%%;"></div><div class="PROGAVG" style="width:%.2f%%"></div><div class="PROGVALUE"><a style="cursor:default" title="%.4f%% = (avg%s%%)">%.2f</a></div></div></td>""" % (usedpercent,100.0-usedpercent,avgpercent,usedpercent,diffstr,usedpercent))
 					else:
 						out.append("""		<td align="center"><span class="sortkey">-1 </span><div class="PROGBOX" style="width:200px;"><div class="PROGCOVER" style="width:100%;"></div><div class="PROGVALUE">-</div></div></td>""")
-					if leaderconn.version_at_least(3,0,38):
-						if tdchunks==0:
+					if masterconn.version_at_least(3,0,38):
+						if tdchunks==0 or leaderfound==0:
 							out.append("""		<td align="center">-</td>""")
 						elif mfrstatus==1 or mfrstatus==0:
 							out.append("""		<td align="center"><a style="cursor:default" title="disks can not be safely removed - please wait"><span class="NOTICE">NOT&nbsp;READY</span></a></td>""")
@@ -4001,9 +4036,9 @@ if "CS" in sectionset:
 					else:
 						tdperc = "-"
 					data = [host,port]
-					if leaderconn.version_at_least(1,7,25):
+					if masterconn.version_at_least(1,7,25):
 						data.append(csid)
-					if leaderconn.version_at_least(2,1,0):
+					if masterconn.version_at_least(2,1,0):
 						if labels==0xFFFFFFFF or labels==0:
 							labelstr = "-"
 						else:
@@ -4014,16 +4049,18 @@ if "CS" in sectionset:
 							labelstr = ",".join(labelstab)
 						data.append(labelstr)
 					data.append(strver)
-					if leaderconn.version_at_least(1,6,28):
+					if masterconn.version_at_least(1,6,28):
 						data.append(load)
-					if leaderconn.version_at_least(2,0,11):
-						if (flags&2)==0:
+					if masterconn.version_at_least(2,0,11):
+						if leaderfound==0:
+							data.append("not available")
+						elif (flags&2)==0:
 							data.append("off")
 						else:
 							data.append("on")
 					data.extend([chunks,humanize_number(used," "),humanize_number(total," "),regperc])
-					if leaderconn.version_at_least(3,0,38):
-						if tdchunks==0:
+					if masterconn.version_at_least(3,0,38):
+						if tdchunks==0 or leaderfound==0:
 							data.append("-")
 						elif mfrstatus==1 or mfrstatus==0:
 							data.append(("NOT READY",'3'))
@@ -4035,9 +4072,9 @@ if "CS" in sectionset:
 					tab.append(*data)
 				else:
 					data = [host,port]
-					if leaderconn.version_at_least(1,7,25):
+					if masterconn.version_at_least(1,7,25):
 						data.append(csid)
-					if leaderconn.version_at_least(2,1,0):
+					if masterconn.version_at_least(2,1,0):
 						if labels==0xFFFFFFFF or labels==0:
 							labelstr = "-"
 						else:
@@ -4048,16 +4085,18 @@ if "CS" in sectionset:
 							labelstr = ",".join(labelstab)
 						data.append(labelstr)
 					data.append(strver)
-					if leaderconn.version_at_least(1,6,28):
+					if masterconn.version_at_least(1,6,28):
 						data.append(load)
-					if leaderconn.version_at_least(2,0,11):
-						if (flags&2)==0:
+					if masterconn.version_at_least(2,0,11):
+						if leaderfound==0:
+							data.append("-")
+						elif (flags&2)==0:
 							data.append("standard_mode")
 						else:
 							data.append("maintenance_mode")
 					data.extend([chunks,used,total])
-					if leaderconn.version_at_least(3,0,38):
-						if tdchunks==0:
+					if masterconn.version_at_least(3,0,38):
+						if tdchunks==0 or leaderfound==0:
 							data.append("-")
 						elif mfrstatus==1 or mfrstatus==0:
 							data.append("NOT READY")
@@ -4072,9 +4111,9 @@ if "CS" in sectionset:
 					out.append("""</table>""")
 					out.append("""<br/>""")
 					out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfsdiscs" cellspacing="0">""")
-					if leaderconn.version_at_least(2,0,11):
+					if masterconn.version_at_least(2,0,11):
 						out.append("""	<tr><th colspan="7">Disconnected Chunk Servers</th></tr>""")
-					elif leaderconn.version_at_least(1,7,25):
+					elif masterconn.version_at_least(1,7,25):
 						out.append("""	<tr><th colspan="6">Disconnected Chunk Servers</th></tr>""")
 					else:
 						out.append("""	<tr><th colspan="5">Disconnected Chunk Servers</th></tr>""")
@@ -4083,38 +4122,41 @@ if "CS" in sectionset:
 					out.append("""		<th>host</th>""")
 					out.append("""		<th>ip</th>""")
 					out.append("""		<th>port</th>""")
-					if leaderconn.version_at_least(1,7,25):
+					if masterconn.version_at_least(1,7,25):
 						out.append("""		<th>id</th>""")
-					if leaderconn.version_at_least(2,0,11):
+					if masterconn.version_at_least(2,0,11):
 						out.append("""		<th>maintenance</th>""")
-					out.append("""		<th class="acid_tab_skip">remove</th>""")
+					if leaderfound:
+						out.append("""		<th class="acid_tab_skip">remove</th>""")
+					else:
+						out.append("""		<th class="acid_tab_skip">temporarily remove</th>""")
 					out.append("""	</tr>""")
 				elif ttymode:
-					if leaderconn.version_at_least(3,0,38):
+					if masterconn.version_at_least(3,0,38):
 						tab.append(("---","",16))
 						tab.append(("disconnected servers","1c",16))
 						tab.append(("---","",16))
 						tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c"),("change maintenance command","c",6),("remove command","c",6))
 						tab.append(("---","",16))
-					elif leaderconn.version_at_least(2,1,0):
+					elif masterconn.version_at_least(2,1,0):
 						tab.append(("---","",15))
 						tab.append(("disconnected servers","1c",15))
 						tab.append(("---","",15))
 						tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c"),("change maintenance command","c",5),("remove command","c",6))
 						tab.append(("---","",15))
-					elif leaderconn.version_at_least(2,0,11):
+					elif masterconn.version_at_least(2,0,11):
 						tab.append(("---","",14))
 						tab.append(("disconnected servers","1c",14))
 						tab.append(("---","",14))
 						tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c"),("change maintenance command","c",5),("remove command","c",5))
 						tab.append(("---","",14))
-					elif leaderconn.version_at_least(1,7,25):
+					elif masterconn.version_at_least(1,7,25):
 						tab.append(("---","",13))
 						tab.append(("disconnected servers","1c",13))
 						tab.append(("---","",13))
 						tab.append(("ip/host","c"),("port","c"),("id","r"),("remove command","c",10))
 						tab.append(("---","",13))
-					elif leaderconn.version_at_least(1,6,28):
+					elif masterconn.version_at_least(1,6,28):
 						tab.append(("---","",12))
 						tab.append(("disconnected servers","1c",12))
 						tab.append(("---","",12))
@@ -4129,17 +4171,19 @@ if "CS" in sectionset:
 				else:
 					print(tab)
 					print("")
-					if leaderconn.version_at_least(2,0,11):
+					if masterconn.version_at_least(2,0,11):
 						tab = Tabble("Disconnected chunk servers",4)
-					elif leaderconn.version_at_least(1,7,25):
+					elif masterconn.version_at_least(1,7,25):
 						tab = Tabble("Disconnected chunk servers",3)
 					else:
 						tab = Tabble("Disconnected chunk servers",2)
 			for sf,host,sortip,strip,port,csid,flags in dservers:
 				if cgimode:
 					out.append("""	<tr>""")
-					if leaderconn.version_at_least(2,0,11):
-						if (flags&2)==0:
+					if masterconn.version_at_least(2,0,11):
+						if leaderfound==0:
+							cl = "DISCONNECTED"
+						elif (flags&2)==0:
 							mm = "switch on"
 							mmurl = createlink({"CSmaintenanceon":("%s:%u" % (strip,port))})
 							cl = "DISCONNECTED"
@@ -4150,52 +4194,78 @@ if "CS" in sectionset:
 						out.append("""		<td align="right"></td><td align="left"><span class="%s">%s</span></td>""" % (cl,host))
 						out.append("""		<td align="center"><span class="sortkey">%s </span><span class="%s">%s</span></td>""" % (sortip,cl,strip))
 						out.append("""		<td align="center"><span class="%s">%u</span></td>""" % (cl,port))
-						if leaderconn.version_at_least(1,7,25):
+						if masterconn.version_at_least(1,7,25):
 							out.append("""		<td align="right"><span class="%s">%u</span></td>""" % (cl,csid))
-						out.append("""		<td align="center"><span class="%s"><a href="%s">%s</a></span></td>""" % (cl,mmurl,mm))
-						out.append("""		<td align="center"><a href="%s">click to remove</a></td>""" % (createlink({"CSremove":("%s:%u" % (strip,port))})))
+						if leaderfound:
+							out.append("""		<td align="center"><span class="%s"><a href="%s">%s</a></span></td>""" % (cl,mmurl,mm))
+						else:
+							out.append("""		<td align="center"><span class="%s">not available</td>""" % cl)
+						if leaderfound:
+							out.append("""		<td align="center"><a href="%s">click to remove</a></td>""" % (createlink({"CSremove":("%s:%u" % (strip,port))})))
+						elif masterconn.version_at_least(3,0,67):
+							out.append("""		<td align="center"><a href="%s">click to temporarily remove</a></td>""" % (createlink({"CStmpremove":("%s:%u" % (strip,port))})))
+						else:
+							out.append("""		<td align="center">not available</td>""")
 					else:
 						out.append("""		<td align="right"></td><td align="left"><span class="DISCONNECTED">%s</span></td>""" % (host))
 						out.append("""		<td align="center"><span class="sortkey">%s </span><span class="DISCONNECTED">%s</span></td>""" % (sortip,strip))
 						out.append("""		<td align="center"><span class="DISCONNECTED">%u</span></td>""" % (port))
-						if leaderconn.version_at_least(1,7,25):
+						if masterconn.version_at_least(1,7,25):
 							out.append("""		<td align="right"><span class="DISCONNECTED">%u</span></td>""" % (csid))
-						out.append("""		<td align="center"><a href="%s">click to remove</a></td>""" % (createlink({"CSremove":("%s:%u" % (strip,port))})))
+						if leaderfound:
+							out.append("""		<td align="center"><a href="%s">click to remove</a></td>""" % (createlink({"CSremove":("%s:%u" % (strip,port))})))
+						else:
+							out.append("""		<td align="center">not available</td>""")
 					out.append("""	</tr>""")
 				elif ttymode:
 					data = [host,port]
-					if leaderconn.version_at_least(1,7,25):
+					if masterconn.version_at_least(1,7,25):
 						data.append(csid)
-					if leaderconn.version_at_least(2,0,11):
-						if (flags&2)==0:
+					if masterconn.version_at_least(2,0,11):
+						if leaderfound==0:
+							mm = "-"
+							mmcmd = "not available"
+						elif (flags&2)==0:
 							mm = "off"
 							mmcmd = "%s -H %s -P %u -CM1/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
 						else:
 							mm = "on"
 							mmcmd = "%s -H %s -P %u -CM0/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
 						data.append(mm)
-						if leaderconn.version_at_least(3,0,38):
+						if masterconn.version_at_least(3,0,38):
 							data.append((mmcmd,"l",6))
 						else:
 							data.append((mmcmd,"l",5))
-						if leaderconn.version_at_least(2,1,0):
-							data.append(("%s -H %s -P %u -CRC/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port),"l",6))
+						if leaderfound:
+							rmcmd = "%s -H %s -P %u -CRC/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
+						elif masterconn.version_at_least(3,0,67):
+							rmcmd = "%s -H %s -P %u -CTR/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
 						else:
-							data.append(("%s -H %s -P %u -CRC/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port),"l",5))
+							rmcmd = "not available"
+						if masterconn.version_at_least(2,1,0):
+							data.append((rmcmd,"l",6))
+						else:
+							data.append((rmcmd,"l",5))
 					else:
-						if leaderconn.version_at_least(1,6,28):
-							data.append(("%s -H %s -P %u -CRC/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port),"l",10))
+						if leaderfound:
+							rmcmd = "%s -H %s -P %u -CRC/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
 						else:
-							data.append(("%s -H %s -P %u -CRC/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port),"l",9))
+							rmcmd = "not available"
+						if masterconn.version_at_least(1,6,28):
+							data.append((rmcmd,"l",10))
+						else:
+							data.append((rmcmd,"l",9))
 					tab.append(*data)
 				else:
-					if leaderconn.version_at_least(2,0,11):
-						if (flags&2)==0:
+					if masterconn.version_at_least(2,0,11):
+						if leaderfound==0:
+							mm = "-"
+						elif (flags&2)==0:
 							mm = "standard_mode"
 						else:
 							mm = "maintenance_mode"
 						tab.append(host,port,csid,mm)
-					elif leaderconn.version_at_least(1,7,25):
+					elif masterconn.version_at_least(1,7,25):
 						tab.append(host,port,csid)
 					else:
 						tab.append(host,port)
@@ -4207,7 +4277,7 @@ if "CS" in sectionset:
 		except Exception:
 			print_exception()
 
-	if "MB" in sectionsubset:
+	if "MB" in sectionsubset and leaderfound:
 		if needseparator:
 			if cgimode:
 				print("""<br/>""")
@@ -4232,7 +4302,7 @@ if "CS" in sectionset:
 				tab.header("ip/host","version")
 			else:
 				tab = Tabble("metadata backup loggers",2)
-			data,length = leaderconn.command(CLTOMA_MLOG_LIST,MATOCL_MLOG_LIST)
+			data,length = masterconn.command(CLTOMA_MLOG_LIST,MATOCL_MLOG_LIST)
 			if (length%8)==0:
 				n = length//8
 				servers = []
@@ -4256,11 +4326,11 @@ if "CS" in sectionset:
 					servers.reverse()
 				for sf,host,sortip,strip,sortver,strver in servers:
 					if cgimode:
-						if leaderconn.is_pro() and not strver.endswith(" PRO"):
+						if masterconn.is_pro() and not strver.endswith(" PRO"):
 							verclass = "BADVERSION"
-						elif leaderconn.sort_ver() > sortver:
+						elif masterconn.sort_ver() > sortver:
 							verclass = "LOWERVERSION"
-						elif leaderconn.sort_ver() < sortver:
+						elif masterconn.sort_ver() < sortver:
 							verclass = "HIGHERVERSION"
 						else:
 							verclass = "OKVERSION"
@@ -4739,7 +4809,7 @@ if "EX" in sectionset:
 		if cgimode:
 			out = []
 			out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfsexports" cellspacing="0">""")
-			out.append("""	<tr><th colspan="%u">Exports</th></tr>""" % (19 if leaderconn.version_at_least(1,7,0) else 18 if leaderconn.version_at_least(1,6,26) else 14))
+			out.append("""	<tr><th colspan="%u">Exports</th></tr>""" % (19 if masterconn.version_at_least(1,7,0) else 18 if masterconn.version_at_least(1,6,26) else 14))
 			out.append("""	<tr>""")
 			out.append("""		<th rowspan="2" class="acid_tab_enumerate">#</th>""")
 			out.append("""		<th colspan="2">ip&nbsp;range</th>""")
@@ -4757,12 +4827,12 @@ if "EX" in sectionset:
 			out.append("""		<th rowspan="2">ro/rw</th>""")
 			out.append("""		<th rowspan="2">restricted&nbsp;ip</th>""")
 			out.append("""		<th rowspan="2">ignore&nbsp;gid</th>""")
-			if leaderconn.version_at_least(1,7,0):
+			if masterconn.version_at_least(1,7,0):
 #				out.append("""		<th rowspan="2"><a href="%s">can&nbsp;change&nbsp;quota</a></th>""" % (createorderlink("EX",10)))
 				out.append("""		<th rowspan="2">admin</th>""")
 			out.append("""		<th colspan="2">map&nbsp;root</th>""")
 			out.append("""		<th colspan="2">map&nbsp;users</th>""")
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				out.append("""		<th colspan="2">goal&nbsp;limit</th>""")
 				out.append("""		<th colspan="2">trashtime&nbsp;limit</th>""")
 			out.append("""	</tr>""")
@@ -4779,7 +4849,7 @@ if "EX" in sectionset:
 			out.append("""		<th>gid</th>""")
 			out.append("""		<th>uid</th>""")
 			out.append("""		<th>gid</th>""")
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 #				out.append("""		<th><a href="%s">min</a></th>""" % (createorderlink("EX",15)))
 #				out.append("""		<th><a href="%s">max</a></th>""" % (createorderlink("EX",16)))
 #				out.append("""		<th><a href="%s">min</a></th>""" % (createorderlink("EX",17)))
@@ -4790,42 +4860,42 @@ if "EX" in sectionset:
 				out.append("""		<th>max</th>""")
 			out.append("""	</tr>""")
 		elif ttymode:
-			tab = Tabble("Exports",(18 if leaderconn.version_at_least(1,7,0) else 17 if leaderconn.version_at_least(1,6,26) else 13))
+			tab = Tabble("Exports",(18 if masterconn.version_at_least(1,7,0) else 17 if masterconn.version_at_least(1,6,26) else 13))
 			dline = ["r","r","l","c","c","c","c","c","c"]
-			if leaderconn.version_at_least(1,7,0):
+			if masterconn.version_at_least(1,7,0):
 				dline.append("c")
 			dline.extend(("r","r","r","r"))
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				dline.extend(("r","r","r","r"))
 			tab.defattr(*dline)
 			dline = [("ip range","",2),"","","","","","",""]
-			if leaderconn.version_at_least(1,7,0):
+			if masterconn.version_at_least(1,7,0):
 				dline.append("")
 			dline.extend((("map root","",2),("map users","",2)))
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				dline.extend((("goal limit","",2),("trashtime limit","",2)))
 			tab.header(*dline)
 			dline = [("---","",2),"path","minversion","alldirs","password","ro/rw","restrict ip","ignore gid"]
-			if leaderconn.version_at_least(1,7,0):
+			if masterconn.version_at_least(1,7,0):
 				dline.append("admin")
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				dline.append(("---","",8))
 			else:
 				dline.append(("---","",4))
 			tab.header(*dline)
 			dline = ["from","to","","","","","","",""]
-			if leaderconn.version_at_least(1,7,0):
+			if masterconn.version_at_least(1,7,0):
 				dline.append("")
 			dline.extend(("uid","gid","uid","gid"))
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				dline.extend(("min","max","min","max"))
 			tab.header(*dline)
 		else:
-			tab = Tabble("exports",(18 if leaderconn.version_at_least(1,7,0) else 17 if leaderconn.version_at_least(1,6,26) else 13))
-		if leaderconn.version_at_least(1,6,26):
-			data,length = leaderconn.command(CLTOMA_EXPORTS_INFO,MATOCL_EXPORTS_INFO,struct.pack(">B",1))
+			tab = Tabble("exports",(18 if masterconn.version_at_least(1,7,0) else 17 if masterconn.version_at_least(1,6,26) else 13))
+		if masterconn.version_at_least(1,6,26):
+			data,length = masterconn.command(CLTOMA_EXPORTS_INFO,MATOCL_EXPORTS_INFO,struct.pack(">B",1))
 		else:
-			data,length = leaderconn.command(CLTOMA_EXPORTS_INFO,MATOCL_EXPORTS_INFO)
+			data,length = masterconn.command(CLTOMA_EXPORTS_INFO,MATOCL_EXPORTS_INFO)
 		servers = []
 		pos = 0
 		while pos<length:
@@ -4842,7 +4912,7 @@ if "EX" in sectionset:
 				except UnicodeDecodeError:
 					pass
 			pos+=pleng
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				v1,v2,v3,exportflags,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime = struct.unpack(">HBBBBLLLLBBLL",data[pos:pos+32])
 				pos+=32
 				if mingoal<=1 and maxgoal>=9:
@@ -4938,7 +5008,7 @@ if "EX" in sectionset:
 				out.append("""		<td align="center">%s</td>""" % ("ro" if sesflags&1 else "rw"))
 				out.append("""		<td align="center">%s</td>""" % ("no" if sesflags&2 else "yes"))
 				out.append("""		<td align="center">%s</td>""" % ("-" if meta else "yes" if sesflags&4 else "no"))
-				if leaderconn.version_at_least(1,7,0):
+				if masterconn.version_at_least(1,7,0):
 					out.append("""		<td align="center">%s</td>""" % ("-" if meta else "yes" if sesflags&8 else "no"))
 				if meta:
 					out.append("""		<td align="center"><span class="sortkey">-1 </span>-</td>""")
@@ -4952,7 +5022,7 @@ if "EX" in sectionset:
 				else:
 					out.append("""		<td align="right">%u</td>""" % mapalluid)
 					out.append("""		<td align="right">%u</td>""" % mapallgid)
-				if leaderconn.version_at_least(1,6,26):
+				if masterconn.version_at_least(1,6,26):
 					if mingoal!=None and maxgoal!=None:
 						out.append("""		<td align="right">%u</td>""" % mingoal)
 						out.append("""		<td align="right">%u</td>""" % maxgoal)
@@ -4968,7 +5038,7 @@ if "EX" in sectionset:
 				out.append("""	</tr>""")
 			elif ttymode:
 				dline = [ipfrom,ipto,". (META)" if meta else path,strver,"-" if meta else "yes" if exportflags&1 else "no","yes" if exportflags&2 else "no","ro" if sesflags&1 else "rw","no" if sesflags&2 else "yes","-" if meta else "yes" if sesflags&4 else "no"]
-				if leaderconn.version_at_least(1,7,0):
+				if masterconn.version_at_least(1,7,0):
 					dline.append("-" if meta else "yes" if sesflags&8 else "no")
 				if meta:
 					dline.extend(("-","-"))
@@ -4978,7 +5048,7 @@ if "EX" in sectionset:
 					dline.extend(("-","-"))
 				else:
 					dline.extend((mapalluid,mapallgid))
-				if leaderconn.version_at_least(1,6,26):
+				if masterconn.version_at_least(1,6,26):
 					if mingoal!=None and maxgoal!=None:
 						dline.extend((mingoal,maxgoal))
 					else:
@@ -4990,7 +5060,7 @@ if "EX" in sectionset:
 				tab.append(*dline)
 			else:
 				dline = [ipfrom,ipto,". (META)" if meta else path,strver,"-" if meta else "yes" if exportflags&1 else "no","yes" if exportflags&2 else "no","ro" if sesflags&1 else "rw","no" if sesflags&2 else "yes","-" if meta else "yes" if sesflags&4 else "no"]
-				if leaderconn.version_at_least(1,7,0):
+				if masterconn.version_at_least(1,7,0):
 					dline.append("-" if meta else "yes" if sesflags&8 else "no")
 				if meta:
 					dline.extend(("-","-"))
@@ -5000,7 +5070,7 @@ if "EX" in sectionset:
 					dline.extend(("-","-"))
 				else:
 					dline.extend((mapalluid,mapallgid))
-				if leaderconn.version_at_least(1,6,26):
+				if masterconn.version_at_least(1,6,26):
 					if mingoal!=None and maxgoal!=None:
 						dline.extend((mingoal,maxgoal))
 					else:
@@ -5018,7 +5088,7 @@ if "EX" in sectionset:
 	except Exception:
 		print_exception()
 
-if "MS" in sectionset:
+if "MS" in sectionset and leaderfound:
 	if needseparator:
 		if cgimode:
 			print("""<br/>""")
@@ -5031,7 +5101,7 @@ if "MS" in sectionset:
 		if cgimode:
 			out = []
 			out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfsmounts" cellspacing="0">""")
-			out.append("""	<tr><th colspan="%u">Active mounts (parameters)</th></tr>""" % (21 if leaderconn.version_at_least(1,7,8) else 19 if leaderconn.version_at_least(1,7,0) else 18 if leaderconn.version_at_least(1,6,26) else 14))
+			out.append("""	<tr><th colspan="%u">Active mounts (parameters)</th></tr>""" % (21 if masterconn.version_at_least(1,7,8) else 19 if masterconn.version_at_least(1,7,0) else 18 if masterconn.version_at_least(1,6,26) else 14))
 			out.append("""	<tr>""")
 			out.append("""		<th rowspan="2" class="acid_tab_enumerate">#</th>""")
 #			out.append("""		<th rowspan="2"><a href="%s">session&nbsp;id</a></th>""" % (createorderlink("MS",1)))
@@ -5047,7 +5117,7 @@ if "MS" in sectionset:
 			out.append("""		<th rowspan="2">host</th>""")
 			out.append("""		<th rowspan="2">ip</th>""")
 			out.append("""		<th rowspan="2">mount&nbsp;point</th>""")
-			if leaderconn.version_at_least(1,7,8):
+			if masterconn.version_at_least(1,7,8):
 				out.append("""		<th rowspan="2">open files</th>""")
 				out.append("""		<th rowspan="2"># of connections</th>""")
 			out.append("""		<th rowspan="2">version</th>""")
@@ -5055,12 +5125,12 @@ if "MS" in sectionset:
 			out.append("""		<th rowspan="2">ro/rw</th>""")
 			out.append("""		<th rowspan="2">restricted&nbsp;ip</th>""")
 			out.append("""		<th rowspan="2">ignore&nbsp;gid</th>""")
-			if leaderconn.version_at_least(1,7,0):
+			if masterconn.version_at_least(1,7,0):
 #				out.append("""		<th rowspan="2"><a href="%s">can&nbsp;change&nbsp;quota</a></th>""" % (createorderlink("MS",10)))
 				out.append("""		<th rowspan="2">admin</th>""")
 			out.append("""		<th colspan="2">map&nbsp;root</th>""")
 			out.append("""		<th colspan="2">map&nbsp;users</th>""")
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				out.append("""		<th colspan="2">goal&nbsp;limits</th>""")
 				out.append("""		<th colspan="2">trashtime&nbsp;limits</th>""")
 			out.append("""	</tr>""")
@@ -5073,7 +5143,7 @@ if "MS" in sectionset:
 			out.append("""		<th>gid</th>""")
 			out.append("""		<th>uid</th>""")
 			out.append("""		<th>gid</th>""")
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 #				out.append("""		<th><a href="%s">min</a></th>""" % (createorderlink("MS",15)))
 #				out.append("""		<th><a href="%s">max</a></th>""" % (createorderlink("MS",16)))
 #				out.append("""		<th><a href="%s">min</a></th>""" % (createorderlink("MS",17)))
@@ -5084,48 +5154,48 @@ if "MS" in sectionset:
 				out.append("""		<th>max</th>""")
 			out.append("""	</tr>""")
 		elif ttymode:
-			tab = Tabble("Active mounts (parameters)",(19 if leaderconn.version_at_least(1,7,8) else 17 if leaderconn.version_at_least(1,7,0) else 16 if leaderconn.version_at_least(1,6,26) else 12))
+			tab = Tabble("Active mounts (parameters)",(19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12))
 			dline = ["r","r","l"]
-			if leaderconn.version_at_least(1,7,8):
+			if masterconn.version_at_least(1,7,8):
 				dline.extend(("r","r"))
 			dline.extend(("r","l","c","c","c"))
-			if leaderconn.version_at_least(1,7,0):
+			if masterconn.version_at_least(1,7,0):
 				dline.append("c")
 			dline.extend(("r","r","r","r"))
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				dline.extend(("r","r","r","r"))
 			tab.defattr(*dline)
 			dline = ["","","","","","","",""]
-			if leaderconn.version_at_least(1,7,0):
-				if leaderconn.version_at_least(1,7,8):
+			if masterconn.version_at_least(1,7,0):
+				if masterconn.version_at_least(1,7,8):
 					dline.extend(("",""))
 				dline.append("")
 			dline.extend((("map root","",2),("map users","",2)))
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				dline.extend((("goal limit","",2),("trashtime limit","",2)))
 			tab.header(*dline)
 			dline = ["session id","ip/host","mount point"]
-			if leaderconn.version_at_least(1,7,8):
+			if masterconn.version_at_least(1,7,8):
 				dline.extend(("open files","# of connections"))
 			dline.extend(("version","root dir","ro/rw","restrict ip","ignore gid"))
-			if leaderconn.version_at_least(1,7,0):
+			if masterconn.version_at_least(1,7,0):
 				dline.append("admin")
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				dline.append(("---","",8))
 			else:
 				dline.append(("---","",4))
 			tab.header(*dline)
 			dline = ["","","","","","","",""]
-			if leaderconn.version_at_least(1,7,0):
-				if leaderconn.version_at_least(1,7,8):
+			if masterconn.version_at_least(1,7,0):
+				if masterconn.version_at_least(1,7,8):
 					dline.extend(("",""))
 				dline.append("")
 			dline.extend(("uid","gid","uid","gid"))
-			if leaderconn.version_at_least(1,6,26):
+			if masterconn.version_at_least(1,6,26):
 				dline.extend(("min","max","min","max"))
 			tab.header(*dline)
 		else:
-			tab = Tabble("active mounts, parameters",(19 if leaderconn.version_at_least(1,7,8) else 17 if leaderconn.version_at_least(1,7,0) else 16 if leaderconn.version_at_least(1,6,26) else 12))
+			tab = Tabble("active mounts, parameters",(19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12))
 
 		servers = []
 		dservers = []
@@ -5203,11 +5273,11 @@ if "MS" in sectionset:
 			dservers.reverse()
 		for sf,sessionid,host,sortipnum,ipnum,info,openfiles,nsocks,sortver,strver,meta,path,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime in servers:
 			if cgimode:
-				if leaderconn.is_pro() and not strver.endswith(" PRO"):
+				if masterconn.is_pro() and not strver.endswith(" PRO"):
 					verclass = "BADVERSION"
-				elif leaderconn.sort_ver() > sortver:
+				elif masterconn.sort_ver() > sortver:
 					verclass = "LOWERVERSION"
-				elif leaderconn.sort_ver() < sortver:
+				elif masterconn.sort_ver() < sortver:
 					verclass = "HIGHERVERSION"
 				else:
 					verclass = "OKVERSION"
@@ -5217,7 +5287,7 @@ if "MS" in sectionset:
 				out.append("""		<td align="left">%s</td>""" % host)
 				out.append("""		<td align="center"><span class="sortkey">%s </span>%s</td>""" % (sortipnum,ipnum))
 				out.append("""		<td align="left">%s</td>""" % info)
-				if leaderconn.version_at_least(1,7,8):
+				if masterconn.version_at_least(1,7,8):
 					out.append("""		<td align="center">%u</td>""" % openfiles)
 					out.append("""		<td align="center">%u</td>""" % nsocks)
 				out.append("""		<td align="center"><span class="sortkey">%s </span><span class="%s">%s</span></td>""" % (sortver,verclass,strver))
@@ -5225,7 +5295,7 @@ if "MS" in sectionset:
 				out.append("""		<td align="center">%s</td>""" % ("ro" if sesflags&1 else "rw"))
 				out.append("""		<td align="center">%s</td>""" % ("no" if sesflags&2 else "yes"))
 				out.append("""		<td align="center">%s</td>""" % ("-" if meta else "yes" if sesflags&4 else "no"))
-				if leaderconn.version_at_least(1,7,0):
+				if masterconn.version_at_least(1,7,0):
 					out.append("""		<td align="center">%s</td>""" % ("-" if meta else "yes" if sesflags&8 else "no"))
 				if meta:
 					out.append("""		<td align="center"><span class="sortkey">-1 </span>-</td>""")
@@ -5239,7 +5309,7 @@ if "MS" in sectionset:
 				else:
 					out.append("""		<td align="right">%u</td>""" % mapalluid)
 					out.append("""		<td align="right">%u</td>""" % mapallgid)
-				if leaderconn.version_at_least(1,6,26):
+				if masterconn.version_at_least(1,6,26):
 					if mingoal!=None and maxgoal!=None:
 						out.append("""		<td align="right">%u</td>""" % mingoal)
 						out.append("""		<td align="right">%u</td>""" % maxgoal)
@@ -5255,10 +5325,10 @@ if "MS" in sectionset:
 				out.append("""	</tr>""")
 			elif ttymode:
 				dline = [sessionid,host,info]
-				if leaderconn.version_at_least(1,7,8):
+				if masterconn.version_at_least(1,7,8):
 					dline.extend((openfiles,nsocks))
 				dline.extend((strver,".&nbsp;(META)" if meta else path,"ro" if sesflags&1 else "rw","no" if sesflags&2 else "yes","-" if meta else "yes" if sesflags&4 else "no"))
-				if leaderconn.version_at_least(1,7,0):
+				if masterconn.version_at_least(1,7,0):
 					dline.append("-" if meta else "yes" if sesflags&8 else "no")
 				if meta:
 					dline.extend(("-","-"))
@@ -5268,7 +5338,7 @@ if "MS" in sectionset:
 					dline.extend(("-","-"))
 				else:
 					dline.extend((mapalluid,mapallgid))
-				if leaderconn.version_at_least(1,6,26):
+				if masterconn.version_at_least(1,6,26):
 					if mingoal!=None and maxgoal!=None:
 						dline.extend((mingoal,maxgoal))
 					else:
@@ -5280,10 +5350,10 @@ if "MS" in sectionset:
 				tab.append(*dline)
 			else:
 				dline = [sessionid,host,info]
-				if leaderconn.version_at_least(1,7,8):
+				if masterconn.version_at_least(1,7,8):
 					dline.extend((openfiles,nsocks))
 				dline.extend((strver,".&nbsp;(META)" if meta else path,"ro" if sesflags&1 else "rw","no" if sesflags&2 else "yes","-" if meta else "yes" if sesflags&4 else "no"))
-				if leaderconn.version_at_least(1,7,0):
+				if masterconn.version_at_least(1,7,0):
 					dline.append("-" if meta else "yes" if sesflags&8 else "no")
 				if meta:
 					dline.extend(("-","-"))
@@ -5293,7 +5363,7 @@ if "MS" in sectionset:
 					dline.extend(("-","-"))
 				else:
 					dline.extend((mapalluid,mapallgid))
-				if leaderconn.version_at_least(1,6,26):
+				if masterconn.version_at_least(1,6,26):
 					if mingoal!=None and maxgoal!=None:
 						dline.extend((mingoal,maxgoal))
 					else:
@@ -5303,7 +5373,7 @@ if "MS" in sectionset:
 					else:
 						dline.extend(("-","-"))
 				tab.append(*dline)
-		if len(dservers)>0 and leaderconn.version_at_least(1,7,8):
+		if len(dservers)>0 and masterconn.version_at_least(1,7,8):
 			if cgimode:
 				out.append("""</table>""")
 				out.append("""<br/>""")
@@ -5320,7 +5390,7 @@ if "MS" in sectionset:
 				out.append("""		<th>cmd</th>""")
 				out.append("""	</tr>""")
 			elif ttymode:
-				tabcols = (19 if leaderconn.version_at_least(1,7,8) else 17 if leaderconn.version_at_least(1,7,0) else 16 if leaderconn.version_at_least(1,6,26) else 12)
+				tabcols = (19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
 				tab.append(("---","",tabcols))
 				tab.append(("Inactive mounts (parameters)","1c",tabcols))
 				tab.append(("---","",tabcols))
@@ -5344,7 +5414,7 @@ if "MS" in sectionset:
 				out.append("""		<td align="center"><a href="%s">click to remove</a></td>""" % createlink({"MSremove":("%u" % (sessionid))}))
 				out.append("""	</tr>""")
 			elif ttymode:
-				tabcols = (19 if leaderconn.version_at_least(1,7,8) else 17 if leaderconn.version_at_least(1,7,0) else 16 if leaderconn.version_at_least(1,6,26) else 12)
+				tabcols = (19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
 				dline = [sessionid,host,info,openfiles,expire,("%s -H %s -P %u -CRS/%u" % (sys.argv[0],masterhost,masterport,sessionid),"l",tabcols-5)]
 				tab.append(*dline)
 			else:
@@ -5358,7 +5428,7 @@ if "MS" in sectionset:
 	except Exception:
 		print_exception()
 
-if "MO" in sectionset:
+if "MO" in sectionset and leaderfound:
 	if needseparator:
 		if cgimode:
 			print("""<br/>""")
@@ -5500,7 +5570,7 @@ if "MO" in sectionset:
 	except Exception:
 		print_exception()
 
-if "RS" in sectionset:
+if "RS" in sectionset and leaderfound:
 
 	if "LD" in sectionsubset:
 		if needseparator:
@@ -5512,7 +5582,7 @@ if "RS" in sectionset:
 			needseparator=1
 
 		try:
-			data,length = leaderconn.command(CLTOMA_LABEL_INFO,MATOCL_LABEL_INFO)
+			data,length = masterconn.command(CLTOMA_LABEL_INFO,MATOCL_LABEL_INFO)
 			scount = struct.unpack(">H",data[:2])
 #			print("scount: %u" % scount)
 #			print(str(data),length)
@@ -5572,11 +5642,11 @@ if "RS" in sectionset:
 			else:
 				tab = Tabble("label sets",20)
 			labelsets = []
-			data,length = leaderconn.command(CLTOMA_LABEL_SET_INFO,MATOCL_LABEL_SET_INFO)
+			data,length = masterconn.command(CLTOMA_LABEL_SET_INFO,MATOCL_LABEL_SET_INFO)
 			scount = struct.unpack(">H",data[:2])[0]
 			pos = 2
 			while pos < length:
-				if leaderconn.version_at_least(3,0,9):
+				if masterconn.version_at_least(3,0,9):
 					labelsetid,files,dirs,stdchunks_under,archchunks_under,stdchunks_exact,archchunks_exact,stdchunks_over,archchunks_over,create_mode,arch_delay,create_canbefulfilled,create_labelscnt,keep_canbefulfilled,keep_labelscnt,arch_canbefulfilled,arch_labelscnt = struct.unpack_from(">BLLQQQQQQBHBBBBBB",data,pos)
 					pos += 18 + 3 * 16
 					if arch_delay==0:
@@ -5611,7 +5681,7 @@ if "RS" in sectionset:
 					matchingservers = struct.unpack_from(">H",data,pos)[0]
 					pos+=2
 					create_labellist.append((labelmasks_to_str(labelmasks),matchingservers))
-				if leaderconn.version_at_least(3,0,9):
+				if masterconn.version_at_least(3,0,9):
 					keep_labellist = []
 					for i in xrange(keep_labelscnt):
 						labelmasks = struct.unpack_from(">"+"L"*MASKORGROUP,data,pos)
@@ -5861,7 +5931,7 @@ if "RS" in sectionset:
 			if cgimode and OFsessionid==0:
 				ofdata = []
 			else:
-				data,length = leaderconn.command(CLTOMA_LIST_OPEN_FILES,MATOCL_LIST_OPEN_FILES,struct.pack(">L",OFsessionid))
+				data,length = masterconn.command(CLTOMA_LIST_OPEN_FILES,MATOCL_LIST_OPEN_FILES,struct.pack(">L",OFsessionid))
 				openfiles = []
 				if OFsessionid==0:
 					n = length//8
@@ -5875,9 +5945,9 @@ if "RS" in sectionset:
 						inode = struct.unpack(">L",data[x*4:x*4+4])[0]
 						openfiles.append((OFsessionid,inode))
 						inodes.add(inode)
-				inodepaths = resolve_inodes_paths(leaderconn,inodes)
+				inodepaths = resolve_inodes_paths(masterconn,inodes)
 #				if len(inodes)>0:
-#					data,length = leaderconn.command(CLTOMA_MASS_RESOLVE_PATHS,MATOCL_MASS_RESOLVE_PATHS,struct.pack(">"+len(inodes)*"L",*inodes))
+#					data,length = masterconn.command(CLTOMA_MASS_RESOLVE_PATHS,MATOCL_MASS_RESOLVE_PATHS,struct.pack(">"+len(inodes)*"L",*inodes))
 #					pos = 0
 #					while pos+8<=length:
 #						inode,psize = struct.unpack(">LL",data[pos:pos+8])
@@ -6020,7 +6090,7 @@ if "RS" in sectionset:
 			if cgimode and ALinode==0:
 				aldata = []
 			else:
-				data,length = leaderconn.command(CLTOMA_LIST_ACQUIRED_LOCKS,MATOCL_LIST_ACQUIRED_LOCKS,struct.pack(">L",ALinode))
+				data,length = masterconn.command(CLTOMA_LIST_ACQUIRED_LOCKS,MATOCL_LIST_ACQUIRED_LOCKS,struct.pack(">L",ALinode))
 				locks = []
 				if ALinode==0:
 					n = length//37
@@ -6202,8 +6272,8 @@ if "QU" in sectionset:
 			tab.defattr("l","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r")
 		else:
 			tab = Tabble("active quotas",16)
-		data,length = leaderconn.command(CLTOMA_QUOTA_INFO,MATOCL_QUOTA_INFO)
-		if length>=4 and leaderconn.version_at_least(1,7,0):
+		data,length = masterconn.command(CLTOMA_QUOTA_INFO,MATOCL_QUOTA_INFO)
+		if length>=4 and masterconn.version_at_least(1,7,0):
 			quotas = []
 			maxperc = 0.0
 			pos = 0
@@ -6217,7 +6287,7 @@ if "QU" in sectionset:
 					except UnicodeDecodeError:
 						pass
 				pos+=pleng
-				if leaderconn.version_at_least(3,0,9):
+				if masterconn.version_at_least(3,0,9):
 					graceperiod,exceeded,qflags,timetoblock = struct.unpack(">LBBL",data[pos:pos+10])
 					pos+=10;
 				else:
@@ -6656,7 +6726,7 @@ if "MC" in sectionset:
 			)
 
 			if MCdata=="" and leaderfound:
-				MCdata="%s:%u:%u" % (leaderconn.host,leaderconn.port,1 if leaderconn.version_at_least(2,0,0) else 0)
+				MCdata="%s:%u:%u" % (masterconn.host,masterconn.port,1 if masterconn.version_at_least(2,0,0) else 0)
 			servers = []
 			mixedservers = 0
 			if len(masterlistver)>0:
@@ -6682,7 +6752,7 @@ if "MC" in sectionset:
 					else:
 						host = " / "+hostx
 					entrystr.append(namearg)
-					entrydesc[namearg] = "Server: %s%s%s" % (name,host," *" if strip==leaderconn.host else "")
+					entrydesc[namearg] = "Server: %s%s%s" % (name,host," *" if strip==masterconn.host else "")
 					servers.append((strip,port,"ma_"+name.replace(".","_").replace(":","_"),entrydesc[namearg],nc))
 				if MCdata not in entrystr:
 					out.append("""<option value="" selected="selected"> data type or server</option>""")
@@ -6979,7 +7049,7 @@ if "MC" in sectionset:
 						out.append("""	</tr>""")
 					out.append("""</table>""")
 		else:
-			if leaderconn.version_at_least(2,0,15):
+			if masterconn.version_at_least(2,0,15):
 				if ttymode:
 					tab = Tabble("Master chart data",len(MCchdata)+1,"r")
 					hdrstr = ["host/port ->"]
@@ -7022,7 +7092,7 @@ if "MC" in sectionset:
 					repeat = 0
 					for host,port,x in series:
 						if host==None or port==None:
-							data,length = leaderconn.command(CLTOAN_CHART_DATA,ANTOCL_CHART_DATA,struct.pack(">LL",x*10+chrange,MCcount))
+							data,length = masterconn.command(CLTOAN_CHART_DATA,ANTOCL_CHART_DATA,struct.pack(">LL",x*10+chrange,MCcount))
 						else:
 							conn = MFSConn(host,port)
 							data,length = conn.command(CLTOAN_CHART_DATA,ANTOCL_CHART_DATA,struct.pack(">LL",x*10+chrange,MCcount))
@@ -7109,8 +7179,8 @@ if "CC" in sectionset:
 			for cs in dataprovider.get_chunkservers():
 				if (cs.flags&1)==0:
 					hostlist.append((cs.ip,cs.port,cs.version))
-#			data,length = leaderconn.command(CLTOMA_CSERV_LIST,MATOCL_CSERV_LIST)
-#			if leaderconn.version_at_least(1,7,25) and (length%64)==0:
+#			data,length = masterconn.command(CLTOMA_CSERV_LIST,MATOCL_CSERV_LIST)
+#			if masterconn.version_at_least(1,7,25) and (length%64)==0:
 #				n = length//64
 #				servers = []
 #				for i in range(n):
@@ -7118,7 +7188,7 @@ if "CC" in sectionset:
 #					flags,v1,v2,v3,ip1,ip2,ip3,ip4,port = struct.unpack(">BBBBBBBBH",d[:10])
 #					if (flags&1)==0:
 #						hostlist.append(((ip1,ip2,ip3,ip4),port,(v1,v2,v3)))
-#			elif leaderconn.version_at_least(1,6,28) and leaderconn.version_less_than(1,7,25) and (length%62)==0:
+#			elif masterconn.version_at_least(1,6,28) and masterconn.version_less_than(1,7,25) and (length%62)==0:
 #				n = length//62
 #				servers = []
 #				for i in range(n):
@@ -7126,7 +7196,7 @@ if "CC" in sectionset:
 #					disconnected,v1,v2,v3,ip1,ip2,ip3,ip4,port = struct.unpack(">BBBBBBBBH",d[:10])
 #					if disconnected==0:
 #						hostlist.append(((ip1,ip2,ip3,ip4),port,(v1,v2,v3)))
-#			elif leaderconn.version_less_than(1,6,28) and (length%54)==0:
+#			elif masterconn.version_less_than(1,6,28) and (length%54)==0:
 #				n = length//54
 #				servers = []
 #				for i in range(n):
@@ -7480,7 +7550,7 @@ if "CC" in sectionset:
 						out.append("""	</tr>""")
 					out.append("""</table>""")
 		else:
-			if leaderconn.version_at_least(2,0,15):
+			if masterconn.version_at_least(2,0,15):
 				if ttymode:
 					tab = Tabble("Chunkserver chart data",len(CCchdata)+1,"r")
 					hdrstr = ["host/port ->"]

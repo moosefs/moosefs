@@ -1270,10 +1270,6 @@ void matoclserv_cserv_command(matoclserventry *eptr,const uint8_t *data,uint32_t
 		status = csdb_maintenance(ip,port,1);
 	} else if (cmd==MFS_CSSERV_COMMAND_MAINTENANCEOFF) {
 		status = csdb_maintenance(ip,port,0);
-//	} else if (cmd==MFS_CSSERV_COMMAND_FASTREPLICATIONON) {
-//		status = csdb_fastreplication(ip,port,1);
-//	} else if (cmd==MFS_CSSERV_COMMAND_FASTREPLICATIONOFF) {
-//		status = csdb_fastreplication(ip,port,0);
 	} else {
 		status = ERROR_EINVAL;
 	}

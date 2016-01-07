@@ -1,3 +1,12 @@
+moosefs (3.0.67-1) unstable; urgency=medium
+
+  * (cgi+cli) added much more info for master in ELECT state (pro version only)
+  * (master+cgi+cli) added temporarily removing chunkservers in master in ELECT
+    state (pro version only)
+  * (cgi) fixed bug in ChunkServers list (heavy load/internal rebalance)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 07 Jan 2016 12:00:00 +0100
+
 moosefs (3.0.66-1) unstable; urgency=medium
 
   * (mount) use direct I/O as a default mode on FreeBSD (due to keep_cache bug

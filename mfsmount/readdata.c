@@ -2246,7 +2246,7 @@ void read_data_end(void *vid) {
 	fprintf(stderr,"%.6lf: closing: %"PRIu32" ; cleaning req list\n",monotonic_seconds(),ind->inode);
 #endif
 	ind->closing = 1;
-	for (rreq = ind->reqhead ; rreq ; rreq=rreqn) {
+	for (rreq = ind->reqhead ; rreq ; rreq = rreqn) {
 		rreqn = rreq->next;
 #ifdef RDEBUG
 		fprintf(stderr,"%.6lf: closing: %"PRIu32" ; free rreq (%"PRIu64":%"PRIu64"/%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->offset+rreq->leng,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -2536,6 +2536,10 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	mattr = mfs_attr_get_mattr(attr);
 	fileinfo = mfs_newfileinfo(fi->flags & O_ACCMODE,inode);
 	fi->fh = (unsigned long)fileinfo;
+#if defined(__FreeBSD__) || defined(__APPLE__)
+	fi->keep_cache = 0;
+	fi->direct_io = 1;
+#else
 	if (keep_cache==1) {
 		fi->keep_cache=1;
 	} else if (keep_cache==2) {
@@ -2543,8 +2547,10 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	} else {
 		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 	}
+	fi->direct_io = 0;
+#endif
 	if (debug_mode) {
-		fprintf(stderr,"create (%lu) ok -> keep cache: %lu\n",(unsigned long int)inode,(unsigned long int)fi->keep_cache);
+		fprintf(stderr,"create (%lu) ok -> keep cache: %u\n",(unsigned long int)inode,(unsigned int)fi->keep_cache);
 	}
 	dcache_invalidate_attr(parent);
 	memset(&e, 0, sizeof(e));
@@ -2554,7 +2560,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:entry_cache_timeout;
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	mfs_makeattrstr(attrstr,256,&e.attr);
-	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s,%lu)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned long int)fi->keep_cache);
+	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s,%u)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned int)fi->keep_cache);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
 		fi->fh = 0;
@@ -2721,6 +2727,10 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	mattr = mfs_attr_get_mattr(attr);
 	fileinfo = mfs_newfileinfo(fi->flags & O_ACCMODE,ino);
 	fi->fh = (unsigned long)fileinfo;
+#if defined(__FreeBSD__) || defined(__APPLE__)
+	fi->keep_cache = 0;
+	fi->direct_io = 1;
+#else
 	if (keep_cache==1) {
 		fi->keep_cache=1;
 	} else if (keep_cache==2) {
@@ -2728,11 +2738,12 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	} else {
 		fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 	}
-	if (debug_mode) {
-		fprintf(stderr,"open (%lu) ok -> keep cache: %lu\n",(unsigned long int)ino,(unsigned long int)fi->keep_cache);
-	}
 	fi->direct_io = 0;
-	oplog_printf(&ctx,"open (%lu): OK (%lu,%lu)",(unsigned long int)ino,(unsigned long int)fi->direct_io,(unsigned long int)fi->keep_cache);
+#endif
+	if (debug_mode) {
+		fprintf(stderr,"open (%lu) ok -> keep cache: %u\n",(unsigned long int)ino,(unsigned int)fi->keep_cache);
+	}
+	oplog_printf(&ctx,"open (%lu): OK (%u,%u)",(unsigned long int)ino,(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache);
 	if (fuse_reply_open(req, fi) == -ENOENT) {
 		mfs_removefileinfo(fileinfo);
 	}

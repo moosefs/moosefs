@@ -1,3 +1,10 @@
+moosefs (2.0.83-1) unstable; urgency=medium
+
+  * (mount) use direct I/O as a default mode on FreeBSD and Mac OS X (due to
+    keep_cache bug in kernel/fuse)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 08 Jan 2016 12:00:00 +0100
+
 moosefs (2.0.82-1) unstable; urgency=medium
 
   * (all) fixed debug symbols
@@ -15,6 +22,8 @@ moosefs (2.0.82-1) unstable; urgency=medium
     version)
   * (master+cs) added sending metaid to cs in ELECT state (pro version only)
   * (master) improved metaid generation method
+  * (all) improved reloading cfg files (commented out options should be treated
+    the same as options set to default values)
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 06 Nov 2015 12:00:00 +0100
 

@@ -9,9 +9,9 @@ Date of first public release: 2008-05-30
 Project web site: http://www.moosefs.com/
 
 Installation and using MooseFS:
-http://www.moosefs.org/reference-guide.html
+https://moosefs.com/documentation.html
 
-Sourceforge project site with source repository:
+Sourceforge project site:
 http://sourceforge.net/projects/moosefs/
 
 Reporting bugs: bugs@moosefs.com
@@ -20,7 +20,7 @@ General contact address: contact@moosefs.com
 Copyright
 =========
 
-Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

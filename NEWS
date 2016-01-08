@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.83-1 (2016-01-08)
+
+  - (mount) use direct I/O as a default mode on FreeBSD and Mac OS X (due to keep_cache bug in kernel/fuse)
+
 * MooseFS 2.0.82-1 (2015-11-06)
 
   - (all) fixed debug symbols
@@ -12,6 +16,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) removed option '-e' from GPL edition (only makes sense in pro version)
   - (master+cs) added sending metaid to cs in ELECT state (pro version only)
   - (master) improved metaid generation method
+  - (all) improved reloading cfg files (commented out options should be treated the same as options set to default values)
 
 * MooseFS 2.0.81-1 (2015-10-30)
 

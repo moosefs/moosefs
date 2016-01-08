@@ -29,7 +29,7 @@ PORTNAMES="master chunkserver client metalogger cgi cgiserv cli netdump"
 
 PORTFILES="Makefile pkg-descr pkg-plist files"
 
-VERSION=2.0.82
+VERSION=2.0.83
 RELEASE=1
 
 cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^DISTNAME=.*$/DISTNAME=		\${PORTNAME}-\${PORTVERSION}-${RELEASE}/" | uniq > .tmp

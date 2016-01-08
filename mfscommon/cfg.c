@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -53,6 +53,13 @@ int cfg_reload (void) {
 		mfs_arg_syslog(LOG_ERR,"cannot load config file: %s",cfgfname);
 		return 0;
 	}
+	while (paramhead!=NULL) {
+		tmp = paramhead;
+		paramhead = tmp->next;
+		free(tmp->name);
+		free(tmp->value);
+		free(tmp);
+	}
 	while (fgets(linebuff,999,fd)!=NULL) {
 		linebuff[999]=0;
 		if (linebuff[0]=='#') {
@@ -61,7 +68,7 @@ int cfg_reload (void) {
 		i = 0;
 		while (linebuff[i]==' ' || linebuff[i]=='\t') i++;
 		nps = i;
-		while (linebuff[i]>32 && linebuff[i]<127) {
+		while (linebuff[i]>32 && linebuff[i]<127 && linebuff[i]!='=') {
 			i++;
 		}
 		npe = i;

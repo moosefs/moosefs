@@ -10,6 +10,7 @@ ExecStop=@SBIN_PATH@/mfsmaster stop
 ExecReload=@SBIN_PATH@/mfsmaster reload
 PIDFile=@DATA_PATH@/.mfsmaster.lock
 TimeoutStopSec=1800
+TimeoutStartSec=1800
 Restart=no
 
 [Install]

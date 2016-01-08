@@ -1262,6 +1262,7 @@ void matoclserv_cserv_command(matoclserventry *eptr,const uint8_t *data,uint32_t
 	}
 	ip = get32bit(&data);
 	port = get16bit(&data);
+	status = ERROR_EINVAL;
 	if (cmd==MFS_CSSERV_COMMAND_REMOVE) {
 		status = csdb_remove_server(ip,port);
 	} else if (cmd==MFS_CSSERV_COMMAND_BACKTOWORK) {
@@ -1270,8 +1271,6 @@ void matoclserv_cserv_command(matoclserventry *eptr,const uint8_t *data,uint32_t
 		status = csdb_maintenance(ip,port,1);
 	} else if (cmd==MFS_CSSERV_COMMAND_MAINTENANCEOFF) {
 		status = csdb_maintenance(ip,port,0);
-	} else {
-		status = ERROR_EINVAL;
 	}
 	if (length==6) {
 		matoclserv_createpacket(eptr,MATOCL_CSSERV_COMMAND,0);

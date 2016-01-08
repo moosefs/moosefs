@@ -1490,6 +1490,26 @@ int read_data_offset_cmp(const void *aa,const void *bb) {
 	return (a<b)?-1:(a>b)?1:0;
 }
 
+static inline void read_inode_free(uint32_t indh,inodedata *indf) {
+	inodedata *ind,**indp;
+	
+	indp = &(indhash[indh]);
+	while ((ind=*indp)) {
+		if (ind==indf) {
+			*indp = ind->next;
+			zassert(pthread_mutex_lock(&(ind->lock)));
+			zassert(pthread_mutex_unlock(&(ind->lock)));
+			zassert(pthread_cond_destroy(&(ind->readerscond)));
+			zassert(pthread_cond_destroy(&(ind->writerscond)));
+			zassert(pthread_cond_destroy(&(ind->closecond)));
+			zassert(pthread_mutex_destroy(&(ind->lock)));
+			free(ind);
+			return;
+		}
+		indp = &(ind->next);
+	}
+}
+
 // return list of rreq
 int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct iovec **iov,uint32_t *iovcnt) {
 	inodedata *ind = (inodedata*)vid;
@@ -1506,6 +1526,10 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 	int status;
 	double now;
 
+	zassert(pthread_mutex_lock(&inode_lock));
+	ind->lcnt++;
+	zassert(pthread_mutex_unlock(&inode_lock));
+
 	zassert(pthread_mutex_lock(&(ind->lock)));
 
 	while (ind->waiting_writers>0) {
@@ -1513,6 +1537,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 	}
 
 	ind->readers_cnt++;
+
 
 	ind->canmodatime = 2;
 
@@ -1889,27 +1914,14 @@ void read_data_free_buff(void *vid,void *vrhead,struct iovec *iov) {
 //	if (ind->waiting_addfn_cnt>0 && ind->readcnt==0) {
 //		zassert(pthread_cond_signal(&(ind->readcond)));
 //	}
-	zassert(pthread_mutex_unlock(&(ind->lock)));
-}
-
-static inline void read_inode_free(uint32_t indh,inodedata *indf) {
-	inodedata *ind,**indp;
 	
-	indp = &(indhash[indh]);
-	while ((ind=*indp)) {
-		if (ind==indf) {
-			*indp = ind->next;
-			zassert(pthread_mutex_lock(&(ind->lock)));
-			zassert(pthread_mutex_unlock(&(ind->lock)));
-			zassert(pthread_cond_destroy(&(ind->readerscond)));
-			zassert(pthread_cond_destroy(&(ind->writerscond)));
-			zassert(pthread_cond_destroy(&(ind->closecond)));
-			zassert(pthread_mutex_destroy(&(ind->lock)));
-			free(ind);
-			return;
-		}
-		indp = &(ind->next);
+	zassert(pthread_mutex_unlock(&(ind->lock)));
+	zassert(pthread_mutex_lock(&inode_lock));
+	ind->lcnt--;
+	if (ind->lcnt==0) {
+		read_inode_free(IDHASH(ind->inode),ind);
 	}
+	zassert(pthread_mutex_unlock(&inode_lock));
 }
 
 static inline void read_data_dirty_region(inodedata *ind,uint64_t offset,uint32_t size,const char *buff) {
@@ -2211,7 +2223,6 @@ void* read_data_new(uint32_t inode,uint64_t fleng) {
 //	ind->laststatus = 0;
 	ind->waiting_writers = 0;
 	ind->readers_cnt = 0;
-	ind->lcnt = 1;
 	zassert(pthread_cond_init(&(ind->readerscond),NULL));
 	zassert(pthread_cond_init(&(ind->writerscond),NULL));
 	zassert(pthread_cond_init(&(ind->closecond),NULL));
@@ -2219,6 +2230,7 @@ void* read_data_new(uint32_t inode,uint64_t fleng) {
 	ind->reqhead = NULL;
 	ind->reqtail = &(ind->reqhead);
 	zassert(pthread_mutex_lock(&inode_lock));
+	ind->lcnt = 1;
 	ind->next = indhash[indh];
 	indhash[indh] = ind;
 #ifdef RDEBUG

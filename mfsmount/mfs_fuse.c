@@ -2709,25 +2709,27 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng) {
 	now = monotonic_seconds();
 #ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
 	pthread_mutex_lock(&finfo_tab_lock);
-	for (i=0 ; i<finfo_max ; i++) {
-		fileinfo = finfo_tab[i];
-		if (fileinfo!=NULL && fileinfo->valid && fileinfo->ops_in_progress==0 && fileinfo->lastuse+FREEBSD_EARLY_RELEASE_DELAY<now) {
-			pthread_mutex_unlock(&finfo_tab_lock);
+	if (finfo_tab!=NULL) {
+		for (i=0 ; i<finfo_max ; i++) {
+			fileinfo = finfo_tab[i];
+			if (fileinfo!=NULL && fileinfo->valid && fileinfo->ops_in_progress==0 && fileinfo->lastuse+FREEBSD_EARLY_RELEASE_DELAY<now) {
+				pthread_mutex_unlock(&finfo_tab_lock);
 
-			pthread_mutex_lock(&(fileinfo->lock));
-			if (fileinfo->rdata) {
-				read_data_end(fileinfo->rdata);
-			}
-			if (fileinfo->wdata) {
-				write_data_end(fileinfo->wdata);
-			}
-			fileinfo->rdata = fileinfo->wdata = NULL;
-			pthread_mutex_unlock(&(fileinfo->lock));
+				pthread_mutex_lock(&(fileinfo->lock));
+				if (fileinfo->rdata) {
+					read_data_end(fileinfo->rdata);
+				}
+				if (fileinfo->wdata) {
+					write_data_end(fileinfo->wdata);
+				}
+				fileinfo->rdata = fileinfo->wdata = NULL;
+				pthread_mutex_unlock(&(fileinfo->lock));
 
-			pthread_mutex_lock(&finfo_tab_lock);
-			finfo_tab[i]->valid = 0;
-			if (i < finfo_first) {
-				finfo_first = i;
+				pthread_mutex_lock(&finfo_tab_lock);
+				finfo_tab[i]->valid = 0;
+				if (i < finfo_first) {
+					finfo_first = i;
+				}
 			}
 		}
 	}
@@ -3386,11 +3388,6 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		fileinfo->rdata = read_data_new(ino,fileinfo->fleng);
 	}
 	write_data_flush_inode(ino);
-/* stable version
-	ssize = size;
-	buff = NULL;	// use internal 'readdata' buffer
-	err = read_data(fileinfo->rdata,off,&ssize,&buff);
-*/
 	ssize = size;
 	err = read_data(fileinfo->rdata,off,&ssize,&buffptr,&iov,&iovcnt);
 

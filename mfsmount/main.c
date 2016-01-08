@@ -337,7 +337,7 @@ static void usage(const char *progname) {
 #else
 	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: NEVER)\n");
 #endif
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__APPLE__)
 	fprintf(stderr,"    -o mfscachemode=CMODE       set cache mode (see below ; default: DIRECT)\n");
 #else
 	fprintf(stderr,"    -o mfscachemode=CMODE       set cache mode (see below ; default: AUTO)\n");
@@ -1230,7 +1230,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (mfsopts.cachemode==NULL) {
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__APPLE__)
 		mfsopts.keepcache = 3;
 #else
 		mfsopts.keepcache = (mfsopts.cachefiles)?1:0;

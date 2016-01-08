@@ -4013,7 +4013,7 @@ if "CS" in sectionset:
 					if masterconn.version_at_least(3,0,38):
 						if tdchunks==0 or leaderfound==0:
 							out.append("""		<td align="center">-</td>""")
-						elif mfrstatus==1 or mfrstatus==0:
+						elif mfrstatus==1:
 							out.append("""		<td align="center"><a style="cursor:default" title="disks can not be safely removed - please wait"><span class="NOTICE">NOT&nbsp;READY</span></a></td>""")
 						elif mfrstatus==2:
 							out.append("""		<td align="center"><a style="cursor:default" title="all disks marked for removal can be safely removed"><span class="OK">READY</span></a></td>""")
@@ -4062,7 +4062,7 @@ if "CS" in sectionset:
 					if masterconn.version_at_least(3,0,38):
 						if tdchunks==0 or leaderfound==0:
 							data.append("-")
-						elif mfrstatus==1 or mfrstatus==0:
+						elif mfrstatus==1:
 							data.append(("NOT READY",'3'))
 						elif mfrstatus==2:
 							data.append(("READY",'4'))
@@ -4098,7 +4098,7 @@ if "CS" in sectionset:
 					if masterconn.version_at_least(3,0,38):
 						if tdchunks==0 or leaderfound==0:
 							data.append("-")
-						elif mfrstatus==1 or mfrstatus==0:
+						elif mfrstatus==1:
 							data.append("NOT READY")
 						elif mfrstatus==2:
 							data.append("READY")

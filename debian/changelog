@@ -1,3 +1,13 @@
+moosefs (3.0.68-1) unstable; urgency=medium
+
+  * (cgi+cli) fixed UNKNOWN state for "marked for removal" readiness
+  * (mount) added protection from releasing inode memory too early in reading
+    module
+  * (mount) use direct I/O as a default mode on Mac OS X (due to keep_cache bug
+    in kernel/fuse)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 08 Jan 2016 12:00:00 +0100
+
 moosefs (3.0.67-1) unstable; urgency=medium
 
   * (cgi+cli) added much more info for master in ELECT state (pro version only)

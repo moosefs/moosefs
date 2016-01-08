@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.68-1 (2016-01-08)
+
+  - (cgi+cli) fixed UNKNOWN state for "marked for removal" readiness
+  - (mount) added protection from releasing inode memory too early in reading module
+  - (mount) use direct I/O as a default mode on Mac OS X (due to keep_cache bug in kernel/fuse)
+
 * MooseFS 3.0.67-1 (2016-01-07)
 
   - (cgi+cli) added much more info for master in ELECT state (pro version only)

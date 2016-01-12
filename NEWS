@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.69-1 (2016-01-12)
+
+  - (mount) fixed rare case when request memory was used after being freed.
+
 * MooseFS 3.0.68-1 (2016-01-08)
 
   - (cgi+cli) fixed UNKNOWN state for "marked for removal" readiness

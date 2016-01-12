@@ -2103,7 +2103,18 @@ void read_data_set_length(inodedata *ind,uint64_t newlength,uint8_t active) {
 #ifdef RDEBUG
 		fprintf(stderr,"%.6lf: read_data_set_length: rreq (before): (%"PRIu64":%"PRIu64"/%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 #endif
-		if (STATE_HAVE_VALID_DATA(rreq->mode)) {
+		if (rreq->mode==BUSY || rreq->mode==FILLED) {
+#ifdef RDEBUG
+			fprintf(stderr,"%.6lf: read_data_set_length: block is busy - refresh\n",monotonic_seconds());
+#endif
+			rreq->mode = REFRESH;
+			if (rreq->waitingworker) {
+				if (write(rreq->pipe[1]," ",1)!=1) {
+					syslog(LOG_ERR,"can't write to pipe !!!");
+				}
+				rreq->waitingworker=0;
+			}
+		} else if (STATE_HAVE_VALID_DATA(rreq->mode)) {
 			if (active) {
 				if (newlength < rreq->offset + rreq->rleng) {
 					if (newlength < rreq->offset) {
@@ -2135,17 +2146,6 @@ void read_data_set_length(inodedata *ind,uint64_t newlength,uint8_t active) {
 			} else {
 				read_delete_request(rreq);
 				rreq = NULL;
-			}
-		} else if (rreq->mode==BUSY) {
-#ifdef RDEBUG
-			fprintf(stderr,"%.6lf: read_data_set_length: block is busy - refresh\n",monotonic_seconds());
-#endif
-			rreq->mode = REFRESH;
-			if (rreq->waitingworker) {
-				if (write(rreq->pipe[1]," ",1)!=1) {
-					syslog(LOG_ERR,"can't write to pipe !!!");
-				}
-				rreq->waitingworker=0;
 			}
 		}
 #ifdef RDEBUG

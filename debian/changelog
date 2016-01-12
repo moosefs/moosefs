@@ -1,3 +1,9 @@
+moosefs (3.0.69-1) unstable; urgency=medium
+
+  * (mount) fixed rare case when request memory was used after being freed.
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 12 Jan 2016 12:00:00 +0100
+
 moosefs (3.0.68-1) unstable; urgency=medium
 
   * (cgi+cli) fixed UNKNOWN state for "marked for removal" readiness

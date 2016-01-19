@@ -1467,6 +1467,17 @@ int write_data_flush(void *vid) {
 }
 
 /* API | glock: UNLOCKED */
+void write_data_setmaxfleng(uint32_t inode,uint64_t maxfleng) {
+	inodedata* id;
+	zassert(pthread_mutex_lock(&glock));
+	id = write_find_inodedata(inode);
+	if (id) {
+		id->maxfleng = maxfleng;
+	}
+	zassert(pthread_mutex_unlock(&glock));
+}
+
+/* API | glock: UNLOCKED */
 uint64_t write_data_getmaxfleng(uint32_t inode) {
 	uint64_t maxfleng;
 	inodedata* id;

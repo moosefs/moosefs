@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.84-1 (2016-01-19)
+
+  - (mount) fixed setting file length in write module during truncate (fixes "git svn" case)
+
 * MooseFS 2.0.83-1 (2016-01-08)
 
   - (mount) use direct I/O as a default mode on FreeBSD and Mac OS X (due to keep_cache bug in kernel/fuse)

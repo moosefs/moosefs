@@ -1528,6 +1528,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		}
 		status = mfs_errorconv(status);
 		// read_inode_ops(ino);
+		write_data_setmaxfleng(ino,stbuf->st_size);
 		read_inode_set_length(ino,stbuf->st_size,1);
 		if (status!=0) {
 			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s:0%04o,%ld,%ld,%lu,%lu,%llu]): %s",(unsigned long int)ino,to_set,modestr+1,(unsigned int)(stbuf->st_mode & 07777),(long int)stbuf->st_uid,(long int)stbuf->st_gid,(unsigned long int)(stbuf->st_atime),(unsigned long int)(stbuf->st_mtime),(unsigned long long int)(stbuf->st_size),strerr(status));

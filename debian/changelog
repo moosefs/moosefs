@@ -1,3 +1,10 @@
+moosefs (2.0.84-1) unstable; urgency=medium
+
+  * (mount) fixed setting file length in write module during truncate (fixes
+    "git svn" case)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 19 Jan 2016 12:00:00 +0100
+
 moosefs (2.0.83-1) unstable; urgency=medium
 
   * (mount) use direct I/O as a default mode on FreeBSD and Mac OS X (due to

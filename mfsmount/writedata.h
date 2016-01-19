@@ -28,6 +28,7 @@ void write_data_term(void);
 void* write_data_new(uint32_t inode);
 int write_data_end(void *vid);
 int write_data_flush(void *vid);
+void write_data_setmaxfleng(uint32_t inode,uint64_t maxfleng);
 uint64_t write_data_getmaxfleng(uint32_t inode);
 int write_data_flush_inode(uint32_t inode);
 int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *buff);

@@ -126,6 +126,8 @@ am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	../mfscommon/mfsmount-md5.$(OBJEXT) \
 	../mfscommon/mfsmount-sockets.$(OBJEXT) \
 	../mfscommon/mfsmount-conncache.$(OBJEXT) \
+	../mfscommon/mfsmount-pipestorage.$(OBJEXT) \
+	../mfscommon/mfsmount-lwthread.$(OBJEXT) \
 	../mfscommon/mfsmount-strerr.$(OBJEXT)
 mfsmount_OBJECTS = $(am_mfsmount_OBJECTS)
 am__DEPENDENCIES_1 =
@@ -432,6 +434,8 @@ mfsmount_SOURCES = \
 	../mfscommon/md5.c ../mfscommon/md5.h \
 	../mfscommon/sockets.c ../mfscommon/sockets.h \
 	../mfscommon/conncache.c ../mfscommon/conncache.h \
+	../mfscommon/pipestorage.c ../mfscommon/pipestorage.h \
+	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/datapack.h ../mfscommon/massert.h \
 	../mfscommon/mfsstrerr.h ../mfscommon/portable.h \
@@ -566,6 +570,12 @@ clean-binPROGRAMS:
 ../mfscommon/mfsmount-conncache.$(OBJEXT):  \
 	../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsmount-pipestorage.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsmount-lwthread.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmount-strerr.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 
@@ -631,8 +641,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-conncache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-crc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-delayrun.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-lwthread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-pcqueue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-pipestorage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-clocks.Po@am__quote@
@@ -1078,6 +1090,34 @@ mfsmount-main.obj: main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/conncache.c' object='../mfscommon/mfsmount-conncache.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-conncache.obj `if test -f '../mfscommon/conncache.c'; then $(CYGPATH_W) '../mfscommon/conncache.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/conncache.c'; fi`
+
+../mfscommon/mfsmount-pipestorage.o: ../mfscommon/pipestorage.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-pipestorage.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-pipestorage.Tpo -c -o ../mfscommon/mfsmount-pipestorage.o `test -f '../mfscommon/pipestorage.c' || echo '$(srcdir)/'`../mfscommon/pipestorage.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-pipestorage.Tpo ../mfscommon/$(DEPDIR)/mfsmount-pipestorage.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/pipestorage.c' object='../mfscommon/mfsmount-pipestorage.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-pipestorage.o `test -f '../mfscommon/pipestorage.c' || echo '$(srcdir)/'`../mfscommon/pipestorage.c
+
+../mfscommon/mfsmount-pipestorage.obj: ../mfscommon/pipestorage.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-pipestorage.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-pipestorage.Tpo -c -o ../mfscommon/mfsmount-pipestorage.obj `if test -f '../mfscommon/pipestorage.c'; then $(CYGPATH_W) '../mfscommon/pipestorage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/pipestorage.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-pipestorage.Tpo ../mfscommon/$(DEPDIR)/mfsmount-pipestorage.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/pipestorage.c' object='../mfscommon/mfsmount-pipestorage.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-pipestorage.obj `if test -f '../mfscommon/pipestorage.c'; then $(CYGPATH_W) '../mfscommon/pipestorage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/pipestorage.c'; fi`
+
+../mfscommon/mfsmount-lwthread.o: ../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-lwthread.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-lwthread.Tpo -c -o ../mfscommon/mfsmount-lwthread.o `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-lwthread.Tpo ../mfscommon/$(DEPDIR)/mfsmount-lwthread.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/lwthread.c' object='../mfscommon/mfsmount-lwthread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-lwthread.o `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
+
+../mfscommon/mfsmount-lwthread.obj: ../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-lwthread.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-lwthread.Tpo -c -o ../mfscommon/mfsmount-lwthread.obj `if test -f '../mfscommon/lwthread.c'; then $(CYGPATH_W) '../mfscommon/lwthread.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/lwthread.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-lwthread.Tpo ../mfscommon/$(DEPDIR)/mfsmount-lwthread.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/lwthread.c' object='../mfscommon/mfsmount-lwthread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-lwthread.obj `if test -f '../mfscommon/lwthread.c'; then $(CYGPATH_W) '../mfscommon/lwthread.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/lwthread.c'; fi`
 
 ../mfscommon/mfsmount-strerr.o: ../mfscommon/strerr.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-strerr.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-strerr.Tpo -c -o ../mfscommon/mfsmount-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c

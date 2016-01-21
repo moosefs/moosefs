@@ -599,67 +599,67 @@ void* mfs_aclstorage_get(uint32_t size) {
 static int mfs_errorconv(int status) {
 	int ret;
 	switch (status) {
-	case STATUS_OK:
+	case MFS_STATUS_OK:
 		ret=0;
 		break;
-	case ERROR_EPERM:
+	case MFS_ERROR_EPERM:
 		ret=EPERM;
 		break;
-	case ERROR_ENOTDIR:
+	case MFS_ERROR_ENOTDIR:
 		ret=ENOTDIR;
 		break;
-	case ERROR_ENOENT:
+	case MFS_ERROR_ENOENT:
 		ret=ENOENT;
 		break;
-	case ERROR_EACCES:
+	case MFS_ERROR_EACCES:
 		ret=EACCES;
 		break;
-	case ERROR_EEXIST:
+	case MFS_ERROR_EEXIST:
 		ret=EEXIST;
 		break;
-	case ERROR_EINVAL:
+	case MFS_ERROR_EINVAL:
 		ret=EINVAL;
 		break;
-	case ERROR_ENOTEMPTY:
+	case MFS_ERROR_ENOTEMPTY:
 		ret=ENOTEMPTY;
 		break;
-	case ERROR_IO:
+	case MFS_ERROR_IO:
 		ret=EIO;
 		break;
-	case ERROR_EROFS:
+	case MFS_ERROR_EROFS:
 		ret=EROFS;
 		break;
-	case ERROR_EINTR:
+	case MFS_ERROR_EINTR:
 		ret=EINTR;
 		break;
-	case ERROR_EAGAIN:
+	case MFS_ERROR_EAGAIN:
 		ret=EAGAIN;
 		break;
-	case ERROR_ECANCELED:
+	case MFS_ERROR_ECANCELED:
 		ret=ECANCELED;
 		break;
-	case ERROR_QUOTA:
+	case MFS_ERROR_QUOTA:
 		ret=EDQUOT;
 		break;
-	case ERROR_ENOATTR:
+	case MFS_ERROR_ENOATTR:
 		ret=ENOATTR;
 		break;
-	case ERROR_ENOTSUP:
+	case MFS_ERROR_ENOTSUP:
 		ret=ENOTSUP;
 		break;
-	case ERROR_ERANGE:
+	case MFS_ERROR_ERANGE:
 		ret=ERANGE;
 		break;
-	case ERROR_NOSPACE:
+	case MFS_ERROR_NOSPACE:
 		ret=ENOSPC;
 		break;
-	case ERROR_CHUNKLOST:
+	case MFS_ERROR_CHUNKLOST:
 		ret=ENXIO;
 		break;
-	case ERROR_NOCHUNKSERVERS:
+	case MFS_ERROR_NOCHUNKSERVERS:
 		ret=ENOSPC;
 		break;
-	case ERROR_CSNOTPRESENT:
+	case MFS_ERROR_CSNOTPRESENT:
 		ret=ENXIO;
 		break;
 	default:
@@ -1172,7 +1172,7 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 	}
 
 	if (fdcache_find(&ctx,ino,NULL,&lflags)) {
-		status = (lflags & (1<<(mmode&0x7)))?STATUS_OK:ERROR_EACCES;
+		status = (lflags & (1<<(mmode&0x7)))?MFS_STATUS_OK:MFS_ERROR_EACCES;
 	} else {
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
@@ -1184,11 +1184,11 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 		}
 	}
 	force_mode = 0;
-	if (status==ERROR_ENOENT) {
+	if (status==MFS_ERROR_ENOENT) {
 		if (ctx.pid == getpid()) {
 			force_mode = 1;
 		}
-		if (sstats_get(ino,attr,force_mode)==STATUS_OK) {
+		if (sstats_get(ino,attr,force_mode)==MFS_STATUS_OK) {
 			if (force_mode==0) {
 				force_mode = 2;
 			}
@@ -1435,8 +1435,8 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			uint32_t gidtmp = ctx.gid;
 			status = fs_lookup(parent,nleng,(const uint8_t*)name,ctx.uid,1,&gidtmp,&inode,attr,&lflags,&csdataver,&chunkid,&version,&csdata,&csdatasize);
 		}
-		if (status==ERROR_ENOENT_NOCACHE) {
-			status = ERROR_ENOENT;
+		if (status==MFS_ERROR_ENOENT_NOCACHE) {
+			status = MFS_ERROR_ENOENT;
 			nocache = 1;
 		} else {
 			nocache = 0;
@@ -1618,16 +1618,16 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	} else {
 		mfs_stats_inc(OP_GETATTR);
 		if (fdcache_find(&ctx,ino,attr,NULL)) {
-			status = STATUS_OK;
+			status = MFS_STATUS_OK;
 		} else {
 			status = fs_getattr(ino,(fi!=NULL)?1:0,ctx.uid,ctx.gid,attr);
 		}
-		if (status==ERROR_ENOENT) {
+		if (status==MFS_ERROR_ENOENT) {
 			if (ctx.pid==getpid()) {
 				force_mode = 1;
 			}
 			status = sstats_get(ino,attr,force_mode);
-			if (status==STATUS_OK && force_mode==0) {
+			if (status==MFS_STATUS_OK && force_mode==0) {
 				force_mode = 2;
 			}
 		}
@@ -1734,13 +1734,13 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			uint32_t gidtmp = ctx.gid;
 			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,1,&gidtmp,0,0,0,0,0,0,0,attr);	
 		}
-		if (status==ERROR_ENOENT) {
+		if (status==MFS_ERROR_ENOENT) {
 			status = sstats_get(ino,attr,0);
-			if (status==STATUS_OK) {
+			if (status==MFS_STATUS_OK) {
 				mfs_attr_modify(to_set,attr,stbuf);
 			}
 		}
-		if (status==STATUS_OK) {
+		if (status==MFS_STATUS_OK) {
 			sstats_set(ino,attr,0);
 		}
 		status = mfs_errorconv(status);
@@ -1802,13 +1802,13 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			uint32_t gidtmp = ctx.gid;
 			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,1,&gidtmp,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,sugid_clear_mode,attr);
 		}
-		if (status==ERROR_ENOENT) {
+		if (status==MFS_ERROR_ENOENT) {
 			status = sstats_get(ino,attr,0);
-			if (status==STATUS_OK) {
+			if (status==MFS_STATUS_OK) {
 				mfs_attr_modify(to_set,attr,stbuf);
 			}
 		}
-		if (status==STATUS_OK) {
+		if (status==MFS_STATUS_OK) {
 			sstats_set(ino,attr,0);
 		}
 		status = mfs_errorconv(status);
@@ -1836,9 +1836,9 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			trycnt = 0;
 			while (1) {
 				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
-				if (status==STATUS_OK || status==ERROR_EROFS || status==ERROR_EACCES || status==ERROR_EPERM || status==ERROR_ENOENT || status==ERROR_QUOTA || status==ERROR_NOSPACE || status==ERROR_CHUNKLOST) {
+				if (status==MFS_STATUS_OK || status==MFS_ERROR_EROFS || status==MFS_ERROR_EACCES || status==MFS_ERROR_EPERM || status==MFS_ERROR_ENOENT || status==MFS_ERROR_QUOTA || status==MFS_ERROR_NOSPACE || status==MFS_ERROR_CHUNKLOST) {
 					break;
-				} else if (status!=ERROR_LOCKED) {
+				} else if (status!=MFS_ERROR_LOCKED) {
 					trycnt++;
 					if (trycnt>=30) {
 						break;
@@ -1855,9 +1855,9 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			trycnt = 0;
 			while (1) {
 				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
-				if (status==STATUS_OK || status==ERROR_EROFS || status==ERROR_EACCES || status==ERROR_EPERM || status==ERROR_ENOENT || status==ERROR_QUOTA || status==ERROR_NOSPACE || status==ERROR_CHUNKLOST) {
+				if (status==MFS_STATUS_OK || status==MFS_ERROR_EROFS || status==MFS_ERROR_EACCES || status==MFS_ERROR_EPERM || status==MFS_ERROR_ENOENT || status==MFS_ERROR_QUOTA || status==MFS_ERROR_NOSPACE || status==MFS_ERROR_CHUNKLOST) {
 					break;
-				} else if (status!=ERROR_LOCKED) {
+				} else if (status!=MFS_ERROR_LOCKED) {
 					trycnt++;
 					if (trycnt>=30) {
 						break;
@@ -2433,7 +2433,7 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		uint32_t gidtmp = ctx.gid;
 		status = fs_access(ino,ctx.uid,1,&gidtmp,MODE_MASK_R);	// at least test rights
 	}
-	if (status==ERROR_ENOENT && sstats_get(ino,attr,0)==STATUS_OK) {
+	if (status==MFS_ERROR_ENOENT && sstats_get(ino,attr,0)==MFS_STATUS_OK) {
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
 			status = mfs_access_test(attr,MODE_MASK_R,ctx.uid,gids->gidcnt,gids->gidtab);
@@ -2442,7 +2442,7 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 			uint32_t gidtmp = ctx.gid;
 			status = mfs_access_test(attr,MODE_MASK_R,ctx.uid,1,&gidtmp);
 		}
-		if (status!=STATUS_OK) {
+		if (status!=MFS_STATUS_OK) {
 			status = mfs_errorconv(status);
 			oplog_printf(&ctx,"opendir (%lu): %s",(unsigned long int)ino,strerr(status));
 			fuse_reply_err(req, status);
@@ -2462,7 +2462,7 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 				fi->fh = 0;
 			}
 		}
-	} else if (status!=STATUS_OK) {
+	} else if (status!=MFS_STATUS_OK) {
 		status = mfs_errorconv(status);
 		oplog_printf(&ctx,"opendir (%lu): %s",(unsigned long int)ino,strerr(status));
 		fuse_reply_err(req, status);
@@ -2540,7 +2540,7 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 			if (full_permissions) {
 				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
 				status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,1,0,&dbuff,&dsize);
-				if (status==ERROR_EACCES) {
+				if (status==MFS_ERROR_EACCES) {
 					df = 0;
 					status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,0,0,&dbuff,&dsize);
 				}
@@ -2548,7 +2548,7 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 			} else {
 				uint32_t gidtmp = ctx.gid;
 				status = fs_readdir(ino,ctx.uid,1,&gidtmp,1,0,&dbuff,&dsize);
-				if (status==ERROR_EACCES) {
+				if (status==MFS_ERROR_EACCES) {
 					df = 0;
 					status = fs_readdir(ino,ctx.uid,1,&gidtmp,0,0,&dbuff,&dsize);
 				}
@@ -2868,11 +2868,11 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		uint32_t gidtmp = ctx.gid;
 		status = fs_create(parent,nleng,(const uint8_t*)name,mode&07777,cumask,ctx.uid,1,&gidtmp,&inode,attr);
 	}
-	if (status!=ERROR_ENOTSUP) {
+	if (status!=MFS_ERROR_ENOTSUP) {
 #if defined(__APPLE__)
 		// due to bug in os x - create in deleted directory goes into infinite loop when it gets ENOENT, so we should change it to different error - we use EACCES
-		if (status==ERROR_ENOENT && sstats_get(parent,attr,0)==STATUS_OK) {
-			status=ERROR_EACCES;
+		if (status==MFS_ERROR_ENOENT && sstats_get(parent,attr,0)==MFS_STATUS_OK) {
+			status=MFS_ERROR_EACCES;
 		}
 #endif
 		status = mfs_errorconv(status);
@@ -2883,8 +2883,8 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		}
 		negentry_cache_remove(parent,nleng,(const uint8_t*)name);
 		if (no_xattrs==0 && xattr_cache_on) { // Linux asks for this xattr before every write, so after create we can safely assume that there is no such attribute, and set it in xattr cache (improve efficiency on small files)
-			xattr_cache_set(inode,ctx.uid,ctx.gid,8+1+10,(const uint8_t*)"security.capability",NULL,0,ERROR_ENOATTR);
-			xattr_cache_set(inode,ctx.uid,ctx.gid,8+1+3,(const uint8_t*)"security.ima",NULL,0,ERROR_ENOATTR);
+			xattr_cache_set(inode,ctx.uid,ctx.gid,8+1+10,(const uint8_t*)"security.capability",NULL,0,MFS_ERROR_ENOATTR);
+			xattr_cache_set(inode,ctx.uid,ctx.gid,8+1+3,(const uint8_t*)"security.ima",NULL,0,MFS_ERROR_ENOATTR);
 		}
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
@@ -3075,9 +3075,9 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 	fdrec = fdcache_acquire(&ctx,ino,attr,&lflags,&found);
 	if (found) {
-		status = (lflags & (1<<(mmode&0x7)))?STATUS_OK:ERROR_EACCES;
+		status = (lflags & (1<<(mmode&0x7)))?MFS_STATUS_OK:MFS_ERROR_EACCES;
 		if (fdrec!=NULL) {
-			if (status==STATUS_OK) {
+			if (status==MFS_STATUS_OK) {
 				fdcache_inject_chunkdata(ino,fdrec);
 			}
 			fdcache_release(fdrec);
@@ -4097,12 +4097,12 @@ int mfs_getacl(fuse_req_t req, fuse_ino_t ino, uint8_t opened,uint32_t uid,uint3
 	*leng = 0;
 	status = fs_getacl(ino,opened,uid,gids,gid,aclxattr,&userperm,&groupperm,&otherperm,&maskperm,&namedusers,&namedgroups,&namedacls,&namedaclssize);
 
-	if (status!=STATUS_OK) {
+	if (status!=MFS_STATUS_OK) {
 		return status;
 	}
 
 	if (((namedusers+namedgroups)*6U) != namedaclssize) {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 
 	*leng = 4+32+(namedusers+namedgroups)*8;
@@ -4145,7 +4145,7 @@ int mfs_getacl(fuse_req_t req, fuse_ino_t ino, uint8_t opened,uint32_t uid,uint3
 //	b+=8;
 
 //	fprintf(stderr,"getacl buff end ptr: %p\n",(void*)b);
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int mfs_setacl(fuse_req_t req,fuse_ino_t ino,uint32_t uid,uint8_t aclxattr,const char *buff,uint32_t leng) {
@@ -4162,11 +4162,11 @@ int mfs_setacl(fuse_req_t req,fuse_ino_t ino,uint32_t uid,uint8_t aclxattr,const
 
 	(void)req;
 	if (leng<4 || ((leng % 8) != 4) ) {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 
 	if (buff[0]!=2) {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 
 	acls = (leng - 4) / 8;
@@ -4181,7 +4181,7 @@ int mfs_setacl(fuse_req_t req,fuse_ino_t ino,uint32_t uid,uint8_t aclxattr,const
 		tag = *(const uint16_t*)(buff+4+i*8);
 		if (tag & 1) {
 			if (userperm!=0xFFFF) {
-				return ERROR_EINVAL;
+				return MFS_ERROR_EINVAL;
 			}
 			userperm = *(const uint16_t*)(buff+6+i*8);
 		}
@@ -4190,7 +4190,7 @@ int mfs_setacl(fuse_req_t req,fuse_ino_t ino,uint32_t uid,uint8_t aclxattr,const
 		}
 		if (tag & 4) {
 			if (groupperm!=0xFFFF) {
-				return ERROR_EINVAL;
+				return MFS_ERROR_EINVAL;
 			}
 			groupperm = *(const uint16_t*)(buff+6+i*8);
 		}
@@ -4199,19 +4199,19 @@ int mfs_setacl(fuse_req_t req,fuse_ino_t ino,uint32_t uid,uint8_t aclxattr,const
 		}
 		if (tag & 16) {
 			if (maskperm!=0xFFFF) {
-				return ERROR_EINVAL;
+				return MFS_ERROR_EINVAL;
 			}
 			maskperm = *(const uint16_t*)(buff+6+i*8);
 		}
 		if (tag & 32) {
 			if (otherperm!=0xFFFF) {
-				return ERROR_EINVAL;
+				return MFS_ERROR_EINVAL;
 			}
 			otherperm = *(const uint16_t*)(buff+6+i*8);
 		}
 	}
 	if (maskperm==0xFFFF && (namedusers|namedgroups)>0) {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 
 	namedacls = mfs_aclstorage_get((namedusers+namedgroups)*6);
@@ -4335,7 +4335,7 @@ void mfs_setxattr (fuse_req_t req, fuse_ino_t ino, const char *name, const char 
 		return;
 	}
 	oplog_printf(&ctx,"setxattr (%lu,%s,%llu,%d): OK",(unsigned long int)ino,name,(unsigned long long int)size,flags);
-	xattr_cache_set(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,(const uint8_t*)value,(uint32_t)size,STATUS_OK);
+	xattr_cache_set(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,(const uint8_t*)value,(uint32_t)size,MFS_STATUS_OK);
 	fuse_reply_err(req,0);
 }
 
@@ -4424,7 +4424,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 		xattr_value_release = xattr_cache_get(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,&buff,&leng,&status);
 		if (xattr_value_release==NULL) {
 			if (usedircache && dcache_getattr(&ctx,ino,attr) && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
-				status = ERROR_ENOATTR;
+				status = MFS_ERROR_ENOATTR;
 				buff = NULL;
 				leng = 0;
 			} else {
@@ -4450,7 +4450,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 		}
 	} else {
 		if (usedircache && dcache_getattr(&ctx,ino,attr) && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
-			status = ERROR_ENOATTR;
+			status = MFS_ERROR_ENOATTR;
 			buff = NULL;
 			leng = 0;
 		} else {
@@ -4530,7 +4530,7 @@ void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 		mode = MFS_XATTR_GETA_DATA;
 	}
 	if (usedircache && dcache_getattr(&ctx,ino,attr) && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
-		status = STATUS_OK;
+		status = MFS_STATUS_OK;
 		buff = NULL;
 		leng = 0;
 	} else {
@@ -4620,7 +4620,7 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 	if (xattr_cache_on) {
 		xattr_value_release = xattr_cache_get(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,NULL,NULL,&status);
 		if (xattr_value_release) {
-			if (status==ERROR_ENOATTR) {
+			if (status==MFS_ERROR_ENOATTR) {
 				usecache = 1;
 			}
 			xattr_cache_rel(xattr_value_release);
@@ -4640,8 +4640,8 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 			}
 		}
 	}
-	if (xattr_cache_on && (status==STATUS_OK || status==ERROR_ENOATTR)) {
-		xattr_cache_set(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,NULL,0,ERROR_ENOATTR);
+	if (xattr_cache_on && (status==MFS_STATUS_OK || status==MFS_ERROR_ENOATTR)) {
+		xattr_cache_set(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,NULL,0,MFS_ERROR_ENOATTR);
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {

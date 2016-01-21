@@ -28,7 +28,7 @@
 #include "sockets.h"
 #include "hashfn.h"
 #include "portable.h"
-#include "main.h"
+#include "lwthread.h"
 
 #define CONN_CACHE_HASHSIZE 256
 #define CONN_CACHE_HASH(ip,port) (hash32((ip)^((port)<<16))%(CONN_CACHE_HASHSIZE))
@@ -135,7 +135,7 @@ void* conncache_keepalive_thread(void* arg) {
 #ifdef MFSDEBUG
 				syslog(LOG_NOTICE,"conncache: pos: %"PRIu32" ; desc: %d ; ip:%08X ; port:%u",p,ce->fd,ce->ip,ce->port);
 #endif
-				i = read(ce->fd,nopbuff,8);
+				i = universal_read(ce->fd,nopbuff,8);
 				if (i<0) {
 					if (!ERRNO_ERROR) {
 						memset(nopbuff,0,8);
@@ -148,7 +148,7 @@ void* conncache_keepalive_thread(void* arg) {
 					conncache_remove(ce,1);
 				} else {
 					memset(nopbuff,0,8);
-					i = write(ce->fd,nopbuff,8);
+					i = universal_write(ce->fd,nopbuff,8);
 					if (i!=8) {
 						conncache_remove(ce,1);
 					}
@@ -203,7 +203,7 @@ int conncache_init(uint32_t cap) {
 	lruhead = NULL;
 	lrutail = &(lruhead);
 	keep_alive = 1;
-	if (main_minthread_create(&main_thread,0,conncache_keepalive_thread,NULL)<0) {
+	if (lwt_minthread_create(&main_thread,0,conncache_keepalive_thread,NULL)<0) {
 		return -1;
 	}
 	return 1;

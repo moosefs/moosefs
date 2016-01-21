@@ -153,8 +153,10 @@ void delay_term(void) {
 
 void delay_init(void) {
 	pthread_attr_t thattr;
+#ifndef WIN32
 	sigset_t oldset;
 	sigset_t newset;
+#endif
 
 	exitflag = 0;
 	waiting = 0;
@@ -167,13 +169,17 @@ void delay_init(void) {
 
 	zassert(pthread_attr_init(&thattr));
 	zassert(pthread_attr_setstacksize(&thattr,0x100000));
+#ifndef WIN32
 	sigemptyset(&newset);
 	sigaddset(&newset, SIGTERM);
 	sigaddset(&newset, SIGINT);
 	sigaddset(&newset, SIGHUP);
 	sigaddset(&newset, SIGQUIT);
 	zassert(pthread_sigmask(SIG_BLOCK, &newset, &oldset));
+#endif
 	zassert(pthread_create(&delay_th,&thattr,delay_scheduler,NULL));
+#ifndef WIN32
 	zassert(pthread_sigmask(SIG_SETMASK, &oldset, NULL));
+#endif
 	zassert(pthread_attr_destroy(&thattr));
 }

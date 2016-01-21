@@ -41,6 +41,7 @@
 #include "charts.h"
 #include "hddspacemgr.h"
 #include "main.h"
+#include "lwthread.h"
 #include "clocks.h"
 #include "portable.h"
 #include "mainserv.h"
@@ -315,19 +316,19 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 	if (size==0) {
 		packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 		put64bit(&wptr,chunkid);
-		put8bit(&wptr,STATUS_OK);	// no bytes to read - just return STATUS_OK
+		put8bit(&wptr,MFS_STATUS_OK);	// no bytes to read - just return MFS_STATUS_OK
 		return mainserv_send_and_free(sock,packet,8+1);
 	}
 	if (size>MFSCHUNKSIZE) {
 		packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 		put64bit(&wptr,chunkid);
-		put8bit(&wptr,ERROR_WRONGSIZE);
+		put8bit(&wptr,MFS_ERROR_WRONGSIZE);
 		return mainserv_send_and_free(sock,packet,8+1);
 	}
 	if (offset>=MFSCHUNKSIZE || offset+size>MFSCHUNKSIZE) {
 		packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 		put64bit(&wptr,chunkid);
-		put8bit(&wptr,ERROR_WRONGOFFSET);
+		put8bit(&wptr,MFS_ERROR_WRONGOFFSET);
 		return mainserv_send_and_free(sock,packet,8+1);
 	}
 	if (protover) {
@@ -337,14 +338,14 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 	if (protover) {
 		mainserv_read_nop_del(&rn);
 		if (rn.error) {
-			if (status==STATUS_OK) {
+			if (status==MFS_STATUS_OK) {
 				hdd_close(chunkid);
 			}
 			return 0;
 		}
 		if (rn.bytesleft>0) {
 			if (mainserv_towrite(sock,read_nop_buff+(8-rn.bytesleft),rn.bytesleft,SERV_TIMEOUT)!=(int32_t)rn.bytesleft) {
-				if (status==STATUS_OK) {
+				if (status==MFS_STATUS_OK) {
 					hdd_close(chunkid);
 				}
 				return 0;
@@ -352,7 +353,7 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 		}
 		rn.bytesleft=0;
 	}
-	if (status!=STATUS_OK) {
+	if (status!=MFS_STATUS_OK) {
 		packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 		put64bit(&wptr,chunkid);
 		put8bit(&wptr,status);
@@ -390,7 +391,7 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 			}
 			rn.bytesleft=0;
 		}
-		if (status!=STATUS_OK) {
+		if (status!=MFS_STATUS_OK) {
 			free(packet);
 			hdd_close(chunkid);
 			packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
@@ -439,7 +440,7 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 	hdd_close(chunkid);
 	packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 	put64bit(&wptr,chunkid);
-	put8bit(&wptr,STATUS_OK);	// no bytes to read - just return STATUS_OK
+	put8bit(&wptr,MFS_STATUS_OK);	// no bytes to read - just return MFS_STATUS_OK
 	ret = mainserv_send_and_free(sock,packet,8+1);
 #ifdef HAVE___SYNC_FETCH_AND_OP
 	__sync_fetch_and_add(&stats_hlopr,1);
@@ -507,7 +508,7 @@ void* mainserv_write_thread(void* arg) {
 		if (write(wrdata->pipe[1],"*",1)!=1) {
 			mfs_errlog(LOG_WARNING,"pipe write error");
 		}
-		if (status!=STATUS_OK) {
+		if (status!=MFS_STATUS_OK) {
 			break;
 		}
 	}
@@ -549,7 +550,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 	pthread_cond_init(&(wrdata.cond),NULL);
 	wrdata.condwaiting = 0;
 	wrdata.term = 0;
-	main_minthread_create(&wrthread,0,mainserv_write_thread,&wrdata);
+	lwt_minthread_create(&wrthread,0,mainserv_write_thread,&wrdata);
 	
 	pdataleng = 4096;
 #ifdef MMAP_ALLOC
@@ -630,7 +631,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 					packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 					put64bit(&wptr,gchunkid);
 					put32bit(&wptr,0);
-					put8bit(&wptr,ERROR_WRONGCHUNKID);
+					put8bit(&wptr,MFS_ERROR_WRONGCHUNKID);
 					mainserv_send_and_free(sock,packet,8+4+1);
 					break;
 				}
@@ -638,7 +639,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 					packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 					put64bit(&wptr,gchunkid);
 					put32bit(&wptr,0);
-					put8bit(&wptr,ERROR_WRONGCHUNKID);
+					put8bit(&wptr,MFS_ERROR_WRONGCHUNKID);
 					mainserv_send_and_free(sock,packet,8+4+1);
 					break;
 				}
@@ -677,7 +678,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 					packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 					put64bit(&wptr,gchunkid);
 					put32bit(&wptr,0);
-					put8bit(&wptr,ERROR_WRONGCHUNKID);
+					put8bit(&wptr,MFS_ERROR_WRONGCHUNKID);
 					mainserv_send_and_free(sock,packet,8+4+1);
 #ifdef MMAP_ALLOC
 					munmap(wrjob,wrjob->structsize);
@@ -788,7 +789,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 					wrjob->writeid = 0;
 					wrjob->structsize = offsetof(write_job,data);
 					wrjob->ack = 3;
-					wrjob->hddstatus = STATUS_OK;
+					wrjob->hddstatus = MFS_STATUS_OK;
 					wrjob->netstatus = status;
 					wrjob->next = wrdata.head;
 					wrdata.head = wrjob;
@@ -821,8 +822,8 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 				mfs_errlog(LOG_WARNING,"read pipe error");
 			}
 		}
-		status = STATUS_OK;
-		while (status==STATUS_OK) {
+		status = MFS_STATUS_OK;
+		while (status==MFS_STATUS_OK) {
 			uint8_t exitloop;
 			pthread_mutex_lock(&(wrdata.lock));
 			if (wrdata.head==NULL) {
@@ -831,12 +832,12 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			}
 			exitloop = 1;
 			wrjob = wrdata.head;
-			if (wrjob->ack&1 && wrjob->hddstatus!=STATUS_OK) {
+			if (wrjob->ack&1 && wrjob->hddstatus!=MFS_STATUS_OK) {
 				status = wrjob->hddstatus;
-			} else if (wrjob->ack&2 && wrjob->netstatus!=STATUS_OK) {
+			} else if (wrjob->ack&2 && wrjob->netstatus!=MFS_STATUS_OK) {
 				status = wrjob->netstatus;
 			} else if (wrjob->ack==3) {
-				status = STATUS_OK;
+				status = MFS_STATUS_OK;
 				exitloop = 0;
 			}
 			if (exitloop) {
@@ -860,17 +861,17 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			put32bit(&wptr,writeid);
 			put8bit(&wptr,status);
 			if (mainserv_send_and_free(sock,packet,8+4+1)==0) {
-				status = ERROR_DISCONNECTED; // any error
+				status = MFS_ERROR_DISCONNECTED; // any error
 			}
 		}
-		if (status!=STATUS_OK) {
+		if (status!=MFS_STATUS_OK) {
 			break;
 		}
 		if (pfd[1].revents & POLLHUP) {
 			packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 			put64bit(&wptr,gchunkid);
 			put32bit(&wptr,0);
-			put8bit(&wptr,ERROR_DISCONNECTED);
+			put8bit(&wptr,MFS_ERROR_DISCONNECTED);
 			mainserv_send_and_free(sock,packet,8+4+1);
 			break;
 		}
@@ -931,7 +932,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 	packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 	put64bit(&wptr,gchunkid);
 	put32bit(&wptr,0);
-	put8bit(&wptr,STATUS_OK);
+	put8bit(&wptr,MFS_STATUS_OK);
 	if (mainserv_send_and_free(sock,packet,8+4+1)==0) {
 		return 0;
 	}
@@ -981,11 +982,11 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 			version = get32bit(&rptr);
 			if (gchunkid!=chunkid || gversion!=version) {
 				rstat = 1;
-				status = ERROR_WRONGCHUNKID;
+				status = MFS_ERROR_WRONGCHUNKID;
 				break;
 			}
 			rstat = 1;
-			status = STATUS_OK;
+			status = MFS_STATUS_OK;
 			break;
 		}
 		if (cmd==ANTOAN_NOP) {
@@ -1014,7 +1015,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 			}
 			if (gchunkid!=chunkid) {
 				rstat = 1;
-				status = ERROR_WRONGCHUNKID;
+				status = MFS_ERROR_WRONGCHUNKID;
 				break;
 			}
 /*
@@ -1040,7 +1041,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 			}
 */
 			status = hdd_write(gchunkid,gversion,blocknum,rptr+4,offset,size,rptr);
-			if (status!=STATUS_OK) {
+			if (status!=MFS_STATUS_OK) {
 //				syslog(LOG_NOTICE,"hdd_write error: %s",mfsstrerr(status));
 				rstat = 1;
 				break;
@@ -1048,7 +1049,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 			packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 			put64bit(&wptr,chunkid);
 			put32bit(&wptr,writeid);
-			put8bit(&wptr,STATUS_OK);
+			put8bit(&wptr,MFS_STATUS_OK);
 			if (mainserv_send_and_free(sock,packet,8+4+1)==0) {
 				break;
 			}
@@ -1062,7 +1063,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 #endif
 	}
 	if (rstat>0) {
-		if (status==STATUS_OK) {
+		if (status==MFS_STATUS_OK) {
 			return 1;
 		} else {
 			packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
@@ -1143,7 +1144,7 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 			packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 			put64bit(&wptr,gchunkid);
 			put32bit(&wptr,0);
-			put8bit(&wptr,ERROR_CANTCONNECT);
+			put8bit(&wptr,MFS_ERROR_CANTCONNECT);
 			return mainserv_send_and_free(sock,packet,8+4+1);
 		}
 //		packet = mainserv_create_packet(&wptr,CLTOCS_WRITE,length-6);
@@ -1155,14 +1156,14 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 //			packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 //			put64bit(&wptr,gchunkid);
 //			put32bit(&wptr,0);
-//			put8bit(&wptr,ERROR_CANTCONNECT);
+//			put8bit(&wptr,MFS_ERROR_CANTCONNECT);
 //			return mainserv_send_and_free(sock,packet,8+4+1);
 //		}
 	} else { // last in chain
 		fwdsock=-1;
 	}
 	status = hdd_open(gchunkid,gversion);
-	if (status!=STATUS_OK) {
+	if (status!=MFS_STATUS_OK) {
 		if (fwdsock>=0) {
 			tcpclose(fwdsock);
 		}
@@ -1235,7 +1236,7 @@ uint8_t mainserv_get_chunk_checksum(int sock,const uint8_t *data,uint32_t length
 	chunkid = get64bit(&data);
 	version = get32bit(&data);
 	status = hdd_get_checksum(chunkid,version,&checksum);
-	if (status!=STATUS_OK) {
+	if (status!=MFS_STATUS_OK) {
 		pleng = 12+1;
 	} else {
 		pleng = 12+4;
@@ -1243,7 +1244,7 @@ uint8_t mainserv_get_chunk_checksum(int sock,const uint8_t *data,uint32_t length
 	packet = mainserv_create_packet(&wptr,CSTOAN_CHUNK_CHECKSUM,pleng);
 	put64bit(&wptr,chunkid);
 	put32bit(&wptr,version);
-	if (status!=STATUS_OK) {
+	if (status!=MFS_STATUS_OK) {
 		put8bit(&wptr,status);
 	} else {
 		put32bit(&wptr,checksum);
@@ -1265,7 +1266,7 @@ uint8_t mainserv_get_chunk_checksum_tab(int sock,const uint8_t *data,uint32_t le
 	chunkid = get64bit(&data);
 	version = get32bit(&data);
 	status = hdd_get_checksum_tab(chunkid,version,crctab);
-	if (status!=STATUS_OK) {
+	if (status!=MFS_STATUS_OK) {
 		pleng = 12+1;
 	} else {
 		pleng = 12+4096;
@@ -1273,7 +1274,7 @@ uint8_t mainserv_get_chunk_checksum_tab(int sock,const uint8_t *data,uint32_t le
 	packet = mainserv_create_packet(&wptr,CSTOAN_CHUNK_CHECKSUM_TAB,pleng);
 	put64bit(&wptr,chunkid);
 	put32bit(&wptr,version);
-	if (status!=STATUS_OK) {
+	if (status!=MFS_STATUS_OK) {
 		put8bit(&wptr,status);
 	} else {
 		memcpy(wptr,crctab,4096);
@@ -1452,7 +1453,7 @@ int mainserv_init(void) {
 	if (pthread_mutex_init(&read_nops_lock,NULL)<0) {
 		return -1;
 	}
-	if (main_minthread_create(&rnthread,1,mainserv_read_nop_sender,NULL)<0) {
+	if (lwt_minthread_create(&rnthread,1,mainserv_read_nop_sender,NULL)<0) {
 		return -1;
 	}
 	return 1;

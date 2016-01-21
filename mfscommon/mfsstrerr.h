@@ -24,9 +24,9 @@
 #include "MFSCommunication.h"
 
 static inline const char* mfsstrerr(uint8_t status) {
-	static const char* errtab[]={ERROR_STRINGS};
-	if (status>ERROR_MAX) {
-		status=ERROR_MAX;
+	static const char* errtab[]={MFS_ERROR_STRINGS};
+	if (status>MFS_ERROR_MAX) {
+		status=MFS_ERROR_MAX;
 	}
 	return errtab[status];
 }

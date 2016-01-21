@@ -28,11 +28,13 @@
 #endif
 #include <sys/time.h>
 #include <unistd.h>
+#ifndef WIN32
 #include <poll.h>
+#include <syslog.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
@@ -53,6 +55,7 @@
 #include "mastercomm.h"
 #include "clocks.h"
 #include "portable.h"
+#include "pipestorage.h"
 #include "readdata.h"
 #include "MFSCommunication.h"
 
@@ -351,7 +354,8 @@ void write_test_chunkdata(inodedata *ind) {
 
 	if (ind->chunkscnt<MAX_SIM_CHUNKS) {
 		if (ind->chunksnext!=NULL) {
-			if (pipe(pfd)<0) {
+			if (ps_get_pipe(pfd)<0) {
+				fprintf(stderr,"pipe error\n");
 				syslog(LOG_WARNING,"pipe error: %s",strerr(errno));
 				return;
 			}
@@ -365,7 +369,7 @@ void write_test_chunkdata(inodedata *ind) {
 	} else {
 		for (chd=ind->chunks ; chd!=NULL ; chd=chd->next) {
 			if (chd->waitingworker) {
-				if (write(chd->pipe[1]," ",1)!=1) {
+				if (universal_write(chd->pipe[1]," ",1)!=1) {
 					syslog(LOG_ERR,"can't write to pipe !!!");
 				}
 				chd->waitingworker=0;
@@ -401,8 +405,7 @@ chunkdata* write_new_chunkdata(inodedata *ind,uint32_t chindx) {
 }
 
 void write_free_chunkdata(chunkdata *chd) {
-	close(chd->pipe[0]);
-	close(chd->pipe[1]);
+	ps_close_pipe(chd->pipe);
 	*(chd->prev) = chd->next;
 	if (chd->next) {
 		chd->next->prev = chd->prev;
@@ -518,8 +521,10 @@ static uint32_t lastnotify = 0;
 #endif
 
 static inline void write_data_spawn_worker(void) {
+#ifndef WIN32
 	sigset_t oldset;
 	sigset_t newset;
+#endif
 	worker *w;
 	int res;
 
@@ -527,14 +532,18 @@ static inline void write_data_spawn_worker(void) {
 	if (w==NULL) {
 		return;
 	}
+#ifndef WIN32
 	sigemptyset(&newset);
 	sigaddset(&newset, SIGTERM);
 	sigaddset(&newset, SIGINT);
 	sigaddset(&newset, SIGHUP);
 	sigaddset(&newset, SIGQUIT);
 	zassert(pthread_sigmask(SIG_BLOCK, &newset, &oldset));
+#endif
 	res = pthread_create(&(w->thread_id),&worker_thattr,write_worker,w);
+#ifndef WIN32
 	zassert(pthread_sigmask(SIG_SETMASK, &oldset, NULL));
+#endif
 	if (res<0) {
 		return;
 	}
@@ -721,21 +730,25 @@ void* write_worker(void *arg) {
 		// get chunk data from master
 //		start = monotonic_seconds();
 		wrstatus = fs_writechunk(ind->inode,chindx,(canmodmtime?CHUNKOPFLAG_CANMODTIME:0)|(continueop?CHUNKOPFLAG_CONTINUEOP:0),&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
-		if (wrstatus!=STATUS_OK) {
-			if (wrstatus!=ERROR_LOCKED && wrstatus!=ERROR_EAGAIN) {
-				if (wrstatus==ERROR_ENOENT) {
+		if (wrstatus!=MFS_STATUS_OK) {
+			if (wrstatus!=MFS_ERROR_LOCKED && wrstatus!=MFS_ERROR_EAGAIN) {
+				if (wrstatus==MFS_ERROR_ENOENT) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,EBADF,0);
-				} else if (wrstatus==ERROR_QUOTA) {
+				} else if (wrstatus==MFS_ERROR_QUOTA) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
+#ifdef EDQUOT
 					write_job_end(chd,EDQUOT,0);
-				} else if (wrstatus==ERROR_NOSPACE) {
+#else
+					write_job_end(chd,ENOSPC,0);
+#endif
+				} else if (wrstatus==MFS_ERROR_NOSPACE) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,ENOSPC,0);
-				} else if (wrstatus==ERROR_CHUNKLOST) {
+				} else if (wrstatus==MFS_ERROR_CHUNKLOST) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,ENXIO,0);
-				} else if (wrstatus==ERROR_IO) {
+				} else if (wrstatus==MFS_ERROR_IO) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",ind->inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,EIO,0);
 				} else {
@@ -744,9 +757,9 @@ void* write_worker(void *arg) {
 					}
 					chd->trycnt++;
 					if (chd->trycnt>=maxretries) {
-						if (wrstatus==ERROR_NOCHUNKSERVERS) {
+						if (wrstatus==MFS_ERROR_NOCHUNKSERVERS) {
 							write_job_end(chd,ENOSPC,0);
-						} else if (wrstatus==ERROR_CSNOTPRESENT) {
+						} else if (wrstatus==MFS_ERROR_CSNOTPRESENT) {
 							write_job_end(chd,ENXIO,0);
 						} else {
 							write_job_end(chd,EIO,0);
@@ -993,7 +1006,7 @@ void* write_worker(void *arg) {
 		cb = NULL;
 
 		status = 0;
-		wrstatus = STATUS_OK;
+		wrstatus = MFS_STATUS_OK;
 
 		lastrcvd = 0.0;
 		lastsent = 0.0;
@@ -1118,12 +1131,12 @@ void* write_worker(void *arg) {
 							i = writev(fd,siov,2);
 						} else {
 #endif
-							i = write(fd,sendbuff+sent,hdrtosend-sent);
+							i = universal_write(fd,sendbuff+sent,hdrtosend-sent);
 #ifdef HAVE_WRITEV
 						}
 #endif
 					} else {
-						i = write(fd,cschain+(sent-hdrtosend),cschainsize-(sent-hdrtosend));
+						i = universal_write(fd,cschain+(sent-hdrtosend),cschainsize-(sent-hdrtosend));
 					}
 					if (i>=0) {
 						sent+=i;
@@ -1141,10 +1154,10 @@ void* write_worker(void *arg) {
 						siov[1].iov_len = cb->to-cb->from;
 						i = writev(fd,siov,2);
 #else
-						i = write(fd,sendbuff+sent,32-sent);
+						i = universal_write(fd,sendbuff+sent,32-sent);
 #endif
 					} else {
-						i = write(fd,cb->data+cb->from+(sent-32),cb->to-cb->from-(sent-32));
+						i = universal_write(fd,cb->data+cb->from+(sent-32),cb->to-cb->from-(sent-32));
 					}
 					if (i>=0) {
 						sent+=i;
@@ -1154,7 +1167,7 @@ void* write_worker(void *arg) {
 					}
 					break;
 				case 3:
-					i = write(fd,sendbuff+sent,8-sent);
+					i = universal_write(fd,sendbuff+sent,8-sent);
 					if (i>=0) {
 						sent+=i;
 						if (sent==8) {
@@ -1195,7 +1208,7 @@ void* write_worker(void *arg) {
 			donotstayidle = (ind->flushwaiting>0 || ind->status!=0 || ind->chunkscnt>=MAX_SIM_CHUNKS)?1:0;
 			zassert(pthread_mutex_unlock(&(ind->lock)));	// make helgrind happy
 			if (pfd[1].revents&POLLIN) {	// used just to break poll - so just read all data from pipe to empty it
-				i = read(chd->pipe[0],pipebuff,1024);
+				i = universal_read(chd->pipe[0],pipebuff,1024);
 				if (i<0) { // mainly to make happy static code analyzers
 					if (chd->trycnt >= minlogretry) {
 						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: read pipe error: %s (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",ind->inode,chindx,chunkid,version,strerr(errno),waitforstatus,chd->trycnt+1);
@@ -1219,7 +1232,7 @@ void* write_worker(void *arg) {
 				break;
 			}
 			if (pfd[0].revents&POLLIN) {
-				i = read(fd,recvbuff+rcvd,21-rcvd);
+				i = universal_read(fd,recvbuff+rcvd,21-rcvd);
 				if (i==0) { 	// connection reset by peer or read error
 					if (chd->trycnt >= minlogretry) {
 						write_prepare_ip(csstrip,ip);
@@ -1266,7 +1279,7 @@ void* write_worker(void *arg) {
 						status=EIO;
 						break;
 					}
-					if (recstatus!=STATUS_OK) {
+					if (recstatus!=MFS_STATUS_OK) {
 						if (chd->trycnt >= minlogretry) {
 							syslog(LOG_WARNING,"writeworker: write error: %s",mfsstrerr(recstatus));
 						}
@@ -1323,7 +1336,7 @@ void* write_worker(void *arg) {
 			put32bit(&wptr,12);
 			put64bit(&wptr,chunkid);
 			put32bit(&wptr,version);
-			if (write(fd,sendbuff,20)==20) {
+			if (universal_write(fd,sendbuff,20)==20) {
 				conncache_insert(ip,port,fd);
 			} else {
 				tcpclose(fd);
@@ -1346,9 +1359,9 @@ void* write_worker(void *arg) {
 		syslog(LOG_NOTICE,"worker %lu sent %"PRIu32" blocks (%"PRIu32" partial) of chunk %016"PRIX64"_%08"PRIX32", received status for %"PRIu32" blocks (%"PRIu32" lost), bw: %.6lfMB/s ( %"PRIu32" B / %.6lf s ), chain: %s",(unsigned long)arg,nextwriteid-1,partialblocks,chunkid,version,nextwriteid-1-waitforstatus,waitforstatus,(double)bytessent/workingtime,bytessent,workingtime,debugchain);
 #endif
 
-		if (status!=0 || wrstatus!=STATUS_OK) {
-			if (wrstatus!=STATUS_OK) {	// convert MFS status to OS errno
-				if (wrstatus==ERROR_NOSPACE) {
+		if (status!=0 || wrstatus!=MFS_STATUS_OK) {
+			if (wrstatus!=MFS_STATUS_OK) {	// convert MFS status to OS errno
+				if (wrstatus==MFS_ERROR_NOSPACE) {
 					status=ENOSPC;
 				} else {
 					status=EIO;
@@ -1377,11 +1390,11 @@ void* write_worker(void *arg) {
 		if (unbreakable==0) {
 //			for (cnt=0 ; cnt<10 ; cnt++) {
 			westatus = fs_writeend(chunkid,ind->inode,mfleng,canmodmtime?CHUNKOPFLAG_CANMODTIME:0);
-//				if (westatus==ERROR_ENOENT || westatus==ERROR_QUOTA) { // can't change -> do not repeat
+//				if (westatus==MFS_ERROR_ENOENT || westatus==MFS_ERROR_QUOTA) { // can't change -> do not repeat
 //					break;
-//				} else if (westatus!=STATUS_OK) {
+//				} else if (westatus!=MFS_STATUS_OK) {
 //					if (optimeout>0.0 && monotonic_seconds() - opbegin > optimeout) {
-//						westatus = ERROR_EIO;
+//						westatus = MFS_ERROR_EIO;
 //						break;
 //					}
 //					portable_usleep(100000+(10000<<cnt));
@@ -1393,18 +1406,18 @@ void* write_worker(void *arg) {
 //				}
 //			}
 		} else {
-			westatus = STATUS_OK;
+			westatus = MFS_STATUS_OK;
 		}
 
 		if (optimeout>0.0 && monotonic_seconds() - opbegin > optimeout) {
 			write_job_end(chd,EIO,0);
-		} else if (westatus==ERROR_ENOENT) {
+		} else if (westatus==MFS_ERROR_ENOENT) {
 			write_job_end(chd,EBADF,0);
-		} else if (westatus==ERROR_QUOTA) {
+		} else if (westatus==MFS_ERROR_QUOTA) {
 			write_job_end(chd,EDQUOT,0);
-		} else if (westatus==ERROR_IO) {
+		} else if (westatus==MFS_ERROR_IO) {
 			write_job_end(chd,EIO,0);
-		} else if (westatus!=STATUS_OK) {
+		} else if (westatus!=MFS_STATUS_OK) {
 			write_job_end(chd,ENXIO,0);
 		} else {
 			if (status!=0) {
@@ -1550,7 +1563,7 @@ int write_cb_expand(chunkdata *chd,cblock *cb,uint32_t from,uint32_t to,const ui
 		cb->to = to;
 	}
 	if (cb->to-cb->from==MFSBLOCKSIZE && cb->next==NULL && chd->waitingworker==2) {
-		if (write(chd->pipe[1]," ",1)!=1) {
+		if (universal_write(chd->pipe[1]," ",1)!=1) {
 			syslog(LOG_ERR,"can't write to pipe !!!");
 		}
 		chd->waitingworker=0;
@@ -1602,7 +1615,7 @@ int write_block(inodedata *ind,uint32_t chindx,uint16_t pos,uint32_t from,uint32
 		write_test_chunkdata(ind);
 	} else {
 		if (chd->waitingworker) {
-			if (write(chd->pipe[1]," ",1)!=1) {
+			if (universal_write(chd->pipe[1]," ",1)!=1) {
 				syslog(LOG_ERR,"can't write to pipe !!!");
 			}
 			chd->waitingworker=0;
@@ -1733,7 +1746,7 @@ static int write_data_do_flush(inodedata *ind,uint8_t releaseflag) {
 	while (ind->chunkscnt>0) {
 		for (chd = ind->chunks ; chd!=NULL ; chd=chd->next) {
 			if (chd->waitingworker) {
-				if (write(chd->pipe[1]," ",1)!=1) {
+				if (universal_write(chd->pipe[1]," ",1)!=1) {
 					syslog(LOG_ERR,"can't write to pipe !!!");
 				}
 				chd->waitingworker=0;

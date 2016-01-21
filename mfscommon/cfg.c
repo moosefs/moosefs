@@ -25,11 +25,27 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#ifdef WIN32
+#include "portable.h"
+#else
 #include <syslog.h>
+#endif
 
 #include "cfg.h"
 #include "massert.h"
+#ifdef WIN32
+#include <stdarg.h>
+static inline void mfs_arg_syslog(uint8_t level,const char *format,...) {
+	va_list args;
+
+	va_start(args, format);
+	vprintf(format, args);
+	va_end(args);
+	printf("\n");
+}
+#else
 #include "slogger.h"
+#endif
 
 typedef struct paramsstr {
 	char *name;
@@ -173,7 +189,7 @@ void cfg_term(void) {
 }
 
 #define _CONFIG_GEN_FUNCTION(fname,type,convname,format) \
-type cfg_get##fname(const char *name,type def) { \
+type cfg_get##fname(const char *name,const type def) { \
 	paramstr *_cfg_tmp; \
 	for (_cfg_tmp = paramhead ; _cfg_tmp ; _cfg_tmp=_cfg_tmp->next) { \
 		if (strcmp(name,_cfg_tmp->name)==0) { \

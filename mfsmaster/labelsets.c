@@ -51,10 +51,10 @@ static labeldescr labeldescriptions[LABELS];
 
 static inline uint8_t labelset_univ_setdescription(uint8_t labelid,uint8_t descrleng,const uint8_t *description,uint8_t mr) {
 	if (labelid>=LABELS) {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 	if (descrleng>128) {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 	if (labeldescriptions[labelid].description!=NULL) {
 		free(labeldescriptions[labelid].description);
@@ -68,7 +68,7 @@ static inline uint8_t labelset_univ_setdescription(uint8_t labelid,uint8_t descr
 	} else {
 		meta_version_inc();
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 uint8_t labelset_setdescription(uint8_t labelid,uint8_t descrleng,const uint8_t *description) {
@@ -317,11 +317,11 @@ uint8_t labelset_mr_labelset(uint16_t labelsetid,uint8_t create_mode,uint8_t cre
 	uint8_t have_arch_labels;
 	if (labelsetid<FIRSTLABELID || labelsetid>firstneverused) {
 		syslog(LOG_WARNING,"labelset: wrong labelsetid");
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 	if ((labelsets[labelsetid].files+labelsets[labelsetid].directories)!=0) {
 		syslog(LOG_WARNING,"labelset: labelsetid not empty");
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 	if (labelsets[labelsetid].create_labelmasks) {
 		for (i=0 ; i<labelsets[labelsetid].create_labelscnt ; i++) {
@@ -397,7 +397,7 @@ uint8_t labelset_mr_labelset(uint16_t labelsetid,uint8_t create_mode,uint8_t cre
 		firstneverused++;
 	}
 	meta_version_inc();
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 void labelset_incref(uint16_t labelsetid,uint8_t type) {

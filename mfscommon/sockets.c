@@ -22,15 +22,24 @@
 #include "config.h"
 #endif
 
-#include <sys/types.h>
+#ifdef WIN32
+#include "portable.h" // poll wrapper
+//#include <winsock2.h>
+//#include <windows.h>
+#include <Ws2def.h>
+#include <Ws2tcpip.h>
+#include <mstcpip.h>
+#else
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/poll.h>
-#include <sys/time.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#endif
+#include <sys/types.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <inttypes.h>
 #include <string.h>
@@ -93,7 +102,11 @@ static inline int sockaddrfill(struct sockaddr_in *sa,const char *hostname,const
 	}
 
 	if (n>0) {
+#ifdef WIN32
+		r = rand()%n;
+#else
 		r = random()%n;
+#endif
 	} else {
 		r = 0;
 	}
@@ -128,6 +141,7 @@ static inline int sockresolve(const char *hostname,const char *service,uint32_t 
 	return 0;
 }
 
+#ifndef WIN32
 static inline int sockaddrpathfill(struct sockaddr_un *sa,const char *path) {
 	size_t pl;
 	pl = strlen(path);
@@ -140,10 +154,15 @@ static inline int sockaddrpathfill(struct sockaddr_un *sa,const char *path) {
 	sa->sun_path[pl]='\0';
 	return 0;
 }
+#endif
 
 /* ---------- SOCKET UNIVERSAL ----------- */
 
 static inline int socknonblock(int sock) {
+#ifdef WIN32
+	u_long yes = 1;
+	return ioctlsocket(sock, FIONBIO, &yes);
+#else
 #ifdef O_NONBLOCK
 	int flags = fcntl(sock, F_GETFL, 0);
 	if (flags == -1) {
@@ -153,6 +172,7 @@ static inline int socknonblock(int sock) {
 #else
 	int yes = 1;
 	return ioctl(sock, FIONBIO, &yes);
+#endif
 #endif
 }
 
@@ -180,7 +200,23 @@ static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t ms
 	pfd.events = POLLIN;
 	pfd.revents = 0;
 	while (1) {
+#ifdef WIN32
+//		printf("recv data from %u (%u) ... ",sock,leng-rcvd);fflush(stdout);
+		i = recv(sock,((uint8_t*)buff)+rcvd,leng-rcvd,0);
+		if (i<0) {
+			switch (WSAGetLastError()) {
+				case WSAEWOULDBLOCK:
+					errno = EAGAIN;
+					break;
+				case WSAECONNRESET:
+					i=0;
+					break;
+			}
+		}
+//		printf("got status %d %d %s %d\n",i,errno,strerr(errno),WSAGetLastError());fflush(stdout);
+#else
 		i = read(sock,((uint8_t*)buff)+rcvd,leng-rcvd);
+#endif
 		if (i==0) {
 			return rcvd;
 		}
@@ -237,7 +273,23 @@ static inline int32_t streamtowrite(int sock,const void *buff,uint32_t leng,uint
 	pfd.events = POLLOUT;
 	pfd.revents = 0;
 	while (1) {
+#ifdef WIN32
+//		printf("send data to %u (%u) ... ",sock,leng-sent);fflush(stdout);
+		i = send(sock,((uint8_t*)buff)+sent,leng-sent,0);
+		if (i<0) {
+			switch (WSAGetLastError()) {
+				case WSAEWOULDBLOCK:
+					errno = EAGAIN;
+					break;
+				case WSAECONNRESET:
+					i=0;
+					break;
+			}
+		}
+//		printf("got status %d %d %s %d\n",i,errno,strerr(errno),WSAGetLastError());fflush(stdout);
+#else
 		i = write(sock,((uint8_t*)buff)+sent,leng-sent);
+#endif
 		if (i==0) {
 			return 0;
 		}
@@ -293,7 +345,21 @@ static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_
 	pfd[1].revents = 0;
 	while (1) {
 		if (rcvd<leng) {
+#ifdef WIN32
+			i = recv(srcsock,((uint8_t*)buff)+rcvd,leng-rcvd,0);
+			if (i<0) {
+				switch (WSAGetLastError()) {
+					case WSAEWOULDBLOCK:
+						errno = EAGAIN;
+						break;
+					case WSAECONNRESET:
+						i=0;
+						break;
+				}
+			}
+#else
 			i = read(srcsock,((uint8_t*)buff)+rcvd,leng-rcvd);
+#endif
 			if (i==0) {
 				leng = rcvd;
 			}
@@ -307,7 +373,21 @@ static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_
 			leng = rcvd;
 		}
 		if (rcvd>sent) {
+#ifdef WIN32
+			i = send(dstsock,((uint8_t*)buff)+sent,rcvd-sent,0);
+			if (i<0) {
+				switch (WSAGetLastError()) {
+					case WSAEWOULDBLOCK:
+						errno = EAGAIN;
+						break;
+					case WSAECONNRESET:
+						i=0;
+						break;
+				}
+			}
+#else
 			i = write(dstsock,((uint8_t*)buff)+sent,rcvd-sent);
+#endif
 			if (i>0) {
 			       sent += i;
 			} else if (ERRNO_ERROR) {
@@ -602,6 +682,11 @@ int tcpnumtoconnect(int sock,uint32_t ip,uint16_t port,uint32_t msecto) {
 	if (connect(sock,(struct sockaddr *)&sa,sizeof(struct sockaddr_in)) >= 0) {
 		return 0;
 	}
+#ifdef WIN32
+	if (WSAGetLastError()==WSAEWOULDBLOCK) {
+		errno = EINPROGRESS;
+	}
+#endif
 	if (errno == EINPROGRESS) {
 		double s,c;
 		uint32_t msecpassed;
@@ -698,8 +783,13 @@ int tcpgetmyaddr(int sock,uint32_t *ip,uint16_t *port) {
 
 int tcpclose(int sock) {
 	// make sure that all pending data in the output buffer will be sent
+#ifdef WIN32
+	shutdown(sock,SD_SEND);
+	return closesocket(sock);
+#else
 	shutdown(sock,SHUT_WR);
 	return close(sock);
+#endif
 }
 
 int32_t tcptoread(int sock,void *buff,uint32_t leng,uint32_t msecto) {
@@ -811,10 +901,16 @@ int udpread(int sock,uint32_t *ip,uint16_t *port,void *buff,uint16_t leng) {
 }
 
 int udpclose(int sock) {
+#ifdef WIN32
+	return closesocket(sock);
+#else
 	return close(sock);
+#endif
 }
 
 /* ----------------- UNIX ---------------- */
+
+#ifndef WIN32
 
 int unixsocket(void) {
 	return socket(AF_UNIX,SOCK_STREAM,0);
@@ -926,3 +1022,4 @@ int unixaccept(int lsock) {
 	return streamaccept(lsock);
 }
 
+#endif

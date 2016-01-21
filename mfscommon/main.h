@@ -21,16 +21,9 @@
 #ifndef _MAIN_H_
 #define _MAIN_H_
 
-#if defined(_THREAD_SAFE) || defined(_REENTRANT) || defined(_USE_PTHREADS)
-#  define USE_PTHREADS 1
-#endif
-
 #include <poll.h>
 #include <sys/types.h>
 #include <inttypes.h>
-#ifdef USE_PTHREADS
-#include <pthread.h>
-#endif
 
 void main_destruct_register (void (*fun)(void));
 void main_canexit_register (int (*fun)(void));
@@ -48,9 +41,5 @@ int main_time_change(void *x,uint32_t seconds,uint32_t offset);
 void main_exit(void);
 uint32_t main_time(void);
 void main_keep_alive(void);
-#ifdef USE_PTHREADS
-int main_thread_create(pthread_t *th,const pthread_attr_t *attr,void *(*fn)(void *),void *arg);
-int main_minthread_create(pthread_t *th,uint8_t detached,void *(*fn)(void *),void *arg);
-#endif
 
 #endif

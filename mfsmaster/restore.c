@@ -517,7 +517,7 @@ int do_labelset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 			EAT(ptr,filename,lv,',');
 			GETU16(arch_delay,ptr);
 			if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9 || arch_labelscnt==0 || arch_labelscnt>9) {
-				return ERROR_EINVAL;
+				return MFS_ERROR_EINVAL;
 			}
 			for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
 				EAT(ptr,filename,lv,',');
@@ -535,7 +535,7 @@ int do_labelset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 			GETU8(create_mode,ptr);
 			arch_delay = 0;
 			if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9) {
-				return ERROR_EINVAL;
+				return MFS_ERROR_EINVAL;
 			}
 			arch_labelscnt = keep_labelscnt;
 			for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
@@ -551,7 +551,7 @@ int do_labelset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	} else {
 		GETU8(create_labelscnt,ptr);
 		if (create_labelscnt==0 || create_labelscnt>9) {
-			return ERROR_EINVAL;
+			return MFS_ERROR_EINVAL;
 		}
 		keep_labelscnt = create_labelscnt;
 		arch_labelscnt = create_labelscnt;
@@ -1025,7 +1025,7 @@ int do_setacl(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETDATA(aclblob,aclblobleng,aclblobsize,ptr,filename,lv,')');
 	EAT(ptr,filename,lv,')');
 	if (aclblobleng!=6U*(namedusers+namedgroups)) {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 	return fs_mr_setacl(ts,inode,mode,changectime,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,aclblob);
 }
@@ -1066,7 +1066,7 @@ int do_snapshot(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 		GETU32(umask,ptr);
 		EAT(ptr,filename,lv,')');
 		if (gids*4!=gidleng) {
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 		}
 		return fs_mr_snapshot(ts,inode,parent,strlen((char*)name),name,smode,sesflags,uid,gids,(uint32_t*)gid,umask);
 	} else {
@@ -1174,9 +1174,9 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 	uint32_t ts;
 	uint32_t hc;
 	int status;
-//	char* errormsgs[]={ ERROR_STRINGS };
+//	char* errormsgs[]={ MFS_ERROR_STRINGS };
 
-	status = ERROR_MISMATCH;
+	status = MFS_ERROR_MISMATCH;
 	ptr = line;
 
 //	EAT(ptr,filename,lv,':');
@@ -1589,7 +1589,7 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
 	}
 #endif
-//	if (status>STATUS_OK) {
+//	if (status>MFS_STATUS_OK) {
 //		mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": error: %d (%s)\n",filename,lv,status,errormsgs[status]);
 //	}
 	return status;
@@ -1606,7 +1606,7 @@ int restore_net(uint64_t lv,const char *ptr) {
 		syslog(LOG_WARNING,"desync - operation (%s) parse error",ptr);
 		return -1;
 	}
-	if (status!=STATUS_OK) {
+	if (status!=MFS_STATUS_OK) {
 		syslog(LOG_WARNING,"desync - operation (%s) error: %d (%s)",ptr,status,mfsstrerr(status));
 		return -1;
 	}

@@ -40,7 +40,7 @@
 #else
 #include "portable.h"
 #include "mastercomm.h"
-#include "main.h"
+#include "lwthread.h"
 #include "massert.h"
 #include "strerr.h"
 // #include "sustained_stats.h"
@@ -130,7 +130,7 @@ void sinodes_end(void) {
 }
 
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__NetBSD__)
 #include <dirent.h>
 #elif defined(__APPLE__)
 #include <sys/types.h>
@@ -150,7 +150,7 @@ void sinodes_pid_inodes(pid_t pid) {
 	uint64_t inode;
 //	printf("pid: %d\n",ki->ki_pid);
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__NetBSD__)
         char path[100];
 	struct stat st;
 	snprintf(path,100,"/proc/%lld/cwd",(long long int)pid);
@@ -251,7 +251,7 @@ void sinodes_pid_inodes(pid_t pid) {
 }
 
 void sinodes_all_pids(void) {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__NetBSD__)
 	DIR *dd;
 	struct dirent *de,*destorage;
 	const char *np;
@@ -457,6 +457,6 @@ void sinodes_init(const char *mp) {
 	term = 0;
 	zassert(pthread_mutex_unlock(&glock));
 #endif
-	main_minthread_create(&clthread,0,sinodes_scanthread,strdup(mp));
+	lwt_minthread_create(&clthread,0,sinodes_scanthread,strdup(mp));
 }
 #endif

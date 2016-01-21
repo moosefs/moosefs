@@ -1340,9 +1340,9 @@ uint8_t meta_mr_setmetaid(uint64_t newmetaid) {
 	if (metaid==0 || metaid==newmetaid) {
 		metaversion++;
 		metaid = newmetaid;
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	} else {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 }
 

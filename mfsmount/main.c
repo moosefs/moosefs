@@ -175,6 +175,7 @@ struct mfsopts {
 	int nostdmountoptions;
 	int meta;
 	int debug;
+	int flattrash;
 	int delayedinit;
 	int mkdircopysgid;
 	char *sugidclearmodestr;
@@ -261,6 +262,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfslogretry=%u", logretry, 0),
 	MFS_OPT("mfsdebug", debug, 1),
 	MFS_OPT("mfsmeta", meta, 1),
+	MFS_OPT("mfsflattrash", flattrash, 1),
 	MFS_OPT("mfsdelayedinit", delayedinit, 1),
 	MFS_OPT("mfsdonotrememberpassword", donotrememberpassword, 1),
 	MFS_OPT("mfscachefiles", cachefiles, 1),
@@ -322,6 +324,7 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfscfgfile=CFGFILE       load some mount options from external file (if not specified then use default file: " ETC_PATH "/mfs/mfsmount.cfg or " ETC_PATH "/mfsmount.cfg)\n");
 	fprintf(stderr,"    -o mfsdebug                 print some debugging information\n");
 	fprintf(stderr,"    -o mfsmeta                  mount meta filesystem (trash etc.)\n");
+	fprintf(stderr,"    -o mfsflattrash             use flat trash structure in meta\n");
 	fprintf(stderr,"    -o mfsdelayedinit           connection with master is done in background - with this option mount can be run without network (good for being run from fstab / init scripts etc.)\n");
 #if defined(__linux__)
 	fprintf(stderr,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 1)\n");
@@ -855,7 +858,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	}
 
 	if (mfsopts.meta) {
-		mfs_meta_init(mfsopts.debug,mfsopts.entrycacheto,mfsopts.attrcacheto);
+		mfs_meta_init(mfsopts.debug,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.flattrash);
 		se = fuse_lowlevel_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), (void*)piped);
 	} else {
 		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
@@ -1150,6 +1153,7 @@ int main(int argc, char *argv[]) {
 #endif
 	mfsopts.nostdmountoptions = 0;
 	mfsopts.meta = 0;
+	mfsopts.flattrash = 0;
 	mfsopts.debug = 0;
 	mfsopts.delayedinit = 0;
 #ifdef __linux__

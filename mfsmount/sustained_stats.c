@@ -31,7 +31,7 @@
 #include <pthread.h>
 
 #include "MFSCommunication.h"
-#include "main.h"
+#include "lwthread.h"
 #include "massert.h"
 #include "portable.h"
 #include "clocks.h"
@@ -136,8 +136,8 @@ int sstats_get(uint32_t inode,uint8_t attr[35],uint8_t forceok) {
 //			sustained = isc->sustained;
 			isc->lastrefresh = monotonic_seconds();
 			zassert(pthread_mutex_unlock(locktab+hash));
-//			return (sustained || forceok)?STATUS_OK:ERROR_ENOENT;
-			return STATUS_OK;
+//			return (sustained || forceok)?MFS_STATUS_OK:MFS_ERROR_ENOENT;
+			return MFS_STATUS_OK;
 		}
 	}
 	if (forceok) {
@@ -153,7 +153,7 @@ int sstats_get(uint32_t inode,uint8_t attr[35],uint8_t forceok) {
 		ishash[hash] = isc;
 	}
 	zassert(pthread_mutex_unlock(locktab+hash));
-	return ERROR_ENOENT;
+	return MFS_ERROR_ENOENT;
 }
 
 void sstats_set(uint32_t inode,const uint8_t attr[35],uint8_t createflag) {
@@ -267,5 +267,5 @@ void sstats_init(void) {
 	term = 0;
 	zassert(pthread_mutex_unlock(&glock));
 #endif
-	main_minthread_create(&clthread,0,sstats_thread,NULL);
+	lwt_minthread_create(&clthread,0,sstats_thread,NULL);
 }

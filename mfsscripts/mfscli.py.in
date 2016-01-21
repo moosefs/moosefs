@@ -2185,7 +2185,7 @@ if cgimode:
 	print("""<div id="header">""")
 	print("""<table class="HDR" cellpadding="0" cellspacing="0" border="0">""")
 	print("""<tr>""")
-	print("""<td class="LOGO"><a href="http://www.moosefs.org"><img src="/logomini.png" alt="logo" style="border:0;width:123px;height:47px" /></a></td>""")
+	print("""<td class="LOGO"><a href="http://moosefs.com"><img src="/logomini.png" alt="logo" style="border:0;width:123px;height:47px" /></a></td>""")
 	print("""<td class="MENU"><table class="MENU" cellspacing="0">""")
 	print("""<tr>""")
 	last="U"
@@ -2633,7 +2633,7 @@ if "IN" in sectionset:
 			print_exception()
 
 
-	if "IG" in sectionsubset:
+	if "IG" in sectionsubset and masterconn!=None:
 		try:
 			if needseparator:
 				if cgimode:
@@ -2934,7 +2934,7 @@ if "IN" in sectionset:
 		except Exception:
 			print_exception()
 
-	if "MU" in sectionsubset and masterconn.version_at_least(1,7,16):
+	if "MU" in sectionsubset and masterconn!=None and masterconn.version_at_least(1,7,16):
 		if needseparator:
 			if cgimode:
 				print("""<br/>""")

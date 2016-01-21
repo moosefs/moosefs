@@ -147,7 +147,11 @@ uint32_t mycrc32(uint32_t crc,const uint8_t *block,uint32_t leng) {
 }
 #endif
 	CRC_REORDER;
-	while (leng && ((unsigned long)block & 7)) {
+#ifdef WIN32
+	while (leng && ((unsigned long long int)block & 7)) {
+#else
+	while (leng && ((unsigned long int)block & 7)) {
+#endif
 		CRC_ONE_BYTE;
 		leng--;
 	}

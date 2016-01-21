@@ -987,7 +987,7 @@ void chunk_emergency_increase_version(chunk *c) {
 		c->version++;
 		changelog("%"PRIu32"|INCVERSION(%"PRIu64")",(uint32_t)main_time(),c->chunkid);
 	} else {
-		matoclserv_chunk_status(c->chunkid,ERROR_CHUNKLOST);
+		matoclserv_chunk_status(c->chunkid,MFS_ERROR_CHUNKLOST);
 	}
 }
 
@@ -1051,7 +1051,7 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 				if (validcopies) {
 					chunk_emergency_increase_version(c);
 				} else {
-					matoclserv_chunk_status(c->chunkid,ERROR_NOTDONE);
+					matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOTDONE);
 					c->operation = NONE;
 				}
 			}
@@ -1069,11 +1069,11 @@ int chunk_mr_increase_version(uint64_t chunkid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	c->version++;
 	meta_version_inc();
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 /* --- */
@@ -1112,15 +1112,15 @@ int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid) {
 	uint8_t oldlsetid;
 
 	if (prevlsetid==newlsetid) {
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	}
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	if (c->fcount==0) {
 		syslog(LOG_WARNING,"serious structure inconsistency: (chunkid:%016"PRIX64")",c->chunkid);
-		return ERROR_CHUNKLOST;	// ERROR_STRUCTURE
+		return MFS_ERROR_CHUNKLOST;	// MFS_ERROR_STRUCTURE
 	}
 	oldlsetid = c->lsetid;
 	if (c->fcount==1) {
@@ -1159,7 +1159,7 @@ int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid) {
 	} else {
 		chunk_priority_queue_check(c,0);
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 static inline int chunk_delete_file_int(chunk *c,uint8_t lsetid,uint32_t delete_timeout) {
@@ -1167,7 +1167,7 @@ static inline int chunk_delete_file_int(chunk *c,uint8_t lsetid,uint32_t delete_
 
 	if (c->fcount==0) {
 		syslog(LOG_WARNING,"serious structure inconsistency: (chunkid:%016"PRIX64")",c->chunkid);
-		return ERROR_CHUNKLOST;	// ERROR_STRUCTURE
+		return MFS_ERROR_CHUNKLOST;	// MFS_ERROR_STRUCTURE
 	}
 	massert(lsetid>0,"wrong labels set");
 	oldlsetid = c->lsetid;
@@ -1194,7 +1194,7 @@ static inline int chunk_delete_file_int(chunk *c,uint8_t lsetid,uint32_t delete_
 	if (c->fcount==0 && delete_timeout>0) {
 		c->lockedto = (uint32_t)main_time()+delete_timeout;
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 static inline int chunk_add_file_int(chunk *c,uint8_t lsetid) {
@@ -1240,14 +1240,14 @@ static inline int chunk_add_file_int(chunk *c,uint8_t lsetid) {
 	if (oldlsetid!=c->lsetid) {
 		chunk_state_change(oldlsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_delete_file(uint64_t chunkid,uint8_t lsetid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	return chunk_delete_file_int(c,lsetid,0);
 }
@@ -1256,7 +1256,7 @@ int chunk_add_file(uint64_t chunkid,uint8_t lsetid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	return chunk_add_file_int(c,lsetid);
 }
@@ -1293,24 +1293,24 @@ int chunk_unlock(uint64_t chunkid) {
 
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	c->lockedto = 0;
 	chunk_write_counters(c,0);
 	matoclserv_chunk_unlocked(c->chunkid,c);
 	chunk_priority_queue_check(c,1);
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_mr_unlock(uint64_t chunkid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	c->lockedto = 0;
 	chunk_write_counters(c,0);
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies) {
@@ -1318,27 +1318,27 @@ int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies) {
 	*vcopies = 0;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	*vcopies = c->allvalidcopies;
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_get_archflag(uint64_t chunkid,uint8_t *archflag) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	*archflag = c->archflag;
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_univ_archflag(uint64_t chunkid,uint8_t archflag,uint32_t *archflagchanged) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	if (archflag != c->archflag) {
 		chunk_state_change(c->lsetid,c->lsetid,c->archflag,archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
@@ -1346,7 +1346,7 @@ int chunk_univ_archflag(uint64_t chunkid,uint8_t archflag,uint32_t *archflagchan
 		chunk_priority_queue_check(c,1);
 		(*archflagchanged)++;
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 // CHUNK_FLOOP_NOTFOUND
@@ -1399,15 +1399,15 @@ int chunk_read_check(uint32_t ts,uint64_t chunkid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	if (c->lockedto>=ts) {
-		return ERROR_LOCKED;
+		return MFS_ERROR_LOCKED;
 	}
 	if (c->operation != NONE) {
-		return ERROR_CHUNKBUSY;
+		return MFS_ERROR_CHUNKBUSY;
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
@@ -1433,14 +1433,14 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 			servcount = chunk_creation_servers(csids,lsetid,&overloaded);
 			if (servcount==0) {
 				if (overloaded) {
-					return ERROR_EAGAIN;
+					return MFS_ERROR_EAGAIN;
 				} else {
 					uint16_t scount;
 					scount = matocsserv_servers_count();
 					if (scount>0 && csstable) {
-						return ERROR_NOSPACE;
+						return MFS_ERROR_NOSPACE;
 					} else {
-						return ERROR_NOCHUNKSERVERS;
+						return MFS_ERROR_NOCHUNKSERVERS;
 					}
 				}
 			}
@@ -1478,7 +1478,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 			*nchunkid = c->chunkid;
 		} else {
 			if (*nchunkid != nextchunkid) {
-				return ERROR_MISMATCH;
+				return MFS_ERROR_MISMATCH;
 			}
 			c = chunk_new(nextchunkid++);
 			c->version = 1;
@@ -1493,17 +1493,17 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 			}
 		}
 		if (oc==NULL) {
-			return ERROR_NOCHUNK;
+			return MFS_ERROR_NOCHUNK;
 		}
 		if (mr==0 && oc->lockedto>=ts && continueop==0) {
-			return ERROR_LOCKED;
+			return MFS_ERROR_LOCKED;
 		}
 		if (oc->fcount==1) {
 			c = oc;
 			if (mr==0) {
 				*nchunkid = ochunkid;
 				if (c->operation!=NONE) {
-					return ERROR_CHUNKBUSY;
+					return MFS_ERROR_CHUNKBUSY;
 				}
 				if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
 					vc = 0;
@@ -1513,7 +1513,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 						}
 					}
 					if (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
-						return ERROR_EAGAIN; // just try again later
+						return MFS_ERROR_EAGAIN; // just try again later
 					}
 				}
 				if (c->needverincrease) {
@@ -1538,9 +1538,9 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 						*opflag = 1;
 					} else {
 						if (csstable) {
-							return ERROR_CHUNKLOST;
+							return MFS_ERROR_CHUNKLOST;
 						} else {
-							return ERROR_CSNOTPRESENT;
+							return MFS_ERROR_CSNOTPRESENT;
 						}
 					}
 				} else {
@@ -1548,7 +1548,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 				}
 			} else {
 				if (*nchunkid != ochunkid) {
-					return ERROR_MISMATCH;
+					return MFS_ERROR_MISMATCH;
 				}
 				if (*opflag) {
 					c->version++;
@@ -1561,11 +1561,11 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 				} else {
 					printf("serious structure inconsistency: (chunkid:%016"PRIX64")\n",ochunkid);
 				}
-				return ERROR_CHUNKLOST;	// ERROR_STRUCTURE
+				return MFS_ERROR_CHUNKLOST;	// MFS_ERROR_STRUCTURE
 			}
 			if (mr==0) {
 				if (oc->operation!=NONE) {
-					return ERROR_CHUNKBUSY;
+					return MFS_ERROR_CHUNKBUSY;
 				}
 				if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
 					vc = 0;
@@ -1575,7 +1575,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 						}
 					}
 					if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
-						return ERROR_EAGAIN; // just try again later
+						return MFS_ERROR_EAGAIN; // just try again later
 					}
 				}
 				i=0;
@@ -1610,14 +1610,14 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 					*opflag=1;
 				} else {
 					if (csstable) {
-						return ERROR_CHUNKLOST;
+						return MFS_ERROR_CHUNKLOST;
 					} else {
-						return ERROR_CSNOTPRESENT;
+						return MFS_ERROR_CSNOTPRESENT;
 					}
 				}
 			} else {
 				if (*nchunkid != nextchunkid) {
-					return ERROR_MISMATCH;
+					return MFS_ERROR_MISMATCH;
 				}
 				c = chunk_new(nextchunkid++);
 				c->version = 1;
@@ -1630,7 +1630,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 
 	c->lockedto = ts+LOCKTIMEOUT;
 	chunk_write_counters(c,1);
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
@@ -1663,17 +1663,17 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 	}
 
 	if (oc==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	if (mr==0 && oc->lockedto>=ts) {
-		return ERROR_LOCKED;
+		return MFS_ERROR_LOCKED;
 	}
 	if (oc->fcount==1) {
 		c = oc;
 		if (mr==0) {
 			*nchunkid = ochunkid;
 			if (c->operation!=NONE) {
-				return ERROR_CHUNKBUSY;
+				return MFS_ERROR_CHUNKBUSY;
 			}
 			if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
 				vc = 0;
@@ -1683,7 +1683,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 					}
 				}
 				if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
-					return ERROR_EAGAIN; // just try again later
+					return MFS_ERROR_EAGAIN; // just try again later
 				}
 			}
 			i=0;
@@ -1706,14 +1706,14 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 				c->version++;
 			} else {
 				if (csstable) {
-					return ERROR_CHUNKLOST;
+					return MFS_ERROR_CHUNKLOST;
 				} else {
-					return ERROR_CSNOTPRESENT;
+					return MFS_ERROR_CSNOTPRESENT;
 				}
 			}
 		} else {
 			if (*nchunkid != ochunkid) {
-				return ERROR_MISMATCH;
+				return MFS_ERROR_MISMATCH;
 			}
 			c->version++;
 		}
@@ -1724,11 +1724,11 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			} else {
 				printf("serious structure inconsistency: (chunkid:%016"PRIX64")\n",ochunkid);
 			}
-			return ERROR_CHUNKLOST;	// ERROR_STRUCTURE
+			return MFS_ERROR_CHUNKLOST;	// MFS_ERROR_STRUCTURE
 		}
 		if (mr==0) {
 			if (oc->operation!=NONE) {
-				return ERROR_CHUNKBUSY;
+				return MFS_ERROR_CHUNKBUSY;
 			}
 			if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
 				vc = 0;
@@ -1738,7 +1738,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 					}
 				}
 				if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
-					return ERROR_EAGAIN; // just try again later
+					return MFS_ERROR_EAGAIN; // just try again later
 				}
 			}
 			i=0;
@@ -1772,14 +1772,14 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 				*nchunkid = c->chunkid;
 			} else {
 				if (csstable) {
-					return ERROR_CHUNKLOST;
+					return MFS_ERROR_CHUNKLOST;
 				} else {
-					return ERROR_CSNOTPRESENT;
+					return MFS_ERROR_CSNOTPRESENT;
 				}
 			}
 		} else {
 			if (*nchunkid != nextchunkid) {
-				return ERROR_MISMATCH;
+				return MFS_ERROR_MISMATCH;
 			}
 			c = chunk_new(nextchunkid++);
 			c->version = 1;
@@ -1790,7 +1790,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 	}
 
 	c->lockedto=ts+LOCKTIMEOUT;
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid) {
@@ -1870,10 +1870,10 @@ int chunk_mr_set_version(uint64_t chunkid,uint32_t version) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	c->version = version;
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 /* ---- */
@@ -1912,7 +1912,7 @@ uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip
 
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	*version = c->version;
 	cnt=0;
@@ -1928,9 +1928,9 @@ uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip
 	if (cnt==0) {
 		*count = 0;
 		if (chunk_counters_in_progress()==0 && csdb_have_all_servers()) {
-			return ERROR_CHUNKLOST; // this is permanent state - chunk is definitely lost
+			return MFS_ERROR_CHUNKLOST; // this is permanent state - chunk is definitely lost
 		} else {
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
 	qsort(lstab,cnt,sizeof(locsort),chunk_locsort_cmp);
@@ -1946,7 +1946,7 @@ uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip
 		}
 	}
 	*count = cnt;
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 uint8_t chunk_get_version_and_copies(uint64_t chunkid,uint32_t *version,uint8_t *count,uint8_t cs_data[100*7]) {
@@ -1959,7 +1959,7 @@ uint8_t chunk_get_version_and_copies(uint64_t chunkid,uint32_t *version,uint8_t 
 
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	*version = c->version;
 	cnt=0;
@@ -1986,7 +1986,7 @@ uint8_t chunk_get_version_and_copies(uint64_t chunkid,uint32_t *version,uint8_t 
 		}
 	}
 	*count = cnt;
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 /* ---- */
@@ -1995,9 +1995,9 @@ int chunk_mr_nextchunkid(uint64_t nchunkid) {
 	if (nchunkid>nextchunkid) {
 		nextchunkid=nchunkid;
 		meta_version_inc();
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	} else {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 }
 
@@ -2005,10 +2005,10 @@ int chunk_mr_chunkadd(uint64_t chunkid,uint32_t version,uint32_t lockedto) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c) {
-		return ERROR_CHUNKEXIST;
+		return MFS_ERROR_CHUNKEXIST;
 	}
 	if (chunkid>nextchunkid+UINT64_C(1000000000)) {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 	if (chunkid>=nextchunkid) {
 		nextchunkid=chunkid+1;
@@ -2017,27 +2017,27 @@ int chunk_mr_chunkadd(uint64_t chunkid,uint32_t version,uint32_t lockedto) {
 	c->version = version;
 	c->lockedto = lockedto;
 	meta_version_inc();
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int chunk_mr_chunkdel(uint64_t chunkid,uint32_t version) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
-		return ERROR_NOCHUNK;
+		return MFS_ERROR_NOCHUNK;
 	}
 	if (c->version != version) {
-		return ERROR_WRONGVERSION;
+		return MFS_ERROR_WRONGVERSION;
 	}
 	if (c->fcount!=0) {
-		return ERROR_ACTIVE;
+		return MFS_ERROR_ACTIVE;
 	}
 	if (c->slisthead!=NULL) {
-		return ERROR_CHUNKBUSY;
+		return MFS_ERROR_CHUNKBUSY;
 	}
 	chunk_delete(c);
 	meta_version_inc();
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 static inline void chunk_mfr_state_check(chunk *c) {
@@ -2379,7 +2379,7 @@ void chunk_got_delete_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
 	if (c==NULL) {
 		return ;
 	}
-	if (status!=STATUS_OK && status!=ERROR_NOCHUNK) { // treat here ERROR_NOCHUNK as ok
+	if (status!=MFS_STATUS_OK && status!=MFS_ERROR_NOCHUNK) { // treat here MFS_ERROR_NOCHUNK as ok
 		return ;
 	}
 	st = &(c->slisthead);
@@ -2550,7 +2550,7 @@ void chunk_operation_status(chunk *c,uint8_t status,uint16_t csid) {
 			if (c->interrupted) {
 				chunk_emergency_increase_version(c);
 			} else {
-				matoclserv_chunk_status(c->chunkid,STATUS_OK);
+				matoclserv_chunk_status(c->chunkid,MFS_STATUS_OK);
 				c->operation = NONE;
 				c->needverincrease = 0;
 				if (c->lockedto==0) {
@@ -2558,7 +2558,7 @@ void chunk_operation_status(chunk *c,uint8_t status,uint16_t csid) {
 				}
 			}
 		} else {
-			matoclserv_chunk_status(c->chunkid,ERROR_NOTDONE);
+			matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOTDONE);
 			c->operation = NONE;
 		}
 	}

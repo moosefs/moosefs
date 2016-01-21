@@ -21,8 +21,12 @@
 #if defined(HAVE_CONFIG_H)
 #  include "config.h"
 #endif
+
 #include <sys/types.h>
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
+#  if defined(__NetBSD__)
+#    define _KMEMUSER
+#  endif
 #  include <sys/sysctl.h>
 #endif
 #if defined(__FreeBSD__)
@@ -50,6 +54,10 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 // /proc/<PID>/status
 // line:
 // Groups: <GID1>  <GID2> <GID3> ...
+//
+// NetBSD - supplementary groups are in file:
+// /proc/<PID>/status
+// as comma separated list of gids at end of (single) line.
 	char proc_filename[50];
 	char linebuff[4096];
 	char *ptr;
@@ -157,7 +165,7 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 		}
 		return gids;
 	}
-#elif defined(__APPLE__) || defined(__FreeBSD__)
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
 // BSD-like - supplementary groups can be obtained from sysctl:
 // kern.proc.pid.<PID>
 	int mibpath[4];
@@ -178,7 +186,7 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 	kplen = sizeof(kp);
 	memset(&kp,0,sizeof(kp));
 	if (sysctl(mibpath,4,&kp,&kplen,NULL,0) == 0) {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__NetBSD__)
 		gcount = kp.kp_eproc.e_ucred.cr_ngroups;
 		gids = 1;
 		for (n=0 ; n<gcount ; n++) {
@@ -437,6 +445,9 @@ void groups_init(double _to,int dm) {
 }
 
 /*
+#include <stdio.h>
+#include "strerr.h"
+
 int main(int argc,char *argv[]) {
 	groups *g;
 	pid_t pid;
@@ -444,6 +455,7 @@ int main(int argc,char *argv[]) {
 	gid_t gid;
 	uint32_t n;
 
+	strerr_init();
 	if (argc==2) {
 		pid = strtoul(argv[1],NULL,10);
 		uid = getuid();

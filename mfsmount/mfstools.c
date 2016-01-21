@@ -3039,7 +3039,7 @@ int append_file(const char *fname,const char *afname) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
 		free(buff);
 		return -1;
-	} else if (*rptr!=STATUS_OK) {
+	} else if (*rptr!=MFS_STATUS_OK) {
 		printf("%s: %s\n",fname,mfsstrerr(*rptr));
 		free(buff);
 		return -1;

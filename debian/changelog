@@ -1,3 +1,22 @@
+moosefs (3.0.71-1) unstable; urgency=medium
+
+  * (master) fixed emptying trash issue (intr. in 3.0.64)
+  * (master) fixed possible segfault in chunkservers database (intr. in 3.0.67)
+  * (master) changed trash part choice from nondeterministic to deterministic
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 21 Jan 2016 12:00:00 +0100
+
+moosefs (3.0.70-1) unstable; urgency=medium
+
+  * (cgi+cli) fixed displaying info when there are no active masters (intr. in
+    3.0.67)
+  * (mount+common) refactoring code to be Windows ready
+  * (mount) added option 'mfsflattrash' (makes trash look like before version
+    3.0.64)
+  * (mount) added fixes for NetBSD (patch contributed by Tom Ivar Helbekkmo)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 19 Jan 2016 12:00:00 +0100
+
 moosefs (3.0.69-1) unstable; urgency=medium
 
   * (mount) fixed rare case when request memory was used after being freed.

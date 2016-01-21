@@ -128,14 +128,14 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 	uint32_t hash,ihash;
 
 	if (avleng>MFS_XATTR_SIZE_MAX) {
-		return ERROR_ERANGE;
+		return MFS_ERROR_ERANGE;
 	}
 #if MFS_XATTR_NAME_MAX<255
 	if (anleng==0U || anleng>MFS_XATTR_NAME_MAX) {
 #else
 	if (anleng==0U) {
 #endif
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 
 	ihash = xattr_inode_hash_fn(inode);
@@ -146,7 +146,7 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 		if (xa->inode==inode && xa->anleng==anleng && memcmp(xa->attrname,attrname,anleng)==0) {
 			passert(ih);
 			if (mode==MFS_XATTR_CREATE_ONLY) { // create only
-				return ERROR_EEXIST;
+				return MFS_ERROR_EEXIST;
 			}
 			if (mode==MFS_XATTR_REMOVE) { // remove
 				ih->anleng -= anleng+1U;
@@ -158,7 +158,7 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 					}
 					xattr_removeinode(inode);
 				}
-				return STATUS_OK;
+				return MFS_STATUS_OK;
 			}
 			ih->avleng -= xa->avleng;
 			if (xa->attrvalue) {
@@ -173,16 +173,16 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 			}
 			xa->avleng = avleng;
 			ih->avleng += avleng;
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
 
 	if (mode==MFS_XATTR_REPLACE_ONLY || mode==MFS_XATTR_REMOVE) {
-		return ERROR_ENOATTR;
+		return MFS_ERROR_ENOATTR;
 	}
 
 	if (ih && ih->anleng+anleng+1>MFS_XATTR_LIST_MAX) {
-		return ERROR_ERANGE;
+		return MFS_ERROR_ERANGE;
 	}
 
 	xa = malloc(sizeof(xattr_data_entry));
@@ -229,7 +229,7 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 		xattr_inode_hash[ihash] = ih;
 		fs_set_xattrflag(inode);
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 uint8_t xattr_getattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint32_t *avleng,uint8_t **attrvalue) {
@@ -238,14 +238,14 @@ uint8_t xattr_getattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 	for (xa = xattr_data_hash[xattr_data_hash_fn(inode,anleng,attrname)] ; xa ; xa=xa->next) {
 		if (xa->inode==inode && xa->anleng==anleng && memcmp(xa->attrname,attrname,anleng)==0) {
 			if (xa->avleng>MFS_XATTR_SIZE_MAX) {
-				return ERROR_ERANGE;
+				return MFS_ERROR_ERANGE;
 			}
 			*attrvalue = xa->attrvalue;
 			*avleng = xa->avleng;
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
-	return ERROR_ENOATTR;
+	return MFS_ERROR_ENOATTR;
 }
 
 uint8_t xattr_listattr_leng(uint32_t inode,void **xanode,uint32_t *xasize) {
@@ -260,13 +260,13 @@ uint8_t xattr_listattr_leng(uint32_t inode,void **xanode,uint32_t *xasize) {
 				*xasize += xa->anleng+1U;
 			}
 			if (*xasize>MFS_XATTR_LIST_MAX) {
-				return ERROR_ERANGE;
+				return MFS_ERROR_ERANGE;
 			}
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
 	*xanode = NULL;
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 void xattr_listattr_data(void *xanode,uint8_t *xabuff) {

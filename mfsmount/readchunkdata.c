@@ -85,8 +85,10 @@ void* read_chunkdata_worker(void*);
 
 /* glock:LOCKED */
 static inline void read_chunkdata_spawn_worker(void) {
+#ifndef WIN32
 	sigset_t oldset;
 	sigset_t newset;
+#endif
 	worker *w;
 	int res;
 
@@ -94,14 +96,18 @@ static inline void read_chunkdata_spawn_worker(void) {
 	if (w==NULL) {
 		return;
 	}
+#ifndef WIN32
 	sigemptyset(&newset);
 	sigaddset(&newset, SIGTERM);
 	sigaddset(&newset, SIGINT);
 	sigaddset(&newset, SIGHUP);
 	sigaddset(&newset, SIGQUIT);
 	pthread_sigmask(SIG_BLOCK, &newset, &oldset);
+#endif
 	res = pthread_create(&(w->thread_id),&worker_thattr,read_chunkdata_worker,w);
+#ifndef WIN32
 	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+#endif
 	if (res<0) {
 		return;
 	}
@@ -135,7 +141,7 @@ static inline void read_chunkdata_refresh(mreqcache *mrc) {
 	zassert(pthread_mutex_lock(&mreq_cache_lock));
 
 	mrc->status = status;
-	if (status==STATUS_OK) {
+	if (status==MFS_STATUS_OK) {
 		mrc->csdataver = csdataver;
 		mrc->chunkid = chunkid;
 		mrc->version = version;
@@ -332,7 +338,7 @@ void read_chunkdata_inject (uint32_t inode,uint32_t chindx,uint64_t mfleng,uint6
 	mrc->csdata = malloc(csdatasize);
 	memcpy(mrc->csdata,csdata,csdatasize);
 	mrc->reqwaiting = 0;
-	mrc->status = STATUS_OK;
+	mrc->status = MFS_STATUS_OK;
 	mrc->state = MR_READY;
 	zassert(pthread_cond_init(&(mrc->reqcond),NULL));
 	mrc->next = mreq_cache[hash];
@@ -351,7 +357,7 @@ uint8_t read_chunkdata_check(uint32_t inode,uint32_t chindx,uint64_t mfleng,uint
 				mrc->reqwaiting = 1;
 				zassert(pthread_cond_wait(&(mrc->reqcond),&mreq_cache_lock));
 			}
-			if (mrc->state==MR_INVALID || mrc->status!=STATUS_OK || mrc->mfleng>mfleng || mrc->chunkid!=chunkid || mrc->version!=version) {
+			if (mrc->state==MR_INVALID || mrc->status!=MFS_STATUS_OK || mrc->mfleng>mfleng || mrc->chunkid!=chunkid || mrc->version!=version) {
 				zassert(pthread_mutex_unlock(&mreq_cache_lock));
 				return 0;
 			} else {
@@ -381,7 +387,7 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 	oldestreqtime = now;
 	hchainleng = 0;
 	while ((mrc = *mrcp)) {
-		if (mrc->state==MR_READY && (mrc->time + MREQ_TIMEOUT < now || mrc->status!=STATUS_OK)) {
+		if (mrc->state==MR_READY && (mrc->time + MREQ_TIMEOUT < now || mrc->status!=MFS_STATUS_OK)) {
 			*mrcp = mrc->next;
 			zassert(pthread_cond_destroy(&(mrc->reqcond)));
 			if (mrc->csdata) {
@@ -394,7 +400,7 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 					mrc->reqwaiting = 1;
 					zassert(pthread_cond_wait(&(mrc->reqcond),&mreq_cache_lock));
 				}
-				if (mrc->status!=STATUS_OK) {
+				if (mrc->status!=MFS_STATUS_OK) {
 					zassert(pthread_mutex_unlock(&mreq_cache_lock));
 					*chunkid = 0;
 					*version = 0;
@@ -412,8 +418,8 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 					*chainelements = 0;
 				}
 				zassert(pthread_mutex_unlock(&mreq_cache_lock));
-				return STATUS_OK;
-			} else if ((mrc->state==MR_READY || mrc->state==MR_REFRESH) && mrc->status==STATUS_OK && mrc->time + MREQ_TIMEOUT >= now) {
+				return MFS_STATUS_OK;
+			} else if ((mrc->state==MR_READY || mrc->state==MR_REFRESH) && mrc->status==MFS_STATUS_OK && mrc->time + MREQ_TIMEOUT >= now) {
 				*chunkid = mrc->chunkid;
 				*version = mrc->version;
 				if (mrc->mfleng > *mfleng) {
@@ -433,7 +439,7 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 					queue_put(jqueue,0,0,(uint8_t*)mrc,0);
 				}
 				zassert(pthread_mutex_unlock(&mreq_cache_lock));
-				return STATUS_OK;
+				return MFS_STATUS_OK;
 			} else { //refresh data
 				break;
 			}
@@ -484,7 +490,7 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 //		mrc->reqwaiting = 1;
 //		zassert(pthread_cond_wait(&(mrc->reqcond),&mreq_cache_lock));
 //	}
-	if (mrc->status!=STATUS_OK) {
+	if (mrc->status!=MFS_STATUS_OK) {
 		zassert(pthread_mutex_unlock(&mreq_cache_lock));
 		*chunkid = 0;
 		*version = 0;
@@ -502,5 +508,5 @@ uint8_t read_chunkdata_get(uint32_t inode,uint8_t *canmodatime,cspri chain[100],
 		*chainelements = 0;
 	}
 	zassert(pthread_mutex_unlock(&mreq_cache_lock));
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }

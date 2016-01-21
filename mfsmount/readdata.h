@@ -21,7 +21,18 @@
 #ifndef _READDATA_H_
 #define _READDATA_H_
 
+#ifdef WIN32
+#include "portable.h"
+#else
+#ifdef HAVE_READV
 #include <sys/uio.h>
+#else
+struct iovec {
+	char *iov_base;
+	size_t iov_len;
+};
+#endif
+#endif
 #include <inttypes.h>
 
 void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t timeout,uint32_t minlogretry);

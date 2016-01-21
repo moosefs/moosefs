@@ -271,11 +271,11 @@ uint32_t of_lsof(uint32_t sessionid,uint8_t *buff) {
 
 int of_mr_acquire(uint32_t sessionid,uint32_t inode) {
 	if (of_checknode(sessionid,inode)) {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 	of_newnode(sessionid,inode);
 	meta_version_inc();
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 int of_mr_release(uint32_t sessionid,uint32_t inode) {
@@ -287,10 +287,10 @@ int of_mr_release(uint32_t sessionid,uint32_t inode) {
 		if (ofr->sessionid==sessionid && ofr->inode==inode) {
 			of_delnode(ofr);
 			meta_version_inc();
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
-	return ERROR_MISMATCH;
+	return MFS_ERROR_MISMATCH;
 }
 
 #define OF_STORE_BLOCK_CNT 256

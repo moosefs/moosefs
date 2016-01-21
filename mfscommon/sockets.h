@@ -71,7 +71,7 @@ int udpread(int sock,uint32_t *ip,uint16_t *port,void *buff,uint16_t leng);
 int udpclose(int sock);
 
 /* ----------------- UNIX ---------------- */
-
+#ifndef WIN32
 int unixsocket(void);
 int unixnonblock(int sock);
 int unixgetstatus(int sock);
@@ -83,5 +83,6 @@ int32_t unixtowrite(int sock,const void *buff,uint32_t leng,uint32_t msecto);
 int32_t unixtoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto);
 int unixtoaccept(int sock,uint32_t msecto);
 int unixaccept(int lsock);
+#endif
 
 #endif

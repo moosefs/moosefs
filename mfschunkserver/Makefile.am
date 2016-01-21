@@ -25,6 +25,7 @@ mfschunkserver_SOURCES= \
 	../mfscommon/md5.c ../mfscommon/md5.h \
 	../mfscommon/random.c ../mfscommon/random.h \
 	../mfscommon/pcqueue.c ../mfscommon/pcqueue.h \
+	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/sockets.c ../mfscommon/sockets.h \
 	../mfscommon/conncache.c ../mfscommon/conncache.h \

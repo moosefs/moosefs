@@ -101,7 +101,7 @@ static void* masterproxy_server(void *args) {
 			wptr = ansbuffer;
 			put32bit(&wptr,MATOCL_FUSE_REGISTER);
 			put32bit(&wptr,1);
-			put8bit(&wptr,STATUS_OK);
+			put8bit(&wptr,MFS_STATUS_OK);
 
 			if (tcptowrite(sock,ansbuffer,9,1000)!=9) {
 				tcpclose(sock);
@@ -122,7 +122,7 @@ static void* masterproxy_server(void *args) {
 			msgid = get32bit(&rptr);
 
 			asize = ANSSIZE-12;
-			if (fs_custom(cmd,querybuffer+4,psize-4,&acmd,ansbuffer+12,&asize)!=STATUS_OK) {
+			if (fs_custom(cmd,querybuffer+4,psize-4,&acmd,ansbuffer+12,&asize)!=MFS_STATUS_OK) {
 				tcpclose(sock);
 				return NULL;
 			}

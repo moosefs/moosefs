@@ -37,6 +37,7 @@
 #include "main.h"
 #include "cfg.h"
 #include "pcqueue.h"
+#include "lwthread.h"
 #include "datapack.h"
 #include "massert.h"
 
@@ -210,7 +211,7 @@ static inline void job_spawn_worker(jobpool *jp) {
 	w = malloc(sizeof(worker));
 	passert(w);
 	w->jp = jp;
-	if (main_minthread_create(&(w->thread_id),0,job_worker,w)<0) {
+	if (lwt_minthread_create(&(w->thread_id),0,job_worker,w)<0) {
 		return;
 	}
 	jp->workers_avail++;
@@ -281,21 +282,21 @@ void* job_worker(void *arg) {
 		zassert(pthread_mutex_unlock(&(jp->jobslock)));
 		switch (op) {
 			case OP_INVAL:
-				status = ERROR_EINVAL;
+				status = MFS_ERROR_EINVAL;
 				break;
 /*
 			case OP_MAINSERV:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					mainserv_serve(*((int*)(jptr->args)));
-					status = STATUS_OK;
+					status = MFS_STATUS_OK;
 				}
 				break;
 */
 			case OP_CHUNKOP:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_chunkop(opargs->chunkid,opargs->version,opargs->newversion,opargs->copychunkid,opargs->copyversion,opargs->length);
 				}
@@ -303,28 +304,28 @@ void* job_worker(void *arg) {
 /*
 			case OP_OPEN:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_open(ocargs->chunkid,ocargs->version);
 				}
 				break;
 			case OP_CLOSE:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_close(ocargs->chunkid);
 				}
 				break;
 			case OP_READ:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_read(rdargs->chunkid,rdargs->version,rdargs->blocknum,rdargs->buffer,rdargs->offset,rdargs->size,rdargs->crcbuff);
 				}
 				break;
 			case OP_WRITE:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_write(wrargs->chunkid,wrargs->version,wrargs->blocknum,wrargs->buffer,wrargs->offset,wrargs->size,wrargs->crcbuff);
 				}
@@ -332,42 +333,42 @@ void* job_worker(void *arg) {
 */
 			case OP_SERV_READ:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = mainserv_read(rwargs->sock,rwargs->packet,rwargs->length);
 				}
 				break;
 			case OP_SERV_WRITE:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = mainserv_write(rwargs->sock,rwargs->packet,rwargs->length);
 				}
 				break;
 			case OP_REPLICATE:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = replicate(rpargs->chunkid,rpargs->version,rpargs->xormasks,rpargs->srccnt,((uint8_t*)(jptr->args))+sizeof(chunk_rp_args));
 				}
 				break;
 			case OP_GETBLOCKS:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_get_blocks(ijargs->chunkid,ijargs->version,ijargs->pointer);
 				}
 				break;
 			case OP_GETCHECKSUM:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_get_checksum(ijargs->chunkid,ijargs->version,ijargs->pointer);
 				}
 				break;
 			case OP_GETCHECKSUMTAB:
 				if (jstate==JSTATE_DISABLED) {
-					status = ERROR_NOTDONE;
+					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_get_checksum_tab(ijargs->chunkid,ijargs->version,ijargs->pointer);
 				}
@@ -395,7 +396,7 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 //	jobpool* jp = (jobpool*)jpool;
 	if (exiting) {
 		if (callback) {
-			callback(ERROR_NOTDONE,extra);
+			callback(MFS_ERROR_NOTDONE,extra);
 		}
 		if (args) {
 			free(args);

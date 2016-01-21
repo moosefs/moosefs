@@ -119,6 +119,7 @@ static uint8_t masterinfoattr[35]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,
 #define PKGVERSION ((VERSMAJ)*1000000+(VERSMID)*1000+(VERSMIN))
 
 static int debug_mode = 0;
+static int flat_trash = 0;
 static double entry_cache_timeout = 0.0;
 static double attr_cache_timeout = 1.0;
 
@@ -135,27 +136,27 @@ uint32_t mfs_meta_name_to_inode(const char *name) {
 
 static int mfs_errorconv(int status) {
 	switch (status) {
-		case STATUS_OK:
+		case MFS_STATUS_OK:
 			return 0;
-		case ERROR_EPERM:
+		case MFS_ERROR_EPERM:
 			return EPERM;
-		case ERROR_ENOTDIR:
+		case MFS_ERROR_ENOTDIR:
 			return ENOTDIR;
-		case ERROR_ENOENT:
+		case MFS_ERROR_ENOENT:
 			return ENOENT;
-		case ERROR_EACCES:
+		case MFS_ERROR_EACCES:
 			return EACCES;
-		case ERROR_EEXIST:
+		case MFS_ERROR_EEXIST:
 			return EEXIST;
-		case ERROR_EINVAL:
+		case MFS_ERROR_EINVAL:
 			return EINVAL;
-		case ERROR_ENOTEMPTY:
+		case MFS_ERROR_ENOTEMPTY:
 			return ENOTEMPTY;
-		case ERROR_IO:
+		case MFS_ERROR_IO:
 			return EIO;
-		case ERROR_EROFS:
+		case MFS_ERROR_EROFS:
 			return EROFS;
-		case ERROR_QUOTA:
+		case MFS_ERROR_QUOTA:
 #ifdef EDQUOT
 			return EDQUOT;
 #else
@@ -424,7 +425,7 @@ void mfs_meta_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			inode = META_ROOT_INODE;
 		} else if (strcmp(name,META_UNDEL_NAME)==0) {
 			inode = META_UNDEL_INODE;
-		} else if (master_version()>=VERSION2INT(3,0,64)) { // subtrashes
+		} else if (master_version()>=VERSION2INT(3,0,64) && flat_trash==0) { // subtrashes
 			inode = strtoul(name,NULL,16);
 			if (inode<TRASH_BUCKETS) {
 				inode += META_SUBTRASH_INODE_MIN;
@@ -629,7 +630,7 @@ static uint32_t dir_metaentries_size(uint32_t ino) {
 	case META_ROOT_INODE:
 		return 4*6+1+2+strlen(META_TRASH_NAME)+strlen(META_SUSTAINED_NAME);
 	case META_TRASH_INODE:
-		if (master_version()>=VERSION2INT(3,0,64)) {
+		if (master_version()>=VERSION2INT(3,0,64) && flat_trash==0) {
 			return (3+TRASH_BUCKETS)*6+1+2+strlen(META_UNDEL_NAME)+(TRASH_BUCKETS*((TRASH_BUCKETS<=4096)?3:4));
 		} else {
 			return 3*6+1+2+strlen(META_UNDEL_NAME);
@@ -695,7 +696,7 @@ static void dir_metaentries_fill(uint8_t *buff,uint32_t ino) {
 		buff+=l;
 		put32bit(&buff,META_UNDEL_INODE);
 		put8bit(&buff,TYPE_DIRECTORY);
-		if (master_version()>=VERSION2INT(3,0,64)) {
+		if (master_version()>=VERSION2INT(3,0,64) && flat_trash==0) {
 			uint32_t tid;
 			for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
 				if (TRASH_BUCKETS>4096) {
@@ -831,21 +832,21 @@ static void dirbuf_meta_fill(dirbuf *b, uint32_t ino) {
 	b->p = NULL;
 	b->size = 0;
 	msize = dir_metaentries_size(ino);
-	if (ino==META_TRASH_INODE && master_version()<VERSION2INT(3,0,64)) {
+	if (ino==META_TRASH_INODE && (master_version()<VERSION2INT(3,0,64) || flat_trash)) {
 		status = fs_gettrash(0xFFFFFFFF,&dbuff,&dsize);
-		if (status!=STATUS_OK) {
+		if (status!=MFS_STATUS_OK) {
 			return;
 		}
 		dcsize = dir_dataentries_size(dbuff,dsize);
 	} else if (ino==META_SUSTAINED_INODE) {
 		status = fs_getsustained(&dbuff,&dsize);
-		if (status!=STATUS_OK) {
+		if (status!=MFS_STATUS_OK) {
 			return;
 		}
 		dcsize = dir_dataentries_size(dbuff,dsize);
-	} else if (ino>=META_SUBTRASH_INODE_MIN && ino<=META_SUBTRASH_INODE_MAX && master_version()>=VERSION2INT(3,0,64)) {
+	} else if (ino>=META_SUBTRASH_INODE_MIN && ino<=META_SUBTRASH_INODE_MAX && master_version()>=VERSION2INT(3,0,64) && flat_trash==0) {
 		status = fs_gettrash(ino-META_SUBTRASH_INODE_MIN,&dbuff,&dsize);
-		if (status!=STATUS_OK) {
+		if (status!=MFS_STATUS_OK) {
 			return;
 		}
 		dcsize = dir_dataentries_size(dbuff,dsize);
@@ -1153,11 +1154,15 @@ void mfs_meta_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size
 	fuse_reply_write(req,size);
 }
 
-void mfs_meta_init(int debug_mode_in,double entry_cache_timeout_in,double attr_cache_timeout_in) {
+void mfs_meta_init(int debug_mode_in,double entry_cache_timeout_in,double attr_cache_timeout_in,int flat_trash_in) {
 	debug_mode = debug_mode_in;
 	entry_cache_timeout = entry_cache_timeout_in;
 	attr_cache_timeout = attr_cache_timeout_in;
+	flat_trash = flat_trash_in;
 	if (debug_mode) {
 		fprintf(stderr,"cache parameters: entry_cache_timeout=%.2lf attr_cache_timeout=%.2lf\n",entry_cache_timeout,attr_cache_timeout);
+		if (flat_trash) {
+			fprintf(stderr,"force using 'flat' trash\n");
+		}
 	}
 }

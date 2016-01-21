@@ -760,9 +760,9 @@ uint8_t sessions_mr_sesadd(uint64_t exportscsum,uint32_t rootinode,uint8_t sesfl
 	session *sesdata;
 	sesdata = sessions_create_session(exportscsum,rootinode,sesflags|SESFLAG_METARESTORE,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
 	if (sesdata->sessionid!=sessionid) {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 void sessions_chg_session(void *vsesdata,uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
@@ -774,15 +774,15 @@ uint8_t sessions_mr_seschanged(uint32_t sessionid,uint64_t exportscsum,uint32_t 
 	session *sesdata;
 	sesdata = sessions_find_session(sessionid);
 	if (sesdata==NULL) {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 	sessions_change_session(sesdata,exportscsum,rootinode,sesflags|SESFLAG_METARESTORE,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 uint8_t sessions_mr_sesdel(uint32_t sessionid) {
 	session **sesdata,*asesdata;
-	uint8_t status = ERROR_BADSESSIONID;
+	uint8_t status = MFS_ERROR_BADSESSIONID;
 	uint32_t hpos;
 
 	hpos = SESSION_HASH(sessionid);
@@ -792,12 +792,12 @@ uint8_t sessions_mr_sesdel(uint32_t sessionid) {
 			sessions_clean_session(asesdata);
 			*sesdata = asesdata->next;
 			free(asesdata);
-			status = STATUS_OK;
+			status = MFS_STATUS_OK;
 		} else {
 			sesdata = &(asesdata->next);
 		}
 	}
-	if (status==STATUS_OK) {
+	if (status==MFS_STATUS_OK) {
 		meta_version_inc();
 	}
 	return status;
@@ -810,19 +810,19 @@ uint8_t sessions_mr_disconnected(uint32_t sessionid,uint32_t disctime) {
 		if (sesdata->sessionid == sessionid) {
 			sesdata->disconnected = disctime;
 			meta_version_inc();
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
-	return ERROR_NOTFOUND;
+	return MFS_ERROR_NOTFOUND;
 }
 
 uint8_t sessions_mr_session(uint32_t sessionid) {
 	if (sessionid!=nextsessionid) {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 	nextsessionid++;
 	meta_version_inc();
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 void sessions_new(void) {
@@ -864,18 +864,18 @@ uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t mingoal,uint8_t
 	switch (smode) {
 		case SMODE_SET:
 			if (mingoal<sesdata->mingoal || maxgoal>sesdata->maxgoal) {
-				return ERROR_EPERM;
+				return MFS_ERROR_EPERM;
 			}
 		case SMODE_INCREASE:
 			if (maxgoal>sesdata->maxgoal) {
-				return ERROR_EPERM;
+				return MFS_ERROR_EPERM;
 			}
 		case SMODE_DECREASE:
 			if (mingoal<sesdata->mingoal) {
-				return ERROR_EPERM;
+				return MFS_ERROR_EPERM;
 			}
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 uint8_t sessions_check_trashtime(void *vsesdata,uint8_t smode,uint32_t trashtime) {
@@ -883,18 +883,18 @@ uint8_t sessions_check_trashtime(void *vsesdata,uint8_t smode,uint32_t trashtime
 	switch (smode) {
 		case SMODE_SET:
 			if (trashtime<sesdata->mintrashtime || trashtime>sesdata->maxtrashtime) {
-				return ERROR_EPERM;
+				return MFS_ERROR_EPERM;
 			}
 		case SMODE_INCREASE:
 			if (trashtime>sesdata->maxtrashtime) {
-				return ERROR_EPERM;
+				return MFS_ERROR_EPERM;
 			}
 		case SMODE_DECREASE:
 			if (trashtime<sesdata->mintrashtime) {
-				return ERROR_EPERM;
+				return MFS_ERROR_EPERM;
 			}
 	}
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 void sessions_inc_stats(void *vsesdata,uint8_t statid) {
@@ -958,15 +958,15 @@ uint8_t sessions_force_remove(uint32_t sessionid) {
 				sessions_clean_session(asesdata);
 				*sesdata = asesdata->next;
 				free(asesdata);
-				return STATUS_OK;
+				return MFS_STATUS_OK;
 			} else {
-				return ERROR_ACTIVE;
+				return MFS_ERROR_ACTIVE;
 			}
 		} else {
 			sesdata = &(asesdata->next);
 		}
 	}
-	return ERROR_NOTFOUND;
+	return MFS_ERROR_NOTFOUND;
 }
 
 void sessions_statsmove(void) {

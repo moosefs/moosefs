@@ -22,7 +22,12 @@
 #define _MASSERT_H_
 
 #include <stdio.h>
+#ifdef WIN32
+#include "portable.h"
+//#define syslog(...) (void)0
+#else
 #include <syslog.h>
+#endif
 #include <stdlib.h>
 #include <errno.h>
 

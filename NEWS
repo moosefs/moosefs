@@ -1,5 +1,18 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.71-1 (2016-01-21)
+
+  - (master) fixed emptying trash issue (intr. in 3.0.64)
+  - (master) fixed possible segfault in chunkservers database (intr. in 3.0.67)
+  - (master) changed trash part choice from nondeterministic to deterministic
+
+* MooseFS 3.0.70-1 (2016-01-19)
+
+  - (cgi+cli) fixed displaying info when there are no active masters (intr. in 3.0.67)
+  - (mount+common) refactoring code to be Windows ready
+  - (mount) added option 'mfsflattrash' (makes trash look like before version 3.0.64)
+  - (mount) added fixes for NetBSD (patch contributed by Tom Ivar Helbekkmo)
+
 * MooseFS 3.0.69-1 (2016-01-12)
 
   - (mount) fixed rare case when request memory was used after being freed.

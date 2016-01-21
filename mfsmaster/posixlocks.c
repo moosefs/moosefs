@@ -420,7 +420,7 @@ static inline void posix_lock_interrupt(inodelocks *il,uint32_t sessionid,uint32
 	wlock *wl;
 	for (wl=il->waiting_head ; wl ; wl=wl->next) {
 		if (wl->sessionid==sessionid && wl->reqid==reqid) {
-			matoclserv_fuse_posix_lock_wake_up(sessionid,wl->msgid,ERROR_EINTR);
+			matoclserv_fuse_posix_lock_wake_up(sessionid,wl->msgid,MFS_ERROR_EINTR);
 			posix_lock_remove_lock(il,wl);
 			return;
 		}
@@ -438,7 +438,7 @@ static inline void posix_lock_check_waiting(inodelocks *il) {
 		nwl = wl->next;
 		if (posix_lock_find_offensive_lock(il,wl->sessionid,wl->owner,wl->type,wl->start,wl->end)==0) {
 			posix_lock_apply_lock(il,wl->sessionid,wl->owner,wl->type,wl->start,wl->end,wl->pid);
-			matoclserv_fuse_posix_lock_wake_up(wl->sessionid,wl->msgid,STATUS_OK);
+			matoclserv_fuse_posix_lock_wake_up(wl->sessionid,wl->msgid,MFS_STATUS_OK);
 			posix_lock_remove_lock(il,wl);
 		}
 		wl = nwl;
@@ -462,7 +462,7 @@ uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t
 
 	if ((op==POSIX_LOCK_CMD_SET || op==POSIX_LOCK_CMD_TRY) && i_type!=POSIX_LOCK_UNLCK) {
 		if (of_checknode(sessionid,inode)==0) {
-			return ERROR_EINVAL; // EBADF ?
+			return MFS_ERROR_EINVAL; // EBADF ?
 		}
 	}
 
@@ -470,51 +470,51 @@ uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t
 
 	if (op==POSIX_LOCK_CMD_INT) {
 		if (il==NULL) {
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 		posix_lock_interrupt(il,sessionid,reqid);
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	}
 	if (op==POSIX_LOCK_CMD_GET) {
 		if (il!=NULL && i_type!=POSIX_LOCK_UNLCK) {
 			if (posix_lock_get_offensive_lock(il,sessionid,owner,type,start,end,pid)) {
-				return STATUS_OK;
+				return MFS_STATUS_OK;
 			}
 		}
 		*type = POSIX_LOCK_UNLCK;
 		*start = 0;
 		*end = 0;
 		*pid = 0;
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	}
 	if (il!=NULL && i_type!=POSIX_LOCK_UNLCK) {
 		if (posix_lock_find_offensive_lock(il,sessionid,owner,i_type,i_start,i_end)) {
 			if (op==POSIX_LOCK_CMD_TRY) {
-				return ERROR_EAGAIN;
+				return MFS_ERROR_EAGAIN;
 			} else {
 				posix_lock_append_lock(il,sessionid,msgid,reqid,owner,i_type,i_start,i_end,i_pid);
-				return ERROR_WAITING;
+				return MFS_ERROR_WAITING;
 			}
 		}
 	}
 	if (i_type==POSIX_LOCK_UNLCK) {
 		if (il==NULL) {
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 		posix_lock_apply_lock(il,sessionid,owner,i_type,i_start,i_end,i_pid);
 		posix_lock_check_waiting(il);
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	}
 	if (il==NULL) {
 		il = posix_lock_inode_new(inode);
 	}
 	if (posix_lock_find_offensive_lock(il,sessionid,owner,i_type,i_start,i_end)) {
 		posix_lock_append_lock(il,sessionid,msgid,reqid,owner,i_type,i_start,i_end,i_pid);
-		return ERROR_WAITING;
+		return MFS_ERROR_WAITING;
 	}
 	posix_lock_apply_lock(il,sessionid,owner,i_type,i_start,i_end,i_pid);
 	posix_lock_check_waiting(il);
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 void posix_lock_file_closed(uint32_t sessionid,uint32_t inode) {
@@ -632,7 +632,7 @@ uint8_t posix_lock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,ch
 	if (cmd=='U' || cmd=='u') {
 		il = posix_lock_inode_find(inode);
 		if (il==NULL) {
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 		}
 		type = POSIX_LOCK_UNLCK;
 	} else if (cmd=='R' || cmd=='r' || cmd=='S' || cmd=='s') {
@@ -648,14 +648,14 @@ uint8_t posix_lock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,ch
 		}
 		type = POSIX_LOCK_WRLCK;
 	} else {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 	if (type!=POSIX_LOCK_UNLCK && posix_lock_find_offensive_lock(il,sessionid,owner,type,start,end)) {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 	posix_lock_do_apply_lock(il,sessionid,owner,type,start,end,pid);
 	meta_version_inc();
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 #define POSIX_LOCK_STORE_BLOCK_CNT 256

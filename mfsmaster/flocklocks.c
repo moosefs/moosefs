@@ -307,10 +307,10 @@ static inline uint8_t flock_lock_new(inodelocks *il,uint8_t ltype,uint32_t sessi
 		l->state = STATE_WAITING;
 		flock_lock_append_req(l,msgid,reqid);
 		flock_lock_inode_attach(l);
-		return ERROR_WAITING;
+		return MFS_ERROR_WAITING;
 	}
 	flock_lock_inode_attach(l);
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 static inline void flock_lock_check_waiting(inodelocks *il) {
@@ -323,7 +323,7 @@ static inline void flock_lock_check_waiting(inodelocks *il) {
 		flock_lock_inode_detach(l);
 		l->state = STATE_ACTIVE;
 		flock_lock_inode_attach(l);
-		flock_lock_wake_up_all(l,STATUS_OK);
+		flock_lock_wake_up_all(l,MFS_STATUS_OK);
 	}
 	if (il->active==NULL || il->active->ltype==LTYPE_READER) {
 		if (FlocksMode==MODE_LINUX) {
@@ -333,7 +333,7 @@ static inline void flock_lock_check_waiting(inodelocks *il) {
 					flock_lock_inode_detach(l);
 					l->state = STATE_ACTIVE;
 					flock_lock_inode_attach(l);
-					flock_lock_wake_up_all(l,STATUS_OK);
+					flock_lock_wake_up_all(l,MFS_STATUS_OK);
 				}
 				l = nl;
 			}
@@ -343,7 +343,7 @@ static inline void flock_lock_check_waiting(inodelocks *il) {
 				flock_lock_inode_detach(l);
 				l->state = STATE_ACTIVE;
 				flock_lock_inode_attach(l);
-				flock_lock_wake_up_all(l,STATUS_OK);
+				flock_lock_wake_up_all(l,MFS_STATUS_OK);
 				l = nl;
 			}
 		}
@@ -376,13 +376,13 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 
 	if (op!=FLOCK_INTERRUPT && op!=FLOCK_RELEASE) {
 		if (of_checknode(sessionid,inode)==0) {
-			return ERROR_EINVAL; // EBADF ?
+			return MFS_ERROR_EINVAL; // EBADF ?
 		}
 	}
 	il = flock_inode_find(inode);
 	if (il==NULL) {
 		if (op==FLOCK_UNLOCK || op==FLOCK_INTERRUPT || op==FLOCK_RELEASE) {
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 		il = flock_inode_new(inode);
 	}
@@ -391,105 +391,105 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 		while (l) {
 			nl = l->next;
 			if (l->sessionid==sessionid && l->owner==owner) {
-				flock_lock_wake_up_one(l,reqid,ERROR_EINTR);
+				flock_lock_wake_up_one(l,reqid,MFS_ERROR_EINTR);
 				if (l->lock_instances==NULL) { // remove
 					flock_lock_remove(l);
 				}
 			}
 			l = nl;
 		}
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	}
 	for (l=il->active ; l ; l=l->next) {
 		if (l->sessionid==sessionid && l->owner==owner) {
 			if (op==FLOCK_UNLOCK || op==FLOCK_RELEASE) {
 				flock_lock_unlock(l);
-				return STATUS_OK;
+				return MFS_STATUS_OK;
 			} else if (op==FLOCK_TRY_SHARED) {
 				if (l->ltype==LTYPE_READER) {
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				} else { // l->ltype==LTYPE_WRITER
 					l->ltype=LTYPE_READER;
 					flock_lock_check_waiting(il);
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				}
 			} else if (op==FLOCK_LOCK_SHARED) {
 				if (l->ltype==LTYPE_READER) {
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				} else { // l->ltype==LTYPE_WRITER
 					flock_lock_unlock(l);
 					return flock_lock_new(il,LTYPE_READER,sessionid,msgid,reqid,owner);
 				}
 			} else if (op==FLOCK_TRY_EXCLUSIVE) {
 				if (l->ltype==LTYPE_WRITER) {
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				} else { // l->ltype==LTYPE_READER
 					if (il->active->next==NULL) { // this lock is the only one
 						l->ltype=LTYPE_WRITER;
-						return STATUS_OK;
+						return MFS_STATUS_OK;
 					}
-					return ERROR_EAGAIN;
+					return MFS_ERROR_EAGAIN;
 				}
 			} else if (op==FLOCK_LOCK_EXCLUSIVE) {
 				if (l->ltype==LTYPE_WRITER) {
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				} else { // l->ltype==LTYPE_READER
 					 flock_lock_unlock(l);
 					 return flock_lock_new(il,LTYPE_WRITER,sessionid,msgid,reqid,owner);
 				}
 			}
-			return ERROR_EINVAL;
+			return MFS_ERROR_EINVAL;
 		}	
 	}
 	for (l=il->waiting_head ; l ; l=l->next) {
 		if (l->sessionid==sessionid && l->owner==owner) {
 			if (op==FLOCK_RELEASE) {
-				flock_lock_wake_up_all(l,ERROR_ECANCELED);
+				flock_lock_wake_up_all(l,MFS_ERROR_ECANCELED);
 				flock_lock_remove(l);
-				return STATUS_OK;
+				return MFS_STATUS_OK;
 			} else if (op==FLOCK_UNLOCK) {
 				if (FlocksMode==MODE_CORRECT) {
 					// logically this call should do this:
-					flock_lock_wake_up_all(l,ERROR_ECANCELED);
+					flock_lock_wake_up_all(l,MFS_ERROR_ECANCELED);
 					flock_lock_remove(l);
 				}
 				// but in all tested kernels it was just ignored
-				return STATUS_OK;
+				return MFS_STATUS_OK;
 			} else if (op==FLOCK_TRY_SHARED || op==FLOCK_TRY_EXCLUSIVE) {
-				return ERROR_EAGAIN;
+				return MFS_ERROR_EAGAIN;
 			} else if (op==FLOCK_LOCK_SHARED) {
 				if (l->ltype==LTYPE_READER) {
 					flock_lock_append_req(l,msgid,reqid);
-					return ERROR_WAITING;
+					return MFS_ERROR_WAITING;
 				} else {
-//					return ERROR_EINVAL;
-					flock_lock_wake_up_all(l,ERROR_ECANCELED);
+//					return MFS_ERROR_EINVAL;
+					flock_lock_wake_up_all(l,MFS_ERROR_ECANCELED);
 					l->ltype=LTYPE_READER;
 					flock_lock_append_req(l,msgid,reqid);
-					return ERROR_WAITING;
+					return MFS_ERROR_WAITING;
 				}
 			} else if (op==FLOCK_LOCK_EXCLUSIVE) {
 				if (l->ltype==LTYPE_WRITER) {
 					flock_lock_append_req(l,msgid,reqid);
-					return ERROR_WAITING;
+					return MFS_ERROR_WAITING;
 				} else {
-//					return ERROR_EINVAL;
-					flock_lock_wake_up_all(l,ERROR_ECANCELED);
+//					return MFS_ERROR_EINVAL;
+					flock_lock_wake_up_all(l,MFS_ERROR_ECANCELED);
 					l->ltype=LTYPE_WRITER;
 					flock_lock_append_req(l,msgid,reqid);
-					return ERROR_WAITING;
+					return MFS_ERROR_WAITING;
 				}
 			}
-			return ERROR_EINVAL;
+			return MFS_ERROR_EINVAL;
 		}
 	}
 	if (op==FLOCK_UNLOCK || op==FLOCK_RELEASE) {
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	}
 	ltype = (op==FLOCK_TRY_SHARED || op==FLOCK_LOCK_SHARED)?LTYPE_READER:LTYPE_WRITER;
 	if (op==FLOCK_TRY_SHARED || op==FLOCK_TRY_EXCLUSIVE) {
 		if (flock_check(il,ltype)) {
-			return ERROR_EAGAIN;
+			return MFS_ERROR_EAGAIN;
 		}
 	}
 	return flock_lock_new(il,ltype,sessionid,msgid,reqid,owner);
@@ -594,7 +594,7 @@ uint8_t flock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,char cm
 	if (cmd=='U' || cmd=='u') {
 		il = flock_inode_find(inode);
 		if (il==NULL) {
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 		}
 		l=il->active;
 		while (l) {
@@ -608,20 +608,20 @@ uint8_t flock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,char cm
 		if (il->waiting_head==NULL && il->active==NULL) {
 			flock_inode_remove(il->inode);
 		}
-		return STATUS_OK;
+		return MFS_STATUS_OK;
 	} else if (cmd=='R' || cmd=='r' || cmd=='S' || cmd=='s') {
 		ltype = LTYPE_READER;
 	} else if (cmd=='W' || cmd=='w' || cmd=='E' || cmd=='e') {
 		ltype = LTYPE_WRITER;
 	} else {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 	il = flock_inode_find(inode);
 	if (il==NULL) {
 		il = flock_inode_new(inode);
 	}
 	if (il->active!=NULL && (il->active->ltype==LTYPE_WRITER || ltype==LTYPE_WRITER)) {
-		return ERROR_MISMATCH;
+		return MFS_ERROR_MISMATCH;
 	}
 	l = malloc(sizeof(lock));
 	l->owner = owner;
@@ -634,7 +634,7 @@ uint8_t flock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,char cm
 	l->prev = NULL;
 	flock_do_lock_inode_attach(l);
 	meta_version_inc();
-	return STATUS_OK;
+	return MFS_STATUS_OK;
 }
 
 #define FLOCK_STORE_BLOCK_CNT 256

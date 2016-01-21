@@ -984,28 +984,28 @@ void masterconn_idlejob_finished(uint8_t status,void *ijp) {
 				put8bit(&ptr,status);
 				break;
 			case IJ_GET_CHUNK_CHECKSUM:
-				if (status!=STATUS_OK) {
+				if (status!=MFS_STATUS_OK) {
 					ptr = masterconn_create_attached_packet(eptr,CSTOAN_CHUNK_CHECKSUM,8+4+1);
 				} else {
 					ptr = masterconn_create_attached_packet(eptr,CSTOAN_CHUNK_CHECKSUM,8+4+4);
 				}
 				put64bit(&ptr,ij->chunkid);
 				put32bit(&ptr,ij->version);
-				if (status!=STATUS_OK) {
+				if (status!=MFS_STATUS_OK) {
 					put8bit(&ptr,status);
 				} else {
 					memcpy(ptr,ij->buff,4);
 				}
 				break;
 			case IJ_GET_CHUNK_CHECKSUM_TAB:
-				if (status!=STATUS_OK) {
+				if (status!=MFS_STATUS_OK) {
 					ptr = masterconn_create_attached_packet(eptr,CSTOAN_CHUNK_CHECKSUM_TAB,8+4+1);
 				} else {
 					ptr = masterconn_create_attached_packet(eptr,CSTOAN_CHUNK_CHECKSUM_TAB,8+4+4096);
 				}
 				put64bit(&ptr,ij->chunkid);
 				put32bit(&ptr,ij->version);
-				if (status!=STATUS_OK) {
+				if (status!=MFS_STATUS_OK) {
 					put8bit(&ptr,status);
 				} else {
 					memcpy(ptr,ij->buff,4096);

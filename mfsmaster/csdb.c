@@ -151,8 +151,8 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 			if (csptr->maintenance) {
 				disconnected_servers_in_maintenance--;
 			}
-			if (csidptr->tmpremoved) {
-				csidptr->tmpremoved = 0;
+			if (csptr->tmpremoved) {
+				csptr->tmpremoved = 0;
 				tmpremoved_servers--;
 			}
 			return csptr;
@@ -360,7 +360,7 @@ uint8_t csdb_remove_server(uint32_t ip,uint16_t port) {
 	while ((csptr=*cspptr)) {
 		if (csptr->ip == ip && csptr->port == port) {
 			if (csptr->eptr!=NULL) {
-				return ERROR_ACTIVE;
+				return MFS_ERROR_ACTIVE;
 			}
 			if (csptr->csid>0) {
 				csdb_delid(csptr->csid);
@@ -376,12 +376,12 @@ uint8_t csdb_remove_server(uint32_t ip,uint16_t port) {
 			servers--;
 			disconnected_servers--;
 			changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_DEL,ip,port);
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		} else {
 			cspptr = &(csptr->next);
 		}
 	}
-	return ERROR_NOTFOUND;
+	return MFS_ERROR_NOTFOUND;
 }
 
 uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
@@ -393,11 +393,11 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if (csptr->ip == ip && csptr->port == port) {
-					return ERROR_MISMATCH;
+					return MFS_ERROR_MISMATCH;
 				}
 			}
 			if (csid>0 && csdbtab[csid]!=NULL) {
-				return ERROR_MISMATCH;
+				return MFS_ERROR_MISMATCH;
 			}
 			csptr = malloc(sizeof(csdbentry));
 			passert(csptr);
@@ -416,14 +416,14 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 			servers++;
 			disconnected_servers++;
 			meta_version_inc();
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		case CSDB_OP_DEL:
 			hash = CSDBHASHFN(ip,port);
 			cspptr = csdbhash + hash;
 			while ((csptr=*cspptr)) {
 				if (csptr->ip == ip && csptr->port == port) {
 					if (csptr->eptr!=NULL) {
-						return ERROR_MISMATCH;
+						return MFS_ERROR_MISMATCH;
 					}
 					if (csptr->csid>0) {
 						csdb_delid(csptr->csid);
@@ -439,15 +439,15 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 					servers--;
 					disconnected_servers--;
 					meta_version_inc();
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				} else {
 					cspptr = &(csptr->next);
 				}
 			}
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 		case CSDB_OP_NEWIPPORT:
 			if (csid==0 || csdbtab[csid]==NULL) {
-				return ERROR_MISMATCH;
+				return MFS_ERROR_MISMATCH;
 			}
 			csidptr = csdbtab[csid];
 
@@ -465,15 +465,15 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 				}
 			}
 			if (csptr==NULL) {
-				return ERROR_MISMATCH;
+				return MFS_ERROR_MISMATCH;
 			}
 			csptr->ip = ip;
 			csptr->port = port;
 			meta_version_inc();
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		case CSDB_OP_NEWID:
 			if (csid==0 || csdbtab[csid]!=NULL) {
-				return ERROR_MISMATCH;
+				return MFS_ERROR_MISMATCH;
 			}
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
@@ -486,71 +486,71 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint16_t csid) {
 						csdbtab[csid] = csptr;
 					}
 					meta_version_inc();
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				}
 			}
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 		case CSDB_OP_MAINTENANCEON:
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if (csptr->ip == ip && csptr->port == port) {
 					if (csptr->maintenance!=0) {
-						return ERROR_MISMATCH;
+						return MFS_ERROR_MISMATCH;
 					}
 					csptr->maintenance = 1;
 					if (csptr->eptr==NULL) {
 						disconnected_servers_in_maintenance++;
 					}
 					meta_version_inc();
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				}
 			}
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 		case CSDB_OP_MAINTENANCEOFF:
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if (csptr->ip == ip && csptr->port == port) {
 					if (csptr->maintenance!=1) {
-						return ERROR_MISMATCH;
+						return MFS_ERROR_MISMATCH;
 					}
 					csptr->maintenance = 0;
 					if (csptr->eptr==NULL) {
 						disconnected_servers_in_maintenance--;
 					}
 					meta_version_inc();
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				}
 			}
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 /*		case CSDB_OP_FASTREPLICATIONON:
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if (csptr->ip == ip && csptr->port == port) {
 					if (csptr->fastreplication!=0) {
-						return ERROR_MISMATCH;
+						return MFS_ERROR_MISMATCH;
 					}
 					csptr->fastreplication = 1;
 					meta_version_inc();
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				}
 			}
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 		case CSDB_OP_FASTREPLICATIONOFF:
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if (csptr->ip == ip && csptr->port == port) {
 					if (csptr->fastreplication!=1) {
-						return ERROR_MISMATCH;
+						return MFS_ERROR_MISMATCH;
 					}
 					csptr->fastreplication = 0;
 					meta_version_inc();
-					return STATUS_OK;
+					return MFS_STATUS_OK;
 				}
 			}
-			return ERROR_MISMATCH;
+			return MFS_ERROR_MISMATCH;
 */
 	}
-	return ERROR_MISMATCH;
+	return MFS_ERROR_MISMATCH;
 }
 
 
@@ -562,10 +562,10 @@ uint8_t csdb_back_to_work(uint32_t ip,uint16_t port) {
 	for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 		if (csptr->ip == ip && csptr->port == port) {
 			csptr->heavyloadts = 0;
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
-	return ERROR_NOTFOUND;
+	return MFS_ERROR_NOTFOUND;
 }
 
 uint8_t csdb_maintenance(uint32_t ip,uint16_t port,uint8_t onoff) {
@@ -573,7 +573,7 @@ uint8_t csdb_maintenance(uint32_t ip,uint16_t port,uint8_t onoff) {
 	csdbentry *csptr;
 
 	if (onoff!=0 && onoff!=1) {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 	hash = CSDBHASHFN(ip,port);
 	for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
@@ -593,10 +593,10 @@ uint8_t csdb_maintenance(uint32_t ip,uint16_t port,uint8_t onoff) {
 					}
 				}
 			}
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
-	return ERROR_NOTFOUND;
+	return MFS_ERROR_NOTFOUND;
 }
 /*
 uint8_t csdb_fastreplication(uint32_t ip,uint16_t port,uint8_t onoff) {
@@ -604,7 +604,7 @@ uint8_t csdb_fastreplication(uint32_t ip,uint16_t port,uint8_t onoff) {
 	csdbentry *csptr;
 
 	if (onoff!=0 && onoff!=1) {
-		return ERROR_EINVAL;
+		return MFS_ERROR_EINVAL;
 	}
 	hash = CSDBHASHFN(ip,port);
 	for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
@@ -617,10 +617,10 @@ uint8_t csdb_fastreplication(uint32_t ip,uint16_t port,uint8_t onoff) {
 					changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_FASTREPLICATIONOFF,ip,port);
 				}
 			}
-			return STATUS_OK;
+			return MFS_STATUS_OK;
 		}
 	}
-	return ERROR_NOTFOUND;
+	return MFS_ERROR_NOTFOUND;
 }
 */
 /*
@@ -677,7 +677,7 @@ uint16_t csdb_sort_servers(void) {
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 			if (csptr->tmpremoved==0) {
-				if (i<servers) {
+				if (i<servers-tmpremoved_servers) {
 					stab[i] = csptr;
 					i++;
 				} else {
@@ -687,13 +687,13 @@ uint16_t csdb_sort_servers(void) {
 			}
 		}
 	}
-	qsort(stab,servers,sizeof(csdbentry*),csdb_compare);
+	qsort(stab,servers-tmpremoved_servers,sizeof(csdbentry*),csdb_compare);
 	for (i=0 ; i<(servers-tmpremoved_servers) ; i++) {
 		stab[i]->number = i+1;
 	}
 	free(stab);
 
-	return servers;
+	return servers-tmpremoved_servers;
 }
 
 uint16_t csdb_servers_count(void) {

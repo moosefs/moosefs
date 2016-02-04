@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -435,6 +435,13 @@
 #define SNAPSHOT_MODE_FORCE_REMOVAL 4
 #define SNAPSHOT_MODE_DELETE 0x80
 
+// OK,OVERLOADED and REBALANCE are used as hlstatus field in "CSTOMA_CURRENT_LOAD", others only internally in master
+#define HLSTATUS_DEFAULT 0
+#define HLSTATUS_OK 1
+#define HLSTATUS_OVERLOADED 2
+#define HLSTATUS_REBALANCE 3
+#define HLSTATUS_GRACEFUL 4
+
 // flags: "flags" fileld in "CLTOMA_FUSE_AQUIRE"
 #define WANT_READ 1
 #define WANT_WRITE 2
@@ -826,6 +833,7 @@
 //  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 ( version >= 1.6.21 && version < 1.6.26 )
 //  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 1.6.26 )
 //  version:32 sessionid:32 metaid:64 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.11 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.72 )
 //  status:8
 
 #define REGISTER_RECONNECT 3
@@ -1412,7 +1420,7 @@
 // 0x01F7
 #define ANTOCL_MONOTONIC_DATA (PROTO_BASE+503)
 // N:16 N * [ data:64 ] // master
-// N:16 N * [ data:64 ] M:16 M * [ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 bytesread:64 byteswritten:64 usecread:64 usecwrite:64 usecfsync:64 readops:32 writeops:32 fsyncops:32 usecreadmax:32 usecwritemax:32 usecfsyncmax:32 ]
+// N:16 N * [ data:64 ] M:16 M * [ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 bytesread:64 byteswritten:64 usecread:64 usecwrite:64 usecfsync:64 readops:32 writeops:32 fsyncops:32 usecreadmax:32 usecwritemax:32 usecfsyncmax:32 ] // chunkserver
 
 
 // 0x01F8
@@ -1444,7 +1452,12 @@
 
 // 0x01FD
 #define MATOCL_SESSION_LIST (PROTO_BASE+509)
-// N*[ip:32 version:32 ]
+// N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 16 * [ current_statdata:32 ] 16 * [ last_statdata:32 ] ] - vmode = 0 or empty and version < 1.6.21
+// N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 21 * [ current_statdata:32 ] 21 * [ last_statdata:32 ] ] - vmode = 0 or empty and version == 1.6.21
+// stats:16 N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 0 or empty and version > 1.6.21
+// stats:16 N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 1 (valid since version 1.6.26)
+// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 2 (valid since version 1.7.8)
+// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 2 (valid since version 3.0.72)
 
 
 // 0x01FE
@@ -1507,7 +1520,9 @@
 
 // 0x0209
 #define MATOCL_EXPORTS_INFO (PROTO_BASE+521)
-// N*[ fromip:32 toip:32 pleng:32 path:plengB extraflags:8 sesflags:8 rootuid:32 rootgid:32 ]
+// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 ] - vmode = 0 (or not present)
+// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ] - vmode = 1 (valid since version 1.6.26)
+// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ] - vmode = 2 (valid since version 3.0.72)
 
 
 // 0x020A

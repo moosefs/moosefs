@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -67,6 +67,7 @@ typedef struct session {
 	uint32_t peerip;
 	uint8_t closed;
 	uint8_t sesflags;
+	uint16_t umaskval;
 	uint8_t mingoal;
 	uint8_t maxgoal;
 	uint32_t mintrashtime;
@@ -163,12 +164,12 @@ static inline void sessions_clean_session(session *sesdata) {
 
 uint8_t sessions_store(bio *fd) {
 	session *asesdata;
-	uint8_t fsesrecord[55+SESSION_STATS*8]; // 4+4+4+4+1+1+1+4+4+4+4+4+4+SESSION_STATS*4+SESSION_STATS*4
+	uint8_t fsesrecord[57+SESSION_STATS*8]; // 4+4+4+4+1+1+1+4+4+4+4+4+4+SESSION_STATS*4+SESSION_STATS*4
 	uint8_t *ptr;
 	int i;
 	uint32_t hpos;
 	if (fd==NULL) {
-		return 0x13;
+		return 0x14;
 	}
 	ptr = fsesrecord;
 	put32bit(&ptr,nextsessionid);
@@ -186,6 +187,7 @@ uint8_t sessions_store(bio *fd) {
 				put32bit(&ptr,asesdata->peerip);
 				put32bit(&ptr,asesdata->rootinode);
 				put8bit(&ptr,asesdata->sesflags);
+				put16bit(&ptr,asesdata->umaskval);
 				put8bit(&ptr,asesdata->mingoal);
 				put8bit(&ptr,asesdata->maxgoal);
 				put32bit(&ptr,asesdata->mintrashtime);
@@ -201,7 +203,7 @@ uint8_t sessions_store(bio *fd) {
 				for (i=0 ; i<SESSION_STATS ; i++) {
 					put32bit(&ptr,asesdata->lasthouropstats[i]);
 				}
-				if (bio_write(fd,fsesrecord,(55+SESSION_STATS*8))!=(55+SESSION_STATS*8)) {
+				if (bio_write(fd,fsesrecord,(57+SESSION_STATS*8))!=(57+SESSION_STATS*8)) {
 					return 0xFF;
 				}
 				if (asesdata->ileng>0) {
@@ -212,8 +214,8 @@ uint8_t sessions_store(bio *fd) {
 			}
 		}
 	}
-	memset(fsesrecord,0,(55+SESSION_STATS*8));
-	if (bio_write(fd,fsesrecord,(55+SESSION_STATS*8))!=(55+SESSION_STATS*8)) {
+	memset(fsesrecord,0,(57+SESSION_STATS*8));
+	if (bio_write(fd,fsesrecord,(57+SESSION_STATS*8))!=(57+SESSION_STATS*8)) {
 		return 0xFF;
 	}
 	return 0;
@@ -258,8 +260,10 @@ int sessions_load(bio *fd,uint8_t mver) {
 		recsize = 43+statsinfile*8;
 	} else if (mver<0x13) {
 		recsize = 47+statsinfile*8;
-	} else {
+	} else if (mver<0x14) {
 		recsize = 55+statsinfile*8;
+	} else {
+		recsize = 57+statsinfile*8;
 	}
 	fsesrecord = malloc(recsize);
 	passert(fsesrecord);
@@ -284,6 +288,11 @@ int sessions_load(bio *fd,uint8_t mver) {
 			asesdata->peerip = get32bit(&ptr);
 			asesdata->rootinode = get32bit(&ptr);
 			asesdata->sesflags = get8bit(&ptr);
+			if (mver>=0x14) {
+				asesdata->umaskval = get16bit(&ptr);
+			} else {
+				asesdata->umaskval = 0;
+			}
 			asesdata->mingoal = get8bit(&ptr);
 			asesdata->maxgoal = get8bit(&ptr);
 			asesdata->mintrashtime = get32bit(&ptr);
@@ -434,6 +443,7 @@ int sessions_import_data(void) {
 			asesdata->peerip = get32bit(&ptr);
 			asesdata->rootinode = get32bit(&ptr);
 			asesdata->sesflags = get8bit(&ptr);
+			asesdata->umaskval = 0;
 			if (goaltrashdata) {
 				asesdata->mingoal = get8bit(&ptr);
 				asesdata->maxgoal = get8bit(&ptr);
@@ -539,7 +549,11 @@ uint32_t sessions_datasize(uint8_t vmode) {
 					}
 				}
 			} else {
-				size += 56+SESSION_STATS*8;
+				if (vmode<3) {
+					size += 56+SESSION_STATS*8;
+				} else {
+					size += 58+SESSION_STATS*8;
+				}
 				size += sesdata->ileng;
 				if (sesdata->rootinode==0) {
 					size += 1;
@@ -643,6 +657,9 @@ void sessions_datafill(uint8_t *ptr,uint8_t vmode) {
 					}
 				}
 				put8bit(&ptr,sesdata->sesflags);
+				if (vmode>=3) {
+					put16bit(&ptr,sesdata->umaskval);
+				}
 				put32bit(&ptr,sesdata->rootuid);
 				put32bit(&ptr,sesdata->rootgid);
 				put32bit(&ptr,sesdata->mapalluid);
@@ -662,7 +679,7 @@ void sessions_datafill(uint8_t *ptr,uint8_t vmode) {
 	}
 }
 
-static inline void* sessions_create_session(uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
+static inline void* sessions_create_session(uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint16_t umaskval,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
 	session *sesdata;
 	uint32_t hpos;
 
@@ -672,6 +689,7 @@ static inline void* sessions_create_session(uint64_t exportscsum,uint32_t rootin
 	sesdata->exportscsum = exportscsum;
 	sesdata->rootinode = rootinode;
 	sesdata->sesflags = (sesflags&(~SESFLAG_METARESTORE));
+	sesdata->umaskval = umaskval;
 	sesdata->rootuid = rootuid;
 	sesdata->rootgid = rootgid;
 	sesdata->mapalluid = mapalluid;
@@ -706,17 +724,18 @@ static inline void* sessions_create_session(uint64_t exportscsum,uint32_t rootin
 	sesdata->next = sessionshashtab[hpos];
 	sessionshashtab[hpos] = sesdata;
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		changelog("%" PRIu32 "|SESADD(#%"PRIu64",%"PRIu32",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%s):%"PRIu32,main_time(),exportscsum,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,changelog_escape_name(ileng,(uint8_t*)info),sesdata->sessionid);
+		changelog("%" PRIu32 "|SESADD(#%"PRIu64",%"PRIu32",%"PRIu8",0%03"PRIo16",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%s):%"PRIu32,main_time(),exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,changelog_escape_name(ileng,(uint8_t*)info),sesdata->sessionid);
 	} else {
 		meta_version_inc();
 	}
 	return sesdata;
 }
 
-static inline void sessions_change_session(session *sesdata,uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
+static inline void sessions_change_session(session *sesdata,uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint16_t umaskval,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
 	sesdata->rootinode = rootinode;
 	sesdata->exportscsum = exportscsum;
 	sesdata->sesflags = (sesflags&(~SESFLAG_METARESTORE));
+	sesdata->umaskval = umaskval;
 	sesdata->rootuid = rootuid;
 	sesdata->rootgid = rootgid;
 	sesdata->mapalluid = mapalluid;
@@ -744,39 +763,39 @@ static inline void sessions_change_session(session *sesdata,uint64_t exportscsum
 	}
 
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		changelog("%" PRIu32 "|SESCHANGED(%"PRIu32",#%"PRIu64",%"PRIu32",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%s)",main_time(),sesdata->sessionid,exportscsum,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,changelog_escape_name(ileng,info));
+		changelog("%" PRIu32 "|SESCHANGED(%"PRIu32",#%"PRIu64",%"PRIu32",%"PRIu8",0%03"PRIo16",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%"PRIu32",%s)",main_time(),sesdata->sessionid,exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,changelog_escape_name(ileng,info));
 	} else {
 		meta_version_inc();
 	}
 }
 
-void* sessions_new_session(uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
+void* sessions_new_session(uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint16_t umaskval,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
 	session *sesdata;
-	sesdata = sessions_create_session(exportscsum,rootinode,sesflags&(~SESFLAG_METARESTORE),rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
+	sesdata = sessions_create_session(exportscsum,rootinode,sesflags&(~SESFLAG_METARESTORE),umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
 	return sesdata;
 }
 
-uint8_t sessions_mr_sesadd(uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng,uint32_t sessionid) {
+uint8_t sessions_mr_sesadd(uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint16_t umaskval,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng,uint32_t sessionid) {
 	session *sesdata;
-	sesdata = sessions_create_session(exportscsum,rootinode,sesflags|SESFLAG_METARESTORE,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
+	sesdata = sessions_create_session(exportscsum,rootinode,sesflags|SESFLAG_METARESTORE,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
 	if (sesdata->sessionid!=sessionid) {
 		return MFS_ERROR_MISMATCH;
 	}
 	return MFS_STATUS_OK;
 }
 
-void sessions_chg_session(void *vsesdata,uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
+void sessions_chg_session(void *vsesdata,uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint16_t umaskval,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
 	session *sesdata = (session*)vsesdata;
-	sessions_change_session(sesdata,exportscsum,rootinode,sesflags&(~SESFLAG_METARESTORE),rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
+	sessions_change_session(sesdata,exportscsum,rootinode,sesflags&(~SESFLAG_METARESTORE),umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
 }
 
-uint8_t sessions_mr_seschanged(uint32_t sessionid,uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
+uint8_t sessions_mr_seschanged(uint32_t sessionid,uint64_t exportscsum,uint32_t rootinode,uint8_t sesflags,uint16_t umaskval,uint32_t rootuid,uint32_t rootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t peerip,const uint8_t *info,uint32_t ileng) {
 	session *sesdata;
 	sesdata = sessions_find_session(sessionid);
 	if (sesdata==NULL) {
 		return MFS_ERROR_MISMATCH;
 	}
-	sessions_change_session(sesdata,exportscsum,rootinode,sesflags|SESFLAG_METARESTORE,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
+	sessions_change_session(sesdata,exportscsum,rootinode,sesflags|SESFLAG_METARESTORE,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
 	return MFS_STATUS_OK;
 }
 
@@ -852,6 +871,11 @@ uint32_t sessions_get_rootinode(void *vsesdata) {
 uint32_t sessions_get_sesflags(void *vsesdata) {
 	session *sesdata = (session*)vsesdata;
 	return sesdata->sesflags | ((sesdata->infoversion>=VERSION2INT(1,7,32))?SESFLAG_ATTRBIT:0);
+}
+
+uint16_t sessions_get_umask(void *vsesdata) {
+	session *sesdata = (session*)vsesdata;
+	return sesdata->umaskval;
 }
 
 uint8_t sessions_is_root_remapped(void *vsesdata) {

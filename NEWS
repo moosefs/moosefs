@@ -1,5 +1,17 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.72-1 (2016-02-04)
+
+  - (master+cgi+cli) added global 'umask' option to exports.cfg
+  - (all) changed address of FSF in GPL licence text
+  - (debian) removed obsolete conffiles
+  - (debian) fixed copyright file
+  - (mount) fixed parsing mfsmount.cfg (system options like nodev,noexec etc. were ommited)
+  - (master) changed way how cs internal rebalance state is treated by master (as 'grace' state instead of 'overloaded')
+  - (mount) fixed bug in read module (setting etab after ranges realloc)
+  - (tools) removed obsoleted command 'mfssnapshot'
+  - (master) fixed 'segfault' in rare case (removing flock with non-existent waiting session)
+
 * MooseFS 3.0.71-1 (2016-01-21)
 
   - (master) fixed emptying trash issue (intr. in 3.0.64)

@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -358,6 +358,7 @@ uint8_t matocsserv_check_password(const uint8_t rndcode[32],const uint8_t csdige
 void matocsserv_log_extra_info(void) {
 	matocsserventry *eptr;
 	double dur;
+	const char *hlstatus_name;
 	uint8_t overloaded;
 	uint8_t maintained;
 	uint32_t now = main_time();
@@ -369,7 +370,26 @@ void matocsserv_log_extra_info(void) {
 			}
 			overloaded = csdb_server_is_overloaded(eptr->csptr,now)?1:0;
 			maintained = csdb_server_is_being_maintained(eptr->csptr)?1:0;
-			syslog(LOG_NOTICE,"cs %s:%u ; usedspace: %"PRIu64" ; totalspace: %"PRIu64" ; usage: %.2lf%% ; load: %"PRIu32" ; timeout: %"PRIu16" ; chunkscount: %"PRIu32" ; errorcounter: %"PRIu32" ; writecounter: %"PRIu16" ; rrepcounter: %"PRIu16" ; wrepcounter: %"PRIu16" ; delcounter: %"PRIu32" ; create_total: %"PRIu32" ; rrep_total: %"PRIu32" ; wrep_total: %"PRIu32" ; del_total: %"PRIu32" ; create/s: %.4lf ; rrep/s: %.4lf ; wrep/s: %.4lf ; del/s: %.4lf ; csid: %"PRIu16" ; privflag: %"PRIu8" ; dist: %"PRIu32" ; first: %"PRIu8" ; corr: %.4lf ; hlstatus: %"PRIu8" ; overloaded: %"PRIu8" ; maintained: %"PRIu8,eptr->servstrip,eptr->servport,eptr->usedspace,eptr->totalspace,100.0*(double)(eptr->usedspace)/(double)(eptr->totalspace),eptr->load,eptr->timeout,eptr->chunkscount,eptr->errorcounter,eptr->writecounter,eptr->rrepcounter,eptr->wrepcounter,eptr->delcounter,eptr->create_total_counter,eptr->rrep_total_counter,eptr->wrep_total_counter,eptr->del_total_counter,eptr->create_total_counter/dur,eptr->rrep_total_counter/dur,eptr->wrep_total_counter/dur,eptr->del_total_counter/dur,eptr->csid,eptr->privflag,eptr->dist,eptr->first,eptr->corr,eptr->hlstatus,overloaded,maintained);
+			switch (eptr->hlstatus) {
+				case HLSTATUS_DEFAULT:
+					hlstatus_name = "DEFAULT";
+					break;
+				case HLSTATUS_OK:
+					hlstatus_name = "OK";
+					break;
+				case HLSTATUS_OVERLOADED:
+					hlstatus_name = "OVERLOADED";
+					break;
+				case HLSTATUS_REBALANCE:
+					hlstatus_name = "REBALANCE";
+					break;
+				case HLSTATUS_GRACEFUL:
+					hlstatus_name = "GRACEFUL";
+					break;
+				default:
+					hlstatus_name = "UNKNOWN";
+			}
+			syslog(LOG_NOTICE,"cs %s:%u ; usedspace: %"PRIu64" ; totalspace: %"PRIu64" ; usage: %.2lf%% ; load: %"PRIu32" ; timeout: %"PRIu16" ; chunkscount: %"PRIu32" ; errorcounter: %"PRIu32" ; writecounter: %"PRIu16" ; rrepcounter: %"PRIu16" ; wrepcounter: %"PRIu16" ; delcounter: %"PRIu32" ; create_total: %"PRIu32" ; rrep_total: %"PRIu32" ; wrep_total: %"PRIu32" ; del_total: %"PRIu32" ; create/s: %.4lf ; rrep/s: %.4lf ; wrep/s: %.4lf ; del/s: %.4lf ; csid: %"PRIu16" ; privflag: %"PRIu8" ; dist: %"PRIu32" ; first: %"PRIu8" ; corr: %.4lf ; hlstatus: %"PRIu8" (%s) ; overloaded: %"PRIu8" ; maintained: %"PRIu8,eptr->servstrip,eptr->servport,eptr->usedspace,eptr->totalspace,100.0*(double)(eptr->usedspace)/(double)(eptr->totalspace),eptr->load,eptr->timeout,eptr->chunkscount,eptr->errorcounter,eptr->writecounter,eptr->rrepcounter,eptr->wrepcounter,eptr->delcounter,eptr->create_total_counter,eptr->rrep_total_counter,eptr->wrep_total_counter,eptr->del_total_counter,eptr->create_total_counter/dur,eptr->rrep_total_counter/dur,eptr->wrep_total_counter/dur,eptr->del_total_counter/dur,eptr->csid,eptr->privflag,eptr->dist,eptr->first,eptr->corr,eptr->hlstatus,hlstatus_name,overloaded,maintained);
 			eptr->create_total_counter = 0;
 			eptr->rrep_total_counter = 0;
 			eptr->wrep_total_counter = 0;
@@ -469,11 +489,10 @@ uint16_t matocsserv_getservers_ordered(uint16_t csids[MAXCSCOUNT]) {
 	} servtab[MAXCSCOUNT];
 	matocsserventry *eptr;
 	uint32_t i,scnt;
-	uint32_t now = main_time();
 
 	scnt = 0;
 	for (eptr = matocsservhead ; eptr && scnt<MAXCSCOUNT; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && (csdb_server_is_overloaded(eptr->csptr,now)==0 || eptr->hlstatus==1) && csdb_server_is_being_maintained(eptr->csptr)==0) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && (eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0) {
 			servtab[scnt].csid = eptr->csid;
 			servtab[scnt].space = (double)(eptr->usedspace) / (double)(eptr->totalspace);
 			scnt++;
@@ -721,7 +740,6 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 	uint32_t gracecnt;
 	uint32_t allcnt;
 	uint32_t totalcnt;
-	uint32_t now = main_time();
 
 	gracecnt = 0;
 	allcnt = 0;
@@ -735,12 +753,12 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
 			allcsids[*allcscnt] = eptr->csid;
 			(*allcscnt)++;
-		       	if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus<2) {
+		       	if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
 				totalcnt++;
 				olcsids[*olcscnt] = eptr->csid;
 				(*olcscnt)++;
 				if ((eptr->privflag & 2) == 0) {
-					if ((csdb_server_is_overloaded(eptr->csptr,now) && eptr->hlstatus!=1) || csdb_server_is_being_maintained(eptr->csptr)) {
+					if ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr)) {
 						gracecnt++;
 					} else {
 						stdcsids[*stdcscnt] = eptr->csid;
@@ -759,8 +777,8 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 
 	if ((gracecnt*5) > (gracecnt+allcnt)) { // there are more than 20% CS in 'grace' state - add all of them to the list
 		for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->csptr!=NULL && eptr->hlstatus<2) {
-				if ((eptr->privflag & 2)==0 && ((csdb_server_is_overloaded(eptr->csptr,now) && eptr->hlstatus!=1) || csdb_server_is_being_maintained(eptr->csptr))) {
+			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->csptr!=NULL && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
+				if ((eptr->privflag & 2)==0 && ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr))) {
 					stdcsids[*stdcscnt] = eptr->csid;
 					(*stdcscnt)++;
 				}
@@ -777,7 +795,7 @@ uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *over
 	uint32_t allcnt;
 	uint32_t totalcnt;
 //	uint32_t wspacecnt;
-	uint32_t now = main_time();
+//	uint32_t now = main_time();
 
 //	matocsserv_recalc_createflag(tolerance);
 
@@ -801,11 +819,11 @@ uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *over
 
 	for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
 		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
-		       	if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus<2) {
+		       	if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
 				totalcnt++;
 				if ((eptr->privflag & 2) == 0) {
 	//			if (eptr->cancreatechunks) {
-					if ((csdb_server_is_overloaded(eptr->csptr,now) && eptr->hlstatus!=1) || csdb_server_is_being_maintained(eptr->csptr)) {
+					if ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr)) {
 						gracecnt++;
 					} else {
 						servtab[allcnt] = eptr;
@@ -820,10 +838,10 @@ uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *over
 		}
 	}
 
-	if ((gracecnt*5) > (gracecnt+allcnt)) { // there are more than 20% CS in 'grace' state - add all of them to the list
+	if ((gracecnt*5) > (gracecnt+allcnt)) { // there are more than 20% CS in 'grace' or 'rebalance' state - add all of them to the list
 		for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->csptr!=NULL && eptr->hlstatus<2) {
-				if ((eptr->privflag & 2)==0 && ((csdb_server_is_overloaded(eptr->csptr,now) && eptr->hlstatus!=1) || csdb_server_is_being_maintained(eptr->csptr))) {
+			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->csptr!=NULL && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
+				if ((eptr->privflag & 2)==0 && ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr))) {
 //				if (eptr->cancreatechunks && csdb_server_is_overloaded(eptr->csptr,now)) {
 					servtab[allcnt] = eptr;
 					allcnt++;
@@ -856,7 +874,7 @@ uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replim
 	*allservflag = 1; // 1 means that there are no servers which reached replication limit
 	for (eptr = matocsservhead ; eptr && j<MAXCSCOUNT; eptr=eptr->next) {
 		a = ((uint32_t)(eptr->csid*UINT32_C(0x9874BF31)+now*UINT32_C(0xB489FC37)))/4294967296.0;
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(eptr->totalspace/100) && eptr->csptr!=NULL && (csdb_server_is_overloaded(eptr->csptr,now)==0 || eptr->hlstatus==1) && csdb_server_is_being_maintained(eptr->csptr)==0) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(eptr->totalspace/100) && eptr->csptr!=NULL && (eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0) {
 			if (eptr->wrepcounter+a<replimit) {
 				csids[j] = eptr->csid;
 				j++;
@@ -945,7 +963,7 @@ void matocsserv_getservdata(void *e,uint32_t *ver,uint64_t *uspc,uint64_t *tspc,
 		*tdchunkcnt = 0;
 		*errcnt = 0;
 		*load = 0;
-		*hlstatus = 0;
+		*hlstatus = HLSTATUS_DEFAULT;
 		*labelmask = 0;
 		*mfrstatus = 0;
 	}
@@ -1026,6 +1044,22 @@ void matocsserv_want_to_be_privileged(void *dst,void *src) {
 			dsteptr->privflag |= 2;
 		} else {
 			dstfilled = 1;
+		}
+	}
+}
+
+void matocsserv_hlstatus_fix(void) {
+	matocsserventry *eptr;
+	uint32_t now = main_time();
+	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->csptr!=NULL) {
+			if (eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_GRACEFUL) {
+				if (csdb_server_is_overloaded(eptr->csptr,now)) {
+					eptr->hlstatus = HLSTATUS_GRACEFUL;
+				} else {
+					eptr->hlstatus = HLSTATUS_DEFAULT;
+				}
+			}
 		}
 	}
 }
@@ -2404,7 +2438,7 @@ void matocsserv_serve(struct pollfd *pdesc) {
 			eptr->servport = 0;
 			eptr->timeout = DefaultTimeout;
 			eptr->load = 0;
-			eptr->hlstatus = 0;
+			eptr->hlstatus = HLSTATUS_DEFAULT;
 			eptr->usedspace = 0;
 			eptr->totalspace = 0;
 			eptr->chunkscount = 0;
@@ -2655,6 +2689,7 @@ int matocsserv_init(void) {
 	main_keepalive_register(matocsserv_keep_alive);
 	main_info_register(matocsserv_log_extra_info);
 	main_time_register(1,0,matocsserv_privileged_cleanup);
+	main_time_register(1,0,matocsserv_hlstatus_fix);
 //	main_time_register(TIMEMODE_SKIP_LATE,60,0,matocsserv_status);
 	return 0;
 }

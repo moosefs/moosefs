@@ -57,11 +57,6 @@ mfstools_SOURCES=\
 
 mfstools_CFLAGS=
 
-EXTRA_DIST = $(bin_SCRIPTS)
-
-bin_SCRIPTS=\
-	mfssnapshot
-
 mfstools_links=\
 	mfscheckfile mfsdirinfo mfsfileinfo mfsfilerepair \
 	mfsgetgoal mfsgettrashtime mfsrgetgoal mfsrgettrashtime \

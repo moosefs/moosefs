@@ -25,7 +25,6 @@ bin/mfssetquota
 bin/mfsdelquota
 bin/mfscopyquota
 bin/mfsfilepaths
-bin/mfssnapshot
 bin/mfsmount
 bin/mfstools
 man/man1/mfsappendchunks.1.gz

@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-echo "mfssnapshot is deprecated, use mfsappendchunks instead or consider using mfsmakesnapshot"
-mfsappendchunks "$@"

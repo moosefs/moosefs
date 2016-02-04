@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -305,11 +305,11 @@ void csdb_servlist_data(uint8_t *ptr) {
 				uint64_t usedspace,totalspace,tdusedspace,tdtotalspace;
 				uint8_t hlstatus,mfrstatus;
 				matocsserv_getservdata(csptr->eptr,&version,&usedspace,&totalspace,&chunkscount,&tdusedspace,&tdtotalspace,&tdchunkscount,&errorcounter,&load,&hlstatus,&labelmask,&mfrstatus);
-				if (hlstatus==1) {
+				if (hlstatus==HLSTATUS_OK) {
 					gracetime = 0;
-				} else if (hlstatus==2) {
+				} else if (hlstatus==HLSTATUS_OVERLOADED) {
 					gracetime = 0xC0000000;
-				} else if (hlstatus==3) {
+				} else if (hlstatus==HLSTATUS_REBALANCE) {
 					gracetime = 0x80000000;
 				}
 				put32bit(&ptr,version&0xFFFFFF);

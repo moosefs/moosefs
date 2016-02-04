@@ -6,6 +6,7 @@ sbin/mfscsstatsdump
 man/man5/mfschunkserver.cfg.5.gz
 man/man5/mfshdd.cfg.5.gz
 man/man8/mfschunkserver.8.gz
+man/man8/mfschunktool.8.gz
 man/man8/mfscsstatsdump.8.gz
 @owner mfs
 @group mfs

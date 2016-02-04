@@ -1,41 +1,24 @@
-.TH mfsnetdump "8" "February 2016" "MooseFS 3.0.72-1" "This is part of MooseFS"
+.TH mfschunktool "8" "February 2016" "MooseFS 3.0.72-1" "This is part of MooseFS"
 .SH NAME
-mfsnetdump \- dump network traffic as mfs packets
+mfschunktool - checks chunk integrity offline
 .SH SYNOPSIS
-.B mfsnetdump
-[\fB\-r\fP \fIPCAP_FILE\fP]
-[\fB\-i\fP \fIINTERFACE\fP]
-[\fB\-f\fP \fIPCAP_FILTER\fP]
-[\fB\-c\fP \fIPCOUNT\fP]
-[\fB\-s\fP \fIMBYTES\fP]
-[\fB\-e\fP \fICOMMANDS\fP]
-[\fB\-o\fP \fICOMMANDS\fP]
-.PP
+\fBmfschunktool\fP 
+[\fB\-f\fP]
+[\fB\-r\fP]
+\fIchunk_file\fP ...
 .SH DESCRIPTION
+\fBmfschunktool\fP checks chunk integrity using stored CRC checksums in chunk's header.
+It can also 'repair' chunk (fix stored checksums). This tool may be useful to check last
+written chunks after possible data corruption (power down etc.)
 .PP
-\fBmfsnetdump\fP is an internal diagnostic tool similar to tcpdump, but specialized for MooseFS.
-.SH OPTIONS
-.TP
-\fB\-r\fP
-specify PCAP file to read packets from
-.TP
-\fB\-i\fP
-dump packets using given network interface
+Options:
 .TP
 \fB\-f\fP
-define pcap filter to filter packets
+turn on fast mode (in this mode only last block is tested - usually this is enough to find corrupted chunks)
 .TP
-\fB\-c\fP
-dump only \fIPCOUNT\fP packets and exit
-.TP
-\fB\-s\fP
-dump only first \fIMBYTES\fP bytes of each packet
-.TP
-\fB\-e\fP
-do not display given commands
-.TP
-\fB\-o\fP
-show only given commands
+\fB\-r\fP
+turn on repair mode (if checksums on given chunk don't match then they will be overwritten by checksums calculated using actual data)
+.PP
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT
@@ -56,3 +39,5 @@ You should have received a copy of the GNU General Public License
 along with MooseFS; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfschunkserver (8)

@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
 */
 
@@ -1652,6 +1652,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 							ranges[0] += 10;
 							ranges = realloc(ranges,sizeof(uint64_t)*(ranges[0]+1));
 							passert(ranges);
+							etab = ranges+1;
 							zassert(pthread_setspecific(rangesstorage,ranges));
 						}
 						etab[edges++] = rreq->offset;
@@ -1664,6 +1665,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 							ranges[0] += 10;
 							ranges = realloc(ranges,sizeof(uint64_t)*(ranges[0]+1));
 							passert(ranges);
+							etab = ranges+1;
 							zassert(pthread_setspecific(rangesstorage,ranges));
 						}
 						etab[edges++] = rreq->offset+rreq->leng;

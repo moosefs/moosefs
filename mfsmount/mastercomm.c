@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -808,6 +808,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	uint8_t havepassword;
 	uint32_t pleng,ileng;
 	uint8_t sesflags;
+	uint16_t umaskval;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint8_t mingoal,maxgoal;
 	uint32_t mintrashtime,maxtrashtime;
@@ -1028,7 +1029,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 			return -1;
 		}
 		i = get32bit(&rptr);
-		if (!(i==1 || i==4 || (cargs->meta && (i==19 || i==27)) || (cargs->meta==0 && (i==35 || i==43)))) {
+		if (!(i==1 || i==4 || (cargs->meta && (i==19 || i==27)) || (cargs->meta==0 && (i==35 || i==43 || i==45)))) {
 			if (oninit) {
 				fprintf(stderr,"got incorrect answer from mfsmaster\n");
 			} else {
@@ -1128,16 +1129,22 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 		return -1;
 	}
 	sessionid = get32bit(&rptr);
-	if ((cargs->meta && i==27) || (cargs->meta==0 && i==43)) {
+	if ((cargs->meta && i==27) || (cargs->meta==0 && (i==43 || i==45))) {
 		metaid = get64bit(&rptr);
 	}
 	sesflags = get8bit(&rptr);
 	if (!cargs->meta) {
+		if (i==45) {
+			umaskval = get16bit(&rptr);
+		} else {
+			umaskval = 0;
+		}
 		rootuid = get32bit(&rptr);
 		rootgid = get32bit(&rptr);
 		mapalluid = get32bit(&rptr);
 		mapallgid = get32bit(&rptr);
 	} else {
+		umaskval = 0;
 		rootuid = 0;
 		rootgid = 0;
 		mapalluid = 0;
@@ -1183,6 +1190,9 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 				fprintf(stderr," ; users mapped to %"PRIu32":%"PRIu32,mapalluid,mapallgid);
 			}
 #else
+			if (umaskval!=0) {
+				fprintf(stderr," ; global umask set to 0%03"PRIo16,umaskval);
+			}
 			fprintf(stderr," ; root mapped to ");
 			getpwuid_r(rootuid,&pwd,pwdgrpbuff,16384,&pw);
 	//		pw = getpwuid(rootuid);

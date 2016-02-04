@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -58,6 +58,7 @@ typedef struct _exports {
 	uint8_t sesflags;
 	uint8_t mingoal;
 	uint8_t maxgoal;
+	uint16_t umask;
 	uint32_t mintrashtime;
 	uint32_t maxtrashtime;
 	uint32_t rootuid;
@@ -73,7 +74,7 @@ static char *ExportsFileName;
 
 uint64_t exports_entry_checksum(exports *e) {
 	uint64_t csum;
-	uint8_t edata[56];
+	uint8_t edata[58];
 	uint8_t *ptr;
 	uint32_t crc,murmur;
 
@@ -91,14 +92,15 @@ uint64_t exports_entry_checksum(exports *e) {
 	put8bit(&ptr,e->sesflags);
 	put8bit(&ptr,e->mingoal);
 	put8bit(&ptr,e->maxgoal);
+	put16bit(&ptr,e->umask);
 	put32bit(&ptr,e->mintrashtime);
 	put32bit(&ptr,e->maxtrashtime);
 	put32bit(&ptr,e->rootuid);
 	put32bit(&ptr,e->rootgid);
 	put32bit(&ptr,e->mapalluid);
 	put32bit(&ptr,e->mapallgid);
-	crc = mycrc32(0xFFFFFFFF,edata,56);
-	murmur = murmur3_32(edata,56,0);
+	crc = mycrc32(0xFFFFFFFF,edata,58);
+	murmur = murmur3_32(edata,58,0);
 	if (e->pleng>0) {
 		crc = mycrc32(crc,e->path,e->pleng);
 		murmur = murmur3_32(e->path,e->pleng,murmur);
@@ -153,11 +155,18 @@ char* exports_strsep(char **stringp, const char *delim) {
 uint32_t exports_info_size(uint8_t versmode) {
 	exports *e;
 	uint32_t size=0;
+	uint32_t add=0;
+	if (versmode>0) {
+		add+=10;
+	}
+	if (versmode>1) {
+		add+=2;
+	}
 	for (e=exports_records ; e ; e=e->next) {
 		if (e->meta) {
-			size+=35+((versmode)?10:0);
+			size+=35+add;
 		} else {
-			size+=35+((versmode)?10:0)+e->pleng;
+			size+=35+add+e->pleng;
 		}
 	}
 	return size;
@@ -182,11 +191,14 @@ void exports_info_data(uint8_t versmode,uint8_t *buff) {
 		put32bit(&buff,e->minversion);
 		put8bit(&buff,(e->alldirs?1:0)+(e->needpassword?2:0));
 		put8bit(&buff,e->sesflags);
+		if (versmode>1) {
+			put16bit(&buff,e->umask);
+		}
 		put32bit(&buff,e->rootuid);
 		put32bit(&buff,e->rootgid);
 		put32bit(&buff,e->mapalluid);
 		put32bit(&buff,e->mapallgid);
-		if (versmode) {
+		if (versmode>0) {
 			put8bit(&buff,e->mingoal);
 			put8bit(&buff,e->maxgoal);
 			put32bit(&buff,e->mintrashtime);
@@ -195,7 +207,7 @@ void exports_info_data(uint8_t versmode,uint8_t *buff) {
 	}
 }
 
-uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime) {
+uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime) {
 	const uint8_t *p;
 	uint32_t pleng,i;
 	uint8_t rndstate;
@@ -307,6 +319,7 @@ uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uin
 		return MFS_ERROR_EACCES;
 	}
 	*sesflags = f->sesflags;
+	*umaskval = f->umask;
 	*rootuid = f->rootuid;
 	*rootgid = f->rootgid;
 	*mapalluid = f->mapalluid;
@@ -342,6 +355,7 @@ void exports_freelist(exports *arec) {
 //  dynamicip
 //  ignoregid
 //  admin
+//  umask=0###
 //  mingoal=#
 //  maxgoal=#
 //  mintrashtime=[#w][#d][#h][#m][#[s]]
@@ -470,6 +484,15 @@ int exports_parsegoal(char *goalstr,uint8_t *goal) {
 		return -1;
 	}
 	*goal = *goalstr-'0';
+	return 0;
+}
+
+// we only accept octal format: 0###
+int exports_parseumask(char *umaskstr,uint16_t *umaskval) {
+	if (*umaskstr!='0' || umaskstr[1]<'0' || umaskstr[1]>'7' || umaskstr[2]<'0' || umaskstr[2]>'7' || umaskstr[3]<'0' || umaskstr[3]>'7') {
+		return -1;
+	}
+	*umaskval = (umaskstr[1]-'0') * 64 + (umaskstr[2]-'0') * 8 + (umaskstr[3]-'0');
 	return 0;
 }
 
@@ -859,6 +882,15 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 				}
 			}
 			break;
+		case 'u':
+			if (strncmp(p,"umask=",6)==0) {
+				if (exports_parseumask(p+6,&arec->umask)<0) {
+					mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect umask definition (%s) in line: %"PRIu32,p,lineno);
+					return -1;
+				}
+				o=1;
+			}
+			break;
 		case 'p':
 			if (strncmp(p,"password=",9)==0) {
 				md5_init(&ctx);
@@ -892,6 +924,7 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec,exports **default
 		arec->meta = 0;
 		arec->rootredefined = 0;
 		arec->sesflags = SESFLAG_READONLY;
+		arec->umask = 0;
 		arec->mingoal = 1;
 		arec->maxgoal = 9;
 		arec->mintrashtime = 0;

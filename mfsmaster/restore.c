@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -753,6 +753,7 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootinode,sesflags,peerip,sessionid;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
+	uint16_t umaskval;
 	uint64_t exportscsum;
 	uint32_t ileng;
 	static uint8_t *info = NULL;
@@ -771,6 +772,16 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(sesflags,ptr);
 	EAT(ptr,filename,lv,',');
+	if (*ptr=='0') {
+		if (ptr[1]<'0' || ptr[1]>'7' || ptr[1]<'0' || ptr[1]>'7' || ptr[1]<'0' || ptr[1]>'7') {
+			return -1;
+		}
+		umaskval = (ptr[1]-'0') * 64 + (ptr[2]-'0') * 8 + (ptr[3]-'0');
+		ptr+=4;
+		EAT(ptr,filename,lv,',');
+	} else {
+		umaskval=0;
+	}
 	GETU32(rootuid,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(rootgid,ptr);
@@ -793,13 +804,14 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(sessionid,ptr);
-	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng,sessionid);
+	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng,sessionid);
 }
 
 int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootinode,sesflags,peerip,sessionid;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
+	uint16_t umaskval;
 	uint64_t exportscsum;
 	uint32_t ileng;
 	static uint8_t *info = NULL;
@@ -820,6 +832,16 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,',');
 	GETU32(sesflags,ptr);
 	EAT(ptr,filename,lv,',');
+	if (*ptr=='0') {
+		if (ptr[1]<'0' || ptr[1]>'7' || ptr[1]<'0' || ptr[1]>'7' || ptr[1]<'0' || ptr[1]>'7') {
+			return -1;
+		}
+		umaskval = (ptr[1]-'0') * 64 + (ptr[2]-'0') * 8 + (ptr[3]-'0');
+		ptr+=4;
+		EAT(ptr,filename,lv,',');
+	} else {
+		umaskval=0;
+	}
 	GETU32(rootuid,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(rootgid,ptr);
@@ -840,7 +862,7 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,',');
 	GETDATA(info,ileng,infosize,ptr,filename,lv,')');
 	EAT(ptr,filename,lv,')');
-	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
+	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
 }
 
 int do_sesdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

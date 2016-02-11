@@ -1908,6 +1908,10 @@ elif electfound:
 	master_exports_checksum = elect_exports_checksum
 else:
 	masterconn = None
+	master_exports_checksum = 0
+	for sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exports_checksum in masterlistinfo:
+		if exports_checksum!=None:
+			master_exports_checksum |= exports_checksum
 
 if leaderfound and masterconn.version_less_than(1,6,10):
 	if cgimode:

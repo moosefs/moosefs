@@ -444,6 +444,10 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 		namedusers = get16bit(&ptr);
 		namedgroups = get16bit(&ptr);
 		acls = namedusers + namedgroups;
+		if (fs_check_inode(inode)==0) { // silently skip acl's for non-existent inodes
+			bio_skip(fd,6*acls);
+			continue;
+		}
 		if (acltype!=POSIX_ACL_ACCESS && acltype!=POSIX_ACL_DEFAULT) {
 			if (nl) {
 				fputc('\n',stderr);

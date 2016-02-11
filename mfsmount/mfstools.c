@@ -40,9 +40,12 @@
 
 #include "labelparser.h"
 #include "datapack.h"
+#include "massert.h"
 #include "strerr.h"
 #include "mfsstrerr.h"
 #include "sockets.h"
+#include "hashfn.h"
+#include "clocks.h"
 #include "md5.h"
 #include "MFSCommunication.h"
 
@@ -64,6 +67,7 @@ const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 #define DIRINFO_LENGTH 0x10
 #define DIRINFO_SIZE 0x20
 #define DIRINFO_REALSIZE 0x40
+#define DIRINFO_PRECISE 0x80
 
 #define INODE_VALUE_MASK 0x1FFFFFFF
 #define INODE_TYPE_MASK 0x60000000
@@ -468,6 +472,166 @@ void dirname_inplace(char *path) {
 		*endp = '\0';
 	}
 }
+
+
+
+/* ---- CHUNK/INODE SET ROUTINES ---- */
+
+uint64_t sc_upper_power_of_two(uint64_t v) {
+	v--;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	v |= v >> 32;
+	v++;
+	return v;
+}
+
+/* ---- CHUNK SET ---- */
+
+uint64_t *chunkhash;
+uint64_t chunkhashsize;
+uint64_t chunkhashelems;
+
+void sc_chunkset_init(uint64_t chunks) {
+	if (chunks<100000) {
+		chunks = 100000;
+	}
+	chunkhashsize = chunks;
+	chunkhashsize *= 3;
+	chunkhashsize /= 2;
+	chunkhashsize = sc_upper_power_of_two(chunkhashsize);
+	chunkhashelems = 0;
+	chunkhash = malloc(sizeof(uint64_t)*chunkhashsize);
+	memset(chunkhash,0,sizeof(uint64_t)*chunkhashsize);
+}
+
+void sc_chunkset_cleanup(void) {
+	free(chunkhash);
+	chunkhash = NULL;
+	chunkhashsize = 0;
+	chunkhashelems = 0;
+}
+
+uint8_t sc_chunkset_add(uint64_t chunkid) {
+	uint64_t hash = hash64(chunkid);
+	uint64_t disp = (hash>>32)|1;
+	hash &= (chunkhashsize-1);
+	disp &= (chunkhashsize-1);
+	while (chunkhash[hash]!=0) {
+		if (chunkhash[hash]==chunkid) {
+			return 0;
+		}
+		hash += disp;
+		hash &= (chunkhashsize-1);
+	}
+	chunkhash[hash] = chunkid;
+	chunkhashelems++;
+	massert(chunkhashelems*10 <= chunkhashsize*8,"chunk hash overloaded !!!");
+	return 1;
+}
+
+/* ---- INODE SET ---- */
+
+uint32_t *inohash;
+uint64_t inohashsize;
+uint64_t inohashelems;
+
+void sc_inoset_init(uint32_t inodes) {
+	if (inodes<100000) {
+		inodes = 100000;
+	}
+	inohashsize = inodes;
+	inohashsize *= 3;
+	inohashsize /= 2;
+	inohashsize = sc_upper_power_of_two(inohashsize);
+	inohashelems = 0;
+	inohash = malloc(sizeof(uint32_t)*inohashsize);
+	memset(inohash,0,sizeof(uint32_t)*inohashsize);
+}
+
+void sc_inoset_cleanup(void) {
+	free(inohash);
+	inohash = NULL;
+	inohashsize = 0;
+	inohashelems = 0;
+}
+
+/*
+uint8_t sc_inoset_inset(uint32_t inode) {
+	uint64_t hash = hash32mult(inode);
+	uint64_t disp = (hash32(inode))|1;
+	hash &= (inohashsize-1);
+	disp &= (inohashsize-1);
+	while (inohash[hash]!=0) {
+		if (inohash[hash]==inode) {
+			return 1;
+		}
+		hash += disp;
+		hash &= (inohashsize-1);
+	}
+	return 0;
+}
+*/
+uint8_t sc_inoset_add(uint32_t inode) {
+	uint64_t hash = hash32mult(inode);
+	uint64_t disp = (hash32(inode))|1;
+	hash &= (inohashsize-1);
+	disp &= (inohashsize-1);
+	while (inohash[hash]!=0) {
+		if (inohash[hash]==inode) {
+			return 0;
+		}
+		hash += disp;
+		hash &= (inohashsize-1);
+	}
+	inohash[hash] = inode;
+	inohashelems++;
+	massert(inohashelems*10 <= inohashsize*8,"inode hash overloaded !!!");
+	return 1;
+}
+
+/* ---- INODE QUEUE ---- */
+
+typedef struct _inoqueue {
+	uint32_t inode;
+	struct _inoqueue *next;
+} inoqueue;
+
+static inoqueue *qhead,**qtail;
+
+uint8_t sc_dequeue(uint32_t *inode) {
+	inoqueue *iq;
+	if (qhead==NULL) {
+		return 0;
+	} else {
+		iq = qhead;
+		qhead = iq->next;
+		if (qhead==NULL) {
+			qtail = &qhead;
+		}
+		*inode = iq->inode;
+		free(iq);
+		return 1;
+	}
+}
+
+uint8_t sc_enqueue(uint32_t inode) {
+	inoqueue *iq;
+	if (sc_inoset_add(inode)) {
+		iq = malloc(sizeof(inoqueue));
+		iq->inode = inode;
+		iq->next = NULL;
+		*qtail = iq;
+		qtail = &(iq->next);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 
 /*
 int32_t socket_read(int sock,void *buff,uint32_t leng) {
@@ -3048,6 +3212,126 @@ int append_file(const char *fname,const char *afname) {
 	return 0;
 }
 
+static uint32_t dirnode_cnt;
+static uint32_t filenode_cnt;
+static uint32_t touched_inodes;
+static uint64_t sumlength;
+static uint64_t chunk_size_cnt;
+static uint64_t chunk_rsize_cnt;
+
+int sc_node_info(int fd,uint32_t inode) {
+	uint8_t *wptr;
+	const uint8_t *rptr;
+	uint8_t *buff;
+	uint8_t reqbuff[28];
+	uint32_t cmd,leng;
+	uint16_t anstype;
+	uint64_t fleng;
+	uint64_t chunkid;
+	uint32_t chunksize;
+	uint32_t childinode;
+	uint64_t continueid;
+	uint8_t copies;
+
+//	printf("inode: %"PRIu32"\n",inode);
+	continueid = 0;
+	touched_inodes++;
+	do {
+		wptr = reqbuff;
+		put32bit(&wptr,CLTOMA_NODE_INFO);
+		put32bit(&wptr,20);
+		put32bit(&wptr,0);
+		put32bit(&wptr,inode);
+		put32bit(&wptr,500); // 500 !!!
+		put64bit(&wptr,continueid);
+		if (tcpwrite(fd,reqbuff,28)!=28) {
+			printf("inode: %"PRIu32" ; master query: send error\n",inode);
+			return -1;
+		}
+		if (tcpread(fd,reqbuff,8)!=8) {
+			printf("inode: %"PRIu32" ; master query: receive error\n",inode);
+			return -1;
+		}
+		rptr = reqbuff;
+		cmd = get32bit(&rptr);
+		leng = get32bit(&rptr);
+		if (cmd!=MATOCL_NODE_INFO) {
+			printf("inode: %"PRIu32" ; master query: wrong answer (type)\n",inode);
+			return -1;
+		}
+		buff = malloc(leng);
+		if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+			printf("inode: %"PRIu32" ; master query: receive error\n",inode);
+			free(buff);
+			return -1;
+		}
+		rptr = buff;
+		cmd = get32bit(&rptr);  // queryid
+		if (cmd!=0) {
+			printf("inode: %"PRIu32" ; master query: wrong answer (queryid)\n",inode);
+			free(buff);
+			return -1;
+		}
+		leng-=4;
+		if (leng==1) {
+			// error - ignore
+			free(buff);
+			return 0;
+		}
+		if (leng<2) {
+			printf("inode: %"PRIu32" ; master query: wrong answer (size)\n",inode);
+			free(buff);
+			return -1;
+		}
+		anstype = get16bit(&rptr);
+		leng-=2;
+		if (anstype==1 && (leng%4)==0) { // directory
+//			printf("directory\n");
+			if (continueid==0) {
+				dirnode_cnt++;
+			}
+			continueid = get64bit(&rptr);
+//			printf("continueid: %"PRIX64"\n",continueid);
+			leng-=8;
+			while (leng>0) {
+				childinode = get32bit(&rptr);
+				leng-=4;
+//				printf("inode: %"PRIu32"\n",childinode);
+				if (sc_enqueue(childinode)==0) {
+					touched_inodes++; // repeated nodes - increment here
+				}
+			}
+		} else if (anstype==2 && (leng-16)%13==0) { // file
+//			printf("file\n");
+			if (continueid==0) {
+				filenode_cnt++;
+			}
+			continueid = get64bit(&rptr);
+			leng-=8;
+			fleng = get64bit(&rptr);
+			leng-=8;
+//			printf("continueid: %"PRIu64" ; fleng: %"PRIu64"\n",continueid,fleng);
+			sumlength += fleng;
+			while (leng>0) {
+				chunkid = get64bit(&rptr);
+				chunksize = get32bit(&rptr);
+				copies = get8bit(&rptr);
+				leng-=13;
+//				printf("chunk: %016"PRIX64" ; chunksize: %"PRIu32" ; copies:%"PRIu8"\n",chunkid,chunksize,copies);
+				if (sc_chunkset_add(chunkid)) {
+					chunk_size_cnt += chunksize;
+					chunk_rsize_cnt += copies * chunksize;
+				}
+			}
+		} else {
+			continueid = 0;
+		}
+		free(buff);
+	} while (continueid!=0);
+	return 0;
+}
+
+
 int dir_info(uint8_t dirinfomode,const char *fname) {
 	uint8_t reqbuff[16],*wptr,*buff;
 	const uint8_t *rptr;
@@ -3109,7 +3393,6 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 		close_master_conn(1);
 		return -1;
 	}
-	close_master_conn(0);
 	inodes = get32bit(&rptr);
 	dirs = get32bit(&rptr);
 	files = get32bit(&rptr);
@@ -3124,7 +3407,7 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 	size = get64bit(&rptr);
 	realsize = get64bit(&rptr);
 	free(buff);
-	if (dirinfomode==0) {
+	if (dirinfomode==0 || dirinfomode==DIRINFO_PRECISE) {
 		printf("%s:\n",fname);
 		print_number(" inodes:       ","\n",inodes,0,0,1);
 		print_number("  directories: ","\n",dirs,0,0,1);
@@ -3164,6 +3447,94 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 		}
 		printf("%s\n",fname);
 	}
+	if (dirinfomode&DIRINFO_PRECISE) {
+		uint16_t progress;
+		double seconds,lseconds;
+		uint8_t err;
+	
+		if (masterversion<VERSION2INT(3,0,73)) {
+			printf("precise data calculation needs master at least in version 3.0.73 - upgrade your unit\n");
+		} else {
+			err = 0;
+
+			qhead = NULL;
+			qtail = &qhead;
+
+			dirnode_cnt = 0;
+			filenode_cnt = 0;
+			touched_inodes = 0;
+			sumlength = 0;
+			chunk_size_cnt = 0;
+			chunk_rsize_cnt = 0;
+			lseconds = monotonic_seconds();
+
+			sc_inoset_init(inodes);
+			sc_chunkset_init(chunks);
+			sc_enqueue(inode);
+			while (sc_dequeue(&inode)) {
+				if (err==0) {
+					if (sc_node_info(fd,inode)<0) {
+						err = 1;
+					}
+					progress = ((uint64_t)touched_inodes * 10000ULL) / (uint64_t)inodes;
+					if (progress>9999) {
+						progress=9999;
+					}
+					seconds = monotonic_seconds();
+					if (lseconds+0.1<seconds) {
+						lseconds = seconds;
+						printf("\r%2u.%02u%% complete ",progress/100,progress%100);fflush(stdout);
+					}
+				}
+			}
+			printf("\r");
+			if (err==0) {
+				if (dirinfomode==DIRINFO_PRECISE) {
+					printf("%s (precise data):\n",fname);
+					print_number(" inodes:       ","\n",inohashelems,0,0,1);
+					print_number("  directories: ","\n",dirnode_cnt,0,0,1);
+					print_number("  files:       ","\n",filenode_cnt,0,0,1);
+					print_number(" chunks:       ","\n",chunkhashelems,0,0,1);
+					print_number(" length:       ","\n",sumlength,0,1,1);
+					print_number(" size:         ","\n",chunk_size_cnt,0,1,1);
+					print_number(" realsize:     ","\n",chunk_rsize_cnt,0,1,1);
+				} else {
+					if (dirinfomode&DIRINFO_INODES) {
+						print_number_only(inohashelems,0);
+						printf("\t");
+					}
+					if (dirinfomode&DIRINFO_DIRS) {
+						print_number_only(dirnode_cnt,0);
+						printf("\t");
+					}
+					if (dirinfomode&DIRINFO_FILES) {
+						print_number_only(filenode_cnt,0);
+						printf("\t");
+					}
+					if (dirinfomode&DIRINFO_CHUNKS) {
+						print_number_only(chunkhashelems,0);
+						printf("\t");
+					}
+					if (dirinfomode&DIRINFO_LENGTH) {
+						print_number_only(sumlength,1);
+						printf("\t");
+					}
+					if (dirinfomode&DIRINFO_SIZE) {
+						print_number_only(chunk_size_cnt,1);
+						printf("\t");
+					}
+					if (dirinfomode&DIRINFO_REALSIZE) {
+						print_number_only(chunk_rsize_cnt,1);
+						printf("\t");
+					}
+					printf("%s (precise data)\n",fname);
+				}
+			}
+			sc_inoset_cleanup();
+			sc_chunkset_cleanup();
+		}
+	}
+	close_master_conn(0);
 	return 0;
 }
 
@@ -3885,7 +4256,7 @@ void usage(int f) {
 			fprintf(stderr,"append file chunks to another file. If destination file doesn't exist then it's created as empty file and then chunks are appended\n\nusage: mfsappendchunks dstfile name [name ...]\n");
 			break;
 		case MFSDIRINFO:
-			fprintf(stderr,"show directories stats\n\nusage: mfsdirinfo [-nhHkmg] [-idfclsr] name [name ...]\n");
+			fprintf(stderr,"show directories stats\n\nusage: mfsdirinfo [-nhHkmg] [-idfclsr] [-p] name [name ...]\n");
 			print_numberformat_options();
 			fprintf(stderr,"'show' switches:\n");
 			fprintf(stderr," -i - show number of inodes\n");
@@ -3895,8 +4266,11 @@ void usage(int f) {
 			fprintf(stderr," -l - show length\n");
 			fprintf(stderr," -s - show size\n");
 			fprintf(stderr," -r - show realsize\n");
+			fprintf(stderr,"'mode' switch:\n");
+			fprintf(stderr," -p - precise mode\n");
 			fprintf(stderr,"\nIf no 'show' switches are present then show everything\n");
 			fprintf(stderr,"\nMeaning of some not obvious output data:\n 'length' is just sum of files lengths\n 'size' is sum of chunks lengths\n 'realsize' is estimated hdd usage (usually size multiplied by current goal)\n");
+			fprintf(stderr,"\nPrecise mode means that system takes into account repeated nodes/chunks\nand count them once, also uses current number of copies instead of goal.\n");
 			break;
 		case MFSFILEREPAIR:
 			fprintf(stderr,"repair given file. Use it with caution. It forces file to be readable, so it could erase (fill with zeros) file when chunkservers are not currently connected.\n\nusage: mfsfilerepair [-nhHkmg] name [name ...]\n");
@@ -4560,7 +4934,7 @@ int main(int argc,char **argv) {
 		argv += optind;
 		break;
 	case MFSDIRINFO:
-		while ((ch=getopt(argc,argv,"nhHkmgidfclsr"))!=-1) {
+		while ((ch=getopt(argc,argv,"nhHkmgidfclsrp"))!=-1) {
 			switch(ch) {
 			case 'n':
 				humode=0;
@@ -4600,6 +4974,9 @@ int main(int argc,char **argv) {
 				break;
 			case 'r':
 				dirinfomode |= DIRINFO_REALSIZE;
+				break;
+			case 'p':
+				dirinfomode |= DIRINFO_PRECISE;
 				break;
 			}
 		}

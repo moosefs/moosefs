@@ -1,4 +1,4 @@
-.TH mfstools "1" "February 2016" "MooseFS 3.0.72-1" "This is part of MooseFS"
+.TH mfstools "1" "February 2016" "MooseFS 3.0.73-1" "This is part of MooseFS"
 .SH NAME
 mfstools \- perform MooseFS\-specific operations
 .SH SYNOPSIS
@@ -39,7 +39,7 @@ mfstools \- perform MooseFS\-specific operations
 \fIFILE\fP...
 .PP
 .B mfsdirinfo
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-i\fP|\fB-d\fP|\fB-f\fP|\fB-c\fP|\fB-l\fP|\fB-s\fP|\fB-r\fP] \fIOBJECT\fP...
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-i\fP|\fB-d\fP|\fB-f\fP|\fB-c\fP|\fB-l\fP|\fB-s\fP|\fB-r\fP] [\fB-p\fP] \fIOBJECT\fP...
 .PP
 .B mfsfilerepair
 [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIFILE\fP...
@@ -125,7 +125,12 @@ It can be used on any file, included deleted (\fItrash\fP).
 \fBmfsdirinfo\fP is extended, MooseFS-specific equivalent of \fBdu -s\fP
 command. It prints summary for each specified object (single file or
 directory tree). If you only want to see one parameter, then add one of
-show options (see \fBSHOW OPTIONS\fP).
+show options (see \fBSHOW OPTIONS\fP). By default it returns data from internal
+master counters (very fast, but not precise). All repeated nodes (hard links) and
+chunks (snapshots) are counted multiple times. To count stats more preciselly
+you can use \fB-p\fP switch which turns on slow, recursive procedure. In this mode
+nodes and chunks are counted only once, also system uses current number of chunk
+copies instead of goal/labels.
 .PP
 \fBmfsfilerepair\fP deals with broken files (those which cause I/O errors on
 read operations) to make them partially readable. In case of missing chunk

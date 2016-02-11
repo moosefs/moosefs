@@ -1,3 +1,13 @@
+moosefs (3.0.73-1) unstable; urgency=medium
+
+  * (master) added 'node_info' packet
+  * (tools) added '-p' option to 'mfsdirinfo' - 'precise mode'
+  * (master) fixed edge renumeration
+  * (master) added detecting of wrong edge numbers and force renumeration in
+    such case
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 08 Feb 2016 12:00:00 +0100
+
 moosefs (3.0.72-1) unstable; urgency=medium
 
   * (master+cgi+cli) added global 'umask' option to exports.cfg

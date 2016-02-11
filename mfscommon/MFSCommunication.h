@@ -1090,6 +1090,7 @@
 // msgid:32 status:8 (common)
 // msgid:32 N*[ copies:8 chunks:16 ] (version < 1.6.23)
 // msgid:32 11*[ chunks:32 ] - 0 copies, 1 copy, 2 copies, ..., 10+ copies (version >= 1.6.23 and no chunkindx)
+// msgid:32 12*[ chunks:32 ] - 0 copies, 1 copy, 2 copies, ..., 10+ copies, 'empty' copies (version >= 3.0.30 and no chunkindx)
 // msgid:32 chunkid:64 version:32 N*[ ip:32 port:16 type:8 ] (version >= 3.0.26 and chunkindx present)
 
 
@@ -1641,6 +1642,16 @@
 #define MATOCL_MISSING_CHUNKS (PROTO_BASE+545)
 // N*[ chunkdid:64 inode:32 indx:32 ]
 
+// 0x0222
+#define CLTOMA_NODE_INFO (PROTO_BASE+546)
+// [ msgid:32 ] inode:32 maxentries:32 continueid:64
+
+// 0x0223
+#define MATOCL_NODE_INFO (PROTO_BASE+547)
+// [ msgid:32 ] status:8
+// [ msgid:32 ] anstype:16 // anstype == 0 (node is neither directory nor file)
+// [ msgid:32 ] anstype:16 continueid:64 N * [ inode:32 ] // anstype == 1 (node is directory)
+// [ msgid:32 ] anstype:16 continueid:64 length:64 N * [ chunkid:64 chunksize:32 copies:8 ] // anstype == 2 (node is file)
 
 // CHUNKSERVER STATS
 

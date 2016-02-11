@@ -109,10 +109,11 @@ void xattr_removeinode(uint32_t inode) {
 		if (ih->inode==inode) {
 			xa = ih->data_head;
 			while (xa) {
-				xan = xa->next;
+				xan = xa->nextinode;
 				xattr_removeentry(xa);
 				xa = xan;
 			}
+			massert(ih->data_head==NULL,"xattr data structure corrupted - inode list not empty after removal");
 			*ihp = ih->next;
 			free(ih);
 		} else {
@@ -144,7 +145,7 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 	hash = xattr_data_hash_fn(inode,anleng,attrname);
 	for (xa = xattr_data_hash[hash]; xa ; xa=xa->next) {
 		if (xa->inode==inode && xa->anleng==anleng && memcmp(xa->attrname,attrname,anleng)==0) {
-			passert(ih);
+			massert(ih!=NULL,"xattr data structure corrupted - inode data present without inode");
 			if (mode==MFS_XATTR_CREATE_ONLY) { // create only
 				return MFS_ERROR_EEXIST;
 			}
@@ -439,6 +440,10 @@ int xattr_load(bio *fd,uint8_t mver,int ignoreflag) {
 		avleng = get32bit(&ptr);
 		if (inode==0) {
 			return 1;
+		}
+		if (fs_check_inode(inode)==0) { // inode does not exist - skip it
+			bio_skip(fd,anleng+avleng);
+			continue;
 		}
 		if (anleng==0) {
 			if (nl) {

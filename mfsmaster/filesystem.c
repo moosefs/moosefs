@@ -206,6 +206,7 @@ static uint32_t hashelements;
 static uint32_t maxnodeid;
 static uint32_t nodes;
 static uint64_t nextedgeid;
+static uint8_t edgesneedrenumeration;
 
 static uint64_t trashspace;
 static uint64_t sustainedspace;
@@ -1574,26 +1575,68 @@ static inline void fsnodes_quota_fixspace(fsnode *node,uint64_t *totalspace,uint
 	quotanode *qn;
 	fsedge *e;
 	statsrecord sr;
-	uint64_t quotarsize;
-	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota) && (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE))) {
+	uint64_t quotasize;
+	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota) && (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE|QUOTA_FLAG_HSIZE|QUOTA_FLAG_SSIZE|QUOTA_FLAG_HLENGTH|QUOTA_FLAG_SLENGTH))) {
 		fsnodes_get_stats(node,&sr);
-		quotarsize = UINT64_C(0xFFFFFFFFFFFFFFFF);
-		if ((qn->flags&QUOTA_FLAG_HREALSIZE) && quotarsize > qn->hrealsize) {
-			quotarsize = qn->hrealsize;
+		if (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE)) {
+			quotasize = UINT64_C(0xFFFFFFFFFFFFFFFF);
+			if ((qn->flags&QUOTA_FLAG_HREALSIZE) && quotasize > qn->hrealsize) {
+				quotasize = qn->hrealsize;
+			}
+			if ((qn->flags&QUOTA_FLAG_SREALSIZE) && quotasize > qn->srealsize) {
+				quotasize = qn->srealsize;
+			}
+			if (sr.realsize >= quotasize) {
+				*availspace = 0;
+			} else if (*availspace > quotasize - sr.realsize) {
+				*availspace = quotasize - sr.realsize;
+			}
+			if (*totalspace > quotasize) {
+				*totalspace = quotasize;
+			}
+			if (sr.realsize + *availspace < *totalspace) {
+				*totalspace = sr.realsize + *availspace;
+			}
 		}
-		if ((qn->flags&QUOTA_FLAG_SREALSIZE) && quotarsize > qn->srealsize) {
-			quotarsize = qn->srealsize;
+		if (qn->flags&(QUOTA_FLAG_HSIZE|QUOTA_FLAG_SSIZE)) {
+			quotasize = UINT64_C(0xFFFFFFFFFFFFFFFF);
+			if ((qn->flags&QUOTA_FLAG_HSIZE) && quotasize > qn->hsize) {
+				quotasize = qn->hsize;
+			}
+			if ((qn->flags&QUOTA_FLAG_SSIZE) && quotasize > qn->ssize) {
+				quotasize = qn->ssize;
+			}
+			if (sr.size >= quotasize) {
+				*availspace = 0;
+			} else if (*availspace > quotasize - sr.size) {
+				*availspace = quotasize - sr.size;
+			}
+			if (*totalspace > quotasize) {
+				*totalspace = quotasize;
+			}
+			if (sr.size + *availspace < *totalspace) {
+				*totalspace = sr.size + *availspace;
+			}
 		}
-		if (sr.realsize >= quotarsize) {
-			*availspace = 0;
-		} else if (*availspace > quotarsize - sr.realsize) {
-			*availspace = quotarsize - sr.realsize;
-		}
-		if (*totalspace > quotarsize) {
-			*totalspace = quotarsize;
-		}
-		if (sr.realsize + *availspace < *totalspace) {
-			*totalspace = sr.realsize + *availspace;
+		if (qn->flags&(QUOTA_FLAG_HLENGTH|QUOTA_FLAG_SLENGTH)) {
+			quotasize = UINT64_C(0xFFFFFFFFFFFFFFFF);
+			if ((qn->flags&QUOTA_FLAG_HLENGTH) && quotasize > qn->hlength) {
+				quotasize = qn->hlength;
+			}
+			if ((qn->flags&QUOTA_FLAG_SLENGTH) && quotasize > qn->slength) {
+				quotasize = qn->slength;
+			}
+			if (sr.length >= quotasize) {
+				*availspace = 0;
+			} else if (*availspace > quotasize - sr.length) {
+				*availspace = quotasize - sr.length;
+			}
+			if (*totalspace > quotasize) {
+				*totalspace = quotasize;
+			}
+			if (sr.length + *availspace < *totalspace) {
+				*totalspace = sr.length + *availspace;
+			}
 		}
 	}
 	if (node && node!=root) {
@@ -3591,6 +3634,12 @@ static inline uint8_t fsnodes_node_find_ext(uint32_t rootinode,uint8_t sesflags,
 	}
 	*node = p;
 	return 1;
+}
+
+/* fs <-> xattr,acl */
+
+uint8_t fs_check_inode(uint32_t inode) {
+	return (fsnodes_node_find(inode)!=NULL)?1:0;
 }
 
 /* fs <-> xattr */
@@ -6405,6 +6454,118 @@ uint8_t fs_get_dir_stats(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 	return MFS_STATUS_OK;
 }
 
+uint32_t fs_node_info(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t maxentries,uint64_t continueid,uint8_t *ptr) {
+	uint32_t i;
+	uint64_t chunkid;
+	uint32_t lastchunk,lastchunksize;
+	uint8_t copies;
+	uint8_t *nextcidptr;
+	uint64_t ncontid;
+	fsnode *p;
+	fsedge *e;
+	uint32_t ret = 0;
+
+	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
+		ret = 1;
+		if (ptr!=NULL) {
+			put8bit(&ptr,MFS_ERROR_ENOENT);
+		}
+		return ret;
+	}
+	if (p->type==TYPE_DIRECTORY) {
+		ret = 10;
+		if (ptr!=NULL) {
+			put16bit(&ptr,1);
+			nextcidptr = ptr;
+			ptr += 8;
+		}
+		ncontid = continueid;
+		if (continueid==0) {
+			e = p->data.ddata.children;
+		} else {
+			e = fsnodes_edgeid_find(continueid);
+		}
+		if (e==NULL) {
+			e = p->data.ddata.children;
+			while (e && e->edgeid < continueid) {
+				e = e->nextchild;
+			}
+			if (e) {
+				ncontid = e->edgeid;
+			} else {
+				ncontid = 0;
+			}
+		}
+		while (e && maxentries > 0) {
+			if (ptr!=NULL) {
+				put32bit(&ptr,e->child->inode);
+			}
+			ret += 4;
+			maxentries--;
+			e = e->nextchild;
+			if (e) {
+				ncontid = e->edgeid;
+			} else {
+				ncontid = 0;
+			}
+		}
+		if (e!=NULL) {
+			fsnodes_edgeid_insert(e);
+		}
+		if (ptr!=NULL) {
+			put64bit(&nextcidptr,ncontid);
+		}
+	} else if (p->type==TYPE_FILE || p->type==TYPE_TRASH || p->type==TYPE_SUSTAINED) {
+		ret = 18;
+		if (ptr!=NULL) {
+			put16bit(&ptr,2);
+			nextcidptr = ptr;
+			ptr += 8;
+			put64bit(&ptr,p->data.fdata.length);
+		}
+		if (p->data.fdata.length>0) {
+			lastchunk = (p->data.fdata.length-1)>>MFSCHUNKBITS;
+			lastchunksize = ((((p->data.fdata.length-1)&MFSCHUNKMASK)+MFSBLOCKSIZE)&MFSBLOCKNEGMASK)+MFSHDRSIZE;
+		} else {
+			lastchunk = 0;
+			lastchunksize = MFSHDRSIZE;
+		}
+		ncontid = continueid;
+		for (i = continueid ; i < p->data.fdata.chunks && maxentries > 0 ; i++) {
+			chunkid = p->data.fdata.chunktab[i];
+			if (chunkid>0 && chunk_get_copies(chunkid,&copies)==MFS_STATUS_OK) {
+				if (ptr!=NULL) {
+					put64bit(&ptr,chunkid);
+					if (i<lastchunk) {
+						put32bit(&ptr,MFSCHUNKSIZE+MFSHDRSIZE);
+					} else if (i==lastchunk) {
+						put32bit(&ptr,lastchunksize);
+					} else {
+						put32bit(&ptr,0);
+					}
+					put8bit(&ptr,copies);
+				}
+				ret += 13;
+				ncontid = i+1;
+				maxentries--;
+			}
+		}
+		if (ncontid>=p->data.fdata.chunks) {
+			ncontid = 0;
+		}
+		if (ptr!=NULL) {
+			put64bit(&nextcidptr,ncontid);
+		}
+	} else {
+		ret = 2;
+		if (ptr!=NULL) {
+			put16bit(&ptr,0);
+		}
+	}
+	return ret;
+}
+
+
 static inline void fs_add_file_to_chunks(fsnode *f) {
 	uint32_t i;
 	uint64_t chunkid;
@@ -6822,12 +6983,17 @@ uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t freeinodes) {
 
 static inline void fs_renumerate_edges(fsnode *p) {
 	fsedge *e;
+	uint64_t fedgeid;
+	fedgeid = nextedgeid;
+	for (e=p->data.ddata.children ; e ; e=e->nextchild) {
+		fedgeid--;
+	}
+	nextedgeid = fedgeid;
+	for (e=p->data.ddata.children ; e ; e=e->nextchild) {
+		e->edgeid = fedgeid++;
+	}
 	for (e=p->data.ddata.children ; e ; e=e->nextchild) {
 		fsnodes_keep_alive_check();
-		if (e->edgeid==0) {
-			e->edgeid = nextedgeid;
-			nextedgeid--;
-		}
 		if (e->child->type==TYPE_DIRECTORY) {
 			fs_renumerate_edges(e->child);
 		}
@@ -6835,12 +7001,11 @@ static inline void fs_renumerate_edges(fsnode *p) {
 }
 
 uint8_t fs_mr_renumerate_edges(uint64_t expected_nextedgeid) {
-	if (nextedgeid!=EDGEID_MAX) {
-		return MFS_ERROR_MISMATCH;
-	}
+	nextedgeid = EDGEID_MAX;
 	nextedgeid--;
 	fsnodes_keep_alive_begin();
 	fs_renumerate_edges(root);
+	edgesneedrenumeration = 0;
 	meta_version_inc();
 	if (nextedgeid!=expected_nextedgeid) {
 		return MFS_ERROR_MISMATCH;
@@ -6849,11 +7014,13 @@ uint8_t fs_mr_renumerate_edges(uint64_t expected_nextedgeid) {
 }
 
 void fs_renumerate_edge_test(void) {
-	if (nextedgeid==EDGEID_MAX) {
+	if (nextedgeid==EDGEID_MAX || edgesneedrenumeration) {
+		nextedgeid = EDGEID_MAX;
 		nextedgeid--;
 		fsnodes_keep_alive_begin();
 		fs_renumerate_edges(root);
-		changelog("%"PRIu32"|RENUMEDGES():%"PRIu64,main_time(),nextedgeid);
+		edgesneedrenumeration = 0;
+		changelog("%"PRIu32"|RENUMERATEEDGES():%"PRIu64,main_time(),nextedgeid);
 	}
 }
 
@@ -6954,7 +7121,9 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 	fsedge *e;
 	statsrecord sr;
 	static fsedge **root_tail;
+	static uint64_t root_edgeid;
 	static fsedge **current_tail;
+	static uint64_t current_edgeid;
 	static fsnode *current_parent;
 	static uint32_t current_parent_id;
 	static uint8_t nl;
@@ -6965,6 +7134,8 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 		current_parent = NULL;
 		current_tail = NULL;
 		root_tail = NULL;
+		root_edgeid = 0;
+		current_edgeid = 0;
 		nl = 1;
 		if (mver<=0x10) {
 			bsize = 4+4+2;
@@ -7134,6 +7305,10 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 		if (parent_id==MFS_ROOT_ID) {	// special case - because of 'ignoreflag' and possibility of attaching orphans into root node
 			if (root_tail==NULL) {
 				root_tail = &(e->parent->data.ddata.children);
+				while (*root_tail) {
+					root_edgeid = (*root_tail)->edgeid;
+					root_tail = &((*root_tail)->nextchild);
+				}
 			}
 		} else if (current_parent_id!=parent_id) {
 			if (e->parent->data.ddata.children) {
@@ -7146,6 +7321,7 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 				if (ignoreflag) {
 					current_tail = &(e->parent->data.ddata.children);
 					while (*current_tail) {
+						current_edgeid = (*current_tail)->edgeid;
 						current_tail = &((*current_tail)->nextchild);
 					}
 				} else {
@@ -7154,6 +7330,7 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 				}
 			} else {
 				current_tail = &(e->parent->data.ddata.children);
+				current_edgeid = 0;
 			}
 			current_parent_id = parent_id;
 			current_parent = e->parent;
@@ -7163,10 +7340,24 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 			*(root_tail) = e;
 			e->prevchild = root_tail;
 			root_tail = &(e->nextchild);
+			if (edgeid <= root_edgeid) {
+				if (edgesneedrenumeration==0) {
+					syslog(LOG_WARNING,"edgeid mismatch detected - force edgeid renumeration");
+					edgesneedrenumeration = 1;
+				}
+			}
+			root_edgeid = edgeid;
 		} else {
 			*(current_tail) = e;
 			e->prevchild = current_tail;
 			current_tail = &(e->nextchild);
+			if (edgeid <= current_edgeid) {
+				if (edgesneedrenumeration==0) {
+					syslog(LOG_WARNING,"edgeid mismatch detected - force edgeid renumeration");
+					edgesneedrenumeration = 1;
+				}
+			}
+			current_edgeid = edgeid;
 		}
 		e->parent->data.ddata.elements++;
 		if (e->child->type==TYPE_DIRECTORY) {
@@ -7697,8 +7888,10 @@ int fs_loadedges(bio *fd,uint8_t mver,int ignoreflag) {
 		}
 		ptr = hdr;
 		nextedgeid = get64bit(&ptr);
+		edgesneedrenumeration = 0;
 	} else {
 		nextedgeid = EDGEID_MAX;
+		edgesneedrenumeration = 1;
 	}
 
 	fs_loadedge(NULL,mver,ignoreflag);	// init
@@ -7970,6 +8163,7 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 
 void fs_new(void) {
 	nextedgeid = (EDGEID_MAX-1);
+	edgesneedrenumeration = 0;
 	hashelements = 1;
 	maxnodeid = MFS_ROOT_ID;
 	fsnodes_init_freebitmask();

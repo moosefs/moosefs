@@ -1,5 +1,16 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.73-1 (2016-02-11)
+
+  - (master) fixed restoring ARCHCHG from changelog
+  - (cli+cgi) fixed displaying master list with followers only (pro version only)
+  - (master) added using size and length quota to fix disk usage values (statfs)
+  - (master) fixed xattr bug which may lead to data corruption and segfaults (intr. in 2.1.1)
+  - (master) added 'node_info' packet
+  - (tools) added '-p' option to 'mfsdirinfo' - 'precise mode'
+  - (master) fixed edge renumeration
+  - (master) added detecting of wrong edge numbers and force renumeration in such case
+
 * MooseFS 3.0.72-1 (2016-02-04)
 
   - (master+cgi+cli) added global 'umask' option to exports.cfg
@@ -10,7 +21,6 @@ This file lists noteworthy changes in MooseFS.
   - (master) changed way how cs internal rebalance state is treated by master (as 'grace' state instead of 'overloaded')
   - (mount) fixed bug in read module (setting etab after ranges realloc)
   - (tools) removed obsoleted command 'mfssnapshot'
-  - (master) fixed 'segfault' in rare case (removing flock with non-existent waiting session)
 
 * MooseFS 3.0.71-1 (2016-01-21)
 

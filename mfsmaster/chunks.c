@@ -1949,6 +1949,29 @@ uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip
 	return MFS_STATUS_OK;
 }
 
+uint8_t chunk_get_copies(uint64_t chunkid,uint8_t *count) {
+	chunk *c;
+	slist *s;
+	uint8_t cnt;
+	uint32_t ip;
+	uint16_t port;
+
+	c = chunk_find(chunkid);
+	if (c==NULL) {
+		return MFS_ERROR_NOCHUNK;
+	}
+	cnt = 0;
+	for (s=c->slisthead ; s && cnt<100 ; s=s->next) {
+		if (cstab[s->csid].valid && s->valid!=DEL) {
+			if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+				cnt++;
+			}
+		}
+	}
+	*count = cnt;
+	return MFS_STATUS_OK;
+}
+
 uint8_t chunk_get_version_and_copies(uint64_t chunkid,uint32_t *version,uint8_t *count,uint8_t cs_data[100*7]) {
 	chunk *c;
 	slist *s;

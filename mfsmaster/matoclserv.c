@@ -1622,6 +1622,33 @@ void matoclserv_missing_chunks(matoclserventry *eptr,const uint8_t *data,uint32_
 	missing_log_getdata(ptr,mode);
 }
 
+void matoclserv_node_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t *ptr;
+	uint32_t inode;
+	uint32_t maxentries;
+	uint64_t continueid;
+	uint32_t msgid;
+
+	if (length!=16 && length!=20) {
+		syslog(LOG_NOTICE,"CLTOMA_NODE_INFO - wrong size (%"PRIu32"/16|20)",length);
+		eptr->mode = KILL;
+		return;
+	}
+	if (length==20) {
+		msgid = get32bit(&data);
+	} else {
+		msgid = 0;
+	}
+	inode = get32bit(&data);
+	maxentries = get32bit(&data);
+	continueid = get64bit(&data);
+	ptr = matoclserv_createpacket(eptr,MATOCL_NODE_INFO,fs_node_info(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,maxentries,continueid,NULL)+((length==20)?4:0));
+	if (length==20) {
+		put32bit(&ptr,msgid);
+	}
+	fs_node_info(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,maxentries,continueid,ptr);
+}
+
 void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint64_t totalspace,availspace,trspace,respace;
 	uint64_t memusage,syscpu,usercpu;
@@ -5275,6 +5302,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_MISSING_CHUNKS:
 				matoclserv_missing_chunks(eptr,data,length);
 				break;
+			case CLTOMA_NODE_INFO:
+				matoclserv_node_info(eptr,data,length);
+				break;
 			default:
 				syslog(LOG_NOTICE,"main master server module: got unknown message from unregistered (type:%"PRIu32")",type);
 				eptr->mode=KILL;
@@ -5518,6 +5548,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 				break;
 			case CLTOMA_MISSING_CHUNKS:
 				matoclserv_missing_chunks(eptr,data,length);
+				break;
+			case CLTOMA_NODE_INFO:
+				matoclserv_node_info(eptr,data,length);
 				break;
 			default:
 				syslog(LOG_NOTICE,"main master server module: got unknown message from mfsmount (type:%"PRIu32")",type);

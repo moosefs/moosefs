@@ -1231,7 +1231,7 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 			break;
 		case HASHCODE('A','R','C','H'):
 			if (strncmp(ptr,"ARCHCHG",7)==0) {
-				return do_archchg(filename,lv,ts,ptr+6);
+				return do_archchg(filename,lv,ts,ptr+7);
 			}
 			break;
 		case HASHCODE('C','R','E','A'):
@@ -1337,8 +1337,8 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 			}
 			break;
 		case HASHCODE('R','E','N','U'):
-			if (strncmp(ptr,"RENUMEDGES",10)==0) {
-				return do_renumedges(filename,lv,ts,ptr+10);
+			if (strncmp(ptr,"RENUMERATEEDGES",15)==0) {
+				return do_renumedges(filename,lv,ts,ptr+15);
 			}
 			break;
 		case HASHCODE('R','O','L','L'):

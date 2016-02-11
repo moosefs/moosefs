@@ -142,6 +142,8 @@ void fs_get_paths_data(uint32_t rootinode,uint32_t inode,uint8_t *buff);
 uint8_t fs_archget(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint64_t *archchunks,uint64_t *notarchchunks,uint32_t *archinodes,uint32_t *partinodes,uint32_t *notarchinodes);
 uint8_t fs_archchg(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t cmd,uint64_t *chgchunks,uint64_t *notchgchunks,uint32_t *nsinodes);
 
+uint32_t fs_node_info(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t maxentries,uint64_t continueid,uint8_t *ptr);
+
 // RESERVED
 //uint8_t fs_acquire(uint32_t inode,uint32_t sessionid);
 //uint8_t fs_release(uint32_t inode,uint32_t sessionid);
@@ -199,6 +201,8 @@ uint8_t fs_mr_renumerate_edges(uint64_t expected_nextedgeid);
 void fs_renumerate_edge_test(void);
 
 int fs_strinit(void);
+
+uint8_t fs_check_inode(uint32_t inode);
 
 void fs_set_xattrflag(uint32_t inode);
 void fs_del_xattrflag(uint32_t inode);

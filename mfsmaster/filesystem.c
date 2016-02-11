@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -130,6 +130,7 @@ typedef struct _quotanode {
 
 static quotanode *quotahead;
 static uint32_t QuotaTimeLimit;
+static uint8_t AtimeMode;
 
 typedef struct _fsnode {
 	uint32_t inode;
@@ -1573,26 +1574,68 @@ static inline void fsnodes_quota_fixspace(fsnode *node,uint64_t *totalspace,uint
 	quotanode *qn;
 	fsedge *e;
 	statsrecord sr;
-	uint64_t quotarsize;
-	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota) && (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE))) {
+	uint64_t quotasize;
+	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota) && (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE|QUOTA_FLAG_HSIZE|QUOTA_FLAG_SSIZE|QUOTA_FLAG_HLENGTH|QUOTA_FLAG_SLENGTH))) {
 		fsnodes_get_stats(node,&sr);
-		quotarsize = UINT64_C(0xFFFFFFFFFFFFFFFF);
-		if ((qn->flags&QUOTA_FLAG_HREALSIZE) && quotarsize > qn->hrealsize) {
-			quotarsize = qn->hrealsize;
+		if (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE)) {
+			quotasize = UINT64_C(0xFFFFFFFFFFFFFFFF);
+			if ((qn->flags&QUOTA_FLAG_HREALSIZE) && quotasize > qn->hrealsize) {
+				quotasize = qn->hrealsize;
+			}
+			if ((qn->flags&QUOTA_FLAG_SREALSIZE) && quotasize > qn->srealsize) {
+				quotasize = qn->srealsize;
+			}
+			if (sr.realsize >= quotasize) {
+				*availspace = 0;
+			} else if (*availspace > quotasize - sr.realsize) {
+				*availspace = quotasize - sr.realsize;
+			}
+			if (*totalspace > quotasize) {
+				*totalspace = quotasize;
+			}
+			if (sr.realsize + *availspace < *totalspace) {
+				*totalspace = sr.realsize + *availspace;
+			}
 		}
-		if ((qn->flags&QUOTA_FLAG_SREALSIZE) && quotarsize > qn->srealsize) {
-			quotarsize = qn->srealsize;
+		if (qn->flags&(QUOTA_FLAG_HSIZE|QUOTA_FLAG_SSIZE)) {
+			quotasize = UINT64_C(0xFFFFFFFFFFFFFFFF);
+			if ((qn->flags&QUOTA_FLAG_HSIZE) && quotasize > qn->hsize) {
+				quotasize = qn->hsize;
+			}
+			if ((qn->flags&QUOTA_FLAG_SSIZE) && quotasize > qn->ssize) {
+				quotasize = qn->ssize;
+			}
+			if (sr.size >= quotasize) {
+				*availspace = 0;
+			} else if (*availspace > quotasize - sr.size) {
+				*availspace = quotasize - sr.size;
+			}
+			if (*totalspace > quotasize) {
+				*totalspace = quotasize;
+			}
+			if (sr.size + *availspace < *totalspace) {
+				*totalspace = sr.size + *availspace;
+			}
 		}
-		if (sr.realsize >= quotarsize) {
-			*availspace = 0;
-		} else if (*availspace > quotarsize - sr.realsize) {
-			*availspace = quotarsize - sr.realsize;
-		}
-		if (*totalspace > quotarsize) {
-			*totalspace = quotarsize;
-		}
-		if (sr.realsize + *availspace < *totalspace) {
-			*totalspace = sr.realsize + *availspace;
+		if (qn->flags&(QUOTA_FLAG_HLENGTH|QUOTA_FLAG_SLENGTH)) {
+			quotasize = UINT64_C(0xFFFFFFFFFFFFFFFF);
+			if ((qn->flags&QUOTA_FLAG_HLENGTH) && quotasize > qn->hlength) {
+				quotasize = qn->hlength;
+			}
+			if ((qn->flags&QUOTA_FLAG_SLENGTH) && quotasize > qn->slength) {
+				quotasize = qn->slength;
+			}
+			if (sr.length >= quotasize) {
+				*availspace = 0;
+			} else if (*availspace > quotasize - sr.length) {
+				*availspace = quotasize - sr.length;
+			}
+			if (*totalspace > quotasize) {
+				*totalspace = quotasize;
+			}
+			if (sr.length + *availspace < *totalspace) {
+				*totalspace = sr.length + *availspace;
+			}
 		}
 	}
 	if (node && node!=root) {
@@ -4266,8 +4309,10 @@ uint8_t fs_readlink(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t 
 	*pleng = p->data.sdata.pleng;
 	*path = p->data.sdata.path;
 	if (p->atime!=ts) {
-		p->atime = ts;
-		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
+		if ((AtimeMode==ATIME_ALWAYS) || (((p->atime <= p->ctime && ts >= p->ctime) || (p->atime <= p->mtime && ts >= p->mtime) || (p->atime + 86400 < ts)) && AtimeMode==ATIME_RELATIVE_ONLY)) {
+			p->atime = ts;
+			changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
+		}
 	}
 	stats_readlink++;
 	return STATUS_OK;
@@ -4939,8 +4984,10 @@ void fs_readdir_data(uint32_t rootinode,uint8_t sesflags,uint32_t uid,uint32_t g
 	uint32_t ts = main_time();
 
 	if (p->atime!=ts) {
-		p->atime = ts;
-		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,p->inode);
+		if ((AtimeMode==ATIME_ALWAYS) || (((p->atime <= p->ctime && ts >= p->ctime) || (p->atime <= p->mtime && ts >= p->mtime) || (p->atime + 86400 < ts)) && AtimeMode==ATIME_RELATIVE_ONLY)) {
+			p->atime = ts;
+			changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,p->inode);
+		}
 	}
 	fsnodes_readdirdata(rootinode,uid,gid,auid,agid,sesflags,p,e,maxentries,nedgeid,dbuff,flags&GETDIR_FLAG_WITHATTR);
 	stats_readdir++;
@@ -5007,8 +5054,10 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint64_t *chunkid,uint64_t *le
 	}
 	*length = p->data.fdata.length;
 	if (p->atime!=ts) {
-		p->atime = ts;
-		changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
+		if ((AtimeMode==ATIME_ALWAYS || AtimeMode==ATIME_FILES_ONLY) || (((p->atime <= p->ctime && ts >= p->ctime) || (p->atime <= p->mtime && ts >= p->mtime) || (p->atime + 86400 < ts)) && (AtimeMode==ATIME_RELATIVE_ONLY || AtimeMode==ATIME_FILES_AND_RELATIVE_ONLY))) {
+			p->atime = ts;
+			changelog("%"PRIu32"|ACCESS(%"PRIu32")",ts,inode);
+		}
 	}
 	stats_read++;
 	return STATUS_OK;
@@ -7566,6 +7615,11 @@ void fs_cs_disconnected(void) {
 
 void fs_reload(void) {
 	QuotaTimeLimit = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400);
+	AtimeMode = cfg_getuint8("ATIME_MODE",0);
+	if (AtimeMode>ATIME_NEVER) {
+		syslog(LOG_NOTICE,"unrecognized value for ATIME_MODE - using defaults");
+		AtimeMode = 0;
+	}
 }
 
 int fs_strinit(void) {

@@ -1,35 +1,50 @@
-This package was debianized by Jakub Bogusz on Fri, 11 Jul 2008 13:05:21 +0200.
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: MooseFS
+Source: http://ppa.moosefs.com/src
 
-Packages are available for download at <http://moosefs.com/>.
+Files: *
+Copyright: Copyright 2005-2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+License: GPL-2
+ This program is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public
+ License as published by the Free Software Foundation,
+ version 2 (only)
+ .
+ This program is distributed in the hope that it will be
+ useful, but WITHOUT ANY WARRANTY; without even the implied
+ warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ PURPOSE.  See the GNU General Public License for more
+ details.
+ .
+ You should have received a copy of the GNU General Public
+ License along with this package; if not, write to the Free
+ Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ Boston, MA  02110-1301 USA
+ .
+ On Debian systems, the full text of the GNU General Public
+ License version 2 can be found in the file
+ `/usr/share/common-licenses/GPL-2'.
 
-Author(s):
-
-    Jakub Kruszona-Zawadzki
-
-Copyright:
-
-    Copyright Core Technology Sp. z o.o.
-
-Contact:
-
-    <contact (at) moosefs.com>
-
-License:
-
-    Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
-    
-    This file is part of MooseFS.
-    
-    MooseFS is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, version 2 (only).
-    
-    MooseFS is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-    GNU General Public License for more details.
-    
-    You should have received a copy of the GNU General Public License
-    along with MooseFS; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-    or visit http://www.gnu.org/licenses/gpl-2.0.html
+Files: debian/*
+Copyright: Copyright 2008 Jakub Bogusz, Copyright 2009-2016 Jakub Kruszona-Zawadzki
+License: GPL-2+
+ This program is free software; you can redistribute it
+ and/or modify it under the terms of the GNU General Public
+ License as published by the Free Software Foundation; either
+ version 2 of the License, or (at your option) any later
+ version.
+ .
+ This program is distributed in the hope that it will be
+ useful, but WITHOUT ANY WARRANTY; without even the implied
+ warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+ PURPOSE.  See the GNU General Public License for more
+ details.
+ .
+ You should have received a copy of the GNU General Public
+ License along with this package; if not, write to the Free
+ Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ Boston, MA  02110-1301 USA
+ .
+ On Debian systems, the full text of the GNU General Public
+ License version 2 can be found in the file
+ `/usr/share/common-licenses/GPL-2'.

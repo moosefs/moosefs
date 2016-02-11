@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -374,6 +374,13 @@
 #define MODULE_TYPE_UNKNOWN 0
 #define MODULE_TYPE_MASTER 1
 #define MODULE_TYPE_CHUNKSERVER 2
+
+// atime mode
+#define ATIME_ALWAYS 0
+#define ATIME_FILES_ONLY 1
+#define ATIME_RELATIVE_ONLY 2
+#define ATIME_FILES_AND_RELATIVE_ONLY 3
+#define ATIME_NEVER 4
 
 
 

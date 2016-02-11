@@ -20,7 +20,6 @@ bin/mfsgetquota
 bin/mfssetquota
 bin/mfsdelquota
 bin/mfsfilepaths
-bin/mfssnapshot
 bin/mfsmount
 bin/mfstools
 etc/mfs/mfsmount.cfg.dist

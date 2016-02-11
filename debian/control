@@ -8,52 +8,67 @@ Homepage: http://moosefs.com/
 
 Package: moosefs-master
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: MooseFS master server
- MooseFS master (metadata) server.
+Depends: ${shlibs:Depends}, ${misc:Depends}, adduser
+Description: MooseFS master (metadata) server
+ This package will install MooseFS component responsible 
+ for keeping metadata and also managinng whole cluster.
 
 Package: moosefs-metalogger
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, adduser
 Description: MooseFS metalogger server
- MooseFS metalogger (metadata replication) server.
+ This package will install MooseFS component responsible
+ for keeping backup of metadata (downloaded from master).
 
 
 Package: moosefs-chunkserver
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, adduser
 Description: MooseFS data server
- MooseFS data server.
+ This package will install MooseFS component responsible
+ for keeping actual data of files (split into chunks - hence name).
 
 Package: moosefs-client
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: MooseFS client
- MooseFS clients: mfsmount and mfstools.
+Description: MooseFS client tools
+ This package will install MooseFS component responsible
+ for accessing data (as a mountpoint) also bunch of tools
+ for managing object parameters (goal etc.).
 
 Package: moosefs-cli
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.5)
 Description: MooseFS CLI Utility
- MooseFS CLI utilities.
+ This package will install MooseFS component responsible
+ for monitoring. This is simple command line utility which
+ can be used for showing list of connected chunkservers,
+ clients, health of the system, some stats etc.
 
 Package: moosefs-cgi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.5)
 Description: MooseFS CGI Monitor
- MooseFS CGI monitor.
+ This package will install MooseFS component responsible
+ for monitoring. This is simple CGI utility which
+ can be used for showing list of connected chunkservers,
+ clients, health of the system, some stats etc.
 
 Package: moosefs-cgiserv
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, moosefs-cgi
+Depends: ${shlibs:Depends}, ${misc:Depends}, moosefs-cgi, adduser, python (>= 2.5)
 Description: Simple CGI-capable HTTP server to run MooseFS CGI Monitor
- Simple CGI-capable HTTP server to run MooseFS CGI monitor.
+ This package will install MooseFS component responsible
+ for monitoring. This is simple CGI web server that can be
+ used with MooseFS cgi script.
 
 Package: moosefs-netdump
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: MooseFS network packet dump utility
- MooseFS network packet dump utility
+ This package will install MooseFS monitoring tool
+ This is simple netdump utility which can interpret
+ MooseFS network traffic and show it in colorful form.
 
 Package: moosefs-dbg
 Architecture: any
@@ -61,5 +76,5 @@ Section: debug
 Priority: extra
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: MooseFS debug binaries
- MooseFS binaries with debuging symbols.
-
+ This package will install MooseFS debug symbols for
+ all MooseFS binaries available in other packages.

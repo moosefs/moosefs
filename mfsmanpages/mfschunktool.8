@@ -1,34 +1,24 @@
-.TH mfsnetdump "8" "February 2016" "MooseFS 2.0.85-1" "This is part of MooseFS"
+.TH mfschunktool "8" "February 2016" "MooseFS 2.0.85-1" "This is part of MooseFS"
 .SH NAME
-mfsnetdump \- dump network traffic as mfs packets
+mfschunktool - checks chunk integrity offline
 .SH SYNOPSIS
-.B mfsnetdump [-s] [-i net device] [-f pcap_filter] [-c packet count] [-e commands] [-o commands]
-.PP
+\fBmfschunktool\fP 
+[\fB\-f\fP]
+[\fB\-r\fP]
+\fIchunk_file\fP ...
 .SH DESCRIPTION
+\fBmfschunktool\fP checks chunk integrity using stored CRC checksums in chunk's header.
+It can also 'repair' chunk (fix stored checksums). This tool may be useful to check last
+written chunks after possible data corruption (power down etc.)
 .PP
-\fBmfsnetdump\fP is 
-the supervisor program of Moose File System. It is needed to start 
-a completely new system or a system after a big crash. It can be also used to force select a new
-leader master.
-.SH OPTIONS
-.TP
-\fB\-s\fP
-set standard PCAP filter (dump only mfs ports - default:9419-9422)
-.TP
-\fB\-i\fP
-dump packets using given network interface
+Options:
 .TP
 \fB\-f\fP
-define pcap filter to filter packets
+turn on fast mode (in this mode only last block is tested - usually this is enough to find corrupted chunks)
 .TP
-\fB\-c\fP
-dump only 'count' packets and exit
-.TP
-\fB\-e\fP
-do not display given commands
-.TP
-\fB\-o\fP
-show only given commands
+\fB\-r\fP
+turn on repair mode (if checksums on given chunk don't match then they will be overwritten by checksums calculated using actual data)
+.PP
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT
@@ -50,4 +40,4 @@ along with MooseFS; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
-.BR moosefs (7)
+.BR mfschunkserver (8)

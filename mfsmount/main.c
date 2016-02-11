@@ -14,7 +14,7 @@
  * 
  * You should have received a copy of the GNU General Public License
  * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
@@ -1029,6 +1029,7 @@ void dump_args(const char *prfx,struct fuse_args *args) {
 int main(int argc, char *argv[]) {
 	int res;
 	int mt,fg;
+	int i;
 	char *mountpoint;
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	struct fuse_args defaultargs = FUSE_ARGS_INIT(0, NULL);
@@ -1085,8 +1086,6 @@ int main(int argc, char *argv[]) {
 
 //	dump_args("input_args",&args);
 
-	fuse_opt_add_arg(&defaultargs,"fakeappname");
-
 	if (fuse_opt_parse(&args, &defaultargs, mfs_opts_stage1, mfs_opt_proc_stage1)<0) {
 		exit(1);
 	}
@@ -1113,15 +1112,17 @@ int main(int argc, char *argv[]) {
 //	dump_args("parsed_defaults",&defaultargs);
 //	dump_args("changed_args",&args);
 
-	if (fuse_opt_parse(&defaultargs, &mfsopts, mfs_opts_stage2, mfs_opt_proc_stage2)<0) {
-		exit(1);
+	for (i=0 ; i<defaultargs.argc ; i++) {
+		fuse_opt_add_arg(&args,defaultargs.argv[i]);
 	}
+
+//	dump_args("combined_args",&args);
 
 	if (fuse_opt_parse(&args, &mfsopts, mfs_opts_stage2, mfs_opt_proc_stage2)<0) {
 		exit(1);
 	}
 
-//	dump_args("args_after_parse",&args);
+//	dump_args("combined_args_after_parse",&args);
 
 	if (mfsopts.cachemode!=NULL && mfsopts.cachefiles) {
 		fprintf(stderr,"mfscachemode and mfscachefiles options are exclusive - use only mfscachemode\nsee: %s -h for help\n",argv[0]);
@@ -1226,7 +1227,7 @@ int main(int argc, char *argv[]) {
 	make_fsname(&args);
 	remove_mfsmount_magic(&args);
 
-//	dump_args("args_before_fuse_parse_cmdline",&args);
+//	dump_args("combined_args_before_fuse_parse_cmdline",&args);
 
 	if (fuse_parse_cmdline(&args,&mountpoint,&mt,&fg)<0) {
 		fprintf(stderr,"see: %s -h for help\n",argv[0]);
@@ -1243,6 +1244,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	res = mainloop(&args,mountpoint,mt,fg);
+	fuse_opt_free_args(&defaultargs);
 	fuse_opt_free_args(&args);
 	free(mfsopts.masterhost);
 	free(mfsopts.masterport);

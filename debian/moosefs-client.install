@@ -22,7 +22,6 @@ usr/bin/mfssetquota
 usr/bin/mfsdelquota
 usr/bin/mfsfilepaths
 usr/bin/mfstools
-usr/bin/mfssnapshot
 usr/share/man/man1/mfsappendchunks.1
 usr/share/man/man1/mfscheckfile.1
 usr/share/man/man1/mfsdirinfo.1

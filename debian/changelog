@@ -1,3 +1,17 @@
+moosefs (2.0.85-1) unstable; urgency=medium
+
+  * (master) added ATIME_MODE option to set atime modification behaviour
+  * (master) added using size and length quota to fix disk usage values
+    (statfs)
+  * (all) changed address of FSF in GPL licence text
+  * (debian) removed obsolete conffiles
+  * (debian) fixed copyright file
+  * (mount) fixed parsing mfsmount.cfg (system options like nodev,noexec etc.
+    were ommited)
+  * (tools) removed obsoleted command 'mfssnapshot'
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 11 Feb 2016 12:00:00 +0100
+
 moosefs (2.0.84-1) unstable; urgency=medium
 
   * (mount) fixed setting file length in write module during truncate (fixes

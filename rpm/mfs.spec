@@ -20,7 +20,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	2.0.84
+Version:	2.0.85
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -265,6 +265,7 @@ exit 0
 %{_mandir}/man5/mfstopology.cfg.5*
 %{_mandir}/man5/mfsmaster.cfg.5*
 %{_mandir}/man8/mfsmaster.8*
+%{_mandir}/man8/mfsmetadump.8*
 %{_mandir}/man8/mfsmetarestore.8*
 %{mfsconfdir}/mfsexports.cfg.dist
 %{mfsconfdir}/mfstopology.cfg.dist
@@ -307,6 +308,7 @@ exit 0
 %{_mandir}/man5/mfschunkserver.cfg.5*
 %{_mandir}/man5/mfshdd.cfg.5*
 %{_mandir}/man8/mfschunkserver.8*
+%{_mandir}/man8/mfschunktool.8*
 %{mfsconfdir}/mfschunkserver.cfg.dist
 %{mfsconfdir}/mfshdd.cfg.dist
 %dir %{_localstatedir}/mfs
@@ -344,7 +346,6 @@ exit 0
 %attr(755,root,root) %{_bindir}/mfssetquota
 %attr(755,root,root) %{_bindir}/mfsdelquota
 %attr(755,root,root) %{_bindir}/mfsfilepaths
-%attr(755,root,root) %{_bindir}/mfssnapshot
 %attr(755,root,root) %{_bindir}/mfstools
 %attr(755,root,root) %{_bindir}/mfsmount
 %{_mandir}/man1/mfsappendchunks.1*
@@ -379,6 +380,7 @@ exit 0
 %defattr(644,root,root,755)
 %doc NEWS README
 %attr(755,root,root) %{_bindir}/mfscli
+%{_mandir}/man1/mfscli.1*
 
 
 

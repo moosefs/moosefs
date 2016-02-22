@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.86-1 (2016-02-22)
+
+  - (master) fixed initialization of ATIME_MODE
+
 * MooseFS 2.0.85-1 (2016-02-11)
 
   - (master) added ATIME_MODE option to set atime modification behaviour

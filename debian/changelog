@@ -1,3 +1,9 @@
+moosefs (2.0.86-1) unstable; urgency=medium
+
+  * (master) fixed initialization of ATIME_MODE
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 22 Feb 2016 12:00:00 +0100
+
 moosefs (2.0.85-1) unstable; urgency=medium
 
   * (master) added ATIME_MODE option to set atime modification behaviour

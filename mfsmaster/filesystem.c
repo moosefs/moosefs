@@ -7641,7 +7641,7 @@ int fs_strinit(void) {
 	symlink_init();
 	chunktab_init();
 	test_start_time = main_time()+900;
-	QuotaTimeLimit = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400);
+	fs_reload();
 
 	main_reload_register(fs_reload);
 	main_msectime_register(100,0,fs_test_files);

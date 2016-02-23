@@ -1007,12 +1007,18 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 	slist *os,*s;
 	uint32_t i;
 	chunk *oc,*c;
-	uint8_t csstable;
+	uint8_t csstable,csalldata;
 
 	if (ts>(starttime+60) && csregisterinprogress==0) {
 		csstable = 1;
 	} else {
 		csstable = 0;
+	}
+
+	if (chunk_counters_in_progress() && csdb_have_all_servers()) {
+		csalldata = 1;
+	} else {
+		csalldata = 0;
 	}
 
 	if (ochunkid==0) {	// new chunk
@@ -1114,7 +1120,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 						c->version++;
 						*opflag=1;
 					} else {
-						if (csstable) {
+						if (csalldata) {
 							return ERROR_CHUNKLOST;
 						} else {
 							return ERROR_CSNOTPRESENT;
@@ -1186,7 +1192,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t o
 					*nchunkid = c->chunkid;
 					*opflag=1;
 				} else {
-					if (csstable) {
+					if (csalldata) {
 						return ERROR_CHUNKLOST;
 					} else {
 						return ERROR_CSNOTPRESENT;
@@ -1221,13 +1227,19 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 	slist *os,*s;
 	uint32_t i;
 	chunk *oc,*c;
-	uint8_t csstable;
+	uint8_t csstable,csalldata;
 	uint32_t vc;
 
 	if (ts>(starttime+60) && csregisterinprogress==0) {
 		csstable = 1;
 	} else {
 		csstable = 0;
+	}
+
+	if (chunk_counters_in_progress() && csdb_have_all_servers()) {
+		csalldata = 1;
+	} else {
+		csalldata = 0;
 	}
 
 	c=NULL;
@@ -1281,7 +1293,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 				c->operation = TRUNCATE;
 				c->version++;
 			} else {
-				if (csstable) {
+				if (csalldata) {
 					return ERROR_CHUNKLOST;
 				} else {
 					return ERROR_CSNOTPRESENT;
@@ -1347,7 +1359,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			if (i>0) {
 				*nchunkid = c->chunkid;
 			} else {
-				if (csstable) {
+				if (csalldata) {
 					return ERROR_CHUNKLOST;
 				} else {
 					return ERROR_CSNOTPRESENT;

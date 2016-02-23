@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.87-1 (2016-02-23)
+
+  - (master) fixed status returned by writechunk after network down/up
+
 * MooseFS 2.0.86-1 (2016-02-22)
 
   - (master) fixed initialization of ATIME_MODE

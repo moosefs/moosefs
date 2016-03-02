@@ -1,3 +1,10 @@
+moosefs (2.0.88-1) unstable; urgency=medium
+
+  * (master) added METADATA_SAVE_FREQ option (allow to save metadata less
+    frequently than every hour)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 02 Mar 2016 12:00:00 +0100
+
 moosefs (2.0.87-1) unstable; urgency=medium
 
   * (master) fixed status returned by writechunk after network down/up

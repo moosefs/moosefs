@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.88-1 (2016-03-02)
+
+  - (master) added METADATA_SAVE_FREQ option (allow to save metadata less frequently than every hour)
+
 * MooseFS 2.0.87-1 (2016-02-23)
 
   - (master) fixed status returned by writechunk after network down/up

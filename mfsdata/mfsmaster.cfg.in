@@ -32,6 +32,9 @@
 # number of metadata change log files (default is 50)
 # BACK_LOGS = 50
 
+# how often master will store metadata (hours - default is 1)
+# METADATA_SAVE_FREQ = 1
+
 
 # number of previous metadata files to be kept (default is 1)
 # BACK_META_KEEP_PREVIOUS = 1

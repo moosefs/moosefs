@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "February 2016" "MooseFS 2.0.87-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "March 2016" "MooseFS 2.0.88-1" "This is part of MooseFS"
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
@@ -45,6 +45,9 @@ alternate location/name of \fBmfslicence.bin\fP file (pro version only)
 .TP
 \fBBACK_LOGS\fP
 number of metadata change log files (default is 50)
+.TP
+\fBMETADATA_SAVE_FREQ\fP
+how often (in hours) master will store metadata (default is 1)
 .TP
 \fBMETADATA_DOWNLOAD_FREQ\fP
 how often (in hours) leader will download metadata from followers (pro version only ; default is 24)

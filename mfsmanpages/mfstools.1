@@ -163,12 +163,12 @@ attribute set (see \fBEXTRA ATTRIBUTES\fP) and only such objects can be removed
 using \fBmfsrmsnapshot\fP command. By default all files and directories inside
 specified directory must have this attribute set for the command to remove the
 whole directory; otherwise the command will not remove anything. This behavior
-can be overriden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
+can be overridden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
 remove only those files/directories that have \fBsnapshot\fP attribute set and
 will leave everything else untouched.
 .PP
 \fBmfsgetquota\fP, \fBmfssetquota\fP and \fBmfsdelquota\fP
-tools are used to check, define and delete quotas. Quota is set on a directory. It can be set in one 
+tools are used to check, define and delete quotas. Quota is set on a directory. It can be set in one
 of 4 ways: for number of inodes inside the directory (total sum of the
 subtree's inodes) with \fB-i\fP, \fB-I\fP options, for sum of (logical) file lengths with
 \fB-l\fP, \fB-L\fP options,

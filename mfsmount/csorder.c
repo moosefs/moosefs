@@ -58,7 +58,7 @@ uint8_t csorder_calc(uint32_t labelmask) {
 	uint8_t i,j;
 //	syslog(LOG_NOTICE,"labelmask: %08"PRIX32,labelmask);
 	for (i=0 ; i<labelscnt ; i++) {
-		if (labelmasks[i][0]==0) { // any - not usefull here, but formally possible
+		if (labelmasks[i][0]==0) { // any - not useful here, but formally possible
 //			syslog(LOG_NOTICE,"labelmasks[%"PRIu8"] = '*'",i);
 			return i;
 		}

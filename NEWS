@@ -17,7 +17,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) changed address of FSF in GPL licence text
   - (debian) removed obsolete conffiles
   - (debian) fixed copyright file
-  - (mount) fixed parsing mfsmount.cfg (system options like nodev,noexec etc. were ommited)
+  - (mount) fixed parsing mfsmount.cfg (system options like nodev,noexec etc. were omitted)
   - (master) changed way how cs internal rebalance state is treated by master (as 'grace' state instead of 'overloaded')
   - (mount) fixed bug in read module (setting etab after ranges realloc)
   - (tools) removed obsoleted command 'mfssnapshot'
@@ -358,7 +358,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed removing damaged disks (lock file issue)
   - (master) treat servers in maintenance mode as overloaded (no chunk creations, replications etc.)
   - (master+tools) added tools for manipulating archive flag
-  - (master+mount) added prefered labels for I/O
+  - (master+mount) added preferred labels for I/O
   - (master) added option for setting length of chunks priority queues
 
 * MooseFS 3.0.9-1 (2015-02-19)
@@ -508,7 +508,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 2.0.40-1 (2014-10-15)
 
   - (cs) fixed serious bug (new chunks were created on disks 'marked for removal') - introduced in 1.7.31
-  - (cs) fixed bug (segfault on very rare ocassions during disk scanning just after startup - caused by damaged chunk files)
+  - (cs) fixed bug (segfault on very rare occasions during disk scanning just after startup - caused by damaged chunk files)
   - (mount) fixed memory leak (supplementary group tabs) - intr. in 2.0.1
   - (rpm) fixed systemd scripts
   - (daemons) added increasing limit of core dump size (debugging purposes)
@@ -821,7 +821,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 1.7.15 (2014-01-15)
 
   - (master+cs) new charts prepared for mfs 2.0
-  - (cs) options for transfering data between disks
+  - (cs) options for transferring data between disks
 
 * MooseFS 1.7.14 (2014-01-08)
 
@@ -1019,7 +1019,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (mount) added resolving master hostname whenever connection has failed
   - (cs) removed getting attributes of every chunk during initialization - speeds up starting of chunkserver
-  - (cs) changed calculating of total/used space. Superuser space now is substracted from total space instead of adding it to used space
+  - (cs) changed calculating of total/used space. Superuser space now is subtracted from total space instead of adding it to used space
   - (master+mount) fixed directory cache.
   - (debian) rewritten init scripts to use mfscommon commands (start/stop/restart/reload) instead of start-stop-daemon (where stop caused killing all instances of daemon)
   - (debian) changed init scripts to bail out early if MFS*_ENABLE is not true (i.e. given daemon is not scripts-controlled)

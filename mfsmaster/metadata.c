@@ -1103,9 +1103,9 @@ int meta_loadall(void) {
 		}
 		if (verboselevel>0) {
 			if (bestid!=0) {
-				mfs_arg_syslog(LOG_NOTICE,"choosen most recent metadata file: %s (version: %"PRIu64" ; id: %"PRIX64")",bestfname,bestver,bestid);
+				mfs_arg_syslog(LOG_NOTICE,"chosen most recent metadata file: %s (version: %"PRIu64" ; id: %"PRIX64")",bestfname,bestver,bestid);
 			} else {
-				mfs_arg_syslog(LOG_NOTICE,"choosen most recent metadata file: %s (version: %"PRIu64")",bestfname,bestver);
+				mfs_arg_syslog(LOG_NOTICE,"chosen most recent metadata file: %s (version: %"PRIu64")",bestfname,bestver);
 			}
 		}
 		// load it

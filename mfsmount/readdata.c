@@ -789,7 +789,7 @@ void* read_worker(void *arg) {
 		csver = chain[0].version;
 /*
 		if (ind->lastchunkid==chunkid) {
-			if (ind->laststatus==0) { // error occured
+			if (ind->laststatus==0) { // error occurred
 				for (i=0 ; i<chainelements ; i++) {
 					if (chain[i].ip != ind->lastip || chain[i].port != ind->lastport) {
 						ip = chain[i].ip;

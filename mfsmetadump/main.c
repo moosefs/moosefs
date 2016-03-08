@@ -737,7 +737,9 @@ int sessions_load(FILE *fd,uint8_t mver) {
 		sesflags = get8bit(&ptr);
 		if (mver>=0x14) {
 			umaskval = get16bit(&ptr);
-		}
+		} else {
+			umaskval = 0;
+		}			
 		mingoal = get8bit(&ptr);
 		maxgoal = get8bit(&ptr);
 		mintrashtime = get32bit(&ptr);
@@ -749,6 +751,8 @@ int sessions_load(FILE *fd,uint8_t mver) {
 		makestrip(strip,peerip);
 		if (mver>=0x11) {
 			disconnected = get32bit(&ptr);
+		} else {
+			disconnected = 0;
 		}
 		if (mver>=0x14) {
 			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|u:%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);

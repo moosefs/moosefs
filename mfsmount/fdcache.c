@@ -31,7 +31,7 @@
 #include <fuse_lowlevel.h>
 
 #include "MFSCommunication.h"
-#include "readchunkdata.h"
+#include "chunksdatacache.h"
 #include "massert.h"
 #include "clocks.h"
 #include "buckets_mt.h"
@@ -42,17 +42,6 @@
 #define FDCACHE_HASH(inode) ((inode)%FDCACHE_HASHSIZE)
 #define FDCACHE_TIMEOUT 1.0
 
-typedef struct _fdcachechunkdata {
-	uint16_t lcnt;
-	uint8_t csdataver;
-	uint32_t hash;
-	uint64_t mfleng;
-	uint64_t chunkid;
-	uint32_t version;
-	uint32_t csdatasize;
-	uint8_t csdata[10*14];
-} fdcachechunkdata;
-
 typedef struct _fdcacheentry {
 	double createtime;
 	uid_t uid;
@@ -61,95 +50,92 @@ typedef struct _fdcacheentry {
 	uint32_t inode;
 	uint8_t attr[35];
 	uint16_t lflags;
-	fdcachechunkdata *chunkdata;
+	uint8_t csdataver;
+	uint64_t chunkid;
+	uint32_t version;
+	uint32_t csdatasize;
+	uint8_t csdata[10*14];
 	struct _fdcacheentry *next;
 } fdcacheentry;
 
-CREATE_BUCKET_MT_ALLOCATOR(fdcachecd,fdcachechunkdata,500)
 CREATE_BUCKET_MT_ALLOCATOR(fdcachee,fdcacheentry,500)
 
 static fdcacheentry *fdhashtab[FDCACHE_HASHSIZE];
 static pthread_mutex_t hashlock[FDCACHE_HASHSIZE];
 
-static inline fdcachechunkdata* fdcache_chunkdata_new(uint32_t hash,uint8_t csdataver,uint64_t mfleng,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize) {
-	fdcachechunkdata *fdccd;
-
-	if (csdatasize>10*14) { // more than 10 copies of chunk ??? - just ignore such data
-		return NULL;
-	}
-
-	fdccd = fdcachecd_malloc();
-	fdccd->lcnt = 1;
-	fdccd->csdataver = csdataver;
-	fdccd->hash = hash;
-	fdccd->mfleng = mfleng;
-	fdccd->chunkid = chunkid;
-	fdccd->version = version;
-	fdccd->csdatasize = csdatasize;
-	memcpy(fdccd->csdata,csdata,csdatasize);
-	return fdccd;
-}
-
-static inline void fdcache_chunkdata_unref(fdcachechunkdata *fdccd) {
-	sassert(fdccd->lcnt>0);
-	fdccd->lcnt--;
-	if (fdccd->lcnt==0) {
-		fdcachecd_free(fdccd);
-	}
-}
-
-void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t lflags,uint8_t csdataver,uint64_t mfleng,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize) {
+void fdcache_insert(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t lflags,uint8_t csdataver,uint64_t chunkid,uint32_t version,const uint8_t *csdata,uint32_t csdatasize) {
 	uint32_t h;
 	double now;
-	uint8_t f;
+	fdcacheentry *f;
 	fdcacheentry *fdce,**fdcep;
 
 	now = monotonic_seconds();
 	h = FDCACHE_HASH(inode);
 	zassert(pthread_mutex_lock(hashlock+h));
 	fdcep = fdhashtab + h;
-	f = 0;
+	f = NULL;
 	while ((fdce = *fdcep)) {
 		if (fdce->createtime + FDCACHE_TIMEOUT < now) {
 			*fdcep = fdce->next;
-			if (fdce->chunkdata) {
-				fdcache_chunkdata_unref(fdce->chunkdata);
-			}
 			fdcachee_free(fdce);
 		} else {
 			if (fdce->inode==inode && fdce->uid==ctx->uid && fdce->gid==ctx->gid && fdce->pid==ctx->pid) {
-				if (fdce->chunkdata) {
-					fdcache_chunkdata_unref(fdce->chunkdata);
-				}
-				if (lflags & LOOKUP_CHUNK_ZERO_DATA) {
-					fdce->chunkdata = fdcache_chunkdata_new(h,csdataver,mfleng,chunkid,version,csdata,csdatasize);
+				if (f==NULL) {
+					f = fdce;
+					fdcep = &(fdce->next);
 				} else {
-					fdce->chunkdata = NULL;
+					*fdcep = fdce->next;
+					fdcachee_free(fdce);
 				}
-				fdce->createtime = now;
-				memcpy(fdce->attr,attr,35);
-				fdce->lflags = lflags;
-				f = 1;
+			} else {
+				fdcep = &(fdce->next);
 			}
-			fdcep = &(fdce->next);
 		}
 	}
-	if (f==0) {
+	if (f==NULL) {
 		fdce = fdcachee_malloc();
 		fdce->uid = ctx->uid;
 		fdce->gid = ctx->gid;
 		fdce->pid = ctx->pid;
 		fdce->inode = inode;
-		fdce->createtime = now;
-		memcpy(fdce->attr,attr,35);
-		fdce->lflags = lflags;
-		if (lflags & LOOKUP_CHUNK_ZERO_DATA) {
-			fdce->chunkdata = fdcache_chunkdata_new(h,csdataver,mfleng,chunkid,version,csdata,csdatasize);
-		} else {
-			fdce->chunkdata = NULL;
-		}
 		fdce->next = fdhashtab[h];
 		fdhashtab[h] = fdce;
+	} else {
+		fdce = f;
+	}
+	fdce->createtime = now;
+	memcpy(fdce->attr,attr,35);
+	fdce->lflags = lflags;
+	if ((lflags & LOOKUP_CHUNK_ZERO_DATA) && csdatasize<=(10*14)) {
+		fdce->csdataver = csdataver;
+		fdce->chunkid = chunkid;
+		fdce->version = version;
+		fdce->csdatasize = csdatasize;
+		memcpy(fdce->csdata,csdata,csdatasize);
+	} else {
+		fdce->lflags &= ~LOOKUP_CHUNK_ZERO_DATA;
+		fdce->csdataver = 0;
+		fdce->chunkid = 0;
+		fdce->version = 0;
+		fdce->csdatasize = 0;
+	}
+	zassert(pthread_mutex_unlock(hashlock+h));
+}
+
+void fdcache_invalidate(uint32_t inode) {
+	uint32_t h;
+	fdcacheentry *fdce,**fdcep;
+
+	h = FDCACHE_HASH(inode);
+	zassert(pthread_mutex_lock(hashlock+h));
+	fdcep = fdhashtab + h;
+	while ((fdce = *fdcep)) {
+		if (fdce->inode==inode) {
+			*fdcep = fdce->next;
+			fdcachee_free(fdce);
+		} else {
+			fdcep = &(fdce->next);
+		}
 	}
 	zassert(pthread_mutex_unlock(hashlock+h));
 }
@@ -177,16 +163,16 @@ uint8_t fdcache_find(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],
 	return 0;
 }
 
-void* fdcache_acquire(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t *lflags,uint8_t *found) {
+void* fdcache_acquire(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35],uint16_t *lflags) {
 	uint32_t h;
 	double now;
-	fdcacheentry *fdce;
-	fdcachechunkdata *fdccd;
+	fdcacheentry *fdce,**fdcep;
 
 	now = monotonic_seconds();
 	h = FDCACHE_HASH(inode);
 	zassert(pthread_mutex_lock(hashlock+h));
-	for (fdce = fdhashtab[h] ; fdce!=NULL ; fdce = fdce->next) {
+	fdcep = fdhashtab + h;
+	while ((fdce = *fdcep)) {
 		if (fdce->inode==inode && fdce->uid==ctx->uid && fdce->gid==ctx->gid && fdce->pid==ctx->pid && fdce->createtime + FDCACHE_TIMEOUT >= now) {
 			if (attr!=NULL) {
 				memcpy(attr,fdce->attr,35);
@@ -194,36 +180,30 @@ void* fdcache_acquire(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35]
 			if (lflags!=NULL) {
 				*lflags = fdce->lflags;
 			}
-			fdccd = fdce->chunkdata;
-			if (fdccd!=NULL) {
-				fdccd->lcnt++;
-			}
+			*fdcep = fdce->next;
 			zassert(pthread_mutex_unlock(hashlock+h));
-			*found = 1;
-			return fdccd;
+			return fdce;
+		} else {
+			fdcep = &(fdce->next);
 		}
 	}
 	zassert(pthread_mutex_unlock(hashlock+h));
-	*found = 0;
 	return NULL;
 }
 
-void fdcache_release(void *vfdccd) {
-	fdcachechunkdata *fdccd = (fdcachechunkdata*)vfdccd;
-	uint32_t h;
+void fdcache_release(void *vfdce) {
+	fdcacheentry *fdce = (fdcacheentry*)vfdce;
 
-	if (fdccd!=NULL) {
-		h = fdccd->hash;
-		zassert(pthread_mutex_lock(hashlock+h));
-		fdcache_chunkdata_unref(fdccd);
-		zassert(pthread_mutex_unlock(hashlock+h));
+	if (fdce!=NULL) {
+		fdcachee_free(fdce);
 	}
 }
 
-void fdcache_inject_chunkdata(uint32_t inode,void *vfdccd) {
-	fdcachechunkdata *fdccd = (fdcachechunkdata*)vfdccd;
-	if (fdccd!=NULL) {
-		read_chunkdata_inject(inode,0,fdccd->mfleng,fdccd->chunkid,fdccd->version,fdccd->csdataver,fdccd->csdata,fdccd->csdatasize);
+void fdcache_inject_chunkdata(void *vfdce) {
+	fdcacheentry *fdce = (fdcacheentry*)vfdce;
+
+	if ((fdce->lflags) & LOOKUP_CHUNK_ZERO_DATA) {
+		chunksdatacache_insert(fdce->inode,0,fdce->chunkid,fdce->version,fdce->csdataver,fdce->csdata,fdce->csdatasize);
 	}
 }
 
@@ -232,8 +212,6 @@ void fdcache_init(void) {
 
 	(void)fdcachee_free_all; // just calm down the compiler about unused functions
 	(void)fdcachee_getusage;
-	(void)fdcachecd_free_all;
-	(void)fdcachecd_getusage;
 
 	for (i=0 ; i<FDCACHE_HASHSIZE ; i++) {
 		fdhashtab[i] = NULL;

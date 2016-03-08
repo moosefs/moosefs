@@ -1199,6 +1199,7 @@ static chunk* hdd_chunk_create(folder *f,uint64_t chunkid,uint32_t version) {
 	c->filename = malloc(leng+39);
 	passert(c->filename);
 	memcpy(c->filename,f->path,leng);
+//	sprintf(c->filename+leng,"%02X/chunk_%016"PRIX64"_%08"PRIX32".mfs",(unsigned int)((chunkid>>12)&255),chunkid,version);
 	sprintf(c->filename+leng,"%02X/chunk_%016"PRIX64"_%08"PRIX32".mfs",(unsigned int)(chunkid&255),chunkid,version);
 	c->blocks = 0;
 	c->validattr = 1;
@@ -4260,7 +4261,8 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 	new_filename = malloc(leng+39);
 	passert(new_filename);
 	memcpy(new_filename,fdst->path,leng);
-	sprintf(new_filename+leng,"%02X/chunk_%016"PRIX64"_%08"PRIX32".mfs",(unsigned int)(c->chunkid&255),c->chunkid,c->version);
+//	sprintf(new_filename+leng,"%02X/chunk_%016"PRIX64"_%08"PRIX32".mfs",(unsigned int)((c->chunkid>>12)&255),c->chunkid,c->version);
+	sprintf(new_filename+leng,"%02X/chunk_%016"PRIX64"_%08"PRIX32".mfs",(unsigned int)((c->chunkid)&255),c->chunkid,c->version);
 
 	if (rename(tmp_filename,new_filename)<0) {
 		mfs_arg_errlog_silent(LOG_WARNING,"move_chunk: file:%s->%s - rename error",tmp_filename,new_filename);

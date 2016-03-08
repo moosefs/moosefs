@@ -79,6 +79,7 @@ int chunk_locked_or_busy(void *cptr);
 uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip,uint32_t *version,uint8_t *count,uint8_t cs_data[100*14]);
 uint8_t chunk_get_version_and_copies(uint64_t chunkid,uint32_t *version,uint8_t *count,uint8_t cs_data[100*7]);
 uint8_t chunk_get_copies(uint64_t chunkid,uint8_t *count);
+uint8_t chunk_get_version(uint64_t chunkid,uint32_t *version);
 
 /* ---- */
 uint8_t chunk_get_mfrstatus(uint16_t csid);

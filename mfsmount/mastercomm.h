@@ -22,9 +22,17 @@
 #define _MASTERCOMM_H_
 
 #include <inttypes.h>
+#include <sys/types.h>
 
 void fs_getmasterlocation(uint8_t loc[14]);
 uint32_t fs_getsrcip(void);
+
+
+void fs_atime(uint32_t inode);
+void fs_mtime(uint32_t inode);
+void fs_no_atime(uint32_t inode);
+void fs_no_mtime(uint32_t inode);
+void fs_fix_amtime(uint32_t inode,time_t *atime,time_t *mtime);
 
 void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes);
 //int fs_direct_connect(void);
@@ -34,6 +42,10 @@ void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes);
 void fs_add_entry(uint32_t inode);
 void fs_forget_entry(uint32_t inode);
 // uint8_t fs_is_sustained_entry(uint32_t inode);
+
+void fs_get_fleng(uint32_t inode,uint64_t *fleng);
+void fs_set_fleng(uint32_t inode,uint64_t fleng);
+void fs_inc_fleng(uint32_t inode,uint64_t fleng);
 
 #ifdef WIN32
 uint8_t fs_simple_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[35]);
@@ -63,10 +75,11 @@ uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uin
 void fs_release(uint32_t inode);
 
 uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
-//uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
 uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
-//uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
-uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t chunkopflags);
+uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint32_t indx,uint64_t length,uint8_t chunkopflags);
+
+//uint8_t fs_fsync_send(uint32_t inode);
+//uint8_t fs_fsync_wait(void);
 
 uint8_t fs_flock(uint32_t inode,uint32_t reqid,uint64_t owner,uint8_t cmd);
 uint8_t fs_posixlock(uint32_t inode,uint32_t reqid,uint64_t owner,uint8_t cmd,uint8_t type,uint64_t start,uint64_t end,uint32_t pid,uint8_t *rtype,uint64_t *rstart,uint64_t *rend,uint32_t *rpid);

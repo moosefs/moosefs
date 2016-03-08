@@ -147,6 +147,9 @@ static char *ListenHost;
 static char *ListenPort;
 static uint32_t DefaultTimeout;
 static char *AuthCode = NULL;
+static uint32_t RemapMask = 0;
+static uint32_t RemapSrc = 0;
+static uint32_t RemapDst = 0;
 
 /* replications DB */
 
@@ -492,7 +495,7 @@ uint16_t matocsserv_getservers_ordered(uint16_t csids[MAXCSCOUNT]) {
 
 	scnt = 0;
 	for (eptr = matocsservhead ; eptr && scnt<MAXCSCOUNT; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && (eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && (eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK || eptr->hlstatus==HLSTATUS_REBALANCE) && csdb_server_is_being_maintained(eptr->csptr)==0) {
 			servtab[scnt].csid = eptr->csid;
 			servtab[scnt].space = (double)(eptr->usedspace) / (double)(eptr->totalspace);
 			scnt++;
@@ -863,35 +866,66 @@ void matocsserv_useservers_wrandom(void* servers[MAXCSCOUNT],uint16_t cnt) {
 	matocsserv_weighted_roundrobin_used((matocsserventry **)servers,cnt);
 }
 
-uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replimit,uint8_t *allservflag) {
+uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replimit,uint8_t highpriority,uint8_t *allservflag) {
 	matocsserventry *eptr;
-	uint32_t j,k,r;
+	uint32_t j,k,r,hpadd;
 	uint16_t x;
 	uint32_t now = main_time();
 	double a;
 
 	j=0;
+	k=0;
+	hpadd = 0;
 	*allservflag = 1; // 1 means that there are no servers which reached replication limit
 	for (eptr = matocsservhead ; eptr && j<MAXCSCOUNT; eptr=eptr->next) {
 		a = ((uint32_t)(eptr->csid*UINT32_C(0x9874BF31)+now*UINT32_C(0xB489FC37)))/4294967296.0;
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(eptr->totalspace/100) && eptr->csptr!=NULL && (eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0) {
-			if (eptr->wrepcounter+a<replimit) {
-				csids[j] = eptr->csid;
-				j++;
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(eptr->totalspace/100) && eptr->csptr!=NULL) {
+		       	if ((eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0) {
+				if (eptr->wrepcounter+a<replimit) {
+					csids[j] = eptr->csid;
+					j++;
+				} else {
+					*allservflag = 0;
+				}
 			} else {
-				*allservflag = 0;
+				if (eptr->wrepcounter+a<replimit) {
+					hpadd = 1;
+				}
 			}
 		}
 	}
-	if (j==0) {
-		return 0;
-	}
-	for (k=0 ; k<j-1 ; k++) {
+	while (j>k+1) {
 		r = k + rndu32_ranged(j-k);
 		if (r!=k) {
 			x = csids[k];
 			csids[k] = csids[r];
 			csids[r] = x;
+		}
+		k++;
+	}
+	if (highpriority && hpadd) {
+		k = j;
+		for (eptr = matocsservhead ; eptr && j<MAXCSCOUNT; eptr=eptr->next) {
+			a = ((uint32_t)(eptr->csid*UINT32_C(0x9874BF31)+now*UINT32_C(0xB489FC37)))/4294967296.0;
+			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(eptr->totalspace/100) && eptr->csptr!=NULL) {
+				if (!((eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0)) {
+					if (eptr->wrepcounter+a<replimit) {
+						csids[j] = eptr->csid;
+						j++;
+					} else {
+						*allservflag = 0;
+					}
+				}
+			}
+		}
+		while (j>k+1) {
+			r = k + rndu32_ranged(j-k);
+			if (r!=k) {
+				x = csids[k];
+				csids[k] = csids[r];
+				csids[r] = x;
+			}
+			k++;
 		}
 	}
 	return j;
@@ -1526,6 +1560,13 @@ void matocsserv_get_version(matocsserventry *eptr,const uint8_t *data,uint32_t l
 	memcpy(ptr,vstring,strlen(vstring));
 }
 
+static uint32_t matocsserv_remap_ip(uint32_t csip) {
+	if ((csip & RemapMask) == RemapSrc) {
+		csip &= ~RemapMask;
+		csip |= RemapDst;
+	}
+	return csip;
+}
 
 void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint64_t chunkid;
@@ -1710,6 +1751,7 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 			if (eptr->servip==0) {
 					tcpgetpeer(eptr->sock,&(eptr->servip),NULL);
 				}
+				eptr->servip = matocsserv_remap_ip(eptr->servip);
 				if (eptr->servstrip) {
 					free(eptr->servstrip);
 				}
@@ -1859,6 +1901,7 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 		if (eptr->servip==0) {
 			tcpgetpeer(eptr->sock,&(eptr->servip),NULL);
 		}
+		eptr->servip = matocsserv_remap_ip(eptr->servip);
 		if (eptr->servstrip) {
 			free(eptr->servstrip);
 		}
@@ -2589,9 +2632,47 @@ void matocsserv_disconnect_all(void) {
 	matocsserv_disconnection_loop();
 }
 
-void matocsserv_reload(void) {
-	char *oldListenHost,*oldListenPort;
-	int newlsock;
+uint8_t matocsserv_parse_ip(const char *ipstr,uint32_t *ipnum) {
+	uint32_t ip,octet,i;
+	ip=0;
+	while (*ipstr==' ' || *ipstr=='\t') {
+		ipstr++;
+	}
+	for (i=0 ; i<4; i++) {
+		if (*ipstr>='0' && *ipstr<='9') {
+			octet=0;
+			while (*ipstr>='0' && *ipstr<='9') {
+				octet*=10;
+				octet+=*ipstr-'0';
+				ipstr++;
+				if (octet>255) {
+					return 0;
+				}
+			}
+		} else {
+			return 0;
+		}
+		if (i<3) {
+			if (*ipstr!='.') {
+				return 0;
+			}
+			ipstr++;
+		} else {
+			if (*ipstr!=0 && *ipstr!=' ' && *ipstr!='\t' && *ipstr!='\r' && *ipstr!='\n') {
+				return 0;
+			}
+		}
+		ip*=256;
+		ip+=octet;
+	}
+	*ipnum = ip;
+	return 1;
+}
+
+void matocsserv_reload_common(void) {
+	uint8_t bits,err;
+	char *srcip,*dstip;
+	uint32_t srcclass,dstclass,mask;
 
 	DefaultTimeout = cfg_getuint32("MATOCS_TIMEOUT",10);
 	if (DefaultTimeout>65535) {
@@ -2607,6 +2688,58 @@ void matocsserv_reload(void) {
 	if (cfg_isdefined("AUTH_CODE")) {
 		AuthCode = cfg_getstr("AUTH_CODE","");
 	}
+
+	if (cfg_isdefined("REMAP_BITS") && cfg_isdefined("REMAP_SOURCE_IP_CLASS") && cfg_isdefined("REMAP_DESTINATION_IP_CLASS")) {
+		bits = cfg_getuint8("REMAP_BITS",0);
+		srcip = cfg_getstr("REMAP_SOURCE_IP_CLASS","0.0.0.0");
+		dstip = cfg_getstr("REMAP_DESTINATION_IP_CLASS","0.0.0.0");
+		err = 0;
+		if (bits==0 || bits>32) {
+			mfs_arg_syslog(LOG_WARNING,"wrong value for REMAP_BITS (%"PRIu8" ; shlould be between 1 and 32)",bits);
+			err |= 1;
+		}
+		mask = UINT32_C(0xFFFFFFFF) << (32-bits);
+		if (matocsserv_parse_ip(srcip,&srcclass)==0) {
+			mfs_arg_syslog(LOG_WARNING,"error parsing ip class from REMAP_SOURCE_IP_CLASS (%s)",srcip);
+			err |= 2;
+		}
+		if (matocsserv_parse_ip(dstip,&dstclass)==0) {
+			mfs_arg_syslog(LOG_WARNING,"error parsing ip class from REMAP_DESTINATION_IP_CLASS (%s)",dstip);
+			err |= 4;
+		}
+		if ((err&3)==0 && ((srcclass & mask) != srcclass)) {
+			char *maskedip;
+			maskedip = matocsserv_makestrip(srcclass & mask);
+			mfs_arg_syslog(LOG_WARNING,"found garbage bits at the end of REMAP_SOURCE_IP_CLASS (given: %s - should be: %s)",srcip,maskedip);
+			free(maskedip);
+			err |= 8;
+		}
+		if ((err&5)==0 && ((dstclass & mask) != dstclass)) {
+			char *maskedip;
+			maskedip = matocsserv_makestrip(dstclass & mask);
+			mfs_arg_syslog(LOG_WARNING,"found garbage bits at the end of REMAP_DESTINATION_IP_CLASS (given: %s - should be: %s)",dstip,maskedip);
+			free(maskedip);
+			err |= 16;
+		}
+		if (err==0) {
+			RemapMask = mask;
+			RemapSrc = srcclass;
+			RemapDst = dstclass;
+		}
+		free(srcip);
+		free(dstip);
+	} else {
+		RemapMask = 0;
+		RemapSrc = 0;
+		RemapDst = 0;
+	}
+}
+
+void matocsserv_reload(void) {
+	char *oldListenHost,*oldListenPort;
+	int newlsock;
+
+	matocsserv_reload_common();
 
 	oldListenHost = ListenHost;
 	oldListenPort = ListenPort;
@@ -2651,16 +2784,8 @@ void matocsserv_reload(void) {
 }
 
 int matocsserv_init(void) {
-	DefaultTimeout = cfg_getuint32("MATOCS_TIMEOUT",10);
-	if (DefaultTimeout>65535) {
-		DefaultTimeout=65535;
-	} else if (DefaultTimeout<10) {
-		DefaultTimeout=10;
-	}
+	matocsserv_reload_common();
 
-	if (cfg_isdefined("AUTH_CODE")) {
-		AuthCode = cfg_getstr("AUTH_CODE","");
-	}
 	ListenHost = cfg_getstr("MATOCS_LISTEN_HOST","*");
 	ListenPort = cfg_getstr("MATOCS_LISTEN_PORT",DEFAULT_MASTER_CS_PORT);
 

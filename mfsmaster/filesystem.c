@@ -33,6 +33,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #ifdef HAVE_PWD_H
 #include <pwd.h>
 #endif
@@ -76,7 +77,7 @@
 #define HASHTAB_MOVEFACTOR 5
 
 #define DEFAULT_LSETID 1
-#define DEFAULT_TRASHTIME 86400
+#define DEFAULT_TRASHTIME 24
 
 #define MAXFNAMELENG 255
 
@@ -146,7 +147,7 @@ typedef struct _fsnode {
 	unsigned mode:12;
 	uint32_t uid;
 	uint32_t gid;
-	uint32_t trashtime;
+	uint16_t trashtime;
 	fsedge *parents;
 	struct _fsnode *next;
 	union _data {
@@ -2917,12 +2918,15 @@ static inline void fsnodes_bst_free(bstnode *n) {
 
 static inline void fsnodes_gettrashtime_recursive(fsnode *node,uint8_t gmode,bstnode **bstrootfiles,bstnode **bstrootdirs) {
 	fsedge *e;
+	uint32_t trashseconds;
 
 	fsnodes_keep_alive_check();
+	trashseconds = node->trashtime;
+	trashseconds *= 3600;
 	if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
-		fsnodes_bst_add(bstrootfiles,node->trashtime);
+		fsnodes_bst_add(bstrootfiles,trashseconds);
 	} else if (node->type==TYPE_DIRECTORY) {
-		fsnodes_bst_add(bstrootdirs,node->trashtime);
+		fsnodes_bst_add(bstrootdirs,trashseconds);
 		if (gmode==GMODE_RECURSIVE) {
 			for (e = node->data.ddata.children ; e ; e=e->nextchild) {
 				fsnodes_gettrashtime_recursive(e->child,gmode,bstrootfiles,bstrootdirs);
@@ -3092,7 +3096,7 @@ static inline void fsnodes_setgoal_recursive(fsnode *node,uint32_t ts,uint32_t u
 	}
 }
 
-static inline void fsnodes_settrashtime_recursive(fsnode *node,uint32_t ts,uint32_t uid,uint32_t trashtime,uint8_t smode,uint32_t *sinodes,uint32_t *ncinodes,uint32_t *nsinodes) {
+static inline void fsnodes_settrashtime_recursive(fsnode *node,uint32_t ts,uint32_t uid,uint16_t trashtime,uint8_t smode,uint32_t *sinodes,uint32_t *ncinodes,uint32_t *nsinodes) {
 	fsedge *e;
 	uint8_t set;
 
@@ -5067,7 +5071,7 @@ uint8_t fs_mr_snapshot(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint16
 	return fs_univ_snapshot(ts,0,sesflags|SESFLAG_METARESTORE,inode_src,parent_dst,nleng_dst,name_dst,uid,gids,gid,smode,cumask);
 }
 
-uint8_t fs_univ_append(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t inode_src,uint32_t uid,uint32_t gids,uint32_t *gid) {
+uint8_t fs_univ_append(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t inode_src,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *fleng) {
 	uint32_t pchunks,lastchunk,lastchunksize,i;
 	uint64_t newlength,lengdiff,sizediff;
 	uint8_t status;
@@ -5152,15 +5156,18 @@ uint8_t fs_univ_append(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 	} else {
 		meta_version_inc();
 	}
+	if (fleng!=NULL) {
+		*fleng = p->data.fdata.length;
+	}
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_append(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t inode_src,uint32_t uid,uint32_t gids,uint32_t *gid) {
-	return fs_univ_append(main_time(),rootinode,sesflags,inode,inode_src,uid,gids,gid);
+uint8_t fs_append(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t inode_src,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *fleng) {
+	return fs_univ_append(main_time(),rootinode,sesflags,inode,inode_src,uid,gids,gid,fleng);
 }
 
 uint8_t fs_mr_append(uint32_t ts,uint32_t inode,uint32_t inode_src) {
-	return fs_univ_append(ts,0,SESFLAG_METARESTORE,inode,inode_src,0,0,NULL);
+	return fs_univ_append(ts,0,SESFLAG_METARESTORE,inode,inode_src,0,0,NULL,NULL);
 }
 
 uint8_t fs_readdir_size(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t flags,uint32_t maxentries,uint64_t nedgeid,void **dnode,void **dedge,uint32_t *dbuffsize) {
@@ -5240,7 +5247,7 @@ uint8_t fs_filechunk(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_checkfile(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t chunkcount[11]) {
+uint8_t fs_checkfile(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t chunkcount[12]) {
 	fsnode *p;
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
 		return MFS_ERROR_ENOENT;
@@ -5519,7 +5526,7 @@ uint8_t fs_mr_rollback(uint32_t inode,uint32_t indx,uint64_t prevchunkid,uint64_
 	return fs_univ_rollback(1,inode,indx,prevchunkid,chunkid);
 }
 
-uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t chunkopflags) {
+uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t chunkopflags,uint8_t *flenghaschanged) {
 	uint32_t ts = main_time();
 	if (length>0) {
 		fsnode *p;
@@ -5546,6 +5553,9 @@ uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t chun
 				p->mtime = p->ctime = ts;
 			}
 			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",%u)",ts,inode,length,(chunkopflags & CHUNKOPFLAG_CANMODTIME)?1:0);
+			if (flenghaschanged!=NULL) {
+				*flenghaschanged = 1;
+			}
 		}
 //		{
 //			uint32_t i;
@@ -5558,6 +5568,48 @@ uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t chun
 	}
 	changelog("%"PRIu32"|UNLOCK(%"PRIu64")",ts,chunkid);
 	return chunk_unlock(chunkid);
+}
+
+uint8_t fs_mr_amtime(uint32_t inode,uint32_t atime,uint32_t mtime,uint32_t ctime) {
+	fsnode *p;
+	p = fsnodes_node_find(inode);
+	if (!p) {
+		return MFS_ERROR_ENOENT;
+	}
+	p->atime = atime;
+	p->mtime = mtime;
+	p->ctime = ctime;
+	meta_version_inc();
+	return MFS_STATUS_OK;
+}
+
+void fs_amtime_update(uint32_t rootinode,uint8_t sesflags,uint32_t *inodetab,uint32_t *atimetab,uint32_t *mtimetab,uint32_t cnt) {
+	fsnode *p;
+	uint32_t i,atime,mtime,ts;
+	uint8_t chg;
+
+	ts = main_time();
+
+	for (i=0 ; i<cnt ; i++) {
+		if (fsnodes_node_find_ext(rootinode,sesflags,inodetab+i,NULL,&p,0)) {
+			chg = 0;
+			atime = atimetab[i];
+			mtime = mtimetab[i];
+			if (p->atime<atime) {
+				if ((AtimeMode==ATIME_ALWAYS || AtimeMode==ATIME_FILES_ONLY) || (((p->atime <= p->ctime && atime >= p->ctime) || (p->atime <= p->mtime && atime >= p->mtime) || (p->atime + 86400 < atime)) && (AtimeMode==ATIME_RELATIVE_ONLY || AtimeMode==ATIME_FILES_AND_RELATIVE_ONLY))) {
+					p->atime = atime;
+					chg = 1;
+				}
+			}
+			if (p->mtime<mtime) {
+				p->ctime = p->mtime = mtime;
+				chg = 1;
+			}
+			if (chg) {
+				changelog("%"PRIu32"|AMTIME(%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32")",ts,inodetab[i],p->atime,p->mtime,p->ctime);
+			}
+		}
+	}
 }
 
 uint8_t fs_repair(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *notchanged,uint32_t *erased,uint32_t *repaired) {
@@ -5802,7 +5854,7 @@ uint8_t fs_univ_settrashtime(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uin
 	}
 
 	fsnodes_keep_alive_begin();
-	fsnodes_settrashtime_recursive(p,ts,uid,trashtime,smode,sinodes,ncinodes,nsinodes);
+	fsnodes_settrashtime_recursive(p,ts,uid,(trashtime+3599)/3600,smode,sinodes,ncinodes,nsinodes);
 	if ((smode&SMODE_RMASK)==0 && *nsinodes>0 && *sinodes==0 && *ncinodes==0) {
 		return MFS_ERROR_EPERM;
 	}
@@ -6478,6 +6530,8 @@ uint32_t fs_node_info(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_
 			put16bit(&ptr,1);
 			nextcidptr = ptr;
 			ptr += 8;
+		} else {
+			nextcidptr = NULL;
 		}
 		ncontid = continueid;
 		if (continueid==0) {
@@ -6512,7 +6566,7 @@ uint32_t fs_node_info(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_
 		if (e!=NULL) {
 			fsnodes_edgeid_insert(e);
 		}
-		if (ptr!=NULL) {
+		if (nextcidptr!=NULL) {
 			put64bit(&nextcidptr,ncontid);
 		}
 	} else if (p->type==TYPE_FILE || p->type==TYPE_TRASH || p->type==TYPE_SUSTAINED) {
@@ -6522,6 +6576,8 @@ uint32_t fs_node_info(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_
 			nextcidptr = ptr;
 			ptr += 8;
 			put64bit(&ptr,p->data.fdata.length);
+		} else {
+			nextcidptr = NULL;
 		}
 		if (p->data.fdata.length>0) {
 			lastchunk = (p->data.fdata.length-1)>>MFSCHUNKBITS;
@@ -6553,7 +6609,7 @@ uint32_t fs_node_info(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_
 		if (ncontid>=p->data.fdata.chunks) {
 			ncontid = 0;
 		}
-		if (ptr!=NULL) {
+		if (nextcidptr!=NULL) {
 			put64bit(&nextcidptr,ncontid);
 		}
 	} else {
@@ -6890,11 +6946,14 @@ void fs_test_files() {
 static inline void fs_univ_empty_trash_part(uint32_t ts,uint32_t eid,uint32_t *fi,uint32_t *ri) {
 	fsedge *e;
 	fsnode *p;
+	uint64_t trashseconds;
 	e = trash[eid];
 	while (e) {
 		p = e->child;
 		e = e->nextchild;
-		if (((uint64_t)(p->atime) + (uint64_t)(p->trashtime) < (uint64_t)ts) && ((uint64_t)(p->mtime) + (uint64_t)(p->trashtime) < (uint64_t)ts) && ((uint64_t)(p->ctime) + (uint64_t)(p->trashtime) < (uint64_t)ts)) {
+		trashseconds = p->trashtime;
+		trashseconds *= 3600;
+		if (((uint64_t)(p->atime) + trashseconds < (uint64_t)ts) && ((uint64_t)(p->mtime) + trashseconds < (uint64_t)ts) && ((uint64_t)(p->ctime) + trashseconds < (uint64_t)ts)) {
 			if (fsnodes_purge(ts,p)) {
 				(*fi)++;
 			} else {
@@ -7383,6 +7442,7 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 	uint8_t unodebuff[1+4+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4];
 	uint8_t *ptr,*chptr;
 	uint32_t i,indx,ch;
+	uint32_t trashseconds;
 
 	if (f==NULL) {	// last node
 		if (bio_write(fd,"\0",1)!=1) {
@@ -7401,7 +7461,9 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 	put32bit(&ptr,f->atime);
 	put32bit(&ptr,f->mtime);
 	put32bit(&ptr,f->ctime);
-	put32bit(&ptr,f->trashtime);
+	trashseconds = f->trashtime;
+	trashseconds *= 3600;
+	put32bit(&ptr,trashseconds);
 	switch (f->type) {
 	case TYPE_DIRECTORY:
 	case TYPE_SOCKET:
@@ -7480,6 +7542,7 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	uint8_t unodebuff[4+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4];
 	const uint8_t *ptr,*chptr;
 	uint8_t type;
+	uint32_t trashseconds;
 	uint32_t i,indx,pleng,ch,sessionids,sessionid;
 	fsnode *p;
 	static uint8_t nl;
@@ -7600,7 +7663,8 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	p->atime = get32bit(&ptr);
 	p->mtime = get32bit(&ptr);
 	p->ctime = get32bit(&ptr);
-	p->trashtime = get32bit(&ptr);
+	trashseconds = get32bit(&ptr);
+	p->trashtime = (trashseconds+3599)/3600;
 	switch (type) {
 	case TYPE_DIRECTORY:
 		memset(&(p->data.ddata.stats),0,sizeof(statsrecord));

@@ -32,6 +32,9 @@
 # number of metadata change log files (default is 50)
 # BACK_LOGS = 50
 
+# how often master will store metadata (hours - default is 1)
+# METADATA_SAVE_FREQ = 1
+
 
 # number of previous metadata files to be kept (default is 1)
 # BACK_META_KEEP_PREVIOUS = 1
@@ -72,6 +75,12 @@
 # If you want to switch on chunkserver authentication, then first define AUTH_CODE in all your chunkservers (and reload/restart them) then uncomment this option and reload/restart master
 # After reload currently connected chunkservers are NOT disconnected. New AUTH_CODE will be used when chunkservers will make new connection.
 # AUTH_CODE = mfspassword
+
+# Optional IP class remapping. If you want to use class A for communication with master and class B for I/O (communcation with chunkservers) then define class A as REMAP_SOURCE_IP_CLASS and class B as REMAP_DESTINATION_IP_CLASS.
+# You must also define REMAP_BITS which means how many of first bits of class A should be changed to bits from class B. All chunkserver IP numbers that are not in class A will stay unchanged.
+# REMAP_BITS = 24
+# REMAP_SOURCE_IP_CLASS = 192.168.1.0
+# REMAP_DESTINATION_IP_CLASS = 10.0.0.0
 
 ###############################################
 # CHUNKSERVER WORKING OPTIONS                 #

@@ -21,9 +21,11 @@ mfsmount_SOURCES=\
 	mfs_fuse.c mfs_fuse.h \
 	mfs_meta_fuse.c mfs_meta_fuse.h \
 	mastercomm.c mastercomm.h \
+	extrapackets.c extrapackets.h \
+	heapsorter.c heapsorter.h \
 	masterproxy.c masterproxy.h \
 	csorder.c csorder.h \
-	readchunkdata.c readchunkdata.h \
+	chunksdatacache.c chunksdatacache.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
 	csdb.c csdb.h \

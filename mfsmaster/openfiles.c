@@ -225,6 +225,18 @@ uint8_t of_isfileopened(uint32_t inode) {
 	return 0;
 }
 
+uint8_t of_isfileopened_by_session(uint32_t inode,uint32_t sessionid) {
+	ofrelation *ofr;
+	uint32_t ihashpos = OF_INODE_HASH(inode);
+
+	for (ofr = inodehash[ihashpos] ; ofr ; ofr = ofr->inext) {
+		if (ofr->inode==inode && ofr->sessionid==sessionid) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 uint32_t of_noofopenedfiles(uint32_t sessionid) {
 	ofrelation *ofr;
 	uint32_t shashpos = OF_SESSION_HASH(sessionid);

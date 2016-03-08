@@ -116,6 +116,39 @@ void oplog_printf(const struct fuse_ctx *ctx,const char *format,...) {
 //	pthread_mutex_unlock(&bufflock);
 }
 
+void oplog_msg(const char *format,...) {
+	va_list ap;
+	char buff[LINELENG];
+	uint32_t leng;
+	struct timeval tv;
+	struct tm ltime;
+
+	pthread_mutex_lock(&timelock);
+	gettimeofday(&tv,NULL);
+	if (convts/900!=tv.tv_sec/900) {
+		convts=tv.tv_sec/900;
+		convts*=900;
+		localtime_r(&convts,&convtm);
+	}
+	ltime = convtm;
+	leng = tv.tv_sec - convts;
+	ltime.tm_sec += leng%60;
+	ltime.tm_min += leng/60;
+	pthread_mutex_unlock(&timelock);
+//	pthread_mutex_lock(&bufflock);
+	leng = snprintf(buff,LINELENG,"%02u.%02u %02u:%02u:%02u.%06u: msg:",ltime.tm_mon+1,ltime.tm_mday,ltime.tm_hour,ltime.tm_min,ltime.tm_sec,(unsigned)(tv.tv_usec));
+	if (leng<LINELENG) {
+		va_start(ap,format);
+		leng += vsnprintf(buff+leng,LINELENG-leng,format,ap);
+		va_end(ap);
+	}
+	if (leng>=LINELENG) {
+		leng=LINELENG-1;
+	}
+	buff[leng++]='\n';
+	oplog_put((uint8_t*)buff,leng);
+//	pthread_mutex_unlock(&bufflock);
+}
 
 unsigned long oplog_newhandle(int hflag) {
 	fhentry *fhptr;

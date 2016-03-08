@@ -74,6 +74,7 @@
 #include "symlinkcache.h"
 #include "negentrycache.h"
 //#include "dircache.h"
+#include "chunksdatacache.h"
 #include "conncache.h"
 #include "readdata.h"
 #include "writedata.h"
@@ -807,6 +808,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	syslog(LOG_NOTICE,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
 
 	conncache_init(200);
+	chunksdatacache_init();
 	symlink_cache_init();
 	negentry_cache_init(mfsopts.negentrycacheto);
 //	dir_cache_init();
@@ -816,6 +818,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
+		chunksdatacache_term();
 		conncache_term();
 		return 1;
 	}
@@ -823,6 +826,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //	fs_term();
 //	negentry_cache_term();
 //	symlink_cache_term();
+//	chunksdatacache_term();
 //	conncache_term();
 //	return 1;
 
@@ -853,6 +857,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
+		chunksdatacache_term();
 		conncache_term();
 		return 1;
 	}
@@ -861,7 +866,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		mfs_meta_init(mfsopts.debug,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.flattrash);
 		se = fuse_lowlevel_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), (void*)piped);
 	} else {
-		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
+		mfs_init(ch,mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
 		se = fuse_lowlevel_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
 	}
 	if (se==NULL) {
@@ -885,6 +890,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
+		chunksdatacache_term();
 		conncache_term();
 		return 1;
 	}
@@ -914,6 +920,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //		dir_cache_term();
 		negentry_cache_term();
 		symlink_cache_term();
+		chunksdatacache_term();
 		conncache_term();
 		return 1;
 	}
@@ -965,6 +972,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //	dir_cache_term();
 	negentry_cache_term();
 	symlink_cache_term();
+	chunksdatacache_term();
 	conncache_term();
 	return err ? 1 : 0;
 }

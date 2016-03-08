@@ -1,5 +1,19 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.74-1 (2016-03-08)
+
+  - (master) fixed rebalance replication (check for all chunk copies for destination - not only valid)
+  - (master+mount) new mechanism for atime+mtime setting during I/O
+  - (master+mount) new I/O synchronization between different mounts (with cache invalidation)
+  - (master+mount) new chunk number/version cache (with automatic invalidation from master)
+  - (master) added mapping chunkserver IP classes (allow to have separate network for I/O and separate for other activity)
+  - (master) fixed status returned by writechunk after network down/up
+  - (master) changed trashtime from seconds to hours
+  - (master) added METADATA_SAVE_FREQ option (allow to save metadata less frequently than every hour)
+  - (master) added using in emergency (endangered chunks) all available servers for replication (even overloaded and being maintained)
+  - (master) added using chunkservers in 'internal rebalance' state in case of deleting chunks
+  - (all) spell check errors fixed (patch committed by Dmitry Smirnov)
+
 * MooseFS 3.0.73-1 (2016-02-11)
 
   - (master) fixed restoring ARCHCHG from changelog

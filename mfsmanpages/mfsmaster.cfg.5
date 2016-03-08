@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "February 2016" "MooseFS 3.0.73-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "March 2016" "MooseFS 3.0.74-1" "This is part of MooseFS"
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
@@ -46,6 +46,9 @@ alternate location/name of \fBmfslicence.bin\fP file (pro version only)
 \fBBACK_LOGS\fP
 number of metadata change log files (default is 50)
 .TP
+\fBMETADATA_SAVE_FREQ\fP
+how often (in hours) master will store metadata (default is 1)
+.TP
 \fBMETADATA_DOWNLOAD_FREQ\fP
 how often (in hours) leader will download metadata from followers (pro version only ; default is 24)
 .TP
@@ -89,6 +92,9 @@ default timeout in seconds for master-chunkserver connection (default is 10)
 .TP
 \fBAUTH_CODE\fP
 Optional authentication string. When defined - then only chunkservers with the same AUTH_CODE are allowed to connect to this master. When not defined (default) - then all chunkservers are allowed. If you want to switch on chunkserver authentication, then first define AUTH_CODE in all your chunkservers (and reload/restart them) then define this option and master and reload/restart it. Remember that after reload currently connected chunkservers are NOT disconnected. New AUTH_CODE will be used only when chunkservers will make new connection.
+.TP
+\fBREMAP_BITS\fP, \fBREMAP_SOURCE_IP_CLASS\fP, \fBREMAP_DESTINATION_IP_CLASS\fP
+Optional IP class remapping. Remap chunkserver IP addresses with first REMAP_BITS of IP equal to first REMAP_BITS of REMAP_SOURCE_IP_CLASS. During remapping system will set first REMAP_BITS of IP address to first REMAP_BITS of REMAP_DESTINATION_IP_CLASS. (defaults are zeros which means no remap)
 .TP
 \fBREPLICATIONS_DELAY_INIT\fP
 initial delay in seconds before starting replications (default is 300)
@@ -191,6 +197,10 @@ There are five values for \fBATIME_MODE\fP (all other values are treated as 0):
 3 = Same as above but only in case of files. In case of folders and symlinks do not modify atime.
 .IP \[bu] 2
 4 = Never modify atime during access (like "noatime" option).
+.PP
+When your network has two (or more) IP classes you may want to use one network for standard communication between MFS modules and separate network only for I/O. It can be done by setting REMAP_BITS, REMAP_SOURCE_IP_CLASS and REMAP_DESTINATION_IP_CLASS.
+When you set these options then master will change internally IP addresses of chunkservers and will send them as chunk locations, so clients will make connections with chunkservers using new (destination) IP for all I/O, but still communicate with master using original (source) IP.
+Also chunkservers will use original IP to communicate with master, but they will use new IP's to communicate between themselves during replication. Beware that all clients and chunkservers must have access to both networks, but masters, metaloggers etc. will need only access to the source network.
 .SH COPYRIGHT
 Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 

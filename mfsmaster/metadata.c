@@ -84,6 +84,7 @@ static double laststoretime = 0.0;
 static uint8_t laststorestatus = 0;
 
 static uint32_t BackMetaCopies;
+static uint32_t MetaSaveFreq;
 
 int meta_store_chunk(bio *fd,uint8_t (*storefn)(bio *),const char chunkname[4]) {
 	uint8_t hdr[16];
@@ -773,9 +774,11 @@ int meta_storeall(int bg) {
 
 void meta_dostoreall(void) {
 	changelog_rotate();
-	if (meta_storeall(1)<=0) {
-			syslog(LOG_ERR,"can't store metadata - exiting");
-			main_exit();
+	if (((main_time() / 3600) % MetaSaveFreq) == 0) {
+			if (meta_storeall(1)<=0) {
+				syslog(LOG_ERR,"can't store metadata - exiting");
+				main_exit();
+			}
 		}
 }
 
@@ -1224,11 +1227,13 @@ int meta_loadall(void) {
 					fd = mkstemp(name);
 					if (fd<0) {
 						mfs_arg_errlog(LOG_ERR,"can't create temporary file %s",name);
+						free(name);
 						return -1;
 					}
 #elif HAVE_MKTEMP
 					if (mktemp(name)==NULL) {
 						mfs_arg_errlog(LOG_ERR,"can't create temporary file %s",name);
+						free(name);
 						return -1;
 					}
 #endif
@@ -1237,6 +1242,7 @@ int meta_loadall(void) {
 #ifdef HAVE_MKSTEMP
 						close(fd);
 #endif
+						free(name);
 						return -1;
 					}
 #ifdef HAVE_MKSTEMP
@@ -1318,6 +1324,14 @@ void meta_set_id(uint64_t newmetaid) {
 }
 
 void meta_reload(void) {
+	uint32_t back_logs;
+
+	MetaSaveFreq = cfg_getuint32("METADATA_SAVE_FREQ",1);
+	back_logs = cfg_getuint32("BACK_LOGS",50);
+	if (MetaSaveFreq>(back_logs/2)) {
+		mfs_syslog(LOG_WARNING,"METADATA_SAVE_FREQ is higher than half of BACK_LOGS - decreasing");
+		MetaSaveFreq = back_logs/2;
+	}
 	BackMetaCopies = cfg_getuint32("BACK_META_KEEP_PREVIOUS",1);
 	if (BackMetaCopies>99) {
 		mfs_syslog(LOG_WARNING,"BACK_META_KEEP_PREVIOUS is too high (>99) - decreasing");

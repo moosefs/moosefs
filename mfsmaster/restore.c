@@ -267,6 +267,21 @@ int do_archchg(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return fs_mr_archchg(ts,inode,uid,flags,chgchunks,notchgchunks,nsinodes);
 }
 
+int do_amtime(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,atime,mtime,ctime;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(atime,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(mtime,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(ctime,ptr);
+	EAT(ptr,filename,lv,')');
+	return fs_mr_amtime(inode,atime,mtime,ctime);
+}
+
 int do_attr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,mode,uid,gid,atime,mtime;
 	EAT(ptr,filename,lv,'(');
@@ -1232,6 +1247,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 		case HASHCODE('A','R','C','H'):
 			if (strncmp(ptr,"ARCHCHG",7)==0) {
 				return do_archchg(filename,lv,ts,ptr+7);
+			}
+			break;
+		case HASHCODE('A','M','T','I'):
+			if (strncmp(ptr,"AMTIME",6)==0) {
+				return do_amtime(filename,lv,ts,ptr+6);
 			}
 			break;
 		case HASHCODE('C','R','E','A'):

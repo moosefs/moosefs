@@ -26,6 +26,7 @@
 #include <stddef.h>
 #include <time.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/uio.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -760,6 +761,9 @@ uint8_t* matoclserv_createpacket(matoclserventry *eptr,uint32_t type,uint32_t si
 	return ptr;
 }
 
+void matoclserv_fuse_chunk_has_changed(matoclserventry *eptr,uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint64_t fleng,uint8_t truncateflag);
+
+void matoclserv_fuse_fleng_has_changed(matoclserventry *eptr,uint32_t inode,uint64_t fleng);
 /*
 int matoclserv_open_check(matoclserventry *eptr,uint32_t fid) {
 	filelist *fl;
@@ -818,6 +822,8 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 		put32bit(&ptr,msgid);
 		put8bit(&ptr,status);
 		return 0;
+	} else {
+		sessions_inc_stats(eptr->sesdata,15);
 	}
 	if (opflag) {	// wait for operation end
 		i = CHUNKHASH(chunkid);
@@ -846,7 +852,7 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_WRITE_CHUNK,5);
 			put32bit(&ptr,msgid);
 			put8bit(&ptr,status);
-			fs_writeend(0,0,chunkid,0);	// ignore status - just do it.
+			fs_writeend(0,0,chunkid,0,NULL);	// ignore status - just do it.
 			return 0;
 		}
 		if (eptr->version>=VERSION2INT(3,0,10)) {
@@ -865,15 +871,17 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 		put64bit(&ptr,fleng);
 		put64bit(&ptr,chunkid);
 		put32bit(&ptr,version);
-		if (eptr->version>=VERSION2INT(3,0,10)) {
-			memcpy(ptr,cs_data,count*14);
-		} else if (eptr->version>=VERSION2INT(1,7,32)) {
-			memcpy(ptr,cs_data,count*10);
-		} else {
-			memcpy(ptr,cs_data,count*6);
+		if (count>0) {
+			if (eptr->version>=VERSION2INT(3,0,10)) {
+				memcpy(ptr,cs_data,count*14);
+			} else if (eptr->version>=VERSION2INT(1,7,32)) {
+				memcpy(ptr,cs_data,count*10);
+			} else {
+				memcpy(ptr,cs_data,count*6);
+			}
 		}
+		matoclserv_fuse_chunk_has_changed(eptr,inode,indx,chunkid,version,fleng,0);
 	}
-	sessions_inc_stats(eptr->sesdata,15);
 	return 0;
 }
 
@@ -913,6 +921,7 @@ static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32
 		put8bit(&ptr,status);
 		return 0;
 	} else {
+		sessions_inc_stats(eptr->sesdata,14);
 		if (chunkid>0) {
 			if (eptr->version>=VERSION2INT(3,0,10)) {
 				status = chunk_get_version_and_csdata(2,chunkid,eptr->peerip,&version,&count,cs_data);
@@ -949,14 +958,15 @@ static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32
 	put64bit(&ptr,fleng);
 	put64bit(&ptr,chunkid);
 	put32bit(&ptr,version);
-	if (eptr->version>=VERSION2INT(3,0,10)) {
-		memcpy(ptr,cs_data,count*14);
-	} else if (eptr->version>=VERSION2INT(1,7,32)) {
-		memcpy(ptr,cs_data,count*10);
-	} else {
-		memcpy(ptr,cs_data,count*6);
+	if (count>0) {
+		if (eptr->version>=VERSION2INT(3,0,10)) {
+			memcpy(ptr,cs_data,count*14);
+		} else if (eptr->version>=VERSION2INT(1,7,32)) {
+			memcpy(ptr,cs_data,count*10);
+		} else {
+			memcpy(ptr,cs_data,count*6);
+		}
 	}
-	sessions_inc_stats(eptr->sesdata,14);
 	return 0;
 }
 
@@ -982,6 +992,7 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 		swc->eptr = eptr;
 		swc->msgid = msgid;
 		swc->inode = inode;
+		swc->indx = indx;
 		swc->uid = uid;
 		swc->gid = gid[0];
 		swc->auid = auid;
@@ -1034,6 +1045,7 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 		put8bit(&ptr,status);
 	} else {
 		memcpy(ptr,attr,35);
+		matoclserv_fuse_fleng_has_changed(eptr,inode,fleng);
 	}
 	sessions_inc_stats(eptr->sesdata,2);
 	return 0;
@@ -1160,7 +1172,7 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 	switch (type) {
 	case FUSE_CREATE:
 		if (status==MFS_STATUS_OK) { // just unlock this chunk
-			fs_writeend(inode,0,chunkid,0);
+			fs_writeend(inode,0,chunkid,0,NULL);
 		}
 		return;
 	case FUSE_WRITE:
@@ -1197,13 +1209,16 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 		put64bit(&ptr,fleng);
 		put64bit(&ptr,chunkid);
 		put32bit(&ptr,version);
-		if (eptr->version>=VERSION2INT(3,0,10)) {
-			memcpy(ptr,cs_data,count*14);
-		} else if (eptr->version>=VERSION2INT(1,7,32)) {
-			memcpy(ptr,cs_data,count*10);
-		} else {
-			memcpy(ptr,cs_data,count*6);
+		if (count>0) {
+			if (eptr->version>=VERSION2INT(3,0,10)) {
+				memcpy(ptr,cs_data,count*14);
+			} else if (eptr->version>=VERSION2INT(1,7,32)) {
+				memcpy(ptr,cs_data,count*10);
+			} else {
+				memcpy(ptr,cs_data,count*6);
+			}
 		}
+		matoclserv_fuse_chunk_has_changed(eptr,inode,indx,chunkid,version,fleng,0);
 //		for (i=0 ; i<count ; i++) {
 //			if (matocsserv_getlocation(sptr[i],&ip,&port)<0) {
 //				put32bit(&ptr,0);
@@ -1227,6 +1242,8 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_TRUNCATE,39);
 		put32bit(&ptr,msgid);
 		memcpy(ptr,attr,35);
+		chunk_get_version(chunkid,&version);
+		matoclserv_fuse_chunk_has_changed(eptr,inode,indx,chunkid,version,fleng,1);
 		return;
 	default:
 		syslog(LOG_WARNING,"got chunk status, but operation type is unknown");
@@ -2430,6 +2447,89 @@ void matoclserv_fuse_sustained_inodes(matoclserventry *eptr,const uint8_t *data,
 //	sessions_sync_open_files(eptr->sesdata,data,length>>2);
 }
 
+void matoclserv_fuse_amtime_inodes(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	const uint8_t *rptr;
+	static uint32_t *inodetab=NULL,*atimetab=NULL,*mtimetab=NULL;
+	static uint32_t tabsizes = 0;
+	uint32_t i,a,m,j;
+
+	if ((length%12)!=0) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_AMTIME_INODES - wrong size (%"PRIu32"/N*12)",length);
+		eptr->mode = KILL;
+		return;
+	}
+
+	if (eptr->sesdata==NULL) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_AMTIME_INODES - session doesn't exist");
+		eptr->mode = KILL;
+		return;
+	}
+	length/=12;
+	if (length>tabsizes) {
+		if (inodetab) {
+			free(inodetab);
+		}
+		if (atimetab) {
+			free(atimetab);
+		}
+		if (mtimetab) {
+			free(mtimetab);
+		}
+		tabsizes = ((length+0xFF)&0xFFFFFF00);
+		inodetab = malloc(sizeof(uint32_t)*tabsizes);
+		passert(inodetab);
+		atimetab = malloc(sizeof(uint32_t)*tabsizes);
+		passert(atimetab);
+		mtimetab = malloc(sizeof(uint32_t)*tabsizes);
+		passert(mtimetab);
+	}
+	rptr = data;
+	j = 0;
+	while (length>0) {
+		i = get32bit(&rptr);
+		a = get32bit(&rptr);
+		m = get32bit(&rptr);
+		if (i>0 && (a>0 || m>0)) {
+			inodetab[j] = i;
+			atimetab[j] = a;
+			mtimetab[j] = m;
+			j++;
+		}
+		length--;
+	}
+	fs_amtime_update(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inodetab,atimetab,mtimetab,j);
+}
+
+void matoclserv_fuse_time_sync(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t *ptr;
+	struct timeval tv;
+	uint32_t msgid;
+	uint64_t usectime;
+
+	if (length!=0 && length!=4) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_TIME_SYNC - wrong size (%"PRIu32"/0)",length);
+		eptr->mode = KILL;
+		return;
+	}
+
+	if (length==4) {
+		msgid = get32bit(&data);
+	} else {
+		msgid = 0;
+	}
+
+	gettimeofday(&tv,NULL);
+	usectime = tv.tv_sec;
+	usectime *= 1000000;
+	usectime += tv.tv_usec;
+
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_TIME_SYNC,8+length);
+	if (length==4) {
+		put32bit(&ptr,msgid);
+	}
+	put64bit(&ptr,usectime);
+}
+
 uint32_t* matoclserv_gid_storage(uint32_t gids) {
 	static uint32_t *gid=NULL;
 	static uint32_t gidleng=0;
@@ -3551,7 +3651,7 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 					swc->next = swchunkshash[i];
 					swchunkshash[i] = swc;
 				} else {
-					fs_writeend(newinode,0,chunkid,0); // no operation? - just unlock this chunk
+					fs_writeend(newinode,0,chunkid,0,NULL); // no operation? - just unlock this chunk
 				}
 			}
 		}
@@ -3600,6 +3700,9 @@ void matoclserv_fuse_read_chunk(matoclserventry *eptr,const uint8_t *data,uint32
 	} else {
 		chunkopflags = CHUNKOPFLAG_CANMODTIME;
 	}
+	if (eptr->version>=VERSION2INT(3,0,74)) {
+		chunkopflags &= ~CHUNKOPFLAG_CANMODTIME;
+	}
 	matoclserv_fuse_read_chunk_common(eptr,msgid,inode,indx,chunkopflags);
 }
 
@@ -3622,6 +3725,9 @@ void matoclserv_fuse_write_chunk(matoclserventry *eptr,const uint8_t *data,uint3
 	} else {
 		chunkopflags = CHUNKOPFLAG_CANMODTIME;
 	}
+	if (eptr->version>=VERSION2INT(3,0,74)) {
+		chunkopflags &= ~CHUNKOPFLAG_CANMODTIME;
+	}
 	matoclserv_fuse_write_chunk_common(eptr,msgid,inode,indx,chunkopflags);
 }
 
@@ -3630,33 +3736,114 @@ void matoclserv_fuse_write_chunk_end(matoclserventry *eptr,const uint8_t *data,u
 	uint32_t msgid;
 	uint32_t inode;
 	uint64_t fleng;
+	uint32_t indx;
+	uint32_t version;
 	uint64_t chunkid;
 	uint8_t status;
 	uint8_t chunkopflags;
+	uint8_t flenghaschanged;
 //	chunklist *cl,**acl;
-	if (length!=24 && length!=25) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_WRITE_CHUNK_END - wrong size (%"PRIu32"/24|25)",length);
+	if (length!=24 && length!=25 && length!=29) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_WRITE_CHUNK_END - wrong size (%"PRIu32"/24|25|29)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	chunkid = get64bit(&data);
 	inode = get32bit(&data);
+	if (length>=29) {
+		indx = get32bit(&data);
+	} else {
+		indx = 0;
+	}
 	fleng = get64bit(&data);
-	if (length==25) {
+	if (length>=25) {
 		chunkopflags = get8bit(&data);
 	} else {
 		chunkopflags = CHUNKOPFLAG_CANMODTIME;
 	}
+	if (eptr->version>=VERSION2INT(3,0,74)) {
+		chunkopflags &= ~CHUNKOPFLAG_CANMODTIME;
+	}
+	flenghaschanged = 0;
 	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
 		status = MFS_ERROR_EROFS;
 	} else {
-		status = fs_writeend(inode,fleng,chunkid,chunkopflags);
+		status = fs_writeend(inode,fleng,chunkid,chunkopflags,&flenghaschanged);
 	}
 	dcm_modify(inode,sessions_get_id(eptr->sesdata));
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_WRITE_CHUNK_END,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
+	if (length==29) {
+		chunk_get_version(chunkid,&version);
+		matoclserv_fuse_chunk_has_changed(eptr,inode,indx,chunkid,version,fleng,0);
+	} else if (flenghaschanged) {
+		matoclserv_fuse_fleng_has_changed(eptr,inode,fleng);
+	}
+}
+
+/*
+void matoclserv_fuse_fsync(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	matoclserventry *xeptr;
+	uint8_t *ptr;
+	uint32_t msgid;
+	uint32_t inode;
+	if (length!=8) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_FSYNC - wrong size (%"PRIu32"/8)",length);
+		eptr->mode = KILL;
+	}
+	msgid = get32bit(&data);
+	inode = get32bit(&data);
+
+	for (xeptr=matoclservhead ; xeptr ; xeptr=xeptr->next) {
+		if (xeptr!=eptr && xeptr->mode==DATA && xeptr->registered==1 && xeptr->sesdata!=NULL && xeptr->version>=VERSION2INT(3,0,74)) {
+			if (of_isfileopened_by_session(inode,sessions_get_id(xeptr->sesdata))) {
+				ptr = matoclserv_createpacket(xeptr,MATOCL_FUSE_INVALIDATE_DATA_CACHE,8);
+				put32bit(&ptr,0);
+				put32bit(&ptr,inode);
+			}
+		}
+	}
+
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_FSYNC,5);
+	put32bit(&ptr,msgid);
+	put8bit(&ptr,MFS_STATUS_OK);
+}
+*/
+
+void matoclserv_fuse_chunk_has_changed(matoclserventry *eptr,uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint64_t fleng,uint8_t truncateflag) {
+	matoclserventry *xeptr;
+	uint8_t *ptr;
+	for (xeptr=matoclservhead ; xeptr ; xeptr=xeptr->next) {
+		if (xeptr!=eptr && xeptr->mode==DATA && xeptr->registered==1 && xeptr->sesdata!=NULL && xeptr->version>=VERSION2INT(3,0,74)) {
+			if (of_isfileopened_by_session(inode,sessions_get_id(xeptr->sesdata))) {
+				ptr = matoclserv_createpacket(xeptr,MATOCL_FUSE_CHUNK_HAS_CHANGED,33);
+				put32bit(&ptr,0);
+				put32bit(&ptr,inode);
+				put32bit(&ptr,chindx);
+				put64bit(&ptr,chunkid);
+				put32bit(&ptr,version);
+				put64bit(&ptr,fleng);
+				put8bit(&ptr,truncateflag);
+			}
+		}
+	}
+}
+
+void matoclserv_fuse_fleng_has_changed(matoclserventry *eptr,uint32_t inode,uint64_t fleng) {
+	matoclserventry *xeptr;
+	uint8_t *ptr;
+	for (xeptr=matoclservhead ; xeptr ; xeptr=xeptr->next) {
+		if (xeptr!=eptr && xeptr->mode==DATA && xeptr->registered==1 && xeptr->sesdata!=NULL && xeptr->version>=VERSION2INT(3,0,74)) {
+			if (of_isfileopened_by_session(inode,sessions_get_id(xeptr->sesdata))) {
+				ptr = matoclserv_createpacket(xeptr,MATOCL_FUSE_FLENG_HAS_CHANGED,16);
+				put32bit(&ptr,0);
+				put32bit(&ptr,inode);
+				put64bit(&ptr,fleng);
+			}
+		}
+	}
 }
 
 static inline matoclserventry* matoclserv_find_connection(uint32_t sessionid) {
@@ -3852,7 +4039,9 @@ void matoclserv_fuse_check(matoclserventry *eptr,const uint8_t *data,uint32_t le
 		put32bit(&ptr,msgid);
 		put64bit(&ptr,chunkid);
 		put32bit(&ptr,version);
-		memcpy(ptr,cs_data,count*7);
+		if (count>0) {
+			memcpy(ptr,cs_data,count*7);
+		}
 	} else {
 		status = fs_checkfile(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,chunkcount);
 		if (status!=MFS_STATUS_OK) {
@@ -4640,6 +4829,7 @@ void matoclserv_fuse_append(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint32_t *gid;
 	uint32_t i;
 	uint32_t msgid;
+	uint64_t fleng;
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<20) {
@@ -4668,10 +4858,13 @@ void matoclserv_fuse_append(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_append(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_src,uid,gids,gid);
+	status = fs_append(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_src,uid,gids,gid,&fleng);
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_APPEND,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
+	if (status==MFS_STATUS_OK) {
+		matoclserv_fuse_fleng_has_changed(NULL,inode,fleng);
+	}
 }
 
 void matoclserv_fuse_snapshot(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -4852,6 +5045,229 @@ void matoclserv_fuse_archctl(matoclserventry *eptr,const uint8_t *data,uint32_t 
 		}
 	}
 }
+
+#if 0
+void matoclserv_storage_policy_create(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	uint8_t nleng;
+	uint8_t fver;
+	uint8_t i;
+	uint32_t create_labelmasks[9*MASKORGROUP];
+	uint32_t keep_labelmasks[9*MASKORGROUP];
+	uint32_t arch_labelmasks[9*MASKORGROUP];
+	uint8_t create_mode;
+	uint8_t create_labelscnt;
+	uint8_t keep_labelscnt;
+	uint8_t arch_labelscnt;
+	uint16_t arch_delay;
+	uint8_t admin_mode;
+	const uint8_t *name;
+	uint8_t *ptr;
+	uint8_t status;
+
+	if (length<5U) {
+		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	nleng = get8bit(&data);
+	name = data;
+	data += nleng;
+	if (length<6U+nleng) {
+		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		eptr->mode = KILL;
+		return;
+	}
+	fver = get8bit(&data);
+	if (fver==0) {
+		if (length<13U+nleng) {
+			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+			eptr->mode = KILL;
+			return;
+		}
+		admin_mode = get8bit(&data);
+		create_mode = get8bit(&data);
+		arch_delay = get16bit(&data);
+		create_labelscnt = get8bit(&data);
+		if (length<13U+nleng+create_labelscnt*4U*MASKORGROUP) {
+			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8")",length,nleng,create_labelscnt);
+			eptr->mode = KILL;
+			return;
+		}
+		for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
+			create_labelmasks[i] = get32bit(&data);
+		}
+		keep_labelscnt = get8bit(&data);
+		if (length<13U+nleng+(create_labelscnt+keep_labelscnt)*4U*MASKORGROUP) {
+			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt);
+			eptr->mode = KILL;
+			return;
+		}
+		for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
+			keep_labelmasks[i] = get32bit(&data);
+		}
+		arch_labelscnt = get8bit(&data);
+		if (length!=13U+nleng+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4U*MASKORGROUP) {
+			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt,arch_labelscnt);
+			eptr->mode = KILL;
+			return;
+		}
+		for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
+			arch_labelmasks[i] = get32bit(&data);
+		}
+		status = sp_create_entry(nleng,name,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
+	} else {
+		status = MFS_ERROR_EINVAL;
+	}
+	ptr = matoclserv_createpacket(eptr,MATOCL_STORAGE_POLICY_CREATE,5);
+	put32bit(&ptr,msgid);
+	put8bit(&ptr,status);
+}
+
+void matoclserv_storage_policy_change(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	uint8_t nleng;
+	uint8_t fver;
+	uint8_t i;
+	uint16_t chgmask;
+	uint32_t create_labelmasks[9*MASKORGROUP];
+	uint32_t keep_labelmasks[9*MASKORGROUP];
+	uint32_t arch_labelmasks[9*MASKORGROUP];
+	uint8_t create_mode;
+	uint8_t create_labelscnt;
+	uint8_t keep_labelscnt;
+	uint8_t arch_labelscnt;
+	uint16_t arch_delay;
+	uint8_t admin_mode;
+	const uint8_t *name;
+	uint8_t *ptr;
+	uint8_t status;
+
+	if (length<5U) {
+		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	nleng = get8bit(&data);
+	name = data;
+	data += nleng;
+	if (length<6U+nleng) {
+		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		eptr->mode = KILL;
+		return;
+	}
+	fver = get8bit(&data);
+	if (fver==0) {
+		if (length<15U+nleng) {
+			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+			eptr->mode = KILL;
+			return;
+		}
+		chgmask = get16bit(&data);
+		admin_mode = get8bit(&data);
+		create_mode = get8bit(&data);
+		arch_delay = get16bit(&data);
+		create_labelscnt = get8bit(&data);
+		if (length<15U+nleng+create_labelscnt*4U*MASKORGROUP) {
+			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8")",length,nleng,create_labelscnt);
+			eptr->mode = KILL;
+			return;
+		}
+		for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
+			create_labelmasks[i] = get32bit(&data);
+		}
+		keep_labelscnt = get8bit(&data);
+		if (length<15U+nleng+(create_labelscnt+keep_labelscnt)*4U*MASKORGROUP) {
+			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt);
+			eptr->mode = KILL;
+			return;
+		}
+		for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
+			keep_labelmasks[i] = get32bit(&data);
+		}
+		arch_labelscnt = get8bit(&data);
+		if (length!=15U+nleng+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4U*MASKORGROUP) {
+			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt,arch_labelscnt);
+			eptr->mode = KILL;
+			return;
+		}
+		for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
+			arch_labelmasks[i] = get32bit(&data);
+		}
+		status = sp_change_entry(nleng,name,chgmask,&create_mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay);
+	} else {
+		status = MFS_ERROR_EINVAL;
+	}
+	ptr = matoclserv_createpacket(eptr,MATOCL_STORAGE_POLICY_CHANGE,(status!=MFS_STATUS_OK)?5:(12U+4U*MASKORGROUP*(create_labelscnt+keep_labelscnt+arch_labelscnt)));
+	put32bit(&ptr,msgid);
+	if (status!=MFS_STATUS_OK) {
+		put8bit(&ptr,status);
+	} else {
+		put8bit(&ptr,0); // fver
+		put8bit(&ptr,admin_mode);
+		put8bit(&ptr,create_mode);
+		put16bit(&ptr,arch_delay);
+		put8bit(&ptr,create_labelscnt);
+		for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
+			put32bit(&ptr,create_labelmasks[i]);
+		}
+		put8bit(&ptr,keep_labelscnt);
+		for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
+			put32bit(&ptr,keep_labelmasks[i]);
+		}
+		put8bit(&ptr,arch_labelscnt);
+		for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
+			put32bit(&ptr,arch_labelmasks[i]);
+		}
+	}
+}
+
+void matoclserv_storage_policy_delete(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	uint8_t nleng;
+	const uint8_t *name;
+	uint8_t *ptr;
+	uint8_t status;
+
+	if (length<5) {
+		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_DELETE - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	nleng = get8bit(&data);
+	name = data;
+	data += nleng;
+	if (length!=5U+nleng) {
+		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_DELETE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		eptr->mode = KILL;
+		return;
+	}
+	status = sp_delete_entry(nleng,name);
+	ptr = matoclserv_createpacket(eptr,MATOCL_STORAGE_POLICY_DELETE,5);
+	put32bit(&ptr,msgid);
+	put8bit(&ptr,status);
+}
+
+void matoclserv_storage_policy_list(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	uint8_t *ptr;
+	uint32_t rsize;
+
+	if (length!=4) {
+		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_LIST - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	rsize = sp_list_entries(NULL);
+	ptr = matoclserv_createpacket(eptr,MATOCL_STORAGE_POLICY_LIST,4+rsize);
+	put32bit(&ptr,msgid);
+	sp_list_entries(ptr);
+}
+#endif
 
 /*
 void matoclserv_fuse_eattr(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -5322,8 +5738,15 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_REGISTER:
 				matoclserv_fuse_register(eptr,data,length);
 				break;
+			case CLTOMA_FUSE_SUSTAINED_INODES_DEPRECATED:
 			case CLTOMA_FUSE_SUSTAINED_INODES:
 				matoclserv_fuse_sustained_inodes(eptr,data,length);
+				break;
+			case CLTOMA_FUSE_AMTIME_INODES:
+				matoclserv_fuse_amtime_inodes(eptr,data,length);
+				break;
+			case CLTOMA_FUSE_TIME_SYNC:
+				matoclserv_fuse_time_sync(eptr,data,length);
 				break;
 			case CLTOMA_FUSE_STATFS:
 				matoclserv_fuse_statfs(eptr,data,length);
@@ -5387,6 +5810,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_WRITE_CHUNK_END:
 				matoclserv_fuse_write_chunk_end(eptr,data,length);
 				break;
+//			case CLTOMA_FUSE_FSYNC:
+//				matoclserv_fuse_fsync(eptr,data,length);
+//				break;
 			case CLTOMA_FUSE_FLOCK:
 				matoclserv_fuse_flock(eptr,data,length);
 				break;
@@ -5478,6 +5904,20 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_ARCHCTL:
 				matoclserv_fuse_archctl(eptr,data,length);
 				break;
+#if 0
+			case CLTOMA_STORAGE_POLICY_CREATE:
+				matoclserv_storage_policy_create(eptr,data,length);
+				break;
+			case CLTOMA_STORAGE_POLICY_CHANGE:
+				matoclserv_storage_policy_change(eptr,data,length);
+				break;
+			case CLTOMA_STORAGE_POLICY_DELETE:
+				matoclserv_storage_policy_delete(eptr,data,length);
+				break;
+			case CLTOMA_STORAGE_POLICY_LIST:
+				matoclserv_storage_policy_list(eptr,data,length);
+				break;
+#endif
 
 /* for tools - also should be available for registered clients */
 			case CLTOMA_CSERV_LIST:
@@ -5618,6 +6058,20 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_ARCHCTL:
 				matoclserv_fuse_archctl(eptr,data,length);
 				break;
+#if 0
+			case CLTOMA_STORAGE_POLICY_CREATE:
+				matoclserv_storage_policy_create(eptr,data,length);
+				break;
+			case CLTOMA_STORAGE_POLICY_CHANGE:
+				matoclserv_storage_policy_change(eptr,data,length);
+				break;
+			case CLTOMA_STORAGE_POLICY_DELETE:
+				matoclserv_storage_policy_delete(eptr,data,length);
+				break;
+			case CLTOMA_STORAGE_POLICY_LIST:
+				matoclserv_storage_policy_list(eptr,data,length);
+				break;
+#endif
 			default:
 				syslog(LOG_NOTICE,"main master server module: got unknown message from mfstools (type:%"PRIu32")",type);
 				eptr->mode=KILL;

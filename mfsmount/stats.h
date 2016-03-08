@@ -27,6 +27,7 @@ void stats_counter_add(void *node,uint64_t delta);
 void stats_counter_sub(void *node,uint64_t delta);
 void stats_counter_inc(void *node);
 void stats_counter_dec(void *node);
+void stats_counter_set(void *node,uint64_t value);
 void* stats_get_subnode(void *node,const char *name,uint8_t absolute,uint8_t printflag);
 // uint64_t* stats_get_counterptr(void *node);
 void stats_reset_all(void);

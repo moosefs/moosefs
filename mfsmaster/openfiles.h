@@ -28,6 +28,7 @@ uint8_t of_checknode(uint32_t sessionid,uint32_t inode);
 void of_openfile(uint32_t sessionid,uint32_t inode);
 void of_sync(uint32_t sessionid,uint32_t *inode,uint32_t inodecnt);
 void of_session_removed(uint32_t sessionid);
+uint8_t of_isfileopened_by_session(uint32_t inode,uint32_t sessionid);
 uint8_t of_isfileopened(uint32_t inode);
 uint32_t of_noofopenedfiles(uint32_t sessionid);
 uint32_t of_lsof(uint32_t sessionid,uint8_t *buff);

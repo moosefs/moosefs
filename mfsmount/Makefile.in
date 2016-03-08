@@ -114,8 +114,9 @@ am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	mfsmount-sustained_stats.$(OBJEXT) \
 	mfsmount-getgroups.$(OBJEXT) mfsmount-mfs_fuse.$(OBJEXT) \
 	mfsmount-mfs_meta_fuse.$(OBJEXT) mfsmount-mastercomm.$(OBJEXT) \
+	mfsmount-extrapackets.$(OBJEXT) mfsmount-heapsorter.$(OBJEXT) \
 	mfsmount-masterproxy.$(OBJEXT) mfsmount-csorder.$(OBJEXT) \
-	mfsmount-readchunkdata.$(OBJEXT) mfsmount-readdata.$(OBJEXT) \
+	mfsmount-chunksdatacache.$(OBJEXT) mfsmount-readdata.$(OBJEXT) \
 	mfsmount-writedata.$(OBJEXT) mfsmount-csdb.$(OBJEXT) \
 	mfsmount-stats.$(OBJEXT) mfsmount-oplog.$(OBJEXT) \
 	mfsmount-main.$(OBJEXT) ../mfscommon/mfsmount-clocks.$(OBJEXT) \
@@ -389,9 +390,11 @@ mfsmount_SOURCES = \
 	mfs_fuse.c mfs_fuse.h \
 	mfs_meta_fuse.c mfs_meta_fuse.h \
 	mastercomm.c mastercomm.h \
+	extrapackets.c extrapackets.h \
+	heapsorter.c heapsorter.h \
 	masterproxy.c masterproxy.h \
 	csorder.c csorder.h \
-	readchunkdata.c readchunkdata.h \
+	chunksdatacache.c chunksdatacache.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
 	csdb.c csdb.h \
@@ -583,11 +586,14 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfstools-strerr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunksdatacache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csdb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csorder.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirattrcache.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-extrapackets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-fdcache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-getgroups.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-heapsorter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-labelparser.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-mastercomm.Po@am__quote@
@@ -596,7 +602,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-mfs_meta_fuse.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-negentrycache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-oplog.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-readchunkdata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-readdata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-stats.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-sustained_inodes.Po@am__quote@
@@ -799,6 +804,34 @@ mfsmount-mastercomm.obj: mastercomm.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-mastercomm.obj `if test -f 'mastercomm.c'; then $(CYGPATH_W) 'mastercomm.c'; else $(CYGPATH_W) '$(srcdir)/mastercomm.c'; fi`
 
+mfsmount-extrapackets.o: extrapackets.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-extrapackets.o -MD -MP -MF $(DEPDIR)/mfsmount-extrapackets.Tpo -c -o mfsmount-extrapackets.o `test -f 'extrapackets.c' || echo '$(srcdir)/'`extrapackets.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-extrapackets.Tpo $(DEPDIR)/mfsmount-extrapackets.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='extrapackets.c' object='mfsmount-extrapackets.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-extrapackets.o `test -f 'extrapackets.c' || echo '$(srcdir)/'`extrapackets.c
+
+mfsmount-extrapackets.obj: extrapackets.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-extrapackets.obj -MD -MP -MF $(DEPDIR)/mfsmount-extrapackets.Tpo -c -o mfsmount-extrapackets.obj `if test -f 'extrapackets.c'; then $(CYGPATH_W) 'extrapackets.c'; else $(CYGPATH_W) '$(srcdir)/extrapackets.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-extrapackets.Tpo $(DEPDIR)/mfsmount-extrapackets.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='extrapackets.c' object='mfsmount-extrapackets.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-extrapackets.obj `if test -f 'extrapackets.c'; then $(CYGPATH_W) 'extrapackets.c'; else $(CYGPATH_W) '$(srcdir)/extrapackets.c'; fi`
+
+mfsmount-heapsorter.o: heapsorter.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-heapsorter.o -MD -MP -MF $(DEPDIR)/mfsmount-heapsorter.Tpo -c -o mfsmount-heapsorter.o `test -f 'heapsorter.c' || echo '$(srcdir)/'`heapsorter.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-heapsorter.Tpo $(DEPDIR)/mfsmount-heapsorter.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='heapsorter.c' object='mfsmount-heapsorter.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-heapsorter.o `test -f 'heapsorter.c' || echo '$(srcdir)/'`heapsorter.c
+
+mfsmount-heapsorter.obj: heapsorter.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-heapsorter.obj -MD -MP -MF $(DEPDIR)/mfsmount-heapsorter.Tpo -c -o mfsmount-heapsorter.obj `if test -f 'heapsorter.c'; then $(CYGPATH_W) 'heapsorter.c'; else $(CYGPATH_W) '$(srcdir)/heapsorter.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-heapsorter.Tpo $(DEPDIR)/mfsmount-heapsorter.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='heapsorter.c' object='mfsmount-heapsorter.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-heapsorter.obj `if test -f 'heapsorter.c'; then $(CYGPATH_W) 'heapsorter.c'; else $(CYGPATH_W) '$(srcdir)/heapsorter.c'; fi`
+
 mfsmount-masterproxy.o: masterproxy.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-masterproxy.o -MD -MP -MF $(DEPDIR)/mfsmount-masterproxy.Tpo -c -o mfsmount-masterproxy.o `test -f 'masterproxy.c' || echo '$(srcdir)/'`masterproxy.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-masterproxy.Tpo $(DEPDIR)/mfsmount-masterproxy.Po
@@ -827,19 +860,19 @@ mfsmount-csorder.obj: csorder.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-csorder.obj `if test -f 'csorder.c'; then $(CYGPATH_W) 'csorder.c'; else $(CYGPATH_W) '$(srcdir)/csorder.c'; fi`
 
-mfsmount-readchunkdata.o: readchunkdata.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-readchunkdata.o -MD -MP -MF $(DEPDIR)/mfsmount-readchunkdata.Tpo -c -o mfsmount-readchunkdata.o `test -f 'readchunkdata.c' || echo '$(srcdir)/'`readchunkdata.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-readchunkdata.Tpo $(DEPDIR)/mfsmount-readchunkdata.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='readchunkdata.c' object='mfsmount-readchunkdata.o' libtool=no @AMDEPBACKSLASH@
+mfsmount-chunksdatacache.o: chunksdatacache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-chunksdatacache.o -MD -MP -MF $(DEPDIR)/mfsmount-chunksdatacache.Tpo -c -o mfsmount-chunksdatacache.o `test -f 'chunksdatacache.c' || echo '$(srcdir)/'`chunksdatacache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-chunksdatacache.Tpo $(DEPDIR)/mfsmount-chunksdatacache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chunksdatacache.c' object='mfsmount-chunksdatacache.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-readchunkdata.o `test -f 'readchunkdata.c' || echo '$(srcdir)/'`readchunkdata.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-chunksdatacache.o `test -f 'chunksdatacache.c' || echo '$(srcdir)/'`chunksdatacache.c
 
-mfsmount-readchunkdata.obj: readchunkdata.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-readchunkdata.obj -MD -MP -MF $(DEPDIR)/mfsmount-readchunkdata.Tpo -c -o mfsmount-readchunkdata.obj `if test -f 'readchunkdata.c'; then $(CYGPATH_W) 'readchunkdata.c'; else $(CYGPATH_W) '$(srcdir)/readchunkdata.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-readchunkdata.Tpo $(DEPDIR)/mfsmount-readchunkdata.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='readchunkdata.c' object='mfsmount-readchunkdata.obj' libtool=no @AMDEPBACKSLASH@
+mfsmount-chunksdatacache.obj: chunksdatacache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-chunksdatacache.obj -MD -MP -MF $(DEPDIR)/mfsmount-chunksdatacache.Tpo -c -o mfsmount-chunksdatacache.obj `if test -f 'chunksdatacache.c'; then $(CYGPATH_W) 'chunksdatacache.c'; else $(CYGPATH_W) '$(srcdir)/chunksdatacache.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-chunksdatacache.Tpo $(DEPDIR)/mfsmount-chunksdatacache.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chunksdatacache.c' object='mfsmount-chunksdatacache.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-readchunkdata.obj `if test -f 'readchunkdata.c'; then $(CYGPATH_W) 'readchunkdata.c'; else $(CYGPATH_W) '$(srcdir)/readchunkdata.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-chunksdatacache.obj `if test -f 'chunksdatacache.c'; then $(CYGPATH_W) 'chunksdatacache.c'; else $(CYGPATH_W) '$(srcdir)/chunksdatacache.c'; fi`
 
 mfsmount-readdata.o: readdata.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-readdata.o -MD -MP -MF $(DEPDIR)/mfsmount-readdata.Tpo -c -o mfsmount-readdata.o `test -f 'readdata.c' || echo '$(srcdir)/'`readdata.c

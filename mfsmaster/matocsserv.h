@@ -36,7 +36,7 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 uint16_t matocsserv_getservers_ordered(uint16_t csids[MAXCSCOUNT]);
 uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *overloaded);
 void matocsserv_useservers_wrandom(void* servers[MAXCSCOUNT],uint16_t cnt);
-uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replimit,uint8_t *allservflag);
+uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replimit,uint8_t highpriority,uint8_t *allservflag);
 
 
 void matocsserv_getspace(uint64_t *totalspace,uint64_t *availspace);

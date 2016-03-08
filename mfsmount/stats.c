@@ -94,6 +94,15 @@ void stats_counter_dec(void *node) {
 	pthread_mutex_unlock(&glock);
 }
 
+void stats_counter_set(void *node,uint64_t value) {
+	statsnode *sn = (statsnode*)node;
+	pthread_mutex_lock(&glock);
+	if (sn->absolute) {
+		sn->counter = value;
+	}
+	pthread_mutex_unlock(&glock);
+}
+
 void* stats_get_subnode(void *node,const char *name,uint8_t absolute,uint8_t printflag) {
 	statsnode *sn = (statsnode*)node;
 	statsnode *a;

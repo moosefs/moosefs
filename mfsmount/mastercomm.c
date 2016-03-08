@@ -60,6 +60,13 @@
 #include "datapack.h"
 #include "clocks.h"
 #include "portable.h"
+#include "heapsorter.h"
+#include "extrapackets.h"
+//#ifndef WIN32
+//#include "mfs_fuse.h"
+//#endif
+#include "chunksdatacache.h"
+//#include "readdata.h"
 // #include "dircache.h"
 
 #define CONNECT_TIMEOUT 2000
@@ -105,13 +112,33 @@ typedef struct _threc {
 } threc;
 */
 
+#define AMTIME_HASH_SIZE 256
+#define AMTIME_MAX_AGE 10
+
+typedef struct _amtime_file {
+	uint32_t inode;
+	uint16_t atimeage;
+	uint16_t mtimeage;
+	uint64_t atime;
+	uint64_t mtime;
+	struct _amtime_file *next;
+} amtime_file;
+
+static amtime_file *amtime_hash[AMTIME_HASH_SIZE];
+
+#define ACQFILES_HASH_SIZE 256
+#define ACQFILES_MAX_AGE 10
 
 typedef struct _acquired_file {
 	uint32_t inode;
-	unsigned cnt:31; // open/close count
-	unsigned dentry:1; // inode exists in dentry cache (can't be removed/reused)
+	uint16_t cnt;
+	uint8_t age;
+	uint8_t dentry;
 	struct _acquired_file *next;
 } acquired_file;
+
+static acquired_file *af_hash[ACQFILES_HASH_SIZE];
+static int64_t timediffusec = 0;
 
 #define DEFAULT_OUTPUT_BUFFSIZE 0x1000
 #define DEFAULT_INPUT_BUFFSIZE 0x10000
@@ -120,19 +147,19 @@ typedef struct _acquired_file {
 
 static threc *threchead=NULL;
 
-static acquired_file *afhead=NULL;
 
 static int fd;
 static int disconnect;
 static int donotsendsustainedinodes;
-static time_t lastwrite;
+static double lastwrite;
 static int sessionlost;
+static uint64_t lastsyncsend = 0;
 
 static uint64_t usectimeout;
 static uint32_t maxretries;
 
 static pthread_t rpthid,npthid;
-static pthread_mutex_t fdlock,reclock,aflock;
+static pthread_mutex_t fdlock,reclock,aflock,amtimelock;
 
 static uint32_t sessionid;
 static uint64_t metaid;
@@ -177,6 +204,8 @@ enum {
 	MASTER_BYTESRCVD,
 	MASTER_PACKETSSENT,
 	MASTER_PACKETSRCVD,
+	MASTER_PING,
+	MASTER_TIMEDIFF,
 	STATNODES
 };
 
@@ -204,6 +233,8 @@ void master_statsptr_init(void) {
 	statsptr[MASTER_BYTESRCVD] = stats_get_subnode(s,"bytes_received",0,1);
 	statsptr[MASTER_BYTESSENT] = stats_get_subnode(s,"bytes_sent",0,1);
 	statsptr[MASTER_CONNECTS] = stats_get_subnode(s,"reconnects",0,1);
+	statsptr[MASTER_PING] = stats_get_subnode(s,"usec_ping",1,1);
+	statsptr[MASTER_TIMEDIFF] = stats_get_subnode(s,"usec_timediff",1,1);
 }
 
 void master_stats_inc(uint8_t id) {
@@ -215,6 +246,12 @@ void master_stats_inc(uint8_t id) {
 void master_stats_add(uint8_t id,uint64_t s) {
 	if (id<STATNODES) {
 		stats_counter_add(statsptr[id],s);
+	}
+}
+
+void master_stats_set(uint8_t id,uint64_t s) {
+	if (id<STATNODES) {
+		stats_counter_set(statsptr[id],s);
 	}
 }
 #else
@@ -229,6 +266,11 @@ void master_stats_add(uint8_t id,uint64_t s) {
 	(void)id;
 	(void)s;
 }
+
+void master_stats_set(uint8_t id,uint64_t s) {
+	(void)id;
+	(void)s;
+}
 #endif
 
 const char* errtab[]={MFS_ERROR_STRINGS};
@@ -240,90 +282,196 @@ static inline const char* mfs_strerror(uint8_t status) {
 	return errtab[status];
 }
 
+// read
+void fs_atime(uint32_t inode) {
+	amtime_file *amfptr;
+	uint32_t amhash;
+	pthread_mutex_lock(&amtimelock);
+	amhash = inode % AMTIME_HASH_SIZE;
+	for (amfptr = amtime_hash[amhash] ; amfptr ; amfptr = amfptr->next) {
+		if (amfptr->inode == inode) {
+			amfptr->atime = monotonic_useconds()+timediffusec;
+			amfptr->atimeage = 0;
+			pthread_mutex_unlock(&amtimelock);
+			return;
+		}
+	}
+	amfptr = malloc(sizeof(amtime_file));
+	amfptr->inode = inode;
+	amfptr->atimeage = 0;
+	amfptr->mtimeage = 0;
+	amfptr->atime = monotonic_useconds()+timediffusec;
+	amfptr->mtime = 0;
+	amfptr->next = amtime_hash[amhash];
+	amtime_hash[amhash] = amfptr;
+	pthread_mutex_unlock(&amtimelock);
+}
+
+// write
+void fs_mtime(uint32_t inode) {
+	amtime_file *amfptr;
+	uint32_t amhash;
+	pthread_mutex_lock(&amtimelock);
+	amhash = inode % AMTIME_HASH_SIZE;
+	for (amfptr = amtime_hash[amhash] ; amfptr ; amfptr = amfptr->next) {
+		if (amfptr->inode == inode) {
+			amfptr->mtime = monotonic_useconds()+timediffusec;
+			amfptr->mtimeage = 0;
+			pthread_mutex_unlock(&amtimelock);
+			return;
+		}
+	}
+	amfptr = malloc(sizeof(amtime_file));
+	amfptr->inode = inode;
+	amfptr->atimeage = 0;
+	amfptr->mtimeage = 0;
+	amfptr->mtime = monotonic_useconds()+timediffusec;
+	amfptr->atime = 0;
+	amfptr->next = amtime_hash[amhash];
+	amtime_hash[amhash] = amfptr;
+	pthread_mutex_unlock(&amtimelock);
+}
+
+// set atime (setattr)
+void fs_no_atime(uint32_t inode) {
+	amtime_file *amfptr;
+	uint32_t amhash;
+	pthread_mutex_lock(&amtimelock);
+	amhash = inode % AMTIME_HASH_SIZE;
+	for (amfptr = amtime_hash[amhash] ; amfptr ; amfptr = amfptr->next) {
+		if (amfptr->inode == inode) {
+			amfptr->atimeage = 0;
+			amfptr->atime = 0;
+			pthread_mutex_unlock(&amtimelock);
+			return;
+		}
+	}
+	pthread_mutex_unlock(&amtimelock);
+}
+
+// set mtime (setattr)
+void fs_no_mtime(uint32_t inode) {
+	amtime_file *amfptr;
+	uint32_t amhash;
+	pthread_mutex_lock(&amtimelock);
+	amhash = inode % AMTIME_HASH_SIZE;
+	for (amfptr = amtime_hash[amhash] ; amfptr ; amfptr = amfptr->next) {
+		if (amfptr->inode == inode) {
+			amfptr->mtimeage = 0;
+			amfptr->mtime = 0;
+			pthread_mutex_unlock(&amtimelock);
+			return;
+		}
+	}
+	pthread_mutex_unlock(&amtimelock);
+}
+
+void fs_fix_amtime(uint32_t inode,time_t *atime,time_t *mtime) {
+	amtime_file *amfptr;
+	uint32_t amhash;
+	time_t ioatime,iomtime;
+	pthread_mutex_lock(&amtimelock);
+	amhash = inode % AMTIME_HASH_SIZE;
+	for (amfptr = amtime_hash[amhash] ; amfptr ; amfptr = amfptr->next) {
+		if (amfptr->inode == inode) {
+			ioatime = amfptr->atime / 1000000;
+			iomtime = amfptr->mtime / 1000000;
+			if (ioatime > *atime) {
+				*atime = ioatime;
+			}
+			if (iomtime > *mtime) {
+				*mtime = iomtime;
+			}
+			pthread_mutex_unlock(&amtimelock);
+			return;
+		}
+	}
+	pthread_mutex_unlock(&amtimelock);
+}
+
+void fs_amtime_reference_clock(uint64_t localmonotonic,uint64_t remotewall) {
+	pthread_mutex_lock(&amtimelock);
+	timediffusec = remotewall - localmonotonic;
+	pthread_mutex_unlock(&amtimelock);
+}
+
+
 void fs_add_entry(uint32_t inode) {
-	acquired_file *afptr,**afpptr;
+	uint32_t afhash;
+	acquired_file *afptr;
 	pthread_mutex_lock(&aflock);
-	afpptr = &afhead;
-	while ((afptr=*afpptr)) {
+	afhash = inode % ACQFILES_HASH_SIZE;
+	for (afptr = af_hash[afhash] ; afptr ; afptr = afptr->next) {
 		if (afptr->inode == inode) {
 			afptr->dentry = 1;
+			afptr->age = 0;
 			pthread_mutex_unlock(&aflock);
 			return;
 		}
-		if (afptr->inode > inode) {
-			break;
-		}
-		afpptr = &(afptr->next);
 	}
 	afptr = (acquired_file*)malloc(sizeof(acquired_file));
 	afptr->inode = inode;
 	afptr->cnt = 0;
 	afptr->dentry = 1;
-	afptr->next = *afpptr;
-	*afpptr = afptr;
+	afptr->age = 0;
+	afptr->next = af_hash[afhash];
+	af_hash[afhash] = afptr;
 	pthread_mutex_unlock(&aflock);
 }
 
 void fs_forget_entry(uint32_t inode) {
-	acquired_file *afptr,**afpptr;
+	uint32_t afhash;
+	acquired_file *afptr;
 	pthread_mutex_lock(&aflock);
-	afpptr = &afhead;
-	while ((afptr=*afpptr)) {
+	afhash = inode % ACQFILES_HASH_SIZE;
+	for (afptr = af_hash[afhash] ; afptr ; afptr = afptr->next) {
 		if (afptr->inode == inode) {
 			afptr->dentry = 0;
-			if (afptr->cnt==0) {
-				*afpptr = afptr->next;
-				free(afptr);
-			}
+			afptr->age = 0;
 			pthread_mutex_unlock(&aflock);
 			return;
 		}
-		afpptr = &(afptr->next);
 	}
 	pthread_mutex_unlock(&aflock);
 }
 
 void fs_inc_acnt(uint32_t inode) {
-	acquired_file *afptr,**afpptr;
+	uint32_t afhash;
+	acquired_file *afptr;
 	pthread_mutex_lock(&aflock);
-	afpptr = &afhead;
-	while ((afptr=*afpptr)) {
-		if (afptr->inode==inode) {
+	afhash = inode % ACQFILES_HASH_SIZE;
+	for (afptr = af_hash[afhash] ; afptr ; afptr = afptr->next) {
+		if (afptr->inode == inode) {
 			afptr->cnt++;
+			afptr->age = 0;
 			pthread_mutex_unlock(&aflock);
 			return;
 		}
-		if (afptr->inode>inode) {
-			break;
-		}
-		afpptr = &(afptr->next);
 	}
 	afptr = (acquired_file*)malloc(sizeof(acquired_file));
 	afptr->inode = inode;
 	afptr->cnt = 1;
 	afptr->dentry = 0;
-	afptr->next = *afpptr;
-	*afpptr = afptr;
+	afptr->age = 0;
+	afptr->next = af_hash[afhash];
+	af_hash[afhash] = afptr;
 	pthread_mutex_unlock(&aflock);
 }
 
 void fs_dec_acnt(uint32_t inode) {
-	acquired_file *afptr,**afpptr;
+	uint32_t afhash;
+	acquired_file *afptr;
 	pthread_mutex_lock(&aflock);
-	afpptr = &afhead;
-	while ((afptr=*afpptr)) {
+	afhash = inode % ACQFILES_HASH_SIZE;
+	for (afptr = af_hash[afhash] ; afptr ; afptr = afptr->next) {
 		if (afptr->inode == inode) {
 			if (afptr->cnt>0) {
 				afptr->cnt--;
 			}
-			if (afptr->cnt==0 && afptr->dentry==0) {
-				*afpptr = afptr->next;
-				free(afptr);
-			}
+			afptr->age = 0;
 			pthread_mutex_unlock(&aflock);
 			return;
 		}
-		afpptr = &(afptr->next);
 	}
 	pthread_mutex_unlock(&aflock);
 }
@@ -472,6 +620,217 @@ static inline void fs_disconnect(void) {
 #endif
 }
 
+/*
+uint8_t fs_send_only(threc *rec) {
+	uint32_t cnt;
+	uint64_t start,period,usecto;
+//	uint32_t size = rec->size;
+
+	start = 0; // make static code analysers happy
+	if (usectimeout>0) {
+		start = monotonic_useconds();
+	}
+	for (cnt=1 ; cnt<=maxretries ; cnt++) {
+		pthread_mutex_lock(&fdlock);
+		if (sessionlost==1) {
+			pthread_mutex_unlock(&fdlock);
+			return 0;
+		}
+		if (fd==-1) {
+			pthread_mutex_unlock(&fdlock);
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return 0;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
+			continue;
+		}
+		//syslog(LOG_NOTICE,"threc(%"PRIu32") - sending ...",rec->packetid);
+		pthread_mutex_lock(&(rec->mutex));	// make helgrind happy
+		if (tcptowrite(fd,rec->obuff,rec->odataleng,1000)!=(int32_t)(rec->odataleng)) {
+			syslog(LOG_WARNING,"tcp send error: %s",strerr(errno));
+#ifdef HAVE___SYNC_FETCH_AND_OP
+			__sync_fetch_and_or(&disconnect,1);
+#else
+			disconnect = 1;
+#endif
+			pthread_mutex_unlock(&(rec->mutex));
+			pthread_mutex_unlock(&fdlock);
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return 0;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
+			continue;
+		}
+		rec->rcvd = 0;
+		rec->sent = 1;
+		pthread_mutex_unlock(&(rec->mutex));	// make helgrind happy
+		master_stats_add(MASTER_BYTESSENT,rec->odataleng);
+		master_stats_inc(MASTER_PACKETSSENT);
+		lastwrite = monotonic_seconds();
+		pthread_mutex_unlock(&fdlock);
+		return 1;
+	}
+	return 0;
+}
+
+const uint8_t* fs_receive_only(threc *rec,uint32_t expected_cmd,uint32_t *answer_leng) {
+	uint32_t cnt;
+	static uint8_t notsup = MFS_ERROR_ENOTSUP;
+	uint64_t start,period,usecto;
+	uint8_t first;
+//	uint32_t size = rec->size;
+
+	start = 0; // make static code analysers happy
+	first = 1;
+	if (usectimeout>0) {
+		start = monotonic_useconds();
+	}
+	for (cnt=1 ; cnt<=maxretries ; cnt++) {
+		if (first==0) { // resend data after error
+			pthread_mutex_lock(&fdlock);
+			if (sessionlost==1) {
+				pthread_mutex_unlock(&fdlock);
+				return NULL;
+			}
+			if (fd==-1) {
+				pthread_mutex_unlock(&fdlock);
+				usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+				if (usectimeout>0) {
+					period = monotonic_useconds() - start;
+					if (period >= usectimeout) {
+						return NULL;
+					}
+					if (usecto > usectimeout - period) {
+						usecto = usectimeout - period;
+					}
+				}
+				portable_usleep(usecto);
+				continue;
+			}
+			//syslog(LOG_NOTICE,"threc(%"PRIu32") - sending ...",rec->packetid);
+			pthread_mutex_lock(&(rec->mutex));	// make helgrind happy
+			if (tcptowrite(fd,rec->obuff,rec->odataleng,1000)!=(int32_t)(rec->odataleng)) {
+				syslog(LOG_WARNING,"tcp send error: %s",strerr(errno));
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_or(&disconnect,1);
+#else
+				disconnect = 1;
+#endif
+				pthread_mutex_unlock(&(rec->mutex));
+				pthread_mutex_unlock(&fdlock);
+				usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+				if (usectimeout>0) {
+					period = monotonic_useconds() - start;
+					if (period >= usectimeout) {
+						return NULL;
+					}
+					if (usecto > usectimeout - period) {
+						usecto = usectimeout - period;
+					}
+				}
+				portable_usleep(usecto);
+				continue;
+			}
+			rec->rcvd = 0;
+			rec->sent = 1;
+			pthread_mutex_unlock(&(rec->mutex));	// make helgrind happy
+			master_stats_add(MASTER_BYTESSENT,rec->odataleng);
+			master_stats_inc(MASTER_PACKETSSENT);
+			lastwrite = monotonic_seconds();
+			pthread_mutex_unlock(&fdlock);
+		} else {
+			first = 0;
+		}
+		// syslog(LOG_NOTICE,"master: lock: %"PRIu32,rec->packetid);
+		pthread_mutex_lock(&(rec->mutex));
+		while (rec->rcvd==0) {
+//			rec->waiting = 1;
+			if (usectimeout>0) {
+				struct timespec ts;
+				struct timeval tv;
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					pthread_mutex_unlock(&(rec->mutex));
+					return NULL;
+				}
+				period = usectimeout - period;
+				gettimeofday(&tv, NULL);
+				usecto = tv.tv_sec;
+				usecto *= 1000000;
+				usecto += tv.tv_usec;
+				usecto += period;
+				ts.tv_sec = usecto / 1000000;
+				ts.tv_nsec = (usecto % 1000000) * 1000;
+				if (pthread_cond_timedwait(&(rec->cond),&(rec->mutex),&ts)==ETIMEDOUT) {
+//					rec->waiting = 0;
+					pthread_mutex_unlock(&(rec->mutex));
+					return NULL;
+				}
+			} else {
+				pthread_cond_wait(&(rec->cond),&(rec->mutex));
+			}
+//			rec->waiting = 0;
+		}
+		*answer_leng = rec->idataleng;
+		// syslog(LOG_NOTICE,"master: unlocked: %"PRIu32,rec->packetid);
+		// syslog(LOG_NOTICE,"master: command_info: %"PRIu32" ; reccmd: %"PRIu32,command_info,rec->cmd);
+		if (rec->status!=0) {
+			pthread_mutex_unlock(&(rec->mutex));
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
+			continue;
+		}
+		if (rec->rcvd_cmd==ANTOAN_UNKNOWN_COMMAND || rec->rcvd_cmd==ANTOAN_BAD_COMMAND_SIZE) {
+			pthread_mutex_unlock(&(rec->mutex));
+			*answer_leng = 1; // simulate error
+			return &notsup; // return MFS_ERROR_ENOTSUP in this case
+		}
+		if (rec->rcvd_cmd!=expected_cmd) {
+			pthread_mutex_unlock(&(rec->mutex));
+			fs_disconnect();
+			usecto = 1000+((cnt<30)?((cnt-1)*300000):10000000);
+			if (usectimeout>0) {
+				period = monotonic_useconds() - start;
+				if (period >= usectimeout) {
+					return NULL;
+				}
+				if (usecto > usectimeout - period) {
+					usecto = usectimeout - period;
+				}
+			}
+			portable_usleep(usecto);
+			continue;
+		}
+		pthread_mutex_unlock(&(rec->mutex));
+		//syslog(LOG_NOTICE,"threc(%"PRIu32") - received",rec->packetid);
+		return rec->ibuff;
+	}
+	return NULL;
+}
+*/
 const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answer_leng) {
 	uint32_t cnt;
 	static uint8_t notsup = MFS_ERROR_ENOTSUP;
@@ -532,7 +891,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		pthread_mutex_unlock(&(rec->mutex));	// make helgrind happy
 		master_stats_add(MASTER_BYTESSENT,rec->odataleng);
 		master_stats_inc(MASTER_PACKETSSENT);
-		lastwrite = time(NULL);
+		lastwrite = monotonic_seconds();
 		pthread_mutex_unlock(&fdlock);
 		// syslog(LOG_NOTICE,"master: lock: %"PRIu32,rec->packetid);
 		pthread_mutex_lock(&(rec->mutex));
@@ -669,7 +1028,7 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 		pthread_mutex_unlock(&(rec->mutex));	// make helgrind happy
 		master_stats_add(MASTER_BYTESSENT,rec->odataleng);
 		master_stats_inc(MASTER_PACKETSSENT);
-		lastwrite = time(NULL);
+		lastwrite = monotonic_seconds();
 		pthread_mutex_unlock(&fdlock);
 		// syslog(LOG_NOTICE,"master: lock: %"PRIu32,rec->packetid);
 		pthread_mutex_lock(&(rec->mutex));
@@ -1155,7 +1514,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	mintrashtime = get32bit(&rptr);
 	maxtrashtime = get32bit(&rptr);
 	free(regbuff);
-	lastwrite=time(NULL);
+	lastwrite = monotonic_seconds();
 	if (oninit==0) {
 		if (sessionlost==2) {
 			syslog(LOG_NOTICE,"registered to master using previous session");
@@ -1412,7 +1771,8 @@ void fs_reconnect() {
 		fd=-1;
 		return;
 	}
-	lastwrite=time(NULL);
+	lastwrite = monotonic_seconds();
+	lastsyncsend = 0;
 	syslog(LOG_NOTICE,"registered to master");
 }
 
@@ -1450,38 +1810,154 @@ void fs_close_session(void) {
 	}
 }
 
-void fs_send_open_inodes(void) {
+void fs_send_amtime_inodes(void) {
 	uint8_t *ptr,*inodespacket;
 	int32_t inodesleng;
-	acquired_file *afptr;
+	amtime_file *amfptr,**amfpptr;
+	uint32_t amhash;
+
+	pthread_mutex_lock(&amtimelock);
+	//inodesleng=24;
+	if (masterversion>=VERSION2INT(3,0,74)) {
+		inodesleng=0;
+		for (amhash=0 ; amhash < AMTIME_HASH_SIZE ; amhash++) {
+			for (amfptr = amtime_hash[amhash] ; amfptr ; amfptr = amfptr->next) {
+				if (amfptr->atime > 0 || amfptr->mtime > 0) {
+					inodesleng+=12;
+				}
+			}
+		}
+		if (inodesleng>0) {
+			inodesleng+=8;
+			inodespacket = malloc(inodesleng);
+			ptr = inodespacket;
+			put32bit(&ptr,CLTOMA_FUSE_AMTIME_INODES);
+			put32bit(&ptr,inodesleng-8);
+			for (amhash=0 ; amhash < AMTIME_HASH_SIZE ; amhash++) {
+				amfpptr = amtime_hash + amhash;
+				while ((amfptr = *amfpptr)) {
+					if (amfptr->atime > 0 || amfptr->mtime > 0) {
+						put32bit(&ptr,amfptr->inode);
+						put32bit(&ptr,amfptr->atime/1000000);
+						put32bit(&ptr,amfptr->mtime/1000000);
+					}
+					if (amfptr->atimeage>=1) { // sending second time - clear it
+						amfptr->atime = 0;
+					}
+					if (amfptr->mtimeage>=1) { // sending second time - clear it
+						amfptr->mtime = 0;
+					}
+					if (amfptr->atimeage < AMTIME_MAX_AGE || amfptr->mtimeage < AMTIME_MAX_AGE) {
+						if (amfptr->atimeage < AMTIME_MAX_AGE) {
+							amfptr->atimeage++;
+						}
+						if (amfptr->mtimeage < AMTIME_MAX_AGE) {
+							amfptr->mtimeage++;
+						}
+						amfpptr = &(amfptr->next);
+					} else {
+						*amfpptr = amfptr->next;
+						free(amfptr);
+					}
+				}
+			}
+			if (tcptowrite(fd,inodespacket,inodesleng,1000)!=inodesleng) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_or(&disconnect,1);
+#else
+				disconnect = 1;
+#endif
+			} else {
+				master_stats_add(MASTER_BYTESSENT,inodesleng);
+				master_stats_inc(MASTER_PACKETSSENT);
+			}
+			free(inodespacket);
+			pthread_mutex_unlock(&amtimelock);
+			return;
+		}
+	}
+	for (amhash=0 ; amhash < AMTIME_HASH_SIZE ; amhash++) {
+		amfpptr = amtime_hash + amhash;
+		while ((amfptr = *amfpptr)) {
+			if (amfptr->atimeage < AMTIME_MAX_AGE || amfptr->mtimeage < AMTIME_MAX_AGE) {
+				if (amfptr->atimeage < AMTIME_MAX_AGE) {
+					amfptr->atimeage++;
+				}
+				if (amfptr->mtimeage < AMTIME_MAX_AGE) {
+					amfptr->mtimeage++;
+				}
+				amfpptr = &(amfptr->next);
+			} else {
+				*amfpptr = amfptr->next;
+				free(amfptr);
+			}
+		}
+	}
+	pthread_mutex_unlock(&amtimelock);
+}
+
+void fs_send_open_inodes(void) {
+	uint8_t *ptr,*inodespacket;
+	uint32_t i,inodes;
+	uint32_t hash;
+	acquired_file *afptr,**afpptr;
+#ifdef MFSDEBUG
+	uint32_t inode;
+#endif
 
 	pthread_mutex_lock(&aflock);
 	//inodesleng=24;
-	inodesleng=8;
-	for (afptr=afhead ; afptr ; afptr=afptr->next) {
-		//syslog(LOG_NOTICE,"sustained inode: %"PRIu32,afptr->inode);
-		inodesleng+=4;
+	heap_cleanup();
+	for (hash=0 ; hash<ACQFILES_HASH_SIZE ; hash++) {
+		afpptr = af_hash + hash;
+		while ((afptr = *afpptr)) {
+			if (afptr->cnt==0 && afptr->dentry==0) {
+				afptr->age++;
+				if (afptr->age>ACQFILES_MAX_AGE) {
+					*afpptr = afptr->next;
+					chunksdatacache_clear_inode(afptr->inode,0);
+					free(afptr);
+					continue;
+				}
+			}
+			//syslog(LOG_NOTICE,"sustained inode: %"PRIu32,afptr->inode);
+			afpptr = &(afptr->next);
+			heap_push(afptr->inode);
+		}
 	}
-	inodespacket = malloc(inodesleng);
+	inodes = heap_elements();
+
+	inodespacket = malloc(inodes*4+8);
 	ptr = inodespacket;
-	put32bit(&ptr,CLTOMA_FUSE_SUSTAINED_INODES);
-	put32bit(&ptr,inodesleng-8);
+	if (masterversion>=VERSION2INT(3,0,74)) {
+		put32bit(&ptr,CLTOMA_FUSE_SUSTAINED_INODES);
+	} else {
+		put32bit(&ptr,CLTOMA_FUSE_SUSTAINED_INODES_DEPRECATED);
+	}
+	put32bit(&ptr,inodes*4);
 	//put32bit(&ptr,inodesleng-24);
 	//put64bit(&ptr,0);	// readbytes
 	//put64bit(&ptr,0);	// writebytes
 	// readbytes = 0;
 	// writebytes = 0;
-	for (afptr=afhead ; afptr ; afptr=afptr->next) {
-		put32bit(&ptr,afptr->inode);
+	for (i=0 ; i<inodes ; i++) {
+#ifdef MFSDEBUG
+		inode = heap_pop();
+		syslog(LOG_NOTICE,"open inode(%"PRIu32"): %"PRIu32,i,inode);
+		put32bit(&ptr,inode);
+#else
+		put32bit(&ptr,heap_pop());
+#endif
 	}
-	if (tcptowrite(fd,inodespacket,inodesleng,1000)!=inodesleng) {
+	i = inodes * 4 + 8;
+	if (tcptowrite(fd,inodespacket,i,1000)!=(int32_t)i) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
 		__sync_fetch_and_or(&disconnect,1);
 #else
 		disconnect = 1;
 #endif
 	} else {
-		master_stats_add(MASTER_BYTESSENT,inodesleng);
+		master_stats_add(MASTER_BYTESSENT,i);
 		master_stats_inc(MASTER_PACKETSSENT);
 	}
 	free(inodespacket);
@@ -1490,14 +1966,15 @@ void fs_send_open_inodes(void) {
 
 void* fs_nop_thread(void *arg) {
 	uint8_t *ptr,hdr[12];
+	uint64_t usec;
 	int now;
 	int inodeswritecnt=0;
 	(void)arg;
 	for (;;) {
-		now = time(NULL);
 		pthread_mutex_lock(&fdlock);
 		if (fterm==2 && donotsendsustainedinodes==0) {
 			if (fd>=0) {
+				fs_send_amtime_inodes();
 				fs_send_open_inodes();
 				fs_close_session();
 				tcpclose(fd);
@@ -1511,7 +1988,8 @@ void* fs_nop_thread(void *arg) {
 #else
 		if (disconnect==0 && fd>=0) {
 #endif
-			if (lastwrite+2<now) {	// NOP
+			now = monotonic_seconds();
+			if (lastwrite+2.0<now) {	// NOP
 				ptr = hdr;
 				put32bit(&ptr,ANTOAN_NOP);
 				put32bit(&ptr,4);
@@ -1526,7 +2004,25 @@ void* fs_nop_thread(void *arg) {
 					master_stats_add(MASTER_BYTESSENT,12);
 					master_stats_inc(MASTER_PACKETSSENT);
 				}
-				lastwrite=now;
+				lastwrite = now;
+			}
+			usec = monotonic_useconds();
+			if (masterversion>=VERSION2INT(3,0,74) && (lastsyncsend==0 || lastsyncsend+60000000<usec)) { // time sync
+				ptr = hdr;
+				put32bit(&ptr,CLTOMA_FUSE_TIME_SYNC);
+				put32bit(&ptr,4);
+				put32bit(&ptr,0);
+				if (tcptowrite(fd,hdr,12,1000)!=12) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+					__sync_fetch_and_or(&disconnect,1);
+#else
+					disconnect=1;
+#endif
+				} else {
+					master_stats_add(MASTER_BYTESSENT,12);
+					master_stats_inc(MASTER_PACKETSSENT);
+				}
+				lastsyncsend = usec;
 			}
 			if (inodeswritecnt<=0 || inodeswritecnt>60) {
 				inodeswritecnt=60;
@@ -1540,6 +2036,7 @@ void* fs_nop_thread(void *arg) {
 					fs_send_open_inodes();
 				}
 			}
+			fs_send_amtime_inodes();
 		}
 		pthread_mutex_unlock(&fdlock);
 		sleep(1);
@@ -1549,6 +2046,8 @@ void* fs_nop_thread(void *arg) {
 void* fs_receive_thread(void *arg) {
 	const uint8_t *ptr;
 	uint8_t hdr[12];
+	uint8_t msgbuff[29];
+	uint8_t internal;
 	threc *rec;
 	uint32_t cmd,size,packetid;
 	uint32_t rcvd,toread;
@@ -1571,6 +2070,7 @@ void* fs_receive_thread(void *arg) {
 			disconnect = 0;
 #endif
 //			dir_cache_remove_all();
+			chunksdatacache_cleanup();
 			tcpclose(fd);
 			fd = -1;
 			// send to any threc status error and unlock them
@@ -1632,6 +2132,7 @@ void* fs_receive_thread(void *arg) {
 			fs_disconnect();
 			continue;
 		}
+//		printf("got packet from master: cmd:%"PRIu32" ; size:%"PRIu32" ; packetid:%"PRIu32"\n",cmd,size,packetid);
 		size -= 4;
 		if (packetid==0) {
 			if (cmd==ANTOAN_NOP && size==0) {
@@ -1641,10 +2142,132 @@ void* fs_receive_thread(void *arg) {
 			if (cmd==ANTOAN_UNKNOWN_COMMAND || cmd==ANTOAN_BAD_COMMAND_SIZE) { // just ignore these packets with packetid==0
 				continue;
 			}
+			internal = 0;
+//			if (cmd==MATOCL_FUSE_INVALIDATE_DATA_CACHE) {
+//			       	if (size==4) {
+//					internal = 1;
+//				} else {
+//					syslog(LOG_WARNING,"master: unexpected msg size (msg:MATOCL_FUSE_INVALIDATE_DATA_CACHE ; size:%"PRIu32"/4)",size);
+//					fs_disconnect();
+//					continue;
+//				}
+//			}
+			if (cmd==MATOCL_FUSE_CHUNK_HAS_CHANGED) {
+				if (size==29) {
+					internal = 1;
+				} else {
+					syslog(LOG_WARNING,"master: unexpected msg size (msg:MATOCL_FUSE_CHUNK_HAS_CHANGED ; size:%"PRIu32"/33)",size+4);
+					fs_disconnect();
+					continue;
+				}
+			}
+			if (cmd==MATOCL_FUSE_FLENG_HAS_CHANGED) {
+				if (size==12) {
+					internal = 1;
+				} else {
+					syslog(LOG_WARNING,"master: unexpected msg size (msg:MATOCL_FUSE_FLENG_HAS_CHANGED ; size:%"PRIu32"/16)",size+4);
+					fs_disconnect();
+					continue;
+				}
+			}
+			if (cmd==MATOCL_FUSE_TIME_SYNC) {
+				if (size==8) {
+					internal = 1;
+				} else {
+					syslog(LOG_WARNING,"master: unexpected msg size (msg:MATOCL_FUSE_TIME_SYNC ; size:%"PRIu32"/12)",size+4);
+					fs_disconnect();
+					continue;
+				}
+			}
+			if (internal) {
+				r = tcptoread(fd,msgbuff,size,RECEIVE_TIMEOUT*1000);
+				if (r==0) {
+					syslog(LOG_WARNING,"master: connection lost (data)");
+					fs_disconnect();
+					continue;
+				}
+				if (r!=(int32_t)size) {
+					syslog(LOG_WARNING,"master: tcp recv error: %s (data)",strerr(errno));
+					fs_disconnect();
+					continue;
+				}
+				master_stats_add(MASTER_BYTESRCVD,size);
+				ptr = msgbuff;
+//				if (cmd==MATOCL_FUSE_INVALIDATE_DATA_CACHE) {
+//#ifndef WIN32
+//					uint32_t inode;
+//					inode = get32bit(&ptr);
+//					mfs_invalidate_data_cache(inode);
+//#endif
+//					continue;
+//				}
+				if (cmd==MATOCL_FUSE_FLENG_HAS_CHANGED) {
+					uint32_t inode;
+					uint64_t fleng;
+					inode = get32bit(&ptr);
+					fleng = get64bit(&ptr);
+//					printf("FLENG_HAS_CHANGED inode:%"PRIu32" ; fleng:%"PRIu64"\n",inode,fleng);
+					ep_fleng_has_changed(inode,fleng);
+					continue;
+				}
+				if (cmd==MATOCL_FUSE_CHUNK_HAS_CHANGED) {
+					uint32_t inode;
+					uint32_t chindx;
+					uint64_t chunkid;
+					uint32_t version;
+					uint64_t fleng;
+					uint8_t truncflag;
+					inode = get32bit(&ptr);
+					chindx = get32bit(&ptr);
+					chunkid = get64bit(&ptr);
+					version = get32bit(&ptr);
+					fleng = get64bit(&ptr);
+					truncflag = get8bit(&ptr);
+//					printf("CHUNK_HAS_CHANGED inode:%"PRIu32" ; chindx:%"PRIu32" ; chunkid:%"PRIu64" ; version:%"PRIu32" ; fleng:%"PRIu64" ; truncate:%"PRIu8"\n",inode,chindx,chunkid,version,fleng,truncflag);
+					ep_chunk_has_changed(inode,chindx,chunkid,version,fleng,truncflag);
+					continue;
+				}
+				if (cmd==MATOCL_FUSE_TIME_SYNC) {
+					uint64_t lusectime,rusectime,usec,usecping;
+					struct timeval tv;
+					usec = monotonic_useconds();
+					if (usec>lastsyncsend) {
+						usecping = usec - lastsyncsend;
+						master_stats_set(MASTER_PING,usecping);
+					} else {
+						syslog(LOG_NOTICE,"negative packet travel time between client and master - ignoring in time sync");
+						usecping = 0;
+					}
+					if (usecping>100000) { // ignore too high differences
+						syslog(LOG_NOTICE,"high packet travel time between client and master (%u.%06us) - ignoring in time sync",(unsigned int)(usecping/1000000),(unsigned int)(usecping%1000000));
+						usecping = 0;
+					}
+					rusectime = get64bit(&ptr);
+					rusectime += usecping/2;
+					// usectime here should have master's wall clock
+					fs_amtime_reference_clock(usec,rusectime);
+					gettimeofday(&tv,NULL);
+					lusectime = tv.tv_sec;
+					lusectime *= 1000000;
+					lusectime += tv.tv_usec;
+					if (rusectime + 1000000 < lusectime || lusectime + 1000000 < rusectime) {
+						syslog(LOG_WARNING,"time desync between client and master is higher than a second - it might lead to strange atime/mtime behaviour - consider time synchronization in your moosefs cluster");
+					}
+					if (rusectime > lusectime) {
+						master_stats_set(MASTER_TIMEDIFF,rusectime-lusectime);
+					} else {
+						master_stats_set(MASTER_TIMEDIFF,lusectime-rusectime);
+					}
+#ifdef MFSDEBUG
+					syslog(LOG_NOTICE,"ping time: %u.%06u ; remote time: %u.%06u ; local time: %u.%06u ; monotonic time: %u.%06u",(unsigned int)(usecping/1000000),(unsigned int)(usecping%1000000),(unsigned int)(rusectime/1000000),(unsigned int)(rusectime%1000000),(unsigned int)(lusectime/1000000),(unsigned int)(lusectime%1000000),(unsigned int)(usec/1000000),(unsigned int)(usec%1000000));
+#endif
+					continue;
+				}
+			}
 		}
 		rec = fs_get_threc_by_id(packetid);
 		if (rec==NULL) {
-			syslog(LOG_WARNING,"master: got unexpected queryid");
+			syslog(LOG_WARNING,"master: got unexpected queryid (%"PRIu32" ; cmd:%"PRIu32" ; size:%"PRIu32")",packetid,cmd,size+4);
 			fs_disconnect();
 			continue;
 		}
@@ -1710,6 +2333,7 @@ int fs_init_master_connection(const char *bindhostname,const char *masterhostnam
 
 	fd = -1;
 	sessionlost = bgregister?1:0;
+	lastsyncsend = 0;
 	sessionid = 0;
 	metaid = 0;
 #ifdef HAVE___SYNC_FETCH_AND_OP
@@ -1745,14 +2369,30 @@ int fs_init_master_connection(const char *bindhostname,const char *masterhostnam
 
 // called after fork
 void fs_init_threads(uint32_t retries,uint32_t timeout) {
+	uint32_t i;
 	pthread_attr_t thattr;
+	struct timeval tv;
+	uint64_t usectime;
 	maxretries = retries;
 	usectimeout = timeout;
 	usectimeout *= 1000000; // sec -> usec
 	fterm = 0;
+	ep_init();
+	for (i=0 ; i<AMTIME_HASH_SIZE ; i++) {
+		amtime_hash[i] = NULL;
+	}
+	for (i=0 ; i<ACQFILES_HASH_SIZE ; i++) {
+		af_hash[i] = NULL;
+	}
+	gettimeofday(&tv,NULL);
+	usectime = tv.tv_sec;
+	usectime *= 1000000;
+	usectime += tv.tv_usec;
+	timediffusec = usectime - monotonic_useconds(); // before receiving packets from master start with own wall clock
 	pthread_mutex_init(&reclock,NULL);
 	pthread_mutex_init(&fdlock,NULL);
 	pthread_mutex_init(&aflock,NULL);
+	pthread_mutex_init(&amtimelock,NULL);
 	pthread_attr_init(&thattr);
 	pthread_attr_setstacksize(&thattr,0x100000);
 	pthread_create(&rpthid,&thattr,fs_receive_thread,NULL);
@@ -1762,6 +2402,8 @@ void fs_init_threads(uint32_t retries,uint32_t timeout) {
 
 void fs_term(void) {
 	threc *tr,*trn;
+	uint32_t i;
+	amtime_file *amf,*amfn;
 	acquired_file *af,*afn;
 
 	pthread_mutex_lock(&fdlock);
@@ -1769,6 +2411,7 @@ void fs_term(void) {
 	pthread_mutex_unlock(&fdlock);
 	pthread_join(npthid,NULL);
 	pthread_join(rpthid,NULL);
+	pthread_mutex_destroy(&amtimelock);
 	pthread_mutex_destroy(&aflock);
 	pthread_mutex_destroy(&fdlock);
 	pthread_mutex_destroy(&reclock);
@@ -1792,9 +2435,17 @@ void fs_term(void) {
 		pthread_cond_destroy(&(tr->cond));
 		free(tr);
 	}
-	for (af = afhead ; af ; af = afn) {
-		afn = af->next;
-		free(af);
+	for (i=0 ; i<ACQFILES_HASH_SIZE ; i++) {
+		for (af = af_hash[i] ; af ; af = afn) {
+			afn = af->next;
+			free(af);
+		}
+	}
+	for (i=0 ; i<AMTIME_HASH_SIZE ; i++) {
+		for (amf = amtime_hash[i] ; amf ; amf = amfn) {
+			amfn = amf->next;
+			free(amfn);
+		}
 	}
 	if (fd>=0) {
 		tcpclose(fd);
@@ -1809,6 +2460,8 @@ void fs_term(void) {
 	if (connect_args.passworddigest) {
 		free(connect_args.passworddigest);
 	}
+	heap_term();
+	ep_term();
 }
 
 void fs_statfs(uint64_t *totalspace,uint64_t *availspace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes) {
@@ -2949,7 +3602,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *
 	*csdata = NULL;
 	*csdatasize = 0;
 
-	if (master_version()>VERSION2INT(3,0,3)) {
+	if (master_version()>=VERSION2INT(3,0,4)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,9);
 	} else {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,8);
@@ -2959,7 +3612,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *
 	}
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
-	if (master_version()>VERSION2INT(3,0,3)) {
+	if (master_version()>=VERSION2INT(3,0,4)) {
 		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_READ_CHUNK,&i);
@@ -3007,7 +3660,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t 
 	*csdata = NULL;
 	*csdatasize = 0;
 
-	if (master_version()>VERSION2INT(3,0,3)) {
+	if (master_version()>=VERSION2INT(3,0,4)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK,9);
 	} else {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK,8);
@@ -3017,7 +3670,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t 
 	}
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
-	if (master_version()>VERSION2INT(3,0,3)) {
+	if (master_version()>=VERSION2INT(3,0,4)) {
 		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_WRITE_CHUNK,&i);
@@ -3055,13 +3708,15 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t 
 	return ret;
 }
 
-uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t chunkopflags) {
+uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint32_t indx,uint64_t length,uint8_t chunkopflags) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
 	uint8_t ret;
 	threc *rec = fs_get_my_threc();
-	if (master_version()>VERSION2INT(3,0,3)) {
+	if (master_version()>=VERSION2INT(3,0,74)) {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK_END,25);
+	} else if (master_version()>=VERSION2INT(3,0,4)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK_END,21);
 	} else {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_WRITE_CHUNK_END,20);
@@ -3071,8 +3726,11 @@ uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t chun
 	}
 	put64bit(&wptr,chunkid);
 	put32bit(&wptr,inode);
+	if (master_version()>=VERSION2INT(3,0,74)) {
+		put32bit(&wptr,indx);
+	}
 	put64bit(&wptr,length);
-	if (master_version()>VERSION2INT(3,0,3)) {
+	if (master_version()>=VERSION2INT(3,0,4)) {
 		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_WRITE_CHUNK_END,&i);
@@ -3086,7 +3744,49 @@ uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint64_t length,uint8_t chun
 	}
 	return ret;
 }
+/*
+uint8_t fs_fsync_send(uint32_t inode) {
+	uint8_t *wptr;
+	threc *rec;
+	if (master_version()>=VERSION2INT(3,0,74)) {
+		rec = fs_get_my_threc();
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_FSYNC,4);
+		if (wptr==NULL) {
+			return MFS_ERROR_IO;
+		}
+		put32bit(&wptr,inode);
+		if (fs_send_only(rec)) {
+			return MFS_STATUS_OK;
+		} else {
+			return MFS_ERROR_IO;
+		}
+	} else {
+		return MFS_STATUS_OK;
+	}
+}
 
+uint8_t fs_fsync_wait(void) {
+	const uint8_t *rptr;
+	uint32_t i;
+	uint8_t ret;
+	threc *rec;
+	if (master_version()>=VERSION2INT(3,0,74)) {
+		rec = fs_get_my_threc();
+		rptr = fs_receive_only(rec,MATOCL_FUSE_FSYNC,&i);
+		if (rptr==NULL) {
+			ret = MFS_ERROR_IO;
+		} else if (i==1) {
+			ret = rptr[0];
+		} else {
+			fs_disconnect();
+			ret = MFS_ERROR_IO;
+		}
+	} else {
+		ret = MFS_STATUS_OK;
+	}
+	return ret;
+}
+*/
 uint8_t fs_flock(uint32_t inode,uint32_t reqid,uint64_t owner,uint8_t cmd) {
 	uint8_t *wptr;
 	const uint8_t *rptr;

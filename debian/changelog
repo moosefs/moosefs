@@ -1,12 +1,42 @@
+moosefs (3.0.74-1) unstable; urgency=medium
+
+  * (master) fixed rebalance replication (check for all chunk copies for
+    destination - not only valid)
+  * (master+mount) new mechanism for atime+mtime setting during I/O
+  * (master+mount) new I/O synchronization between different mounts (with cache
+    invalidation)
+  * (master+mount) new chunk number/version cache (with automatic invalidation
+    from master)
+  * (master) added mapping chunkserver IP classes (allow to have separate
+    network for I/O and separate for other activity)
+  * (master) fixed status returned by writechunk after network down/up
+  * (master) changed trashtime from seconds to hours
+  * (master) added METADATA_SAVE_FREQ option (allow to save metadata less
+    frequently than every hour)
+  * (master) added using in emergency (endangered chunks) all available servers
+    for replication (even overloaded and being maintained)
+  * (master) added using chunkservers in 'internal rebalance' state in case of
+    deleting chunks
+  * (all) spell check errors fixed (patch committed by Dmitry Smirnov)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 08 Mar 2016 12:00:00 +0100
+
 moosefs (3.0.73-1) unstable; urgency=medium
 
+  * (master) fixed restoring ARCHCHG from changelog
+  * (cli+cgi) fixed displaying master list with followers only (pro version
+    only)
+  * (master) added using size and length quota to fix disk usage values
+    (statfs)
+  * (master) fixed xattr bug which may lead to data corruption and segfaults
+    (intr. in 2.1.1)
   * (master) added 'node_info' packet
   * (tools) added '-p' option to 'mfsdirinfo' - 'precise mode'
   * (master) fixed edge renumeration
   * (master) added detecting of wrong edge numbers and force renumeration in
     such case
 
- -- MooseFS Team <contact@moosefs.com>  Mon, 08 Feb 2016 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Thu, 11 Feb 2016 12:00:00 +0100
 
 moosefs (3.0.72-1) unstable; urgency=medium
 

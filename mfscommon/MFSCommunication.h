@@ -780,6 +780,36 @@
 
 // CLIENT <-> MASTER
 
+// Storage Policy (for future version)
+
+#define CLTOMA_STORAGE_POLICY_CREATE 350
+// msgid:32 storage_policy_name:NAME fver:8 admin_mode:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+
+#define MATOCL_STORAGE_POLICY_CREATE 351
+// msgid:32 status:8
+
+#define CLTOMA_STORAGE_POLICY_CHANGE 352
+// msgid:32 storage_policy_name:NAME fver:8 chgmask:16 admin_mode:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+
+#define MATOCL_STORAGE_POLICY_CHANGE 353
+// msgid:32 status:8
+// msgid:32 fver:8 admin_mode:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+
+#define CLTOMA_STORAGE_POLICY_DELETE 354
+// msgid:32 storage_policy_name:NAME
+
+#define MATOCL_STORAGE_POLICY_DELETE 355
+// msgid:32 status:8
+
+#define CLTOMA_STORAGE_POLICY_LIST 356
+// msgid:32
+
+#define MATOCL_STORAGE_POLICY_LIST 357
+// msgid:32 N * [ storage_policy_name:NAME ]
+
+
+// Fuse
+
 // attr record
 //   type:8 mode:16 uid:32 gid:32 atime:32 mtime:32 ctime:32 nlink:32 length:64
 //   total: 35B
@@ -874,7 +904,7 @@
 
 // 0x0191
 #define MATOCL_FUSE_REGISTER (PROTO_BASE+401)
-// maxsize=35 minsize=1
+// maxsize=45 minsize=1
 // depends on blob - see blob descriptions above
 
 // 0x0192
@@ -1061,7 +1091,8 @@
 // 0x01B4
 #define CLTOMA_FUSE_WRITE_CHUNK_END (PROTO_BASE+436)
 // msgid:32 chunkid:64 inode:32 length:64 - version < 3.0.4
-// msgid:32 chunkid:64 inode:32 length:64 chunkopflags:8
+// msgid:32 chunkid:64 inode:32 length:64 chunkopflags:8 - version < 3.0.74
+// msgid:32 chunkid:64 inode:32 chunkindx:32 length:64 chunkopflags:8
 
 // 0x01B5
 #define MATOCL_FUSE_WRITE_CHUNK_END (PROTO_BASE+437)
@@ -1131,6 +1162,7 @@
 #define CLTOMA_FUSE_SETGOAL (PROTO_BASE+448)
 // msgid:32 inode:32 uid:32 goal:8 smode:8 (any version)
 // msgid:32 inode:32 uid:32 labelscnt:8 smode:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 2.1.0)
+// msgid:32 inode:32 uid:32 zero:8 smode:8 create_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 3.0.x)
 
 // 0x01C1
 #define MATOCL_FUSE_SETGOAL (PROTO_BASE+449)
@@ -1390,10 +1422,18 @@
 // msgid:32 archchunks:64 notarchchunks:64 archinodes:32 partialinodes:32 notarchinodes:32 (cmd==ARCHCTL_GET)
 // msgid:32 chunkschanged:64 chunksnotchanged:64 inodesnotpermitted:32 (cmd==ARCHCTL_SET or cmd==ARCHCTL_CLR)
 
+// 0x01F2
+#define CLTOMA_FUSE_FSYNC (PROTO_BASE+498)
+// msgid:32 inode:32
 
-// special - sustained (opened) inodes - keep opened files.
 // 0x01F3
-#define CLTOMA_FUSE_SUSTAINED_INODES (PROTO_BASE+499)
+#define MATOCL_FUSE_FSYNC (PROTO_BASE+499)
+// msgid:32 status:8
+
+
+// deprecated packet - since version 3.0.74 new packet should be used
+// 0x01F3
+#define CLTOMA_FUSE_SUSTAINED_INODES_DEPRECATED (PROTO_BASE+499)
 // N*[ inode:32 ]
 
 
@@ -1662,6 +1702,34 @@
 // 0x0259
 #define CSTOCL_HDD_LIST (PROTO_BASE+601)
 // N * [ entrysize:16 path:NAME flags:8 errchunkid:64 errtime:32 used:64 total:64 chunkscount:32 3 * [ bytesread:64 byteswritten:64 usecread:64 usecwrite:64 usecfsync:64 readops:32 writeops:32 fsyncops:32 usecreadmax:32 usecwritemax:32 usecfsyncmax:32 ] ]
+
+
+
+// CLIENT <-> MASTER meta data synchronization
+
+
+#define CLTOMA_FUSE_SUSTAINED_INODES (PROTO_BASE+700)
+// N*[ inode:32 ]
+
+#define CLTOMA_FUSE_AMTIME_INODES (PROTO_BASE+701)
+// N*[ inode:32 atime:32 mtime:32 ]
+
+#define MATOCL_FUSE_CHUNK_HAS_CHANGED (PROTO_BASE+702)
+// zero:32 inode:32 index:32 chunkid:64 version:32 fleng:64 truncateflag:8
+
+#define MATOCL_FUSE_FLENG_HAS_CHANGED (PROTO_BASE+703)
+// zero:32 inode:32 fleng:64
+
+#define CLTOMA_FUSE_TIME_SYNC (PROTO_BASE+704)
+// [ msgid:32 ]
+
+#define MATOCL_FUSE_TIME_SYNC (PROTO_BASE+705)
+// [ msgid:32 ] timestamp_useconds:64
+
+
+// #define MATOCL_FUSE_INVALIDATE_DATA_CACHE (PROTO_BASE+704)
+// zero:32 inode:32
+
 
 
 #endif

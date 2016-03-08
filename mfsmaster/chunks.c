@@ -1420,12 +1420,18 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 	slist *os,*s;
 	uint32_t i;
 	chunk *oc,*c;
-	uint8_t csstable;
+	uint8_t csstable,csalldata;
 
 	if (ts>(starttime+60) && csregisterinprogress==0) {
 		csstable = 1;
 	} else {
 		csstable = 0;
+	}
+
+	if (chunk_counters_in_progress() && csdb_have_all_servers()) {
+		csalldata = 1;
+	} else {
+		csalldata = 0;
 	}
 
 	if (ochunkid==0) {	// new chunk
@@ -1537,7 +1543,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 						c->version++;
 						*opflag = 1;
 					} else {
-						if (csstable) {
+						if (csalldata) {
 							return MFS_ERROR_CHUNKLOST;
 						} else {
 							return MFS_ERROR_CSNOTPRESENT;
@@ -1609,7 +1615,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 					*nchunkid = c->chunkid;
 					*opflag=1;
 				} else {
-					if (csstable) {
+					if (csalldata) {
 						return MFS_ERROR_CHUNKLOST;
 					} else {
 						return MFS_ERROR_CSNOTPRESENT;
@@ -1645,13 +1651,19 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 	slist *os,*s;
 	uint32_t i;
 	chunk *oc,*c;
-	uint8_t csstable;
+	uint8_t csstable,csalldata;
 	uint32_t vc;
 
 	if (ts>(starttime+60) && csregisterinprogress==0) {
 		csstable = 1;
 	} else {
 		csstable = 0;
+	}
+
+	if (chunk_counters_in_progress() && csdb_have_all_servers()) {
+		csalldata = 1;
+	} else {
+		csalldata = 0;
 	}
 
 	c=NULL;
@@ -1705,7 +1717,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 				c->operation = TRUNCATE;
 				c->version++;
 			} else {
-				if (csstable) {
+				if (csalldata) {
 					return MFS_ERROR_CHUNKLOST;
 				} else {
 					return MFS_ERROR_CSNOTPRESENT;
@@ -1771,7 +1783,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			if (i>0) {
 				*nchunkid = c->chunkid;
 			} else {
-				if (csstable) {
+				if (csalldata) {
 					return MFS_ERROR_CHUNKLOST;
 				} else {
 					return MFS_ERROR_CSNOTPRESENT;
@@ -1969,6 +1981,18 @@ uint8_t chunk_get_copies(uint64_t chunkid,uint8_t *count) {
 		}
 	}
 	*count = cnt;
+	return MFS_STATUS_OK;
+}
+
+uint8_t chunk_get_version(uint64_t chunkid,uint32_t *version) {
+	chunk *c;
+	c = chunk_find(chunkid);
+
+	if (c==NULL) {
+		*version = 0;
+		return MFS_ERROR_NOCHUNK;
+	}
+	*version = c->version;
 	return MFS_STATUS_OK;
 }
 
@@ -2692,7 +2716,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	uint32_t **labelmasks;
 	uint32_t labelcnt;
 	static uint16_t *servers = NULL;
-	uint32_t servcnt;
+	uint32_t servcnt,extraservcnt;
 	int32_t *matching;
 	uint32_t forcereplication;
 
@@ -3162,7 +3186,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	}
 
 // step 7.2. if chunk has one copy on each server and some of them have status TDVALID then delete them
-	if (extrajob==0 && vc+tdc>=scount && vc<goal && tdc>0 && vc+tdc>1) {
+	if (extrajob==0 && vc+tdc>=scount && vc<goal && tdc>0 && vc+tdc>1 && chunks_priority_leng[0]==0 && chunks_priority_leng[1]==0 && chunks_priority_leng[2]==0) {
 		uint8_t tdcr = 0;
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid==TDVALID) {
@@ -3259,7 +3283,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					}
 				}
 			}
-			rservcount = matocsserv_getservers_lessrepl(rcsids,MaxWriteRepl[lclass],&allservflag);
+			rservcount = matocsserv_getservers_lessrepl(rcsids,MaxWriteRepl[lclass],(j<2)?1:0,&allservflag);
 			rgvc=0;
 			rgtdc=0;
 			for (s=c->slisthead ; s ; s=s->next) {
@@ -3481,6 +3505,12 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				servers[servcnt++] = s->csid;
 			}
 		}
+		extraservcnt = servcnt;
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (s->valid!=VALID) {
+				servers[extraservcnt++] = s->csid;
+			}
+		}
 		labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
 		matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
 
@@ -3510,8 +3540,8 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 //			lclass = (matocsserv_can_create_chunks(cstab[servers[i]].ptr,AcceptableDifference*1.5)<2)?2:3;
 			if (matocsserv_replication_read_counter(cstab[servers[i]].ptr,now)<MaxReadRepl[lclass]) {
 				for (j=0 ; j<dservcount ; j++) {
-					for (k=0 ; k<servcnt && servers[k]!=dcsids[j] ; k++) { }
-					if (k==servcnt) { // not one of copies
+					for (k=0 ; k<extraservcnt && servers[k]!=dcsids[j] ; k++) { }
+					if (k==extraservcnt) { // not one of copies
 						dstusage = matocsserv_get_usage(cstab[dcsids[j]].ptr);
 						if (srcusage - dstusage < maxdiff) {
 							break;

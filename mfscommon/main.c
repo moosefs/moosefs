@@ -1418,7 +1418,7 @@ int main(int argc,char **argv) {
 			ch=1;
 		}
 	} else {
-		fprintf(stderr,"error occured during initialization - exiting\n");
+		fprintf(stderr,"error occurred during initialization - exiting\n");
 		if (rundaemon) {
 			fputc(0,stderr);
 			close_msg_channel();

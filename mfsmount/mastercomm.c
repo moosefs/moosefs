@@ -1596,7 +1596,7 @@ void* fs_receive_thread(void *arg) {
 				if (fs_connect(0,&connect_args)==0) {
 					sessionlost=0;
 				}
-			} else {	// if other problem occured then try to resolve hostname and portname then try to reconnect using the same session id
+			} else {	// if other problem occurred then try to resolve hostname and portname then try to reconnect using the same session id
 				if (fs_resolve(0,connect_args.bindhostname,connect_args.masterhostname,connect_args.masterportname)==0) {
 					fs_reconnect();
 				}

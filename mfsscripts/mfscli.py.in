@@ -359,7 +359,7 @@ else: # CLI mode
 			print("\t-8 : force 8-color terminal color codes")
 			print("\t-H master_host : master address (default: @DEFAULT_MASTERNAME@)")
 			print("\t-P master_port : master client port (default: @DEFAULT_MASTER_CLIENT_PORT@)")
-			print("\t-n : do not resolve ip adresses (default when output device is not tty)")
+			print("\t-n : do not resolve ip addresses (default when output device is not tty)")
 			print("\t-f frame charset number : set frame charset to be displayed as table frames in ttymode")
 			print("\t\t-f0 : use simple ascii frames '+','-','|' (default for non utf-8 encodings)")
 			if sys.stdout.encoding=='UTF-8':

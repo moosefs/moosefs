@@ -498,7 +498,7 @@ void write_job_end(chunkdata *chd,int status,uint32_t delay) {
 			cb->writeid = 0;
 		}
 		write_delayed_enqueue(chd,delay);
-	} else {	// no more work or error occured
+	} else {	// no more work or error occurred
 		// if this is an error then release all data blocks
 		cb = chd->datachainhead;
 		while (cb) {

@@ -163,12 +163,12 @@ attribute set (see \fBEXTRA ATTRIBUTES\fP) and only such objects can be removed
 using \fBmfsrmsnapshot\fP command. By default all files and directories inside
 specified directory must have this attribute set for the command to remove the
 whole directory; otherwise the command will not remove anything. This behavior
-can be overriden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
+can be overridden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
 remove only those files/directories that have \fBsnapshot\fP attribute set and
 will leave everything else untouched.
 .PP
 \fBmfsgetquota\fP, \fBmfssetquota\fP and \fBmfsdelquota\fP
-tools are used to check, define and delete quotas. Quota is set on a directory. It can be set in one 
+tools are used to check, define and delete quotas. Quota is set on a directory. It can be set in one
 of 4 ways: for number of inodes inside the directory (total sum of the
 subtree's inodes) with \fB-i\fP, \fB-I\fP options, for sum of (logical) file lengths with
 \fB-l\fP, \fB-L\fP options,
@@ -179,7 +179,7 @@ Small letters set soft quota, capital letters set hard quota. \fB-a\fP and \fB-A
 For soft quota grace period can be defined using \fB-p\fP option. When grace period is not given then
 default value will be used (option defined in mfsmaster.cfg or seven days if it's not defined there).
 .PP
-\fBmfsfilepaths\fP tool can be used to find all occurences (hard links) of given file in filesystem.
+\fBmfsfilepaths\fP tool can be used to find all occurrences (hard links) of given file in filesystem.
 Also can be used to find file by number of i-node. In case of searching by i-node tool has to be run
 in mfs mounted directory.
 .PP
@@ -284,7 +284,7 @@ sees the real \fIuid\fP and \fIgid\fP.
 \fBnoattrcache\fP This flag means, that standard file attributes such as uid, gid,
 mode, length and so on won't be stored in kernel cache. In MooseFS 1.5 this was the
 only behaviour, and mfsmount always prevented attributes from being stored in
-kernel cache, but in MooseFS 1.6 attributes can be cached, so in very rare ocassions
+kernel cache, but in MooseFS 1.6 attributes can be cached, so in very rare occasions
 it could be useful to turn it off.
 .PP
 \fBnoentrycache\fP This flag is similar to above. It prevents directory entries

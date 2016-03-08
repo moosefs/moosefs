@@ -366,7 +366,7 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)\n");
 	fprintf(stderr,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
 	fprintf(stderr,"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n");
-	fprintf(stderr,"    -o mfsreadaheadleng=N       define amount of bytes to be additionaly read (default: 1048576)\n");
+	fprintf(stderr,"    -o mfsreadaheadleng=N       define amount of bytes to be additionally read (default: 1048576)\n");
 	fprintf(stderr,"    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n");
 	fprintf(stderr,"    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n");
 	fprintf(stderr,"    -o mfstimeout=N             define maximum timeout in seconds before I/O error is returned (default: 0 - which means no timeout)\n");
@@ -379,7 +379,7 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfspassword=PASSWORD     authenticate to mfsmaster with password\n");
 	fprintf(stderr,"    -o mfsmd5pass=MD5           authenticate to mfsmaster using directly given md5 (only if mfspassword is not defined)\n");
 	fprintf(stderr,"    -o mfsdonotrememberpassword do not remember password in memory - more secure, but when session is lost then new session is created without password\n");
-	fprintf(stderr,"    -o mfspreflabels=LABELEXPR  specify prefered labels for choosing chunkservers during I/O\n");
+	fprintf(stderr,"    -o mfspreflabels=LABELEXPR  specify preferred labels for choosing chunkservers during I/O\n");
 	fprintf(stderr,"    -o mfsnoxattrs              turn off xattr support\n");
 #if FUSE_VERSION >= 26
 	fprintf(stderr,"    -o mfsnoposixlocks          turn off support for global posix locks (lockf + ioctl) - locks will work locally\n");
@@ -1339,7 +1339,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (csorder_init(mfsopts.preferedlabels)<0) {
-		fprintf(stderr,"error parsing prefered labels expression\nsee: %s -h for help\n",argv[0]);
+		fprintf(stderr,"error parsing preferred labels expression\nsee: %s -h for help\n",argv[0]);
 		return 1;
 	}
 

@@ -1878,7 +1878,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		write_data_inode_setmaxfleng(ino,stbuf->st_size);
 		read_inode_set_length(ino,stbuf->st_size,1);
 	}
-	if (status!=0) {	// should never happend but better check than sorry
+	if (status!=0) {	// should never happened but better check than sorry
 		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s:0%04o,%ld,%ld,%lu,%lu,%llu]): %s",(unsigned long int)ino,to_set,modestr+1,(unsigned int)(stbuf->st_mode & 07777),(long int)stbuf->st_uid,(long int)stbuf->st_gid,(unsigned long int)(stbuf->st_atime),(unsigned long int)(stbuf->st_mtime),(unsigned long long int)(stbuf->st_size),strerr(status));
 		fuse_reply_err(req, status);
 		return;
@@ -3374,7 +3374,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 #endif
 			pthread_mutex_unlock(&(fileinfo->lock));
 			if (debug_mode) {
-				fprintf(stderr,"IO error occured while writing inode %lu\n",(unsigned long int)ino);
+				fprintf(stderr,"IO error occurred while writing inode %lu\n",(unsigned long int)ino);
 			}
 			oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 			fuse_reply_err(req,err);
@@ -3393,7 +3393,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 
 	if (err!=0) {
 		if (debug_mode) {
-			fprintf(stderr,"IO error occured while reading inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
+			fprintf(stderr,"IO error occurred while reading inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
 		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);
@@ -3495,7 +3495,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	if (err!=0) {
 		pthread_mutex_unlock(&(fileinfo->lock));
 		if (debug_mode) {
-			fprintf(stderr,"IO error occured while writing inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
+			fprintf(stderr,"IO error occurred while writing inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);

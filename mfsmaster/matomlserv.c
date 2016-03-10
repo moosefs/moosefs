@@ -52,6 +52,7 @@
 #include "slogger.h"
 #include "massert.h"
 #include "clocks.h"
+#include "mfsalloc.h"
 
 #define MaxPacketSize ANTOMA_MAXPACKETSIZE
 
@@ -660,7 +661,7 @@ void matomlserv_read(matomlserventry *eptr,double now) {
 			rbleng += i;
 			if (rbleng==readbuffsize) {
 				readbuffsize*=2;
-				readbuff = realloc(readbuff,readbuffsize);
+				readbuff = mfsrealloc(readbuff,readbuffsize);
 				passert(readbuff);
 			} else {
 				break;

@@ -1,3 +1,10 @@
+moosefs (3.0.75-1) unstable; urgency=medium
+
+  * (all) This is 'work in progress' version !!!
+  * (all) fixed cppcheck warnings/errors (mostly false negatives)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 10 Mar 2016 10:00:00 +0100
+
 moosefs (3.0.74-1) unstable; urgency=medium
 
   * (master) fixed rebalance replication (check for all chunk copies for
@@ -17,7 +24,7 @@ moosefs (3.0.74-1) unstable; urgency=medium
     for replication (even overloaded and being maintained)
   * (master) added using chunkservers in 'internal rebalance' state in case of
     deleting chunks
-  * (all) spell check errors fixed (patch committed by Dmitry Smirnov)
+  * (all) spell check errors fixed (patch contributed by Dmitry Smirnov)
 
  -- MooseFS Team <contact@moosefs.com>  Tue, 08 Mar 2016 12:00:00 +0100
 

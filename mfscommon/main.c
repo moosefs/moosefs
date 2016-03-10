@@ -1059,20 +1059,25 @@ void makedaemon() {
 	}
 	set_signal_handlers(1);
 
+	f = open("/dev/null", O_RDWR, 0);
 	close(STDIN_FILENO);
-	sassert(open("/dev/null", O_RDWR, 0)==STDIN_FILENO);
+	sassert(dup(f)==STDIN_FILENO);
 	close(STDOUT_FILENO);
-	sassert(dup(STDIN_FILENO)==STDOUT_FILENO);
+	sassert(dup(f)==STDOUT_FILENO);
 	close(STDERR_FILENO);
 	sassert(dup(piped[1])==STDERR_FILENO);
 	close(piped[1]);
+	close(f); // this stupid construction with open/dup/close is used due to cppcheck false negatives
 //	setvbuf(stderr,(char *)NULL,_IOLBF,0);
 }
 
 void close_msg_channel() {
+	int f;
 	fflush(stderr);
+	f = open("/dev/null", O_RDWR, 0);
 	close(STDERR_FILENO);
-	sassert(open("/dev/null", O_RDWR, 0)==STDERR_FILENO);
+	sassert(dup(f)==STDERR_FILENO);
+	close(f); // this stupid construction with open/dup/close is used due to cppcheck false negatives
 }
 
 void createpath(const char *filename) {
@@ -1263,7 +1268,7 @@ int main(int argc,char **argv) {
 		rls.rlim_cur = MFSMAXFILES;
 		rls.rlim_max = MFSMAXFILES;
 		if (setrlimit(RLIMIT_NOFILE,&rls)<0) {
-			syslog(LOG_NOTICE,"can't change open files limit to: %u (trying to set smaller value)",MFSMAXFILES);
+			syslog(LOG_NOTICE,"can't change open files limit to: %u (trying to set smaller value)",(unsigned)(MFSMAXFILES));
 			if (getrlimit(RLIMIT_NOFILE,&rls)>=0) {
 				uint32_t limit;
 				if (rls.rlim_max > MFSMAXFILES) {
@@ -1282,7 +1287,7 @@ int main(int argc,char **argv) {
 				}
 			}
 		} else {
-			mfs_arg_syslog(LOG_NOTICE,"open files limit has been set to: %u",MFSMAXFILES);
+			mfs_arg_syslog(LOG_NOTICE,"open files limit has been set to: %u",(unsigned)(MFSMAXFILES));
 		}
 
 		lockmemory = cfg_getnum("LOCK_MEMORY",0);

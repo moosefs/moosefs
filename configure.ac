@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.74], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.75], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -157,7 +157,7 @@ AC_FUNC_STAT
 dnl AC_FUNC_MALLOC
 dnl AC_FUNC_REALLOC
 # rpl_malloc/rpl_realloc problem AC_FUNC_MALLOC/AC_FUNC_REALLOC !!!
-AC_CHECK_FUNCS([malloc realloc])
+AC_CHECK_FUNCS([malloc realloc reallocf])
 
 # required functions
 AC_CHECK_FUNCS([atexit bzero ftruncate getaddrinfo getpass gettimeofday memmove memset mkdir realpath poll socket strchr strdup strtol strtoul ftello fseeko],, [AC_MSG_ERROR([One of required functions was not found])])

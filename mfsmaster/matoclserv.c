@@ -70,6 +70,7 @@
 #include "missinglog.h"
 #include "mfsstrerr.h"
 #include "iptosesid.h"
+#include "mfsalloc.h"
 
 #define MaxPacketSize CLTOMA_MAXPACKETSIZE
 
@@ -6129,7 +6130,7 @@ void matoclserv_read(matoclserventry *eptr,double now) {
 			rbleng += i;
 			if (rbleng==readbuffsize) {
 				readbuffsize*=2;
-				readbuff = realloc(readbuff,readbuffsize);
+				readbuff = mfsrealloc(readbuff,readbuffsize);
 				passert(readbuff);
 			} else {
 				break;

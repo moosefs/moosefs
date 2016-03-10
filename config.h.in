@@ -219,6 +219,9 @@
 /* Define to 1 if you have the `realloc' function. */
 #undef HAVE_REALLOC
 
+/* Define to 1 if you have the `reallocf' function. */
+#undef HAVE_REALLOCF
+
 /* Define to 1 if you have the `realpath' function. */
 #undef HAVE_REALPATH
 

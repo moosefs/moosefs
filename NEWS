@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.75-1 (WIP)
+
+  - (all) fixed cppcheck warnings/errors (mostly false negatives)
+
 * MooseFS 3.0.74-1 (2016-03-08)
 
   - (master) fixed rebalance replication (check for all chunk copies for destination - not only valid)
@@ -12,7 +16,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added METADATA_SAVE_FREQ option (allow to save metadata less frequently than every hour)
   - (master) added using in emergency (endangered chunks) all available servers for replication (even overloaded and being maintained)
   - (master) added using chunkservers in 'internal rebalance' state in case of deleting chunks
-  - (all) spell check errors fixed (patch committed by Dmitry Smirnov)
+  - (all) spell check errors fixed (patch contributed by Dmitry Smirnov)
 
 * MooseFS 3.0.73-1 (2016-02-11)
 

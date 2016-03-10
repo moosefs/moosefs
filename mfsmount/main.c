@@ -726,7 +726,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		}
 	}
 	if (i != (int)(mfsopts.nofile)) {
-		fprintf(stderr,"can't set open file limit to %d\n",mfsopts.nofile);
+		fprintf(stderr,"can't set open file limit to %u\n",mfsopts.nofile);
 		if (i>=1000) {
 			fprintf(stderr,"open file limit set to: %d\n",i);
 		}

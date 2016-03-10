@@ -53,6 +53,7 @@
 #include "csserv.h"
 #include "clocks.h"
 #include "md5.h"
+#include "mfsalloc.h"
 
 #define MaxPacketSize MATOCS_MAXPACKETSIZE
 
@@ -1292,7 +1293,7 @@ void masterconn_read(masterconn *eptr,double now) {
 			rbleng += i;
 			if (rbleng==readbuffsize) {
 				readbuffsize*=2;
-				readbuff = realloc(readbuff,readbuffsize);
+				readbuff = mfsrealloc(readbuff,readbuffsize);
 				passert(readbuff);
 			} else {
 				break;

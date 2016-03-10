@@ -264,6 +264,7 @@ int do_archchg(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETU64(notchgchunks,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(nsinodes,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_archchg(ts,inode,uid,flags,chgchunks,notchgchunks,nsinodes);
 }
 
@@ -347,6 +348,7 @@ int do_create(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(inode,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_create(ts,parent,strlen((char*)name),name,type,mode,cumask,uid,gid,rdev,inode);
 }
 
@@ -428,6 +430,7 @@ int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	GETU32(freeinodes,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(sustainedinodes,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_emptytrash(ts,tid,freeinodes,sustainedinodes);
 }
 
@@ -437,6 +440,7 @@ int do_emptysustained(const char *filename,uint64_t lv,uint32_t ts,const char *p
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(freeinodes,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_emptysustained(ts,freeinodes);
 }
 
@@ -470,6 +474,7 @@ int do_freeinodes(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	} else {
 		sustainedinodes = 0;
 	}
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_freeinodes(ts,freeinodes,sustainedinodes);
 }
 
@@ -615,6 +620,7 @@ int do_move(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(inode,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_move(ts,parent_src,strlen((char*)name_src),name_src,parent_dst,strlen((char*)name_dst),name_dst,inode);
 }
 
@@ -733,6 +739,7 @@ int do_repair(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(version,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_repair(ts,inode,indx,version);
 }
 
@@ -743,6 +750,7 @@ int do_renumedges(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU64(enextedgeid,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_renumerate_edges(enextedgeid);
 }
 /*
@@ -761,6 +769,7 @@ int do_session(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(sessionid,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return sessions_mr_session(sessionid);
 }
 
@@ -819,6 +828,7 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(sessionid,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng,sessionid);
 }
 
@@ -933,6 +943,7 @@ int do_seteattr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETU32(nci,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(npi,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_seteattr(ts,inode,uid,eattr,smode,ci,nci,npi);
 }
 
@@ -968,6 +979,7 @@ int do_setgoal(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETU32(nci,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(npi,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_setgoal(ts,inode,uid,goal,smode,ci,nci,npi);
 }
 
@@ -1012,6 +1024,7 @@ int do_settrashtime(const char *filename,uint64_t lv,uint32_t ts,const char *ptr
 	GETU32(nci,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(npi,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_settrashtime(ts,inode,uid,trashtime,smode,ci,nci,npi);
 }
 
@@ -1131,6 +1144,7 @@ int do_symlink(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(inode,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_symlink(ts,parent,strlen((char*)name),name,path,uid,gid,inode);
 }
 
@@ -1152,6 +1166,7 @@ int do_unlink(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(inode,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_unlink(ts,parent,strlen((char*)name),name,inode);
 }
 
@@ -1174,6 +1189,7 @@ int do_trunc(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU64(chunkid,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_trunc(ts,inode,indx,chunkid);
 }
 
@@ -1200,6 +1216,7 @@ int do_write(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU64(chunkid,ptr);
+	(void)ptr; // silence cppcheck warnings
 	return fs_mr_write(ts,inode,indx,opflag,canmodmtime,chunkid);
 }
 

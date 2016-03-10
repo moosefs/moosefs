@@ -58,6 +58,7 @@
 #include "pipestorage.h"
 #include "readdata.h"
 #include "chunksdatacache.h"
+#include "mfsalloc.h"
 #include "MFSCommunication.h"
 
 #define CHUNKSERVER_ACTIVITY_TIMEOUT 2.0
@@ -412,7 +413,7 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 
 	if (ind->closing || status!=MFS_STATUS_OK || breakmode) {
 #ifdef RDEBUG
-		fprintf(stderr,"%.6lf: readworker end (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" - closing: %u ; status: %u ; breakmode: %u\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,ind->inode,ind->closing,status,breakmode);
+		fprintf(stderr,"%.6lf: readworker end (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" - closing: %u ; status: %d ; breakmode: %u\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,ind->inode,ind->closing,status,breakmode);
 #endif
 		if (rreq->lcnt==0) {
 #ifdef RDEBUG
@@ -446,7 +447,7 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 			ind->inqueue++;
 		}
 #ifdef RDEBUG
-		fprintf(stderr,"%.6lf: readworker end - enqueue waiting requests ; inqueue: %u ; closing: %u ; status: %u ; breakmode: %u\n",monotonic_seconds(),ind->inqueue,ind->closing,status,breakmode);
+		fprintf(stderr,"%.6lf: readworker end - enqueue waiting requests ; inqueue: %"PRIu8" ; closing: %"PRIu8" ; status: %d ; breakmode: %u\n",monotonic_seconds(),ind->inqueue,ind->closing,status,breakmode);
 #endif
 		for (rreq = ind->reqhead ; rreq && ind->inqueue < MAXREQINQUEUE ; rreq=rreq->next) {
 			if (rreq->mode==NEW) {
@@ -1212,7 +1213,7 @@ void* read_worker(void *arg) {
 							if (rreq==NULL) {
 								syslog(LOG_WARNING,"readworker: got unexpected data from chunkserver (leng:%"PRIu32")",recleng);
 #ifdef RDEBUG
-								fprintf(stderr,"%.6lf: readworker inode: %"PRIu32" ; rreq: %"PRIu64":%"PRIu64"/%"PRIu32" ; got unexpected data from chunkserver (leng:%"PRIu32")\n",monotonic_seconds(),inode,rreq->offset,rreq->offset+rreq->leng,rreq->leng,recleng);
+								fprintf(stderr,"%.6lf: readworker inode: %"PRIu32" ; rreq: NULL ; got unexpected data from chunkserver (leng:%"PRIu32")\n",monotonic_seconds(),inode,recleng);
 #endif
 								status = EIO;
 								currentpos = 0; // start again from beginning
@@ -1778,7 +1779,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 					if (i>=edges) {
 						if (i>=ranges[0]) {
 							ranges[0] += 10;
-							ranges = realloc(ranges,sizeof(uint64_t)*(ranges[0]+1));
+							ranges = mfsrealloc(ranges,sizeof(uint64_t)*(ranges[0]+1));
 							passert(ranges);
 							etab = ranges+1;
 							zassert(pthread_setspecific(rangesstorage,ranges));
@@ -1791,7 +1792,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 					if (i>=edges) {
 						if (i>=ranges[0]) {
 							ranges[0] += 10;
-							ranges = realloc(ranges,sizeof(uint64_t)*(ranges[0]+1));
+							ranges = mfsrealloc(ranges,sizeof(uint64_t)*(ranges[0]+1));
 							passert(ranges);
 							etab = ranges+1;
 							zassert(pthread_setspecific(rangesstorage,ranges));

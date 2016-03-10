@@ -1205,7 +1205,7 @@ int meta_loadall(void) {
 					return -1;
 				}
 			}
-		} else {
+		} else if (dd) {
 			closedir(dd);
 		}
 		if (stat("metadata.mfs",&st)==0) {

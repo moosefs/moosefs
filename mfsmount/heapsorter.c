@@ -22,6 +22,7 @@
 #include <inttypes.h>
 
 #include "massert.h"
+#include "mfsalloc.h"
 
 static uint32_t *heap = NULL;
 static uint32_t heapsize = 0;
@@ -81,7 +82,7 @@ void heap_push(uint32_t element) {
 			heap = malloc(sizeof(uint32_t)*heapsize);
 		} else {
 			heapsize <<= 1;
-			heap = realloc(heap,sizeof(uint32_t)*heapsize);
+			heap = mfsrealloc(heap,sizeof(uint32_t)*heapsize);
 		}
 		passert(heap);
 	}

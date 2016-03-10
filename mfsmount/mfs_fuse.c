@@ -52,6 +52,7 @@
 #include "writedata.h"
 #include "massert.h"
 #include "strerr.h"
+#include "mfsalloc.h"
 #include "MFSCommunication.h"
 
 #include "sustained_stats.h"
@@ -180,7 +181,7 @@ static uint32_t sinfo_new(void) {
 			sinfo_tab[0] = NULL;
 		} else {
 			sinfo_size *= 2;
-			sinfo_tab = realloc(sinfo_tab,sizeof(sinfo*)*sinfo_size);
+			sinfo_tab = mfsrealloc(sinfo_tab,sizeof(sinfo*)*sinfo_size);
 			passert(sinfo_tab);
 		}
 	}
@@ -265,7 +266,7 @@ static uint32_t dirbuf_new(void) {
 			dirbuf_tab[0] = NULL;
 		} else {
 			dirbuf_size *= 2;
-			dirbuf_tab = realloc(dirbuf_tab,sizeof(dirbuf*)*dirbuf_size);
+			dirbuf_tab = mfsrealloc(dirbuf_tab,sizeof(dirbuf*)*dirbuf_size);
 			passert(dirbuf_tab);
 		}
 	}
@@ -350,7 +351,7 @@ static uint32_t finfo_new(void) {
 			finfo_tab[0] = NULL;
 		} else {
 			finfo_size *= 2;
-			finfo_tab = realloc(finfo_tab,sizeof(finfo*)*finfo_size);
+			finfo_tab = mfsrealloc(finfo_tab,sizeof(finfo*)*finfo_size);
 			passert(finfo_tab);
 		}
 	}

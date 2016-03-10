@@ -181,7 +181,8 @@ static inline int pipe(int handles[2]) {
 
 	handles[0] = handles[1] = -1;
 
-	if ((s = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
+	s = socket(AF_INET, SOCK_STREAM, 0);
+	if (s<0 || s==INVALID_SOCKET) {
 		printf("socket error: %u\n",GetLastError());
 		return -1;
 	}
@@ -206,7 +207,8 @@ static inline int pipe(int handles[2]) {
 		return -1;
 	}
 
-	if ((tmp_sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
+	tmp_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (tmp_sock<0 || tmp_sock==INVALID_SOCKET) {
 		printf("socket error: %u\n",GetLastError());
 		closesocket(s);
 		return -1;

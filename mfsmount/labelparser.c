@@ -391,7 +391,7 @@ static inline termval* expr_eval(node *a) {
 		}
 	}
 	if (t->cnt > MASKORGROUP) {
-		printf("Too many 'or' groups (max: %u)\n",MASKORGROUP);
+		printf("Too many 'or' groups (max: %u)\n",(unsigned)(MASKORGROUP));
 		free(t->labelmasks);
 		free(t);
 		return NULL;

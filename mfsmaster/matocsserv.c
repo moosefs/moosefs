@@ -57,6 +57,7 @@
 #include "clocks.h"
 #include "labelsets.h"
 #include "md5.h"
+#include "mfsalloc.h"
 
 #define MaxPacketSize CSTOMA_MAXPACKETSIZE
 
@@ -2177,7 +2178,7 @@ void matocsserv_read(matocsserventry *eptr,double now) {
 			rbleng += i;
 			if (rbleng==readbuffsize) {
 				readbuffsize*=2;
-				readbuff = realloc(readbuff,readbuffsize);
+				readbuff = mfsrealloc(readbuff,readbuffsize);
 				passert(readbuff);
 			} else {
 				break;

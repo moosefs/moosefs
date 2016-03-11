@@ -453,7 +453,7 @@ mfsmaster_SOURCES = \
 	../mfscommon/datapack.h ../mfscommon/massert.h \
 	../mfscommon/slogger.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/hashfn.h ../mfscommon/median.h \
-	../mfscommon/buckets.h \
+	../mfscommon/buckets.h ../mfscommon/mfsalloc.h \
 	../mfscommon/MFSCommunication.h
 
 EXTRA_DIST = $(sbin_SCRIPTS)

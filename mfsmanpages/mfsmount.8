@@ -85,6 +85,9 @@ do not remember password in memory - more secure, but when session is lost then 
 \fB\-o mfsdebug\fP
 print some MooseFS-specific debugging information
 .TP
+\fB\-o mfsflattrash\fP
+use flat trash structure in meta (option added for compatibility reasons - since version 3.0.64 trash is split into 4096 subfolders which reduces problems with big trashes)
+.TP
 \fB\-o mfsdelayedinit\fP
 connection with master is done in background - with this option mount can be run without network (good for being run from fstab / init scripts etc.)
 .TP

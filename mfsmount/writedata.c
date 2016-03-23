@@ -58,8 +58,10 @@
 #include "pipestorage.h"
 #include "readdata.h"
 #include "chunksdatacache.h"
-#include "fdcache.h"
 #include "MFSCommunication.h"
+#ifndef WIN32
+#include "fdcache.h"
+#endif
 
 // #define WORKER_DEBUG 1
 // #define BUFFER_DEBUG 1
@@ -781,7 +783,9 @@ void* write_worker(void *arg) {
 		}
 
 		chunksdatacache_insert(ind->inode,chindx,chunkid,version,csdataver,csdata,csdatasize);
+#ifndef WIN32
 		fdcache_invalidate(ind->inode);
+#endif
 
 //		now = monotonic_seconds();
 //		fprintf(stderr,"fs_writechunk time: %.3lf\n",(now-start));

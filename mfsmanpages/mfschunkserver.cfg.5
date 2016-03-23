@@ -55,6 +55,9 @@ how many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a
 \fBHDD_FSYNC_BEFORE_CLOSE\fP
 enables/disables fsync before chunk closing; default is 0 (off)
 .TP
+\fBHDD_SPARSIFY_ON_WRITE\fP
+enables/disables sparsification (skip leading and trailing zeroz) during writing new block; default is 1 (on)
+.TP
 \fBWORKERS_MAX\fP,\fBWORKERS_MAX_IDLE\fP
 maximum number of active workers and maximum number of idle workers; defaults are 150 and 40
 .TP

@@ -262,6 +262,10 @@ typedef struct damaged {
 } damaged;
 */
 
+#ifndef HAVE___SYNC_OP_AND_FETCH
+static pthread_mutex_t cfglock = PTHREAD_MUTEX_INITIALIZER;
+#endif
+static uint8_t Sparsification;
 static uint32_t HDDTestFreq = 10;
 static uint32_t HDDRebalancePerc = 20;
 static uint32_t HDDErrorCount = 2;
@@ -346,6 +350,7 @@ static uint32_t stats_version = 0;
 static uint32_t stats_duplicate = 0;
 static uint32_t stats_truncate = 0;
 static uint32_t stats_duptrunc = 0;
+
 
 static inline void hdd_stats_clear(hddstats *r) {
 	memset(r,0,sizeof(hddstats));
@@ -2676,9 +2681,80 @@ int hdd_write(uint64_t chunkid,uint32_t version,uint16_t blocknum,const uint8_t 
 		return MFS_ERROR_WRONGOFFSET;
 	}
 	crc = get32bit(&crcbuff);
-	if (crc!=mycrc32(0,buffer,size)) {
-		hdd_chunk_release(c);
-		return MFS_ERROR_CRC;
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	if (blocknum>=c->blocks && __sync_or_and_fetch(&Sparsification,0)) { // new block - may be sparsified
+#else
+	pthread_mutex_lock(&cfglock);
+	i = Sparsification;
+	pthread_mutex_unlock(&cfglock);
+	if (blocknum>=c->blocks && i) {
+#endif
+		uint32_t nzstart,nzend;
+		uint32_t dataoffset,datasize;
+		const uint8_t *p,*e;
+		p = buffer;
+		e = p+size;
+		while (p<e && (*p)==0) {
+			p++;
+		}
+		if (p==e) { // only zeros !!!
+			nzstart = offset;
+			nzend = offset;
+		} else {
+			e--;
+			while (p<=e && (*e)==0) {
+				e--;
+			}
+			e++;
+			nzstart = (p - buffer) + offset;
+			nzend = (e - buffer) + offset;
+			nzstart &= UINT32_C(0xFFFFFE00); // floor(nzstart/512)*512
+			nzend = (nzend+511) & UINT32_C(0xFFFFFE00); // ceil(nzend/512)*512
+			if (nzstart<offset) {
+				nzstart = offset;
+			}
+			if (nzend>offset+size) {
+				nzend = offset+size;
+			}
+		}
+		if (nzstart!=offset || nzend!=offset+size) { // can be sparsified
+			dataoffset = nzstart - offset;
+			datasize = nzend - nzstart;
+			if (datasize==0) {
+				combinedcrc = mycrc32_zeroblock(0,size);
+				chcrc = 0;
+			} else {
+				precrc = mycrc32_zeroblock(0,dataoffset);
+				postcrc = mycrc32_zeroblock(0,size-(dataoffset+datasize));
+				chcrc = mycrc32(0,buffer+dataoffset,datasize);
+				if (dataoffset==0) {
+					combinedcrc = mycrc32_combine(chcrc,postcrc,size-(dataoffset+datasize));
+				} else {
+					combinedcrc = mycrc32_combine(precrc,chcrc,datasize);
+					if ((dataoffset+datasize)<size) {
+						combinedcrc = mycrc32_combine(combinedcrc,postcrc,size-(dataoffset+datasize));
+					}
+				}
+			}
+			if (combinedcrc!=crc) {
+				hdd_chunk_release(c);
+				return MFS_ERROR_CRC;
+			}
+			buffer += dataoffset;
+			offset += dataoffset;
+			size = datasize;
+			crc = chcrc;
+		} else {
+			if (crc!=mycrc32(0,buffer,size)) {
+				hdd_chunk_release(c);
+				return MFS_ERROR_CRC;
+			}
+		}
+	} else {
+		if (crc!=mycrc32(0,buffer,size)) {
+			hdd_chunk_release(c);
+			return MFS_ERROR_CRC;
+		}
 	}
 	if (offset==0 && size==MFSBLOCKSIZE) {
 		if (blocknum>=c->blocks) {
@@ -2813,39 +2889,53 @@ int hdd_write(uint64_t chunkid,uint32_t version,uint16_t blocknum,const uint8_t 
 			precrc = mycrc32_zeroblock(0,offset);
 			postcrc = mycrc32_zeroblock(0,MFSBLOCKSIZE-(offset+size));
 		}
+		if (size>0) {
 #ifdef PRESERVE_BLOCK
-		memcpy(c->block+offset,buffer,size);
-		ts = monotonic_nseconds();
+			memcpy(c->block+offset,buffer,size);
+			ts = monotonic_nseconds();
 #ifdef USE_PIO
-		ret = pwrite(c->fd,c->block+offset,size,CHUNKHDRSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS)+offset);
+			ret = pwrite(c->fd,c->block+offset,size,CHUNKHDRSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS)+offset);
 #else /* USE_PIO */
-		lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS)+offset,SEEK_SET);
-		ret = write(c->fd,c->block+offset,size);
+			lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS)+offset,SEEK_SET);
+			ret = write(c->fd,c->block+offset,size);
 #endif /* USE_PIO */
-		error = errno;
-		te = monotonic_nseconds();
-		hdd_stats_datawrite(c->owner,size,te-ts);
-		chcrc = mycrc32(0,c->block+offset,size);
+			error = errno;
+			te = monotonic_nseconds();
+			hdd_stats_datawrite(c->owner,size,te-ts);
+			chcrc = mycrc32(0,c->block+offset,size);
 #else /* PRESERVE_BLOCK */
-		memcpy(blockbuffer+offset,buffer,size);
-		ts = monotonic_nseconds();
+			memcpy(blockbuffer+offset,buffer,size);
+			ts = monotonic_nseconds();
 #ifdef USE_PIO
-		ret = pwrite(c->fd,blockbuffer+offset,size,CHUNKHDRSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS)+offset);
+			ret = pwrite(c->fd,blockbuffer+offset,size,CHUNKHDRSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS)+offset);
 #else /* USE_PIO */
-		lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS)+offset,SEEK_SET);
-		ret = write(c->fd,blockbuffer+offset,size);
+			lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS)+offset,SEEK_SET);
+			ret = write(c->fd,blockbuffer+offset,size);
 #endif /* USE_PIO */
-		error = errno;
-		te = monotonic_nseconds();
-		hdd_stats_datawrite(c->owner,size,te-ts);
-		chcrc = mycrc32(0,blockbuffer+offset,size);
+			error = errno;
+			te = monotonic_nseconds();
+			hdd_stats_datawrite(c->owner,size,te-ts);
+			chcrc = mycrc32(0,blockbuffer+offset,size);
 #endif /* PRESERVE_BLOCK */
-		if (offset==0) {
-			combinedcrc = mycrc32_combine(chcrc,postcrc,MFSBLOCKSIZE-(offset+size));
+			if (offset==0) {
+				combinedcrc = mycrc32_combine(chcrc,postcrc,MFSBLOCKSIZE-(offset+size));
+			} else {
+				combinedcrc = mycrc32_combine(precrc,chcrc,size);
+				if ((offset+size)<MFSBLOCKSIZE) {
+					combinedcrc = mycrc32_combine(combinedcrc,postcrc,MFSBLOCKSIZE-(offset+size));
+				}
+			}
 		} else {
-			combinedcrc = mycrc32_combine(precrc,chcrc,size);
-			if ((offset+size)<MFSBLOCKSIZE) {
-				combinedcrc = mycrc32_combine(combinedcrc,postcrc,MFSBLOCKSIZE-(offset+size));
+			ret = 0;
+			error = 0;
+			chcrc = 0; // just initialize variable to silence warnings in some compilers
+			if (offset==0) {
+				combinedcrc = postcrc;
+			} else {
+				combinedcrc = precrc;
+				if ((offset+size)<MFSBLOCKSIZE) {
+					combinedcrc = mycrc32_combine(combinedcrc,postcrc,MFSBLOCKSIZE-(offset+size));
+				}
 			}
 		}
 		wcrcptr = (c->crc)+(4*blocknum);
@@ -2854,7 +2944,7 @@ int hdd_write(uint64_t chunkid,uint32_t version,uint16_t blocknum,const uint8_t 
 		put32bit(&wcrcptr,combinedcrc);
 		c->crcchanged = 1;
 //		if (crc!=mycrc32(0,blockbuffer+offset,size)) {
-		if (crc!=chcrc) {
+		if (size>0 && crc!=chcrc) {
 			errno = error;
 			hdd_error_occured(c);	// uses and preserves errno !!!
 			syslog(LOG_WARNING,"write_block_to_chunk: file:%s - crc error",c->filename);
@@ -3144,6 +3234,11 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 	int32_t retsize;
 	int status;
 	chunk *c,*oc;
+	const uint8_t *writeptr;
+	const uint8_t *p,*e;
+	uint8_t sp;
+	uint32_t nzstart,nzend;
+	uint8_t truncneeded;
 #ifdef PRESERVE_BLOCK
 	uint8_t hdrbuffer[CHUNKHDRSIZE];
 #else /* PRESERVE_BLOCK */
@@ -3165,6 +3260,13 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 		zassert(pthread_setspecific(hdrbufferkey,hdrbuffer));
 	}
 #endif /* PRESERVE_BLOCK */
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	sp = __sync_or_and_fetch(&Sparsification,0);
+#else
+	pthread_mutex_lock(&cfglock);
+	sp = Sparsification;
+	pthread_mutex_unlock(&cfglock);
+#endif
 
 	oc = hdd_chunk_find(chunkid);
 	if (oc==NULL) {
@@ -3272,6 +3374,7 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 #ifndef PRESERVE_BLOCK
 	lseek(oc->fd,CHUNKHDRSIZE,SEEK_SET);
 #endif /* PRESERVE_BLOCK */
+	truncneeded = 0;
 	for (block=0 ; block<oc->blocks ; block++) {
 #ifdef PRESERVE_BLOCK
 		if (oc->blockno==block) {
@@ -3303,12 +3406,49 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 		if (oc->blockno!=block) {
 			hdd_stats_read(MFSBLOCKSIZE);
 		}
-		retsize = write(c->fd,c->block,MFSBLOCKSIZE);
+		writeptr = c->block;
 #else /* PRESERVE_BLOCK */
 		hdd_stats_read(MFSBLOCKSIZE);
-		retsize = write(c->fd,blockbuffer,MFSBLOCKSIZE);
+		writeptr = blockbuffer;
 #endif /* PRESERVE_BLOCK */
-		if (retsize!=MFSBLOCKSIZE) {
+		if (sp) {
+			// sparsify
+			p = writeptr;
+			e = p+MFSBLOCKSIZE;
+			while (p<e && (*p)==0) {
+				p++;
+			}
+			if (p==e) {
+				nzstart = nzend = 0;
+			} else {
+				e--;
+				while (p<=e && (*e)==0) {
+					e--;
+				}
+				e++;
+				nzstart = (p - writeptr);
+				nzend = (e - writeptr);
+				nzstart &= UINT32_C(0xFFFFFE00); // floor(nzstart/512)*512
+				nzend = (nzend+511) & UINT32_C(0xFFFFFE00); // ceil(nzend/512)*512
+			}
+		} else {
+			nzstart = 0;
+			nzend = MFSBLOCKSIZE;
+		}
+		if (nzend==nzstart) {
+			retsize = 0;
+			nzstart = nzend = 0;
+		} else if (nzstart>0 || truncneeded) {
+#ifdef USE_PIO
+			retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
+#else
+			lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
+			retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
+#endif
+		} else {
+			retsize = write(c->fd,writeptr,nzend-nzstart);
+		}
+		if (retsize!=(int32_t)(nzend-nzstart)) {
 			hdd_error_occured(c);	// uses and preserves errno !!!
 			mfs_arg_errlog_silent(LOG_WARNING,"duplicate_chunk: file:%s - data write error",c->filename);
 			hdd_io_end(c);
@@ -3318,10 +3458,27 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 			hdd_chunk_release(oc);
 			return MFS_ERROR_IO;	//write error
 		}
-		hdd_stats_write(MFSBLOCKSIZE);
+		hdd_stats_write(nzend-nzstart);
+		if (nzend!=MFSBLOCKSIZE) {
+			truncneeded = 1;
+		} else {
+			truncneeded = 0;
+		}
 #ifdef PRESERVE_BLOCK
 		c->blockno = block;
 #endif /* PRESERVE_BLOCK */
+	}
+	if (truncneeded) {
+		if (ftruncate(c->fd,CHUNKHDRSIZE+(((uint32_t)oc->blocks)<<MFSBLOCKBITS))<0) {
+			hdd_error_occured(c);	// uses and preserves errno !!!
+			mfs_arg_errlog_silent(LOG_WARNING,"duplicate_chunk: file:%s - ftruncate error",c->filename);
+			hdd_io_end(c);
+			unlink(c->filename);
+			hdd_chunk_delete(c);
+			hdd_io_end(oc);
+			hdd_chunk_release(oc);
+			return MFS_ERROR_IO;	//write error
+		}
 	}
 	status = hdd_io_end(oc);
 	if (status!=MFS_STATUS_OK) {
@@ -3581,6 +3738,11 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 	uint32_t crc;
 	int status;
 	chunk *c,*oc;
+	const uint8_t *writeptr;
+	const uint8_t *p,*e;
+	uint8_t sp;
+	uint32_t nzstart,nzend;
+	uint8_t truncneeded;
 #ifdef PRESERVE_BLOCK
 	uint8_t hdrbuffer[CHUNKHDRSIZE];
 #else /* PRESERVE_BLOCK */
@@ -3602,6 +3764,13 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 		zassert(pthread_setspecific(hdrbufferkey,hdrbuffer));
 	}
 #endif /* PRESERVE_BLOCK */
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	sp = __sync_or_and_fetch(&Sparsification,0);
+#else
+	pthread_mutex_lock(&cfglock);
+	sp = Sparsification;
+	pthread_mutex_unlock(&cfglock);
+#endif
 
 	if (length>MFSCHUNKSIZE) {
 		return MFS_ERROR_WRONGSIZE;
@@ -3704,6 +3873,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 	lseek(oc->fd,CHUNKHDRSIZE,SEEK_SET);
 #endif /* PRESERVE_BLOCK */
 	if (blocks>oc->blocks) { // expanding
+		truncneeded = 0;
 		for (block=0 ; block<oc->blocks ; block++) {
 #ifdef PRESERVE_BLOCK
 			if (oc->blockno==block) {
@@ -3735,12 +3905,49 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 			if (oc->blockno!=block) {
 				hdd_stats_read(MFSBLOCKSIZE);
 			}
-			retsize = write(c->fd,c->block,MFSBLOCKSIZE);
+			writeptr = c->block;
 #else /* PRESERVE_BLOCK */
 			hdd_stats_read(MFSBLOCKSIZE);
-			retsize = write(c->fd,blockbuffer,MFSBLOCKSIZE);
+			writeptr = blockbuffer;
 #endif /* PRESERVE_BLOCK */
-			if (retsize!=MFSBLOCKSIZE) {
+			if (sp) {
+				// sparsify
+				p = writeptr;
+				e = p+MFSBLOCKSIZE;
+				while (p<e && (*p)==0) {
+					p++;
+				}
+				if (p==e) {
+					nzstart = nzend = 0;
+				} else {
+					e--;
+					while (p<=e && (*e)==0) {
+						e--;
+					}
+					e++;
+					nzstart = (p - writeptr);
+					nzend = (e - writeptr);
+					nzstart &= UINT32_C(0xFFFFFE00); // floor(nzstart/512)*512
+					nzend = (nzend+511) & UINT32_C(0xFFFFFE00); // ceil(nzend/512)*512
+				}
+			} else {
+				nzstart = 0;
+				nzend = MFSBLOCKSIZE;
+			}
+			if (nzend==nzstart) {
+				retsize = 0;
+				nzstart = nzend = 0;
+			} else if (nzstart>0 || truncneeded) {
+#ifdef USE_PIO
+				retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
+#else
+				lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
+				retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
+#endif
+			} else {
+				retsize = write(c->fd,writeptr,nzend-nzstart);
+			}
+			if (retsize!=(int32_t)(nzend-nzstart)) {
 				hdd_error_occured(c);	// uses and preserves errno !!!
 				mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - data write error",c->filename);
 				hdd_io_end(c);
@@ -3748,13 +3955,19 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				hdd_chunk_delete(c);
 				hdd_io_end(oc);
 				hdd_chunk_release(oc);
-				return MFS_ERROR_IO;
+				return MFS_ERROR_IO;	//write error
 			}
-			hdd_stats_write(MFSBLOCKSIZE);
+			hdd_stats_write(nzend-nzstart);
+			if (nzend!=MFSBLOCKSIZE) {
+				truncneeded = 1;
+			} else {
+				truncneeded = 0;
+			}
 #ifdef PRESERVE_BLOCK
 			c->blockno = block;
 #endif /* PRESERVE_BLOCK */
 		}
+		// always truncate because we are expanding chunk here
 		if (ftruncate(c->fd,CHUNKHDRSIZE+(((uint32_t)blocks)<<MFSBLOCKBITS))<0) {
 			hdd_error_occured(c);	// uses and preserves errno !!!
 			mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - ftruncate error",c->filename);
@@ -3772,6 +3985,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 	} else { // shrinking
 		uint32_t blocksize = (length&MFSBLOCKMASK);
 		if (blocksize==0) { // aligned shring
+			truncneeded = 0;
 			for (block=0 ; block<blocks ; block++) {
 #ifdef PRESERVE_BLOCK
 				if (oc->blockno==block) {
@@ -3803,12 +4017,49 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				if (oc->blockno!=block) {
 					hdd_stats_read(MFSBLOCKSIZE);
 				}
-				retsize = write(c->fd,c->block,MFSBLOCKSIZE);
+				writeptr = c->block;
 #else /* PRESERVE_BLOCK */
 				hdd_stats_read(MFSBLOCKSIZE);
-				retsize = write(c->fd,blockbuffer,MFSBLOCKSIZE);
+				writeptr = blockbuffer;
 #endif /* PRESERVE_BLOCK */
-				if (retsize!=MFSBLOCKSIZE) {
+				if (sp) {
+					// sparsify
+					p = writeptr;
+					e = p+MFSBLOCKSIZE;
+					while (p<e && (*p)==0) {
+						p++;
+					}
+					if (p==e) {
+						nzstart = nzend = 0;
+					} else {
+						e--;
+						while (p<=e && (*e)==0) {
+							e--;
+						}
+						e++;
+						nzstart = (p - writeptr);
+						nzend = (e - writeptr);
+						nzstart &= UINT32_C(0xFFFFFE00); // floor(nzstart/512)*512
+						nzend = (nzend+511) & UINT32_C(0xFFFFFE00); // ceil(nzend/512)*512
+					}
+				} else {
+					nzstart = 0;
+					nzend = MFSBLOCKSIZE;
+				}
+				if (nzend==nzstart) {
+					retsize = 0;
+					nzstart = nzend = 0;
+				} else if (nzstart>0 || truncneeded) {
+#ifdef USE_PIO
+					retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
+#else
+					lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
+					retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
+#endif
+				} else {
+					retsize = write(c->fd,writeptr,nzend-nzstart);
+				}
+				if (retsize!=(int32_t)(nzend-nzstart)) {
 					hdd_error_occured(c);	// uses and preserves errno !!!
 					mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - data write error",c->filename);
 					hdd_io_end(c);
@@ -3816,14 +4067,32 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 					hdd_chunk_delete(c);
 					hdd_io_end(oc);
 					hdd_chunk_release(oc);
-					return MFS_ERROR_IO;
+					return MFS_ERROR_IO;	//write error
 				}
-				hdd_stats_write(MFSBLOCKSIZE);
+				hdd_stats_write(nzend-nzstart);
+				if (nzend!=MFSBLOCKSIZE) {
+					truncneeded = 1;
+				} else {
+					truncneeded = 0;
+				}
 #ifdef PRESERVE_BLOCK
 				c->blockno = block;
 #endif /* PRESERVE_BLOCK */
 			}
+			if (truncneeded) {
+				if (ftruncate(c->fd,CHUNKHDRSIZE+(((uint32_t)blocks)<<MFSBLOCKBITS))<0) {
+					hdd_error_occured(c);	// uses and preserves errno !!!
+					mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - ftruncate error",c->filename);
+					hdd_io_end(c);
+					unlink(c->filename);
+					hdd_chunk_delete(c);
+					hdd_io_end(oc);
+					hdd_chunk_release(oc);
+					return MFS_ERROR_IO;	//write error
+				}
+			}
 		} else { // misaligned shrink
+			truncneeded = 0;
 			for (block=0 ; block<blocks-1 ; block++) {
 #ifdef PRESERVE_BLOCK
 				if (oc->blockno==block) {
@@ -3855,12 +4124,49 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				if (oc->blockno!=block) {
 					hdd_stats_read(MFSBLOCKSIZE);
 				}
-				retsize = write(c->fd,c->block,MFSBLOCKSIZE);
+				writeptr = c->block;
 #else /* PRESERVE_BLOCK */
 				hdd_stats_read(MFSBLOCKSIZE);
-				retsize = write(c->fd,blockbuffer,MFSBLOCKSIZE);
+				writeptr = blockbuffer;
 #endif /* PRESERVE_BLOCK */
-				if (retsize!=MFSBLOCKSIZE) {
+				if (sp) {
+					// sparsify
+					p = writeptr;
+					e = p+MFSBLOCKSIZE;
+					while (p<e && (*p)==0) {
+						p++;
+					}
+					if (p==e) {
+						nzstart = nzend = 0;
+					} else {
+						e--;
+						while (p<=e && (*e)==0) {
+							e--;
+						}
+						e++;
+						nzstart = (p - writeptr);
+						nzend = (e - writeptr);
+						nzstart &= UINT32_C(0xFFFFFE00); // floor(nzstart/512)*512
+						nzend = (nzend+511) & UINT32_C(0xFFFFFE00); // ceil(nzend/512)*512
+					}
+				} else {
+					nzstart = 0;
+					nzend = MFSBLOCKSIZE;
+				}
+				if (nzend==nzstart) {
+					retsize = 0;
+					nzstart = nzend = 0;
+				} else if (nzstart>0 || truncneeded) {
+#ifdef USE_PIO
+					retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
+#else
+					lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
+					retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
+#endif
+				} else {
+					retsize = write(c->fd,writeptr,nzend-nzstart);
+				}
+				if (retsize!=(int32_t)(nzend-nzstart)) {
 					hdd_error_occured(c);	// uses and preserves errno !!!
 					mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - data write error",c->filename);
 					hdd_io_end(c);
@@ -3870,7 +4176,12 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 					hdd_chunk_release(oc);
 					return MFS_ERROR_IO;	//write error
 				}
-				hdd_stats_write(MFSBLOCKSIZE);
+				hdd_stats_write(nzend-nzstart);
+				if (nzend!=MFSBLOCKSIZE) {
+					truncneeded = 1;
+				} else {
+					truncneeded = 0;
+				}
 			}
 			block = blocks-1;
 #ifdef PRESERVE_BLOCK
@@ -3904,13 +4215,53 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				hdd_stats_read(blocksize);
 			}
 			memset(c->block+blocksize,0,MFSBLOCKSIZE-blocksize);
-			retsize = write(c->fd,c->block,MFSBLOCKSIZE);
+			writeptr = c->block;
 #else /* PRESERVE_BLOCK */
 			hdd_stats_read(blocksize);
 			memset(blockbuffer+blocksize,0,MFSBLOCKSIZE-blocksize);
-			retsize = write(c->fd,blockbuffer,MFSBLOCKSIZE);
+			writeptr = blockbuffer;
 #endif /* PRESERVE_BLOCK */
-			if (retsize!=MFSBLOCKSIZE) {
+			if (sp) {
+				// sparsify
+				p = writeptr;
+				e = p+blocksize;
+				while (p<e && (*p)==0) {
+					p++;
+				}
+				if (p==e) {
+					nzstart = nzend = 0;
+				} else {
+					e--;
+					while (p<=e && (*e)==0) {
+						e--;
+					}
+					e++;
+					nzstart = (p - writeptr);
+					nzend = (e - writeptr);
+					nzstart &= UINT32_C(0xFFFFFE00); // floor(nzstart/512)*512
+					nzend = (nzend+511) & UINT32_C(0xFFFFFE00); // ceil(nzend/512)*512
+					if (nzend>blocksize) {
+						nzend = blocksize;
+					}
+				}
+			} else {
+				nzstart = 0;
+				nzend = blocksize;
+			}
+			if (nzend==nzstart) {
+				retsize = 0;
+				nzstart = nzend = 0;
+			} else if (nzstart>0 || truncneeded) {
+#ifdef USE_PIO
+				retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
+#else
+				lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
+				retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
+#endif
+			} else {
+				retsize = write(c->fd,writeptr,nzend-nzstart);
+			}
+			if (retsize!=(int32_t)(nzend-nzstart)) {
 				hdd_error_occured(c);	// uses and preserves errno !!!
 				mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - data write error",c->filename);
 				hdd_io_end(c);
@@ -3918,9 +4269,14 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				hdd_chunk_delete(c);
 				hdd_io_end(oc);
 				hdd_chunk_release(oc);
-				return MFS_ERROR_IO;
+				return MFS_ERROR_IO;	//write error
 			}
-			hdd_stats_write(MFSBLOCKSIZE);
+			hdd_stats_write(nzend-nzstart);
+			if (nzend!=MFSBLOCKSIZE) {
+				truncneeded = 1;
+			} else {
+				truncneeded = 0;
+			}
 			ptr = hdrbuffer+CHUNKHDRCRC+4*(blocks-1);
 #ifdef PRESERVE_BLOCK
 			crc = mycrc32_zeroexpanded(0,c->block,blocksize,MFSBLOCKSIZE-blocksize);
@@ -3931,6 +4287,18 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 #ifdef PRESERVE_BLOCK
 			c->blockno = block;
 #endif /* PRESERVE_BLOCK */
+			if (truncneeded) {
+				if (ftruncate(c->fd,CHUNKHDRSIZE+(((uint32_t)blocks)<<MFSBLOCKBITS))<0) {
+					hdd_error_occured(c);	// uses and preserves errno !!!
+					mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - ftruncate error",c->filename);
+					hdd_io_end(c);
+					unlink(c->filename);
+					hdd_chunk_delete(c);
+					hdd_io_end(oc);
+					hdd_chunk_release(oc);
+					return MFS_ERROR_IO;	//write error
+				}
+			}
 		}
 	}
 // and now write header
@@ -4114,6 +4482,11 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 	int new_fd;
 	chunk *c;
 	uint64_t ts,te;
+	const uint8_t *writeptr;
+	const uint8_t *p,*e;
+	uint8_t sp;
+	uint32_t nzstart,nzend;
+	uint8_t truncneeded;
 #ifdef PRESERVE_BLOCK
 	uint8_t hdrbuffer[CHUNKHDRSIZE];
 #else /* PRESERVE_BLOCK */
@@ -4135,6 +4508,13 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 		zassert(pthread_setspecific(hdrbufferkey,hdrbuffer));
 	}
 #endif /* PRESERVE_BLOCK */
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	sp = __sync_or_and_fetch(&Sparsification,0);
+#else
+	pthread_mutex_lock(&cfglock);
+	sp = Sparsification;
+	pthread_mutex_unlock(&cfglock);
+#endif
 
 	c = hdd_random_chunk(fsrc);
 	if (c==NULL) {
@@ -4185,6 +4565,7 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 	hdd_stats_write(CHUNKHDRSIZE);
 	lseek(c->fd,CHUNKHDRSIZE,SEEK_SET);
 	rptr = c->crc;
+	truncneeded = 0;
 	for (block=0 ; block<c->blocks ; block++) {
 		ts = monotonic_nseconds();
 #ifdef PRESERVE_BLOCK
@@ -4194,7 +4575,6 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 #endif /* PRESERVE_BLOCK */
 		error = errno;
 		te = monotonic_nseconds();
-		hdd_stats_dataread(fsrc,MFSBLOCKSIZE,te-ts);
 		if (retsize!=MFSBLOCKSIZE) {
 			errno = error;
 			hdd_error_occured(c);	// uses and preserves errno !!!
@@ -4207,6 +4587,7 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 			free(tmp_filename);
 			return MFS_ERROR_IO;
 		}
+		hdd_stats_dataread(fsrc,MFSBLOCKSIZE,te-ts);
 		hdd_stats_read(MFSBLOCKSIZE);
 #ifdef PRESERVE_BLOCK
 		c->blockno = block;
@@ -4227,15 +4608,51 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 			free(tmp_filename);
 			return MFS_ERROR_CRC;
 		}
-		ts = monotonic_nseconds();
 #ifdef PRESERVE_BLOCK
-		retsize = write(new_fd,c->block,MFSBLOCKSIZE);
+		writeptr = c->block;
 #else /* PRESERVE_BLOCK */
-		retsize = write(new_fd,blockbuffer,MFSBLOCKSIZE);
+		writeptr = blockbuffer;
 #endif /* PRESERVE_BLOCK */
+		if (sp) {
+			// sparsify
+			p = writeptr;
+			e = p+MFSBLOCKSIZE;
+			while (p<e && (*p)==0) {
+				p++;
+			}
+			if (p==e) {
+				nzstart = nzend = 0;
+			} else {
+				e--;
+				while (p<=e && (*e)==0) {
+					e--;
+				}
+				e++;
+				nzstart = (p - writeptr);
+				nzend = (e - writeptr);
+				nzstart &= UINT32_C(0xFFFFFE00); // floor(nzstart/512)*512
+				nzend = (nzend+511) & UINT32_C(0xFFFFFE00); // ceil(nzend/512)*512
+			}
+		} else {
+			nzstart = 0;
+			nzend = MFSBLOCKSIZE;
+		}
+		ts = monotonic_nseconds();
+		if (nzend==nzstart) {
+			retsize = 0;
+			nzstart = nzend = 0;
+		} else if (nzstart>0 || truncneeded) {
+#ifdef USE_PIO
+			retsize = pwrite(new_fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
+#else
+			lseek(new_fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
+			retsize = write(new_fd,writeptr+nzstart,nzend-nzstart);
+#endif
+		} else {
+			retsize = write(new_fd,writeptr,nzend-nzstart);
+		}
 		te = monotonic_nseconds();
-		hdd_stats_datawrite(fdst,MFSBLOCKSIZE,te-ts);
-		if (retsize!=MFSBLOCKSIZE) {
+		if (retsize!=(int32_t)(nzend-nzstart)) {
 			mfs_arg_errlog_silent(LOG_WARNING,"move_chunk: file:%s - data write error",tmp_filename);
 			close(new_fd);
 			unlink(tmp_filename);
@@ -4244,7 +4661,24 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 			free(tmp_filename);
 			return MFS_ERROR_IO;	//write error
 		}
-		hdd_stats_write(MFSBLOCKSIZE);
+		hdd_stats_datawrite(fdst,nzend-nzstart,te-ts);
+		hdd_stats_write(nzend-nzstart);
+		if (nzend!=MFSBLOCKSIZE) {
+			truncneeded = 1;
+		} else {
+			truncneeded = 0;
+		}
+	}
+	if (truncneeded) {
+		if (ftruncate(new_fd,CHUNKHDRSIZE+(((uint32_t)c->blocks)<<MFSBLOCKBITS))<0) {
+			mfs_arg_errlog_silent(LOG_WARNING,"move_chunk: file:%s - ftruncate error",c->filename);
+			close(new_fd);
+			unlink(tmp_filename);
+			hdd_io_end(c);
+			hdd_chunk_release(c);
+			free(tmp_filename);
+			return MFS_ERROR_IO;	//write error
+		}
 	}
 	status = hdd_io_end(c);
 	if (status!=MFS_STATUS_OK) {
@@ -5896,6 +6330,7 @@ void hdd_info(void) {
 
 void hdd_reload(void) {
 	char *LeaveFreeStr;
+	uint8_t sp;
 
 	zassert(pthread_mutex_lock(&folderlock));
 	HDDErrorCount = cfg_getuint32("HDD_ERROR_TOLERANCE_COUNT",2);
@@ -5934,6 +6369,19 @@ void hdd_reload(void) {
 	if (LeaveFree<0x4000000) {
 		syslog(LOG_NOTICE,"hdd space manager: HDD_LEAVE_SPACE_DEFAULT < chunk size - leaving so small space on hdd is not recommended");
 	}
+
+	sp = cfg_getuint8("HDD_SPARSIFY_ON_WRITE",1);
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	if (sp) {
+		__sync_or_and_fetch(&Sparsification,1);
+	} else {
+		__sync_and_and_fetch(&Sparsification,0);
+	}
+#else
+	pthread_mutex_lock(&cfglock);
+	Sparsification = sp?1:0;
+	pthread_mutex_unlock(&cfglock);
+#endif
 
 	syslog(LOG_NOTICE,"reloading hdd data ...");
 	hdd_folders_reinit();
@@ -6019,6 +6467,7 @@ int hdd_init(void) {
 	if (HDDRebalancePerc>100) {
 		HDDRebalancePerc=100;
 	}
+	Sparsification = cfg_getuint8("HDD_SPARSIFY_ON_WRITE",1);
 
 	main_reload_register(hdd_reload);
 	main_time_register(60,0,hdd_diskinfo_movestats);

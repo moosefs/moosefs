@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.75-1 (WIP)
 
   - (all) fixed cppcheck warnings/errors (mostly false negatives)
+  - (cs) added file sparsification during chunk write (also chunk replication, chunk duplication etc.)
 
 * MooseFS 3.0.74-1 (2016-03-08)
 

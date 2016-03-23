@@ -2,8 +2,10 @@ moosefs (3.0.75-1) unstable; urgency=medium
 
   * (all) This is 'work in progress' version !!!
   * (all) fixed cppcheck warnings/errors (mostly false negatives)
+  * (cs) added file sparsification during chunk write (also chunk replication,
+    chunk duplication etc.)
 
- -- MooseFS Team <contact@moosefs.com>  Thu, 10 Mar 2016 10:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Wed, 23 Mar 2016 07:00:00 +0100
 
 moosefs (3.0.74-1) unstable; urgency=medium
 

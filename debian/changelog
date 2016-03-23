@@ -4,6 +4,7 @@ moosefs (3.0.75-1) unstable; urgency=medium
   * (all) fixed cppcheck warnings/errors (mostly false negatives)
   * (cs) added file sparsification during chunk write (also chunk replication,
     chunk duplication etc.)
+  * (mount) fixed write data inefficiency when I/O was performed by root
 
  -- MooseFS Team <contact@moosefs.com>  Wed, 23 Mar 2016 07:00:00 +0100
 

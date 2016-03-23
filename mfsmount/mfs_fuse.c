@@ -4501,7 +4501,12 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 		return;
 	}
 	(void)position;
-	if (full_permissions) {
+	if (xattr_cache_on) { // check chache before getting groups
+		xattr_value_release = xattr_cache_get(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,&buff,&leng,&status);
+	} else {
+		xattr_value_release = NULL;
+	}
+	if (full_permissions && xattr_value_release==NULL) { // and get groups only if data were not found in cache
 		if (strcmp(name,"com.apple.quarantine")==0) { // special case - obtaining groups from the kernel here leads to freeze, so avoid it
 			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,1);
 		} else {
@@ -4510,9 +4515,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	} else {
 		gids = NULL;
 	}
-	xattr_value_release = NULL;
 	if (xattr_cache_on) {
-		xattr_value_release = xattr_cache_get(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,&buff,&leng,&status);
 		if (xattr_value_release==NULL) {
 			if (usedircache && dcache_getattr(&ctx,ino,attr) && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
 				status = MFS_ERROR_ENOATTR;
@@ -4520,14 +4523,14 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 				leng = 0;
 			} else {
 				if (aclxattr) {
-					if (full_permissions && gids!=NULL) { // gids!=NULL - only for clang static code analyzer
+					if (gids!=NULL) { // full_permissions
 						status = mfs_getacl(req,ino,0,ctx.uid,gids->gidcnt,gids->gidtab,aclxattr,&buff,&leng);
 					} else {
 						uint32_t gidtmp = ctx.gid;
 						status = mfs_getacl(req,ino,0,ctx.uid,1,&gidtmp,aclxattr,&buff,&leng);
 					}
 				} else {
-					if (full_permissions && gids!=NULL) { // gids!=NULL - only for clang static code analyzer
+					if (gids!=NULL) { // full_permissions
 						status = fs_getxattr(ino,0,ctx.uid,gids->gidcnt,gids->gidtab,nleng,(const uint8_t*)name,MFS_XATTR_GETA_DATA,&buff,&leng);
 					} else {
 						uint32_t gidtmp = ctx.gid;
@@ -4546,14 +4549,14 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 			leng = 0;
 		} else {
 			if (aclxattr) {
-				if (full_permissions && gids!=NULL) { // gids!=NULL - only for clang static code analyzer
+				if (gids!=NULL) { // full_permissions
 					status = mfs_getacl(req,ino,0,ctx.uid,gids->gidcnt,gids->gidtab,aclxattr,&buff,&leng);
 				} else {
 					uint32_t gidtmp = ctx.gid;
 					status = mfs_getacl(req,ino,0,ctx.uid,1,&gidtmp,aclxattr,&buff,&leng);
 				}
 			} else {
-				if (full_permissions && gids!=NULL) { // gids!=NULL - only for clang static code analyzer
+				if (gids!=NULL) { // full_permissions
 					status = fs_getxattr(ino,0,ctx.uid,gids->gidcnt,gids->gidtab,nleng,(const uint8_t*)name,mode,&buff,&leng);
 				} else {
 					uint32_t gidtmp = ctx.gid;
@@ -4562,7 +4565,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 			}
 		}
 	}
-	if (full_permissions) {
+	if (gids!=NULL) {
 		groups_rel(gids);
 	}
 	status = mfs_errorconv(status);

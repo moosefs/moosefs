@@ -845,6 +845,8 @@ int open_master_conn(const char *name,uint32_t *inode,mode_t *mode,uint64_t *len
 							printf("%s: can't create connection socket: %s\n",name,strerr(errno));
 							return -1;
 						}
+						tcpreuseaddr(sd);
+						tcpnumbind(sd,0,0);
 						if (tcpnumtoconnect(sd,masterip,masterport,(cnt%2)?(300*(1<<(cnt>>1))):(200*(1<<(cnt>>1))))<0) {
 							cnt++;
 							if (cnt==10) {
@@ -856,6 +858,7 @@ int open_master_conn(const char *name,uint32_t *inode,mode_t *mode,uint64_t *len
 							cnt=10;
 						}
 					}
+					tcpnodelay(sd);
 					if (master_register(sd,mastercuid)<0) {
 						printf("%s: can't register to master (.masterinfo)\n",name);
 						return -1;

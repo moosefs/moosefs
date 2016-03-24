@@ -1135,6 +1135,7 @@ int main(int argc,char **argv) {
 	uint32_t locktimeout;
 	int fd;
 	uint8_t movewarning;
+	uint8_t userconfig;
 	struct rlimit rls;
 
 	strerr_init();
@@ -1157,10 +1158,11 @@ int main(int argc,char **argv) {
 	}
 	locktimeout = 1800;
 	rundaemon = 1;
-	runmode = RM_RESTART;
+	runmode = RM_START;
 	logundefined = 0;
 	lockmemory = 0;
 	forcecoredump = 1;
+	userconfig = 0;
 	appname = argv[0];
 
 	while ((ch = getopt(argc, argv, "nuvfdc:t:h?" MODULE_OPTIONS_GETOPT)) != -1) {
@@ -1182,6 +1184,7 @@ int main(int argc,char **argv) {
 				cfgfile = strdup(optarg);
 				passert(cfgfile);
 				movewarning = 0;
+				userconfig = 1;
 				break;
 			case 'u':
 				logundefined=1;
@@ -1236,6 +1239,13 @@ int main(int argc,char **argv) {
 	}
 
 	if (cfg_load(cfgfile,logundefined)==0) {
+		if (userconfig) {
+			if (rundaemon) {
+				fputc(0,stderr);
+				close_msg_channel();
+			}
+			return 1;
+		}
 		fprintf(stderr,"can't load config file: %s - using defaults\n",cfgfile);
 	}
 	free(cfgfile);

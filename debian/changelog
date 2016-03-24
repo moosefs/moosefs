@@ -8,8 +8,10 @@ moosefs (3.0.75-1) unstable; urgency=medium
   * (master) fixed removing too early locked chunks from data structures
   * (tools) fixed reusing local ports (connection to master returned
     EADDRNOTAVAIL)
+  * (all) changed default action from restart to start
+  * (all) added exiting when user defined config (option -c) cannot be loaded
 
- -- MooseFS Team <contact@moosefs.com>  Thu, 24 Mar 2016 11:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Thu, 24 Mar 2016 12:00:00 +0100
 
 moosefs (3.0.74-1) unstable; urgency=medium
 

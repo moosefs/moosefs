@@ -7,6 +7,8 @@ This file lists noteworthy changes in MooseFS.
   - (mount) fixed write data inefficiency when I/O was performed by root
   - (master) fixed removing too early locked chunks from data structures
   - (tools) fixed reusing local ports (connection to master returned EADDRNOTAVAIL)
+  - (all) changed default action from restart to start
+  - (all) added exiting when user defined config (option -c) cannot be loaded
 
 * MooseFS 3.0.74-1 (2016-03-08)
 

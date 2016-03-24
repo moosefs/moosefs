@@ -5,6 +5,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) fixed cppcheck warnings/errors (mostly false negatives)
   - (cs) added file sparsification during chunk write (also chunk replication, chunk duplication etc.)
   - (mount) fixed write data inefficiency when I/O was performed by root
+  - (master) fixed removing too early locked chunks from data structures
 
 * MooseFS 3.0.74-1 (2016-03-08)
 

@@ -1026,7 +1026,7 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 	if (disc==0) {
 		return 0;
 	}
-	if (c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
+	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
 		changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 		chunk_delete(c);
 		return 1;
@@ -2048,7 +2048,7 @@ int chunk_mr_nextchunkid(uint64_t nchunkid) {
 	}
 }
 
-int chunk_mr_chunkadd(uint64_t chunkid,uint32_t version,uint32_t lockedto) {
+int chunk_mr_chunkadd(uint32_t ts,uint64_t chunkid,uint32_t version,uint32_t lockedto) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c) {
@@ -2060,6 +2060,9 @@ int chunk_mr_chunkadd(uint64_t chunkid,uint32_t version,uint32_t lockedto) {
 	if (chunkid>=nextchunkid) {
 		nextchunkid=chunkid+1;
 	}
+	if (lockedto<ts) {
+		return MFS_ERROR_MISMATCH;
+	}
 	c = chunk_new(chunkid);
 	c->version = version;
 	c->lockedto = lockedto;
@@ -2067,7 +2070,7 @@ int chunk_mr_chunkadd(uint64_t chunkid,uint32_t version,uint32_t lockedto) {
 	return MFS_STATUS_OK;
 }
 
-int chunk_mr_chunkdel(uint64_t chunkid,uint32_t version) {
+int chunk_mr_chunkdel(uint32_t ts,uint64_t chunkid,uint32_t version) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
@@ -2081,6 +2084,9 @@ int chunk_mr_chunkdel(uint64_t chunkid,uint32_t version) {
 	}
 	if (c->slisthead!=NULL) {
 		return MFS_ERROR_CHUNKBUSY;
+	}
+	if (c->lockedto>=ts) {
+		return MFS_ERROR_LOCKED;
 	}
 	chunk_delete(c);
 	meta_version_inc();
@@ -2112,7 +2118,11 @@ static inline void chunk_mfr_state_check(chunk *c) {
 void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 	chunk *c;
 	slist *s;
-
+#ifndef MFSDEBUG
+	static uint32_t loglastts = 0;
+	static uint32_t ilogcount = 0;
+	static uint32_t clogcount = 0;
+#endif
 	cstab[csid].newchunkdelay = NEWCHUNKDELAY;
 	csreceivingchunks |= 2;
 
@@ -2124,11 +2134,36 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 	}
 
 	if (c==NULL) {
+#ifndef MFSDEBUG
+		if (loglastts+60<main_time()) {
+			ilogcount=0;
+			clogcount=0;
+			loglastts = main_time();
+		}
+#endif
 		if (chunkid>nextchunkid+UINT64_C(1000000000)) {
-			syslog(LOG_WARNING,"chunkserver has nonexistent chunk (%016"PRIX64"_%08"PRIX32"), id looks wrong - just ignore it",chunkid,(version&0x7FFFFFFF));
+#ifndef MFSDEBUG
+			if (ilogcount<10) {
+#endif
+				syslog(LOG_WARNING,"chunkserver (%s) has nonexistent chunk (%016"PRIX64"_%08"PRIX32"), id looks wrong - just ignore it",matocsserv_getstrip(cstab[csid].ptr),chunkid,(version&0x7FFFFFFF));
+#ifndef MFSDEBUG
+			} else if (ilogcount==10) {
+				syslog(LOG_WARNING,"there are more nonexistent chunks to ignore - stop logging");
+			}
+			ilogcount++;
+#endif
 			return;
 		}
-		syslog(LOG_WARNING,"chunkserver has nonexistent chunk (%016"PRIX64"_%08"PRIX32"), so create it for future deletion",chunkid,(version&0x7FFFFFFF));
+#ifndef MFSDEBUG
+		if (clogcount<10) {
+#endif
+			syslog(LOG_WARNING,"chunkserver (%s) has nonexistent chunk (%016"PRIX64"_%08"PRIX32"), so create it for future deletion",matocsserv_getstrip(cstab[csid].ptr),chunkid,(version&0x7FFFFFFF));
+#ifndef MFSDEBUG
+		} else if (clogcount==10) {
+			syslog(LOG_WARNING,"there are more nonexistent chunks to create - stop logging");
+		}
+		clogcount++;
+#endif
 		if (chunkid>=nextchunkid) {
 			nextchunkid=chunkid+1;
 //			changelog("%"PRIu32"|NEXTCHUNKID(%"PRIu64")",main_time(),nextchunkid);
@@ -2259,7 +2294,7 @@ void chunk_lost(uint16_t csid,uint64_t chunkid) {
 			sptr = &(s->next);
 		}
 	}
-	if (c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
+	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
 		changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 		chunk_delete(c);
 	} else {
@@ -2454,7 +2489,7 @@ void chunk_got_delete_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
 			st = &(s->next);
 		}
 	}
-	if (c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
+	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
 		changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 		chunk_delete(c);
 	}
@@ -3770,7 +3805,7 @@ void chunk_jobs_main(void) {
 			c = chunkhashtab[jobshpos>>HASHTAB_LOBITS][jobshpos&HASHTAB_MASK];
 			while (c) {
 				cn = c->next;
-				if (c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
+				if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
 					changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 					chunk_delete(c);
 				} else {

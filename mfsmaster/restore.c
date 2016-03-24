@@ -394,7 +394,6 @@ int do_csdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 int do_chunkadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint64_t chunkid;
 	uint32_t version,lockedto;
-	(void)ts;
 	EAT(ptr,filename,lv,'(');
 	GETU64(chunkid,ptr);
 	EAT(ptr,filename,lv,',');
@@ -402,7 +401,7 @@ int do_chunkadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(lockedto,ptr);
 	EAT(ptr,filename,lv,')');
-	return chunk_mr_chunkadd(chunkid,version,lockedto);
+	return chunk_mr_chunkadd(ts,chunkid,version,lockedto);
 }
 
 int do_chunkdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -414,7 +413,7 @@ int do_chunkdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(version,ptr);
 	EAT(ptr,filename,lv,')');
-	return chunk_mr_chunkdel(chunkid,version);
+	return chunk_mr_chunkdel(ts,chunkid,version);
 }
 
 int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

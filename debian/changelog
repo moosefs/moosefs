@@ -5,8 +5,9 @@ moosefs (3.0.75-1) unstable; urgency=medium
   * (cs) added file sparsification during chunk write (also chunk replication,
     chunk duplication etc.)
   * (mount) fixed write data inefficiency when I/O was performed by root
+  * (master) fixed removing too early locked chunks from data structures
 
- -- MooseFS Team <contact@moosefs.com>  Wed, 23 Mar 2016 07:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Thu, 24 Mar 2016 10:00:00 +0100
 
 moosefs (3.0.74-1) unstable; urgency=medium
 

@@ -47,8 +47,8 @@ int chunk_mr_increase_version(uint64_t chunkid);
 int chunk_mr_set_version(uint64_t chunkid,uint32_t version);
 
 int chunk_mr_nextchunkid(uint64_t nchunkid);
-int chunk_mr_chunkadd(uint64_t chunkid,uint32_t version,uint32_t lockedto);
-int chunk_mr_chunkdel(uint64_t chunkid,uint32_t version);
+int chunk_mr_chunkadd(uint32_t ts,uint64_t chunkid,uint32_t version,uint32_t lockedto);
+int chunk_mr_chunkdel(uint32_t ts,uint64_t chunkid,uint32_t version);
 
 // void chunk_text_dump(FILE *fd);
 

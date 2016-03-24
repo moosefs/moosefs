@@ -80,65 +80,65 @@
 
 #define TRASH_BUCKETS 4096
 
-#define MFS_STATUS_OK              0	// OK
+#define MFS_STATUS_OK              0    // OK
 
-#define MFS_ERROR_EPERM            1	// Operation not permitted
-#define MFS_ERROR_ENOTDIR          2	// Not a directory
-#define MFS_ERROR_ENOENT           3	// No such file or directory
-#define MFS_ERROR_EACCES           4	// Permission denied
-#define MFS_ERROR_EEXIST           5	// File exists
-#define MFS_ERROR_EINVAL           6	// Invalid argument
-#define MFS_ERROR_ENOTEMPTY        7	// Directory not empty
-#define MFS_ERROR_CHUNKLOST        8	// Chunk lost
-#define MFS_ERROR_OUTOFMEMORY      9	// Out of memory
+#define MFS_ERROR_EPERM            1    // Operation not permitted
+#define MFS_ERROR_ENOTDIR          2    // Not a directory
+#define MFS_ERROR_ENOENT           3    // No such file or directory
+#define MFS_ERROR_EACCES           4    // Permission denied
+#define MFS_ERROR_EEXIST           5    // File exists
+#define MFS_ERROR_EINVAL           6    // Invalid argument
+#define MFS_ERROR_ENOTEMPTY        7    // Directory not empty
+#define MFS_ERROR_CHUNKLOST        8    // Chunk lost
+#define MFS_ERROR_OUTOFMEMORY      9    // Out of memory
 
-#define MFS_ERROR_INDEXTOOBIG     10	// Index too big
-#define MFS_ERROR_LOCKED          11	// Chunk locked
-#define MFS_ERROR_NOCHUNKSERVERS  12	// No chunk servers
-#define MFS_ERROR_NOCHUNK         13	// No such chunk
-#define MFS_ERROR_CHUNKBUSY	      14	// Chunk is busy
-#define MFS_ERROR_REGISTER        15	// Incorrect register BLOB
-#define MFS_ERROR_NOTDONE         16	// None of chunk servers performed requested operation
-#define MFS_ERROR_NOTOPENED       17	// File not opened
-#define MFS_ERROR_NOTSTARTED      18	// Write not started
+#define MFS_ERROR_INDEXTOOBIG     10    // Index too big
+#define MFS_ERROR_LOCKED          11    // Chunk locked
+#define MFS_ERROR_NOCHUNKSERVERS  12    // No chunk servers
+#define MFS_ERROR_NOCHUNK         13    // No such chunk
+#define MFS_ERROR_CHUNKBUSY       14    // Chunk is busy
+#define MFS_ERROR_REGISTER        15    // Incorrect register BLOB
+#define MFS_ERROR_NOTDONE         16    // Operation not completed
+#define MFS_ERROR_NOTOPENED       17    // File not opened
+#define MFS_ERROR_NOTSTARTED      18    // Write not started
 
-#define MFS_ERROR_WRONGVERSION    19	// Wrong chunk version
-#define MFS_ERROR_CHUNKEXIST      20	// Chunk already exists
-#define MFS_ERROR_NOSPACE         21	// No space left
-#define MFS_ERROR_IO              22	// IO error
-#define MFS_ERROR_BNUMTOOBIG      23	// Incorrect block number
-#define MFS_ERROR_WRONGSIZE	      24	// Incorrect size
-#define MFS_ERROR_WRONGOFFSET     25	// Incorrect offset
-#define MFS_ERROR_CANTCONNECT     26	// Can't connect
-#define MFS_ERROR_WRONGCHUNKID    27	// Incorrect chunk id
-#define MFS_ERROR_DISCONNECTED    28	// Disconnected
-#define MFS_ERROR_CRC             29	// CRC error
-#define MFS_ERROR_DELAYED         30	// Operation delayed
-#define MFS_ERROR_CANTCREATEPATH  31	// Can't create path
+#define MFS_ERROR_WRONGVERSION    19    // Wrong chunk version
+#define MFS_ERROR_CHUNKEXIST      20    // Chunk already exists
+#define MFS_ERROR_NOSPACE         21    // No space left
+#define MFS_ERROR_IO              22    // IO error
+#define MFS_ERROR_BNUMTOOBIG      23    // Incorrect block number
+#define MFS_ERROR_WRONGSIZE       24    // Incorrect size
+#define MFS_ERROR_WRONGOFFSET     25    // Incorrect offset
+#define MFS_ERROR_CANTCONNECT     26    // Can't connect
+#define MFS_ERROR_WRONGCHUNKID    27    // Incorrect chunk id
+#define MFS_ERROR_DISCONNECTED    28    // Disconnected
+#define MFS_ERROR_CRC             29    // CRC error
+#define MFS_ERROR_DELAYED         30    // Operation delayed
+#define MFS_ERROR_CANTCREATEPATH  31    // Can't create path
 
-#define MFS_ERROR_MISMATCH        32	// Data mismatch
+#define MFS_ERROR_MISMATCH        32    // Data mismatch
 
-#define MFS_ERROR_EROFS           33	// Read-only file system
-#define MFS_ERROR_QUOTA           34	// Quota exceeded
-#define MFS_ERROR_BADSESSIONID    35	// Bad session id
-#define MFS_ERROR_NOPASSWORD      36        // Password is needed
-#define MFS_ERROR_BADPASSWORD     37        // Incorrect password
+#define MFS_ERROR_EROFS           33    // Read-only file system
+#define MFS_ERROR_QUOTA           34    // Quota exceeded
+#define MFS_ERROR_BADSESSIONID    35    // Bad session id
+#define MFS_ERROR_NOPASSWORD      36    // Password is needed
+#define MFS_ERROR_BADPASSWORD     37    // Incorrect password
 
-#define MFS_ERROR_ENOATTR         38        // Attribute not found
-#define MFS_ERROR_ENOTSUP         39        // Operation not supported
-#define MFS_ERROR_ERANGE          40        // Result too large
+#define MFS_ERROR_ENOATTR         38    // Attribute not found
+#define MFS_ERROR_ENOTSUP         39    // Operation not supported
+#define MFS_ERROR_ERANGE          40    // Result too large
 
-#define MFS_ERROR_NOTFOUND        41        // Entity not found
-#define MFS_ERROR_ACTIVE          42        // Entity is active
+#define MFS_ERROR_NOTFOUND        41    // Entity not found
+#define MFS_ERROR_ACTIVE          42    // Entity is active
 
-#define MFS_ERROR_CSNOTPRESENT    43        // Chunkserver not present
+#define MFS_ERROR_CSNOTPRESENT    43    // Chunkserver not present
 
-#define MFS_ERROR_WAITING         44        // Waiting on lock
-#define MFS_ERROR_EAGAIN          45        // Resource temporarily unavailable
-#define MFS_ERROR_EINTR           46        // Interrupted system call
-#define MFS_ERROR_ECANCELED       47        // Operation canceled
+#define MFS_ERROR_WAITING         44    // Waiting on lock
+#define MFS_ERROR_EAGAIN          45    // Resource temporarily unavailable
+#define MFS_ERROR_EINTR           46    // Interrupted system call
+#define MFS_ERROR_ECANCELED       47    // Operation canceled
 
-#define MFS_ERROR_ENOENT_NOCACHE  48	// No such file or directory (do not store in cache)
+#define MFS_ERROR_ENOENT_NOCACHE  48   // No such file or directory (do not store in cache)
 
 #define MFS_ERROR_MAX             49
 
@@ -159,7 +159,7 @@
 	"No such chunk", \
 	"Chunk is busy", \
 	"Incorrect register BLOB", \
-	"None of chunk servers performed requested operation", \
+	"Operation not completed", \
 	"File not opened", \
 	"Write not started", \
 	"Wrong chunk version", \

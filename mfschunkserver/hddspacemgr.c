@@ -109,6 +109,10 @@
 
 #define CHUNKLOCKED ((void*)1)
 
+#define MODE_EXISTING 0
+#define MODE_IGNVERS 1
+#define MODE_NEW 2
+
 typedef struct damagedchunk {
 	uint64_t chunkid;
 	struct damagedchunk *next;
@@ -1958,7 +1962,7 @@ static inline void chunk_emptycrc(chunk *c) {
 	memset(c->crc,0,4096);	// make valgrind happy
 }
 
-static inline int chunk_readcrc(chunk *c) {
+static inline int chunk_readcrc(chunk *c,int mode) {
 	int ret;
 	uint8_t hdr[20];
 	const uint8_t *ptr;
@@ -1992,6 +1996,9 @@ static inline int chunk_readcrc(chunk *c) {
 	ptr = hdr+8;
 	chunkid = get64bit(&ptr);
 	version = get32bit(&ptr);
+	if (mode==MODE_IGNVERS) { // file name has new version, but header still old one - just ignore it
+		version = c->version;
+	}
 	if (c->chunkid!=chunkid || c->version!=version) {
 		hdd_generate_filename(fname,c);
 		syslog(LOG_WARNING,"chunk_readcrc: file:%s - wrong id/version in header (%016"PRIX64"_%08"PRIX32")",fname,chunkid,version);
@@ -2283,7 +2290,7 @@ void hdd_delayed_ops() {
 //	printf("delayed ops: after unlock\n");
 }
 
-static int hdd_io_begin(chunk *c,int newflag) {
+static int hdd_io_begin(chunk *c,int mode) {
 	dopchunk *cc;
 	char fname[PATH_MAX];
 	int status;
@@ -2302,7 +2309,7 @@ static int hdd_io_begin(chunk *c,int newflag) {
 #endif /* PRESERVE_BLOCK */
 		if (c->fd<0) {
 			hdd_open_files_handle(OF_BEFORE_OPEN);
-			if (newflag) {
+			if (mode==MODE_NEW) {
 				c->fd = open(fname,O_RDWR | O_TRUNC | O_CREAT,0666);
 			} else {
 				if (c->todel<2) {
@@ -2321,10 +2328,10 @@ static int hdd_io_begin(chunk *c,int newflag) {
 			c->fsyncneeded = 0;
 		}
 		if (c->crc==NULL) {
-			if (newflag) {
+			if (mode==MODE_NEW) {
 				chunk_emptycrc(c);
 			} else {
-				status = chunk_readcrc(c);
+				status = chunk_readcrc(c,mode);
 				if (status!=MFS_STATUS_OK) {
 					int errmem = errno;
 					if (add) {
@@ -2411,7 +2418,7 @@ int hdd_open(uint64_t chunkid,uint32_t version) {
 		hdd_chunk_release(c);
 		return MFS_ERROR_WRONGVERSION;
 	}
-	status = hdd_io_begin(c,0);
+	status = hdd_io_begin(c,MODE_EXISTING);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_report_damaged_chunk(chunkid);
@@ -2998,7 +3005,7 @@ int hdd_get_checksum(uint64_t chunkid,uint32_t version,uint8_t *checksum_buff) {
 		hdd_chunk_release(c);
 		return MFS_ERROR_WRONGVERSION;
 	}
-	status = hdd_io_begin(c,0);
+	status = hdd_io_begin(c,MODE_EXISTING);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_report_damaged_chunk(chunkid);
@@ -3034,7 +3041,7 @@ int hdd_get_checksum_tab(uint64_t chunkid,uint32_t version,uint8_t *checksum_tab
 		hdd_chunk_release(c);
 		return MFS_ERROR_WRONGVERSION;
 	}
-	status = hdd_io_begin(c,0);
+	status = hdd_io_begin(c,MODE_EXISTING);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_report_damaged_chunk(chunkid);
@@ -3094,7 +3101,7 @@ static int hdd_int_create(uint64_t chunkid,uint32_t version) {
 	}
 #endif /* PRESERVE_BLOCK */
 
-	status = hdd_io_begin(c,1);
+	status = hdd_io_begin(c,MODE_NEW);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_chunk_delete(c);
@@ -3156,7 +3163,7 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version) {
 		hdd_chunk_release(c);
 		return MFS_ERROR_WRONGVERSION;
 	}
-	status = hdd_io_begin(c,0);
+	status = hdd_io_begin(c,MODE_EXISTING);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_chunk_release(c);
@@ -3290,7 +3297,7 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 			hdd_chunk_release(oc);
 			return MFS_ERROR_IO;
 		}
-		status = hdd_io_begin(oc,0);
+		status = hdd_io_begin(oc,MODE_IGNVERS);
 		if (status!=MFS_STATUS_OK) {
 			hdd_error_occured(oc);	// uses and preserves errno !!!
 			if (rename(fname,ofname)>=0) {
@@ -3320,7 +3327,7 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 		}
 		hdd_stats_write(4);
 	} else {
-		status = hdd_io_begin(oc,0);
+		status = hdd_io_begin(oc,MODE_EXISTING);
 		if (status!=MFS_STATUS_OK) {
 			hdd_error_occured(oc);	// uses and preserves errno !!!
 			hdd_chunk_delete(c);
@@ -3329,7 +3336,7 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 			return status;
 		}
 	}
-	status = hdd_io_begin(c,1);
+	status = hdd_io_begin(c,MODE_NEW);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_chunk_delete(c);
@@ -3523,7 +3530,7 @@ static int hdd_int_version(uint64_t chunkid,uint32_t version,uint32_t newversion
 		hdd_chunk_release(c);
 		return MFS_ERROR_IO;
 	}
-	status = hdd_io_begin(c,0);
+	status = hdd_io_begin(c,MODE_IGNVERS);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		if (rename(fname,ofname)>=0) {
@@ -3602,7 +3609,7 @@ static int hdd_int_truncate(uint64_t chunkid,uint32_t version,uint32_t newversio
 		hdd_chunk_release(c);
 		return MFS_ERROR_IO;
 	}
-	status = hdd_io_begin(c,0);
+	status = hdd_io_begin(c,MODE_IGNVERS);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		if (rename(fname,ofname)>=0) {
@@ -3802,7 +3809,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 			hdd_chunk_release(oc);
 			return MFS_ERROR_IO;
 		}
-		status = hdd_io_begin(oc,0);
+		status = hdd_io_begin(oc,MODE_IGNVERS);
 		if (status!=MFS_STATUS_OK) {
 			hdd_error_occured(oc);	// uses and preserves errno !!!
 			if (rename(fname,ofname)>=0) {
@@ -3832,7 +3839,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 		}
 		hdd_stats_write(4);
 	} else {
-		status = hdd_io_begin(oc,0);
+		status = hdd_io_begin(oc,MODE_EXISTING);
 		if (status!=MFS_STATUS_OK) {
 			hdd_error_occured(oc);	// uses and preserves errno !!!
 			hdd_chunk_delete(c);
@@ -3841,7 +3848,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 			return status;
 		}
 	}
-	status = hdd_io_begin(c,1);
+	status = hdd_io_begin(c,MODE_NEW);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_chunk_delete(c);
@@ -5312,7 +5319,6 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 				hdd_generate_filename(fname,c);
 				unlink(fname); // if yes then remove file
 			}
-			c->pathid = pathid;
 			c->version = version;
 			c->blocks = blocks;
 			c->validattr = validattr;
@@ -5320,6 +5326,7 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 //			c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
 			zassert(pthread_mutex_lock(&testlock));
 			hdd_remove_chunk_from_test_chain(c,prevf);
+			c->pathid = pathid;
 			hdd_add_chunk_to_test_chain(c,currf);
 			zassert(pthread_mutex_unlock(&testlock));
 		}

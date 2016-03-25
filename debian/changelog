@@ -10,8 +10,10 @@ moosefs (3.0.75-1) unstable; urgency=medium
     EADDRNOTAVAIL)
   * (all) changed default action from restart to start
   * (all) added exiting when user defined config (option -c) cannot be loaded
+  * (cs) changed handling chunk filename (dynamic filename generation - cs
+    should use less memory)
 
- -- MooseFS Team <contact@moosefs.com>  Thu, 24 Mar 2016 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Fri, 25 Mar 2016 08:00:00 +0100
 
 moosefs (3.0.74-1) unstable; urgency=medium
 

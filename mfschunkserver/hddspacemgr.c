@@ -76,9 +76,9 @@
 #define REBALANCE_DIFF_MAX 0.01
 
 /* system every DELAYEDSTEP seconds searches opened/crc_loaded chunk list for chunks to be closed/free crc */
-#define DELAYEDSTEP 1
+#define DELAYEDUSTEP 100000
 
-#define OPEN_DELAY 5
+#define OPEN_DELAY 0.5
 #define CRC_DELAY 100
 
 #ifdef PRESERVE_BLOCK
@@ -252,6 +252,11 @@ typedef struct folder {
 //	double carry;
 	pthread_t scanthread;
 	struct chunk *testhead,**testtail;
+	uint32_t min_count;
+	uint16_t min_pathid;
+	uint16_t current_pathid;
+	uint32_t subf_count[256];
+	pthread_t maintenance_thread;
 	struct folder *next;
 } folder;
 
@@ -896,14 +901,41 @@ static inline void hdd_remove_chunk_from_test_chain(chunk *c,folder *f) {
 	}
 	c->testnext = NULL;
 	c->testprev = NULL;
+	if (f->subf_count[c->pathid]>0) {
+		f->subf_count[c->pathid]--;
+		if (f->subf_count[c->pathid]<f->min_count) {
+			f->min_count = f->subf_count[c->pathid];
+		}
+	}
 }
 
 // testlock:locked
 static inline void hdd_add_chunk_to_test_chain(chunk *c,folder *f) {
+	uint8_t recalcmin;
+	uint16_t i;
 	c->testnext = NULL;
 	c->testprev = f->testtail;
 	*(c->testprev) = c;
 	f->testtail = &(c->testnext);
+	if (f->subf_count[c->pathid]<=f->min_count) {
+		recalcmin=1;
+	} else {
+		recalcmin=0;
+	}
+	f->subf_count[c->pathid]++;
+	if (recalcmin) {
+		f->min_count = f->subf_count[0];
+		f->min_pathid = 0;
+		for (i=1 ; i<256 ; i++) {
+			if (f->subf_count[i] < f->min_count) {
+				f->min_count = f->subf_count[i];
+				f->min_pathid = i;
+			}
+		}
+	}
+	if (c->pathid==f->current_pathid && f->subf_count[c->pathid]>f->min_count+10000) {
+		f->current_pathid = f->min_pathid;
+	}
 }
 
 // folderlock:locked
@@ -1212,12 +1244,12 @@ static chunk* hdd_chunk_create(folder *f,uint64_t chunkid,uint32_t version) {
 		return NULL;
 	}
 	c->version = version;
-	c->pathid = chunkid&255;
 	c->blocks = 0;
 	c->validattr = 1;
 	f->needrefresh = 1;
 	hdd_add_chunk_to_folder(c,f);
 	zassert(pthread_mutex_lock(&testlock));
+	c->pathid = f->current_pathid;
 	hdd_add_chunk_to_test_chain(c,f);
 	zassert(pthread_mutex_unlock(&testlock));
 	return c;
@@ -2631,6 +2663,7 @@ int hdd_write(uint64_t chunkid,uint32_t version,uint16_t blocknum,const uint8_t 
 	uint32_t crc,bcrc,precrc,postcrc,combinedcrc,chcrc;
 	uint32_t i;
 	uint64_t ts,te;
+	uint8_t truncneeded;
 	char fname[PATH_MAX];
 #ifndef PRESERVE_BLOCK
 	uint8_t *blockbuffer;
@@ -2788,6 +2821,7 @@ int hdd_write(uint64_t chunkid,uint32_t version,uint16_t blocknum,const uint8_t 
 		c->blockno = blocknum;
 #endif /* PRESERVE_BLOCK */
 	} else {
+		truncneeded = 0;
 		if (blocknum<c->blocks) {
 #ifdef PRESERVE_BLOCK
 			if (c->blockno != blocknum) {
@@ -2857,13 +2891,8 @@ int hdd_write(uint64_t chunkid,uint32_t version,uint16_t blocknum,const uint8_t 
 				return MFS_ERROR_CRC;
 			}
 		} else {
-			if (ftruncate(c->fd,CHUNKHDRSIZE+(((uint32_t)(blocknum+1))<<MFSBLOCKBITS))<0) {
-				hdd_error_occured(c);	// uses and preserves errno !!!
-				hdd_generate_filename(fname,c); // preserves errno !!!
-				mfs_arg_errlog_silent(LOG_WARNING,"write_block_to_chunk: file:%s - ftruncate error",fname);
-				hdd_report_damaged_chunk(chunkid);
-				hdd_chunk_release(c);
-				return MFS_ERROR_IO;
+			if (offset+size < MFSBLOCKSIZE) {
+				truncneeded = 1;
 			}
 			wcrcptr = (c->crc)+(4*(c->blocks));
 			for (i=c->blocks ; i<blocknum ; i++) {
@@ -2953,6 +2982,16 @@ int hdd_write(uint64_t chunkid,uint32_t version,uint16_t blocknum,const uint8_t 
 			hdd_report_damaged_chunk(chunkid);
 			hdd_chunk_release(c);
 			return MFS_ERROR_IO;
+		}
+		if (truncneeded) {
+			if (ftruncate(c->fd,CHUNKHDRSIZE+(((uint32_t)(blocknum+1))<<MFSBLOCKBITS))<0) {
+				hdd_error_occured(c);	// uses and preserves errno !!!
+				hdd_generate_filename(fname,c); // preserves errno !!!
+				mfs_arg_errlog_silent(LOG_WARNING,"write_block_to_chunk: file:%s - ftruncate error",fname);
+				hdd_report_damaged_chunk(chunkid);
+				hdd_chunk_release(c);
+				return MFS_ERROR_IO;
+			}
 		}
 	}
 	hdd_chunk_release(c);
@@ -5664,7 +5703,7 @@ void* hdd_delayed_thread(void *arg) {
 			return arg;
 		}
 		zassert(pthread_mutex_unlock(&termlock));
-		sleep(DELAYEDSTEP);
+		portable_usleep(DELAYEDUSTEP);
 	}
 	return arg;
 }
@@ -6242,6 +6281,10 @@ int hdd_parseline(char *hddcfgline) {
 	f->dumpfd = -1;
 	f->testhead = NULL;
 	f->testtail = &(f->testhead);
+	f->min_count = 0;
+	f->min_pathid = 0;
+	f->current_pathid = 0;
+	memset(f->subf_count,0,sizeof(f->subf_count));
 //	f->carry = (double)(random()&0x7FFFFFFF)/(double)(0x7FFFFFFF);
 	f->read_dist = 0;
 	f->write_dist = 0;

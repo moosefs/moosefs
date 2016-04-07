@@ -1,15 +1,17 @@
-.TH mfsnetdump "8" "March 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfsnetdump "8" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
 mfsnetdump \- dump network traffic as mfs packets
 .SH SYNOPSIS
 .B mfsnetdump
 [\fB\-r\fP \fIPCAP_FILE\fP]
 [\fB\-i\fP \fIINTERFACE\fP]
+[\fB\-p\fP \fIPORT_RANGE\fP]
 [\fB\-f\fP \fIPCAP_FILTER\fP]
 [\fB\-c\fP \fIPCOUNT\fP]
 [\fB\-s\fP \fIMBYTES\fP]
 [\fB\-e\fP \fICOMMANDS\fP]
 [\fB\-o\fP \fICOMMANDS\fP]
+[\fB\-x\fP] [\fB\-y\fP] [\fB\-n\fP]
 .PP
 .SH DESCRIPTION
 .PP
@@ -21,6 +23,9 @@ specify PCAP file to read packets from
 .TP
 \fB\-i\fP
 dump packets using given network interface
+.TP
+\fB\-p\fP
+show only packets from given port range (default range is 9419-9422, so by default only MFS packets are shown)
 .TP
 \fB\-f\fP
 define pcap filter to filter packets
@@ -36,6 +41,15 @@ do not display given commands
 .TP
 \fB\-o\fP
 show only given commands
+.TP
+\fB\-x\fP
+do not display mfs maintenance commands (such as CSTOMA_SPACE or CLTOMA_FUSE_TIME_SYNC)
+.TP
+\fB\-y\fP
+do not display open/close connections packets
+.TP
+\fB\-n\fP
+show ANTOAN_NOP command (disabled by default)
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

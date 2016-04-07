@@ -29,9 +29,10 @@
 
 typedef struct _userdata {
 	uint8_t linktype;
-	uint8_t mfsportsonly;
 	uint8_t showmfsnops;
 	uint8_t showconnections;
+	uint16_t minport;
+	uint16_t maxport;
 	uint32_t maxdatainpacket;
 } userdata;
 
@@ -355,10 +356,8 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 	dstip = ((ip[16]*256U+ip[17])*256U+ip[18])*256U+ip[19];
 	srcport = tcp[0]*256U+tcp[1];
 	dstport = tcp[2]*256U+tcp[3];
-	if (ud->mfsportsonly) {
-		if ((srcport < 9419 || srcport > 9422) && (dstport < 9419 || dstport > 9422)) {
-			return; // not standard mfs port
-		}
+	if ((srcport < ud->minport || srcport > ud->maxport) && (dstport < ud->minport || dstport > ud->maxport)) {
+		return; // not standard mfs port
 	}
 	seqno = ((tcp[4]*256U+tcp[5])*256U+tcp[6])*256U+tcp[7];
 	cp = packet_find(srcip,srcport,dstip,dstport);
@@ -476,7 +475,7 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 }
 
 void usage(const char *appname) {
-	fprintf(stderr,"usage: %s [-xym] [-r pcap_file] [-i interface] [-f pcap_filter] [-c packet_count] [-s max_bytes_to_show] [-e commands] [-o commands]\n\t-e: do not display this commands\n\t-o: when present only this commands will be displayed\n\t-x: ignore maintenance packets like 'ANTOAN_NOP'\n\t-y: do not show SYN/FIN packets\n\t-m: show packets from/to all ports instead of standard mfs ports (9419-9422)\n",appname);
+	fprintf(stderr,"usage: %s [-xy] [-r pcap_file] [-i interface] [-p portrange] [-f pcap_filter] [-c packet_count] [-s max_bytes_to_show] [-e commands] [-o commands]\n\t-e: do not display this commands\n\t-o: when present only this commands will be displayed\n\t-x: ignore maintenance packets like 'CSTOMA_SPACE' or 'CLTOMA_FUSE_TIME_SYNC'\n\t-y: do not show SYN/FIN packets\n\t-p: show only packets on given port range (default: 9419-9422)\n",appname);
 }
 
 int main(int argc, char **argv) {
@@ -485,6 +484,7 @@ int main(int argc, char **argv) {
 	char *dev;
 	char *filter;
 	char *pcapfile;
+	char *optaux;
 	int32_t packetcnt;
 	bpf_u_int32 devnet;
 	bpf_u_int32 devmask;
@@ -502,16 +502,34 @@ int main(int argc, char **argv) {
 	packetcnt = -1;
 	udm.maxdatainpacket = 128;
 	udm.showconnections = 1;
-	udm.mfsportsonly = 1;
+	udm.minport = 9419;
+	udm.maxport = 9422;
 	udm.showmfsnops = 0;
 
-	while ((ch = getopt(argc, argv, "ms:i:f:c:e:o:r:hxyn?")) != -1) {
+	while ((ch = getopt(argc, argv, "s:p:i:f:c:e:o:r:hxyn?")) != -1) {
 		switch (ch) {
 			case 's':
 				udm.maxdatainpacket = strtoul(optarg,NULL,0);
 				break;
-			case 'm':
-				udm.mfsportsonly = 0;
+			case 'p':
+				if (optarg[0]=='*') {
+					udm.minport = 0;
+					udm.maxport = 65535;
+				} else {
+					udm.minport = strtoul(optarg,&optaux,10);
+					while (*optaux==' ') {
+						optaux++;
+					}
+					if (*optaux=='-') {
+						optaux++;
+						while (*optaux==' ') {
+							optaux++;
+						}
+						udm.maxport = strtoul(optaux,NULL,10);
+					} else {
+						udm.maxport = udm.minport;
+					}
+				}
 				break;
 			case 'i':
 				if (dev) {
@@ -535,7 +553,7 @@ int main(int argc, char **argv) {
 				commands_onlyuse(optarg);
 				break;
 			case 'x':
-				commands_exclude("ANTOMA_REGISTER,MATOAN_STATE,CSTOMA_SPACE,CLTOMA_FUSE_SUSTAINED_INODES,CSTOMA_CURRENT_LOAD,MATOCS_MANAGER_OFFSET_TIME");
+				commands_exclude("ANTOMA_REGISTER,MATOAN_STATE,CSTOMA_SPACE,CLTOMA_FUSE_SUSTAINED_INODES,CSTOMA_CURRENT_LOAD,MATOCS_MANAGER_OFFSET_TIME,CLTOMA_FUSE_TIME_SYNC,MATOCL_FUSE_TIME_SYNC");
 				break;
 			case 'y':
 				udm.showconnections = 0;

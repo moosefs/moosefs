@@ -112,7 +112,7 @@ typedef struct _threc {
 } threc;
 */
 
-#define AMTIME_HASH_SIZE 256
+#define AMTIME_HASH_SIZE 4096
 #define AMTIME_MAX_AGE 10
 
 typedef struct _amtime_file {
@@ -126,7 +126,8 @@ typedef struct _amtime_file {
 
 static amtime_file *amtime_hash[AMTIME_HASH_SIZE];
 
-#define ACQFILES_HASH_SIZE 256
+#define ACQFILES_HASH_SIZE 4096
+#define ACQFILES_LRU_LIMIT 5000
 #define ACQFILES_MAX_AGE 10
 
 typedef struct _acquired_file {
@@ -135,9 +136,12 @@ typedef struct _acquired_file {
 	uint8_t age;
 	uint8_t dentry;
 	struct _acquired_file *next;
+	struct _acquired_file *lrunext,**lruprev;
 } acquired_file;
 
 static acquired_file *af_hash[ACQFILES_HASH_SIZE];
+static acquired_file *af_lruhead,**af_lrutail;
+static uint32_t af_lru_cnt;
 static int64_t timediffusec = 0;
 
 #define DEFAULT_OUTPUT_BUFFSIZE 0x1000
@@ -395,6 +399,41 @@ void fs_amtime_reference_clock(uint64_t localmonotonic,uint64_t remotewall) {
 	pthread_mutex_unlock(&amtimelock);
 }
 
+static void fs_af_remove_from_lru(acquired_file *afptr) {
+	if (afptr->lrunext) {
+		afptr->lrunext->lruprev = afptr->lruprev;
+	} else {
+		af_lrutail = afptr->lruprev;
+	}
+	*(afptr->lruprev) = afptr->lrunext;
+	af_lru_cnt--;
+	afptr->lrunext = NULL;
+	afptr->lruprev = NULL;
+}
+
+static void fs_af_add_to_lru(acquired_file *afptr) {
+	acquired_file *iafptr,**afpptr;
+	uint32_t hash;
+	if (af_lru_cnt>ACQFILES_LRU_LIMIT) {
+		hash = af_lruhead->inode % ACQFILES_HASH_SIZE;
+		afpptr = af_hash + hash;
+		while ((iafptr = *afpptr)) {
+			if (iafptr==af_lruhead) {
+				*afpptr = iafptr->next;
+				chunksdatacache_clear_inode(iafptr->inode,0);
+				fs_af_remove_from_lru(iafptr);
+				free(iafptr);
+			} else {
+				afpptr = &(iafptr->next);
+			}
+		}
+	}
+	afptr->lruprev = af_lrutail;
+	*af_lrutail = afptr;
+	afptr->lrunext = NULL;
+	af_lrutail = &(afptr->lrunext);
+	af_lru_cnt++;
+}
 
 void fs_add_entry(uint32_t inode) {
 	uint32_t afhash;
@@ -404,6 +443,9 @@ void fs_add_entry(uint32_t inode) {
 	for (afptr = af_hash[afhash] ; afptr ; afptr = afptr->next) {
 		if (afptr->inode == inode) {
 			afptr->dentry = 1;
+			if (afptr->lruprev!=NULL) {
+				fs_af_remove_from_lru(afptr);
+			}
 			afptr->age = 0;
 			pthread_mutex_unlock(&aflock);
 			return;
@@ -414,6 +456,8 @@ void fs_add_entry(uint32_t inode) {
 	afptr->cnt = 0;
 	afptr->dentry = 1;
 	afptr->age = 0;
+	afptr->lrunext = NULL;
+	afptr->lruprev = NULL;
 	afptr->next = af_hash[afhash];
 	af_hash[afhash] = afptr;
 	pthread_mutex_unlock(&aflock);
@@ -427,6 +471,9 @@ void fs_forget_entry(uint32_t inode) {
 	for (afptr = af_hash[afhash] ; afptr ; afptr = afptr->next) {
 		if (afptr->inode == inode) {
 			afptr->dentry = 0;
+			if (afptr->cnt==0 && afptr->lruprev==NULL) {
+				fs_af_add_to_lru(afptr);
+			}
 			afptr->age = 0;
 			pthread_mutex_unlock(&aflock);
 			return;
@@ -443,6 +490,9 @@ void fs_inc_acnt(uint32_t inode) {
 	for (afptr = af_hash[afhash] ; afptr ; afptr = afptr->next) {
 		if (afptr->inode == inode) {
 			afptr->cnt++;
+			if (afptr->lruprev!=NULL) {
+				fs_af_remove_from_lru(afptr);
+			}
 			afptr->age = 0;
 			pthread_mutex_unlock(&aflock);
 			return;
@@ -453,6 +503,8 @@ void fs_inc_acnt(uint32_t inode) {
 	afptr->cnt = 1;
 	afptr->dentry = 0;
 	afptr->age = 0;
+	afptr->lrunext = NULL;
+	afptr->lruprev = NULL;
 	afptr->next = af_hash[afhash];
 	af_hash[afhash] = afptr;
 	pthread_mutex_unlock(&aflock);
@@ -467,6 +519,9 @@ void fs_dec_acnt(uint32_t inode) {
 		if (afptr->inode == inode) {
 			if (afptr->cnt>0) {
 				afptr->cnt--;
+			}
+			if (afptr->cnt==0 && afptr->dentry==0 && afptr->lruprev==NULL) {
+				fs_af_add_to_lru(afptr);
 			}
 			afptr->age = 0;
 			pthread_mutex_unlock(&aflock);
@@ -1916,6 +1971,7 @@ void fs_send_open_inodes(void) {
 				if (afptr->age>ACQFILES_MAX_AGE) {
 					*afpptr = afptr->next;
 					chunksdatacache_clear_inode(afptr->inode,0);
+					fs_af_remove_from_lru(afptr);
 					free(afptr);
 					continue;
 				}
@@ -2384,6 +2440,9 @@ void fs_init_threads(uint32_t retries,uint32_t timeout) {
 	for (i=0 ; i<ACQFILES_HASH_SIZE ; i++) {
 		af_hash[i] = NULL;
 	}
+	af_lruhead = NULL;
+	af_lrutail = &(af_lruhead);
+	af_lru_cnt = 0;
 	gettimeofday(&tv,NULL);
 	usectime = tv.tv_sec;
 	usectime *= 1000000;

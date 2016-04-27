@@ -437,12 +437,19 @@ int do_link(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 int do_length(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode;
 	uint64_t length;
+	uint8_t canmodmtime;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU64(length,ptr);
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU8(canmodmtime,ptr);
+	} else {
+		canmodmtime = 1;
+	}
 	EAT(ptr,filename,lv,')');
-	return fs_mr_length(ts,inode,length);
+	return fs_mr_length(ts,inode,length,canmodmtime);
 }
 
 int do_move(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

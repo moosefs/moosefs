@@ -4003,16 +4003,16 @@ uint8_t fs_getattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	return STATUS_OK;
 }
 
-uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint64_t *chunkid) {
+uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35],uint64_t *chunkid) {
 	fsnode *p;
 	memset(attr,0,35);
 	if (sesflags&SESFLAG_READONLY) {
 		return ERROR_EROFS;
 	}
-	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,opened)==0) {
+	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,(flags&TRUNCATE_FLAG_OPENED))==0) {
 		return ERROR_ENOENT;
 	}
-	if (opened==0) {
+	if ((flags&TRUNCATE_FLAG_OPENED)==0) {
 		if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_W,sesflags)) {
 			return ERROR_EACCES;
 		}
@@ -4050,21 +4050,23 @@ uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 			return ERROR_QUOTA;
 		}
 	}
-	if (length&MFSCHUNKMASK) {
-		uint32_t indx = (length>>MFSCHUNKBITS);
-		if (indx<p->data.fdata.chunks) {
-			uint64_t ochunkid = p->data.fdata.chunktab[indx];
-			if (ochunkid>0) {
-				uint8_t status;
-				uint64_t nchunkid;
-				status = chunk_multi_truncate(&nchunkid,ochunkid,length&MFSCHUNKMASK,p->goal);
-				if (status!=STATUS_OK) {
-					return status;
+	if (length!=p->data.fdata.length) {
+		if (length&MFSCHUNKMASK) {
+			uint32_t indx = (length>>MFSCHUNKBITS);
+			if (indx<p->data.fdata.chunks) {
+				uint64_t ochunkid = p->data.fdata.chunktab[indx];
+				if (ochunkid>0) {
+					uint8_t status;
+					uint64_t nchunkid;
+					status = chunk_multi_truncate(&nchunkid,ochunkid,length&MFSCHUNKMASK,p->goal);
+					if (status!=STATUS_OK) {
+						return status;
+					}
+					p->data.fdata.chunktab[indx] = nchunkid;
+					*chunkid = nchunkid;
+					changelog("%"PRIu32"|TRUNC(%"PRIu32",%"PRIu32"):%"PRIu64,(uint32_t)main_time(),inode,indx,nchunkid);
+					return ERROR_DELAYED;
 				}
-				p->data.fdata.chunktab[indx] = nchunkid;
-				*chunkid = nchunkid;
-				changelog("%"PRIu32"|TRUNC(%"PRIu32",%"PRIu32"):%"PRIu64,(uint32_t)main_time(),inode,indx,nchunkid);
-				return ERROR_DELAYED;
 			}
 		}
 	}
@@ -4110,17 +4112,23 @@ uint8_t fs_mr_unlock(uint64_t chunkid) {
 	return chunk_mr_unlock(chunkid);
 }
 
-uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35]) {
+uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35]) {
 	fsnode *p;
 	uint32_t ts = main_time();
+	uint8_t chtime = 1;
 
 	memset(attr,0,35);
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
 		return ERROR_ENOENT;
 	}
+	if (length==p->data.fdata.length && (flags&TRUNCATE_FLAG_TIMEFIX)) {
+		chtime = 0;
+	}
 	fsnodes_setlength(p,length);
-	changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64")",ts,inode,p->data.fdata.length);
-	p->ctime = p->mtime = ts;
+	changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",%"PRIu8")",ts,inode,p->data.fdata.length,chtime);
+	if (chtime) {
+		p->ctime = p->mtime = ts;
+	}
 	fsnodes_fill_attr(p,NULL,uid,gid,auid,agid,sesflags,attr);
 	stats_setattr++;
 	return STATUS_OK;
@@ -4277,7 +4285,7 @@ uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_
 	return STATUS_OK;
 }
 
-uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length) {
+uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length,uint8_t chtime) {
 	fsnode *p;
 	p = fsnodes_node_find(inode);
 	if (!p) {
@@ -4287,8 +4295,10 @@ uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length) {
 		return ERROR_EINVAL;
 	}
 	fsnodes_setlength(p,length);
-	p->mtime = ts;
-	p->ctime = ts;
+	if (chtime) {
+		p->mtime = ts;
+		p->ctime = ts;
+	}
 	meta_version_inc();
 	return STATUS_OK;
 }

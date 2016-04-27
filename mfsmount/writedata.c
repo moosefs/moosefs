@@ -372,7 +372,7 @@ void write_job_end(inodedata *id,int status,uint32_t delay) {
 			cb->writeid = 0;
 		}
 		write_delayed_enqueue(id,delay);
-	} else {	// no more work or error occured
+	} else {	// no more work or error occurred
 		// if this is an error then release all data blocks
 		cb = id->datachainhead;
 		while (cb) {

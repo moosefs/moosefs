@@ -1363,7 +1363,7 @@ void* fs_receive_thread(void *arg) {
 				if (fs_connect(0,&connect_args)==0) {
 					sessionlost=0;
 				}
-			} else {	// if other problem occured then try to resolve hostname and portname then try to reconnect using the same session id
+			} else {	// if other problem occurred then try to resolve hostname and portname then try to reconnect using the same session id
 				if (fs_resolve(0,connect_args.bindhostname,connect_args.masterhostname,connect_args.masterportname)==0) {
 					fs_reconnect();
 				}
@@ -1885,7 +1885,7 @@ uint8_t fs_setattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint
 	return ret;
 }
 
-uint8_t fs_truncate(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t attrlength,uint8_t attr[35]) {
+uint8_t fs_truncate(uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t attrlength,uint8_t attr[35]) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -1903,7 +1903,7 @@ uint8_t fs_truncate(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uin
 		return ERROR_IO;
 	}
 	put32bit(&wptr,inode);
-	put8bit(&wptr,opened);
+	put8bit(&wptr,flags);
 	put32bit(&wptr,uid);
 	if (packetver==0) {
 		if (gids>0) {

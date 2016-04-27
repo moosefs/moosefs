@@ -809,10 +809,12 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 		put64bit(&ptr,fleng);
 		put64bit(&ptr,chunkid);
 		put32bit(&ptr,version);
-		if (eptr->version>=VERSION2INT(1,7,32)) {
-			memcpy(ptr,cs_data,count*10);
-		} else {
-			memcpy(ptr,cs_data,count*6);
+		if (count>0) {
+			if (eptr->version>=VERSION2INT(1,7,32)) {
+				memcpy(ptr,cs_data,count*10);
+			} else {
+				memcpy(ptr,cs_data,count*6);
+			}
 		}
 //		for (i=0 ; i<count ; i++) {
 //			if (matocsserv_getlocation(sptr[i],&ip,&port)<0) {
@@ -833,7 +835,7 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 			put8bit(&ptr,status);
 			return;
 		}
-		fs_do_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,gid,auid,agid,fleng,attr);
+		fs_do_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,0,uid,gid,auid,agid,fleng,attr);
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_TRUNCATE,39);
 		put32bit(&ptr,qid);
 		memcpy(ptr,attr,35);
@@ -2047,7 +2049,7 @@ void matoclserv_fuse_truncate(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint8_t attr[35];
 	uint32_t msgid;
 	uint8_t *ptr;
-	uint8_t opened;
+	uint8_t flags;
 	uint8_t status;
 	uint64_t attrlength;
 	chunklist *cl;
@@ -2057,11 +2059,11 @@ void matoclserv_fuse_truncate(matoclserventry *eptr,const uint8_t *data,uint32_t
 		eptr->mode = KILL;
 		return;
 	}
-	opened = 0;
+	flags = 0;
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	if (length>=25) {
-		opened = get8bit(&data);
+		flags = get8bit(&data);
 	}
 	auid = uid = get32bit(&data);
 	if (length<=25) {
@@ -2070,7 +2072,7 @@ void matoclserv_fuse_truncate(matoclserventry *eptr,const uint8_t *data,uint32_t
 		agid = gid[0] = get32bit(&data);
 		if (length==24) {
 			if (uid==0 && gid[0]!=0) {	// stupid "opened" patch for old clients
-				opened = 1;
+				flags |= TRUNCATE_FLAG_OPENED;
 			}
 		}
 		sessions_ugid_remap(eptr->sesdata,&uid,gid);
@@ -2089,7 +2091,7 @@ void matoclserv_fuse_truncate(matoclserventry *eptr,const uint8_t *data,uint32_t
 		sessions_ugid_remap(eptr->sesdata,&uid,gid);
 	}
 	attrlength = get64bit(&data);
-	status = fs_try_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,opened,uid,gids,gid,auid,agid,attrlength,attr,&chunkid);
+	status = fs_try_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,flags,uid,gids,gid,auid,agid,attrlength,attr,&chunkid);
 	if (status==ERROR_DELAYED) {
 		cl = (chunklist*)malloc(sizeof(chunklist));
 		passert(cl);
@@ -2108,7 +2110,7 @@ void matoclserv_fuse_truncate(matoclserventry *eptr,const uint8_t *data,uint32_t
 		return;
 	}
 	if (status==STATUS_OK) {
-		status = fs_do_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,gid[0],auid,agid,attrlength,attr);
+		status = fs_do_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,flags,uid,gid[0],auid,agid,attrlength,attr);
 	}
 	if (status==STATUS_OK) {
 		dcm_modify(inode,sessions_get_id(eptr->sesdata));
@@ -2896,10 +2898,12 @@ void matoclserv_fuse_read_chunk(matoclserventry *eptr,const uint8_t *data,uint32
 	put64bit(&ptr,fleng);
 	put64bit(&ptr,chunkid);
 	put32bit(&ptr,version);
-	if (eptr->version>=VERSION2INT(1,7,32)) {
-		memcpy(ptr,cs_data,count*10);
-	} else {
-		memcpy(ptr,cs_data,count*6);
+	if (count>0) {
+		if (eptr->version>=VERSION2INT(1,7,32)) {
+			memcpy(ptr,cs_data,count*10);
+		} else {
+			memcpy(ptr,cs_data,count*6);
+		}
 	}
 	sessions_inc_stats(eptr->sesdata,14);
 }
@@ -2973,10 +2977,12 @@ void matoclserv_fuse_write_chunk(matoclserventry *eptr,const uint8_t *data,uint3
 		put64bit(&ptr,fleng);
 		put64bit(&ptr,chunkid);
 		put32bit(&ptr,version);
-		if (eptr->version>=VERSION2INT(1,7,32)) {
-			memcpy(ptr,cs_data,count*10);
-		} else {
-			memcpy(ptr,cs_data,count*6);
+		if (count>0) {
+			if (eptr->version>=VERSION2INT(1,7,32)) {
+				memcpy(ptr,cs_data,count*10);
+			} else {
+				memcpy(ptr,cs_data,count*6);
+			}
 		}
 	}
 	sessions_inc_stats(eptr->sesdata,15);

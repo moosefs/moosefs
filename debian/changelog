@@ -1,3 +1,10 @@
+moosefs (2.0.89-1) unstable; urgency=medium
+
+  * (master+mount) added fix for bug in FreeBSD kernel (kernel sends truncate
+    before first close - FreeBSD only)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 27 Apr 2016 13:00:00 +0200
+
 moosefs (2.0.88-1) unstable; urgency=medium
 
   * (master) added METADATA_SAVE_FREQ option (allow to save metadata less
@@ -26,7 +33,7 @@ moosefs (2.0.85-1) unstable; urgency=medium
   * (debian) removed obsolete conffiles
   * (debian) fixed copyright file
   * (mount) fixed parsing mfsmount.cfg (system options like nodev,noexec etc.
-    were ommited)
+    were omitted)
   * (tools) removed obsoleted command 'mfssnapshot'
 
  -- MooseFS Team <contact@moosefs.com>  Thu, 11 Feb 2016 12:00:00 +0100
@@ -337,7 +344,7 @@ moosefs (2.0.40-1) unstable; urgency=medium
 
   * (cs) fixed serious bug (new chunks were created on disks 'marked for
     removal') - introduced in 1.7.31
-  * (cs) fixed bug (segfault on very rare ocassions during disk scanning just
+  * (cs) fixed bug (segfault on very rare occasions during disk scanning just
     after startup - caused by damaged chunk files)
   * (mount) fixed memory leak (supplementary group tabs) - intr. in 2.0.1
   * (rpm) fixed systemd scripts
@@ -779,7 +786,7 @@ moosefs (1.7.16) unstable; urgency=medium
 moosefs (1.7.15) unstable; urgency=medium
 
   * (master+cs) new charts prepared for mfs 2.0
-  * (cs) options for transfering data between disks
+  * (cs) options for transferring data between disks
 
  -- MooseFS Team <contact@moosefs.com>  Wed, 15 Jan 2014 12:00:00 +0100
 
@@ -1061,7 +1068,7 @@ moosefs (1.6.22) unstable; urgency=medium
   * (cs) removed getting attributes of every chunk during initialization -
     speeds up starting of chunkserver
   * (cs) changed calculating of total/used space. Superuser space now is
-    substracted from total space instead of adding it to used space
+    subtracted from total space instead of adding it to used space
   * (master+mount) fixed directory cache.
   * (debian) rewritten init scripts to use mfscommon commands
     (start/stop/restart/reload) instead of start-stop-daemon (where stop caused

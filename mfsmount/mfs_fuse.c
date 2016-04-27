@@ -65,7 +65,8 @@
 #endif
 
 #if defined(__FreeBSD__)
-	// workaround for bug in FreeBSD Fuse version (kernel part)
+// workaround for bug in FreeBSD Fuse version (kernel part)
+#  define FREEBSD_FALSE_TRUNCATE_WORKAROUND 1
 #  define FREEBSD_EARLY_RELEASE_BUG_WORKAROUND 1
 #  define FREEBSD_EARLY_RELEASE_DELAY 10.0
 #endif
@@ -1497,7 +1498,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
 			trycnt = 0;
 			while (1) {
-				status = fs_truncate(ino,(fi!=NULL)?1:0,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
+#ifdef FREEBSD_FALSE_TRUNCATE_WORKAROUND
+				status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
+#else
+				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
+#endif
 				if (status==STATUS_OK || status==ERROR_EROFS || status==ERROR_EACCES || status==ERROR_EPERM || status==ERROR_ENOENT || status==ERROR_QUOTA || status==ERROR_NOSPACE || status==ERROR_CHUNKLOST) {
 					break;
 				} else if (status!=ERROR_LOCKED) {
@@ -1514,7 +1519,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			uint32_t trycnt;
 			trycnt = 0;
 			while (1) {
-				status = fs_truncate(ino,(fi!=NULL)?1:0,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
+#ifdef FREEBSD_FALSE_TRUNCATE_WORKAROUND
+				status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
+#else
+				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
+#endif
 				if (status==STATUS_OK || status==ERROR_EROFS || status==ERROR_EACCES || status==ERROR_EPERM || status==ERROR_ENOENT || status==ERROR_QUOTA || status==ERROR_NOSPACE || status==ERROR_CHUNKLOST) {
 					break;
 				} else if (status!=ERROR_LOCKED) {
@@ -1536,7 +1545,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			return;
 		}
 	}
-	if (status!=0) {	// should never happend but better check than sorry
+	if (status!=0) {	// should never happened but better check than sorry
 		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s:0%04o,%ld,%ld,%lu,%lu,%llu]): %s",(unsigned long int)ino,to_set,modestr+1,(unsigned int)(stbuf->st_mode & 07777),(long int)stbuf->st_uid,(long int)stbuf->st_gid,(unsigned long int)(stbuf->st_atime),(unsigned long int)(stbuf->st_mtime),(unsigned long long int)(stbuf->st_size),strerr(status));
 		fuse_reply_err(req, status);
 		return;
@@ -2982,7 +2991,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 #endif
 			pthread_mutex_unlock(&(fileinfo->lock));
 			if (debug_mode) {
-				fprintf(stderr,"IO error occured while writing inode %lu\n",(unsigned long int)ino);
+				fprintf(stderr,"IO error occurred while writing inode %lu\n",(unsigned long int)ino);
 			}
 			oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 			fuse_reply_err(req,err);
@@ -3005,7 +3014,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 
 	if (err!=0) {
 		if (debug_mode) {
-			fprintf(stderr,"IO error occured while reading inode %lu\n",(unsigned long int)ino);
+			fprintf(stderr,"IO error occurred while reading inode %lu\n",(unsigned long int)ino);
 		}
 		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);
@@ -3107,7 +3116,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	if (err!=0) {
 		pthread_mutex_unlock(&(fileinfo->lock));
 		if (debug_mode) {
-			fprintf(stderr,"IO error occured while writing inode %lu\n",(unsigned long int)ino);
+			fprintf(stderr,"IO error occurred while writing inode %lu\n",(unsigned long int)ino);
 		}
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);

@@ -297,9 +297,9 @@ void read_job_end(inodedata *id,int status,uint32_t delay) {
 		}
 	} else if (todo && status==0) {   // still have some work to do
                 read_delayed_enqueue(id,delay);
-        } else {        // no more work, descriptor wait for being closed or error occured 
+        } else {        // no more work, descriptor wait for being closed or error occurred 
 		for (rreq = id->reqhead ; rreq ; rreq=rreq->next) {
-			if (rreq->filled==0) { // error occured
+			if (rreq->filled==0) { // error occurred
 				rreq->rleng = 0;
 				rreq->filled = 1;
 				if (rreq->waiting) {

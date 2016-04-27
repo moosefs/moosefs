@@ -1053,9 +1053,9 @@ int meta_loadall(void) {
 		}
 		if (verboselevel>0) {
 			if (bestfileid!=0) {
-				mfs_arg_syslog(LOG_NOTICE,"choosen most recent metadata file: %s (version: %"PRIu64" ; fileid: %"PRIX64")",bestfname,bestver,bestfileid);
+				mfs_arg_syslog(LOG_NOTICE,"chosen most recent metadata file: %s (version: %"PRIu64" ; fileid: %"PRIX64")",bestfname,bestver,bestfileid);
 			} else {
-				mfs_arg_syslog(LOG_NOTICE,"choosen most recent metadata file: %s (version: %"PRIu64")",bestfname,bestver);
+				mfs_arg_syslog(LOG_NOTICE,"chosen most recent metadata file: %s (version: %"PRIu64")",bestfname,bestver);
 			}
 		}
 		// load it
@@ -1174,11 +1174,13 @@ int meta_loadall(void) {
 					fd = mkstemp(name);
 					if (fd<0) {
 						mfs_arg_errlog(LOG_ERR,"can't create temporary file %s",name);
+						free(name);
 						return -1;
 					}
 #elif HAVE_MKTEMP
 					if (mktemp(name)==NULL) {
 						mfs_arg_errlog(LOG_ERR,"can't create temporary file %s",name);
+						free(name);
 						return -1;
 					}
 #endif
@@ -1187,6 +1189,7 @@ int meta_loadall(void) {
 #ifdef HAVE_MKSTEMP
 						close(fd);
 #endif
+						free(name);
 						return -1;
 					}
 #ifdef HAVE_MKSTEMP

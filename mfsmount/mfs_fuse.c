@@ -68,7 +68,8 @@
 #endif
 
 #if defined(__FreeBSD__)
-	// workaround for bug in FreeBSD Fuse version (kernel part)
+// workaround for bug in FreeBSD Fuse version (kernel part)
+#  define FREEBSD_FALSE_TRUNCATE_WORKAROUND 1
 #  define FREEBSD_EARLY_RELEASE_BUG_WORKAROUND 1
 #  define FREEBSD_EARLY_RELEASE_DELAY 10.0
 #endif
@@ -373,6 +374,7 @@ static uint32_t finfo_new(void) {
 	return i;
 }
 
+#ifndef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
 static void finfo_release(uint32_t findex) {
 	if (findex>0) {
 		zassert(pthread_mutex_lock(&finfo_tab_lock));
@@ -383,6 +385,7 @@ static void finfo_release(uint32_t findex) {
 		zassert(pthread_mutex_unlock(&finfo_tab_lock));
 	}
 }
+#endif
 
 static void finfo_freeall(void) {
 	uint32_t i;
@@ -1915,7 +1918,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
 			trycnt = 0;
 			while (1) {
+#ifdef FREEBSD_FALSE_TRUNCATE_WORKAROUND
+				status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
+#else
 				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
+#endif
 				if (status==MFS_STATUS_OK || status==MFS_ERROR_EROFS || status==MFS_ERROR_EACCES || status==MFS_ERROR_EPERM || status==MFS_ERROR_ENOENT || status==MFS_ERROR_QUOTA || status==MFS_ERROR_NOSPACE || status==MFS_ERROR_CHUNKLOST) {
 					break;
 				} else if (status!=MFS_ERROR_LOCKED) {
@@ -1934,7 +1941,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			uint32_t trycnt;
 			trycnt = 0;
 			while (1) {
+#ifdef FREEBSD_FALSE_TRUNCATE_WORKAROUND
+				status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
+#else
 				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
+#endif
 				if (status==MFS_STATUS_OK || status==MFS_ERROR_EROFS || status==MFS_ERROR_EACCES || status==MFS_ERROR_EPERM || status==MFS_ERROR_ENOENT || status==MFS_ERROR_QUOTA || status==MFS_ERROR_NOSPACE || status==MFS_ERROR_CHUNKLOST) {
 					break;
 				} else if (status!=MFS_ERROR_LOCKED) {
@@ -2848,11 +2859,16 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng) {
 	fileinfo->writing = 0;
 #ifdef __FreeBSD__
 	/* old FreeBSD fuse reads whole file when opening with O_WRONLY|O_APPEND,
-	 * so can't open it write-only */
-	(void)accmode;
-	fileinfo->mode = IO_NONE;
-	fileinfo->rdata = NULL;
-	fileinfo->wdata = NULL;
+	 * so can't open it write-only - use read-write instead */
+	if (accmode == O_RDONLY) {
+		fileinfo->mode = IO_READONLY;
+		fileinfo->rdata = read_data_new(inode,fleng);
+		fileinfo->wdata = NULL;
+	} else {
+		fileinfo->mode = IO_READWRITE;
+		fileinfo->rdata = NULL;
+		fileinfo->wdata = NULL;
+	}
 #else
 	if (accmode == O_RDONLY) {
 		fileinfo->mode = IO_READONLY;

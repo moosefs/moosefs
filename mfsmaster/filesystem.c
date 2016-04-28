@@ -4222,22 +4222,24 @@ uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 			return MFS_ERROR_QUOTA;
 		}
 	}
-	if (length&MFSCHUNKMASK) {
-		*indx = (length>>MFSCHUNKBITS);
-		if (*indx<p->data.fdata.chunks) {
-			uint64_t ochunkid = p->data.fdata.chunktab[*indx];
-			if (ochunkid>0) {
-				uint8_t status;
-				uint64_t nchunkid;
-				status = chunk_multi_truncate(&nchunkid,ochunkid,length&MFSCHUNKMASK,p->lsetid);
-				*prevchunkid = ochunkid;
-				if (status!=MFS_STATUS_OK) {
-					return status;
+	if (length!=p->data.fdata.length) {
+		if (length&MFSCHUNKMASK) {
+			*indx = (length>>MFSCHUNKBITS);
+			if (*indx<p->data.fdata.chunks) {
+				uint64_t ochunkid = p->data.fdata.chunktab[*indx];
+				if (ochunkid>0) {
+					uint8_t status;
+					uint64_t nchunkid;
+					status = chunk_multi_truncate(&nchunkid,ochunkid,length&MFSCHUNKMASK,p->sclassid);
+					*prevchunkid = ochunkid;
+					if (status!=MFS_STATUS_OK) {
+						return status;
+					}
+					p->data.fdata.chunktab[*indx] = nchunkid;
+					*chunkid = nchunkid;
+					changelog("%"PRIu32"|TRUNC(%"PRIu32",%"PRIu32"):%"PRIu64,(uint32_t)main_time(),inode,*indx,nchunkid);
+					return MFS_ERROR_DELAYED;
 				}
-				p->data.fdata.chunktab[*indx] = nchunkid;
-				*chunkid = nchunkid;
-				changelog("%"PRIu32"|TRUNC(%"PRIu32",%"PRIu32"):%"PRIu64,(uint32_t)main_time(),inode,*indx,nchunkid);
-				return MFS_ERROR_DELAYED;
 			}
 		}
 	}
@@ -4286,6 +4288,7 @@ uint8_t fs_mr_unlock(uint64_t chunkid) {
 uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[35]) {
 	fsnode *p;
 	uint32_t ts = main_time();
+	uint8_t chtime = 1;
 
 	memset(attr,0,35);
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
@@ -4297,9 +4300,14 @@ uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",0)",ts,inode,p->data.fdata.length);
 		}
 	} else {
+		if (length==p->data.fdata.length && (flags&TRUNCATE_FLAG_TIMEFIX)) {
+			chtime = 0;
+		}
 		fsnodes_setlength(p,length);
-		changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",1)",ts,inode,p->data.fdata.length);
-		p->ctime = p->mtime = ts;
+		changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",%"PRIu8")",ts,inode,p->data.fdata.length,chtime);
+		if (chtime) {
+			p->ctime = p->mtime = ts;
+		}
 		stats_setattr++;
 	}
 	fsnodes_fill_attr(p,NULL,uid,gid,auid,agid,sesflags,attr);

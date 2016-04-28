@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.75-1 (WIP)
+* MooseFS 3.0.75-1 (2016-04-20)
 
   - (all) fixed cppcheck warnings/errors (mostly false negatives)
   - (cs) added file sparsification during chunk write (also chunk replication, chunk duplication etc.)
@@ -10,6 +10,14 @@ This file lists noteworthy changes in MooseFS.
   - (all) changed default action from restart to start
   - (all) added exiting when user defined config (option -c) cannot be loaded
   - (cs) changed handling chunk filename (dynamic filename generation - cs should use less memory)
+  - (netdump) changed 'moose ports only' option to 'port range'
+  - (mount) limited number of files kept as open after close
+  - (cs) changed subfolder choosing algorithm
+  - (mount) changed mutex lock to rw-lock for I/O on the same descriptor
+  - (mount) added link to mfsmount from '/sbin/mount.moosefs' (Linux only)
+  - (all) introduced "storage classes" (new goal/labels management)
+  - (master+cs) introduced 'temporary maintenance mode' (automatic maintenance mode after graceful stop of cs)
+  - (master+mount) added fix for bug in FreeBSD kernel (kernel sends truncate before first close - FreeBSD only)
 
 * MooseFS 3.0.74-1 (2016-03-08)
 

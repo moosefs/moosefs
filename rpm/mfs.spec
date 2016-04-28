@@ -371,6 +371,7 @@ exit 0
 %attr(755,root,root) %{_bindir}/mfsfilepaths
 %attr(755,root,root) %{_bindir}/mfstools
 %attr(755,root,root) %{_bindir}/mfsmount
+/sbin/mount.moosefs
 %{_mandir}/man1/mfsappendchunks.1*
 %{_mandir}/man1/mfscheckfile.1*
 %{_mandir}/man1/mfsdirinfo.1*

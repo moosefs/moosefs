@@ -356,6 +356,7 @@ psdir = @psdir@
 pyexecdir = @pyexecdir@
 pythondir = @pythondir@
 release = @release@
+root_sbindir = @root_sbindir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -897,6 +898,7 @@ mfsdist: dist
 	else \
 		mv $(distdir).tar.gz ../moosefs-dist/$(distdir)-$(RELEASE).tar.gz ; \
 		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/$(distdir).tar.gz ; \
+		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/moosefs-WIP.tar.gz ; \
 	fi
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

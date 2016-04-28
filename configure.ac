@@ -53,10 +53,18 @@ if test "$GCC" = "yes"; then
 	fi
 fi
 
+root_sbindir="xxx";
+
 case $target_os in
   *linux*)
 	fuse=maybe
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -DDEFAULT_SUGID_CLEAR_MODE_EXT"
+	# Check whether exec_prefix=/usr:
+	root_sbindir="${sbindir}"
+	case $exec_prefix:$prefix in
+	NONE:NONE | NONE:/usr | /usr:*)
+		root_sbindir="/sbin"
+	esac
 	;;
   *solaris*)
 	# OpenSolaris has fuse available and is still identified as "solaris"
@@ -80,6 +88,8 @@ case $target_os in
 	fuse=no
 	;;
 esac
+
+AC_SUBST([root_sbindir])
 
 AX_PTHREAD(, [AC_MSG_ERROR([Posix threads not found])])
 dnl AC_CHECK_LIB([pthread], [pthread_create])

@@ -71,7 +71,11 @@ mfstools_links=\
 install-exec-hook:
 	for l in $(mfstools_links) ; do \
 		$(LN_S) -f mfstools $(DESTDIR)$(bindir)/$$l ; \
-	done
+	done ; \
+	if test "$(root_sbindir)" != "xxx" ; then \
+		$(MKDIR_P) $(DESTDIR)$(root_sbindir) ; \
+		$(LN_S) -f $(bindir)/mfsmount $(DESTDIR)$(root_sbindir)/mount.moosefs ; \
+	fi
 
 distclean:distclean-am
 	-rm -rf ./$(DEPDIR)

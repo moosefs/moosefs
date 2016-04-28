@@ -1197,6 +1197,48 @@ int main(int argc, char *argv[]) {
 
 	custom_cfg = 0;
 
+	if (args.argc>1) {
+		uint32_t hostlen,portlen;
+		char *c,*portbegin;
+		// check if argv[1] matches to HOST[/PORT]:[PATH]
+		c = args.argv[1];
+		hostlen = 0;
+		portlen = 0;
+		portbegin = NULL;
+		while (((*c)>='a' && (*c)<='z') || ((*c)>='A' && (*c)<='Z') || ((*c)>='0' && (*c)<='9') || (*c)=='-' || (*c)=='.') { // DNS chars
+			c++;
+			hostlen++;
+		}
+		if (hostlen>0) {
+			if ((*c)=='/') {
+				c++;
+				portbegin = c;
+				while ((*c)>='0' && ((*c)<='9')) {
+					c++;
+					portlen++;
+				}
+			}
+			if ((*c)==':') { // match found
+				c++;
+				if (*c) {
+					mfsopts.subfolder = strdup(c);
+				}
+				mfsopts.masterhost = malloc(hostlen+1);
+				memcpy(mfsopts.masterhost,args.argv[1],hostlen);
+				mfsopts.masterhost[hostlen]=0;
+				if (portbegin!=NULL && portlen>0) {
+					mfsopts.masterport = malloc(portlen+1);
+					memcpy(mfsopts.masterport,portbegin,portlen);
+					mfsopts.masterport[portlen]=0;
+				}
+				for (i=2 ; i<args.argc ; i++) {
+					args.argv[i-1] = args.argv[i];
+				}
+				args.argc--;
+			}
+		}
+	}
+
 //	dump_args("input_args",&args);
 
 	if (fuse_opt_parse(&args, &defaultargs, mfs_opts_stage1, mfs_opt_proc_stage1)<0) {

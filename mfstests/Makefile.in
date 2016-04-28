@@ -566,6 +566,7 @@ psdir = @psdir@
 pyexecdir = @pyexecdir@
 pythondir = @pythondir@
 release = @release@
+root_sbindir = @root_sbindir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@

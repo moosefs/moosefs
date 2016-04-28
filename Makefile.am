@@ -77,4 +77,5 @@ mfsdist: dist
 	else \
 		mv $(distdir).tar.gz ../moosefs-dist/$(distdir)-$(RELEASE).tar.gz ; \
 		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/$(distdir).tar.gz ; \
+		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/moosefs-WIP.tar.gz ; \
 	fi

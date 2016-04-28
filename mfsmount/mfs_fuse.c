@@ -3273,13 +3273,17 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	if (fi->fh>0) {
 		finfo *fileinfo = finfo_tab[fi->fh];
 		uint8_t uselocks;
+		zassert(pthread_mutex_lock(&(fileinfo->lock)));
+		// rwlock_wait_for_unlock:
+		while (fileinfo->writing | fileinfo->writers_cnt | fileinfo->readers_cnt) {
+			zassert(pthread_cond_wait(&(fileinfo->cond),&(fileinfo->lock)));
+		}
 #ifdef HAVE___SYNC_OP_AND_FETCH
 		uselocks = __sync_or_and_fetch(&(fileinfo->uselocks),0);
 #else
-		zassert(pthread_mutex_lock(&(fileinfo->lock)));
 		uselocks = fileinfo->uselocks;
-		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 #endif
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 		if (uselocks&1) {
 			fs_flock(ino,0,fi->lock_owner,FLOCK_RELEASE);
 		}

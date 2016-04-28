@@ -1,0 +1,63 @@
+.TH mfssnapshots "1" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.SH NAME
+\fBMooseFS\fP snapshot tools
+.SH SYNOPSIS
+.B mfsappendchunks
+\fISNAPSHOT_FILE\fP \fIOBJECT\fP...
+.PP
+.B mfsmakesnapshot
+[\fB-o\fP] \fISOURCE\fP... \fIDESTINATION\fP
+.PP
+.B mfsrmsnapshot
+[\fB-f\fP] \fIOBJECT\fP...
+.SH DESCRIPTION
+\fBmfsappendchunks\fP (equivalent of \fBmfssnapshot\fP from MooseFS 1.5)
+appends a lazy copy of specified file(s) to specified snapshot file ("lazy"
+means that creation of new chunks is delayed to the moment one copy is
+modified).
+If multiple files are given, they are merged into one target file in such a way
+that each file begins at \fIchunk\fP (64MB) boundary; padding space is left
+empty.
+.PP
+\fBmfsmakesnapshot\fP makes a "real" snapshot (lazy copy, like in case of
+\fBmfsappendchunks\fP) of some object(s) or subtree (similarly to \fBcp -r\fP
+command). It's atomic with respect to each \fISOURCE\fP argument separately.
+If \fIDESTINATION\fP points to already existing file, error will be reported
+unless \fB-o\fP (overwrite) option is given. Note: if \fISOURCE\fP is
+a directory, it is copied as a whole; but if it's followed by trailing slash,
+only directory content is copied.
+.PP
+\fBmfsrmsnapshot\fP removes objects created as a result of
+\fBmfsmakesnapshot\fP (similarly to \fBrm -r\fP, but much faster). For safety
+reasons objects created via \fBmfsmakesnapshot\fP have the \fBsnapshot\fP
+attribute set (see \fBmfseattr\fP(1)) and only such objects can be removed
+using \fBmfsrmsnapshot\fP command. By default all files and directories inside
+specified directory must have this attribute set for the command to remove the
+whole directory; otherwise the command will not remove anything. This behavior
+can be overridden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
+remove only those files/directories that have \fBsnapshot\fP attribute set and
+will leave everything else untouched.
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR mfstools (1),
+.BR mfseattr (1)

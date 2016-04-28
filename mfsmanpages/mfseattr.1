@@ -1,40 +1,40 @@
-.TH mfstools "1" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfseattr "1" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
-mfstools \- perform \fBMooseFS\fP\-specific operations
-.SH GOAL MANAGEMENT TOOLS
-.BR mfsgetgoal ,
-.BR mfssetgoal ,
-.B mfscopygoal
-.SH STORAGE CLASSES MANAGEMENT TOOLS
-.BR mfsgetsclass ,
-.BR mfssetsclass ,
-.BR mfscopysclass ,
-.BR mfsxchgsclass ,
-.B mfslistsclass
-.SH TRASH RETENTION MANAGEMENT TOOLS
-.BR mfsgettrashtime ,
-.BR mfssettrashtime ,
-.B mfscopytrashtime
-.SH EXTRA ATTRIBUTES MANAGEMENT TOOLS
-.BR mfsgeteattr ,
-.BR mfsseteattr ,
-.BR mfsdeleattr ,
+\fBMooseFS\fP extra attributes management tools
+.SH SYNOPSIS
+.B mfsgeteattr
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfsseteattr
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fB-f\fP \fIATTRNAME\fP [\fB-f\fP \fIATTRNAME\fP ...] \fIOBJECT\fP...
+.PP
+.B mfsdeleattr
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fB-f\fP \fIATTRNAME\fP [\fB-f\fP \fIATTRNAME\fP ...] \fIOBJECT\fP...
+.PP
 .B mfscopyeattr
-.SH DIAGNOSTIC TOOLS
-.BR mfscheckfile ,
-.BR mfsfileinfo ,
-.BR mfsdirinfo ,
-.BR mfsfilepaths ,
-.B mfsfilerepair
-.SH SNAPSHOT TOOLS
-.BR mfsappendchunks ,
-.BR mfsmakesnapshot ,
-.B mfsrmsnapshot
-.SH QUOTA MANAGEMENT TOOLS
-.BR mfsgetquota ,
-.BR mfssetquota ,
-.BR mfsdelquota ,
-.B mfscopyquota
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
+.SH DESCRIPTION
+These tools are used to get, set or delete some extra attributes (flags).
+.PP
+Attributes:
+.PP
+\fBnoowner\fP This flag means,
+that particular object belongs to current user (\fIuid\fP and \fIgid\fP are equal
+to \fIuid\fP and \fIgid\fP values of accessing process). Only root (\fIuid\fP=0)
+sees the real \fIuid\fP and \fIgid\fP.
+.PP
+\fBnoattrcache\fP This flag means, that standard file attributes such as uid, gid,
+mode, length and so on won't be stored in kernel cache. In MooseFS 1.5 this was the
+only behaviour, and mfsmount always prevented attributes from being stored in
+kernel cache, but in MooseFS 1.6 attributes can be cached, so in very rare occasions
+it could be useful to turn it off.
+.PP
+\fBnoentrycache\fP This flag is similar to above. It prevents directory entries
+from being cached in kernel.
+.PP
+\fBnodatacache\fP This flag means, that data cache should be cleared every time a file is opened.
+.PP
+\fBsnapshot\fP This flag means that the object was created via a \fBmfsmakesnapshot\fP command
 .SH GENERAL OPTIONS
 Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
@@ -56,6 +56,7 @@ this directory will have storage class set to "important" and "noowner" flag set
 object inherits always the current set of its parent's attributes. Changing a
 directory attribute does not affect its already created children. To change
 an attribute for a directory and all of its children use \fB-r\fP option.
+
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT
@@ -78,10 +79,5 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmount (8),
-.BR mfsgoal (1),
-.BR mfssclass (1),
-.BR mfstrashtime (1),
-.BR mfseattr (1),
-.BR mfssnapshots (1),
-.BR mfsdiagtools (1),
-.BR mfsscadmin (1)
+.BR mfstools (1),
+.BR mfssnapshots (1)

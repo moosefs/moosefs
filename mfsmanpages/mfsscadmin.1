@@ -1,0 +1,175 @@
+.TH mfsscadmin "1" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.SH NAME
+\fBMooseFS\fP storage class administration tool
+.SH SYNOPSIS
+.B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBcreate\fP|\fBmake\fP
+[\fB-a\fP \fIadmin_only\fP]
+[\fB-m\fP \fIcreation_mode\fP]
+[\fB-C\fP \fICREATION_LABELS\fP] \fB-K\fP \fIKEEP_LABELS\fP [\fB-A\fP \fIARCH_LABELS\fP \fB-d\fP \fIARCH_DELAY\fP]
+\fISCLASS_NAME\fP...
+.PP
+.B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBcreate\fP|\fBmake\fP
+[\fB-a\fP \fIadmin_only\fP]
+[\fB-m\fP \fIcreation_mode\fP]
+\fILABELS\fP
+\fISCLASS_NAME\fP...
+.PP
+.B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBchange\fP|\fBmodify\fP
+[\fB-f\fP]
+[\fB-a\fP \fIadmin_only\fP]
+[\fB-m\fP \fIcreation_mode\fP]
+[\fB-C\fP \fICREATION_LABELS\fP]
+[\fB-K\fP \fIKEEP_LABELS\fP]
+[\fB-A\fP \fIARCH_LABELS\fP]
+[\fB-d\fP \fIARCH_DELAY\fP]
+\fISCLASS_NAME\fP...
+.PP
+.B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBdelete\fP|\fBremove\fP
+\fISCLASS_NAME\fP...
+.PP
+.B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBcopy\fP|\fBduplicate\fP
+\fISRC_SCLASS_NAME\fP \fIDST_SCLASS_NAME\fP...
+.PP
+.B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBrename\fP
+\fISRC_SCLASS_NAME\fP \fIDST_SCLASS_NAME\fP
+.PP
+.B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBlist\fP
+[\fB-l\fP]
+.SH DESCRIPTION
+\fBmfsscadmin\fP is a tool for defining storage classes, which can be later applied to
+MooseFS objects with \fBmfssetsclass\fP, \fBmfsgetsclass\fP etc.
+Storage class is a set of labels expressions and options that indicate, 
+on which chunkservers the files in this class should be written and later kept.
+.SH COMMANDS
+.PP
+\fBcreate\fP|\fBmake\fP creates a new storage class with given options, described below and names it 
+\fISCLASS_NAME\fP; there can be more than one name provided, multiple storage classes with the
+same definition will be created then
+.PP
+\fBchange\fP|\fBmodify\fP changes the given options in a class or classes indicated by 
+\fISCLASS_NAME\fP paremeter(s)
+.PP
+\fBdelete\fP|\fBremove\fP removes the class or classes indicated by 
+\fISCLASS_NAME\fP paremeter(s); if any of the classes is not empty (i.e. it is still 
+used by some MooseFS objects), it will not be removed and the tool will return an error 
+and an error message will be printed; empty classes will be removed in any case
+.PP
+\fBcopy\fP|\fBduplicate\fP copies class indicated by \fISRC_SCLASS_NAME\fP under a new
+name provided with \fIDST_SCLASS_NAME\fP
+.PP
+\fBrename\fP changes the name of a class from \fISRC_SCLASS_NAME\fP to \fIDST_SCLASS_NAME\fP
+.PP
+\fBlist\fP lists all the classes
+.SH OPTIONS
+.PP
+\fB-C\fP optional parameter, that tells the system to which chunkservers, defined by the 
+\fICREATION_LABELS\fP expression, the chunk should be first written just after creation; if
+this parameter is not provided for a class, the \fIKEEP_LABELS\fP chunkservers will be used
+.PP
+\fB-K\fP mandatory parameter (assumed in the second, abbreviated version of the command), 
+that tells the system on which chunkservers, defined by the 
+\fIKEEP_LABELS\fP expression, the chunk(s) should be kept always, except for special conditions
+like creating and archiving, if defined
+.PP
+\fB-A\fP optional parameter, that tells the system on which chunkservers, defined by the 
+\fIARCH_LABELS\fP expression, the chunk(s) should be kept for archiving purposes; the system
+starts to treat a chunk as archive, when the last modification time of 
+the file it belongs to is older than the number of days specified with \fB-d\fP option
+.PP
+\fB-d\fP optional parameter that MUST be defined when \fB-A\fP is defined, \fIARCH_DELAY\fP
+parameter defines after how many days from last modification time a file (and its chunks) are
+treated as archive
+.PP
+\fB-a\fP can be either 1 or 0 and indicates if the storage class is available to everyone (0)
+or admin only (1)
+.PP
+\fB-f\fP force the changes on a predefined storage class (see below), use with caution!
+.PP
+\fB-m\fP is described below in \fBCREATION MODES\fP section
+.PP
+\fB-l\fP list also definitions, not only the names of existing storage classes
+
+.SH LABELS EXPRESSIONS
+
+Labels are letters (A-Z - 26 letters) that can be assigned to chunkservers. Each chunkserver can
+have multiple (up to 26) labels. Labels are defined in mfschunkserver.cfg file, for more infomation
+refer to the appropriate manpage.
+.PP
+Labels expression is a set of subexpressions separated by commas, each subexpression specifies the storage schema
+of one copy of a file. Subexpression can be: an asterisk or a label schema. Label schema can be one label or an expression with 
+sums, multiplications and brackets. Sum means a file can be stored on any chunkserver matching any element of the
+sum (logical or). Multiplication means a file can be stored only on a chunkserver matching all elements (logical and).
+Asterisk means any chunkserver. Identical subexpressions can be shortened by adding a number in front of one instead
+of repeating it a number of times.
+.PP
+Examples of lables expressions:
+.PP
+\fBA,B\fP - files will have two copies, one copy will be stored on chunkserver(s) 
+with label \fBA\fP, the other on chunkserver(s) with label \fBB\fP
+.PP
+\fBA,*\fP - files will have two copies, one copy will be stored on chunkserver(s) 
+with label \fBA\fP, the other on any chunkserver(s)
+.PP
+\fB*,*\fP - files will have two copies, stored on any chunkservers (different for each copy) 
+.PP
+\fBAB,C+D\fP - files will have two copies, one copy will be stored on any chunkserver(s) 
+that has both labels \fBA\fP and \fBB\fP (multiplication of labels), the other on any 
+chunkserver(s) that has either the \fBC\fP label or the \fBD\fP label
+(sum of labels)
+.PP
+\fBA,B[X+Y],C[X+Y]\fP - files will have three copies, one copy will be stored on any 
+chunkserver(s) with \fBA\fP label, the second on any chunserver(s) that has the \fBB\fP label 
+and either \fBX\fP or \fBY\fP label, the third on any chunkserver(s), that
+has the \fBC\fP label and either \fBX\fP or \fBY\fP label
+.PP
+\fBA,A\fP expression is equivalent to \fB2A\fP expression
+.PP
+\fBA,BC,BC,BC\fP expression is equivalent to \fBA,3BC\fP expression
+.PP
+\fB*,*\fP expression is equivalent to \fB2*\fP expression is equivalent to \fB2\fP expression
+.SH CREATION MODES
+It is important to specify what to do in case when there is no space available on all servers
+marked with labels needed for new chunk creation. Also all servers marked with such labels can be temporariliy overloaded.
+The question is if the system should create chunks on other servers or not.
+.PP
+Answer to this question should be resolved by user and hence the \fB-m\fP option. By default (no options or option \fB-m D\fP) in case of overloaded servers system will wait for them, but in case of no space available will use other servers.
+.PP
+Option \fB-m S\fP turns on STRICT mode. In this mode the system will return error (ENOSPC) in case of no space
+available on servers marked with labels specified for chunk creation. It will still wait for overloaded servers.
+.PP
+Option \fB-m L\fP turns on LOOSE mode. In this mode the system will use other servers in case of overloaded servers 
+or no space on servers and will replicate data to correct servers when it becomes possible.
+.SH PREDEFINED STORAGE CLASSES
+For compatibility reasons, every fresh or freshly upgraded instance of MooseFS has 9 predefined 
+storage classes. Their names are single digits, from \fB1\fP to \fB9\fP, and their definitions 
+are \fB*\fP to \fB9*\fP. They
+are equivalents of simple numeric goals from previous versions of the system. In case of an
+upgrade, all files that had goal \fIN\fP before upgrade, will now have \fIN\fP storage class.
+These classes can be modified only when option \fB-f\fP is specified. It is advised to create new 
+storage classes in an upgraded system and migrate files with \fBmfsxchgsclass\fP tool, rather than
+modify the predefined classes. The predefined classes CANNOT be deleted.
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR mfstools (1),
+.BR mfssclass (1),
+.BR mfschunkserver.cfg (5)

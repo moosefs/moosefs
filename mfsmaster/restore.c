@@ -36,7 +36,7 @@
 #include "posixlocks.h"
 #include "csdb.h"
 #include "chunks.h"
-#include "labelsets.h"
+#include "storageclass.h"
 #include "metadata.h"
 #include "slogger.h"
 #include "massert.h"
@@ -499,94 +499,6 @@ int do_link(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return fs_mr_link(ts,inode,parent,strlen((char*)name),name);
 }
 
-int do_labeldesc(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint8_t labelid;
-	uint8_t name[256];
-	(void)ts;
-	EAT(ptr,filename,lv,'(');
-	GETU8(labelid,ptr);
-	EAT(ptr,filename,lv,',');
-	GETNAME(name,ptr,filename,lv,')');
-	EAT(ptr,filename,lv,')');
-	return labelset_mr_setdescription(labelid,name);
-}
-
-int do_labelset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint16_t labelsetid,arch_delay;
-	uint8_t create_labelscnt,keep_labelscnt,arch_labelscnt,create_mode,i;
-	uint32_t create_labelmasks[9*MASKORGROUP];
-	uint32_t keep_labelmasks[9*MASKORGROUP];
-	uint32_t arch_labelmasks[9*MASKORGROUP];
-	(void)ts;
-	EAT(ptr,filename,lv,'(');
-	GETU16(labelsetid,ptr);
-	EAT(ptr,filename,lv,',');
-	if (*ptr=='W') {
-		EAT(ptr,filename,lv,'W');
-		GETU8(create_labelscnt,ptr);
-		EAT(ptr,filename,lv,',');
-		EAT(ptr,filename,lv,'K');
-		GETU8(keep_labelscnt,ptr);
-		EAT(ptr,filename,lv,',');
-		if (*ptr=='A') {
-			EAT(ptr,filename,lv,'A');
-			GETU8(arch_labelscnt,ptr);
-			EAT(ptr,filename,lv,',');
-			GETU8(create_mode,ptr);
-			EAT(ptr,filename,lv,',');
-			GETU16(arch_delay,ptr);
-			if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9 || arch_labelscnt==0 || arch_labelscnt>9) {
-				return MFS_ERROR_EINVAL;
-			}
-			for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
-				EAT(ptr,filename,lv,',');
-				GETU32(create_labelmasks[i],ptr);
-			}
-			for (i=0 ; i<keep_labelscnt*MASKORGROUP ; i++) {
-				EAT(ptr,filename,lv,',');
-				GETU32(keep_labelmasks[i],ptr);
-			}
-			for (i=0 ; i<arch_labelscnt*MASKORGROUP ; i++) {
-				EAT(ptr,filename,lv,',');
-				GETU32(arch_labelmasks[i],ptr);
-			}
-		} else {
-			GETU8(create_mode,ptr);
-			arch_delay = 0;
-			if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9) {
-				return MFS_ERROR_EINVAL;
-			}
-			arch_labelscnt = keep_labelscnt;
-			for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
-				EAT(ptr,filename,lv,',');
-				GETU32(create_labelmasks[i],ptr);
-			}
-			for (i=0 ; i<keep_labelscnt*MASKORGROUP ; i++) {
-				EAT(ptr,filename,lv,',');
-				GETU32(keep_labelmasks[i],ptr);
-				arch_labelmasks[i] = keep_labelmasks[i];
-			}
-		}
-	} else {
-		GETU8(create_labelscnt,ptr);
-		if (create_labelscnt==0 || create_labelscnt>9) {
-			return MFS_ERROR_EINVAL;
-		}
-		keep_labelscnt = create_labelscnt;
-		arch_labelscnt = create_labelscnt;
-		for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
-			EAT(ptr,filename,lv,',');
-			GETU32(create_labelmasks[i],ptr);
-			keep_labelmasks[i] = create_labelmasks[i];
-			arch_labelmasks[i] = create_labelmasks[i];
-		}
-		create_mode = CREATE_MODE_STD;
-		arch_delay = 0;
-	}
-	EAT(ptr,filename,lv,')');
-	return labelset_mr_labelset(labelsetid,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
-}
-
 int do_length(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode;
 	uint64_t length;
@@ -960,15 +872,16 @@ int do_setfilechunk(const char *filename,uint64_t lv,uint32_t ts,const char *ptr
 	return fs_mr_set_file_chunk(inode,indx,chunkid);
 }
 
+// deprecated
 int do_setgoal(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,uid,ci,nci,npi;
-	uint8_t goal,smode;
+	uint8_t sclassid,smode;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(uid,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(goal,ptr);
+	GETU32(sclassid,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(smode,ptr);
 	EAT(ptr,filename,lv,')');
@@ -979,7 +892,31 @@ int do_setgoal(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(npi,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_setgoal(ts,inode,uid,goal,smode,ci,nci,npi);
+	return fs_mr_setsclass(ts,inode,uid,sclassid,sclassid,smode,ci,nci,npi);
+}
+
+int do_setsclass(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,uid,ci,nci,npi;
+	uint8_t src_sclassid,dst_sclassid,smode;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(uid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(src_sclassid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(dst_sclassid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(smode,ptr);
+	EAT(ptr,filename,lv,')');
+	EAT(ptr,filename,lv,':');
+	GETU32(ci,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(nci,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(npi,ptr);
+	(void)ptr; // silence cppcheck warnings
+	return fs_mr_setsclass(ts,inode,uid,src_sclassid,dst_sclassid,smode,ci,nci,npi);
 }
 
 int do_setmetaid(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -1145,6 +1082,104 @@ int do_symlink(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETU32(inode,ptr);
 	(void)ptr; // silence cppcheck warnings
 	return fs_mr_symlink(ts,parent,strlen((char*)name),name,path,uid,gid,inode);
+}
+
+int do_spdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint8_t name[256];
+	uint16_t spid;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETNAME(name,ptr,filename,lv,')');
+	EAT(ptr,filename,lv,')');
+	EAT(ptr,filename,lv,':');
+	GETU16(spid,ptr);
+	(void)ptr; // silence cppcheck warnings
+	return sclass_mr_delete_entry(strlen((char*)name),name,spid);
+}
+
+int do_spdup(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint8_t sname[256];
+	uint8_t dname[256];
+	uint16_t sspid,dspid;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETNAME(sname,ptr,filename,lv,',');
+	EAT(ptr,filename,lv,',');
+	GETNAME(dname,ptr,filename,lv,')');
+	EAT(ptr,filename,lv,')');
+	EAT(ptr,filename,lv,':');
+	GETU16(sspid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU16(dspid,ptr);
+	(void)ptr; // silence cppcheck warnings
+	return sclass_mr_duplicate_entry(strlen((char*)sname),sname,strlen((char*)dname),dname,sspid,dspid);
+}
+
+int do_spren(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint8_t sname[256];
+	uint8_t dname[256];
+	uint16_t spid;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETNAME(sname,ptr,filename,lv,',');
+	EAT(ptr,filename,lv,',');
+	GETNAME(dname,ptr,filename,lv,')');
+	EAT(ptr,filename,lv,')');
+	EAT(ptr,filename,lv,':');
+	GETU16(spid,ptr);
+	(void)ptr; // silence cppcheck warnings
+	return sclass_mr_rename_entry(strlen((char*)sname),sname,strlen((char*)dname),dname,spid);
+}
+
+int do_spset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint8_t name[256];
+	uint16_t spid;
+	uint16_t arch_delay;
+	uint8_t new_flag,adminonly;
+	uint8_t create_labelscnt,keep_labelscnt,arch_labelscnt,create_mode,i;
+	uint32_t create_labelmasks[9*MASKORGROUP];
+	uint32_t keep_labelmasks[9*MASKORGROUP];
+	uint32_t arch_labelmasks[9*MASKORGROUP];
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETNAME(name,ptr,filename,lv,',');
+	EAT(ptr,filename,lv,',');
+	GETU8(new_flag,ptr);
+	EAT(ptr,filename,lv,',');
+	EAT(ptr,filename,lv,'W');
+	GETU8(create_labelscnt,ptr);
+	EAT(ptr,filename,lv,',');
+	EAT(ptr,filename,lv,'K');
+	GETU8(keep_labelscnt,ptr);
+	EAT(ptr,filename,lv,',');
+	EAT(ptr,filename,lv,'A');
+	GETU8(arch_labelscnt,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(create_mode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU16(arch_delay,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(adminonly,ptr);
+	if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9 || arch_labelscnt==0 || arch_labelscnt>9) {
+		return MFS_ERROR_EINVAL;
+	}
+	for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
+		EAT(ptr,filename,lv,',');
+		GETU32(create_labelmasks[i],ptr);
+	}
+	for (i=0 ; i<keep_labelscnt*MASKORGROUP ; i++) {
+		EAT(ptr,filename,lv,',');
+		GETU32(keep_labelmasks[i],ptr);
+	}
+	for (i=0 ; i<arch_labelscnt*MASKORGROUP ; i++) {
+		EAT(ptr,filename,lv,',');
+		GETU32(arch_labelmasks[i],ptr);
+	}
+	EAT(ptr,filename,lv,')');
+	EAT(ptr,filename,lv,':');
+	GETU16(spid,ptr);
+	(void)ptr; // silence cppcheck warnings
+	return sclass_mr_set_entry(strlen((char*)name),name,spid,new_flag,adminonly,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
 }
 
 int do_undel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -1326,13 +1361,6 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 				return do_incversion(filename,lv,ts,ptr+10);
 			}
 			break;
-		case HASHCODE('L','A','B','E'):
-			if (strncmp(ptr,"LABELSET",8)==0) {
-				return do_labelset(filename,lv,ts,ptr+8);
-			} else if (strncmp(ptr,"LABELDESC",9)==0) {
-				return do_labeldesc(filename,lv,ts,ptr+9);
-			}
-			break;
 		case HASHCODE('L','E','N','G'):
 			if (strncmp(ptr,"LENGTH",6)==0) {
 				return do_length(filename,lv,ts,ptr+6);
@@ -1407,6 +1435,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 				return do_setpath(filename,lv,ts,ptr+7);
 			}
 			break;
+		case HASHCODE('S','E','T','S'):
+			if (strncmp(ptr,"SETSCLASS",9)==0) {
+				return do_setsclass(filename,lv,ts,ptr+9);
+			}
+			break;
 		case HASHCODE('S','E','T','T'):
 			if (strncmp(ptr,"SETTRASHTIME",12)==0) {
 				return do_settrashtime(filename,lv,ts,ptr+12);
@@ -1452,6 +1485,26 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 				return do_sesdel(filename,lv,ts,ptr+6);
 			} else if (strncmp(ptr,"SESDISCONNECTED",15)==0) {
 				return do_sesdisconnected(filename,lv,ts,ptr+15);
+			}
+			break;
+		case HASHCODE('S','P','D','E'):
+			if (strncmp(ptr,"SPDEL",5)==0) {
+				return do_spdel(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('S','P','D','U'):
+			if (strncmp(ptr,"SPDUP",5)==0) {
+				return do_spdup(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('S','P','R','E'):
+			if (strncmp(ptr,"SPREN",5)==0) {
+				return do_spren(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('S','P','S','E'):
+			if (strncmp(ptr,"SPSET",5)==0) {
+				return do_spset(filename,lv,ts,ptr+5);
 			}
 			break;
 		case HASHCODE('T','R','U','N'):

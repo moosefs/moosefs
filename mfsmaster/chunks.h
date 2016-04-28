@@ -39,8 +39,8 @@ typedef enum {
 	CHUNK_FLOOP_OK_AFLAG_CHANGED
 } chunkfloop;
 
-int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t opflag);
-int chunk_mr_multi_truncate(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid);
+int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t opflag);
+int chunk_mr_multi_truncate(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid);
 //int chunk_multi_reinitialize(uint32_t ts,uint64_t chunkid);
 int chunk_mr_unlock(uint64_t chunkid);
 int chunk_mr_increase_version(uint64_t chunkid);
@@ -64,13 +64,13 @@ int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies);
 
 int chunk_get_archflag(uint64_t chunkid,uint8_t *archflag);
 int chunk_univ_archflag(uint64_t chunkid,uint8_t archflag,uint32_t *archflagchanged);
-chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t lsetid,uint8_t aftereof,uint8_t archflag);
+chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t sclassid,uint8_t aftereof,uint8_t archflag);
 
 int chunk_read_check(uint32_t ts,uint64_t chunkid);
-int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag);
-int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid);
+int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t *opflag);
+int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t sclassid);
 //int chunk_multi_reinitialize(uint64_t chunkid);
-int chunk_repair(uint8_t lsetid,uint64_t ochunkid,uint32_t *nversion);
+int chunk_repair(uint8_t sclassid,uint64_t ochunkid,uint32_t *nversion);
 
 int chunk_locked_or_busy(void *cptr);
 
@@ -108,9 +108,9 @@ uint8_t chunk_labelset_can_be_fulfilled(uint8_t labelcnt,uint32_t **labelmasks);
 
 uint8_t chunk_no_more_pending_jobs(void);
 
-int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid);
-int chunk_delete_file(uint64_t chunkid,uint8_t lsetid);
-int chunk_add_file(uint64_t chunkid,uint8_t lsetid);
+int chunk_change_file(uint64_t chunkid,uint8_t prevsclassid,uint8_t newsclassid);
+int chunk_delete_file(uint64_t chunkid,uint8_t sclassid);
+int chunk_add_file(uint64_t chunkid,uint8_t sclassid);
 int chunk_unlock(uint64_t chunkid);
 
 void chunk_get_memusage(uint64_t allocated[3],uint64_t used[3]);

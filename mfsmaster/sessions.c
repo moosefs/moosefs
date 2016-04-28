@@ -883,19 +883,20 @@ uint8_t sessions_is_root_remapped(void *vsesdata) {
 	return (sesdata->rootuid!=0)?1:0;
 }
 
-uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t mingoal,uint8_t maxgoal) {
+uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t goal) {
 	session *sesdata = (session*)vsesdata;
 	switch (smode) {
+		case SMODE_EXCHANGE:
 		case SMODE_SET:
-			if (mingoal<sesdata->mingoal || maxgoal>sesdata->maxgoal) {
+			if (goal<sesdata->mingoal || goal>sesdata->maxgoal) {
 				return MFS_ERROR_EPERM;
 			}
 		case SMODE_INCREASE:
-			if (maxgoal>sesdata->maxgoal) {
+			if (goal>sesdata->maxgoal) {
 				return MFS_ERROR_EPERM;
 			}
 		case SMODE_DECREASE:
-			if (mingoal<sesdata->mingoal) {
+			if (goal<sesdata->mingoal) {
 				return MFS_ERROR_EPERM;
 			}
 	}
@@ -905,6 +906,7 @@ uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t mingoal,uint8_t
 uint8_t sessions_check_trashtime(void *vsesdata,uint8_t smode,uint32_t trashtime) {
 	session *sesdata = (session*)vsesdata;
 	switch (smode) {
+		case SMODE_EXCHANGE:
 		case SMODE_SET:
 			if (trashtime<sesdata->mintrashtime || trashtime>sesdata->maxtrashtime) {
 				return MFS_ERROR_EPERM;

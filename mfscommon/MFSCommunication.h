@@ -138,9 +138,11 @@
 #define MFS_ERROR_EINTR           46    // Interrupted system call
 #define MFS_ERROR_ECANCELED       47    // Operation canceled
 
-#define MFS_ERROR_ENOENT_NOCACHE  48   // No such file or directory (do not store in cache)
+#define MFS_ERROR_ENOENT_NOCACHE  48    // No such file or directory (do not store in cache)
 
-#define MFS_ERROR_MAX             49
+#define MFS_ERROR_EPERM_NOTADMIN  49    // Operation not permitted (mfs admin only)
+
+#define MFS_ERROR_MAX             50
 
 #define MFS_ERROR_STRINGS \
 	"OK", \
@@ -192,7 +194,16 @@
 	"Interrupted system call", \
 	"Operation canceled", \
 	"No such file or directory (not cacheable)", \
+	"Operation not permitted (mfs admin only)", \
 	"Unknown MFS error"
+
+#define SCLASS_CHG_ADMIN_ONLY        0x0001
+#define SCLASS_CHG_CREATE_MODE       0x0002
+#define SCLASS_CHG_CREATE_MASKS      0x0004
+#define SCLASS_CHG_KEEP_MASKS        0x0008
+#define SCLASS_CHG_ARCH_MASKS        0x0010
+#define SCLASS_CHG_ARCH_DELAY        0x0020
+#define SCLASS_CHG_FORCE             0x8000
 
 /* type for readdir command */
 #define DISP_TYPE_FILE         'f'
@@ -298,11 +309,11 @@
 #define SMODE_SET              0
 #define SMODE_INCREASE         1
 #define SMODE_DECREASE         2
-#define SMODE_LABELS           3
+#define SMODE_EXCHANGE         3
 #define SMODE_RSET             4
 #define SMODE_RINCREASE        5
 #define SMODE_RDECREASE        6
-#define SMODE_RLABELS          7
+#define SMODE_REXCHANGE        7
 #define SMODE_TMASK            3
 #define SMODE_RMASK            4
 #define SMODE_ISVALID(x)       (((uint32_t)(x))<=7)
@@ -779,35 +790,46 @@
 
 
 
-
 // CLIENT <-> MASTER
 
-// Storage Policy (for future version)
+// Storage Class
 
-#define CLTOMA_STORAGE_POLICY_CREATE 350
-// msgid:32 storage_policy_name:NAME fver:8 admin_mode:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+#define CLTOMA_SCLASS_CREATE 350
+// msgid:32 storage_class_name:NAME fver:8 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
-#define MATOCL_STORAGE_POLICY_CREATE 351
+#define MATOCL_SCLASS_CREATE 351
 // msgid:32 status:8
 
-#define CLTOMA_STORAGE_POLICY_CHANGE 352
-// msgid:32 storage_policy_name:NAME fver:8 chgmask:16 admin_mode:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+#define CLTOMA_SCLASS_CHANGE 352
+// msgid:32 storage_class_name:NAME fver:8 chgmask:16 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
-#define MATOCL_STORAGE_POLICY_CHANGE 353
+#define MATOCL_SCLASS_CHANGE 353
 // msgid:32 status:8
-// msgid:32 fver:8 admin_mode:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// msgid:32 fver:8 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
-#define CLTOMA_STORAGE_POLICY_DELETE 354
-// msgid:32 storage_policy_name:NAME
+#define CLTOMA_SCLASS_DELETE 354
+// msgid:32 storage_class_name:NAME
 
-#define MATOCL_STORAGE_POLICY_DELETE 355
+#define MATOCL_SCLASS_DELETE 355
 // msgid:32 status:8
 
-#define CLTOMA_STORAGE_POLICY_LIST 356
+#define CLTOMA_SCLASS_DUPLICATE 356
+// msgid:32 storage_class_oldname:NAME storage_class_newname:NAME
+
+#define MATOCL_SCLASS_DUPLICATE 357
+// msgid:32 status:8
+
+#define CLTOMA_SCLASS_RENAME 358
+// msgid:32 storage_class_oldname:NAME storage_class_newname:NAME
+
+#define MATOCL_SCLASS_RENAME 359
+// msgid:32 status:8
+
+#define CLTOMA_SCLASS_LIST 360
 // msgid:32
 
-#define MATOCL_STORAGE_POLICY_LIST 357
-// msgid:32 N * [ storage_policy_name:NAME ]
+#define MATOCL_SCLASS_LIST 361
+// msgid:32 N * [ storage_class_name:NAME ]
 
 
 // Fuse
@@ -1149,27 +1171,30 @@
 
 
 // 0x01BE
-#define CLTOMA_FUSE_GETGOAL (PROTO_BASE+446)
+#define CLTOMA_FUSE_GETSCLASS (PROTO_BASE+446)
 // msgid:32 inode:32 gmode:8
 
 // 0x01BF
-#define MATOCL_FUSE_GETGOAL (PROTO_BASE+447)
+#define MATOCL_FUSE_GETSCLASS (PROTO_BASE+447)
 // maxsize=100000
 // msgid:32 status:8
 // msgid:32 gdirs:8 gfiles:8 gdirs*[ goal:8 dirs:32 ] gfiles*[ goal:8 files:32 ] (version < 2.1.0)
 // msgid:32 gdirs:8 gfiles:8 gdirs*[ goal:8 dirs:32 | zero:8 labelscnt:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] dirs:32 ] gfiles*[ goal:8 files:32 | zero:8 labelscnt:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] files:32 ] (version >= 2.1.0)
+// msgid:32 gdirs:8 gfiles:8 gdirs*[ goal:8 dirs:32 | 0xFF:8 storage_class:NAME ] gfiles*[ goal:8 files:32 | 0xFF storage_class:NAME ] (version >= 3.0.75)
 
 
 // 0x01C0
-#define CLTOMA_FUSE_SETGOAL (PROTO_BASE+448)
+#define CLTOMA_FUSE_SETSCLASS (PROTO_BASE+448)
 // msgid:32 inode:32 uid:32 goal:8 smode:8 (any version)
 // msgid:32 inode:32 uid:32 labelscnt:8 smode:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 2.1.0)
-// msgid:32 inode:32 uid:32 zero:8 smode:8 create_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 3.0.x)
+// msgid:32 inode:32 uid:32 zero:8 smode:8 create_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 3.0.0)
+// msgid:32 inode:32 uid:32 0xFF:8 smode:8 storage_class:NAME                             (version >= 3.0.75 && (smode & SMODE_TMASK) != SMODE_EXCHANGE )
+// msgid:32 inode:32 uid:32 0xFF:8 smode:8 old_storage_class:NAME new_storage_class:NAME  (version >= 3.0.75 && (smode & SMODE_TMASK) == SMODE_EXCHANGE )
 
 // 0x01C1
-#define MATOCL_FUSE_SETGOAL (PROTO_BASE+449)
+#define MATOCL_FUSE_SETSCLASS (PROTO_BASE+449)
 // msgid:32 status:8
-// msgid:32 changed:32 notchanged:32 notpermitted:32
+// msgid:32 changed:32 notchanged:32 notpermitted:32 [quotaexceeded:32]
 
 
 // 0x01C2
@@ -1653,28 +1678,22 @@
 // N*[ inode:32 pathssize:32 M*[ pathleng:32 path:pathlengB ] ]
 
 // 0x021A
-#define CLTOMA_SET_LABEL_DESCRIPTION (PROTO_BASE+538)
-// labelid:8 description:NAME
 
 // 0x021B
-#define MATOCL_SET_LABEL_DESCRIPTION (PROTO_BASE+539)
-// status:8
 
 // 0x021C
-#define CLTOMA_LABEL_INFO (PROTO_BASE+540)
-// -
 
 // 0x021D
-#define MATOCL_LABEL_INFO (PROTO_BASE+541)
-// allservers:16 N*[ labelid:8 description:NAME labeledservers:16 inodes:32 ]
 
 // 0x021E
-#define CLTOMA_LABEL_SET_INFO (PROTO_BASE+542)
+#define CLTOMA_SCLASS_INFO (PROTO_BASE+542)
 // - 
 
 // 0x021F
-#define MATOCL_LABEL_SET_INFO (PROTO_BASE+543)
-// allservers:16 N*[ labelsetid:8 inodes:32 canbefulfilled:8 labelscnt:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ]
+#define MATOCL_SCLASS_INFO (PROTO_BASE+543)
+// allservers:16 N*[ sclassid:8 sclassname:NAME files:32 dirs:32 3 * [ stdchunks:64 archchunks:64 ] admin_only:8 create_mode:8 arch_delay:16 3 * [ canbefulfilled:8 labelscnt:8 ] 3 * [ labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ] ]
+//  - redundancy classes (0 - undergoal ; 1 - ok ; 2 - overgoal)
+//  - label sets (0 - create ; 1 - keep ; 2 - archive)
 
 // 0x0220
 #define CLTOMA_MISSING_CHUNKS (PROTO_BASE+544)

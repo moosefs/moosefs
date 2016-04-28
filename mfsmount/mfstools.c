@@ -776,11 +776,13 @@ int open_master_conn(const char *name,uint32_t *inode,mode_t *mode,uint64_t *len
 		return -1;
 	}
 	pinode = stb.st_ino;
-	*inode = pinode;
-	if (mode) {
+	if (inode!=NULL) {
+		*inode = pinode;
+	}
+	if (mode!=NULL) {
 		*mode = stb.st_mode;
 	}
-	if (leng) {
+	if (leng!=NULL) {
 		*leng = stb.st_size;
 	}
 	if (current_master>=0) {
@@ -803,7 +805,7 @@ int open_master_conn(const char *name,uint32_t *inode,mode_t *mode,uint64_t *len
 			strcpy(rpath+rpathlen,"/.masterinfo");
 			if (lstat(rpath,&stb)==0) {
 				if ((stb.st_ino==0x7FFFFFFF || stb.st_ino==0x7FFFFFFE) && stb.st_nlink==1 && stb.st_uid==0 && stb.st_gid==0 && (stb.st_size==10 || stb.st_size==14)) {
-					if (stb.st_ino==0x7FFFFFFE) {	// meta master
+					if (stb.st_ino==0x7FFFFFFE && inode!=NULL) {	// meta master
 						if (((*inode)&INODE_TYPE_MASK)!=INODE_TYPE_TRASH && ((*inode)&INODE_TYPE_MASK)!=INODE_TYPE_SUSTAINED) {
 							printf("%s: only files in 'trash' and 'sustained' are usable in mfsmeta\n",name);
 							return -1;
@@ -1765,6 +1767,108 @@ int copy_goal_src(const char *fname,void **params) {
 }
 */
 
+typedef struct _storage_class {
+	uint8_t admin_only;
+	uint8_t create_mode;
+	uint16_t arch_delay;
+	uint8_t create_labelscnt,keep_labelscnt,arch_labelscnt;
+	uint32_t create_labelmasks[9][MASKORGROUP];
+	uint32_t keep_labelmasks[9][MASKORGROUP];
+	uint32_t arch_labelmasks[9][MASKORGROUP];
+} storage_class;
+
+static inline int deserialize_sc(const uint8_t **rptr,uint32_t leng,storage_class *sc) {
+	uint8_t i,og;
+	if (leng<7) {
+		return -1;
+	}
+	sc->admin_only = get8bit(rptr);
+	sc->create_mode = get8bit(rptr);
+	sc->arch_delay = get16bit(rptr);
+	sc->create_labelscnt = get8bit(rptr);
+	sc->keep_labelscnt = get8bit(rptr);
+	sc->arch_labelscnt = get8bit(rptr);
+	if (leng<(uint32_t)(7+(sc->create_labelscnt+sc->keep_labelscnt+sc->arch_labelscnt)*4*MASKORGROUP)) {
+		return -1;
+	}
+	if (sc->create_labelscnt>9 || sc->create_labelscnt<1 || sc->keep_labelscnt>9 || sc->keep_labelscnt<1 || sc->arch_labelscnt>9 || sc->arch_labelscnt<1) {
+		return -1;
+	}
+	for (i=0 ; i<sc->create_labelscnt ; i++) {
+		for (og=0 ; og<MASKORGROUP ; og++) {
+			sc->create_labelmasks[i][og] = get32bit(rptr);
+		}
+	}
+	for (i=0 ; i<sc->keep_labelscnt ; i++) {
+		for (og=0 ; og<MASKORGROUP ; og++) {
+			sc->keep_labelmasks[i][og] = get32bit(rptr);
+		}
+	}
+	for (i=0 ; i<sc->arch_labelscnt ; i++) {
+		for (og=0 ; og<MASKORGROUP ; og++) {
+			sc->arch_labelmasks[i][og] = get32bit(rptr);
+		}
+	}
+	return  7+(sc->create_labelscnt+sc->keep_labelscnt+sc->arch_labelscnt)*4*MASKORGROUP;
+}
+
+static inline uint32_t serialize_sc(uint8_t **wptr,const storage_class *sc) {
+	uint8_t i,og;
+	if (wptr!=NULL) {
+		put8bit(wptr,sc->admin_only);
+		put8bit(wptr,sc->create_mode);
+		put16bit(wptr,sc->arch_delay);
+		put8bit(wptr,sc->create_labelscnt);
+		put8bit(wptr,sc->keep_labelscnt);
+		put8bit(wptr,sc->arch_labelscnt);
+		for (i=0 ; i<sc->create_labelscnt ; i++) {
+			for (og=0 ; og<MASKORGROUP ; og++) {
+				put32bit(wptr,sc->create_labelmasks[i][og]);
+			}
+		}
+		for (i=0 ; i<sc->keep_labelscnt ; i++) {
+			for (og=0 ; og<MASKORGROUP ; og++) {
+				put32bit(wptr,sc->keep_labelmasks[i][og]);
+			}
+		}
+		for (i=0 ; i<sc->arch_labelscnt ; i++) {
+			for (og=0 ; og<MASKORGROUP ; og++) {
+				put32bit(wptr,sc->arch_labelmasks[i][og]);
+			}
+		}
+	}
+	return 7+(sc->create_labelscnt+sc->keep_labelscnt+sc->arch_labelscnt)*4*MASKORGROUP;
+}
+
+static inline void printf_sc(const storage_class *sc,char *endstr) {
+	char labelsbuff[LABELS_BUFF_SIZE];
+	if (sc->arch_delay==0) {
+		if (sc->create_labelscnt==sc->keep_labelscnt) {
+			printf("%"PRIu8,sc->create_labelscnt);
+		} else {
+			printf("%"PRIu8"->%"PRIu8,sc->create_labelscnt,sc->keep_labelscnt);
+		}
+		printf(" ; admin_only: %s",(sc->admin_only)?"YES":"NO");
+		printf(" ; create_mode: %s",(sc->create_mode==CREATE_MODE_LOOSE)?"LOOSE":(sc->create_mode==CREATE_MODE_STRICT)?"STRICT":"STD");
+		printf(" ; create_labels: %s",make_label_expr(labelsbuff,sc->create_labelscnt,(uint32_t (*)[MASKORGROUP])sc->create_labelmasks));
+		printf(" ; keep_labels: %s",make_label_expr(labelsbuff,sc->keep_labelscnt,(uint32_t (*)[MASKORGROUP])sc->keep_labelmasks));
+	} else {
+		if (sc->create_labelscnt==sc->keep_labelscnt && sc->keep_labelscnt==sc->arch_labelscnt) {
+			printf("%"PRIu8,sc->create_labelscnt);
+		} else {
+			printf("%"PRIu8"->%"PRIu8"->%"PRIu8,sc->create_labelscnt,sc->keep_labelscnt,sc->arch_labelscnt);
+		}
+		printf(" ; admin_only: %s",(sc->admin_only)?"YES":"NO");
+		printf(" ; create_mode: %s",(sc->create_mode==CREATE_MODE_LOOSE)?"LOOSE":(sc->create_mode==CREATE_MODE_STRICT)?"STRICT":"STD");
+		printf(" ; create_labels: %s",make_label_expr(labelsbuff,sc->create_labelscnt,(uint32_t (*)[MASKORGROUP])sc->create_labelmasks));
+		printf(" ; keep_labels: %s",make_label_expr(labelsbuff,sc->keep_labelscnt,(uint32_t (*)[MASKORGROUP])sc->keep_labelmasks));
+		printf(" ; arch_labels: %s",make_label_expr(labelsbuff,sc->arch_labelscnt,(uint32_t (*)[MASKORGROUP])sc->arch_labelmasks));
+		printf(" ; arch_delay: %"PRIu16"d",sc->arch_delay);
+	}
+	printf("%s",endstr);
+}
+
+#if 0
 static inline int labels_deserialize(const uint8_t **rptr,uint8_t *create_mode,uint8_t *create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t *keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t *arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t *arch_delay) {
 	uint8_t lc,og;
 	if (masterversion>=VERSION2INT(3,0,9)) {
@@ -1827,15 +1931,14 @@ void printf_goal(uint8_t create_mode,uint8_t create_labelscnt,uint32_t create_la
 		}
 	}
 }
+#endif
 
-int get_goal(const char *fname,uint8_t *goal,uint8_t *create_mode,uint8_t *create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t *keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t *arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t *arch_delay,uint8_t mode) {
+int get_sclass(const char *fname,uint8_t *goal,char storage_class_name[256],uint8_t mode) {
 	uint8_t reqbuff[17],*wptr,*buff;
 	const uint8_t *rptr;
 	uint32_t cmd,leng,inode;
 	uint8_t fn,dn,i;
-//	uint8_t goal;
-//	uint8_t labelscnt;
-//	uint32_t labelmasks[9][MASKORGROUP];
+	uint8_t scnleng;
 	uint32_t cnt;
 	int fd;
 	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
@@ -1843,7 +1946,7 @@ int get_goal(const char *fname,uint8_t *goal,uint8_t *create_mode,uint8_t *creat
 		return -1;
 	}
 	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_GETGOAL);
+	put32bit(&wptr,CLTOMA_FUSE_GETSCLASS);
 	put32bit(&wptr,9);
 	put32bit(&wptr,0);
 	put32bit(&wptr,inode);
@@ -1861,7 +1964,7 @@ int get_goal(const char *fname,uint8_t *goal,uint8_t *create_mode,uint8_t *creat
 	rptr = reqbuff;
 	cmd = get32bit(&rptr);
 	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_GETGOAL) {
+	if (cmd!=MATOCL_FUSE_GETSCLASS) {
 		printf("%s: master query: wrong answer (type)\n",fname);
 		close_master_conn(1);
 		return -1;
@@ -1901,11 +2004,14 @@ int get_goal(const char *fname,uint8_t *goal,uint8_t *create_mode,uint8_t *creat
 		}
 		*goal = get8bit(&rptr);
 		if (*goal==0) {
-			if (labels_deserialize(&rptr,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay)<0) {
-				printf("%s: master query: wrong answer (labels)\n",fname);
-				free(buff);
-				return -1;
-			}
+			printf("%s: unsupported data format (upgrade master)\n",fname);
+			free(buff);
+			return -1;
+		} else if (*goal==0xFF) {
+			scnleng = get8bit(&rptr);
+			memcpy(storage_class_name,rptr,scnleng);
+			storage_class_name[scnleng]=0;
+			rptr+=scnleng;
 		}
 		cnt = get32bit(&rptr);
 		if (cnt!=1) {
@@ -1913,9 +2019,8 @@ int get_goal(const char *fname,uint8_t *goal,uint8_t *create_mode,uint8_t *creat
 			free(buff);
 			return -1;
 		}
-		if (*goal==0) {
-			printf("%s: ",fname);
-			printf_goal(*create_mode,*create_labelscnt,create_labelmasks,*keep_labelscnt,keep_labelmasks,*arch_labelscnt,arch_labelmasks,*arch_delay,"\n");
+		if (*goal==0xFF) {
+			printf("%s: '%s'\n",fname,storage_class_name);
 		} else {
 			printf("%s: %"PRIu8"\n",fname,*goal);
 		}
@@ -1926,36 +2031,40 @@ int get_goal(const char *fname,uint8_t *goal,uint8_t *create_mode,uint8_t *creat
 		for (i=0 ; i<fn ; i++) {
 			*goal = get8bit(&rptr);
 			if (*goal==0) {
-				if (labels_deserialize(&rptr,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay)<0) {
-					printf("%s: master query: wrong answer (labels)\n",fname);
-					free(buff);
-					return -1;
-				}
+				printf("%s: unsupported data format (upgrade master)\n",fname);
+				free(buff);
+				return -1;
+			} else if (*goal==0xFF) {
+				scnleng = get8bit(&rptr);
+				memcpy(storage_class_name,rptr,scnleng);
+				storage_class_name[scnleng]=0;
+				rptr+=scnleng;
 			}
 			cnt = get32bit(&rptr);
-			if (*goal==0) {
-				printf(" files with goal        ");
-				printf_goal(*create_mode,*create_labelscnt,create_labelmasks,*keep_labelscnt,keep_labelmasks,*arch_labelscnt,arch_labelmasks,*arch_delay," :");
+			if (*goal==0xFF) {
+				printf(" files with storage class       '%s' :",storage_class_name);
 			} else {
-				printf(" files with goal        %"PRIu8" :",*goal);
+				printf(" files with goal                %"PRIu8" :",*goal);
 			}
 			print_number(" ","\n",cnt,1,0,1);
 		}
 		for (i=0 ; i<dn ; i++) {
 			*goal = get8bit(&rptr);
 			if (*goal==0) {
-				if (labels_deserialize(&rptr,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay)<0) {
-					printf("%s: master query: wrong answer (labels)\n",fname);
-					free(buff);
-					return -1;
-				}
+				printf("%s: unsupported data format (upgrade master)\n",fname);
+				free(buff);
+				return -1;
+			} else if (*goal==0xFF) {
+				scnleng = get8bit(&rptr);
+				memcpy(storage_class_name,rptr,scnleng);
+				storage_class_name[scnleng]=0;
+				rptr+=scnleng;
 			}
 			cnt = get32bit(&rptr);
-			if (*goal==0) {
-				printf(" directories with goal  ");
-				printf_goal(*create_mode,*create_labelscnt,create_labelmasks,*keep_labelscnt,keep_labelmasks,*arch_labelscnt,arch_labelmasks,*arch_delay," :");
+			if (*goal==0xFF) {
+				printf(" directories with storage class '%s' :",storage_class_name);
 			} else {
-				printf(" directories with goal  %"PRIu8" :",*goal);
+				printf(" directories with goal          %"PRIu8" :",*goal);
 			}
 			print_number(" ","\n",cnt,1,0,1);
 		}
@@ -2209,79 +2318,61 @@ int get_eattr(const char *fname,uint8_t *eattr,uint8_t mode) {
 	return 0;
 }
 
-int set_goal(const char *fname,uint8_t goal,uint8_t create_mode,uint8_t create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t arch_delay,uint8_t mode) {
-	uint8_t reqbuff[28+3*9*4*MASKORGROUP],*wptr,*buff;
+int set_sclass(const char *fname,uint8_t goal,const char src_storage_class_name[256],const char storage_class_name[256],uint8_t mode) {
+	uint8_t reqbuff[22+512],*wptr,*buff;
 	const uint8_t *rptr;
 	int32_t rleng;
+	uint8_t nleng,snleng;
 	uint32_t cmd,leng,inode,uid;
 	uint32_t changed,notchanged,notpermitted,quotaexceeded;
-	uint8_t i,og;
 	int fd;
+
+	nleng = strlen(storage_class_name);
+	if ((mode&SMODE_TMASK)==SMODE_EXCHANGE) {
+		snleng = strlen(src_storage_class_name);
+	} else {
+		snleng = 0;
+	}
 	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
 	if (fd<0) {
 		return -1;
 	}
 	uid = getuid();
 	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_SETGOAL);
-	if (goal>0) {
+	put32bit(&wptr,CLTOMA_FUSE_SETSCLASS);
+	if (goal>=1 && goal<=9) {
 		rleng = 14;
-	} else {
-		if (masterversion<VERSION2INT(2,1,0)) {
-			printf("%s: labels not supported (master too old)\n",fname);
+	} else if (goal==0xFF) {
+		if (masterversion<VERSION2INT(3,0,75)) {
+			printf("%s: storage classes not supported (master too old)\n",fname);
 			close_master_conn(0);
 			return -1;
 		}
-		mode = (mode&SMODE_RMASK) | SMODE_LABELS;
-		if (masterversion<VERSION2INT(3,0,9)) {
-			rleng = 14+keep_labelscnt*4*MASKORGROUP;
+		if ((mode&SMODE_TMASK)==SMODE_EXCHANGE) {
+			rleng = 14+2+snleng+nleng;
 		} else {
-			rleng = 20+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4*MASKORGROUP;
+			rleng = 14+1+nleng;
 		}
+	} else {
+		printf("%s: set storage class unsupported mode (internal error)\n",fname);
+		close_master_conn(0);
+		return -1;
 	}
 	put32bit(&wptr,rleng);
 	put32bit(&wptr,0);
 	put32bit(&wptr,inode);
 	put32bit(&wptr,uid);
-	if (goal>0) {
-		put8bit(&wptr,goal);
-	} else {
-		if (masterversion<VERSION2INT(3,0,9)) {
-			put8bit(&wptr,keep_labelscnt);
-		} else {
-			put8bit(&wptr,0);
-		}
-	}
+	put8bit(&wptr,goal);
 	put8bit(&wptr,mode);
-	if (goal==0) {
-		if (masterversion<VERSION2INT(3,0,9)) {
-			for (i=0 ; i<keep_labelscnt ; i++) {
-				for (og=0 ; og<MASKORGROUP ; og++) {
-					put32bit(&wptr,keep_labelmasks[i][og]);
-				}
-			}
-		} else {
-			put8bit(&wptr,create_mode);
-			put16bit(&wptr,arch_delay);
-			put8bit(&wptr,create_labelscnt);
-			put8bit(&wptr,keep_labelscnt);
-			put8bit(&wptr,arch_labelscnt);
-			for (i=0 ; i<create_labelscnt ; i++) {
-				for (og=0 ; og<MASKORGROUP ; og++) {
-					put32bit(&wptr,create_labelmasks[i][og]);
-				}
-			}
-			for (i=0 ; i<keep_labelscnt ; i++) {
-				for (og=0 ; og<MASKORGROUP ; og++) {
-					put32bit(&wptr,keep_labelmasks[i][og]);
-				}
-			}
-			for (i=0 ; i<arch_labelscnt ; i++) {
-				for (og=0 ; og<MASKORGROUP ; og++) {
-					put32bit(&wptr,arch_labelmasks[i][og]);
-				}
-			}
+	if (goal==0xFF) {
+	       	if ((mode&SMODE_TMASK)==SMODE_EXCHANGE) {
+			put8bit(&wptr,snleng);
+			memcpy(wptr,src_storage_class_name,snleng);
+			wptr+=snleng;
 		}
+		put8bit(&wptr,nleng);
+		memcpy(wptr,storage_class_name,nleng);
+		wptr+=nleng;
 	}
 	rleng += 8;
 	if (tcpwrite(fd,reqbuff,rleng)!=rleng) {
@@ -2297,7 +2388,7 @@ int set_goal(const char *fname,uint8_t goal,uint8_t create_mode,uint8_t create_l
 	rptr = reqbuff;
 	cmd = get32bit(&rptr);
 	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_SETGOAL) {
+	if (cmd!=MATOCL_FUSE_SETSCLASS) {
 		printf("%s: master query: wrong answer (type)\n",fname);
 		close_master_conn(1);
 		return -1;
@@ -2336,23 +2427,27 @@ int set_goal(const char *fname,uint8_t goal,uint8_t create_mode,uint8_t create_l
 		quotaexceeded = 0;
 	}
 	if ((mode&SMODE_RMASK)==0) {
-		if (changed || mode==SMODE_SET || mode==SMODE_LABELS) {
-			if (mode==SMODE_LABELS) {
-				printf("%s: ",fname);
-				printf_goal(create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay,"\n");
+		if (changed || mode==SMODE_SET) {
+			if (goal==0xFF) {
+				printf("%s: storage class: '%s'\n",fname,storage_class_name);
 			} else {
-				printf("%s: %"PRIu8"\n",fname,goal);
+				printf("%s: goal: %"PRIu8"\n",fname,goal);
 			}
 		} else {
 			printf("%s: goal not changed\n",fname);
 		}
 	} else {
 		printf("%s:\n",fname);
-		print_number(" inodes with goal changed:      ","\n",changed,1,0,1);
-		print_number(" inodes with goal not changed:  ","\n",notchanged,1,0,1);
-		print_number(" inodes with permission denied: ","\n",notpermitted,1,0,1);
+		if (goal==0xFF) {
+			print_number(" inodes with storage class changed:     ","\n",changed,1,0,1);
+			print_number(" inodes with storage class not changed: ","\n",notchanged,1,0,1);
+		} else {
+			print_number(" inodes with goal changed:              ","\n",changed,1,0,1);
+			print_number(" inodes with goal not changed:          ","\n",notchanged,1,0,1);
+		}
+		print_number(" inodes with permission denied:         ","\n",notpermitted,1,0,1);
 		if (leng==16) {
-			print_number(" inodes with quota exceeded:    ","\n",quotaexceeded,1,0,1);
+			print_number(" inodes with quota exceeded:            ","\n",quotaexceeded,1,0,1);
 		}
 	}
 	free(buff);
@@ -2631,6 +2726,531 @@ int archive_control(const char *fname,uint8_t archcmd) {
 		print_number(" files with permission denied: ","\n",notpermitted,1,0,1);
 	}
 	free(buff);
+	return 0;
+}
+
+int make_sc(const char *mfsmp,const char *scname,storage_class *sc) {
+	uint8_t reqbuff[12+256+8+3*9*4*MASKORGROUP],*wptr,*buff;
+	const uint8_t *rptr;
+	uint32_t cmd,leng;
+	int32_t pleng;
+	uint32_t nleng;
+	char cwdbuff[MAXPATHLEN];
+	int fd;
+
+	nleng = strlen(scname);
+	if (nleng>=256) {
+		printf("%s: name too long\n",scname);
+		return -1;
+	}
+	if (mfsmp==NULL) {
+		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
+	}
+	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
+	if (fd<0) {
+		return -1;
+	}
+	pleng = 4+1+nleng+1+serialize_sc(NULL,sc);
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_SCLASS_CREATE);
+	put32bit(&wptr,pleng);
+	put32bit(&wptr,0);
+	put8bit(&wptr,nleng);
+	memcpy(wptr,scname,nleng);
+	wptr+=nleng;
+	put8bit(&wptr,0); // packet version
+	serialize_sc(&wptr,sc);
+	pleng+=8;
+	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
+		printf("master query: send error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("master query: receive error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_SCLASS_CREATE) {
+		printf("master query: wrong answer (type)\n");
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("master query: receive error\n");
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("master query: wrong answer (queryid)\n");
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng!=1) {
+		printf("master query: wrong answer (leng)\n");
+		free(buff);
+		return -1;
+	}
+	if (rptr[0]!=MFS_STATUS_OK) {
+		printf("storage class make %s: error: %s\n",scname,mfsstrerr(*rptr));
+		free(buff);
+		return -1;
+	}
+	printf("storage class make %s: ok\n",scname);
+	return 0;
+}
+
+int change_sc(const char *mfsmp,const char *scname,uint16_t chgmask,storage_class *sc) {
+	uint8_t reqbuff[12+256+10+3*9*4*MASKORGROUP],*wptr,*buff;
+	const uint8_t *rptr;
+	uint32_t cmd,leng;
+	int32_t pleng;
+	uint32_t nleng;
+	char cwdbuff[MAXPATHLEN];
+	int fd;
+
+	nleng = strlen(scname);
+	if (nleng>=256) {
+		printf("%s: name too long\n",scname);
+		return -1;
+	}
+	if (mfsmp==NULL) {
+		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
+	}
+	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
+	if (fd<0) {
+		return -1;
+	}
+	pleng = 4+1+nleng+3+serialize_sc(NULL,sc);
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_SCLASS_CHANGE);
+	put32bit(&wptr,pleng);
+	put32bit(&wptr,0);
+	put8bit(&wptr,nleng);
+	memcpy(wptr,scname,nleng);
+	wptr+=nleng;
+	put8bit(&wptr,0); // packet version
+	put16bit(&wptr,chgmask);
+	serialize_sc(&wptr,sc);
+	pleng+=8;
+	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
+		printf("master query: send error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("master query: receive error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_SCLASS_CHANGE) {
+		printf("master query: wrong answer (type)\n");
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("master query: receive error\n");
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("master query: wrong answer (queryid)\n");
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng==0) {
+		printf("master query: wrong answer (leng)\n");
+		free(buff);
+		return -1;
+	}
+	if (leng==1) {
+		if (chgmask==0) {
+			printf("storage class show %s: error: %s\n",scname,mfsstrerr(*rptr));
+		} else {
+			printf("storage class change %s: error: %s\n",scname,mfsstrerr(*rptr));
+		}
+		free(buff);
+		return -1;
+	}
+	if (get8bit(&rptr)!=0) {
+		printf("master query: wrong answer (wrong data format)\n");
+		free(buff);
+		return -1;
+	}
+	if (deserialize_sc(&rptr,leng-1,sc)<0) {
+		printf("master query: wrong answer (deserialize stoage class)\n");
+		free(buff);
+		return -1;
+	}
+	printf("storage class change %s: ",scname);
+	printf_sc(sc,"\n");
+	return 0;
+}
+
+int show_sc(const char *mfsmp,const char *scname) {
+	storage_class sc;
+
+	return change_sc(mfsmp,scname,0,&sc);
+}
+
+int remove_sc(const char *mfsmp,const char *scname) {
+	uint8_t reqbuff[12+256],*wptr,*buff;
+	const uint8_t *rptr;
+	uint32_t cmd,leng;
+	int32_t pleng;
+	uint32_t nleng;
+	char cwdbuff[MAXPATHLEN];
+	int fd;
+
+	nleng = strlen(scname);
+	if (nleng>=256) {
+		printf("%s: name too long\n",scname);
+		return -1;
+	}
+	if (mfsmp==NULL) {
+		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
+	}
+	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
+	if (fd<0) {
+		return -1;
+	}
+	pleng = 4+1+nleng;
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_SCLASS_DELETE);
+	put32bit(&wptr,pleng);
+	put32bit(&wptr,0);
+	put8bit(&wptr,nleng);
+	memcpy(wptr,scname,nleng);
+	wptr+=nleng;
+	pleng+=8;
+	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
+		printf("master query: send error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("master query: receive error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_SCLASS_DELETE) {
+		printf("master query: wrong answer (type)\n");
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("master query: receive error\n");
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("master query: wrong answer (queryid)\n");
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng!=1) {
+		printf("master query: wrong answer (leng)\n");
+		free(buff);
+		return -1;
+	}
+	if (rptr[0]!=MFS_STATUS_OK) {
+		printf("storage class remove %s: error: %s\n",scname,mfsstrerr(*rptr));
+		free(buff);
+		return -1;
+	}
+	printf("storage class remove %s: ok\n",scname);
+	return 0;
+
+	return 0;
+}
+
+int copy_sc(const char *mfsmp,const char *oldscname,const char *newscname) {
+	uint8_t reqbuff[12+512],*wptr,*buff;
+	const uint8_t *rptr;
+	uint32_t cmd,leng;
+	int32_t pleng;
+	uint32_t onleng,nnleng;
+	char cwdbuff[MAXPATHLEN];
+	int fd;
+
+	onleng = strlen(oldscname);
+	nnleng = strlen(newscname);
+	if (onleng>=256) {
+		printf("%s: name too long\n",oldscname);
+		return -1;
+	}
+	if (nnleng>=256) {
+		printf("%s: name too long\n",newscname);
+		return -1;
+	}
+	if (mfsmp==NULL) {
+		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
+	}
+	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
+	if (fd<0) {
+		return -1;
+	}
+	
+	pleng = 4+2+onleng+nnleng;
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_SCLASS_DUPLICATE);
+	put32bit(&wptr,pleng);
+	put32bit(&wptr,0);
+	put8bit(&wptr,onleng);
+	memcpy(wptr,oldscname,onleng);
+	wptr+=onleng;
+	put8bit(&wptr,nnleng);
+	memcpy(wptr,newscname,nnleng);
+	wptr+=nnleng;
+	pleng+=8;
+	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
+		printf("master query: send error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("master query: receive error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_SCLASS_DUPLICATE) {
+		printf("master query: wrong answer (type)\n");
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("master query: receive error\n");
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("master query: wrong answer (queryid)\n");
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng!=1) {
+		printf("master query: wrong answer (leng)\n");
+		free(buff);
+		return -1;
+	}
+	if (rptr[0]!=MFS_STATUS_OK) {
+		printf("storage class copy %s->%s: error: %s\n",oldscname,newscname,mfsstrerr(*rptr));
+		free(buff);
+		return -1;
+	}
+	printf("storage class copy %s->%s: ok\n",oldscname,newscname);
+	return 0;
+}
+
+int move_sc(const char *mfsmp,const char *oldscname,const char *newscname) {
+	uint8_t reqbuff[12+512],*wptr,*buff;
+	const uint8_t *rptr;
+	uint32_t cmd,leng;
+	int32_t pleng;
+	uint32_t onleng,nnleng;
+	char cwdbuff[MAXPATHLEN];
+	int fd;
+
+	onleng = strlen(oldscname);
+	nnleng = strlen(newscname);
+	if (onleng>=256) {
+		printf("%s: name too long\n",oldscname);
+		return -1;
+	}
+	if (nnleng>=256) {
+		printf("%s: name too long\n",newscname);
+		return -1;
+	}
+	if (mfsmp==NULL) {
+		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
+	}
+	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
+	if (fd<0) {
+		return -1;
+	}
+
+	pleng = 4+2+onleng+nnleng;
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_SCLASS_RENAME);
+	put32bit(&wptr,pleng);
+	put32bit(&wptr,0);
+	put8bit(&wptr,onleng);
+	memcpy(wptr,oldscname,onleng);
+	wptr+=onleng;
+	put8bit(&wptr,nnleng);
+	memcpy(wptr,newscname,nnleng);
+	wptr+=nnleng;
+	pleng+=8;
+	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
+		printf("master query: send error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("master query: receive error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_SCLASS_RENAME) {
+		printf("master query: wrong answer (type)\n");
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("master query: receive error\n");
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("master query: wrong answer (queryid)\n");
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng!=1) {
+		printf("master query: wrong answer (leng)\n");
+		free(buff);
+		return -1;
+	}
+	if (rptr[0]!=MFS_STATUS_OK) {
+		printf("storage class move %s->%s: error: %s\n",oldscname,newscname,mfsstrerr(*rptr));
+		free(buff);
+		return -1;
+	}
+	printf("storage class move %s->%s: ok\n",oldscname,newscname);
+	return 0;
+}
+
+int list_sc(const char *mfsmp,uint8_t longmode) {
+	uint8_t reqbuff[12+512],*wptr,*buff;
+	const uint8_t *rptr;
+	uint32_t cmd,leng;
+	uint8_t nleng;
+	int dret;
+	char scname[256];
+	storage_class sc;
+	char cwdbuff[MAXPATHLEN];
+	int fd;
+
+	if (mfsmp==NULL) {
+		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
+	}
+	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
+	if (fd<0) {
+		return -1;
+	}
+
+	wptr = reqbuff;
+	put32bit(&wptr,CLTOMA_SCLASS_LIST);
+	put32bit(&wptr,5);
+	put32bit(&wptr,0);
+	put8bit(&wptr,longmode);
+	if (tcpwrite(fd,reqbuff,13)!=13) {
+		printf("master query: send error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("master query: receive error\n");
+		close_master_conn(1);
+		return -1;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=MATOCL_SCLASS_LIST) {
+		printf("master query: wrong answer (type)\n");
+		close_master_conn(1);
+		return -1;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("master query: receive error\n");
+		free(buff);
+		close_master_conn(1);
+		return -1;
+	}
+	close_master_conn(0);
+	rptr = buff;
+	cmd = get32bit(&rptr);	// queryid
+	if (cmd!=0) {
+		printf("master query: wrong answer (queryid)\n");
+		free(buff);
+		return -1;
+	}
+	leng-=4;
+	if (leng==1) {
+		printf("storage class list: error: %s\n",mfsstrerr(*rptr));
+		free(buff);
+		return -1;
+	}
+	while (leng>0) {
+		nleng = get8bit(&rptr);
+		leng--;
+		if (nleng<=leng) {
+			memcpy(scname,rptr,nleng);
+			rptr+=nleng;
+			leng-=nleng;
+			scname[nleng]=0;
+		}
+		if (longmode&1) {
+			dret = deserialize_sc(&rptr,leng,&sc);
+			if (dret<0) {
+				printf("master query: wrong answer (deserialize storage class)\n");
+				free(buff);
+				return -1;
+			}
+			leng -= dret;
+			printf("%s : ",scname);
+			printf_sc(&sc,"\n");
+		} else {
+			printf("%s\n",scname);
+		}
+	}
 	return 0;
 }
 
@@ -4154,6 +4774,11 @@ enum {
 	MFSGETGOAL=1,
 	MFSSETGOAL,
 	MFSCOPYGOAL,
+	MFSGETSCLASS,
+	MFSSETSCLASS,
+	MFSXCHGSCLASS,
+	MFSCOPYSCLASS,
+	MFSLISTSCLASS,
 	MFSGETTRASHTIME,
 	MFSSETTRASHTIME,
 	MFSCOPYTRASHTIME,
@@ -4175,7 +4800,14 @@ enum {
 	MFSFILEPATHS,
 	MFSCHKARCHIVE,
 	MFSSETARCHIVE,
-	MFSCLRARCHIVE
+	MFSCLRARCHIVE,
+	MFSSCADMIN,
+	MFSMKSC,
+	MFSCHSC,
+	MFSRMSC,
+	MFSCPSC,
+	MFSMVSC,
+	MFSLSSC
 };
 
 static inline void print_numberformat_options() {
@@ -4209,23 +4841,43 @@ void usage(int f) {
 			print_recursive_option();
 			break;
 		case MFSSETGOAL:
-			fprintf(stderr,"set objects goal (desired number of copies)\n\nusage: mfssetgoal [-lsnhHkmgr] GOAL[-|+]|LABELS name [name ...]\n       mfssetgoal [-lsnhHkmgr] -K KEEP_LABELS [ -C CREATE_LABELS ] [ -A ARCHIVE_LABELS -d ARCHIVE_DELAY ] name [name ...]\n");
+			fprintf(stderr,"set objects goal (desired number of copies)\n\nusage: mfssetgoal [-nhHkmgr] GOAL[-|+] name [name ...]\n");
 			print_numberformat_options();
 			print_recursive_option();
-			fprintf(stderr," -l - use 'loose' mode for create (allow using other labels during chunk creation wnen servers are overloaded or full)\n");
-			fprintf(stderr," -s - use 'strict' mode for create (never use other labels for creating new chunks)\n");
 			fprintf(stderr," GOAL+ - increase goal to given value\n");
 			fprintf(stderr," GOAL- - decrease goal to given value\n");
 			fprintf(stderr," GOAL - just set goal to given value\n");
-			fprintf(stderr," LABELS - set goal using labels\n");
-			fprintf(stderr," KEEP_LABELS - specify separate labels/goal used to keep data\n");
-			fprintf(stderr," CREATE_LABELS - specify separate labels/goal used to create new chunks\n");
-			fprintf(stderr," ARCHIVE_LABELS - specify separate labels/goal used when ARCHIVE_DELAY days passed after last file modification (mtime)\n");
 			break;
 		case MFSCOPYGOAL:
 			fprintf(stderr,"copy object goal (desired number of copies)\n\nusage: mfscopygoal [-nhHkmgr] srcname dstname [dstname ...]\n");
 			print_numberformat_options();
 			print_recursive_option();
+			break;
+		case MFSGETSCLASS:
+			fprintf(stderr,"get objects storage class (desired number of copies / labels)\n\nusage: mfsgetsclass [-nhHkmgr] name [name ...]\n");
+			print_numberformat_options();
+			print_recursive_option();
+			break;
+		case MFSSETSCLASS:
+			fprintf(stderr,"set objects storage class (desired number of copies / labels)\n\nusage: mfssetsclass [-nhHkmgr] STORAGE_CLASS_NAME name [name ...]\n");
+			print_numberformat_options();
+			print_recursive_option();
+			break;
+		case MFSCOPYSCLASS:
+			fprintf(stderr,"copy object storage class (desired number of copies / labels)\n\nusage: mfscopysclass [-nhHkmgr] srcname dstname [dstname ...]\n");
+			print_numberformat_options();
+			print_recursive_option();
+			break;
+		case MFSXCHGSCLASS:
+			fprintf(stderr,"exchange objects storage class (desired number of copies / labels)\n\nusage: mfsxchgsclass [-nhHkmgr] OLD_STORAGE_CLASS_NAME NEW_STORAGE_CLASS_NAME name [name ...]\n");
+			print_numberformat_options();
+			print_recursive_option();
+			break;
+		case MFSLISTSCLASS:
+			fprintf(stderr,"lists available storage classes (same as mfsscadmin list)\n\nusage: mfslistsclass [-al] [mountpoint_or_any_subfolder]\n");
+			fprintf(stderr," -a - lists all storage classes (including standard goal classes)\n");
+			fprintf(stderr," -l - lists storage classes with definitions (long format)\n");
+			fprintf(stderr,"If mountpoint_or_any_subfolder is not specified then current directory will be used\n");
 			break;
 		case MFSGETTRASHTIME:
 			fprintf(stderr,"get objects trashtime (how many seconds file should be left in trash)\n\nusage: mfsgettrashtime [-nhHkmgr] name [name ...]\n");
@@ -4251,9 +4903,9 @@ void usage(int f) {
 		case MFSFILEINFO:
 			fprintf(stderr,"show files info (shows detailed info of each file chunk)\n\nusage: mfsfileinfo [-qcs] name [name ...]\n");
 			fprintf(stderr,"switches:\n");
-			fprintf(stderr,"-q - quick info (show only number of valid copies)\n");
-			fprintf(stderr,"-c - receive chunk checksums from chunkservers\n");
-			fprintf(stderr,"-s - calculate file signature (using checksums)\n");
+			fprintf(stderr," -q - quick info (show only number of valid copies)\n");
+			fprintf(stderr," -c - receive chunk checksums from chunkservers\n");
+			fprintf(stderr," -s - calculate file signature (using checksums)\n");
 			break;
 		case MFSAPPENDCHUNKS:
 			fprintf(stderr,"append file chunks to another file. If destination file doesn't exist then it's created as empty file and then chunks are appended\n\nusage: mfsappendchunks dstfile name [name ...]\n");
@@ -4281,12 +4933,12 @@ void usage(int f) {
 			break;
 		case MFSMAKESNAPSHOT:
 			fprintf(stderr,"make snapshot (lazy copy)\n\nusage: mfsmakesnapshot [-op] src [src ...] dst\n");
-			fprintf(stderr,"-o - allow to overwrite existing objects\n");
-			fprintf(stderr,"-c - 'cp' mode for attributes (create objects using current uid,gid,umask etc.)\n");
+			fprintf(stderr," -o - allow to overwrite existing objects\n");
+			fprintf(stderr," -c - 'cp' mode for attributes (create objects using current uid,gid,umask etc.)\n");
 			break;
 		case MFSRMSNAPSHOT:
 			fprintf(stderr,"remove snapshot (quick rm -r)\n\nusage: mfsrmsnapshot [-f] name [name ...]\n");
-			fprintf(stderr,"-f - remove as much as possible (according to access rights and snapshot flags)\n");
+			fprintf(stderr," -f - remove as much as possible (according to access rights and snapshot flags)\n");
 			break;
 		case MFSGETEATTR:
 			fprintf(stderr,"get objects extra attributes\n\nusage: mfsgeteattr [-nhHkmgr] name [name ...]\n");
@@ -4349,9 +5001,45 @@ void usage(int f) {
 			break;
 		case MFSSETARCHIVE:
 			fprintf(stderr,"set archive flags in chunks (recursivelly for directories) - moves files to archive (use 'archive' goal/labels instead of 'keep' goal/labels)\n\nusage: mfssetarchive [-nhHkmg] name [name ...]\n");
+			print_numberformat_options();
 			break;
 		case MFSCLRARCHIVE:
 			fprintf(stderr,"clear archive flags in chunks (recursivelly for directories) - moves files from archive (use 'keep' goal/labels instead of 'archive' goal/labels) - it also changes ctime, so files will move back to archive after time specified in mfssetgoal\n\nusage: mfsclrarchive [-nhHkmg] name [name ...]\n");
+			print_numberformat_options();
+			break;
+		case MFSSCADMIN:
+		case MFSMKSC:
+		case MFSCHSC:
+		case MFSRMSC:
+		case MFSCPSC:
+		case MFSMVSC:
+		case MFSLSSC:
+			fprintf(stderr,"mfs storage class admin tool\n\nusage:\n");
+			fprintf(stderr,"\tmfsscadmin [/mountpoint] create|make [-a admin_only] [-m create_mode] [-C create_labels] -K keep_labels [-A archive_labels -d archive_delay] sclass [sclass ...]\n");
+			fprintf(stderr,"\tmfsscadmin [/mountpoint] create|make [-a admin_only] [-m create_mode] LABELS sclass [sclass ...]\n");
+			fprintf(stderr,"\tmfsscadmin [/mountpoint] modify|change [-f] [-a admin_only] [-m create_mode] [-C create_labels] [-K keep_labels] [-A archive_labels] [-d archive_delay] sclass [sclass ...]\n");
+			fprintf(stderr,"\tmfsscadmin [/mountpoint] delete|remove sclass [sclass ...]\n");
+			fprintf(stderr,"\tmfsscadmin [/mountpoint] copy|duplicate src_sclass dst_sclass [dst_sclass ...]\n");
+			fprintf(stderr,"\tmfsscadmin [/mountpoint] rename src_sclass_name dst_sclass_name\n");
+			fprintf(stderr,"\tmfsscadmin [/mountpoint] list [-l]\n");
+			fprintf(stderr,"\n");
+			fprintf(stderr,"create/modify options:\n");
+			fprintf(stderr," -m - set create mode (options are: 'l' for 'loose', 's' for 'strict' and 'd' or not specified for 'default')\n");
+			fprintf(stderr,"    'default' mode: if there are overloaded servers, system will wait for them, but in case of no space available will use other servers (disregarding the labels).\n");
+			fprintf(stderr,"    'strict' mode: the system will wait for overloaded servers, but will return error (ENOSPC) when there is no space on servers with correct labels.\n");
+			fprintf(stderr,"    'loose' mode: the system will disregard the labels in both cases.\n");
+			fprintf(stderr," -a - set admin only mode ( 0 - anybody can use this storage class, 1 - only admin can use this storage class ) - by default it set to 0\n");
+			fprintf(stderr," -C - set labels used for creation chunks - when not specified then 'keep' labels are used\n");
+			fprintf(stderr," -K - set labels used for keeping chunks - must be specified\n");
+			fprintf(stderr," -A - set labels used for archiving chunks - when not specified then 'keep' labels are used\n");
+			fprintf(stderr," -d - set number of days used to switch labels from 'keep' to 'archive' - must be specified when '-A' option is given\n");
+			fprintf(stderr," -f - force modification of classes 1 to 9 (modify only)\n");
+			fprintf(stderr,"\n");
+			fprintf(stderr,"list options:\n");
+			fprintf(stderr," -l - lists storage classes with definitions (long format)\n");
+			fprintf(stderr,"\n");
+			fprintf(stderr,"If '/mountpoint' parameter is not specified then current directory is used (it might be any subfolder of mountpoint).\n");
+			fprintf(stderr,"All actions but list need 'admin' flag specified in mfsexports.cfg\n");
 			break;
 	}
 	exit(1);
@@ -4361,33 +5049,35 @@ int main(int argc,char **argv) {
 	int l,f,status;
 	int i,j,found;
 	int ch;
+	int longmode = 0;
 	int snapmode = 0;
 	int rflag = 0;
 	uint8_t dirinfomode = 0;
 	uint8_t fileinfomode = 0;
 	uint64_t v;
-	uint8_t eattr = 0,goal = 1,smode = SMODE_SET,create_mode = CREATE_MODE_STD;
-	uint32_t create_labelmasks[9][MASKORGROUP];
-	uint32_t keep_labelmasks[9][MASKORGROUP];
-	uint32_t arch_labelmasks[9][MASKORGROUP];
-	uint8_t create_labelscnt = 0;
-	uint8_t keep_labelscnt = 0;
-	uint8_t arch_labelscnt = 0;
-	uint16_t arch_delay = 0;
+	uint8_t eattr = 0,goal = 1,smode = SMODE_SET;
+	storage_class sc;
+	uint16_t chgmask = 0;
 	uint32_t trashtime = 86400;
 	uint32_t sinodes = 0,hinodes = 0;
 	uint64_t slength = 0,hlength = 0,ssize = 0,hsize = 0,srealsize = 0,hrealsize = 0;
 	uint32_t graceperiod = 0;
 	uint8_t qflags = 0;
+	uint32_t scnleng;
+	char *scadmin_mp = NULL;
 	char *appendfname = NULL;
 	char *srcname = NULL;
 	char *hrformat;
+	char storage_class_name[256];
+	char src_storage_class_name[256];
 	char *p;
 
+	memset(&sc,0,sizeof(sc));
+	sc.create_mode = CREATE_MODE_STD;
 	strerr_init();
 
 	l = strlen(argv[0]);
-#define CHECKNAME(name) ((l==(int)(sizeof(name)-1) && strcmp(argv[0],name)==0) || (l>(int)(sizeof(name)-1) && strcmp((argv[0])+(l-sizeof(name)),"/" name)==0))
+#define CHECKNAME(name) ((strcmp(argv[0],name)==0) || (l>(int)(sizeof(name)-1) && strcmp((argv[0])+(l-sizeof(name)),"/" name)==0))
 
 	if (CHECKNAME("mfstools")) {
 		if (argc==2 && strcmp(argv[1],"create")==0) {
@@ -4398,6 +5088,11 @@ int main(int argc,char **argv) {
 			SYMLINK("mfsgetgoal")
 			SYMLINK("mfssetgoal")
 			SYMLINK("mfscopygoal")
+			SYMLINK("mfsgetsclass")
+			SYMLINK("mfssetsclass")
+			SYMLINK("mfscopysclass")
+			SYMLINK("mfsxchgsclass")
+			SYMLINK("mfslistsclass")
 			SYMLINK("mfsgettrashtime")
 			SYMLINK("mfssettrashtime")
 			SYMLINK("mfscopytrashtime")
@@ -4420,6 +5115,7 @@ int main(int argc,char **argv) {
 			SYMLINK("mfschkarchive")
 			SYMLINK("mfssetarchive")
 			SYMLINK("mfsclrarchive")
+			SYMLINK("mfsscadmin")
 			// deprecated tools:
 			SYMLINK("mfsrgetgoal")
 			SYMLINK("mfsrsetgoal")
@@ -4431,19 +5127,60 @@ int main(int argc,char **argv) {
 			fprintf(stderr,"\tmfstools mfs<toolname> ... - work as a given tool\n");
 			fprintf(stderr,"\ntools:\n");
 			fprintf(stderr,"\tmfsgetgoal\n\tmfssetgoal\n\tmfscopygoal\n");
+			fprintf(stderr,"\tmfsgetsclass\n\tmfssetsclass\n\tmfscopysclass\n\tmfsxchgsclass\n\tmfslistsclass\n");
 			fprintf(stderr,"\tmfsgettrashtime\n\tmfssettrashtime\n\tmfscopytrashtime\n");
 			fprintf(stderr,"\tmfsgeteattr\n\tmfsseteattr\n\tmfsdeleattr\n\tmfscopyeattr\n");
 			fprintf(stderr,"\tmfsgetquota\n\tmfssetquota\n\tmfsdelquota\n\tmfscopyquota\n");
 			fprintf(stderr,"\tmfscheckfile\n\tmfsfileinfo\n\tmfsappendchunks\n\tmfsdirinfo\n");
 			fprintf(stderr,"\tmfsfilerepair\n\tmfsmakesnapshot\n\tmfsfilepaths\n");
 			fprintf(stderr,"\tmfschkarchive\n\tmfssetarchive\n\tmfsclrarchive\n");
+			fprintf(stderr,"\tmfsscadmin\n");
 			return 1;
 		}
 		argv++;
 		argc--;
-		l = strlen(argv[0]);
+		l = 0;
 	}
-	if (CHECKNAME("mfsgetgoal")) {
+	if (CHECKNAME("mfsscadmin")) {
+		f = MFSSCADMIN;
+		if (argc<=1) {
+			usage(MFSSCADMIN);
+		} else {
+			argv++;
+			argc--;
+			l = 0;
+			if (*argv[0]=='/') {
+				scadmin_mp = *argv;
+				argv++;
+				argc--;
+			}
+			fprintf(stderr,"%s ; %u\n",argv[0],CHECKNAME("list"));
+			if (CHECKNAME("create")) {
+				f = MFSMKSC;
+			} else if (CHECKNAME("make")) {
+				f = MFSMKSC;
+			} else if (CHECKNAME("modify")) {
+				f = MFSCHSC;
+			} else if (CHECKNAME("change")) {
+				f = MFSCHSC;
+			} else if (CHECKNAME("delete")) {
+				f = MFSRMSC;
+			} else if (CHECKNAME("remove")) {
+				f = MFSRMSC;
+			} else if (CHECKNAME("copy")) {
+				f = MFSCPSC;
+			} else if (CHECKNAME("duplicate")) {
+				f = MFSCPSC;
+			} else if (CHECKNAME("rename")) {
+				f = MFSMVSC;
+			} else if (CHECKNAME("list")) {
+				f = MFSLSSC;
+			} else {
+				fprintf(stderr,"unknown storage class admin command\n");
+				usage(MFSSCADMIN);
+			}
+		}
+	} else if (CHECKNAME("mfsgetgoal")) {
 		f=MFSGETGOAL;
 	} else if (CHECKNAME("mfsrgetgoal")) {
 		f=MFSGETGOAL;
@@ -4457,6 +5194,16 @@ int main(int argc,char **argv) {
 		fprintf(stderr,"deprecated tool - use \"mfssetgoal -r\"\n");
 	} else if (CHECKNAME("mfscopygoal")) {
 		f=MFSCOPYGOAL;
+	} else if (CHECKNAME("mfsgetsclass")) {
+		f=MFSGETSCLASS;
+	} else if (CHECKNAME("mfssetsclass")) {
+		f=MFSSETSCLASS;
+	} else if (CHECKNAME("mfsxchgsclass")) {
+		f=MFSXCHGSCLASS;
+	} else if (CHECKNAME("mfscopysclass")) {
+		f=MFSCOPYSCLASS;
+	} else if (CHECKNAME("mfslistsclass")) {
+		f=MFSLISTSCLASS;
 	} else if (CHECKNAME("mfsgettrashtime")) {
 		f=MFSGETTRASHTIME;
 	} else if (CHECKNAME("mfsrgettrashtime")) {
@@ -4509,6 +5256,18 @@ int main(int argc,char **argv) {
 		f=MFSSETARCHIVE;
 	} else if (CHECKNAME("mfsclrarchive")) {
 		f=MFSCLRARCHIVE;
+	} else if (CHECKNAME("mfsmksc")) {
+		f=MFSMKSC;
+	} else if (CHECKNAME("mfschsc")) {
+		f=MFSCHSC;
+	} else if (CHECKNAME("mfsrmsc")) {
+		f=MFSRMSC;
+	} else if (CHECKNAME("mfscpsc")) {
+		f=MFSCPSC;
+	} else if (CHECKNAME("mfsmvsc")) {
+		f=MFSMVSC;
+	} else if (CHECKNAME("mfslssc")) {
+		f=MFSLSSC;
 	} else {
 		fprintf(stderr,"unknown binary name\n");
 		return 1;
@@ -4568,6 +5327,7 @@ int main(int argc,char **argv) {
 		argv += optind;
 		break;
 	case MFSCOPYGOAL:
+	case MFSCOPYSCLASS:
 	case MFSCOPYTRASHTIME:
 	case MFSCOPYEATTR:
 		while ((ch=getopt(argc,argv,"rnhHkmg"))!=-1) {
@@ -4637,38 +5397,10 @@ int main(int argc,char **argv) {
 		argv++;
 		break;
 	case MFSSETGOAL:
-		while ((ch=getopt(argc,argv,"d:A:K:C:slrnhHkmg"))!=-1) {
+	case MFSSETSCLASS:
+	case MFSXCHGSCLASS:
+		while ((ch=getopt(argc,argv,"rnhHkmg"))!=-1) {
 			switch(ch) {
-			case 'd':
-				arch_delay = strtoul(optarg,NULL,10);
-				break;
-			case 'A':
-				if (arch_labelscnt>0) {
-					fprintf(stderr,"option '-A' defined more than once\n");
-					usage(f);
-				}
-				if (parse_label_expr(optarg,&arch_labelscnt,arch_labelmasks)<0) {
-					usage(f);
-				}
-				break;
-			case 'K':
-				if (keep_labelscnt>0) {
-					fprintf(stderr,"option '-K' defined more than once\n");
-					usage(f);
-				}
-				if (parse_label_expr(optarg,&keep_labelscnt,keep_labelmasks)<0) {
-					usage(f);
-				}
-				break;
-			case 'C':
-				if (create_labelscnt>0) {
-					fprintf(stderr,"option '-C' defined more than once\n");
-					usage(f);
-				}
-				if (parse_label_expr(optarg,&create_labelscnt,create_labelmasks)<0) {
-					usage(f);
-				}
-				break;
 			case 'n':
 				humode=0;
 				break;
@@ -4690,91 +5422,60 @@ int main(int argc,char **argv) {
 			case 'r':
 				rflag=1;
 				break;
-			case 's':
-				if (create_mode==CREATE_MODE_LOOSE) {
-					fprintf(stderr,"flags '-l' and '-s' are mutually exclusive\n");
-					usage(f);
-				}
-				create_mode = CREATE_MODE_STRICT;
-				break;
-			case 'l':
-				if (create_mode==CREATE_MODE_STRICT) {
-					fprintf(stderr,"flags '-l' and '-s' are mutually exclusive\n");
-					usage(f);
-				}
-				create_mode = CREATE_MODE_LOOSE;
-				break;
 			}
 		}
 		argc -= optind;
 		argv += optind;
-		if (arch_labelscnt==0 && arch_delay>0) {
-			fprintf(stderr,"option '-A' without '-d'\n");
+		if (argc==0) {
 			usage(f);
 		}
-		if (arch_delay==0 && arch_labelscnt>0) {
-			fprintf(stderr,"option '-d' without '-A'\n");
-			usage(f);
-		}
-		if (keep_labelscnt==0 && arch_labelscnt>0) {
-			fprintf(stderr,"option '-A' without '-K'\n");
-			usage(f);
-		}
-		if (keep_labelscnt==0 && create_labelscnt>0) {
-			fprintf(stderr,"option '-C' without '-K'\n");
-			usage(f);
-		}
-		if (arch_labelscnt==0 && keep_labelscnt>0) {
-			arch_labelscnt = keep_labelscnt;
-			for (i=0 ; i<create_labelscnt ; i++) {
-				for (j=0 ; j<MASKORGROUP ; j++) {
-					arch_labelmasks[i][j] = keep_labelmasks[i][j];
-				}
-			}
-		}
-		if (create_labelscnt==0 && keep_labelscnt>0) {
-			create_labelscnt = keep_labelscnt;
-			for (i=0 ; i<create_labelscnt ; i++) {
-				for (j=0 ; j<MASKORGROUP ; j++) {
-					create_labelmasks[i][j] = keep_labelmasks[i][j];
-				}
-			}
-		}
-		if (keep_labelscnt==0 && create_labelscnt==0 && arch_labelscnt==0) {
-			if (argc==0) {
-				usage(f);
-			}
+		if (f==MFSSETGOAL) {
 			p = argv[0];
 			// [1-9] | [1-9]+ | [1-9]-
 			if (p[0]>'0' && p[0]<='9' && (p[1]=='\0' || ((p[1]=='-' || p[1]=='+') && p[2]=='\0'))) {
 				goal = p[0]-'0';
+				srcname = NULL;
 				if (p[1]=='-') {
 					smode = SMODE_DECREASE;
 				} else if (p[1]=='+') {
 					smode = SMODE_INCREASE;
+				} else {
+					smode = SMODE_SET;
 				}
 			} else {
-				if (parse_label_expr(p,&create_labelscnt,create_labelmasks)<0) {
+				printf("%s: wrong goal definition\n",p);
+				usage(f);
+			}
+		} else {
+			goal = 0xFF;
+			smode = SMODE_SET;
+			if (f==MFSXCHGSCLASS) {
+				p = argv[0];
+				scnleng = strlen(p);
+				if (scnleng>=256) {
+					printf("%s: storage class name too long\n",p);
 					usage(f);
 				}
-				keep_labelscnt = create_labelscnt;
-				arch_labelscnt = create_labelscnt;
-				for (i=0 ; i<create_labelscnt ; i++) {
-					for (j=0 ; j<MASKORGROUP ; j++) {
-						arch_labelmasks[i][j] = keep_labelmasks[i][j] = create_labelmasks[i][j];
-					}
-				}
-				goal = 0;
-				smode = SMODE_SET;
+				memcpy(src_storage_class_name,p,scnleng);
+				src_storage_class_name[scnleng]=0;
+				argc--;
+				argv++;
+				smode |= SMODE_EXCHANGE;
 			}
-			argc--;
-			argv++;
-		} else {
-			goal = 0;
-			smode = SMODE_SET;
+			p = argv[0];
+			scnleng = strlen(p);
+			if (scnleng>=256) {
+				printf("%s: storage class name too long\n",p);
+				usage(f);
+			}
+			memcpy(storage_class_name,p,scnleng);
+			storage_class_name[scnleng]=0;
 		}
+		argc--;
+		argv++;
 		break;
 	case MFSGETGOAL:
+	case MFSGETSCLASS:
 	case MFSGETTRASHTIME:
 	case MFSSETTRASHTIME:
 	case MFSGETEATTR:
@@ -5227,6 +5928,187 @@ int main(int argc,char **argv) {
 		argc -= optind;
 		argv += optind;
 		break;
+	case MFSMKSC:
+	case MFSCHSC:
+		while ((ch=getopt(argc,argv,(f==MFSCHSC)?"d:A:K:C:m:a:f":"d:A:K:C:m:a:"))!=-1) {
+			switch (ch) {
+			case 'd':
+				if (chgmask & SCLASS_CHG_ARCH_DELAY) {
+					fprintf(stderr,"option '-d' defined more than once\n");
+					usage(f);
+				}
+				sc.arch_delay = strtoul(optarg,NULL,10);
+				chgmask |= SCLASS_CHG_ARCH_DELAY;
+				break;
+			case 'A':
+				if (chgmask & SCLASS_CHG_ARCH_MASKS) {
+					fprintf(stderr,"option '-A' defined more than once\n");
+					usage(f);
+				}
+				if (parse_label_expr(optarg,&(sc.arch_labelscnt),sc.arch_labelmasks)<0) {
+					usage(f);
+				}
+				chgmask |= SCLASS_CHG_ARCH_MASKS;
+				break;
+			case 'K':
+				if (chgmask & SCLASS_CHG_KEEP_MASKS) {
+					fprintf(stderr,"option '-K' defined more than once\n");
+					usage(f);
+				}
+				if (parse_label_expr(optarg,&(sc.keep_labelscnt),sc.keep_labelmasks)<0) {
+					usage(f);
+				}
+				chgmask |= SCLASS_CHG_KEEP_MASKS;
+				break;
+			case 'C':
+				if (chgmask & SCLASS_CHG_CREATE_MASKS) {
+					fprintf(stderr,"option '-C' defined more than once\n");
+					usage(f);
+				}
+				if (parse_label_expr(optarg,&(sc.create_labelscnt),sc.create_labelmasks)<0) {
+					usage(f);
+				}
+				chgmask |= SCLASS_CHG_CREATE_MASKS;
+				break;
+			case 'm':
+				if (chgmask & SCLASS_CHG_CREATE_MODE) {
+					fprintf(stderr,"option '-m' defined more than once\n");
+					usage(f);
+				}
+				if (optarg[0]=='l' || optarg[0]=='L') {
+					sc.create_mode = CREATE_MODE_LOOSE;
+				} else if (optarg[0]=='s' || optarg[0]=='S') {
+					sc.create_mode = CREATE_MODE_STRICT;
+				} else if (optarg[0]=='d' || optarg[0]=='D') {
+					sc.create_mode = CREATE_MODE_STD;
+				} else {
+					fprintf(stderr,"unknown create mode (option '-m')\n");
+					usage(f);
+				}
+				chgmask |= SCLASS_CHG_CREATE_MODE;
+				break;
+			case 'a':
+				if (chgmask & SCLASS_CHG_ADMIN_ONLY) {
+					fprintf(stderr,"option '-a' defined more than once\n");
+					usage(f);
+				}
+				if (optarg[0]=='0' || optarg[0]=='n' || optarg[0]=='N' || optarg[0]=='f' || optarg[0]=='F') {
+					sc.admin_only = 0;
+				} else if (optarg[0]=='1' || optarg[0]=='y' || optarg[0]=='Y' || optarg[0]=='t' || optarg[0]=='T') {
+					sc.admin_only = 1;
+				} else {
+					fprintf(stderr,"unknown value for admin only flag (option '-a')\n");
+					usage(f);
+				}
+				chgmask |= SCLASS_CHG_ADMIN_ONLY;
+				break;
+			case 'f':
+				if (chgmask & SCLASS_CHG_FORCE) {
+					fprintf(stderr,"option '-f' defined more than once\n");
+					usage(f);
+				}
+				chgmask |= SCLASS_CHG_FORCE;
+				break;
+			}
+		}
+		argc -= optind;
+		argv += optind;
+		if (f==MFSMKSC) {
+			if ((chgmask & (SCLASS_CHG_ARCH_MASKS|SCLASS_CHG_KEEP_MASKS|SCLASS_CHG_CREATE_MASKS)) == 0) {
+				if (argc<2) {
+					usage(f);
+				}
+				if (parse_label_expr(argv[0],&(sc.create_labelscnt),sc.create_labelmasks)<0) {
+					usage(f);
+				}
+				argc--;
+				argv++;
+				sc.keep_labelscnt = sc.create_labelscnt;
+				sc.arch_labelscnt = sc.create_labelscnt;
+				for (i=0 ; i<sc.create_labelscnt ; i++) {
+					for (j=0 ; j<MASKORGROUP ; j++) {
+						sc.arch_labelmasks[i][j] = sc.keep_labelmasks[i][j] = sc.create_labelmasks[i][j];
+					}
+				}
+			} else {
+				if ((chgmask & SCLASS_CHG_ARCH_MASKS) && ((chgmask & SCLASS_CHG_KEEP_MASKS)==0)) {
+					fprintf(stderr,"option '-A' without '-K'\n");
+					usage(f);
+				}
+				if ((chgmask & SCLASS_CHG_CREATE_MASKS) && ((chgmask & SCLASS_CHG_KEEP_MASKS)==0)) {
+					fprintf(stderr,"option '-C' without '-K'\n");
+					usage(f);
+				}
+				if ((chgmask & SCLASS_CHG_ARCH_MASKS) && ((chgmask & SCLASS_CHG_ARCH_DELAY)==0)) {
+					fprintf(stderr,"option '-A' without '-d'\n");
+					usage(f);
+				}
+				if ((chgmask & SCLASS_CHG_ARCH_DELAY) && ((chgmask & SCLASS_CHG_ARCH_MASKS)==0)) {
+					fprintf(stderr,"option '-A' without '-d'\n");
+					usage(f);
+				}
+				if ((chgmask & SCLASS_CHG_KEEP_MASKS) && ((chgmask & SCLASS_CHG_ARCH_MASKS)==0)) {
+					sc.arch_labelscnt = sc.keep_labelscnt;
+					for (i=0 ; i<sc.keep_labelscnt ; i++) {
+						for (j=0 ; j<MASKORGROUP ; j++) {
+							sc.arch_labelmasks[i][j] = sc.keep_labelmasks[i][j];
+						}
+					}
+				}
+				if ((chgmask & SCLASS_CHG_KEEP_MASKS) && ((chgmask & SCLASS_CHG_CREATE_MASKS)==0)) {
+					sc.create_labelscnt = sc.keep_labelscnt;
+					for (i=0 ; i<sc.keep_labelscnt ; i++) {
+						for (j=0 ; j<MASKORGROUP ; j++) {
+							sc.create_labelmasks[i][j] = sc.keep_labelmasks[i][j];
+						}
+					}
+				}
+			}
+		}
+		break;
+	case MFSCPSC:
+		while (getopt(argc,argv,"")!=-1);
+		argc -= optind;
+		argv += optind;
+		if (argc<2) {
+			usage(f);
+		}
+		srcname = *argv;
+		argc--;
+		argv++;
+		break;
+	case MFSMVSC:
+		while (getopt(argc,argv,"")!=-1);
+		argc -= optind;
+		argv += optind;
+		if (argc!=2) {
+			usage(f);
+		}
+		return move_sc(scadmin_mp,argv[0],argv[1]);
+	case MFSLSSC:
+	case MFSLISTSCLASS:
+		while ((ch=getopt(argc,argv,"l"))!=-1) {
+			switch(ch) {
+			case 'l':
+				longmode |= 1;
+				break;
+			}
+		}
+		argc -= optind;
+		argv += optind;
+		if (f==MFSLISTSCLASS) {
+			if (argc==1) {
+				scadmin_mp = *argv;
+			} else if (argc>1) {
+				usage(f);
+			}
+		} else {
+			if (argc>0) {
+				usage(f);
+			}
+		}
+		return list_sc(scadmin_mp,longmode);
+	case MFSRMSC:
 	default:
 		while (getopt(argc,argv,"")!=-1);
 		argc -= optind;
@@ -5254,8 +6136,8 @@ int main(int argc,char **argv) {
 		usage(f);
 	}
 	status=0;
-	if (f==MFSCOPYGOAL) {
-		if (get_goal(srcname,&goal,&create_mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay,GMODE_NORMAL)<0) {
+	if (f==MFSCOPYGOAL || f==MFSCOPYSCLASS) {
+		if (get_sclass(srcname,&goal,storage_class_name,GMODE_NORMAL)<0) {
 			return 1;
 		}
 		smode = SMODE_SET;
@@ -5277,103 +6159,127 @@ int main(int argc,char **argv) {
 	while (argc>0) {
 		switch (f) {
 		case MFSGETGOAL:
-			if (get_goal(*argv,&goal,&create_mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
-				status=1;
+		case MFSGETSCLASS:
+			if (get_sclass(*argv,&goal,storage_class_name,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
+				status = 1;
 			}
 			break;
 		case MFSSETGOAL:
+		case MFSSETSCLASS:
 		case MFSCOPYGOAL:
-			if (set_goal(*argv,goal,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay,(rflag)?(smode | SMODE_RMASK):smode)<0) {
-				status=1;
+		case MFSCOPYSCLASS:
+		case MFSXCHGSCLASS:
+			if (set_sclass(*argv,goal,src_storage_class_name,storage_class_name,(rflag)?(smode | SMODE_RMASK):smode)<0) {
+				status = 1;
 			}
 			break;
 		case MFSGETTRASHTIME:
 			if (get_trashtime(*argv,&trashtime,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSSETTRASHTIME:
 		case MFSCOPYTRASHTIME:
 			if (set_trashtime(*argv,trashtime,(rflag)?(smode | SMODE_RMASK):smode)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSCHECKFILE:
 			if (file_info(FILEINFO_QUICK,*argv)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSFILEINFO:
 			if (file_info(fileinfomode,*argv)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSAPPENDCHUNKS:
 			if (append_file(appendfname,*argv)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSDIRINFO:
 			if (dir_info(dirinfomode,*argv)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSFILEREPAIR:
 			if (file_repair(*argv)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSGETEATTR:
 			if (get_eattr(*argv,&eattr,(rflag)?GMODE_RECURSIVE:GMODE_NORMAL)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSSETEATTR:
 		case MFSDELEATTR:
 		case MFSCOPYEATTR:
 			if (set_eattr(*argv,eattr,(rflag)?(smode | SMODE_RMASK):smode)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSGETQUOTA:
 			if (quota_control(*argv,2,&qflags,&graceperiod,&sinodes,&slength,&ssize,&srealsize,&hinodes,&hlength,&hsize,&hrealsize)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSSETQUOTA:
 		case MFSCOPYQUOTA:
 			if (quota_control(*argv,0,&qflags,&graceperiod,&sinodes,&slength,&ssize,&srealsize,&hinodes,&hlength,&hsize,&hrealsize)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSDELQUOTA:
 			if (quota_control(*argv,1,&qflags,&graceperiod,&sinodes,&slength,&ssize,&srealsize,&hinodes,&hlength,&hsize,&hrealsize)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSFILEPATHS:
 			if (file_paths(*argv)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSCHKARCHIVE:
 			if (archive_control(*argv,ARCHCTL_GET)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSSETARCHIVE:
 			if (archive_control(*argv,ARCHCTL_SET)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSCLRARCHIVE:
 			if (archive_control(*argv,ARCHCTL_CLR)<0) {
-				status=1;
+				status = 1;
 			}
 			break;
 		case MFSRMSNAPSHOT:
 			if (remove_snapshot(*argv,snapmode)<0) {
-				status=1;
+				status = 1;
+			}
+			break;
+		case MFSMKSC:
+			if (make_sc(scadmin_mp,*argv,&sc)<0) {
+				status = 1;
+			}
+			break;
+		case MFSCHSC:
+			if (change_sc(scadmin_mp,*argv,chgmask,&sc)<0) {
+				status = 1;
+			}
+			break;
+		case MFSRMSC:
+			if (remove_sc(scadmin_mp,*argv)<0) {
+				status = 1;
+			}
+			break;
+		case MFSCPSC:
+			if (copy_sc(scadmin_mp,srcname,*argv)<0) {
+				status = 1;
 			}
 			break;
 		}

@@ -55,7 +55,7 @@
 #include "hashfn.h"
 #include "buckets.h"
 #include "clocks.h"
-#include "labelsets.h"
+#include "storageclass.h"
 
 #define MINLOOPTIME 60
 #define MAXLOOPTIME 7200
@@ -151,7 +151,7 @@ static slist *slfreehead = NULL;
 typedef struct chunk {
 	uint64_t chunkid;
 	uint32_t version;
-	uint8_t lsetid;
+	uint8_t sclassid;
 	uint8_t allvalidcopies;
 	uint8_t regularvalidcopies;
 	unsigned ondangerlist:1;
@@ -262,6 +262,9 @@ static uint32_t HashCPTMax;
 static double AcceptableDifference;
 
 static uint32_t jobshpos;
+static uint32_t jobshstep;
+static uint32_t jobshcnt;
+static uint32_t jobshmax;
 
 static uint32_t starttime;
 
@@ -604,7 +607,7 @@ chunk* chunk_new(uint64_t chunkid) {
 	regularchunkcounts[0][0]++;
 	newchunk->chunkid = chunkid;
 	newchunk->version = 0;
-	newchunk->lsetid = 0;
+	newchunk->sclassid = 0;
 	newchunk->lockedto = 0;
 	newchunk->allvalidcopies = 0;
 	newchunk->regularvalidcopies = 0;
@@ -621,7 +624,7 @@ chunk* chunk_new(uint64_t chunkid) {
 	lastchunkid = chunkid;
 	lastchunkptr = newchunk;
 	chunk_hash_add(newchunk);
-	// labelset_state_change(0,0,0,c->lsetid,c->archflag,c->regularvalidcopies); - not needed since lsetid==0 , archflag==0 and regularvalidcopies==0
+	// sclass_state_change(0,0,0,c->sclassid,c->archflag,c->regularvalidcopies); - not needed since sclassid==0 , archflag==0 and regularvalidcopies==0
 	return newchunk;
 }
 
@@ -647,16 +650,16 @@ void chunk_delete(chunk* c) {
 		lastchunkptr=NULL;
 	}
 	chunks--;
-	allchunkcounts[labelset_get_keeparch_goal(c->lsetid,c->archflag)][0]--;
-	regularchunkcounts[labelset_get_keeparch_goal(c->lsetid,c->archflag)][0]--;
-	labelset_state_change(c->lsetid,c->archflag,c->regularvalidcopies,0,0,0);
+	allchunkcounts[sclass_get_keeparch_goal(c->sclassid,c->archflag)][0]--;
+	regularchunkcounts[sclass_get_keeparch_goal(c->sclassid,c->archflag)][0]--;
+	sclass_state_change(c->sclassid,c->archflag,c->regularvalidcopies,0,0,0);
 	chunk_hash_delete(c);
 	chunk_free(c);
 }
 
-static inline void chunk_state_change(uint8_t oldlsetid,uint8_t newlsetid,uint8_t oldarchflag,uint8_t newarchflag,uint8_t oldavc,uint8_t newavc,uint8_t oldrvc,uint8_t newrvc) {
-	uint8_t oldgoal = labelset_get_keeparch_goal(oldlsetid,oldarchflag);
-	uint8_t newgoal = labelset_get_keeparch_goal(newlsetid,newarchflag);
+static inline void chunk_state_change(uint8_t oldsclassid,uint8_t newsclassid,uint8_t oldarchflag,uint8_t newarchflag,uint8_t oldavc,uint8_t newavc,uint8_t oldrvc,uint8_t newrvc) {
+	uint8_t oldgoal = sclass_get_keeparch_goal(oldsclassid,oldarchflag);
+	uint8_t newgoal = sclass_get_keeparch_goal(newsclassid,newarchflag);
 	if (oldgoal>9) {
 		oldgoal=10;
 	}
@@ -675,7 +678,7 @@ static inline void chunk_state_change(uint8_t oldlsetid,uint8_t newlsetid,uint8_
 	if (newrvc>9) {
 		newrvc=10;
 	}
-	labelset_state_change(oldlsetid,oldarchflag,oldrvc,newlsetid,newarchflag,newrvc);
+	sclass_state_change(oldsclassid,oldarchflag,oldrvc,newsclassid,newarchflag,newrvc);
 	allchunkcounts[oldgoal][oldavc]--;
 	allchunkcounts[newgoal][newavc]++;
 	regularchunkcounts[oldgoal][oldrvc]--;
@@ -785,7 +788,7 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 		return;
 	}
 
-	if (c->ondangerlist || servers==NULL) {
+	if (c->ondangerlist || servers==NULL || c->sclassid==0 || c->fcount==0 || c->lockedto+3600<(uint32_t)main_time()) {
 		return;
 	}
 	vc = 0;
@@ -801,15 +804,15 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 		}
 	}
 	wronglabels = 0;
-	goal = labelset_get_keeparch_goal(c->lsetid,c->archflag);
-	if (labelset_has_keeparch_labels(c->lsetid,c->archflag) && vc >= goal && checklabels) {
+	goal = sclass_get_keeparch_goal(c->sclassid,c->archflag);
+	if (sclass_has_keeparch_labels(c->sclassid,c->archflag) && vc >= goal && checklabels) {
 		servcnt = 0;
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid==VALID) {
 				servers[servcnt++] = s->csid;
 			}
 		}
-		labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+		labelcnt = sclass_get_keeparch_labelmasks(c->sclassid,c->archflag,&labelmasks);
 		matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
 		for (j=0 ; j<labelcnt ; j++) {
 			if (matching[j]<0) { // there are unmatched labels
@@ -867,7 +870,7 @@ void chunk_delopchunk(uint16_t csid,uint64_t chunkid) {
 	}
 }
 
-static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t lsetid,uint8_t *olflag) {
+static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t sclassid,uint8_t *olflag) {
 	int32_t *matching;
 	uint32_t **labelmasks;
 	uint8_t labelcnt;
@@ -883,16 +886,16 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 		*olflag = (overloaded>0)?1:0;
 		return 0;
 	}
-	create_mode = labelset_get_create_mode(lsetid);
-	labelcnt = labelset_get_create_goal(lsetid);
+	create_mode = sclass_get_create_mode(sclassid);
+	labelcnt = sclass_get_create_goal(sclassid);
 	if (servcount < labelcnt && servcount + overloaded >= labelcnt) {
 		*olflag = 1;
 		return 0;
 	} else {
 		*olflag = 0;
 	}
-	if (labelset_has_create_labels(lsetid)) {
-		labelcnt = labelset_get_create_labelmasks(lsetid,&labelmasks);
+	if (sclass_has_create_labels(sclassid)) {
+		labelcnt = sclass_get_create_labelmasks(sclassid,&labelmasks);
 
 		// reverse server list
 		for (i=0 ; i<servcount/2 ; i++) {
@@ -1004,11 +1007,11 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 		s = *st;
 		if (!cstab[s->csid].valid) {
 			if (s->valid==TDBUSY || s->valid==TDVALID) {
-				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+				chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 				c->allvalidcopies--;
 			}
 			if (s->valid==BUSY || s->valid==VALID) {
-				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+				chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 				c->allvalidcopies--;
 				c->regularvalidcopies--;
 			}
@@ -1078,40 +1081,40 @@ int chunk_mr_increase_version(uint64_t chunkid) {
 
 /* --- */
 
-static inline void chunk_find_lsetid(chunk *c) {
+static inline void chunk_find_sclassid(chunk *c) {
 	uint32_t i;
 	uint8_t g;
 	uint8_t mg;
-	uint8_t lsetid,v;
+	uint8_t sclassid,v;
 	mg = 0;
-	lsetid = 0;
+	sclassid = 0;
 	v = 0;
 	for (i=1 ; i<c->ftab[0] ; i++) {
 		if (c->ftab[i]>0) {
-			g = labelset_get_keepmax_goal(i);
+			g = sclass_get_keepmax_goal(i);
 			if (g>mg) {
 				mg = g;
-				lsetid = i;
+				sclassid = i;
 				v = 0;
 			} else if (g==mg) {
-				if (lsetid<=9 && v==0) {
-					lsetid = i;
-				} else if (lsetid>9 && i>9) {
-					lsetid = g;
+				if (sclassid<=9 && v==0) {
+					sclassid = i;
+				} else if (sclassid>9 && i>9) {
+					sclassid = g;
 					v = 1;
 				}
 			}
 		}
 	}
-	massert(lsetid>0,"wrong labels set");
-	c->lsetid = lsetid;
+	massert(sclassid>0,"wrong labels set");
+	c->sclassid = sclassid;
 }
 
-int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid) {
+int chunk_change_file(uint64_t chunkid,uint8_t prevsclassid,uint8_t newsclassid) {
 	chunk *c;
-	uint8_t oldlsetid;
+	uint8_t oldsclassid;
 
-	if (prevlsetid==newlsetid) {
+	if (prevsclassid==newsclassid) {
 		return MFS_STATUS_OK;
 	}
 	c = chunk_find(chunkid);
@@ -1122,39 +1125,39 @@ int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid) {
 		syslog(LOG_WARNING,"serious structure inconsistency: (chunkid:%016"PRIX64")",c->chunkid);
 		return MFS_ERROR_CHUNKLOST;	// MFS_ERROR_STRUCTURE
 	}
-	oldlsetid = c->lsetid;
+	oldsclassid = c->sclassid;
 	if (c->fcount==1) {
-		c->lsetid = newlsetid;
+		c->sclassid = newsclassid;
 	} else {
 		if (c->ftab==NULL) {
-			uint32_t ftableng = prevlsetid;
-			if (newlsetid > ftableng) {
-				ftableng = newlsetid;
+			uint32_t ftableng = prevsclassid;
+			if (newsclassid > ftableng) {
+				ftableng = newsclassid;
 			}
 			ftableng++;
 			c->ftab = malloc(sizeof(uint32_t)*(ftableng+1));
 			passert(c->ftab);
 			memset(c->ftab,0,sizeof(uint32_t)*(ftableng+1));
 			c->ftab[0] = ftableng+1;
-			massert(c->lsetid==prevlsetid,"wrong labels set");
-			c->ftab[prevlsetid] = c->fcount-1;
-			c->ftab[newlsetid] = 1;
-			chunk_find_lsetid(c);
+			massert(c->sclassid==prevsclassid,"wrong labels set");
+			c->ftab[prevsclassid] = c->fcount-1;
+			c->ftab[newsclassid] = 1;
+			chunk_find_sclassid(c);
 		} else {
-			if (newlsetid >= c->ftab[0]) {
-				c->ftab = realloc(c->ftab,sizeof(uint32_t)*(newlsetid+1));
+			if (newsclassid >= c->ftab[0]) {
+				c->ftab = realloc(c->ftab,sizeof(uint32_t)*(newsclassid+1));
 				passert(c->ftab);
-				memset(c->ftab+c->ftab[0],0,sizeof(uint32_t)*(newlsetid+1-c->ftab[0]));
-				c->ftab[0] = newlsetid+1;
+				memset(c->ftab+c->ftab[0],0,sizeof(uint32_t)*(newsclassid+1-c->ftab[0]));
+				c->ftab[0] = newsclassid+1;
 			}
-			massert(c->ftab[prevlsetid]>0,"wrong ftab entry");
-			c->ftab[prevlsetid]--;
-			c->ftab[newlsetid]++;
-			chunk_find_lsetid(c);
+			massert(c->ftab[prevsclassid]>0,"wrong ftab entry");
+			c->ftab[prevsclassid]--;
+			c->ftab[newsclassid]++;
+			chunk_find_sclassid(c);
 		}
 	}
-	if (oldlsetid!=c->lsetid) {
-		chunk_state_change(oldlsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+	if (oldsclassid!=c->sclassid) {
+		chunk_state_change(oldsclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
 		chunk_priority_queue_check(c,1);
 	} else {
 		chunk_priority_queue_check(c,0);
@@ -1162,25 +1165,25 @@ int chunk_change_file(uint64_t chunkid,uint8_t prevlsetid,uint8_t newlsetid) {
 	return MFS_STATUS_OK;
 }
 
-static inline int chunk_delete_file_int(chunk *c,uint8_t lsetid,uint32_t delete_timeout) {
-	uint8_t oldlsetid;
+static inline int chunk_delete_file_int(chunk *c,uint8_t sclassid,uint32_t delete_timeout) {
+	uint8_t oldsclassid;
 
 	if (c->fcount==0) {
 		syslog(LOG_WARNING,"serious structure inconsistency: (chunkid:%016"PRIX64")",c->chunkid);
 		return MFS_ERROR_CHUNKLOST;	// MFS_ERROR_STRUCTURE
 	}
-	massert(lsetid>0,"wrong labels set");
-	oldlsetid = c->lsetid;
+	massert(sclassid>0,"wrong labels set");
+	oldsclassid = c->sclassid;
 	if (c->fcount==1) {
-		c->lsetid = 0;
+		c->sclassid = 0;
 		c->fcount = 0;
 //#ifdef METARESTORE
 //		printf("D%"PRIu64"\n",c->chunkid);
 //#endif
 	} else {
 		if (c->ftab) {
-			c->ftab[lsetid]--;
-			chunk_find_lsetid(c);
+			c->ftab[sclassid]--;
+			chunk_find_sclassid(c);
 		}
 		c->fcount--;
 		if (c->fcount==1 && c->ftab) {
@@ -1188,8 +1191,8 @@ static inline int chunk_delete_file_int(chunk *c,uint8_t lsetid,uint32_t delete_
 			c->ftab = NULL;
 		}
 	}
-	if (oldlsetid!=c->lsetid) {
-		chunk_state_change(oldlsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+	if (oldsclassid!=c->sclassid) {
+		chunk_state_change(oldsclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
 	}
 	if (c->fcount==0 && delete_timeout>0) {
 		c->lockedto = (uint32_t)main_time()+delete_timeout;
@@ -1197,68 +1200,68 @@ static inline int chunk_delete_file_int(chunk *c,uint8_t lsetid,uint32_t delete_
 	return MFS_STATUS_OK;
 }
 
-static inline int chunk_add_file_int(chunk *c,uint8_t lsetid) {
-	uint8_t oldlsetid;
+static inline int chunk_add_file_int(chunk *c,uint8_t sclassid) {
+	uint8_t oldsclassid;
 
-	massert(lsetid>0,"wrong labels set");
-	oldlsetid = c->lsetid;
+	massert(sclassid>0,"wrong labels set");
+	oldsclassid = c->sclassid;
 	if (c->fcount==0) {
-		c->lsetid = lsetid;
+		c->sclassid = sclassid;
 		c->fcount = 1;
-	} else if (lsetid==c->lsetid) {
+	} else if (sclassid==c->sclassid) {
 		c->fcount++;
 		if (c->ftab) {
-			c->ftab[lsetid]++;
+			c->ftab[sclassid]++;
 		}
 	} else {
 		if (c->ftab==NULL) {
-			uint32_t ftableng = c->lsetid;
-			if (lsetid > ftableng) {
-				ftableng = lsetid;
+			uint32_t ftableng = c->sclassid;
+			if (sclassid > ftableng) {
+				ftableng = sclassid;
 			}
 			ftableng++;
 			c->ftab = malloc(sizeof(uint32_t)*(ftableng+1));
 			passert(c->ftab);
 			memset(c->ftab,0,sizeof(uint32_t)*(ftableng+1));
 			c->ftab[0] = ftableng+1;
-			c->ftab[c->lsetid] = c->fcount;
-			c->ftab[lsetid] = 1;
+			c->ftab[c->sclassid] = c->fcount;
+			c->ftab[sclassid] = 1;
 			c->fcount++;
-			chunk_find_lsetid(c);
+			chunk_find_sclassid(c);
 		} else {
-			if (lsetid >= c->ftab[0]) {
-				c->ftab = realloc(c->ftab,sizeof(uint32_t)*(lsetid+1));
+			if (sclassid >= c->ftab[0]) {
+				c->ftab = realloc(c->ftab,sizeof(uint32_t)*(sclassid+1));
 				passert(c->ftab);
-				memset(c->ftab+c->ftab[0],0,sizeof(uint32_t)*(lsetid+1-c->ftab[0]));
-				c->ftab[0] = lsetid+1;
+				memset(c->ftab+c->ftab[0],0,sizeof(uint32_t)*(sclassid+1-c->ftab[0]));
+				c->ftab[0] = sclassid+1;
 			}
-			c->ftab[lsetid]++;
+			c->ftab[sclassid]++;
 			c->fcount++;
-			chunk_find_lsetid(c);
+			chunk_find_sclassid(c);
 		}
 	}
-	if (oldlsetid!=c->lsetid) {
-		chunk_state_change(oldlsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+	if (oldsclassid!=c->sclassid) {
+		chunk_state_change(oldsclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
 	}
 	return MFS_STATUS_OK;
 }
 
-int chunk_delete_file(uint64_t chunkid,uint8_t lsetid) {
+int chunk_delete_file(uint64_t chunkid,uint8_t sclassid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
 		return MFS_ERROR_NOCHUNK;
 	}
-	return chunk_delete_file_int(c,lsetid,0);
+	return chunk_delete_file_int(c,sclassid,0);
 }
 
-int chunk_add_file(uint64_t chunkid,uint8_t lsetid) {
+int chunk_add_file(uint64_t chunkid,uint8_t sclassid) {
 	chunk *c;
 	c = chunk_find(chunkid);
 	if (c==NULL) {
 		return MFS_ERROR_NOCHUNK;
 	}
-	return chunk_add_file_int(c,lsetid);
+	return chunk_add_file_int(c,sclassid);
 }
 
 static inline void chunk_write_counters(chunk *c,uint8_t x) {
@@ -1341,7 +1344,7 @@ int chunk_univ_archflag(uint64_t chunkid,uint8_t archflag,uint32_t *archflagchan
 		return MFS_ERROR_NOCHUNK;
 	}
 	if (archflag != c->archflag) {
-		chunk_state_change(c->lsetid,c->lsetid,c->archflag,archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+		chunk_state_change(c->sclassid,c->sclassid,c->archflag,archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
 		c->archflag = archflag;
 		chunk_priority_queue_check(c,1);
 		(*archflagchanged)++;
@@ -1358,7 +1361,7 @@ int chunk_univ_archflag(uint64_t chunkid,uint8_t archflag,uint32_t *archflagchan
 // CHUNK_FLOOP_UNDERGOAL_AFLAG_CHANGED
 // CHUNK_FLOOP_OK_AFLAG_NOT_CHANGED
 // CHUNK_FLOOP_OK_AFLAG_CHANGED
-chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t lsetid,uint8_t aftereof,uint8_t archflag) {
+chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t sclassid,uint8_t aftereof,uint8_t archflag) {
 	chunk *c;
 	slist *s;
 	uint8_t aflagchg;
@@ -1367,7 +1370,7 @@ chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t lsetid,uint8_t aftereof,
 		return CHUNK_FLOOP_NOTFOUND;
 	}
 	if (c->allvalidcopies==0 && aftereof && c->lockedto<(uint32_t)(main_time()) && c->operation==NONE) {
-		chunk_delete_file_int(c,lsetid,UNUSED_DELETE_TIMEOUT);
+		chunk_delete_file_int(c,sclassid,UNUSED_DELETE_TIMEOUT);
 		return CHUNK_FLOOP_DELETED;
 	}
 	if (c->allvalidcopies==0) {
@@ -1382,14 +1385,14 @@ chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t lsetid,uint8_t aftereof,
 		return CHUNK_FLOOP_MISSING_INVALID;
 	}
 	if (archflag==1 && c->archflag==0) {
-		chunk_state_change(c->lsetid,c->lsetid,c->archflag,archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
+		chunk_state_change(c->sclassid,c->sclassid,c->archflag,archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,c->regularvalidcopies);
 		c->archflag = archflag;
 		chunk_priority_queue_check(c,1);
 		aflagchg = 1;
 	} else {
 		aflagchg = 0;
 	}
-	if (c->allvalidcopies < labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
+	if (c->allvalidcopies < sclass_get_keeparch_goal(c->sclassid,c->archflag)) {
 		return aflagchg?CHUNK_FLOOP_UNDERGOAL_AFLAG_CHANGED:CHUNK_FLOOP_UNDERGOAL_AFLAG_NOT_CHANGED;
 	}
 	return aflagchg?CHUNK_FLOOP_OK_AFLAG_CHANGED:CHUNK_FLOOP_OK_AFLAG_NOT_CHANGED;
@@ -1410,7 +1413,7 @@ int chunk_read_check(uint32_t ts,uint64_t chunkid) {
 	return MFS_STATUS_OK;
 }
 
-int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
+int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t *opflag) {
 	uint16_t csids[MAXCSCOUNT];
 	static void **chosen = NULL;
 	static uint32_t chosenleng = 0;
@@ -1436,7 +1439,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 
 	if (ochunkid==0) {	// new chunk
 		if (mr==0) {
-			servcount = chunk_creation_servers(csids,lsetid,&overloaded);
+			servcount = chunk_creation_servers(csids,sclassid,&overloaded);
 			if (servcount==0) {
 				if (overloaded) {
 					return MFS_ERROR_EAGAIN;
@@ -1454,13 +1457,13 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 			c->version = 1;
 			c->interrupted = 0;
 			c->operation = CREATE;
-			chunk_add_file_int(c,lsetid);
-			if (servcount<labelset_get_create_goal(lsetid)) {
+			chunk_add_file_int(c,sclassid);
+			if (servcount<sclass_get_create_goal(sclassid)) {
 				c->allvalidcopies = servcount;
 				c->regularvalidcopies = servcount;
 			} else {
-				c->allvalidcopies = labelset_get_create_goal(lsetid);
-				c->regularvalidcopies = labelset_get_create_goal(lsetid);
+				c->allvalidcopies = sclass_get_create_goal(sclassid);
+				c->regularvalidcopies = sclass_get_create_goal(sclassid);
 			}
 			if (c->allvalidcopies>chosenleng) {
 				chosenleng = c->allvalidcopies+10;
@@ -1479,7 +1482,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 				chunk_addopchunk(s->csid,c->chunkid);
 			}
 			matocsserv_useservers_wrandom(chosen,c->allvalidcopies);
-			chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
+			chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 			*opflag=1;
 			*nchunkid = c->chunkid;
 		} else {
@@ -1488,7 +1491,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 			}
 			c = chunk_new(nextchunkid++);
 			c->version = 1;
-			chunk_add_file_int(c,lsetid);
+			chunk_add_file_int(c,sclassid);
 		}
 	} else {
 		c = NULL;
@@ -1518,7 +1521,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 							vc++;
 						}
 					}
-					if (vc < labelset_get_keeparch_goal(c->lsetid,c->archflag)) {
+					if (vc < sclass_get_keeparch_goal(c->sclassid,c->archflag)) {
 						return MFS_ERROR_EAGAIN; // just try again later
 					}
 				}
@@ -1580,7 +1583,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 							vc++;
 						}
 					}
-					if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
+					if (vc < sclass_get_keeparch_goal(oc->sclassid,oc->archflag)) {
 						return MFS_ERROR_EAGAIN; // just try again later
 					}
 				}
@@ -1592,8 +1595,8 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 							c->version = 1;
 							c->interrupted = 0;
 							c->operation = DUPLICATE;
-							chunk_delete_file_int(oc,lsetid,0);
-							chunk_add_file_int(c,lsetid);
+							chunk_delete_file_int(oc,sclassid,0);
+							chunk_add_file_int(c,sclassid);
 						}
 						s = slist_malloc();
 						s->csid = os->csid;
@@ -1609,7 +1612,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 					}
 				}
 				if (c!=NULL) {
-					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 				}
 				if (i>0) {
 					*nchunkid = c->chunkid;
@@ -1627,8 +1630,8 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 				}
 				c = chunk_new(nextchunkid++);
 				c->version = 1;
-				chunk_delete_file_int(oc,lsetid,0);
-				chunk_add_file_int(c,lsetid);
+				chunk_delete_file_int(oc,sclassid,0);
+				chunk_add_file_int(c,sclassid);
 				*nchunkid = c->chunkid;
 			}
 		}
@@ -1639,15 +1642,15 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 	return MFS_STATUS_OK;
 }
 
-int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t *opflag) {
-	return chunk_univ_multi_modify(main_time(),0,continueop,nchunkid,ochunkid,lsetid,opflag);
+int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t *opflag) {
+	return chunk_univ_multi_modify(main_time(),0,continueop,nchunkid,ochunkid,sclassid,opflag);
 }
 
-int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid,uint8_t opflag) {
-	return chunk_univ_multi_modify(ts,1,0,nchunkid,ochunkid,lsetid,&opflag);
+int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t opflag) {
+	return chunk_univ_multi_modify(ts,1,0,nchunkid,ochunkid,sclassid,&opflag);
 }
 
-int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid) {
+int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t sclassid) {
 	slist *os,*s;
 	uint32_t i;
 	chunk *oc,*c;
@@ -1694,7 +1697,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 						vc++;
 					}
 				}
-				if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
+				if (vc < sclass_get_keeparch_goal(oc->sclassid,oc->archflag)) {
 					return MFS_ERROR_EAGAIN; // just try again later
 				}
 			}
@@ -1749,7 +1752,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 						vc++;
 					}
 				}
-				if (vc < labelset_get_keeparch_goal(oc->lsetid,oc->archflag)) {
+				if (vc < sclass_get_keeparch_goal(oc->sclassid,oc->archflag)) {
 					return MFS_ERROR_EAGAIN; // just try again later
 				}
 			}
@@ -1761,8 +1764,8 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 						c->version = 1;
 						c->interrupted = 0;
 						c->operation = DUPTRUNC;
-						chunk_delete_file_int(oc,lsetid,0);
-						chunk_add_file_int(c,lsetid);
+						chunk_delete_file_int(oc,sclassid,0);
+						chunk_add_file_int(c,sclassid);
 					}
 					s = slist_malloc();
 					s->csid = os->csid;
@@ -1778,7 +1781,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 				}
 			}
 			if (c!=NULL) {
-				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
+				chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 			}
 			if (i>0) {
 				*nchunkid = c->chunkid;
@@ -1795,8 +1798,8 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			}
 			c = chunk_new(nextchunkid++);
 			c->version = 1;
-			chunk_delete_file_int(oc,lsetid,0);
-			chunk_add_file_int(c,lsetid);
+			chunk_delete_file_int(oc,sclassid,0);
+			chunk_add_file_int(c,sclassid);
 			*nchunkid = c->chunkid;
 		}
 	}
@@ -1805,15 +1808,15 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 	return MFS_STATUS_OK;
 }
 
-int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t lsetid) {
-	return chunk_univ_multi_truncate(main_time(),0,nchunkid,ochunkid,length,lsetid);
+int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t sclassid) {
+	return chunk_univ_multi_truncate(main_time(),0,nchunkid,ochunkid,length,sclassid);
 }
 
-int chunk_mr_multi_truncate(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t lsetid) {
-	return chunk_univ_multi_truncate(ts,1,nchunkid,ochunkid,0,lsetid);
+int chunk_mr_multi_truncate(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid) {
+	return chunk_univ_multi_truncate(ts,1,nchunkid,ochunkid,0,sclassid);
 }
 
-int chunk_repair(uint8_t lsetid,uint64_t ochunkid,uint32_t *nversion) {
+int chunk_repair(uint8_t sclassid,uint64_t ochunkid,uint32_t *nversion) {
 	uint32_t bestversion;
 	chunk *c;
 	slist *s;
@@ -1845,7 +1848,7 @@ int chunk_repair(uint8_t lsetid,uint64_t ochunkid,uint32_t *nversion) {
 		}
 	}
 	if (bestversion==0) {	// didn't find sensible chunk - so erase it
-		chunk_delete_file_int(c,lsetid,0);
+		chunk_delete_file_int(c,sclassid,0);
 		return 1;
 	}
 	if (c->allvalidcopies>0 || c->regularvalidcopies>0) {
@@ -1855,7 +1858,7 @@ int chunk_repair(uint8_t lsetid,uint64_t ochunkid,uint32_t *nversion) {
 		if (c->regularvalidcopies>0) {
 			syslog(LOG_WARNING,"wrong regular valid copies counter - (counter value: %u, should be: 0) - fixed",c->regularvalidcopies);
 		}
-		chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,0,c->regularvalidcopies,0);
+		chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,0,c->regularvalidcopies,0);
 		c->allvalidcopies = 0;
 		c->regularvalidcopies = 0;
 	}
@@ -1873,7 +1876,7 @@ int chunk_repair(uint8_t lsetid,uint64_t ochunkid,uint32_t *nversion) {
 		}
 	}
 	*nversion = bestversion;
-	chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
+	chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 	c->needverincrease = 1;
 	return 1;
 }
@@ -2096,7 +2099,7 @@ int chunk_mr_chunkdel(uint32_t ts,uint64_t chunkid,uint32_t version) {
 static inline void chunk_mfr_state_check(chunk *c) {
 	slist *s;
 	uint8_t goal,vc,tdc;
-	goal = labelset_get_keeparch_goal(c->lsetid,c->archflag);
+	goal = sclass_get_keeparch_goal(c->sclassid,c->archflag);
 	vc = 0;
 	tdc = 0;
 	for (s=c->slisthead ; s ; s=s->next) {
@@ -2194,12 +2197,12 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 		if (version&0x80000000) {
 			s->valid = TDVALID;
 			s->version = c->version;
-			chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies);
+			chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies);
 			c->allvalidcopies++;
 		} else {
 			s->valid = VALID;
 			s->version = c->version;
-			chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+			chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
 			c->allvalidcopies++;
 			c->regularvalidcopies++;
 		}
@@ -2233,11 +2236,11 @@ void chunk_damaged(uint16_t csid,uint64_t chunkid) {
 	for (s=c->slisthead ; s ; s=s->next) {
 		if (s->csid==csid) {
 			if (s->valid==TDBUSY || s->valid==TDVALID) {
-				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+				chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 				c->allvalidcopies--;
 			}
 			if (s->valid==BUSY || s->valid==VALID) {
-				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+				chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 				c->allvalidcopies--;
 				c->regularvalidcopies--;
 			}
@@ -2276,11 +2279,11 @@ void chunk_lost(uint16_t csid,uint64_t chunkid) {
 	while ((s=*sptr)) {
 		if (s->csid==csid) {
 			if (s->valid==TDBUSY || s->valid==TDVALID) {
-				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+				chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 				c->allvalidcopies--;
 			}
 			if (s->valid==BUSY || s->valid==VALID) {
-				chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+				chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 				c->allvalidcopies--;
 				c->regularvalidcopies--;
 			}
@@ -2470,11 +2473,11 @@ void chunk_got_delete_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
 		if (s->csid == csid) {
 			if (s->valid!=DEL) {
 				if (s->valid==TDBUSY || s->valid==TDVALID) {
-					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 					c->allvalidcopies--;
 				}
 				if (s->valid==BUSY || s->valid==VALID) {
-					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 					c->allvalidcopies--;
 					c->regularvalidcopies--;
 				}
@@ -2510,11 +2513,11 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 				}
 				if (status!=0 || version!=c->version) {
 					if (s->valid==TDBUSY || s->valid==TDVALID) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 						c->allvalidcopies--;
 					}
 					if (s->valid==BUSY || s->valid==VALID) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 						c->allvalidcopies--;
 						c->regularvalidcopies--;
 					}
@@ -2545,7 +2548,7 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 			if (s->csid == csid) {
 				syslog(LOG_WARNING,"got replication status from server which had had that chunk before (chunk:%016"PRIX64"_%08"PRIX32")",chunkid,version);
 				if (s->valid==VALID && version!=c->version) {
-					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 					c->allvalidcopies--;
 					c->regularvalidcopies--;
 					s->valid = INVALID;
@@ -2564,7 +2567,7 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 			s->valid = INVALID;
 		} else {
 			chunk_write_counters(c,0);
-			chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+			chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
 			c->allvalidcopies++;
 			c->regularvalidcopies++;
 			s->valid = VALID;
@@ -2597,11 +2600,11 @@ void chunk_operation_status(chunk *c,uint8_t status,uint16_t csid) {
 			if (status!=0) {
 				c->interrupted = 1;	// increase version after finish, just in case
 				if (s->valid==TDBUSY || s->valid==TDVALID) {
-					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 					c->allvalidcopies--;
 				}
 				if (s->valid==BUSY || s->valid==VALID) {
-					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 					c->allvalidcopies--;
 					c->regularvalidcopies--;
 				}
@@ -2876,19 +2879,19 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	}
 	if (c->allvalidcopies!=vc+tdc+bc+tdb) {
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": wrong all valid copies counter - (counter value: %u, should be: %u) - fixed",c->chunkid,c->version,c->allvalidcopies,vc+tdc+bc+tdb);
-		chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,vc+tdc+bc+tdb,c->regularvalidcopies,c->regularvalidcopies);
+		chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,vc+tdc+bc+tdb,c->regularvalidcopies,c->regularvalidcopies);
 		c->allvalidcopies = vc+tdc+bc+tdb;
 	}
 	if (c->regularvalidcopies!=vc+bc) {
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": wrong regular valid copies counter - (counter value: %u, should be: %u) - fixed",c->chunkid,c->version,c->regularvalidcopies,vc+bc);
-		chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,vc+bc);
+		chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies,c->regularvalidcopies,vc+bc);
 		c->regularvalidcopies = vc+bc;
 	}
 	if (tdb+bc==0 && c->operation!=NONE) {
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk in middle of operation %s, but no chunk server is busy - finish operation",c->chunkid,c->version,opstr[c->operation]);
 		c->operation = NONE;
 	}
-	goal = labelset_get_keeparch_goal(c->lsetid,c->archflag);
+	goal = sclass_get_keeparch_goal(c->sclassid,c->archflag);
 	if (vc + bc < goal && tdc + tdb > 0) {
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid == TDVALID || s->valid == TDBUSY) {
@@ -2902,7 +2905,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": unexpected BUSY copies - fixing",c->chunkid,c->version);
 				for (s=c->slisthead ; s ; s=s->next) {
 					if (s->valid == BUSY) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 						c->allvalidcopies--;
 						c->regularvalidcopies--;
 						s->valid = INVALID;
@@ -2910,7 +2913,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						ivc++;
 						bc--;
 					} else if (s->valid == TDBUSY) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 						c->allvalidcopies--;
 						s->valid = INVALID;
 						s->version = 0;
@@ -2976,7 +2979,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							syslog(LOG_NOTICE,"chunk %016"PRIX64"_%08"PRIX32" - valid copy on (%s - ver:%08"PRIX32")",c->chunkid,c->version,matocsserv_getstrip(cstab[s->csid].ptr),s->version);
 						}
 					}
-					chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,0,c->allvalidcopies,0,c->regularvalidcopies);
 					c->needverincrease = 1;
 					return;
 				}
@@ -3049,12 +3052,12 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			for (s=c->slisthead ; s ; s=s->next) {
 				if (s->valid==TDBUSY || s->valid==BUSY) {
 					if (s->valid==TDBUSY) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 						c->allvalidcopies--;
 						tdb--;
 					}
 					if (s->valid==BUSY) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 						c->allvalidcopies--;
 						c->regularvalidcopies--;
 						bc--;
@@ -3106,10 +3109,10 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
 				if (s->valid==VALID || s->valid==TDVALID) {
 					if (s->valid==TDVALID) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 						c->allvalidcopies--;
 					} else {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 						c->allvalidcopies--;
 						c->regularvalidcopies--;
 					}
@@ -3152,12 +3155,12 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			// dservcount = matocsserv_getservers_ordered(dcsids,AcceptableDifference/2.0,NULL,NULL);
 			dservcount = matocsserv_getservers_ordered(dcsids);
 		}
-	//	syslog(LOG_WARNING,"vc (%"PRIu32") > goal (%"PRIu32") - delete",vc,labelset_getgoal(c->lsetid));
+	//	syslog(LOG_WARNING,"vc (%"PRIu32") > goal (%"PRIu32") - delete",vc,sclass_getgoal(c->sclassid));
 		inforec.notdone.del_overgoal+=(vc-goal);
 		delnotdone+=(vc-goal);
 		prevdone = 1;
 
-		if (labelset_has_keeparch_labels(c->lsetid,c->archflag)) { // labels version
+		if (sclass_has_keeparch_labels(c->sclassid,c->archflag)) { // labels version
 			servcnt = 0;
 			for (i=0 ; i<dservcount ; i++) {
 				for (s=c->slisthead ; s && s->csid!=dcsids[dservcount-1-i] ; s=s->next) {}
@@ -3165,14 +3168,14 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					servers[servcnt++] = s->csid;
 				}
 			}
-			labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+			labelcnt = sclass_get_keeparch_labelmasks(c->sclassid,c->archflag,&labelmasks);
 			matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
 			for (i=0 ; i<servcnt && vc>goal && prevdone ; i++) {
 				if (matching[i+labelcnt]<0) {
 					for (s=c->slisthead ; s && s->csid!=servers[i] ; s=s->next) {}
 					if (s && s->valid==VALID) {
 						if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
-							chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+							chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 							c->allvalidcopies--;
 							c->regularvalidcopies--;
 							c->needverincrease = 1;
@@ -3197,7 +3200,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				for (s=c->slisthead ; s && s->csid!=dcsids[dservcount-1-i] ; s=s->next) {}
 				if (s && s->valid==VALID) {
 					if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
 						c->allvalidcopies--;
 						c->regularvalidcopies--;
 						c->needverincrease = 1;
@@ -3237,7 +3240,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			for (s=c->slisthead ; s && prevdone==0 ; s=s->next) {
 				if (s->valid==TDVALID) {
 					if (matocsserv_has_avail_space(cstab[s->csid].ptr) && matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
-						chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
 						c->allvalidcopies--;
 						c->needverincrease = 1;
 						s->valid = DEL;
@@ -3260,14 +3263,14 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 // step 8. check matching for labeled chunks
 	forcereplication = 0;
-	if (labelset_has_keeparch_labels(c->lsetid,c->archflag)) {
+	if (sclass_has_keeparch_labels(c->sclassid,c->archflag)) {
 		servcnt = 0;
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid==VALID) {
 				servers[servcnt++] = s->csid;
 			}
 		}
-		labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+		labelcnt = sclass_get_keeparch_labelmasks(c->sclassid,c->archflag,&labelmasks);
 		matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
 		for (i=0 ; i<labelcnt ; i++) {
 			if (matching[i]<0) { // there are unmatched labels
@@ -3331,7 +3334,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				}
 			}
 			if (rgvc+rgtdc>0 && rservcount>0) { // have at least one server to read from and at least one to write to
-				if (labelset_has_keeparch_labels(c->lsetid,c->archflag)) { // labels version
+				if (sclass_has_keeparch_labels(c->sclassid,c->archflag)) { // labels version
 					uint32_t dstservcnt;
 					uint8_t allowallservers;
 					servcnt = 0;
@@ -3347,7 +3350,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							servers[servcnt++] = s->csid;
 						}
 					}
-					labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+					labelcnt = sclass_get_keeparch_labelmasks(c->sclassid,c->archflag,&labelmasks);
 					matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
 					allowallservers = 0;
 					if (scount<=rservcount) { // all servers can accept replication
@@ -3371,7 +3374,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						}
 					}
 /*
-					if (vc < labelset_getgoal(c->lsetid) && csdb_servers_count()<=rservcount) { // all servers can accept replications
+					if (vc < sclass_getgoal(c->sclassid) && csdb_servers_count()<=rservcount) { // all servers can accept replications
 						for (i=0 ; i<labelcnt ; i++) {
 							if (matching[i]<0) {
 								unmatchedlabels++;
@@ -3417,7 +3420,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 								s->version = c->version;
 								s->next = c->slisthead;
 								c->slisthead = s;
-								chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+								chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
 								c->allvalidcopies++;
 								c->regularvalidcopies++;
 								if (extrajob==0) {
@@ -3474,7 +3477,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 								s->version = c->version;
 								s->next = c->slisthead;
 								c->slisthead = s;
-								chunk_state_change(c->lsetid,c->lsetid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+								chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
 								c->allvalidcopies++;
 								c->regularvalidcopies++;
 								if (extrajob==0) {
@@ -3546,7 +3549,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				servers[extraservcnt++] = s->csid;
 			}
 		}
-		labelcnt = labelset_get_keeparch_labelmasks(c->lsetid,c->archflag,&labelmasks);
+		labelcnt = sclass_get_keeparch_labelmasks(c->sclassid,c->archflag,&labelmasks);
 		matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
 
 		if (dservcount==0) {
@@ -3782,9 +3785,19 @@ void chunk_jobs_main(void) {
 	lc = 0;
 	hashsteps = 1+((chunkrehashpos)/(LoopTimeMin*TICKSPERSECOND));
 	for (i=0 ; i<hashsteps && lc<HashCPTMax ; i++) {
-		if (jobshpos>=chunkrehashpos) {
+		if (jobshcnt>=chunkrehashpos) {
 			chunk_do_jobs(NULL,JOBS_EVERYLOOP,0,now,0);	// every loop tasks
-			jobshpos=0;
+			jobshpos = 0;
+			jobshcnt = 0;
+			jobshmax = chunkrehashpos;
+			jobshstep *= 16;
+			if (jobshstep==0 || jobshstep>=jobshmax) {
+				jobshstep = 1;
+			} else {
+				if ((jobshmax&1)==0) {
+					jobshmax--;
+				}
+			}
 			for (csid = csusedhead ; csid < MAXCSCOUNT ; csid = cstab[csid].next) {
 				switch (cstab[csid].mfr_state) {
 					case CAN_BE_REMOVED:
@@ -3814,7 +3827,13 @@ void chunk_jobs_main(void) {
 				}
 				c = cn;
 			}
-			jobshpos++;
+			if (jobshcnt<jobshmax) {
+				jobshpos += jobshstep;
+				jobshpos %= jobshmax;
+			} else {
+				jobshpos = jobshcnt;
+			}
+			jobshcnt++;
 		}
 	}
 }
@@ -3835,7 +3854,7 @@ void chunk_text_dump(FILE *fd) {
 			if (lockedto<now) {
 				lockedto = 0;
 			}
-			fprintf(fd,"*|i:%016"PRIX64"|v:%08"PRIX32"|g:%"PRIu8"|t:%10"PRIu32"\n",c->chunkid,c->version,c->lsetid,lockedto);
+			fprintf(fd,"*|i:%016"PRIX64"|v:%08"PRIX32"|g:%"PRIu8"|t:%10"PRIu32"\n",c->chunkid,c->version,c->sclassid,lockedto);
 		}
 	}
 }
@@ -4330,6 +4349,9 @@ int chunk_strinit(void) {
 		}
 	}
 	jobshpos = 0;
+	jobshstep = 1;
+	jobshcnt = 0;
+	jobshmax = 0;
 	for (j=0 ; j<DANGER_PRIORITIES ; j++) {
 		chunks_priority_queue[j] = (chunk**)malloc(sizeof(chunk*)*DangerMaxLeng);
 		passert(chunks_priority_queue[j]);

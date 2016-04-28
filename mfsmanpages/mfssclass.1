@@ -1,40 +1,42 @@
-.TH mfstools "1" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfssclass "1" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
-mfstools \- perform \fBMooseFS\fP\-specific operations
-.SH GOAL MANAGEMENT TOOLS
-.BR mfsgetgoal ,
-.BR mfssetgoal ,
-.B mfscopygoal
-.SH STORAGE CLASSES MANAGEMENT TOOLS
-.BR mfsgetsclass ,
-.BR mfssetsclass ,
-.BR mfscopysclass ,
-.BR mfsxchgsclass ,
+\fBMooseFS\fP storage classes management tools
+.SH SYNOPSIS
+.B mfsgetsclass
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfssetsclass
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISCLASS_NAME\fP \fIOBJECT\fP...
+.PP
+.B mfscopysclass
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
+.PP
+.B mfsxchgsclass
+[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISRC_SCLASS_NAME\fP \fIDST_SCLASS_NAME\fP \fIOBJECT\fP...
+.PP
 .B mfslistsclass
-.SH TRASH RETENTION MANAGEMENT TOOLS
-.BR mfsgettrashtime ,
-.BR mfssettrashtime ,
-.B mfscopytrashtime
-.SH EXTRA ATTRIBUTES MANAGEMENT TOOLS
-.BR mfsgeteattr ,
-.BR mfsseteattr ,
-.BR mfsdeleattr ,
-.B mfscopyeattr
-.SH DIAGNOSTIC TOOLS
-.BR mfscheckfile ,
-.BR mfsfileinfo ,
-.BR mfsdirinfo ,
-.BR mfsfilepaths ,
-.B mfsfilerepair
-.SH SNAPSHOT TOOLS
-.BR mfsappendchunks ,
-.BR mfsmakesnapshot ,
-.B mfsrmsnapshot
-.SH QUOTA MANAGEMENT TOOLS
-.BR mfsgetquota ,
-.BR mfssetquota ,
-.BR mfsdelquota ,
-.B mfscopyquota
+[\fB-l\fP] [\fIMOUNT_POINT\fP]
+.SH DESCRIPTION
+These tools operate on object's \fIstorage class\fP name. This is an extended version of classic goal.
+There are predefined storage classes provided as equivalents of goals 1 to 9 (names are simply "1","2",...,"9"). Other classes 
+can be created/modified/deleted etc. by administrator using \fBmfsscadmin\fP tool.
+.PP
+\fBmfsgetsclass\fP prints current \fIstorage class\fP of given object(s).
+\fB-r\fP option enables recursive mode, which works as usual for every
+given file, but for every given directory additionally prints current
+\fIstorage class\fP of all contained objects (files and directories).
+.PP
+\fBmfssetsclass\fP changes current \fIstorage class\fP of given object(s).
+\fB-r\fP option enables recursive mode.
+.PP
+\fBmfscopysclass\fP copies \fIstorage class\fP from one object to given object(s).
+.PP
+\fBmfsxchgsclass\fP sets \fIstorage class\fP to \fIDST_SCLASS_NAME\fP of given objects(s) but only
+when current \fIstorage class\fP is set to \fISRC_SCLASS_NAME\fP.
+.PP
+\fBmfslistsclass\fP lists currently defined storage classes.
+\fB-l\fP option enables long format - whole class definition is printed for each class, not only its name. For 
+description of storage class definition refer to \fBmfsscadmin\fP manpage.
 .SH GENERAL OPTIONS
 Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
@@ -78,10 +80,5 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmount (8),
-.BR mfsgoal (1),
-.BR mfssclass (1),
-.BR mfstrashtime (1),
-.BR mfseattr (1),
-.BR mfssnapshots (1),
-.BR mfsdiagtools (1),
+.BR mfstools (1),
 .BR mfsscadmin (1)

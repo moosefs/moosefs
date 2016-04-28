@@ -25,7 +25,7 @@ mfsmaster_SOURCES=\
 	openfiles.c openfiles.h \
 	csdb.c csdb.h \
 	iptosesid.c iptosesid.h \
-	labelsets.c labelsets.h \
+	storageclass.c storageclass.h \
 	sessions.c sessions.h \
 	metadata.c metadata.h \
 	restore.c restore.h \

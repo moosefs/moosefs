@@ -63,7 +63,8 @@ mfstools_links=\
 	mfscheckfile mfsdirinfo mfsfileinfo mfsfilerepair \
 	mfsgetgoal mfsgettrashtime mfsrgetgoal mfsrgettrashtime \
 	mfsrsetgoal mfsrsettrashtime mfssetgoal mfssettrashtime \
-	mfscopygoal mfscopytrashtime \
+	mfscopygoal mfscopytrashtime mfsscadmin \
+	mfsgetsclass mfssetsclass mfscopysclass mfsxchgsclass mfslistsclass \
 	mfsgeteattr mfsseteattr mfsdeleattr mfscopyeattr \
 	mfsgetquota mfssetquota mfsdelquota mfscopyquota \
 	mfsmakesnapshot mfsrmsnapshot mfsappendchunks mfsfilepaths

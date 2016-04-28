@@ -50,7 +50,7 @@
 #include "posixlocks.h"
 #include "openfiles.h"
 #include "csdb.h"
-#include "labelsets.h"
+#include "storageclass.h"
 #include "chunks.h"
 #include "filesystem.h"
 #include "metadata.h"
@@ -146,7 +146,7 @@ void meta_store(bio *fd) {
 	if (meta_store_chunk(fd,sessions_store,"SESS")<0) { // (metadump!!!)
 		return;
 	}
-	if (meta_store_chunk(fd,labelset_store,"LABS")<0) { // needs to be before NODE (refcnt)
+	if (meta_store_chunk(fd,sclass_store,"SCLA")<0) { // needs to be before NODE (refcnt)
 		return;
 	}
 	if (meta_store_chunk(fd,fs_storenodes,"NODE")<0) {
@@ -459,15 +459,15 @@ int meta_load(bio *fd,uint8_t fver) {
 					syslog(LOG_ERR,"error reading metadata (sessions)");
 					return -1;
 				}
-			} else if (memcmp(hdr,"LABS",4)==0) {
-				if (mver>labelset_store(NULL)) {
-					mfs_syslog(LOG_ERR,"error reading metadata (label sets) - metadata in file have been stored by newer version of MFS !!!");
+			} else if (memcmp(hdr,"LABS",4)==0 || memcmp(hdr,"SCLA",4)==0) {
+				if (mver>sclass_store(NULL)) {
+					mfs_syslog(LOG_ERR,"error reading metadata (storage classes) - metadata in file have been stored by newer version of MFS !!!");
 					return -1;
 				}
-				fprintf(stderr,"loading label data ... ");
+				fprintf(stderr,"loading storage classes data ... ");
 				fflush(stderr);
-				if (labelset_load(fd,mver,ignoreflag)<0) {
-					syslog(LOG_ERR,"error reading metadata (label sets)");
+				if (sclass_load(fd,mver,ignoreflag)<0) {
+					syslog(LOG_ERR,"error reading metadata (storage classes)");
 					return -1;
 				}
 			} else if (memcmp(hdr,"OPEN",4)==0) {
@@ -817,9 +817,9 @@ void meta_cleanup(void) {
 	fflush(stderr);
 	sessions_cleanup();
 	fprintf(stderr,"done\n");
-	fprintf(stderr,"cleaning label sets data ...");
+	fprintf(stderr,"cleaning storage classes data ...");
 	fflush(stderr);
-	labelset_cleanup();
+	sclass_cleanup();
 	fprintf(stderr,"done\n");
 	metaversion = 0;
 	mfs_syslog(LOG_NOTICE,"metadata have been cleaned");
@@ -1364,8 +1364,8 @@ uint8_t meta_mr_setmetaid(uint64_t newmetaid) {
 int meta_init(void) {
 	metaversion = 0;
 	metaid = 0;
-	if (labelset_init()<0) {
-		mfs_syslog(LOG_ERR,"label sets init error");
+	if (sclass_init()<0) {
+		mfs_syslog(LOG_ERR,"storage class init error");
 		return -1;
 	}
 	if (fs_strinit()<0) {

@@ -1,0 +1,107 @@
+.TH mfsdiagtools "1" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.SH NAME
+\fBNooseFS\fP diagnostic tools
+.SH SYNOPSIS
+.B mfscheckfile
+\fIFILE\fP...
+.PP
+.B mfsfilerepair
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIFILE\fP...
+.PP
+.B mfsfileinfo
+\fIFILE\fP...
+.PP
+.B mfsdirinfo
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-i\fP|\fB-d\fP|\fB-f\fP|\fB-c\fP|\fB-l\fP|\fB-s\fP|\fB-r\fP] [\fB-p\fP] \fIOBJECT\fP...
+.PP
+.B mfsfilepaths
+\fIOBJECT\fP|\fIINODE\fP...
+.SH DESCRIPTION
+\fBmfscheckfile\fP checks and prints number of chunks and number of chunk
+copies belonging to specified file(s).
+It can be used on any file, included deleted (\fItrash\fP).
+.PP
+\fBmfsfilerepair\fP deals with broken files (those which cause I/O errors on
+read operations) to make them partially readable. In case of missing chunk
+it fills missing parts of file with zeros; in case of chunk version mismatch
+it sets chunk version known to \fBmfsmaster\fP to highest one found on
+chunkservers. Note: because in the second case content mismatch can occur in
+chunks with the same version, it is advised to make a copy (not a snapshot!)
+and delete original file after "repairing".
+.PP
+\fBmfsfileinfo\fP prints location (\fIchunkserver\fP host and port) of each
+chunk copy belonging to specified file(s).
+It can be used on any file, included deleted (\fItrash\fP).
+.PP
+\fBmfsdirinfo\fP is extended, MooseFS-specific equivalent of \fBdu -s\fP
+command. It prints summary for each specified object (single file or
+directory tree). If you only want to see one parameter, then add one of
+show options (see \fBSHOW OPTIONS\fP). By default it returns data from internal
+master counters (very fast, but not precise). All repeated nodes (hard links) and
+chunks (snapshots) are counted multiple times. To count stats more preciselly
+you can use \fB-p\fP switch which turns on slow, recursive procedure. In this mode
+nodes and chunks are counted only once and the system uses current number of chunk
+copies instead of goal/labels.
+.PP
+\fBmfsfilepaths\fP tool can be used to find all occurrences (hard links) of given file 
+in filesystem. It can also be used to find a file with given i-node number. 
+In case of searching for i-node number, the tool has to be run
+in mfs mounted directory.
+.SH GENERAL OPTIONS
+Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
+options to select
+format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
+uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
+prefixes (k, M, G as 10^3, 10^6 etc.). \fB-k\fP, \fB-m\fP and \fB-g\fP show plain numbers
+respectivaly in kibis (binary kilo - 1024), mebis (binary mega - 1024^2)
+and gibis (binary giga - 1024^3).
+The same can be achieved by setting
+\fBMFSHRFORMAT\fP environment variable to: \fB0\fP (exact numbers), \fB1\fP
+or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
+\fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
+numbers and SI prefixes). The default is to print just exact numbers.
+.SH SHOW OPTIONS
+.TP
+\fB-i\fP
+show number of inodes
+.TP
+\fB-d\fP
+show number of directories
+.TP
+\fB-f\fP
+show number of files
+.TP
+\fB-c\fP
+show number of chunks
+.TP
+\fB-l\fP
+show length
+.TP
+\fB-s\fP
+show size
+.TP
+\fB-r\fP
+show realsize
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR mfstools (1)

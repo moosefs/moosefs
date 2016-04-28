@@ -343,32 +343,38 @@ exit 0
 %files client
 %defattr(644,root,root,755)
 %doc NEWS README
-%attr(755,root,root) %{_bindir}/mfsappendchunks
-%attr(755,root,root) %{_bindir}/mfscheckfile
-%attr(755,root,root) %{_bindir}/mfsdirinfo
-%attr(755,root,root) %{_bindir}/mfsfileinfo
-%attr(755,root,root) %{_bindir}/mfsfilerepair
-%attr(755,root,root) %{_bindir}/mfsmakesnapshot
-%attr(755,root,root) %{_bindir}/mfsrmsnapshot
-%attr(755,root,root) %{_bindir}/mfsgetgoal
-%attr(755,root,root) %{_bindir}/mfssetgoal
-%attr(755,root,root) %{_bindir}/mfscopygoal
-%attr(755,root,root) %{_bindir}/mfsrgetgoal
-%attr(755,root,root) %{_bindir}/mfsrsetgoal
-%attr(755,root,root) %{_bindir}/mfsgettrashtime
-%attr(755,root,root) %{_bindir}/mfssettrashtime
-%attr(755,root,root) %{_bindir}/mfscopytrashtime
-%attr(755,root,root) %{_bindir}/mfsrgettrashtime
-%attr(755,root,root) %{_bindir}/mfsrsettrashtime
-%attr(755,root,root) %{_bindir}/mfsgeteattr
-%attr(755,root,root) %{_bindir}/mfsseteattr
-%attr(755,root,root) %{_bindir}/mfsdeleattr
-%attr(755,root,root) %{_bindir}/mfscopyeattr
-%attr(755,root,root) %{_bindir}/mfsgetquota
-%attr(755,root,root) %{_bindir}/mfssetquota
-%attr(755,root,root) %{_bindir}/mfsdelquota
-%attr(755,root,root) %{_bindir}/mfscopyquota
-%attr(755,root,root) %{_bindir}/mfsfilepaths
+%{_bindir}/mfsappendchunks
+%{_bindir}/mfscheckfile
+%{_bindir}/mfsdirinfo
+%{_bindir}/mfsfileinfo
+%{_bindir}/mfsfilerepair
+%{_bindir}/mfsmakesnapshot
+%{_bindir}/mfsrmsnapshot
+%{_bindir}/mfsgetgoal
+%{_bindir}/mfssetgoal
+%{_bindir}/mfscopygoal
+%{_bindir}/mfsrgetgoal
+%{_bindir}/mfsrsetgoal
+%{_bindir}/mfsgetsclass
+%{_bindir}/mfssetsclass
+%{_bindir}/mfscopysclass
+%{_bindir}/mfsxchgsclass
+%{_bindir}/mfslistsclass
+%{_bindir}/mfsgettrashtime
+%{_bindir}/mfssettrashtime
+%{_bindir}/mfscopytrashtime
+%{_bindir}/mfsrgettrashtime
+%{_bindir}/mfsrsettrashtime
+%{_bindir}/mfsgeteattr
+%{_bindir}/mfsseteattr
+%{_bindir}/mfsdeleattr
+%{_bindir}/mfscopyeattr
+%{_bindir}/mfsgetquota
+%{_bindir}/mfssetquota
+%{_bindir}/mfsdelquota
+%{_bindir}/mfscopyquota
+%{_bindir}/mfsfilepaths
+%{_bindir}/mfsscadmin
 %attr(755,root,root) %{_bindir}/mfstools
 %attr(755,root,root) %{_bindir}/mfsmount
 /sbin/mount.moosefs
@@ -384,6 +390,11 @@ exit 0
 %{_mandir}/man1/mfscopygoal.1*
 %{_mandir}/man1/mfsrgetgoal.1*
 %{_mandir}/man1/mfsrsetgoal.1*
+%{_mandir}/man1/mfsgetsclass.1*
+%{_mandir}/man1/mfssetsclass.1*
+%{_mandir}/man1/mfscopysclass.1*
+%{_mandir}/man1/mfsxchgsclass.1*
+%{_mandir}/man1/mfslistsclass.1*
 %{_mandir}/man1/mfsgettrashtime.1*
 %{_mandir}/man1/mfssettrashtime.1*
 %{_mandir}/man1/mfscopytrashtime.1*
@@ -398,6 +409,14 @@ exit 0
 %{_mandir}/man1/mfsdelquota.1*
 %{_mandir}/man1/mfscopyquota.1*
 %{_mandir}/man1/mfsfilepaths.1*
+%{_mandir}/man1/mfsgoal.1*
+%{_mandir}/man1/mfstrashtime.1*
+%{_mandir}/man1/mfseattr.1*
+%{_mandir}/man1/mfsquota.1*
+%{_mandir}/man1/mfssnapshots.1*
+%{_mandir}/man1/mfsdiagtools.1*
+%{_mandir}/man1/mfssclass.1*
+%{_mandir}/man1/mfsscadmin.1*
 %{_mandir}/man1/mfstools.1*
 %{_mandir}/man8/mfsmount.8*
 %{mfsconfdir}/mfsmount.cfg.sample

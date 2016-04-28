@@ -53,12 +53,8 @@ CLTOMA_LIST_ACQUIRED_LOCKS = (PROTO_BASE+534)
 MATOCL_LIST_ACQUIRED_LOCKS = (PROTO_BASE+535)
 CLTOMA_MASS_RESOLVE_PATHS = (PROTO_BASE+536)
 MATOCL_MASS_RESOLVE_PATHS = (PROTO_BASE+537)
-CLTOMA_SET_LABEL_DESCRIPTION = (PROTO_BASE+538)
-MATOCL_SET_LABEL_DESCRIPTION = (PROTO_BASE+539)
-CLTOMA_LABEL_INFO = (PROTO_BASE+540)
-MATOCL_LABEL_INFO = (PROTO_BASE+541)
-CLTOMA_LABEL_SET_INFO = (PROTO_BASE+542)
-MATOCL_LABEL_SET_INFO = (PROTO_BASE+543)
+CLTOMA_SCLASS_INFO = (PROTO_BASE+542)
+MATOCL_SCLASS_INFO = (PROTO_BASE+543)
 CLTOMA_MISSING_CHUNKS = (PROTO_BASE+544)
 MATOCL_MISSING_CHUNKS = (PROTO_BASE+545)
 
@@ -224,10 +220,8 @@ else: # CLI mode
 	EXrev = 0
 	MSorder = 0
 	MSrev = 0
-	LDorder = 0
-	LDrev = 0
-	LSorder = 0
-	LSrev = 0
+	SCorder = 0
+	SCrev = 0
 	OForder = 0
 	OFrev = 0
 	OFsessionid = 0
@@ -349,7 +343,7 @@ else: # CLI mode
 	for opt,val in opts:
 		if opt=='-h':
 			print("usage:")
-			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|LD|LS|OF|AL|MO|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-a count] [-b chart_data_columns] [-c count] [-d chart_data_columns]" % sys.argv[0])
+			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|SC|OF|AL|MO|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-a count] [-b chart_data_columns] [-c count] [-d chart_data_columns]" % sys.argv[0])
 			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -C(RC/ip/port|BW/ip/port|M[01]/ip/port|RS/sessionid)" % sys.argv[0])
 			print("\ncommon:\n")
 			print("\t-h : print this message")
@@ -390,9 +384,8 @@ else: # CLI mode
 			print("\t\t-SHD : show hdd data")
 			print("\t\t-SEX : show exports")
 			print("\t\t-SMS : show active mounts")
-			print("\t\t-SRS : show resources (labels,open files,acquired locks)")
-			print("\t\t-SLD : show label descriptions")
-			print("\t\t-SLS : show label sets")
+			print("\t\t-SRS : show resources (storage classes,open files,acquired locks)")
+			print("\t\t-SSC : show storage classes")
 			print("\t\t-SOF : show only open files")
 			print("\t\t-SAL : show only acquired locks")
 			print("\t\t-SMO : show operation counters")
@@ -535,24 +528,16 @@ else: # CLI mode
 					MOdata = lastmode
 			if 'RS' in val:
 				sectionset.append("RS")
-				sectionsubset.append("LD")
-				sectionsubset.append("LS")
+				sectionsubset.append("SC")
 				sectionsubset.append("OF")
 				sectionsubset.append("AL")
-			if 'LD' in val:
+			if 'SC' in val:
 				sectionset.append("RS")
-				sectionsubset.append("LD")
+				sectionsubset.append("SC")
 				if lastorder!=None:
-					LDorder = lastorder
+					SCorder = lastorder
 				if lastrev:
-					LDrev = 1
-			if 'LS' in val:
-				sectionset.append("RS")
-				sectionsubset.append("LS")
-				if lastorder!=None:
-					LSorder = lastorder
-				if lastrev:
-					LSrev = 1
+					SCrev = 1
 			if 'OF' in val:
 				sectionset.append("RS")
 				sectionsubset.append("OF")
@@ -605,10 +590,8 @@ else: # CLI mode
 				MSorder = int(val)
 			if 'MO' in lastsval:
 				MOorder = int(val)
-			if 'LD' in lastsval:
-				LDorder = int(val)
-			if 'LS' in lastsval:
-				LSorder = int(val)
+			if 'SC' in lastsval:
+				SCorder = int(val)
 			if 'OF' in lastsval:
 				OForder = int(val)
 			if 'AL' in lastsval:
@@ -634,10 +617,8 @@ else: # CLI mode
 				MSrev = 1
 			if 'MO' in lastsval:
 				MOrev = 1
-			if 'LD' in lastsval:
-				LDrev = 1
-			if 'LS' in lastsval:
-				LSrev = 1
+			if 'SC' in lastsval:
+				SCrev = 1
 			if 'OF' in lastsval:
 				OFrev = 1
 			if 'AL' in lastsval:
@@ -2202,7 +2183,7 @@ if cgimode:
 		subsectionstr = fields.getvalue("subsections")
 		sectionsubset = set(subsectionstr.split("|"))
 	else:
-		sectionsubset = ["IM","LI","IG","MU","IC","IL","MF","CS","MB","LD","LS","OF","AL"] # used only in climode - in cgimode turn on all subsections
+		sectionsubset = ["IM","LI","IG","MU","IC","IL","MF","CS","MB","SC","OF","AL"] # used only in climode - in cgimode turn on all subsections
 
 	if leaderfound:
 		if masterconn.version_less_than(1,7,0):
@@ -2461,21 +2442,13 @@ if cgimode:
 	except Exception:
 		MOdata = 0
 	try:
-		LDorder = int(fields.getvalue("LDorder"))
+		SCorder = int(fields.getvalue("SCorder"))
 	except Exception:
-		LDorder = 0
+		SCorder = 0
 	try:
-		LDrev = int(fields.getvalue("LDrev"))
+		SCrev = int(fields.getvalue("SCrev"))
 	except Exception:
-		LDrev = 0
-	try:
-		LSorder = int(fields.getvalue("LSorder"))
-	except Exception:
-		LSorder = 0
-	try:
-		LSrev = int(fields.getvalue("LSrev"))
-	except Exception:
-		LSrev = 0
+		SCrev = 0
 	try:
 		OForder = int(fields.getvalue("OForder"))
 	except Exception:
@@ -5718,24 +5691,7 @@ if "MO" in sectionset and leaderfound:
 
 if "RS" in sectionset and leaderfound:
 
-	if "LD" in sectionsubset:
-		if needseparator:
-			if cgimode:
-				print("""<br/>""")
-			else:
-				print("")
-		else:
-			needseparator=1
-
-		try:
-			data,length = masterconn.command(CLTOMA_LABEL_INFO,MATOCL_LABEL_INFO)
-			scount = struct.unpack(">H",data[:2])
-#			print("scount: %u" % scount)
-#			print(str(data),length)
-		except Exception:
-			print_exception()
-
-	if "LS" in sectionsubset:
+	if "SC" in sectionsubset:
 		if needseparator:
 			if cgimode:
 				print("""<br/>""")
@@ -5748,9 +5704,11 @@ if "RS" in sectionset and leaderfound:
 			if cgimode:
 				out = []
 				out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfsls" cellspacing="0">""")
-				out.append("""	<tr><th colspan="20">Label Sets</th></tr>""")
+				out.append("""	<tr><th colspan="22">Storage Classes</th></tr>""")
 				out.append("""	<tr>""")
-				out.append("""		<th rowspan="2">set id</th>""")
+				out.append("""		<th rowspan="2">id</th>""")
+				out.append("""		<th rowspan="2">name</th>""")
+				out.append("""		<th rowspan="2">admin only</th>""")
 				out.append("""		<th colspan="2"># of inodes</th>""")
 				out.append("""		<th colspan="3"># of standard chunks</th>""")
 				out.append("""		<th colspan="3"># of archived chunks</th>""")
@@ -5780,20 +5738,28 @@ if "RS" in sectionset and leaderfound:
 				out.append("""		<th>delay</th>""")
 				out.append("""	</tr>""")
 			elif ttymode:
-				tab = Tabble("Label Sets",20,"r")
-				tab.header("",("# of inodes","",2),("# of standard chunks","",3),("# of archived chunks","",3),("create","",4),("keep","",3),("archive","",4))
-				tab.header("set id",("---","",19))
-				tab.header("","files","dirs","under","exact","over","under","exact","over","mode","can be fulfilled","goal","labels","can be fulfilled","goal","labels","can be fulfilled","goal","labels","delay")
-				tab.defattr("r","r","r","r","r","r","r","r","r","c","c","r","l","c","r","l","c","r","l","r")
+				tab = Tabble("Storage Classes",22,"r")
+				tab.header("","","",("# of inodes","",2),("# of standard chunks","",3),("# of archived chunks","",3),("create","",4),("keep","",3),("archive","",4))
+				tab.header("id","name","admin only",("---","",19))
+				tab.header("","","","files","dirs","under","exact","over","under","exact","over","mode","can be fulfilled","goal","labels","can be fulfilled","goal","labels","can be fulfilled","goal","labels","delay")
+				tab.defattr("r","l","c","r","r","r","r","r","r","r","r","c","c","r","l","c","r","l","c","r","l","r")
 			else:
-				tab = Tabble("label sets",20)
-			labelsets = []
-			data,length = masterconn.command(CLTOMA_LABEL_SET_INFO,MATOCL_LABEL_SET_INFO)
+				tab = Tabble("storage classes",22)
+			sclasses = []
+			data,length = masterconn.command(CLTOMA_SCLASS_INFO,MATOCL_SCLASS_INFO)
 			scount = struct.unpack(">H",data[:2])[0]
 			pos = 2
 			while pos < length:
-				if masterconn.version_at_least(3,0,9):
-					labelsetid,files,dirs,stdchunks_under,archchunks_under,stdchunks_exact,archchunks_exact,stdchunks_over,archchunks_over,create_mode,arch_delay,create_canbefulfilled,create_labelscnt,keep_canbefulfilled,keep_labelscnt,arch_canbefulfilled,arch_labelscnt = struct.unpack_from(">BLLQQQQQQBHBBBBBB",data,pos)
+				if masterconn.version_at_least(3,0,75):
+					sclassid,sclassnleng = struct.unpack_from(">BB",data,pos)
+					pos += 2
+					sclassname = data[pos:pos+sclassnleng]
+					try:
+						sclassname = sclassname.decode('utf-8')
+					except UnicodeDecodeError:
+						pass
+					pos += sclassnleng
+					files,dirs,stdchunks_under,archchunks_under,stdchunks_exact,archchunks_exact,stdchunks_over,archchunks_over,admin_only,create_mode,arch_delay,create_canbefulfilled,create_labelscnt,keep_canbefulfilled,keep_labelscnt,arch_canbefulfilled,arch_labelscnt = struct.unpack_from(">LLQQQQQQBBHBBBBBB",data,pos)
 					pos += 18 + 3 * 16
 					if arch_delay==0:
 						stdchunks_under += archchunks_under
@@ -5802,8 +5768,28 @@ if "RS" in sectionset and leaderfound:
 						archchunks_under = None
 						archchunks_exact = None
 						archchunks_over = None
+				elif masterconn.version_at_least(3,0,9):
+					sclassid,files,dirs,stdchunks_under,archchunks_under,stdchunks_exact,archchunks_exact,stdchunks_over,archchunks_over,create_mode,arch_delay,create_canbefulfilled,create_labelscnt,keep_canbefulfilled,keep_labelscnt,arch_canbefulfilled,arch_labelscnt = struct.unpack_from(">BLLQQQQQQBHBBBBBB",data,pos)
+					pos += 18 + 3 * 16
+					admin_only = 0
+					if sclassid<10:
+						sclassname = str(sclassid)
+					else:
+						sclassname = "sclass_%u" % (sclassid-9)
+					if arch_delay==0:
+						stdchunks_under += archchunks_under
+						stdchunks_exact += archchunks_exact
+						stdchunks_over += archchunks_over
+						archchunks_under = None
+						archchunks_exact = None
+						archchunks_over = None
 				else:
-					labelsetid,files,create_canbefulfilled,create_labelscnt = struct.unpack_from(">BLBB",data,pos)
+					sclassid,files,create_canbefulfilled,create_labelscnt = struct.unpack_from(">BLBB",data,pos)
+					admin_only = 0
+					if sclassid<10:
+						sclassname = str(sclassid)
+					else:
+						sclassname = "sclass_%u" % (sclassid-9)
 					dirs = 0
 					if create_canbefulfilled:
 						create_canbefulfilled = 3
@@ -5845,53 +5831,59 @@ if "RS" in sectionset and leaderfound:
 				else:
 					keep_labellist = create_labellist
 					arch_labellist = create_labellist
-				sf = labelsetid
-				if LSorder==2:
+				sf = sclassid
+				if SCorder==2:
+					sf = sclassname
+				elif SCorder==3:
+					sf = admin_only
+				elif SCorder==4:
 					sf = files
-				if LSorder==3:
+				elif SCorder==5:
 					sf = dirs
-				elif LSorder==4:
+				elif SCorder==6:
 					sf = stdchunks_under
-				elif LSorder==5:
+				elif SCorder==7:
 					sf = stdchunks_exact
-				elif LSorder==6:
+				elif SCorder==8:
 					sf = stdchunks_over
-				elif LSorder==7:
+				elif SCorder==9:
 					sf = archchunks_under
-				elif LSorder==8:
+				elif SCorder==10:
 					sf = archchunks_exact
-				elif LSorder==9:
+				elif SCorder==11:
 					sf = archchunks_over
-				elif LSorder==10:
+				elif SCorder==12:
 					sf = create_mode
-				elif LSorder==11:
+				elif SCorder==13:
 					sf = create_canbefulfilled
-				elif LSorder==12:
+				elif SCorder==14:
 					sf = create_labelscnt
-				elif LSorder==13:
+				elif SCorder==15:
 					sf = create_labellist
-				elif LSorder==14:
+				elif SCorder==16:
 					sf = keep_canbefulfilled
-				elif LSorder==15:
+				elif SCorder==17:
 					sf = keep_labelscnt
-				elif LSorder==16:
+				elif SCorder==18:
 					sf = keep_labellist
-				elif LSorder==17:
+				elif SCorder==19:
 					sf = arch_canbefulfilled
-				elif LSorder==18:
+				elif SCorder==20:
 					sf = arch_labelscnt
-				elif LSorder==19:
+				elif SCorder==21:
 					sf = arch_labellist
-				elif LSorder==20:
+				elif SCorder==22:
 					sf = arch_delay
-				labelsets.append((sf,labelsetid,files,dirs,stdchunks_under,stdchunks_exact,stdchunks_over,archchunks_under,archchunks_exact,archchunks_over,create_mode,create_canbefulfilled,create_labellist,keep_canbefulfilled,keep_labellist,arch_canbefulfilled,arch_labellist,arch_delay))
-			labelsets.sort()
-			if LSrev:
-				labelsets.reverse()
-			for sf,labelsetid,files,dirs,stdchunks_under,stdchunks_exact,stdchunks_over,archchunks_under,archchunks_exact,archchunks_over,create_mode,create_canbefulfilled,create_labellist,keep_canbefulfilled,keep_labellist,arch_canbefulfilled,arch_labellist,arch_delay in labelsets:
+				sclasses.append((sf,sclassid,sclassname,admin_only,files,dirs,stdchunks_under,stdchunks_exact,stdchunks_over,archchunks_under,archchunks_exact,archchunks_over,create_mode,create_canbefulfilled,create_labellist,keep_canbefulfilled,keep_labellist,arch_canbefulfilled,arch_labellist,arch_delay))
+			sclasses.sort()
+			if SCrev:
+				sclasses.reverse()
+			for sf,sclassid,sclassname,admin_only,files,dirs,stdchunks_under,stdchunks_exact,stdchunks_over,archchunks_under,archchunks_exact,archchunks_over,create_mode,create_canbefulfilled,create_labellist,keep_canbefulfilled,keep_labellist,arch_canbefulfilled,arch_labellist,arch_delay in sclasses:
 				if cgimode:
 					out.append("""	<tr>""")
-					out.append("""		<td align="right">%u</td>""" % labelsetid)
+					out.append("""		<td align="right">%u</td>""" % sclassid)
+					out.append("""		<td align="right">%s</td>""" % sclassname)
+					out.append("""		<td align="right">%s</td>""" % ("YES" if admin_only else "NO"))
 					out.append("""		<td align="right">%u</td>""" % files)
 					out.append("""		<td align="right">%u</td>""" % dirs)
 					if stdchunks_under!=None and stdchunks_exact!=None and stdchunks_over!=None:
@@ -5971,7 +5963,7 @@ if "RS" in sectionset and leaderfound:
 						out.append("""		<td align="center">-</td>""")
 					out.append("""	</tr>""")
 				else:
-					data = [labelsetid,files,dirs]
+					data = [sclassid,sclassname,("YES" if admin_only else "NO"),files,dirs]
 					if stdchunks_under!=None and stdchunks_exact!=None and stdchunks_over!=None:
 						data.append((stdchunks_under,'3') if stdchunks_under>0 else "-")
 						data.append((stdchunks_exact,'4'))

@@ -60,7 +60,7 @@
 #include "datacachemgr.h"
 #include "charts.h"
 #include "chartsdata.h"
-#include "labelsets.h"
+#include "storageclass.h"
 #include "cfg.h"
 #include "main.h"
 #include "sockets.h"
@@ -1579,48 +1579,16 @@ void matoclserv_mass_resolve_paths(matoclserventry *eptr,const uint8_t *data,uin
 	}
 }
 
-void matoclserv_set_label_description(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint8_t labelid,descrleng,status;
-	uint8_t *ptr;
-	if (length<2) {
-		syslog(LOG_NOTICE,"CLTOMA_SET_LABEL_DESCRIPTION - wrong size (%"PRIu32"/2+)",length);
-		eptr->mode = KILL;
-		return;
-	}
-	labelid = get8bit(&data);
-	descrleng = get8bit(&data);
-	if (length!=2U+descrleng) {
-		syslog(LOG_NOTICE,"CLTOMA_SET_LABEL_DESCRIPTION - wrong size (%"PRIu32"/%u)",length,2U+descrleng);
-		eptr->mode = KILL;
-		return;
-	}
-	status = labelset_setdescription(labelid,descrleng,data);
-	ptr = matoclserv_createpacket(eptr,MATOCL_SET_LABEL_DESCRIPTION,1);
-	put8bit(&ptr,status);
-}
-
-void matoclserv_label_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_sclass_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t *ptr;
 	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOMA_LABEL_INFO - wrong size (%"PRIu32"/0)",length);
+		syslog(LOG_NOTICE,"CLTOMA_SCLASS_INFO - wrong size (%"PRIu32"/0)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	(void)data;
-	ptr = matoclserv_createpacket(eptr,MATOCL_LABEL_INFO,labelset_label_info(NULL));
-	labelset_label_info(ptr);
-}
-
-void matoclserv_label_set_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint8_t *ptr;
-	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOMA_LABEL_SET_INFO - wrong size (%"PRIu32"/0)",length);
-		eptr->mode = KILL;
-		return;
-	}
-	(void)data;
-	ptr = matoclserv_createpacket(eptr,MATOCL_LABEL_SET_INFO,labelset_label_set_info(NULL));
-	labelset_label_set_info(ptr);
+	ptr = matoclserv_createpacket(eptr,MATOCL_SCLASS_INFO,sclass_info(NULL));
+	sclass_info(ptr);
 }
 
 void matoclserv_missing_chunks(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -4149,36 +4117,31 @@ void matoclserv_fuse_settrashtime(matoclserventry *eptr,const uint8_t *data,uint
 	}
 }
 
-void matoclserv_fuse_getgoal(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_fuse_getsclass(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode;
 	uint32_t msgid;
-	uint32_t fgtab[MAXLABELSETS],dgtab[MAXLABELSETS];
-	uint32_t **create_labelmasks;
-	uint8_t create_labelcnt;
-	uint32_t **keep_labelmasks;
-	uint8_t keep_labelcnt;
-	uint32_t **arch_labelmasks;
-	uint8_t arch_labelcnt;
+	uint32_t fgtab[MAXSCLASS],dgtab[MAXSCLASS];
+	uint8_t nleng;
 	uint16_t i;
-	uint8_t j,k,fn,dn,gmode;
+	uint8_t fn,dn,gmode;
 	uint32_t psize;
 	uint8_t *ptr;
 	uint8_t status;
 	if (length!=9) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_GETGOAL - wrong size (%"PRIu32"/9)",length);
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_GETSCLASS - wrong size (%"PRIu32"/9)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	gmode = get8bit(&data);
-	status = fs_getgoal(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,gmode,fgtab,dgtab);
+	status = fs_getsclass(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,gmode,fgtab,dgtab);
 	fn = 0;
 	dn = 0;
 	psize = 6;
 	if (status==MFS_STATUS_OK) {
-		for (i=1 ; i<MAXLABELSETS ; i++) {
-			if (labelset_is_simple_goal(i)) {
+		for (i=1 ; i<MAXSCLASS ; i++) {
+			if (sclass_is_simple_goal(i)) {
 				if (fgtab[i]) {
 					fn++;
 					psize += 5;
@@ -4187,89 +4150,51 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr,const uint8_t *data,uint32_t 
 					dn++;
 					psize += 5;
 				}
-			} else if (eptr->version>=VERSION2INT(3,0,9)) {
+			} else if (eptr->version>=VERSION2INT(3,0,75)) {
 				if (fgtab[i]) {
 					fn++;
-					psize += 11 + (labelset_get_create_goal(i)+labelset_get_keeparch_goal(i,0)+labelset_get_keeparch_goal(i,1))*4*MASKORGROUP;
+					psize += 6 + sclass_get_nleng(i);
 				}
 				if (dgtab[i]) {
 					dn++;
-					psize += 11 + (labelset_get_create_goal(i)+labelset_get_keeparch_goal(i,0)+labelset_get_keeparch_goal(i,1))*4*MASKORGROUP;
+					psize += 6 + sclass_get_nleng(i);
 				}
 			}
 		}
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETGOAL,(status!=MFS_STATUS_OK)?5:psize);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETSCLASS,(status!=MFS_STATUS_OK)?5:psize);
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put8bit(&ptr,fn);
 		put8bit(&ptr,dn);
-		for (i=1 ; i<MAXLABELSETS ; i++) {
+		for (i=1 ; i<MAXSCLASS ; i++) {
 			if (fgtab[i]) {
-				if (labelset_is_simple_goal(i)) {
+				if (sclass_is_simple_goal(i)) {
 					put8bit(&ptr,i);
 					put32bit(&ptr,fgtab[i]);
-				} else if (eptr->version>=VERSION2INT(3,0,9)) {
-					put8bit(&ptr,0);
-					put8bit(&ptr,labelset_get_create_mode(i));
-					put16bit(&ptr,labelset_get_arch_delay(i));
-					create_labelcnt = labelset_get_create_labelmasks(i,&create_labelmasks);
-					keep_labelcnt = labelset_get_keeparch_labelmasks(i,0,&keep_labelmasks);
-					arch_labelcnt = labelset_get_keeparch_labelmasks(i,1,&arch_labelmasks);
-					put8bit(&ptr,create_labelcnt);
-					put8bit(&ptr,keep_labelcnt);
-					put8bit(&ptr,arch_labelcnt);
-					for (j=0 ; j<create_labelcnt ; j++) {
-						for (k=0 ; k<MASKORGROUP ; k++) {
-							put32bit(&ptr,create_labelmasks[j][k]);
-						}
-					}
-					for (j=0 ; j<keep_labelcnt ; j++) {
-						for (k=0 ; k<MASKORGROUP ; k++) {
-							put32bit(&ptr,keep_labelmasks[j][k]);
-						}
-					}
-					for (j=0 ; j<arch_labelcnt ; j++) {
-						for (k=0 ; k<MASKORGROUP ; k++) {
-							put32bit(&ptr,arch_labelmasks[j][k]);
-						}
-					}
+				} else if (eptr->version>=VERSION2INT(3,0,75)) {
+					put8bit(&ptr,0xFF);
+					nleng = sclass_get_nleng(i);
+					put8bit(&ptr,nleng);
+					memcpy(ptr,sclass_get_name(i),nleng);
+					ptr+=nleng;
 					put32bit(&ptr,fgtab[i]);
 				}
 			}
 		}
-		for (i=1 ; i<MAXLABELSETS ; i++) {
+		for (i=1 ; i<MAXSCLASS ; i++) {
 			if (dgtab[i]) {
-				if (labelset_is_simple_goal(i)) {
+				if (sclass_is_simple_goal(i)) {
 					put8bit(&ptr,i);
 					put32bit(&ptr,dgtab[i]);
 				} else if (eptr->version>=VERSION2INT(3,0,9)) {
-					put8bit(&ptr,0);
-					put8bit(&ptr,labelset_get_create_mode(i));
-					put16bit(&ptr,labelset_get_arch_delay(i));
-					create_labelcnt = labelset_get_create_labelmasks(i,&create_labelmasks);
-					keep_labelcnt = labelset_get_keeparch_labelmasks(i,0,&keep_labelmasks);
-					arch_labelcnt = labelset_get_keeparch_labelmasks(i,1,&arch_labelmasks);
-					put8bit(&ptr,create_labelcnt);
-					put8bit(&ptr,keep_labelcnt);
-					put8bit(&ptr,arch_labelcnt);
-					for (j=0 ; j<create_labelcnt ; j++) {
-						for (k=0 ; k<MASKORGROUP ; k++) {
-							put32bit(&ptr,create_labelmasks[j][k]);
-						}
-					}
-					for (j=0 ; j<keep_labelcnt ; j++) {
-						for (k=0 ; k<MASKORGROUP ; k++) {
-							put32bit(&ptr,keep_labelmasks[j][k]);
-						}
-					}
-					for (j=0 ; j<arch_labelcnt ; j++) {
-						for (k=0 ; k<MASKORGROUP ; k++) {
-							put32bit(&ptr,arch_labelmasks[j][k]);
-						}
-					}
+					put8bit(&ptr,0xFF);
+					nleng = sclass_get_nleng(i);
+					put8bit(&ptr,nleng);
+					memcpy(ptr,sclass_get_name(i),nleng);
+					ptr+=nleng;
 					put32bit(&ptr,dgtab[i]);
 				}
 			}
@@ -4277,25 +4202,18 @@ void matoclserv_fuse_getgoal(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	}
 }
 
-void matoclserv_fuse_setgoal(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_fuse_setsclass(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode,uid;
 	uint32_t msgid;
 	uint8_t setid,smode;
 	uint32_t changed,notchanged,notpermitted;
-	uint32_t create_labelmasks[9*MASKORGROUP];
-	uint32_t keep_labelmasks[9*MASKORGROUP];
-	uint32_t arch_labelmasks[9*MASKORGROUP];
-	uint8_t create_mode;
-	uint8_t create_labelscnt;
-	uint8_t keep_labelscnt;
-	uint8_t arch_labelscnt;
-	uint8_t mingoal,maxgoal;
-	uint16_t arch_delay;
-	uint8_t i;
+	uint8_t scnleng;
+	uint8_t src_sclassid,dst_sclassid;
+	uint32_t pskip;
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<14) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_SETGOAL - wrong size (%"PRIu32"/<14)",length);
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_SETSCLASS - wrong size (%"PRIu32"/<14)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -4305,85 +4223,61 @@ void matoclserv_fuse_setgoal(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	sessions_ugid_remap(eptr->sesdata,&uid,NULL);
 	setid = get8bit(&data);
 	smode = get8bit(&data);
-	if ((smode&SMODE_TMASK)==SMODE_LABELS) {
-		if (setid==0) {
-			if (length<20) {
-				syslog(LOG_NOTICE,"CLTOMA_FUSE_SETGOAL - wrong size (%"PRIu32"/<20)",length);
+	if (setid==0xFF) {
+		if ((smode&SMODE_TMASK)==SMODE_EXCHANGE) {
+			if (length<15) {
+				syslog(LOG_NOTICE,"CLTOMA_FUSE_SETSCLASS - wrong size (%"PRIu32"/<15)",length);
 				eptr->mode = KILL;
 				return;
 			}
-			create_mode = get8bit(&data);
-			arch_delay = get16bit(&data);
-			create_labelscnt = get8bit(&data);
-			keep_labelscnt = get8bit(&data);
-			arch_labelscnt = get8bit(&data);
-			if (create_labelscnt<1 || create_labelscnt>9 || keep_labelscnt<1 || keep_labelscnt>9 || arch_labelscnt<1 || arch_labelscnt>9) {
-				status = MFS_ERROR_EINVAL;
-			} else {
-				if (length!=20U+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4U*MASKORGROUP) {
-					syslog(LOG_NOTICE,"CLTOMA_FUSE_SETGOAL (labels version) - wrong size (%"PRIu32"/%u)",length,20+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4);
-					eptr->mode = KILL;
-					return;
-				}
-				for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
-					create_labelmasks[i] = get32bit(&data);
-				}
-				for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
-					keep_labelmasks[i] = get32bit(&data);
-				}
-				for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
-					arch_labelmasks[i] = get32bit(&data);
-				}
-				setid = labelset_getsetid(create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
-				smode = (smode&SMODE_RMASK) | SMODE_SET;
-				mingoal = (create_labelscnt<keep_labelscnt)?create_labelscnt:keep_labelscnt;
-				maxgoal = (create_labelscnt<keep_labelscnt)?keep_labelscnt:create_labelscnt;
-				if (arch_labelscnt<mingoal) {
-					mingoal = arch_labelscnt;
-				}
-				if (arch_labelscnt>maxgoal) {
-					maxgoal = arch_labelscnt;
-				}
-				status = sessions_check_goal(eptr->sesdata,smode&SMODE_TMASK,mingoal,maxgoal);
-			}
+			scnleng = get8bit(&data);
+			src_sclassid = sclass_find_by_name(scnleng,data);
+			data += scnleng;
+			pskip = 15+scnleng;
 		} else {
-			if (setid<1 || setid>9) {
-				status = MFS_ERROR_EINVAL;
+			pskip = 14;
+			src_sclassid = 0x1; // any non 0 value
+		}
+		if (length<pskip+1) {
+			syslog(LOG_NOTICE,"CLTOMA_FUSE_SETSCLASS - wrong size (%"PRIu32")",length);
+			eptr->mode = KILL;
+			return;
+		}
+		scnleng = get8bit(&data);
+		dst_sclassid = sclass_find_by_name(scnleng,data);
+		data += scnleng;
+		if (length<pskip+1+scnleng) {
+			syslog(LOG_NOTICE,"CLTOMA_FUSE_SETSCLASS - wrong size (%"PRIu32")",length);
+			eptr->mode = KILL;
+			return;
+		}
+		if (src_sclassid==0 || dst_sclassid==0) {
+			status = MFS_ERROR_EINVAL; // new status ? NOSUCHSCLASS ?
+		} else {
+			if (sclass_is_simple_goal(dst_sclassid)) {
+				status = sessions_check_goal(eptr->sesdata,smode&SMODE_TMASK,dst_sclassid);
 			} else {
-				if (length!=14U+setid*4U*MASKORGROUP) {
-					syslog(LOG_NOTICE,"CLTOMA_FUSE_SETGOAL (labels version) - wrong size (%"PRIu32"/%u)",length,14+setid*4);
-					eptr->mode = KILL;
-					return;
-				}
-				create_mode = CREATE_MODE_STD;
-				arch_delay = 0;
-				create_labelscnt = setid;
-				keep_labelscnt = setid;
-				arch_labelscnt = setid;
-				for (i = 0 ; i < setid*MASKORGROUP ; i++) {
-					arch_labelmasks[i] = keep_labelmasks[i] = create_labelmasks[i] = get32bit(&data);
-				}
-				setid = labelset_getsetid(create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
-				smode = (smode&SMODE_RMASK) | SMODE_SET;
-				status = sessions_check_goal(eptr->sesdata,smode&SMODE_TMASK,create_labelscnt,create_labelscnt);
+				status = MFS_STATUS_OK;
 			}
 		}
 	} else { // setid == goal
 		if (setid<1 || setid>9) {
 			status = MFS_ERROR_EINVAL;
 		} else {
+			src_sclassid = setid;
+			dst_sclassid = setid;
 			if (length!=14) {
-				syslog(LOG_NOTICE,"CLTOMA_FUSE_SETGOAL (classic version) - wrong size (%"PRIu32"/14)",length);
+				syslog(LOG_NOTICE,"CLTOMA_FUSE_SETSCLASS (classic version) - wrong size (%"PRIu32"/14)",length);
 				eptr->mode = KILL;
 				return;
 			}
-			status = sessions_check_goal(eptr->sesdata,smode&SMODE_TMASK,setid,setid);
+			status = sessions_check_goal(eptr->sesdata,smode&SMODE_TMASK,setid);
 		}
 	}
 	if (status==MFS_STATUS_OK) {
-		status = fs_setgoal(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,setid,smode,&changed,&notchanged,&notpermitted);
+		status = fs_setsclass(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,src_sclassid,dst_sclassid,smode,&changed,&notchanged,&notpermitted);
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETGOAL,(status!=MFS_STATUS_OK)?5:16);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETSCLASS,(status!=MFS_STATUS_OK)?5:16);
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
 		put8bit(&ptr,status);
@@ -5047,8 +4941,7 @@ void matoclserv_fuse_archctl(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	}
 }
 
-#if 0
-void matoclserv_storage_policy_create(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid;
 	uint8_t nleng;
 	uint8_t fver;
@@ -5061,72 +4954,66 @@ void matoclserv_storage_policy_create(matoclserventry *eptr,const uint8_t *data,
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
 	uint16_t arch_delay;
-	uint8_t admin_mode;
+	uint8_t admin_only;
 	const uint8_t *name;
 	uint8_t *ptr;
 	uint8_t status;
 
 	if (length<5U) {
-		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32")",length);
+		syslog(LOG_NOTICE,"CLTOMA_SCLASS_CREATE - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
-	nleng = get8bit(&data);
-	name = data;
-	data += nleng;
-	if (length<6U+nleng) {
-		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
-		eptr->mode = KILL;
-		return;
-	}
-	fver = get8bit(&data);
-	if (fver==0) {
-		if (length<13U+nleng) {
-			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_ADMIN) { 
+		nleng = get8bit(&data);
+		name = data;
+		data += nleng;
+		if (length<6U+nleng) {
+			syslog(LOG_NOTICE,"CLTOMA_SCLASS_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
 			eptr->mode = KILL;
 			return;
 		}
-		admin_mode = get8bit(&data);
-		create_mode = get8bit(&data);
-		arch_delay = get16bit(&data);
-		create_labelscnt = get8bit(&data);
-		if (length<13U+nleng+create_labelscnt*4U*MASKORGROUP) {
-			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8")",length,nleng,create_labelscnt);
-			eptr->mode = KILL;
-			return;
+		fver = get8bit(&data);
+		if (fver==0) {
+			if (length<13U+nleng) {
+				syslog(LOG_NOTICE,"CLTOMA_SCLASS_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+				eptr->mode = KILL;
+				return;
+			}
+			admin_only = get8bit(&data);
+			create_mode = get8bit(&data);
+			arch_delay = get16bit(&data);
+			create_labelscnt = get8bit(&data);
+			keep_labelscnt = get8bit(&data);
+			arch_labelscnt = get8bit(&data);
+			if (length!=13U+nleng+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4U*MASKORGROUP) {
+				syslog(LOG_NOTICE,"CLTOMA_SCLASS_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt,arch_labelscnt);
+				eptr->mode = KILL;
+				return;
+			}
+			for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
+				create_labelmasks[i] = get32bit(&data);
+			}
+			for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
+				keep_labelmasks[i] = get32bit(&data);
+			}
+			for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
+				arch_labelmasks[i] = get32bit(&data);
+			}
+			status = sclass_create_entry(nleng,name,admin_only,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
+		} else {
+			status = MFS_ERROR_EINVAL;
 		}
-		for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
-			create_labelmasks[i] = get32bit(&data);
-		}
-		keep_labelscnt = get8bit(&data);
-		if (length<13U+nleng+(create_labelscnt+keep_labelscnt)*4U*MASKORGROUP) {
-			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt);
-			eptr->mode = KILL;
-			return;
-		}
-		for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
-			keep_labelmasks[i] = get32bit(&data);
-		}
-		arch_labelscnt = get8bit(&data);
-		if (length!=13U+nleng+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4U*MASKORGROUP) {
-			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CREATE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt,arch_labelscnt);
-			eptr->mode = KILL;
-			return;
-		}
-		for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
-			arch_labelmasks[i] = get32bit(&data);
-		}
-		status = sp_create_entry(nleng,name,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
 	} else {
-		status = MFS_ERROR_EINVAL;
+		status = MFS_ERROR_EPERM_NOTADMIN;
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_STORAGE_POLICY_CREATE,5);
+	ptr = matoclserv_createpacket(eptr,MATOCL_SCLASS_CREATE,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
 }
 
-void matoclserv_storage_policy_change(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid;
 	uint8_t nleng;
 	uint8_t fver;
@@ -5140,13 +5027,13 @@ void matoclserv_storage_policy_change(matoclserventry *eptr,const uint8_t *data,
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
 	uint16_t arch_delay;
-	uint8_t admin_mode;
+	uint8_t admin_only;
 	const uint8_t *name;
 	uint8_t *ptr;
 	uint8_t status;
 
 	if (length<5U) {
-		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32")",length);
+		syslog(LOG_NOTICE,"CLTOMA_SCLASS_CHANGE - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -5155,77 +5042,71 @@ void matoclserv_storage_policy_change(matoclserventry *eptr,const uint8_t *data,
 	name = data;
 	data += nleng;
 	if (length<6U+nleng) {
-		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		syslog(LOG_NOTICE,"CLTOMA_SCLASS_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
 		eptr->mode = KILL;
 		return;
 	}
 	fver = get8bit(&data);
 	if (fver==0) {
 		if (length<15U+nleng) {
-			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+			syslog(LOG_NOTICE,"CLTOMA_SCLASS_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
 			eptr->mode = KILL;
 			return;
 		}
 		chgmask = get16bit(&data);
-		admin_mode = get8bit(&data);
-		create_mode = get8bit(&data);
-		arch_delay = get16bit(&data);
-		create_labelscnt = get8bit(&data);
-		if (length<15U+nleng+create_labelscnt*4U*MASKORGROUP) {
-			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8")",length,nleng,create_labelscnt);
-			eptr->mode = KILL;
-			return;
+		if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_ADMIN || chgmask==0) {
+			admin_only = get8bit(&data);
+			create_mode = get8bit(&data);
+			arch_delay = get16bit(&data);
+			create_labelscnt = get8bit(&data);
+			keep_labelscnt = get8bit(&data);
+			arch_labelscnt = get8bit(&data);
+			if (length!=15U+nleng+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4U*MASKORGROUP) {
+				syslog(LOG_NOTICE,"CLTOMA_SCLASS_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt,arch_labelscnt);
+				eptr->mode = KILL;
+				return;
+			}
+			for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
+				create_labelmasks[i] = get32bit(&data);
+			}
+			for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
+				keep_labelmasks[i] = get32bit(&data);
+			}
+			for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
+				arch_labelmasks[i] = get32bit(&data);
+			}
+			status = sclass_change_entry(nleng,name,chgmask,&admin_only,&create_mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay);
+		} else {
+			status = MFS_ERROR_EPERM_NOTADMIN;
 		}
-		for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
-			create_labelmasks[i] = get32bit(&data);
-		}
-		keep_labelscnt = get8bit(&data);
-		if (length<15U+nleng+(create_labelscnt+keep_labelscnt)*4U*MASKORGROUP) {
-			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt);
-			eptr->mode = KILL;
-			return;
-		}
-		for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
-			keep_labelmasks[i] = get32bit(&data);
-		}
-		arch_labelscnt = get8bit(&data);
-		if (length!=15U+nleng+(create_labelscnt+keep_labelscnt+arch_labelscnt)*4U*MASKORGROUP) {
-			syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_CHANGE - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8")",length,nleng,create_labelscnt,keep_labelscnt,arch_labelscnt);
-			eptr->mode = KILL;
-			return;
-		}
-		for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
-			arch_labelmasks[i] = get32bit(&data);
-		}
-		status = sp_change_entry(nleng,name,chgmask,&create_mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay);
 	} else {
 		status = MFS_ERROR_EINVAL;
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_STORAGE_POLICY_CHANGE,(status!=MFS_STATUS_OK)?5:(12U+4U*MASKORGROUP*(create_labelscnt+keep_labelscnt+arch_labelscnt)));
+	ptr = matoclserv_createpacket(eptr,MATOCL_SCLASS_CHANGE,(status!=MFS_STATUS_OK)?5:(12U+4U*MASKORGROUP*(create_labelscnt+keep_labelscnt+arch_labelscnt)));
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put8bit(&ptr,0); // fver
-		put8bit(&ptr,admin_mode);
+		put8bit(&ptr,admin_only);
 		put8bit(&ptr,create_mode);
 		put16bit(&ptr,arch_delay);
 		put8bit(&ptr,create_labelscnt);
+		put8bit(&ptr,keep_labelscnt);
+		put8bit(&ptr,arch_labelscnt);
 		for (i = 0 ; i < create_labelscnt*MASKORGROUP ; i++) {
 			put32bit(&ptr,create_labelmasks[i]);
 		}
-		put8bit(&ptr,keep_labelscnt);
 		for (i = 0 ; i < keep_labelscnt*MASKORGROUP ; i++) {
 			put32bit(&ptr,keep_labelmasks[i]);
 		}
-		put8bit(&ptr,arch_labelscnt);
 		for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
 			put32bit(&ptr,arch_labelmasks[i]);
 		}
 	}
 }
 
-void matoclserv_storage_policy_delete(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_sclass_delete(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid;
 	uint8_t nleng;
 	const uint8_t *name;
@@ -5233,42 +5114,125 @@ void matoclserv_storage_policy_delete(matoclserventry *eptr,const uint8_t *data,
 	uint8_t status;
 
 	if (length<5) {
-		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_DELETE - wrong size (%"PRIu32")",length);
+		syslog(LOG_NOTICE,"CLTOMA_SCLASS_DELETE - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
-	nleng = get8bit(&data);
-	name = data;
-	data += nleng;
-	if (length!=5U+nleng) {
-		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_DELETE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
-		eptr->mode = KILL;
-		return;
+	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_ADMIN) { 
+		nleng = get8bit(&data);
+		name = data;
+		data += nleng;
+		if (length!=5U+nleng) {
+			syslog(LOG_NOTICE,"CLTOMA_SCLASS_DELETE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+			eptr->mode = KILL;
+			return;
+		}
+		status = sclass_delete_entry(nleng,name);
+	} else {
+		status = MFS_ERROR_EPERM_NOTADMIN;
 	}
-	status = sp_delete_entry(nleng,name);
-	ptr = matoclserv_createpacket(eptr,MATOCL_STORAGE_POLICY_DELETE,5);
+	ptr = matoclserv_createpacket(eptr,MATOCL_SCLASS_DELETE,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
 }
 
-void matoclserv_storage_policy_list(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_sclass_duplicate(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid;
+	uint8_t snleng,dnleng;
+	const uint8_t *sname,*dname;
 	uint8_t *ptr;
-	uint32_t rsize;
+	uint8_t status;
 
-	if (length!=4) {
-		syslog(LOG_NOTICE,"CLTOMA_STORAGE_POLICY_LIST - wrong size (%"PRIu32")",length);
+	if (length<5) {
+		syslog(LOG_NOTICE,"CLTOMA_SCLASS_DUPLICATE - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
-	rsize = sp_list_entries(NULL);
-	ptr = matoclserv_createpacket(eptr,MATOCL_STORAGE_POLICY_LIST,4+rsize);
+	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_ADMIN) { 
+		snleng = get8bit(&data);
+		sname = data;
+		data += snleng;
+		if (length<6U+snleng) {
+			syslog(LOG_NOTICE,"CLTOMA_SCLASS_DUPLICATE - wrong size (%"PRIu32":snleng=%"PRIu8")",length,snleng);
+			eptr->mode = KILL;
+			return;
+		}
+		dnleng = get8bit(&data);
+		dname = data;
+		data += dnleng;
+		if (length!=6U+snleng+dnleng) {
+			syslog(LOG_NOTICE,"CLTOMA_SCLASS_DUPLICATE - wrong size (%"PRIu32":snleng=%"PRIu8":dnleng=%"PRIu8")",length,snleng,dnleng);
+			eptr->mode = KILL;
+			return;
+		}
+		status = sclass_duplicate_entry(snleng,sname,dnleng,dname);
+	} else {
+		status = MFS_ERROR_EPERM_NOTADMIN;
+	}
+	ptr = matoclserv_createpacket(eptr,MATOCL_SCLASS_DUPLICATE,5);
 	put32bit(&ptr,msgid);
-	sp_list_entries(ptr);
+	put8bit(&ptr,status);
 }
-#endif
+
+void matoclserv_sclass_rename(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	uint8_t snleng,dnleng;
+	const uint8_t *sname,*dname;
+	uint8_t *ptr;
+	uint8_t status;
+
+	if (length<5) {
+		syslog(LOG_NOTICE,"CLTOMA_SCLASS_RENAME - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_ADMIN) { 
+		snleng = get8bit(&data);
+		sname = data;
+		data += snleng;
+		if (length<6U+snleng) {
+			syslog(LOG_NOTICE,"CLTOMA_SCLASS_RENAME - wrong size (%"PRIu32":snleng=%"PRIu8")",length,snleng);
+			eptr->mode = KILL;
+			return;
+		}
+		dnleng = get8bit(&data);
+		dname = data;
+		data += dnleng;
+		if (length!=6U+snleng+dnleng) {
+			syslog(LOG_NOTICE,"CLTOMA_SCLASS_RENAME - wrong size (%"PRIu32":snleng=%"PRIu8":dnleng=%"PRIu8")",length,snleng,dnleng);
+			eptr->mode = KILL;
+			return;
+		}
+		status = sclass_rename_entry(snleng,sname,dnleng,dname);
+	} else {
+		status = MFS_ERROR_EPERM_NOTADMIN;
+	}
+	ptr = matoclserv_createpacket(eptr,MATOCL_SCLASS_RENAME,5);
+	put32bit(&ptr,msgid);
+	put8bit(&ptr,status);
+}
+
+void matoclserv_sclass_list(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	uint8_t *ptr;
+	uint32_t rsize;
+	uint8_t longmode;
+
+	if (length!=5) {
+		syslog(LOG_NOTICE,"CLTOMA_SCLASS_LIST - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	longmode = get8bit(&data);
+	rsize = sclass_list_entries(NULL,longmode);
+	ptr = matoclserv_createpacket(eptr,MATOCL_SCLASS_LIST,4+rsize);
+	put32bit(&ptr,msgid);
+	sclass_list_entries(ptr,longmode);
+}
 
 /*
 void matoclserv_fuse_eattr(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -5707,14 +5671,8 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_MASS_RESOLVE_PATHS:
 				matoclserv_mass_resolve_paths(eptr,data,length);
 				break;
-			case CLTOMA_SET_LABEL_DESCRIPTION:
-				matoclserv_set_label_description(eptr,data,length);
-				break;
-			case CLTOMA_LABEL_INFO:
-				matoclserv_label_info(eptr,data,length);
-				break;
-			case CLTOMA_LABEL_SET_INFO:
-				matoclserv_label_set_info(eptr,data,length);
+			case CLTOMA_SCLASS_INFO:
+				matoclserv_sclass_info(eptr,data,length);
 				break;
 			case CLTOMA_MISSING_CHUNKS:
 				matoclserv_missing_chunks(eptr,data,length);
@@ -5851,11 +5809,11 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_SETTRASHTIME:
 				matoclserv_fuse_settrashtime(eptr,data,length);
 				break;
-			case CLTOMA_FUSE_GETGOAL:
-				matoclserv_fuse_getgoal(eptr,data,length);
+			case CLTOMA_FUSE_GETSCLASS:
+				matoclserv_fuse_getsclass(eptr,data,length);
 				break;
-			case CLTOMA_FUSE_SETGOAL:
-				matoclserv_fuse_setgoal(eptr,data,length);
+			case CLTOMA_FUSE_SETSCLASS:
+				matoclserv_fuse_setsclass(eptr,data,length);
 				break;
 			case CLTOMA_FUSE_APPEND:
 				matoclserv_fuse_append(eptr,data,length);
@@ -5905,20 +5863,24 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_ARCHCTL:
 				matoclserv_fuse_archctl(eptr,data,length);
 				break;
-#if 0
-			case CLTOMA_STORAGE_POLICY_CREATE:
-				matoclserv_storage_policy_create(eptr,data,length);
+			case CLTOMA_SCLASS_CREATE:
+				matoclserv_sclass_create(eptr,data,length);
 				break;
-			case CLTOMA_STORAGE_POLICY_CHANGE:
-				matoclserv_storage_policy_change(eptr,data,length);
+			case CLTOMA_SCLASS_CHANGE:
+				matoclserv_sclass_change(eptr,data,length);
 				break;
-			case CLTOMA_STORAGE_POLICY_DELETE:
-				matoclserv_storage_policy_delete(eptr,data,length);
+			case CLTOMA_SCLASS_DELETE:
+				matoclserv_sclass_delete(eptr,data,length);
 				break;
-			case CLTOMA_STORAGE_POLICY_LIST:
-				matoclserv_storage_policy_list(eptr,data,length);
+			case CLTOMA_SCLASS_DUPLICATE:
+				matoclserv_sclass_duplicate(eptr,data,length);
 				break;
-#endif
+			case CLTOMA_SCLASS_RENAME:
+				matoclserv_sclass_rename(eptr,data,length);
+				break;
+			case CLTOMA_SCLASS_LIST:
+				matoclserv_sclass_list(eptr,data,length);
+				break;
 
 /* for tools - also should be available for registered clients */
 			case CLTOMA_CSERV_LIST:
@@ -5978,14 +5940,8 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_MASS_RESOLVE_PATHS:
 				matoclserv_mass_resolve_paths(eptr,data,length);
 				break;
-			case CLTOMA_SET_LABEL_DESCRIPTION:
-				matoclserv_set_label_description(eptr,data,length);
-				break;
-			case CLTOMA_LABEL_INFO:
-				matoclserv_label_info(eptr,data,length);
-				break;
-			case CLTOMA_LABEL_SET_INFO:
-				matoclserv_label_set_info(eptr,data,length);
+			case CLTOMA_SCLASS_INFO:
+				matoclserv_sclass_info(eptr,data,length);
 				break;
 			case CLTOMA_MISSING_CHUNKS:
 				matoclserv_missing_chunks(eptr,data,length);
@@ -6023,11 +5979,11 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_SETTRASHTIME:
 				matoclserv_fuse_settrashtime(eptr,data,length);
 				break;
-			case CLTOMA_FUSE_GETGOAL:
-				matoclserv_fuse_getgoal(eptr,data,length);
+			case CLTOMA_FUSE_GETSCLASS:
+				matoclserv_fuse_getsclass(eptr,data,length);
 				break;
-			case CLTOMA_FUSE_SETGOAL:
-				matoclserv_fuse_setgoal(eptr,data,length);
+			case CLTOMA_FUSE_SETSCLASS:
+				matoclserv_fuse_setsclass(eptr,data,length);
 				break;
 			case CLTOMA_FUSE_APPEND:
 				matoclserv_fuse_append(eptr,data,length);
@@ -6059,20 +6015,24 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_ARCHCTL:
 				matoclserv_fuse_archctl(eptr,data,length);
 				break;
-#if 0
-			case CLTOMA_STORAGE_POLICY_CREATE:
-				matoclserv_storage_policy_create(eptr,data,length);
+			case CLTOMA_SCLASS_CREATE:
+				matoclserv_sclass_create(eptr,data,length);
 				break;
-			case CLTOMA_STORAGE_POLICY_CHANGE:
-				matoclserv_storage_policy_change(eptr,data,length);
+			case CLTOMA_SCLASS_CHANGE:
+				matoclserv_sclass_change(eptr,data,length);
 				break;
-			case CLTOMA_STORAGE_POLICY_DELETE:
-				matoclserv_storage_policy_delete(eptr,data,length);
+			case CLTOMA_SCLASS_DELETE:
+				matoclserv_sclass_delete(eptr,data,length);
 				break;
-			case CLTOMA_STORAGE_POLICY_LIST:
-				matoclserv_storage_policy_list(eptr,data,length);
+			case CLTOMA_SCLASS_DUPLICATE:
+				matoclserv_sclass_duplicate(eptr,data,length);
 				break;
-#endif
+			case CLTOMA_SCLASS_RENAME:
+				matoclserv_sclass_rename(eptr,data,length);
+				break;
+			case CLTOMA_SCLASS_LIST:
+				matoclserv_sclass_list(eptr,data,length);
+				break;
 			default:
 				syslog(LOG_NOTICE,"main master server module: got unknown message from mfstools (type:%"PRIu32")",type);
 				eptr->mode=KILL;

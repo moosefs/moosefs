@@ -114,7 +114,7 @@ am_mfsmaster_OBJECTS = mfsmaster-itree.$(OBJEXT) \
 	mfsmaster-xattr.$(OBJEXT) mfsmaster-posixacl.$(OBJEXT) \
 	mfsmaster-flocklocks.$(OBJEXT) mfsmaster-posixlocks.$(OBJEXT) \
 	mfsmaster-openfiles.$(OBJEXT) mfsmaster-csdb.$(OBJEXT) \
-	mfsmaster-iptosesid.$(OBJEXT) mfsmaster-labelsets.$(OBJEXT) \
+	mfsmaster-iptosesid.$(OBJEXT) mfsmaster-storageclass.$(OBJEXT) \
 	mfsmaster-sessions.$(OBJEXT) mfsmaster-metadata.$(OBJEXT) \
 	mfsmaster-restore.$(OBJEXT) mfsmaster-merger.$(OBJEXT) \
 	mfsmaster-missinglog.$(OBJEXT) \
@@ -425,7 +425,7 @@ mfsmaster_SOURCES = \
 	openfiles.c openfiles.h \
 	csdb.c csdb.h \
 	iptosesid.c iptosesid.h \
-	labelsets.c labelsets.h \
+	storageclass.c storageclass.h \
 	sessions.c sessions.h \
 	metadata.c metadata.h \
 	restore.c restore.h \
@@ -664,7 +664,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-flocklocks.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-iptosesid.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-itree.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-labelsets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-matoclserv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-matocsserv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-matomlserv.Po@am__quote@
@@ -677,6 +676,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-restore.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-sessions.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-sharedpointer.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-storageclass.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-topology.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-xattr.Po@am__quote@
 
@@ -900,19 +900,19 @@ mfsmaster-iptosesid.obj: iptosesid.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -c -o mfsmaster-iptosesid.obj `if test -f 'iptosesid.c'; then $(CYGPATH_W) 'iptosesid.c'; else $(CYGPATH_W) '$(srcdir)/iptosesid.c'; fi`
 
-mfsmaster-labelsets.o: labelsets.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -MT mfsmaster-labelsets.o -MD -MP -MF $(DEPDIR)/mfsmaster-labelsets.Tpo -c -o mfsmaster-labelsets.o `test -f 'labelsets.c' || echo '$(srcdir)/'`labelsets.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-labelsets.Tpo $(DEPDIR)/mfsmaster-labelsets.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='labelsets.c' object='mfsmaster-labelsets.o' libtool=no @AMDEPBACKSLASH@
+mfsmaster-storageclass.o: storageclass.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -MT mfsmaster-storageclass.o -MD -MP -MF $(DEPDIR)/mfsmaster-storageclass.Tpo -c -o mfsmaster-storageclass.o `test -f 'storageclass.c' || echo '$(srcdir)/'`storageclass.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-storageclass.Tpo $(DEPDIR)/mfsmaster-storageclass.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='storageclass.c' object='mfsmaster-storageclass.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -c -o mfsmaster-labelsets.o `test -f 'labelsets.c' || echo '$(srcdir)/'`labelsets.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -c -o mfsmaster-storageclass.o `test -f 'storageclass.c' || echo '$(srcdir)/'`storageclass.c
 
-mfsmaster-labelsets.obj: labelsets.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -MT mfsmaster-labelsets.obj -MD -MP -MF $(DEPDIR)/mfsmaster-labelsets.Tpo -c -o mfsmaster-labelsets.obj `if test -f 'labelsets.c'; then $(CYGPATH_W) 'labelsets.c'; else $(CYGPATH_W) '$(srcdir)/labelsets.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-labelsets.Tpo $(DEPDIR)/mfsmaster-labelsets.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='labelsets.c' object='mfsmaster-labelsets.obj' libtool=no @AMDEPBACKSLASH@
+mfsmaster-storageclass.obj: storageclass.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -MT mfsmaster-storageclass.obj -MD -MP -MF $(DEPDIR)/mfsmaster-storageclass.Tpo -c -o mfsmaster-storageclass.obj `if test -f 'storageclass.c'; then $(CYGPATH_W) 'storageclass.c'; else $(CYGPATH_W) '$(srcdir)/storageclass.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-storageclass.Tpo $(DEPDIR)/mfsmaster-storageclass.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='storageclass.c' object='mfsmaster-storageclass.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -c -o mfsmaster-labelsets.obj `if test -f 'labelsets.c'; then $(CYGPATH_W) 'labelsets.c'; else $(CYGPATH_W) '$(srcdir)/labelsets.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -c -o mfsmaster-storageclass.obj `if test -f 'storageclass.c'; then $(CYGPATH_W) 'storageclass.c'; else $(CYGPATH_W) '$(srcdir)/storageclass.c'; fi`
 
 mfsmaster-sessions.o: sessions.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmaster_CFLAGS) $(CFLAGS) -MT mfsmaster-sessions.o -MD -MP -MF $(DEPDIR)/mfsmaster-sessions.Tpo -c -o mfsmaster-sessions.o `test -f 'sessions.c' || echo '$(srcdir)/'`sessions.c

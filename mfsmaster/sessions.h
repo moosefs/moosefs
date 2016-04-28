@@ -46,7 +46,7 @@ uint32_t sessions_get_rootinode(void *vsesdata);
 uint32_t sessions_get_sesflags(void *vsesdata);
 uint16_t sessions_get_umask(void *vsesdata);
 uint8_t sessions_is_root_remapped(void *vsesdata);
-uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t mingoal,uint8_t maxgoal);
+uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t goal);
 uint8_t sessions_check_trashtime(void *vsesdata,uint8_t smode,uint32_t trashtime);
 void sessions_inc_stats(void *vsesdata,uint8_t statid);
 void sessions_ugid_remap(void *vsesdata,uint32_t *auid,uint32_t *agid);

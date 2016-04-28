@@ -1,4 +1,4 @@
-.TH mfsexports.cfg "5" "March 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfsexports.cfg "5" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
 mfsexports.cfg \- MooseFS access control for \fBmfsmount\fPs
 .SH DESCRIPTION
@@ -28,27 +28,27 @@ value \fB.\fP means MFSMETA companion filesystem.
 .PP
 \fIOPTIONS\fP list:
 .TP
-\fBro\fP, \fBreadonly\fP
+.BR ro ", " readonly
 export tree in read-only mode; this is default
 .TP
-\fBrw\fP, \fBreadwrite\fP
+.BR rw ", " readwrite
 export tree in read-write mode
 .TP
-\fBalldirs\fP
+.B alldirs
 allows to mount any subdirectory of specified directory (similarly to NFS)
 .TP
-\fBdynamicip\fP
+.B dynamicip
 allows reconnecting of already authenticated client from any IP address
 (the default is to check IP address on reconnect)
 .TP
-\fBignoregid\fP
+.B ignoregid
 disable testing of group access at \fBmfsmaster\fP level (it's still done
 at \fBmfsmount\fP level) - in this case "group" and "other" permissions are
 logically added; needed for supplementary groups to work (\fBmfsmaster\fP
 receives only user primary group information)
 .TP
-\fBadmin\fB
-administrative privileges - currently: allow changing of quota values
+.B admin
+administrative privileges - currently: allow changing of quota values and storage classes management
 .TP
 \fBmaproot=\fP\fIUSER\fP[\fB:\fP\fIGROUP\fP]
 maps root (uid=0) accesses to given user and group (similarly to maproot

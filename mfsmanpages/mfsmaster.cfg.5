@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "March 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
@@ -7,150 +7,156 @@ The file \fBmfsmaster.cfg\fP contains configuration of MooseFS master process.
 .PP
 Syntax is:
 .TP
-\fIOPTION\fP \fB=\fP \fIVALUE\fP
+.IB OPTION " = " VALUE
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
 .SH OPTIONS
 Configuration options:
 .TP
-\fBWORKING_USER\fP
+.B WORKING_USER
 user to run daemon as
 .TP
-\fBWORKING_GROUP\fP
+.B WORKING_GROUP
 group to run daemon as; optional value - if empty then default user group will be used
 .TP
-\fBSYSLOG_IDENT\fP
+.B SYSLOG_IDENT
 name of process to place in syslog messages; default is mfsmaster
 .TP
-\fBLOCK_MEMORY\fP
+.B LOCK_MEMORY
 whether to perform mlockall() to avoid swapping out mfsmaster process; default is 0, i.e. no
 .TP
-\fBNICE_LEVEL\fP
+.B NICE_LEVEL
 nice level to run daemon with; default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with
 .TP
-\fBFILE_UMASK\fP
+.B FILE_UMASK
 set default umask for group and others (user has always 0); default is 027 - block write for group and block all for others
 .TP
-\fBDATA_PATH\fP
+.B DATA_PATH
 where to store metadata files and lock file
 .TP
-\fBEXPORTS_FILENAME\fP
+.B EXPORTS_FILENAME
 alternate location/name of \fBmfsexports.cfg\fP file
 .TP
-\fBTOPOLOGY_FILENAME\fP
+.B TOPOLOGY_FILENAME
 alternate location/name of \fBmfstopology.cfg\fP file
 .TP
-\fBLICENCE_FILENAME\fP
+.B LICENCE_FILENAME
 alternate location/name of \fBmfslicence.bin\fP file (pro version only)
 .TP
-\fBBACK_LOGS\fP
+.B BACK_LOGS
 number of metadata change log files (default is 50)
 .TP
-\fBMETADATA_SAVE_FREQ\fP
+.B METADATA_SAVE_FREQ
 how often (in hours) master will store metadata (default is 1)
 .TP
-\fBMETADATA_DOWNLOAD_FREQ\fP
+.B METADATA_DOWNLOAD_FREQ
 how often (in hours) leader will download metadata from followers (pro version only ; default is 24)
 .TP
-\fBBACK_META_KEEP_PREVIOUS\fP
+.B BACK_META_KEEP_PREVIOUS
 number of previous metadata files to be kept (default is 1)
 .TP
-\fBCHANGELOG_PRESERVE_SECONDS\fP
+.B CHANGELOG_PRESERVE_SECONDS
 how many seconds of change logs have to be preserved in memory (default is 1800; 
 this sets the minimum, actual number may be a bit bigger due to logs being kept 
 in 5k blocks; zero disables extra logs storage)
 .TP
-\fBMISSING_LOG_CAPACITY\fP
+.B MISSING_LOG_CAPACITY
 how many missing chunks will be stored in master (up to 100*MISSING_LOG_CAPACITY bytes of memory will be allocated ; default value is 100000)
 .TP
-\fBMATOML_LISTEN_HOST\fP
+.B MATOML_LISTEN_HOST
 IP address to listen on for metalogger, masters and supervisors connections (* means any)
 .TP
-\fBMATOML_LISTEN_PORT\fP
+.B MATOML_LISTEN_PORT
 port to listen on for metalogger, masters and supervisors connections
 .TP
-\fBMASTER_HOST\fP
+.B MASTER_HOST
 MooseFS master host, IP is allowed only in single-master installations (pro version only ; default is mfsmaster)
 .TP
-\fBMASTER_RECONNECTION_DELAY\fP
+.B MASTER_RECONNECTION_DELAY
 delay in seconds before next try to reconnect to master-leader if not connected (pro version only ; default is 5)
 .TP
-\fBMASTER_TIMEOUT\fP
+.B MASTER_TIMEOUT
 timeout in seconds for master-leader connections (pro version only ; default is 10)
 .TP
-\fBBIND_HOST\fP
+.B BIND_HOST
 local address to use for connecting with master-leader (pro version only ; default is *, i.e. default local address)
 .TP
-\fBMATOCS_LISTEN_HOST\fP
+.B MATOCS_LISTEN_HOST
 IP address to listen on for chunkserver connections (\fB*\fP means any)
 .TP
-\fBMATOCS_LISTEN_PORT\fP
+.B MATOCS_LISTEN_PORT
 port to listen on for chunkserver connections
 .TP
-\fBMATOCS_TIMEOUT\fP
+.B MATOCS_TIMEOUT
 default timeout in seconds for master-chunkserver connection (default is 10)
 .TP
-\fBAUTH_CODE\fP
+.B AUTH_CODE
 Optional authentication string. When defined - then only chunkservers with the same AUTH_CODE are allowed to connect to this master. When not defined (default) - then all chunkservers are allowed. If you want to switch on chunkserver authentication, then first define AUTH_CODE in all your chunkservers (and reload/restart them) then define this option and master and reload/restart it. Remember that after reload currently connected chunkservers are NOT disconnected. New AUTH_CODE will be used only when chunkservers will make new connection.
 .TP
-\fBREMAP_BITS\fP, \fBREMAP_SOURCE_IP_CLASS\fP, \fBREMAP_DESTINATION_IP_CLASS\fP
+.BR REMAP_BITS ", " REMAP_SOURCE_IP_CLASS ", " REMAP_DESTINATION_IP_CLASS
 Optional IP class remapping. Remap chunkserver IP addresses with first REMAP_BITS of IP equal to first REMAP_BITS of REMAP_SOURCE_IP_CLASS. During remapping system will set first REMAP_BITS of IP address to first REMAP_BITS of REMAP_DESTINATION_IP_CLASS. (defaults are zeros which means no remap)
 .TP
-\fBREPLICATIONS_DELAY_INIT\fP
+.B REPLICATIONS_DELAY_INIT
 initial delay in seconds before starting replications (default is 300)
 .TP
-\fBCHUNKS_LOOP_MAX_CPS\fP
+.B CHUNKS_LOOP_MAX_CPS
 Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)
 .TP
-\fBCHUNKS_LOOP_MIN_TIME\fP
+.B CHUNKS_LOOP_MIN_TIME
 Chunks loop shouldn't be done in less seconds than given number (default is 300)
 .TP
-\fBCHUNKS_SOFT_DEL_LIMIT\fP
+.B CHUNKS_SOFT_DEL_LIMIT
 Soft maximum number of chunks to delete on one chunkserver (default is 10)
 .TP
-\fBCHUNKS_HARD_DEL_LIMIT\fP
+.B CHUNKS_HARD_DEL_LIMIT
 Hard maximum number of chunks to delete on one chunkserver (default is 25)
 .TP
-\fBCHUNKS_WRITE_REP_LIMIT\fP
+.B CHUNKS_WRITE_REP_LIMIT
 Maximum number of chunks to replicate to one chunkserver (default is 2,1,1,4 - see NOTES)
 .TP
-\fBCHUNKS_READ_REP_LIMIT\fP
+.B CHUNKS_READ_REP_LIMIT
 Maximum number of chunks to replicate from one chunkserver (default is 10,5,2,5 - see NOTES)
 .TP
-\fBCS_HEAVY_LOAD_THRESHOLD\fP
+.B CS_HEAVY_LOAD_THRESHOLD
 Threshold for chunkserver load. (default is 100 - see NOTES)
 .TP
-\fBCS_HEAVY_LOAD_RATIO_THRESHOLD\fP
+.B CS_HEAVY_LOAD_RATIO_THRESHOLD
 Threshold ratio for chunkserver load (default is 5.0 - see NOTES)
 .TP
-\fBCS_HEAVY_LOAD_GRACE_PERIOD\fP
+.B CS_HEAVY_LOAD_GRACE_PERIOD
 Defines how long chunkservers will remain in 'grace' mode (default is 900 - see NOTES)
 .TP
-\fBACCEPTABLE_DIFFERENCE\fP
+.B CS_MAINTENANCE_MODE_TIMEOUT
+Maximum number of seconds server can be in maintenance mode (default value is 0 - which means 'forever')
+.TP
+.B CS_QUICK_MAINTENANCE_MODE_TIMEOUT
+Maximum number of seconds server can be in "quick" maintenance mode (server is switched to this mode whenever is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 1800)
+.TP
+.B ACCEPTABLE_DIFFERENCE
 Maximum difference between space usage of chunkservers (deprecated, use \fBACCEPTABLE_PERCENTAGE_DIFFERENCE\fP instead)
 .TP
-\fBACCEPTABLE_PERCENTAGE_DIFFERENCE\fP
+.B ACCEPTABLE_PERCENTAGE_DIFFERENCE
 Maximum percentage difference between space usage of chunkservers (default is 1 = 1%)
 .TP
-\fBPRIORITY_QUEUES_LENGTH\fP
+.B PRIORITY_QUEUES_LENGTH
 Length of priority queues (for endangered, undergoal etc. chunks - chunks that should be processed first - default is 1000000)
 .TP
-\fBMATOCL_LISTEN_HOST\fP
+.B MATOCL_LISTEN_HOST
 IP address to listen on for client (mount) connections (\fB*\fP means any)
 .TP
-\fBMATOCL_LISTEN_PORT\fP
+.B MATOCL_LISTEN_PORT
 port to listen on for client (mount) connections
 .TP
-\fBSESSION_SUSTAIN_TIME\fP
+.B SESSION_SUSTAIN_TIME
 How long to sustain a disconnected client session (in seconds; default is 86400 = 1 day)
 .TP
-\fBQUOTA_TIME_LIMIT\fP
+.B QUOTA_TIME_LIMIT
 Grace period in secods for soft quota (deprecated, use \fBQUOTA_DEFAULT_GRACE_PERIOD\fP instead for default value or specify it individually)
 .TP
-\fBQUOTA_DEFAULT_GRACE_PERIOD\fP
+.B QUOTA_DEFAULT_GRACE_PERIOD
 Default grace period in seconds for soft quota (default is 604800 = 7 days)
 .TP
-\fBATIME_MODE\fP
+.B ATIME_MODE
 Set atime modification mode (default is 0 = always modify atime - see NOTES)
 .SH NOTES
 .PP

@@ -1,4 +1,4 @@
-.TH mfschunkserver.cfg "5" "March 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfschunkserver.cfg "5" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
 mfschunkserver.cfg \- main configuration file for \fBmfschunkserver\fP
 .SH DESCRIPTION
@@ -8,93 +8,93 @@ chunkserver process.
 .PP
 Syntax is:
 .TP
-\fIOPTION\fP \fB=\fP \fIVALUE\fP
+.IB OPTION " = " VALUE
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
 .SH OPTIONS
 Configuration options:
 .TP
-\fBWORKING_USER\fP
+.B WORKING_USER
 user to run daemon as
 .TP
-\fBWORKING_GROUP\fP
+.B WORKING_GROUP
 group to run daemon as; optional value - if empty then default user group will be used
 .TP
-\fBSYSLOG_IDENT\fP
+.B SYSLOG_IDENT
 name of process to place in syslog messages; default is mfschunkserver
 .TP
-\fBLOCK_MEMORY\fP
+.B LOCK_MEMORY
 whether to perform mlockall() to avoid swapping out mfschunkserver process; default is 0, i.e. no
 .TP
-\fBNICE_LEVEL\fP
+.B NICE_LEVEL
 nice level to run daemon with; default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with
 .TP
-\fBFILE_UMASK\fP
+.B FILE_UMASK
 set default umask for group and others (user has always 0); default is 027 - block write for group and block all for others
 .TP
-\fBDATA_PATH\fP
+.B DATA_PATH
 where to store daemon lock file
 .TP
-\fBHDD_CONF_FILENAME\fP
+.B HDD_CONF_FILENAME
 alternate location/name of \fBmfshdd.cfg\fP file
 .TP
-\fBHDD_TEST_FREQ\fP
+.B HDD_TEST_FREQ
 chunk test period in seconds; default is 10
 .TP
-\fBHDD_LEAVE_SPACE_DEFAULT\fP
+.B HDD_LEAVE_SPACE_DEFAULT
 how much space should be left unused on each hard drive; 
 number format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B? ; default is 256MiB; 
 examples: 0.5GB, .5G, 2.56GiB, 1256M etc.
 .TP
-\fBHDD_REBALANCE_UTILIZATION\fP
+.B HDD_REBALANCE_UTILIZATION
 percent of total work time the chunkserver is allowed to spend on hdd space rebalancing; default is 20
 .TP
-\fBHDD_ERROR_TOLERANCE_COUNT\fP,\fBHDD_ERROR_TOLERANCE_PERIOD\fP
+.BR HDD_ERROR_TOLERANCE_COUNT ", " HDD_ERROR_TOLERANCE_PERIOD
 how many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged; defaults are 2 and 600
 .TP
-\fBHDD_FSYNC_BEFORE_CLOSE\fP
+.B HDD_FSYNC_BEFORE_CLOSE
 enables/disables fsync before chunk closing; default is 0 (off)
 .TP
-\fBHDD_SPARSIFY_ON_WRITE\fP
+.B HDD_SPARSIFY_ON_WRITE
 enables/disables sparsification (skip leading and trailing zeroz) during writing new block; default is 1 (on)
 .TP
-\fBWORKERS_MAX\fP,\fBWORKERS_MAX_IDLE\fP
+.BR WORKERS_MAX ", " WORKERS_MAX_IDLE
 maximum number of active workers and maximum number of idle workers; defaults are 150 and 40
 .TP
-\fBLABELS\fP
+.B LABELS
 labels string; default is empty - no labels
 .TP
-\fBBIND_HOST\fB
+.B BIND_HOST
 local address to use for master connections; default is *, i.e. default local address
 .TP
-\fBMASTER_HOST\fP
+.B MASTER_HOST
 MooseFS master host, IP is allowed only in single-master installations; default is mfsmaster
 .TP
-\fBMASTER_PORT\fP
+.B MASTER_PORT
 MooseFS master command port; default is 9420
 .TP
-\fBMASTER_CONTROL_PORT\fP
+.B MASTER_CONTROL_PORT
 MooseFS master control port; default is 9419
 .TP
-\fBMASTER_TIMEOUT\fP
+.B MASTER_TIMEOUT
 timeout in seconds for master connections; default is 60
 .TP
-\fBMASTER_RECONNECTION_DELAY\fP
+.B MASTER_RECONNECTION_DELAY
 delay in seconds before trying to reconnect to master after disconnection (default is 5)
 .TP
-\fBAUTH_CODE\fP
+.B AUTH_CODE
 authentication string (used only when master requires authorization)
 .TP
-\fBBIND_HOST\fP
+.B BIND_HOST
 local address to use for connecting with master (default is \fB*\fP, i.e. default local address)
 .TP
-\fBCSSERV_LISTEN_HOST\fP
+.B CSSERV_LISTEN_HOST
 IP address to listen on for client (mount) connections (\fB*\fP means any)
 .TP
-\fBCSSERV_LISTEN_PORT\fP
+.B CSSERV_LISTEN_PORT
 port to listen on for client (mount) connections (default is 9422)
 .TP
-\fBCSSERV_TIMEOUT\fP
+.B CSSERV_TIMEOUT
 timeout (in seconds) for client (mount) connections (default is 5)
 .SH COPYRIGHT
 Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.

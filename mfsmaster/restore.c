@@ -353,7 +353,7 @@ int do_create(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 }
 
 int do_csdbop(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t op,ip,port,csid;
+	uint32_t op,ip,port,arg;
 	(void)ts;
 	EAT(ptr,filename,lv,'(');
 	GETU8(op,ptr);
@@ -362,9 +362,9 @@ int do_csdbop(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU16(port,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU16(csid,ptr);
+	GETU32(arg,ptr);
 	EAT(ptr,filename,lv,')');
-	return csdb_mr_op(op,ip,port,csid);
+	return csdb_mr_op(op,ip,port,arg);
 }
 
 /* deprecated since version 1.7.25 */

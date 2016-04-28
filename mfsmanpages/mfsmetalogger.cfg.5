@@ -1,4 +1,4 @@
-.TH mfsmetalogger.cfg "5" "March 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfsmetalogger.cfg "5" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
 mfsmetalogger.cfg \- configuration file for \fBmfsmetalogger\fP
 .SH DESCRIPTION
@@ -8,56 +8,56 @@ metalogger process.
 .PP
 Syntax is:
 .TP
-\fIOPTION\fP \fB=\fP \fIVALUE\fP
+.IB OPTION " = " VALUE
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
 .SH OPTIONS
 Configuration options:
 .TP
-\fBDATA_PATH\fP
+.B DATA_PATH
 where to store metadata files
 .TP
-\fBLOCK_FILE\fP
+.B LOCK_FILE
 (deprecated)
 daemon lock/pid file
 .TP
-\fBWORKING_USER\fP
+.B WORKING_USER
 user to run daemon as
 .TP
-\fBWORKING_GROUP\fP
+.B WORKING_GROUP
 group to run daemon as (optional - if empty then default user group will be used)
 .TP
-\fBSYSLOG_IDENT\fP
+.B SYSLOG_IDENT
 name of process to place in syslog messages (default is mfsmetalogger)
 .TP
-\fBLOCK_MEMORY\fP
+.B LOCK_MEMORY
 whether to perform mlockall() to avoid swapping out mfsmetalogger process (default is 0, i.e. no)
 .TP
-\fBNICE_LEVEL\fP
+.B NICE_LEVEL
 nice level to run daemon with (default is -19 if possible; note: process must be started as root to increase priority)
 .TP
-\fBBACK_LOGS\fP
+.B BACK_LOGS
 number of metadata change log files (default is 50)
 .TP
-\fBBACK_META_KEEP_PREVIOUS\fP
+.B BACK_META_KEEP_PREVIOUS
 number of previous metadata files to be kept (default is 3)
 .TP
-\fBMETA_DOWNLOAD_FREQ\fP
+.B META_DOWNLOAD_FREQ
 metadata download frequency in hours (default is 24, at most \fBBACK_LOGS\fP/2)
 .TP
-\fBBIND_HOST\fP
+.B BIND_HOST
 local address to use for master connections; default is *, i.e. default local address
 .TP
-\fBMASTER_HOST\fP
+.B MASTER_HOST
 address of MooseFS master host to connect with (default is mfsmaster)
 .TP
-\fBMASTER_PORT\fP
+.B MASTER_PORT
 number of MooseFS master port to connect with (default is 9420)
 .TP
-\fBMASTER_RECONNECTION_DELAY\fP
+.B MASTER_RECONNECTION_DELAY
 delay in seconds before trying to reconnect to master after disconnection (default is 30)
 .TP
-\fBMASTER_TIMEOUT\fP
+.B MASTER_TIMEOUT
 timeout (in seconds) for master connections (default is 60)
 .SH COPYRIGHT
 Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.

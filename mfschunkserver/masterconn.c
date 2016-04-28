@@ -636,6 +636,17 @@ void masterconn_send_error_occurred() {
 }
 */
 
+void masterconn_send_disconnect_command(void) {
+	masterconn *eptr = masterconnsingleton;
+	uint8_t *buff;
+
+	if (eptr->registerstate==REGISTERED && eptr->mode==DATA && eptr->masterversion>=VERSION2INT(3,0,75)) {
+		syslog(LOG_NOTICE,"sending unregister command ...");
+		buff = masterconn_create_attached_packet(eptr,CSTOMA_REGISTER,1);
+		put8bit(&buff,63);
+	}
+}
+
 void masterconn_heavyload(uint32_t load,uint8_t hlstatus) {
 	masterconn *eptr = masterconnsingleton;
 	uint8_t *buff;
@@ -1670,7 +1681,13 @@ void masterconn_reload(void) {
 }
 
 void masterconn_wantexit(void) {
+	masterconn_send_disconnect_command();
 	wantexittime = monotonic_seconds();
+}
+
+int masterconn_canexit(void) {
+	masterconn *eptr = masterconnsingleton;
+	return (eptr->mode==FREE || eptr->outputhead==NULL)?1:0;
 }
 
 int masterconn_init(void) {
@@ -1729,7 +1746,7 @@ int masterconn_init(void) {
 	main_destruct_register(masterconn_term);
 	main_poll_register(masterconn_desc,masterconn_serve);
 	main_wantexit_register(masterconn_wantexit);
-//	main_canexit_register(masterconn_canexit);
+	main_canexit_register(masterconn_canexit);
 	main_reload_register(masterconn_reload);
 	return 0;
 }

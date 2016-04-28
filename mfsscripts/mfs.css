@@ -111,6 +111,7 @@ span.OKVERSION {color: #000;}
 
 span.DISCONNECTED {color: #F00;}
 span.MAINTAINED {color: #90A;}
+span.TMPMAINTAINED {color: #905;}
 span.MAINTAINREADY {color: #00A;}
 
 span.CHDLBOX {background: #19A8C8; width:8px; height:8px; display: inline-block;}

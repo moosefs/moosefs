@@ -4050,10 +4050,17 @@ if "CS" in sectionset:
 						verclass = "OKVERSION"
 					if masterconn.version_at_least(2,0,11) and leaderfound:
 						if (flags&2)==0:
+							mmstr = "OFF"
 							mm = "switch on"
 							mmurl = createlink({"CSmaintenanceon":("%s:%u" % (strip,port))})
 							cl = None
+						elif (flags&4)==0:
+							mmstr = "ON"
+							mm = "switch off"
+							mmurl = createlink({"CSmaintenanceoff":("%s:%u" % (strip,port))})
+							cl = "MAINTAINREADY"
 						else:
+							mmstr = "ON (TEMP)"
 							mm = "switch off"
 							mmurl = createlink({"CSmaintenanceoff":("%s:%u" % (strip,port))})
 							cl = "MAINTAINREADY"
@@ -4096,7 +4103,7 @@ if "CS" in sectionset:
 							out.append("""		<td align="right">%u</td>""" % (load))
 					if masterconn.version_at_least(2,0,11):
 						if leaderfound:
-							out.append("""		<td align="center"><a href="%s">%s</a></td>""" % (mmurl,mm))
+							out.append("""		<td align="center">%s : <a href="%s">%s</a></td>""" % (mmstr,mmurl,mm))
 						else:
 							out.append("""          <td align="center">not available</td>""")
 					out.append("""		<td align="right">%u</td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td>""" % (chunks,used,decimal_number(used),humanize_number(used,"&nbsp;"),total,decimal_number(total),humanize_number(total,"&nbsp;")))
@@ -4155,8 +4162,10 @@ if "CS" in sectionset:
 							data.append("not available")
 						elif (flags&2)==0:
 							data.append("off")
-						else:
+						elif (flags&4)==0:
 							data.append("on")
+						else:
+							data.append("on (temp)")
 					data.extend([chunks,humanize_number(used," "),humanize_number(total," "),regperc])
 					if masterconn.version_at_least(3,0,38):
 						if tdchunks==0 or leaderfound==0:
@@ -4190,9 +4199,11 @@ if "CS" in sectionset:
 						if leaderfound==0:
 							data.append("-")
 						elif (flags&2)==0:
-							data.append("standard_mode")
+							data.append("maintenance_off")
+						elif (flags&4)==0:
+							data.append("maintenance_on")
 						else:
-							data.append("maintenance_mode")
+							data.append("maintenance_tmp_on")
 					data.extend([chunks,used,total])
 					if masterconn.version_at_least(3,0,38):
 						if tdchunks==0 or leaderfound==0:
@@ -4283,20 +4294,27 @@ if "CS" in sectionset:
 						if leaderfound==0:
 							cl = "DISCONNECTED"
 						elif (flags&2)==0:
+							mmstr = "OFF"
 							mm = "switch on"
 							mmurl = createlink({"CSmaintenanceon":("%s:%u" % (strip,port))})
 							cl = "DISCONNECTED"
-						else:
+						elif (flags&4)==0:
+							mmstr = "ON"
 							mm = "switch off"
 							mmurl = createlink({"CSmaintenanceoff":("%s:%u" % (strip,port))})
 							cl = "MAINTAINED"
+						else:
+							mmstr = "ON (temp)"
+							mm = "switch off"
+							mmurl = createlink({"CSmaintenanceoff":("%s:%u" % (strip,port))})
+							cl = "TMPMAINTAINED"
 						out.append("""		<td align="right"></td><td align="left"><span class="%s">%s</span></td>""" % (cl,host))
 						out.append("""		<td align="center"><span class="sortkey">%s </span><span class="%s">%s</span></td>""" % (sortip,cl,strip))
 						out.append("""		<td align="center"><span class="%s">%u</span></td>""" % (cl,port))
 						if masterconn.version_at_least(1,7,25):
 							out.append("""		<td align="right"><span class="%s">%u</span></td>""" % (cl,csid))
 						if leaderfound:
-							out.append("""		<td align="center"><span class="%s"><a href="%s">%s</a></span></td>""" % (cl,mmurl,mm))
+							out.append("""		<td align="center"><span class="%s">%s : <a href="%s">%s</a></span></td>""" % (cl,mmstr,mmurl,mm))
 						else:
 							out.append("""		<td align="center"><span class="%s">not available</td>""" % cl)
 						if leaderfound:
@@ -4327,8 +4345,11 @@ if "CS" in sectionset:
 						elif (flags&2)==0:
 							mm = "off"
 							mmcmd = "%s -H %s -P %u -CM1/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
-						else:
+						elif (flags&4)==0:
 							mm = "on"
+							mmcmd = "%s -H %s -P %u -CM0/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
+						else:
+							mm = "on (temp)"
 							mmcmd = "%s -H %s -P %u -CM0/%s/%s" % (sys.argv[0],masterhost,masterport,strip,port)
 						data.append(mm)
 						if masterconn.version_at_least(3,0,38):
@@ -4360,9 +4381,11 @@ if "CS" in sectionset:
 						if leaderfound==0:
 							mm = "-"
 						elif (flags&2)==0:
-							mm = "standard_mode"
+							mm = "maintenance_off"
+						elif (flags&4)==0:
+							mm = "maintenance_on"
 						else:
-							mm = "maintenance_mode"
+							mm = "maintenance_temp_on"
 						tab.append(host,port,csid,mm)
 					elif masterconn.version_at_least(1,7,25):
 						tab.append(host,port,csid)

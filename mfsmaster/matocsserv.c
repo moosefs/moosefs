@@ -55,7 +55,7 @@
 #include "mfsstrerr.h"
 #include "hashfn.h"
 #include "clocks.h"
-#include "labelsets.h"
+#include "storageclass.h"
 #include "md5.h"
 #include "mfsalloc.h"
 
@@ -1577,13 +1577,12 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 	uint16_t csid;
 	double us,ts;
 
-	if (eptr->registered==REGISTERED) {
-		syslog(LOG_WARNING,"got register message from registered chunk-server !!!");
-		eptr->mode=KILL;
-		return;
-	}
-
 	if ((length&1)==0) {
+		if (eptr->registered==REGISTERED) {
+			syslog(LOG_WARNING,"got register message from registered chunk-server !!!");
+			eptr->mode=KILL;
+			return;
+		}
 		if (length<22 || ((length-22)%12)!=0) {
 			syslog(LOG_NOTICE,"CSTOMA_REGISTER (old ver.) - wrong size (%"PRIu32"/22+N*12)",length);
 			eptr->mode=KILL;
@@ -1599,6 +1598,13 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 	} else {
 		passert(data);
 		rversion = get8bit(&data);
+
+		if (eptr->registered==REGISTERED && rversion!=63) {
+			syslog(LOG_WARNING,"got register message from registered chunk-server !!!");
+			eptr->mode=KILL;
+			return;
+		}
+
 #ifdef MFSDEBUG
 		syslog(LOG_NOTICE,"got register packet: %u",rversion);
 #endif
@@ -1885,6 +1891,17 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 			syslog(LOG_NOTICE,"chunkserver register end (packet version: 6) - ip: %s / port: %"PRIu16,eptr->servstrip,eptr->servport);
 			eptr->registered = REGISTERED;
 			chunk_server_register_end(eptr->csid);
+		} else if (rversion==63) {
+			if (length!=1) {
+				syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:DISCONNECT) - wrong size (%"PRIu32"/1)",length);
+				eptr->mode=KILL;
+				return;
+			}
+			syslog(LOG_NOTICE,"chunkserver graceful disconnection (packet version: 6) - ip: %s / port: %"PRIu16,eptr->servstrip,eptr->servport);
+			if (eptr->csptr!=NULL) {
+				csdb_temporary_maintenance_mode(eptr->csptr);
+			}
+			eptr->mode=KILL;
 		} else {
 			syslog(LOG_NOTICE,"CSTOMA_REGISTER - wrong version (%"PRIu8"/1..4)",rversion);
 			eptr->mode=KILL;
@@ -2698,8 +2715,10 @@ void matocsserv_reload_common(void) {
 		if (bits==0 || bits>32) {
 			mfs_arg_syslog(LOG_WARNING,"wrong value for REMAP_BITS (%"PRIu8" ; shlould be between 1 and 32)",bits);
 			err |= 1;
+			mask = 0;
+		} else {
+			mask = UINT32_C(0xFFFFFFFF) << (32-bits);
 		}
-		mask = UINT32_C(0xFFFFFFFF) << (32-bits);
 		if (matocsserv_parse_ip(srcip,&srcclass)==0) {
 			mfs_arg_syslog(LOG_WARNING,"error parsing ip class from REMAP_SOURCE_IP_CLASS (%s)",srcip);
 			err |= 2;

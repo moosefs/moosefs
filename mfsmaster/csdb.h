@@ -26,6 +26,7 @@
 
 void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr);
 uint16_t csdb_get_csid(void *v_csptr);
+void csdb_temporary_maintenance_mode(void *v_csptr);
 void csdb_lost_connection(void *v_csptr);
 void csdb_server_load(void *v_csptr,uint32_t load);
 uint8_t csdb_server_is_overloaded(void *v_csptr,uint32_t now);
@@ -45,7 +46,7 @@ uint16_t csdb_getnumber(void *v_csptr);
 uint8_t csdb_store(bio *fd);
 int csdb_load(bio *fd,uint8_t mver,int ignoreflag);
 int csdb_init(void);
-uint8_t csdb_mr_op(uint8_t csop,uint32_t ip,uint16_t port,uint16_t csid);
+uint8_t csdb_mr_op(uint8_t csop,uint32_t ip,uint16_t port,uint32_t arg);
 #define csdb_mr_csadd(x,y) csdb_mr_op(0,x,y,0)
 #define csdb_mr_csdel(x,y) csdb_mr_op(1,x,y,0)
 uint32_t csdb_getdisconnecttime(void);

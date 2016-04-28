@@ -586,6 +586,7 @@
 //		( rver:8 ) N*[chunkid:64 version:32]
 //	rver==62:	// version 6 / END
 //		( rver:8 ) -
+//	rver==63:	// version 6 / DISCONNECT
 
 // 0x0065
 #define CSTOMA_SPACE (PROTO_BASE+101)

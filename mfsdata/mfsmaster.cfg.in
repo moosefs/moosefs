@@ -132,6 +132,12 @@
 # Length of priority queues (for endangered, undergoal etc. chunks - chunks that should be processed first - default value is 1000000).
 # PRIORITY_QUEUES_LENGTH = 1000000
 
+# Maximum number of seconds server can be in maintenance mode (default value is 0 - which means 'forever').
+# CS_MAINTENANCE_MODE_TIMEOUT = 0
+
+# Maximum number of seconds server can be in "temporary" maintenance mode (server is switched to this mode whenever is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 1800)
+# CS_TEMP_MAINTENANCE_MODE_TIMEOUT = 1800
+
 ###############################################
 # CLIENTS CONNECTION OPTIONS                  #
 ###############################################

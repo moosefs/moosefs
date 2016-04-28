@@ -7,9 +7,9 @@
 #include "lwthread.h"
 #ifndef WIN32
 #include "mfs_fuse.h"
+#include "fdcache.h"
 #endif
 #include "chunksdatacache.h"
-#include "fdcache.h"
 #include "readdata.h"
 
 #define MAX_UNUSED_CNT 100

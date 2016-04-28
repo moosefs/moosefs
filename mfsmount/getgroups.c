@@ -289,7 +289,7 @@ groups* groups_get_x(pid_t pid,uid_t uid,gid_t gid,uint8_t lockmode) {
 				fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32") - lock cache\n",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
 			}
 		}
-		if (g->locked==0 && g->uid==0) { // refresh groups for user 'root' - only root can change groups
+		if (g->lcnt==1 && g->locked==0 && g->uid==0) { // refresh groups for user 'root' - only root can change groups
 			if (debug_mode) {
 				fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32") - refresh cache\n",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
 			}

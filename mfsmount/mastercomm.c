@@ -2287,10 +2287,13 @@ void* fs_receive_thread(void *arg) {
 					uint64_t lusectime,rusectime,usec,usecping;
 					struct timeval tv;
 					usec = monotonic_useconds();
+					pthread_mutex_lock(&fdlock);
 					if (usec>lastsyncsend) {
 						usecping = usec - lastsyncsend;
+						pthread_mutex_unlock(&fdlock);
 						master_stats_set(MASTER_PING,usecping);
 					} else {
+						pthread_mutex_unlock(&fdlock);
 						syslog(LOG_NOTICE,"negative packet travel time between client and master - ignoring in time sync");
 						usecping = 0;
 					}

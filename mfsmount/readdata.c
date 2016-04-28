@@ -425,16 +425,14 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 			fprintf(stderr,"%.6lf: inode: %"PRIu32" - reqhead: %s (reqbufftotalsize: %"PRIu64")\n",monotonic_seconds(),ind->inode,ind->reqhead?"NOT NULL":"NULL",rbuffsize);
 #endif
 
-			if (/*ind->closewaiting>0 && */ind->reqhead==NULL) {
+			if (ind->closing && ind->reqhead==NULL) {
 				zassert(pthread_cond_broadcast(&(ind->closecond)));
 			}
 		} else {
 			if (breakmode==0 && rreq->mode!=READY) {
 				rreq->rleng = 0;
 				rreq->mode = READY;
-//				if (rreq->waiting) {
-					zassert(pthread_cond_broadcast(&(rreq->cond)));
-//				}
+				zassert(pthread_cond_broadcast(&(rreq->cond)));
 			}
 		}
 	} else {
@@ -2055,7 +2053,7 @@ void read_data_free_buff(void *vid,void *vrhead,struct iovec *iov) {
 	if (iov) {
 		free(iov);
 	}
-	if (/*ind->closewaiting>0 && */ind->reqhead==NULL) {
+	if (ind->closing && ind->reqhead==NULL) {
 		zassert(pthread_cond_broadcast(&(ind->closecond)));
 	}
 	ind->readers_cnt--;

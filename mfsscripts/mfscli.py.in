@@ -20,6 +20,8 @@
 
 PROTO_BASE = @PROTO_BASE@
 
+VERSION = "@VERSION@"
+
 #some constants from MFSCommunication.h
 CLTOMA_CSERV_LIST = (PROTO_BASE+500)
 MATOCL_CSERV_LIST = (PROTO_BASE+501)
@@ -337,7 +339,7 @@ else: # CLI mode
 	lastid = 0
 	lastmode = None
 	try:
-		opts,args = getopt.getopt(sys.argv[1:],"hH:P:S:C:f:ps:no:rm:i:a:b:c:d:28")
+		opts,args = getopt.getopt(sys.argv[1:],"hvH:P:S:C:f:ps:no:rm:i:a:b:c:d:28")
 	except:
 		opts = [('-h',None)]
 	for opt,val in opts:
@@ -345,8 +347,10 @@ else: # CLI mode
 			print("usage:")
 			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|SC|OF|AL|MO|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-a count] [-b chart_data_columns] [-c count] [-d chart_data_columns]" % sys.argv[0])
 			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -C(RC/ip/port|BW/ip/port|M[01]/ip/port|RS/sessionid)" % sys.argv[0])
+			print("\t%s -v" % sys.argv[0])
 			print("\ncommon:\n")
-			print("\t-h : print this message")
+			print("\t-h : print this message and exit")
+			print("\t-v : print version number and exit")
 			print("\t-p : force plain text format on tty devices")
 			print("\t-s separator : field separator to use in plain text format on tty devices (forces -p)")
 			print("\t-2 : force 256-color terminal color codes")
@@ -417,6 +421,9 @@ else: # CLI mode
 			print("\t\t-CM1/ip/port : switch given chunkserver to maintenance mode")
 			print("\t\t-CM0/ip/port : switch given chunkserver to standard mode (from maintenance mode)")
 			print("\t\t-CRS/sessionid : remove given session")
+			os._exit(0)
+		elif opt=='-v':
+			print("version: %s" % VERSION);
 			os._exit(0)
 		elif opt=='-2':
 			colormode = 2
@@ -2284,6 +2291,7 @@ if cgimode:
 	print("""</tr>""")
 	print("""</table></td>""")
 	print("""<td class="FILLER" style="white-space:nowrap;">""")
+	print("""version: %s""" % VERSION)
 	#print("""<a href="http://jigsaw.w3.org/css-validator/check/referer"><img style="border:0;width:88px;height:31px" src="http://jigsaw.w3.org/css-validator/images/vcss-blue" alt="Valid CSS!" /></a>""")
 	#print("""<a href="http://validator.w3.org/check?uri=referer"><img style="border:0;width:88px;height:31px" src="http://www.w3.org/Icons/valid-xhtml10-blue" alt="Valid XHTML 1.0 Strict" /></a>""")
 	print("""</td>""")

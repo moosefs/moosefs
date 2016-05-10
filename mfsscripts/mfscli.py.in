@@ -5064,7 +5064,7 @@ if "EX" in sectionset:
 				sf = expe.maxtrashtime
 			elif EXorder==19:
 				sf = expe.umaskval
-			servers.append((sf,expe.sortipfrom,expe.ipfrom,expe.sortipto,expe.ipto,expe.path,expe.meta,expe.sortver,expe.strver,expe.exportflags,expe.sesflags,expe.umaskval,expe.rootuid,expe.rootgid,expe.mapalluid,expe.mapallgid,expe.mingoal,expe.maxgoal,expe.mintrashtime,expe.maxtrashtime))
+			servers.append((sf,expe.sortipfrom,expe.stripfrom,expe.sortipto,expe.stripto,expe.path,expe.meta,expe.sortver,expe.strver,expe.exportflags,expe.sesflags,expe.umaskval,expe.rootuid,expe.rootgid,expe.mapalluid,expe.mapallgid,expe.mingoal,expe.maxgoal,expe.mintrashtime,expe.maxtrashtime))
 		servers.sort()
 		if EXrev:
 			servers.reverse()

@@ -777,17 +777,18 @@ int sessions_load(FILE *fd,uint8_t mver) {
 }
 
 int csdb_load(FILE *fd,uint8_t mver) {
-	uint8_t csdbbuff[9];
+	uint8_t csdbbuff[13];
 	const uint8_t *ptr;
 	uint32_t t;
 	uint32_t ip;
 	uint16_t port;
 	uint16_t csid;
 	uint8_t maintenance;
+	uint32_t maintenance_to;
 	size_t bsize;
 	char strip[16];
 
-	if (mver>0x12) {
+	if (mver>0x13) {
 		fprintf(stderr,"loading chunk servers: unsupported format\n");
 		return -1;
 	}
@@ -795,8 +796,10 @@ int csdb_load(FILE *fd,uint8_t mver) {
 		bsize = 6;
 	} else if (mver<=0x11) {
 		bsize = 8;
-	} else {
+	} else if (mver<=0x12) {
 		bsize = 9;
+	} else {
+		bsize = 13;
 	}
 
 	if (fread(csdbbuff,1,4,fd)!=4) {
@@ -822,13 +825,21 @@ int csdb_load(FILE *fd,uint8_t mver) {
 			csid = get16bit(&ptr);
 			makestrip(strip,ip);
 			printf("CHUNKSERVER|i:%s|p:%5"PRIu16"|#:%5"PRIu16"\n",strip,port,csid);
-		} else {
+		} else if (mver<=0x12) {
 			ip = get32bit(&ptr);
 			port = get16bit(&ptr);
 			csid = get16bit(&ptr);
 			maintenance = get8bit(&ptr);
 			makestrip(strip,ip);
 			printf("CHUNKSERVER|i:%s|p:%5"PRIu16"|#:%5"PRIu16"|m:%u\n",strip,port,csid,(maintenance)?1:0);
+		} else {
+			ip = get32bit(&ptr);
+			port = get16bit(&ptr);
+			csid = get16bit(&ptr);
+			maintenance = get8bit(&ptr);
+			maintenance_to = get32bit(&ptr);
+			makestrip(strip,ip);
+			printf("CHUNKSERVER|i:%s|p:%5"PRIu16"|#:%5"PRIu16"|m:%4s|t:%10"PRIu32"\n",strip,port,csid,(maintenance==0)?"off":(maintenance==1)?"on":(maintenance==2)?"temp":"???",maintenance_to);
 		}
 		t--;
 	}

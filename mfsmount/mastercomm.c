@@ -667,7 +667,7 @@ uint8_t* fs_createpacket(threc *rec,uint32_t cmd,uint32_t size) {
 
 static inline void fs_disconnect(void) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
-	__sync_fetch_and_or(&disconnect,1);
+	(void)__sync_fetch_and_or(&disconnect,1);
 #else
 	pthread_mutex_lock(&fdlock);
 	disconnect = 1;
@@ -922,7 +922,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 		if (tcptowrite(fd,rec->obuff,rec->odataleng,1000)!=(int32_t)(rec->odataleng)) {
 			syslog(LOG_WARNING,"tcp send error: %s",strerr(errno));
 #ifdef HAVE___SYNC_FETCH_AND_OP
-			__sync_fetch_and_or(&disconnect,1);
+			(void)__sync_fetch_and_or(&disconnect,1);
 #else
 			disconnect = 1;
 #endif
@@ -1059,7 +1059,7 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 		if (tcptowrite(fd,rec->obuff,rec->odataleng,1000)!=(int32_t)(rec->odataleng)) {
 			syslog(LOG_WARNING,"tcp send error: %s",strerr(errno));
 #ifdef HAVE___SYNC_FETCH_AND_OP
-			__sync_fetch_and_or(&disconnect,1);
+			(void)__sync_fetch_and_or(&disconnect,1);
 #else
 			disconnect = 1;
 #endif
@@ -1918,7 +1918,7 @@ void fs_send_amtime_inodes(void) {
 			}
 			if (tcptowrite(fd,inodespacket,inodesleng,1000)!=inodesleng) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
-				__sync_fetch_and_or(&disconnect,1);
+				(void)__sync_fetch_and_or(&disconnect,1);
 #else
 				disconnect = 1;
 #endif
@@ -2008,7 +2008,7 @@ void fs_send_open_inodes(void) {
 	i = inodes * 4 + 8;
 	if (tcptowrite(fd,inodespacket,i,1000)!=(int32_t)i) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
-		__sync_fetch_and_or(&disconnect,1);
+		(void)__sync_fetch_and_or(&disconnect,1);
 #else
 		disconnect = 1;
 #endif
@@ -2052,7 +2052,7 @@ void* fs_nop_thread(void *arg) {
 				put32bit(&ptr,0);
 				if (tcptowrite(fd,hdr,12,1000)!=12) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
-					__sync_fetch_and_or(&disconnect,1);
+					(void)__sync_fetch_and_or(&disconnect,1);
 #else
 					disconnect=1;
 #endif
@@ -2070,7 +2070,7 @@ void* fs_nop_thread(void *arg) {
 				put32bit(&ptr,0);
 				if (tcptowrite(fd,hdr,12,1000)!=12) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
-					__sync_fetch_and_or(&disconnect,1);
+					(void)__sync_fetch_and_or(&disconnect,1);
 #else
 					disconnect=1;
 #endif
@@ -2396,7 +2396,7 @@ int fs_init_master_connection(const char *bindhostname,const char *masterhostnam
 	sessionid = 0;
 	metaid = 0;
 #ifdef HAVE___SYNC_FETCH_AND_OP
-	__sync_fetch_and_and(&disconnect,0);
+	(void)__sync_fetch_and_and(&disconnect,0);
 #else
 	disconnect = 0;
 #endif

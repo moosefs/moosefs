@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "May 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
@@ -129,8 +129,8 @@ Defines how long chunkservers will remain in 'grace' mode (default is 900 - see 
 .B CS_MAINTENANCE_MODE_TIMEOUT
 Maximum number of seconds server can be in maintenance mode (default value is 0 - which means 'forever')
 .TP
-.B CS_QUICK_MAINTENANCE_MODE_TIMEOUT
-Maximum number of seconds server can be in "quick" maintenance mode (server is switched to this mode whenever is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 1800)
+.B CS_TEMP_MAINTENANCE_MODE_TIMEOUT
+Maximum number of seconds server can be in "temporary" maintenance mode (server is switched to this mode whenever is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 1800)
 .TP
 .B ACCEPTABLE_DIFFERENCE
 Maximum difference between space usage of chunkservers (deprecated, use \fBACCEPTABLE_PERCENTAGE_DIFFERENCE\fP instead)

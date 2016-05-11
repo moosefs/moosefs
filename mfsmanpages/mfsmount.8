@@ -1,25 +1,24 @@
-.TH mfsmount "8" "April 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
+.TH mfsmount "8" "May 2016" "MooseFS 3.0.75-1" "This is part of MooseFS"
 .SH NAME
 mfsmount \- mount Moose File System
 .SH SYNOPSIS
 .B mfsmount
+[\fIHOST\fP[\fB:\fP\fIPORT\fP]\fB:\fP[\fIPATH\fP]]
+[options]
 \fImountpoint\fP
-[\fB\-d\fP]
-[\fB\-f\fP]
-[\fB\-s\fP]
-[\fB\-m\fP]
-[\fB\-n\fP]
-[\fB\-p\fP]
-[\fB\-H\fP \fIHOST\fP]
-[\fB\-P\fP \fIPORT\fP]
-[\fB\-S\fP \fIPATH\fP]
-[\fB\-o\fP \fIopt\fP[,\fIopt\fP]...]
 .PP
 .B mfsmount
 \fB\-h\fP|\fB\-\-help\fP
 .PP
 .B mfsmount
 \fB\-V\fP|\fB\-\-version\fP
+.PP
+Since 3.0.75 (Linux only):
+.PP
+.B mount -t moosefs
+[options]
+[\fIHOST\fP[\fB:\fP\fIPORT\fP]\fB:\fP[\fIPATH\fP]]
+\fImountpoint\fP
 .SH DESCRIPTION
 .PP
 Mount Moose File System.
@@ -216,6 +215,27 @@ file cache is managed by mfsmaster automatically (should be very safe and effici
 -> \fBa\fP .. \fBz\fP | \fBA\fP .. \fBZ\fP | \fB(\fP \fIS\fP \fB)\fP | \fB[\fP \fIS\fP \fB]\fP
 .PP
 Subexpressions should be placed in priority order. Up to nine subexpressions (priorities) can be specified.
+.SH "FSTAB"
+On most Unix systems mfsmount can be invoked automatically from \fB/etc/fstab\fP. Be aware that \fBrw\fP or \fBro\fP option has to be specified in \fIoptions\fP. Also on many systems there should be option which informs the system that this mountpoint should be mounted after starting networking services (options such as \fB_netdev\fP or \fBlate\fP).
+.PP
+Linux:
+.PP
+\fBmfsmount\fP \fImountpoint\fP \fBfuse\fP \fIoptions\fP 0 0
+.PP
+*BSD:
+.PP
+\fBmfsmount_magic\fP \fImountpoint\fP \fBmoosefs\fP \fIoptions\fP\fB,mountprog=/usr/local/bin/mfsmount\fP 0 0
+.PP
+.PP
+Since version 3.0.75 alternative form can be used:
+.PP
+Linux:
+.PP
+\fIHOST\fP[\fB:\fP\fIPORT\fP]\fB:\fP[\fIPATH\fP] \fImountpoint\fP \fBmoosefs\fP \fIoptions\fP 0 0
+.PP
+*BSD:
+.PP
+\fIHOST\fP[\fB:\fP\fIPORT\fP]\fB:\fP[\fIPATH\fP] \fImountpoint\fP \fBmoosefs\fP \fIoptions\fP\fB,mountprog=/usr/local/bin/mfsmount\fP 0 0
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

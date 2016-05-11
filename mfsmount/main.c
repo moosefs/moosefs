@@ -305,7 +305,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 };
 
 static void usage(const char *progname) {
-	fprintf(stderr,"usage: %s [HOST[/PORT]:[PATH]] [options] mountpoint\n",progname);
+	fprintf(stderr,"usage: %s [HOST[:PORT]:[PATH]] [options] mountpoint\n",progname);
 	fprintf(stderr,"\n");
 	fprintf(stderr,"general options:\n");
 	fprintf(stderr,"    -o opt,[opt...]         mount options\n");
@@ -1200,13 +1200,12 @@ int main(int argc, char *argv[]) {
 //	dump_args("input_args",&args);
 
 	if (args.argc>1) {
-		uint32_t hostlen,portlen;
+		uint32_t hostlen,portlen,colons;
 		char *c,*portbegin;
 		int optpos;
-		// check if argv[1] matches to HOST[/PORT]:[PATH]
-
+		// skip options in format '-o XXXX' and '-oXXXX'
 		optpos = 1;
-		while (args.argc>optpos) {
+		while (optpos<args.argc) {
 			c = args.argv[optpos];
 			if (c[0]=='-' && c[1]=='o') {
 				if (c[2]) {
@@ -1218,40 +1217,50 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 		}
-		if (args.argc>optpos) {
-			hostlen = 0;
-			portlen = 0;
-			portbegin = NULL;
-			while (((*c)>='a' && (*c)<='z') || ((*c)>='A' && (*c)<='Z') || ((*c)>='0' && (*c)<='9') || (*c)=='-' || (*c)=='.') { // DNS chars
-				c++;
-				hostlen++;
-			}
-			if (hostlen>0) {
-				if ((*c)=='/') {
-					c++;
-					portbegin = c;
-					while ((*c)>='0' && ((*c)<='9')) {
-						c++;
-						portlen++;
-					}
+		if (optpos<args.argc) {
+			// check if next arg matches to HOST[:PORT]:[PATH]
+			c = args.argv[optpos];
+			colons = 0;
+			for (i=0 ; c[i] ; i++) {
+				if (c[i]==':') {
+					colons++;
 				}
-				if ((*c)==':') { // match found
+			}
+			if (colons>0) {
+				hostlen = 0;
+				portlen = 0;
+				portbegin = NULL;
+				while (((*c)>='a' && (*c)<='z') || ((*c)>='A' && (*c)<='Z') || ((*c)>='0' && (*c)<='9') || (*c)=='-' || (*c)=='.') { // DNS chars
 					c++;
-					if (*c) {
-						mfsopts.subfolder = strdup(c);
+					hostlen++;
+				}
+				if (hostlen>0) {
+					if ((*c)==':' && colons>1) {
+						c++;
+						portbegin = c;
+						while ((*c)>='0' && ((*c)<='9')) {
+							c++;
+							portlen++;
+						}
 					}
-					mfsopts.masterhost = malloc(hostlen+1);
-					memcpy(mfsopts.masterhost,args.argv[optpos],hostlen);
-					mfsopts.masterhost[hostlen]=0;
-					if (portbegin!=NULL && portlen>0) {
-						mfsopts.masterport = malloc(portlen+1);
-						memcpy(mfsopts.masterport,portbegin,portlen);
-						mfsopts.masterport[portlen]=0;
+					if ((*c)==':') { // match found
+						c++;
+						if (*c) {
+							mfsopts.subfolder = strdup(c);
+						}
+						mfsopts.masterhost = malloc(hostlen+1);
+						memcpy(mfsopts.masterhost,args.argv[optpos],hostlen);
+						mfsopts.masterhost[hostlen]=0;
+						if (portbegin!=NULL && portlen>0) {
+							mfsopts.masterport = malloc(portlen+1);
+							memcpy(mfsopts.masterport,portbegin,portlen);
+							mfsopts.masterport[portlen]=0;
+						}
+						for (i=optpos+1 ; i<args.argc ; i++) {
+							args.argv[i-1] = args.argv[i];
+						}
+						args.argc--;
 					}
-					for (i=optpos+1 ; i<args.argc ; i++) {
-						args.argv[i-1] = args.argv[i];
-					}
-					args.argc--;
 				}
 			}
 		}

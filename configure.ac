@@ -26,8 +26,7 @@ AC_DEFINE_UNQUOTED([VERSION2INT(maj,med,min)], [((maj)*0x10000+(med)*0x100+(((ma
 AC_DEFINE_UNQUOTED([VERSSTR], ["${PACKAGE_VERSION}-${release}"], [MFS version - string])
 
 # Checks for programs.
-AC_PROG_CC(myclang clang llvm-gcc gcc)
-dnl AC_PROG_CXX(clang++ llvm-g++ g++)
+AC_PROG_CC(mycc gcc llvm-gcc clang)
 AC_PROG_LN_S
 AC_PROG_LIBTOOL
 

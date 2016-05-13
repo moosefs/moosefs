@@ -788,7 +788,7 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 		return;
 	}
 
-	if (c->ondangerlist || servers==NULL || c->sclassid==0 || c->fcount==0 || c->lockedto+3600<(uint32_t)main_time()) {
+	if (c->ondangerlist || servers==NULL || c->sclassid==0 || c->fcount==0 || c->lockedto+3600>=(uint32_t)main_time()) {
 		return;
 	}
 	vc = 0;
@@ -1289,31 +1289,6 @@ static inline void chunk_write_counters(chunk *c,uint8_t x) {
 int chunk_locked_or_busy(void *cptr) {
 	chunk *c = (chunk*)cptr;
 	return (c->lockedto<(uint32_t)(main_time()) && c->operation==NONE)?0:1;
-}
-
-int chunk_unlock(uint64_t chunkid) {
-	chunk *c;
-
-	c = chunk_find(chunkid);
-	if (c==NULL) {
-		return MFS_ERROR_NOCHUNK;
-	}
-	c->lockedto = 0;
-	chunk_write_counters(c,0);
-	matoclserv_chunk_unlocked(c->chunkid,c);
-	chunk_priority_queue_check(c,1);
-	return MFS_STATUS_OK;
-}
-
-int chunk_mr_unlock(uint64_t chunkid) {
-	chunk *c;
-	c = chunk_find(chunkid);
-	if (c==NULL) {
-		return MFS_ERROR_NOCHUNK;
-	}
-	c->lockedto = 0;
-	chunk_write_counters(c,0);
-	return MFS_STATUS_OK;
 }
 
 int chunk_get_validcopies(uint64_t chunkid,uint8_t *vcopies) {
@@ -3703,6 +3678,35 @@ static inline void chunk_clean_priority_queues(void) {
 		chunks_priority_tail[j] = 0;
 		chunks_priority_leng[j] = 0;
 	}
+}
+
+int chunk_unlock(uint64_t chunkid) {
+	chunk *c;
+
+	c = chunk_find(chunkid);
+	if (c==NULL) {
+		return MFS_ERROR_NOCHUNK;
+	}
+	c->lockedto = 0;
+	chunk_write_counters(c,0);
+	chunk_priority_queue_check(c,1);
+	if (c->ondangerlist) {
+		chunk_do_jobs(c,matocsserv_servers_count(),matocsserv_almostfull_servers(),main_time(),1);
+	} else {
+		matoclserv_chunk_unlocked(c->chunkid,c);
+	}
+	return MFS_STATUS_OK;
+}
+
+int chunk_mr_unlock(uint64_t chunkid) {
+	chunk *c;
+	c = chunk_find(chunkid);
+	if (c==NULL) {
+		return MFS_ERROR_NOCHUNK;
+	}
+	c->lockedto = 0;
+	chunk_write_counters(c,0);
+	return MFS_STATUS_OK;
 }
 
 

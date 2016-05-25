@@ -22,6 +22,10 @@
 #include "config.h"
 #endif
 
+#if defined(_THREAD_SAFE) || defined(_REENTRANT) || defined(_USE_PTHREADS)
+#  define USE_PTHREADS 1
+#endif
+
 #ifndef MFSMAXFILES
 #define MFSMAXFILES 4096
 #endif

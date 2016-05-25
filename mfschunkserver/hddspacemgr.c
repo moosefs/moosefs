@@ -193,9 +193,9 @@ typedef struct hddstats {
 	uint32_t rops;
 	uint32_t wops;
 	uint32_t fsyncops;
-	uint32_t nsecreadmax;
-	uint32_t nsecwritemax;
-	uint32_t nsecfsyncmax;
+	uint64_t nsecreadmax;
+	uint64_t nsecwritemax;
+	uint64_t nsecfsyncmax;
 } hddstats;
 
 typedef struct folder {
@@ -664,7 +664,7 @@ static inline void hdd_stats_dataread(folder *f,uint32_t size,int64_t rtime) {
 	f->cstat.rops++;
 	f->cstat.rbytes += size;
 	f->cstat.nsecreadsum += rtime;
-	if (rtime>f->cstat.nsecreadmax) {
+	if (rtime>(int64_t)(f->cstat.nsecreadmax)) {
 		f->cstat.nsecreadmax = rtime;
 	}
 	zassert(pthread_mutex_unlock(&statslock));
@@ -681,7 +681,7 @@ static inline void hdd_stats_datawrite(folder *f,uint32_t size,int64_t wtime) {
 	f->cstat.wops++;
 	f->cstat.wbytes += size;
 	f->cstat.nsecwritesum += wtime;
-	if (wtime>f->cstat.nsecwritemax) {
+	if (wtime>(int64_t)(f->cstat.nsecwritemax)) {
 		f->cstat.nsecwritemax = wtime;
 	}
 	zassert(pthread_mutex_unlock(&statslock));
@@ -695,7 +695,7 @@ static inline void hdd_stats_datafsync(folder *f,int64_t fsynctime) {
 	stats_wtime += fsynctime;
 	f->cstat.fsyncops++;
 	f->cstat.nsecfsyncsum += fsynctime;
-	if (fsynctime>f->cstat.nsecfsyncmax) {
+	if (fsynctime>(int64_t)(f->cstat.nsecfsyncmax)) {
 		f->cstat.nsecfsyncmax = fsynctime;
 	}
 	zassert(pthread_mutex_unlock(&statslock));

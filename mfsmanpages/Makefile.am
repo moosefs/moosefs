@@ -10,7 +10,7 @@ mount_mans=\
 	mfscheckfile.1 mfsdirinfo.1 mfsfileinfo.1 mfsfilerepair.1 \
 	mfsgetgoal.1 mfsgettrashtime.1 mfsrgetgoal.1 mfsrgettrashtime.1 \
 	mfsrsetgoal.1 mfsrsettrashtime.1 mfssetgoal.1 mfssettrashtime.1 \
-	mfscopygoal.1 mfscopytrashtime.1 \
+	mfscopygoal.1 mfscopytrashtime.1 mount.moosefs.8 \
 	mfssetsclass.1 mfsgetsclass.1 mfscopysclass.1 mfsxchgsclass.1 mfslistsclass.1 \
 	mfsgeteattr.1 mfsseteattr.1 mfsdeleattr.1 mfscopyeattr.1 \
 	mfsgetquota.1 mfssetquota.1 mfsdelquota.1 mfscopyquota.1 \

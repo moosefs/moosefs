@@ -75,3 +75,4 @@ usr/share/man/man1/mfssclass.1
 usr/share/man/man1/mfsscadmin.1
 usr/share/man/man1/mfstools.1
 usr/share/man/man8/mfsmount.8
+usr/share/man/man8/mount.moosefs.8

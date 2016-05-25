@@ -42,8 +42,7 @@ endif
 		--localstatedir=/var/lib \
 		--with-default-user=mfs \
 		--with-default-group=mfs \
-		CFLAGS="$(CFLAGS)" \
-		LDFLAGS="-Wl,-z,defs -Wl,-as-needed"
+		$(shell if dpkg-buildflags --export=configure > /dev/null 2> /dev/null; then dpkg-buildflags --export=configure ; fi)
 
 
 #Architecture
@@ -117,12 +116,8 @@ binary-common:
 	dh_strip --dbg-package=moosefs-dbg
 	dh_compress
 	dh_fixperms
-#	dh_makeshlibs
 	dh_installdeb
 	dh_shlibdeps
-#	dh_shlibdeps -Lmoosefs_pro-master
-#	dh_shlibdeps -Lmoosefs_pro-chunkserver
-#	dh_shlibdeps -Lmoosefs_pro-client
 	dh_gencontrol
 	dh_md5sums
 	dh_builddeb

@@ -419,6 +419,7 @@ exit 0
 %{_mandir}/man1/mfsscadmin.1*
 %{_mandir}/man1/mfstools.1*
 %{_mandir}/man8/mfsmount.8*
+%{_mandir}/man8/mount.moosefs.8*
 %{mfsconfdir}/mfsmount.cfg.sample
 
 

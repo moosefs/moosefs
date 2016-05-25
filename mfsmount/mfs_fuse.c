@@ -4852,7 +4852,7 @@ void mfs_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng) {
 	ctx.pid = 0;
 
 	fdcache_invalidate(inode);
-#if FUSE_VERSION >= 28
+#if (FUSE_VERSION >= 28) && !defined(__FreeBSD__)
 	if (fuse_ch!=NULL) {
 		fuse_lowlevel_notify_inval_inode(fuse_ch,inode,offset,leng);
 		oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): ok",inode,offset,leng);

@@ -4754,12 +4754,12 @@ void matoclserv_fuse_append(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
 	status = fs_append(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_src,uid,gids,gid,&fleng);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_APPEND,5);
-	put32bit(&ptr,msgid);
-	put8bit(&ptr,status);
 	if (status==MFS_STATUS_OK) {
 		matoclserv_fuse_fleng_has_changed(NULL,inode,fleng);
 	}
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_APPEND,5);
+	put32bit(&ptr,msgid);
+	put8bit(&ptr,status);
 }
 
 void matoclserv_fuse_snapshot(matoclserventry *eptr,const uint8_t *data,uint32_t length) {

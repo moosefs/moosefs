@@ -3184,6 +3184,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		} 
 		fdcache_release(fdrec);
 	} else {
+		write_data_flush_inode(ino); // update file attributes in master !!!
 		if (full_permissions) {
 			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,2); // allow group refresh again (see: getxattr for "com.apple.quarantine")
 			status = fs_opencheck(ino,ctx.uid,gids->gidcnt,gids->gidtab,oflags,attr);
@@ -3637,14 +3638,21 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
 		fuse_reply_err(req,err);
 	} else {
+		uint64_t newfleng;
 		if ((uint64_t)(off+size)>fileinfo->fleng) {
 			fileinfo->fleng = off+size;
+			newfleng = off+size;
+		} else {
+			newfleng = 0;
 		}
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 		if (debug_mode) {
 			fprintf(stderr,"%llu bytes have been written to inode %lu (offset:%llu)\n",(unsigned long long int)size,(unsigned long int)ino,(unsigned long long int)off);
 		}
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long long int)size);
+		if (newfleng>0) {
+			read_inode_set_length_async(ino,newfleng,0);
+		}
 		read_inode_dirty_region(ino,off,size,buf);
 		fdcache_invalidate(ino);
 		fuse_reply_write(req,size);

@@ -1,3 +1,10 @@
+moosefs (3.0.76-1) unstable; urgency=medium
+
+  * (master) fixed resolving multi path for root inode
+  * (master) fixed licence expiration behaviour (pro only)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 03 Jun 2016 13:00:00 +0200
+
 moosefs (3.0.75-1) unstable; urgency=medium
 
   * (all) fixed cppcheck warnings/errors (mostly false negatives)
@@ -21,6 +28,7 @@ moosefs (3.0.75-1) unstable; urgency=medium
     mode after graceful stop of cs)
   * (master+mount) added fix for bug in FreeBSD kernel (kernel sends truncate
     before first close - FreeBSD only)
+  * (cs) fixed setting malloc pools on Linux
 
  -- MooseFS Team <contact@moosefs.com>  Wed, 20 Apr 2016 13:00:00 +0200
 
@@ -584,7 +592,7 @@ moosefs (3.0.12-1) unstable; urgency=medium
 
 moosefs (3.0.11-1) unstable; urgency=medium
 
-  * (all) changed license of standard version to GPLv2
+  * (all) changed licence of standard version to GPLv2
   * (all) changed name moosefs-ce to just moosefs
 
  -- MooseFS Team <contact@moosefs.com>  Wed, 18 Mar 2015 12:00:00 +0100

@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.76-1 (2016-06-03)
+
+  - (master) fixed resolving multi path for root inode
+  - (master) fixed licence expiration behaviour (pro only)
+
 * MooseFS 3.0.75-1 (2016-04-20)
 
   - (all) fixed cppcheck warnings/errors (mostly false negatives)
@@ -18,6 +23,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) introduced "storage classes" (new goal/labels management)
   - (master+cs) introduced 'temporary maintenance mode' (automatic maintenance mode after graceful stop of cs)
   - (master+mount) added fix for bug in FreeBSD kernel (kernel sends truncate before first close - FreeBSD only)
+  - (cs) fixed setting malloc pools on Linux
 
 * MooseFS 3.0.74-1 (2016-03-08)
 
@@ -381,7 +387,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 3.0.11-1 (2015-03-18)
 
-  - (all) changed license of standard version to GPLv2
+  - (all) changed licence of standard version to GPLv2
   - (all) changed name moosefs-ce to just moosefs
 
 * MooseFS 3.0.10-1 (2015-03-10)

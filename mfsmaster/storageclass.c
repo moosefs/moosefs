@@ -137,7 +137,7 @@ uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only
 	fsclassid = 0;
 	for (sclassid=1 ; sclassid<firstneverused ; sclassid++) {
 		if (sclasstab[sclassid].nleng==nleng && memcmp(sclasstab[sclassid].name,name,nleng)==0) {
-			return MFS_ERROR_EEXIST;
+			return MFS_ERROR_CLASSEXISTS;
 		}
 		if (sclasstab[sclassid].nleng==0 && fsclassid==0) {
 			fsclassid = sclassid;
@@ -145,7 +145,7 @@ uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only
 	}
 	if (fsclassid==0) {
 		if (firstneverused==MAXSCLASS) {
-			return MFS_ERROR_NOSPACE;
+			return MFS_ERROR_CLASSLIMITREACH;
 		}
 		fsclassid = firstneverused;
 		firstneverused++;
@@ -187,7 +187,7 @@ uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,u
 		}
 	}
 	if (fsclassid==0) {
-		return MFS_ERROR_ENOENT;
+		return MFS_ERROR_NOSUCHCLASS;
 	}
 	if (sclassid<FIRSTSCLASSID && (chgmask&SCLASS_CHG_FORCE)==0 && chgmask!=0) {
 		return MFS_ERROR_EPERM;
@@ -265,7 +265,7 @@ uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid
 	for (sclassid=1 ; sclassid<firstneverused ; sclassid++) {
 		if (sclasstab[sclassid].nleng==nleng && memcmp(sclasstab[sclassid].name,name,nleng)==0) {
 			if (new_flag) {
-				return MFS_ERROR_EEXIST;
+				return MFS_ERROR_CLASSEXISTS;
 			} else {
 				fsclassid = sclassid;
 				break;
@@ -278,12 +278,12 @@ uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid
 	if (fsclassid==0) {
 		if (new_flag) {
 			if (firstneverused==MAXSCLASS) {
-				return MFS_ERROR_NOSPACE;
+				return MFS_ERROR_CLASSLIMITREACH;
 			}
 			fsclassid = firstneverused;
 			firstneverused++;
 		} else {
-			return MFS_ERROR_ENOENT;
+			return MFS_ERROR_NOSUCHCLASS;
 		}
 	}
 	if (fsclassid!=esclassid) {
@@ -328,7 +328,7 @@ static inline uint8_t sclass_univ_duplicate_entry(uint8_t oldnleng,const uint8_t
 		}
 	}
 	if (fssclassid==0) {
-		return MFS_ERROR_ENOENT;
+		return MFS_ERROR_NOSUCHCLASS;
 	}
 	if (essclassid!=0 && fssclassid!=essclassid) {
 		return MFS_ERROR_MISMATCH;
@@ -336,7 +336,7 @@ static inline uint8_t sclass_univ_duplicate_entry(uint8_t oldnleng,const uint8_t
 	fdsclassid = 0;
 	for (sclassid=1 ; sclassid<firstneverused ; sclassid++) {
 		if (sclasstab[sclassid].nleng==newnleng && memcmp(sclasstab[sclassid].name,newname,newnleng)==0) {
-			return MFS_ERROR_EEXIST;
+			return MFS_ERROR_CLASSEXISTS;
 		}
 		if (sclasstab[sclassid].nleng==0 && fdsclassid==0) {
 			fdsclassid = sclassid;
@@ -344,7 +344,7 @@ static inline uint8_t sclass_univ_duplicate_entry(uint8_t oldnleng,const uint8_t
 	}
 	if (fdsclassid==0) {
 		if (firstneverused==MAXSCLASS) {
-			return MFS_ERROR_NOSPACE;
+			return MFS_ERROR_CLASSLIMITREACH;
 		}
 		fdsclassid = firstneverused;
 		firstneverused++;
@@ -397,7 +397,7 @@ static inline uint8_t sclass_univ_rename_entry(uint8_t oldnleng,const uint8_t *o
 		}
 	}
 	if (fsclassid==0) {
-		return MFS_ERROR_ENOENT;
+		return MFS_ERROR_NOSUCHCLASS;
 	}
 	if (fsclassid<FIRSTSCLASSID) {
 		return MFS_ERROR_EPERM;
@@ -407,7 +407,7 @@ static inline uint8_t sclass_univ_rename_entry(uint8_t oldnleng,const uint8_t *o
 	}
 	for (sclassid=1 ; sclassid<firstneverused ; sclassid++) {
 		if (sclasstab[sclassid].nleng==newnleng && memcmp(sclasstab[sclassid].name,newname,newnleng)==0) {
-			return MFS_ERROR_EEXIST;
+			return MFS_ERROR_CLASSEXISTS;
 		}
 	}
 	sclasstab[fsclassid].nleng = newnleng;
@@ -440,13 +440,13 @@ static inline uint8_t sclass_univ_delete_entry(uint8_t nleng,const uint8_t *name
 		}
 	}
 	if (fsclassid==0) {
-		return MFS_ERROR_ENOENT;
+		return MFS_ERROR_NOSUCHCLASS;
 	}
 	if (fsclassid<FIRSTSCLASSID) {
 		return MFS_ERROR_EPERM;
 	}
 	if (sclasstab[fsclassid].files>0 || sclasstab[fsclassid].directories>0) {
-		return MFS_ERROR_ENOTEMPTY;
+		return MFS_ERROR_CLASSINUSE;
 	}
 	if (esclassid!=0 && fsclassid!=esclassid) {
 		return MFS_ERROR_MISMATCH;

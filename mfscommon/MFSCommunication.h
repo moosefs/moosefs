@@ -142,7 +142,12 @@
 
 #define MFS_ERROR_EPERM_NOTADMIN  49    // Operation not permitted (mfs admin only)
 
-#define MFS_ERROR_MAX             50
+#define MFS_ERROR_CLASSEXISTS     50    // Class name already in use
+#define MFS_ERROR_CLASSLIMITREACH 51    // Maximum number of classes reached
+#define MFS_ERROR_NOSUCHCLASS     52    // No such class
+#define MFS_ERROR_CLASSINUSE      53    // Class in use
+
+#define MFS_ERROR_MAX             54
 
 #define MFS_ERROR_STRINGS \
 	"OK", \
@@ -195,6 +200,10 @@
 	"Operation canceled", \
 	"No such file or directory (not cacheable)", \
 	"Operation not permitted (mfs admin only)", \
+	"Class name already in use", \
+	"Maximum number of classes reached", \
+	"No such class", \
+	"Class in use", \
 	"Unknown MFS error"
 
 #define SCLASS_CHG_ADMIN_ONLY        0x0001

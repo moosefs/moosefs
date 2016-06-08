@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.77-1 (2016-06-07)
+
+  - (mount) added assertions after packet allocation in master communication module
+  - (manpages) fixes related to storage classes
+  - (all) improved error messages used for storage classes
+
 * MooseFS 3.0.76-1 (2016-06-03)
 
   - (master) fixed resolving multi path for root inode

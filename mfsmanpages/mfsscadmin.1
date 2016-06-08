@@ -132,7 +132,7 @@ It is important to specify what to do in case when there is no space available o
 marked with labels needed for new chunk creation. Also all servers marked with such labels can be temporariliy overloaded.
 The question is if the system should create chunks on other servers or not.
 .PP
-Answer to this question should be resolved by user and hence the \fB-m\fP option. By default (no options or option \fB-m D\fP) in case of overloaded servers system will wait for them, but in case of no space available will use other servers.
+Answer to this question should be resolved by user and hence the \fB-m\fP option. By default (no options or option \fB-m D\fP) in case of overloaded servers system will wait for them, but in case of no space available will use other servers and will replicate data to correct servers when it becomes possible.
 .PP
 Option \fB-m S\fP turns on STRICT mode. In this mode the system will return error (ENOSPC) in case of no space
 available on servers marked with labels specified for chunk creation. It will still wait for overloaded servers.
@@ -147,7 +147,7 @@ are equivalents of simple numeric goals from previous versions of the system. In
 upgrade, all files that had goal \fIN\fP before upgrade, will now have \fIN\fP storage class.
 These classes can be modified only when option \fB-f\fP is specified. It is advised to create new 
 storage classes in an upgraded system and migrate files with \fBmfsxchgsclass\fP tool, rather than
-modify the predefined classes. The predefined classes CANNOT be deleted.
+modify the predefined classes. The predefined classes CANNOT be deleted nor renamed.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

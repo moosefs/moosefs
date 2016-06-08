@@ -62,6 +62,7 @@
 #include "portable.h"
 #include "heapsorter.h"
 #include "extrapackets.h"
+#include "massert.h"
 //#ifndef WIN32
 //#include "mfs_fuse.h"
 //#endif
@@ -595,6 +596,7 @@ void fs_output_buffer_init(threc *rec,uint32_t size) {
 		}
 		rec->obuff = malloc(size);
 #endif
+		passert(rec->obuff);
 		rec->obuffsize = size;
 	} else if (rec->obuffsize!=DEFAULT_OUTPUT_BUFFSIZE) {
 #ifdef MMAP_ALLOC
@@ -608,11 +610,12 @@ void fs_output_buffer_init(threc *rec,uint32_t size) {
 		}
 		rec->obuff = malloc(DEFAULT_OUTPUT_BUFFSIZE);
 #endif
+		passert(rec->obuff);
 		rec->obuffsize = DEFAULT_OUTPUT_BUFFSIZE;
 	}
-	if (rec->obuff==NULL) {
-		rec->obuffsize = 0;
-	}
+//	if (rec->obuff==NULL) {
+//		rec->obuffsize = 0;
+//	}
 }
 
 void fs_input_buffer_init(threc *rec,uint32_t size) {
@@ -628,6 +631,7 @@ void fs_input_buffer_init(threc *rec,uint32_t size) {
 		}
 		rec->ibuff = malloc(size);
 #endif
+		passert(rec->ibuff);
 		rec->ibuffsize = size;
 	} else if (rec->ibuffsize!=DEFAULT_INPUT_BUFFSIZE) {
 #ifdef MMAP_ALLOC
@@ -641,11 +645,12 @@ void fs_input_buffer_init(threc *rec,uint32_t size) {
 		}
 		rec->ibuff = malloc(DEFAULT_INPUT_BUFFSIZE);
 #endif
+		passert(rec->ibuff);
 		rec->ibuffsize = DEFAULT_INPUT_BUFFSIZE;
 	}
-	if (rec->ibuff==NULL) {
-		rec->ibuffsize = 0;
-	}
+//	if (rec->ibuff==NULL) {
+//		rec->ibuffsize = 0;
+//	}
 }
 
 uint8_t* fs_createpacket(threc *rec,uint32_t cmd,uint32_t size) {

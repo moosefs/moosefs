@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.78-1 (2016-06-14)
+
+  - (cs) fixed serious error that may cause data corruption during internal rebalance (intr. in 3.0.75)
+
 * MooseFS 3.0.77-1 (2016-06-07)
 
   - (mount) added assertions after packet allocation in master communication module

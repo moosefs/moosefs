@@ -1,3 +1,10 @@
+moosefs (3.0.78-1) unstable; urgency=medium
+
+  * (cs) fixed serious error that may cause data corruption during internal
+    rebalance (intr. in 3.0.75)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 14 Jun 2016 13:00:00 +0200
+
 moosefs (3.0.77-1) unstable; urgency=medium
 
   * (mount) added assertions after packet allocation in master communication

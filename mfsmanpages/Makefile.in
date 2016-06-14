@@ -91,11 +91,12 @@ target_triplet = @target@
 @BUILD_MASTER_TRUE@am__append_1 = $(master_mans)
 @BUILD_CHUNKSERVER_TRUE@am__append_2 = $(chunkserver_mans)
 @BUILD_MOUNT_TRUE@am__append_3 = $(mount_mans)
-@BUILD_METALOGGER_TRUE@am__append_4 = $(metalogger_mans)
-@BUILD_NETDUMP_TRUE@am__append_5 = $(netdump_mans)
-@BUILD_SUPERVISOR_TRUE@am__append_6 = $(supervisor_mans)
-@INSTALL_CGISERV_TRUE@am__append_7 = $(cgiserv_mans)
-@INSTALL_CLI_TRUE@am__append_8 = $(cli_mans)
+@BUILD_MOUNT_TRUE@@INSTALL_MOOSEFS_MOUNT_TRUE@am__append_4 = $(mount_extra_man)
+@BUILD_METALOGGER_TRUE@am__append_5 = $(metalogger_mans)
+@BUILD_NETDUMP_TRUE@am__append_6 = $(netdump_mans)
+@BUILD_SUPERVISOR_TRUE@am__append_7 = $(supervisor_mans)
+@INSTALL_CGISERV_TRUE@am__append_8 = $(cgiserv_mans)
+@INSTALL_CLI_TRUE@am__append_9 = $(cli_mans)
 subdir = mfsmanpages
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_pthread.m4 \
@@ -339,17 +340,18 @@ mount_mans = \
 	mfscheckfile.1 mfsdirinfo.1 mfsfileinfo.1 mfsfilerepair.1 \
 	mfsgetgoal.1 mfsgettrashtime.1 mfsrgetgoal.1 mfsrgettrashtime.1 \
 	mfsrsetgoal.1 mfsrsettrashtime.1 mfssetgoal.1 mfssettrashtime.1 \
-	mfscopygoal.1 mfscopytrashtime.1 mount.moosefs.8 \
+	mfscopygoal.1 mfscopytrashtime.1 \
 	mfssetsclass.1 mfsgetsclass.1 mfscopysclass.1 mfsxchgsclass.1 mfslistsclass.1 \
 	mfsgeteattr.1 mfsseteattr.1 mfsdeleattr.1 mfscopyeattr.1 \
 	mfsgetquota.1 mfssetquota.1 mfsdelquota.1 mfscopyquota.1 \
 	mfsappendchunks.1 mfsmakesnapshot.1 mfsrmsnapshot.1 mfsfilepaths.1
 
-all_mans = $(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) 
+mount_extra_man = mount.moosefs.8
+all_mans = $(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) $(mount_extra_man) 
 EXTRA_DIST = $(all_mans)
 man_MANS = $(am__append_1) $(am__append_2) $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6) \
-	$(am__append_7) $(am__append_8)
+	$(am__append_7) $(am__append_8) $(am__append_9)
 all: all-am
 
 .SUFFIXES:

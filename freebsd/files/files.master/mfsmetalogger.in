@@ -1,4 +1,5 @@
 #!/bin/sh
+# $FreeBSD$
 
 # PROVIDE: mfsmetalogger
 # REQUIRE: DAEMON

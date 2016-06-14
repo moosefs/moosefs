@@ -3,7 +3,7 @@
 
 PKGNAMESUFFIX=	-netdump
 
-COMMENT=	Network packet dump utility for mfs packets
+COMMENT=	MooseFS network packet dump utility
 
 LICENSE=	GPLv2
 

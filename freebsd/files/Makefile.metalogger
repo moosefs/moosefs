@@ -3,7 +3,7 @@
 
 PKGNAMESUFFIX=	-metalogger
 
-COMMENT=	Metadata backing up daemon
+COMMENT=	MooseFS metadata backup server
 
 LICENSE=	GPLv2
 

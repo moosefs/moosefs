@@ -3,7 +3,7 @@
 
 PKGNAMESUFFIX=	-cli
 
-COMMENT=	Cli moosefs interface
+COMMENT=	MooseFS command line interface
 
 LICENSE=	GPLv2
 

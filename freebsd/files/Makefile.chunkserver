@@ -3,7 +3,7 @@
 
 PKGNAMESUFFIX=	-chunkserver
 
-COMMENT=	Storing files data and synchronizing it among themselves
+COMMENT=	MooseFS data storage and synchronization component
 
 LICENSE=	GPLv2
 

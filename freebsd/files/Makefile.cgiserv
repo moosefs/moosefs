@@ -3,7 +3,7 @@
 
 PKGNAMESUFFIX=	-cgiserv
 
-COMMENT=	Simple cgi-capable web server for using with mfs cgi
+COMMENT=	MooseFS CGI webserver
 
 LICENSE=	GPLv2
 

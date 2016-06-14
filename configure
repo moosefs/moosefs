@@ -672,6 +672,8 @@ BUILD_MASTER_FALSE
 BUILD_MASTER_TRUE
 CGISERVDIR
 CGIDIR
+INSTALL_MOOSEFS_MOUNT_FALSE
+INSTALL_MOOSEFS_MOUNT_TRUE
 INSTALL_CGISERV_FALSE
 INSTALL_CGISERV_TRUE
 INSTALL_CLI_FALSE
@@ -16155,6 +16157,14 @@ else
   INSTALL_CGISERV_FALSE=
 fi
 
+ if test "$root_sbindir" != "xxx"; then
+  INSTALL_MOOSEFS_MOUNT_TRUE=
+  INSTALL_MOOSEFS_MOUNT_FALSE='#'
+else
+  INSTALL_MOOSEFS_MOUNT_TRUE='#'
+  INSTALL_MOOSEFS_MOUNT_FALSE=
+fi
+
 
 
 
@@ -16833,6 +16843,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${INSTALL_CGISERV_TRUE}" && test -z "${INSTALL_CGISERV_FALSE}"; then
   as_fn_error $? "conditional \"INSTALL_CGISERV\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${INSTALL_MOOSEFS_MOUNT_TRUE}" && test -z "${INSTALL_MOOSEFS_MOUNT_FALSE}"; then
+  as_fn_error $? "conditional \"INSTALL_MOOSEFS_MOUNT\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${BUILD_MASTER_TRUE}" && test -z "${BUILD_MASTER_FALSE}"; then

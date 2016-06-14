@@ -10,13 +10,14 @@ mount_mans=\
 	mfscheckfile.1 mfsdirinfo.1 mfsfileinfo.1 mfsfilerepair.1 \
 	mfsgetgoal.1 mfsgettrashtime.1 mfsrgetgoal.1 mfsrgettrashtime.1 \
 	mfsrsetgoal.1 mfsrsettrashtime.1 mfssetgoal.1 mfssettrashtime.1 \
-	mfscopygoal.1 mfscopytrashtime.1 mount.moosefs.8 \
+	mfscopygoal.1 mfscopytrashtime.1 \
 	mfssetsclass.1 mfsgetsclass.1 mfscopysclass.1 mfsxchgsclass.1 mfslistsclass.1 \
 	mfsgeteattr.1 mfsseteattr.1 mfsdeleattr.1 mfscopyeattr.1 \
 	mfsgetquota.1 mfssetquota.1 mfsdelquota.1 mfscopyquota.1 \
 	mfsappendchunks.1 mfsmakesnapshot.1 mfsrmsnapshot.1 mfsfilepaths.1
+mount_extra_man=mount.moosefs.8
 
-all_mans=$(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) 
+all_mans=$(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) $(mount_extra_man) 
 
 EXTRA_DIST=$(all_mans)
 
@@ -32,6 +33,9 @@ endif
 
 if BUILD_MOUNT
 man_MANS+=$(mount_mans)
+if INSTALL_MOOSEFS_MOUNT
+man_MANS+=$(mount_extra_man)
+endif
 endif
 
 if BUILD_METALOGGER

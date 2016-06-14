@@ -380,6 +380,7 @@ AM_CONDITIONAL([BUILD_SCRIPTS], [test "$enable_mfscgi" != "no" -o "$enable_mfscl
 AM_CONDITIONAL([INSTALL_CGI], [test "$enable_mfscgi" != "no"])
 AM_CONDITIONAL([INSTALL_CLI], [test "$enable_mfscli" != "no"])
 AM_CONDITIONAL([INSTALL_CGISERV], [test "$enable_mfscgiserv" != "no"])
+AM_CONDITIONAL([INSTALL_MOOSEFS_MOUNT], [test "$root_sbindir" != "xxx"])
 AC_SUBST([CGIDIR])
 AC_SUBST([CGISERVDIR])
 AC_SUBST([PYTHON])

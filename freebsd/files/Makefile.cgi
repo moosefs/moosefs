@@ -3,7 +3,7 @@
 
 PKGNAMESUFFIX=	-cgi
 
-COMMENT=	Cgi moosefs interface
+COMMENT=	MooseFS CGI interface
 
 LICENSE=	GPLv2
 

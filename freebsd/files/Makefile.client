@@ -3,7 +3,7 @@
 
 PKGNAMESUFFIX=	-client
 
-COMMENT=	Moosefs client tools
+COMMENT=	MooseFS client tools
 
 LICENSE=	GPLv2
 

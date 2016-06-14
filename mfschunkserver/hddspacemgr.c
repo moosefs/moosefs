@@ -3471,15 +3471,13 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 		if (nzend==nzstart) {
 			retsize = 0;
 			nzstart = nzend = 0;
-		} else if (nzstart>0 || truncneeded) {
+		} else {
 #ifdef USE_PIO
 			retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
 #else
 			lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
 			retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
 #endif
-		} else {
-			retsize = write(c->fd,writeptr,nzend-nzstart);
 		}
 		if (retsize!=(int32_t)(nzend-nzstart)) {
 			hdd_error_occured(c);	// uses and preserves errno !!!
@@ -3974,15 +3972,13 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 			if (nzend==nzstart) {
 				retsize = 0;
 				nzstart = nzend = 0;
-			} else if (nzstart>0 || truncneeded) {
+			} else {
 #ifdef USE_PIO
 				retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
 #else
 				lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
 				retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
 #endif
-			} else {
-				retsize = write(c->fd,writeptr,nzend-nzstart);
 			}
 			if (retsize!=(int32_t)(nzend-nzstart)) {
 				hdd_error_occured(c);	// uses and preserves errno !!!
@@ -4090,15 +4086,13 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				if (nzend==nzstart) {
 					retsize = 0;
 					nzstart = nzend = 0;
-				} else if (nzstart>0 || truncneeded) {
+				} else {
 #ifdef USE_PIO
 					retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
 #else
 					lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
 					retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
 #endif
-				} else {
-					retsize = write(c->fd,writeptr,nzend-nzstart);
 				}
 				if (retsize!=(int32_t)(nzend-nzstart)) {
 					hdd_error_occured(c);	// uses and preserves errno !!!
@@ -4201,15 +4195,13 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				if (nzend==nzstart) {
 					retsize = 0;
 					nzstart = nzend = 0;
-				} else if (nzstart>0 || truncneeded) {
+				} else {
 #ifdef USE_PIO
 					retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
 #else
 					lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
 					retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
 #endif
-				} else {
-					retsize = write(c->fd,writeptr,nzend-nzstart);
 				}
 				if (retsize!=(int32_t)(nzend-nzstart)) {
 					hdd_error_occured(c);	// uses and preserves errno !!!
@@ -4299,15 +4291,13 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 			if (nzend==nzstart) {
 				retsize = 0;
 				nzstart = nzend = 0;
-			} else if (nzstart>0 || truncneeded) {
+			} else {
 #ifdef USE_PIO
 				retsize = pwrite(c->fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
 #else
 				lseek(c->fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
 				retsize = write(c->fd,writeptr+nzstart,nzend-nzstart);
 #endif
-			} else {
-				retsize = write(c->fd,writeptr,nzend-nzstart);
 			}
 			if (retsize!=(int32_t)(nzend-nzstart)) {
 				hdd_error_occured(c);	// uses and preserves errno !!!
@@ -4702,15 +4692,13 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 		if (nzend==nzstart) {
 			retsize = 0;
 			nzstart = nzend = 0;
-		} else if (nzstart>0 || truncneeded) {
+		} else {
 #ifdef USE_PIO
 			retsize = pwrite(new_fd,writeptr+nzstart,nzend-nzstart,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart);
 #else
 			lseek(new_fd,CHUNKHDRSIZE+(((uint32_t)block)<<MFSBLOCKBITS)+nzstart,SEEK_SET);
 			retsize = write(new_fd,writeptr+nzstart,nzend-nzstart);
 #endif
-		} else {
-			retsize = write(new_fd,writeptr,nzend-nzstart);
 		}
 		te = monotonic_nseconds();
 		if (retsize!=(int32_t)(nzend-nzstart)) {

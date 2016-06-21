@@ -85,6 +85,7 @@ case $target_os in
 	;;
   *)
 	fuse=no
+	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 	;;
 esac
 

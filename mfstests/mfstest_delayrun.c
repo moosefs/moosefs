@@ -18,9 +18,9 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
+#include <sys/types.h>
 #include <sys/select.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <stdlib.h>
 
 #include "delayrun.h"

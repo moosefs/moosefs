@@ -3831,13 +3831,13 @@ void chunk_jobs_main(void) {
 				}
 				c = cn;
 			}
+			jobshcnt++;
 			if (jobshcnt<jobshmax) {
 				jobshpos += jobshstep;
 				jobshpos %= jobshmax;
 			} else {
 				jobshpos = jobshcnt;
 			}
-			jobshcnt++;
 		}
 	}
 }

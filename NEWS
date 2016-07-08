@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.79-1 (2016-07-05)
+
+  - (master) fixed 'flock' (change type of lock SH->EX and EX->SH caused access to freed memory and usually SEGV)
+
 * MooseFS 3.0.78-1 (2016-06-14)
 
   - (cs) fixed serious error that may cause data corruption during internal rebalance (intr. in 3.0.75)

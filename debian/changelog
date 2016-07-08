@@ -1,3 +1,10 @@
+moosefs (3.0.79-1) unstable; urgency=medium
+
+  * (master) fixed 'flock' (change type of lock SH->EX and EX->SH caused access
+    to freed memory and usually SEGV)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 05 Jul 2016 13:00:00 +0200
+
 moosefs (3.0.78-1) unstable; urgency=medium
 
   * (cs) fixed serious error that may cause data corruption during internal

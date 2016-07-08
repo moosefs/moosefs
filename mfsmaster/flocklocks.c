@@ -350,19 +350,13 @@ static inline void flock_lock_check_waiting(inodelocks *il) {
 	}
 }
 
-static inline void flock_lock_unlock(lock *l) {
-	inodelocks *il;
-
-	il = l->parent;
+static inline void flock_lock_unlock(inodelocks *il,lock *l) {
+	massert(il==l->parent,"flock data structures mismatch");
 
 	flock_lock_remove(l);
 
-	if (il->active==NULL) {
-		if (il->waiting_head==NULL) {
-			flock_inode_remove(il->inode);
-		} else {
-			flock_lock_check_waiting(il);
-		}
+	if (il->active==NULL && il->waiting_head!=NULL) {
+		flock_lock_check_waiting(il);
 	}
 }
 
@@ -403,7 +397,10 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 	for (l=il->active ; l ; l=l->next) {
 		if (l->sessionid==sessionid && l->owner==owner) {
 			if (op==FLOCK_UNLOCK || op==FLOCK_RELEASE) {
-				flock_lock_unlock(l);
+				flock_lock_unlock(il,l);
+				if (il->waiting_head==NULL && il->active==NULL) {
+					flock_inode_remove(il->inode);
+				}
 				return MFS_STATUS_OK;
 			} else if (op==FLOCK_TRY_SHARED) {
 				if (l->ltype==LTYPE_READER) {
@@ -417,7 +414,7 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 				if (l->ltype==LTYPE_READER) {
 					return MFS_STATUS_OK;
 				} else { // l->ltype==LTYPE_WRITER
-					flock_lock_unlock(l);
+					flock_lock_unlock(il,l);
 					return flock_lock_new(il,LTYPE_READER,sessionid,msgid,reqid,owner);
 				}
 			} else if (op==FLOCK_TRY_EXCLUSIVE) {
@@ -434,8 +431,8 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 				if (l->ltype==LTYPE_WRITER) {
 					return MFS_STATUS_OK;
 				} else { // l->ltype==LTYPE_READER
-					 flock_lock_unlock(l);
-					 return flock_lock_new(il,LTYPE_WRITER,sessionid,msgid,reqid,owner);
+					flock_lock_unlock(il,l);
+					return flock_lock_new(il,LTYPE_WRITER,sessionid,msgid,reqid,owner);
 				}
 			}
 			return MFS_ERROR_EINVAL;
@@ -517,7 +514,7 @@ void flock_file_closed(uint32_t sessionid,uint32_t inode) {
 	while (l) {
 		nl = l->next;
 		if (l->sessionid==sessionid) {
-			flock_lock_unlock(l);
+			flock_lock_unlock(il,l);
 		}
 		l = nl;
 	}

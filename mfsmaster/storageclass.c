@@ -58,10 +58,10 @@ typedef struct _storageclass {
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
 //	uint8_t trash_labelscnt;
-	uint8_t have_create_labels;
-	uint8_t have_keep_labels;
-	uint8_t have_arch_labels;
-//	uint8_t have_trash_labels;
+	uint8_t has_create_labels;
+	uint8_t has_keep_labels;
+	uint8_t has_arch_labels;
+//	uint8_t has_trash_labels;
 	uint32_t *create_labelmasks[MAXLABELSCNT];
 	uint32_t *keep_labelmasks[MAXLABELSCNT];
 	uint32_t *arch_labelmasks[MAXLABELSCNT];
@@ -91,7 +91,7 @@ static inline uint8_t sclass_name_check(uint8_t nleng,const uint8_t *name) {
 	return 1;
 }
 
-static void sclass_make_changelog(uint16_t sclassid,uint8_t new_flag) {
+static inline void sclass_make_changelog(uint16_t sclassid,uint8_t new_flag) {
 	uint32_t i,j;
 	char chlogstr[CHLOGSTRSIZE];
 	int chlogstrleng;
@@ -126,6 +126,36 @@ static void sclass_make_changelog(uint16_t sclassid,uint8_t new_flag) {
 	}
 	changelog("%"PRIu32"|SCSET(%s,%"PRIu8",W%"PRIu8",K%"PRIu8",A%"PRIu8",%"PRIu8",%"PRIu16",%"PRIu8",%s)",main_time(),changelog_escape_name(sclasstab[sclassid].nleng,sclasstab[sclassid].name),new_flag,sclasstab[sclassid].create_labelscnt,sclasstab[sclassid].keep_labelscnt,sclasstab[sclassid].arch_labelscnt,sclasstab[sclassid].create_mode,sclasstab[sclassid].arch_delay,sclasstab[sclassid].admin_only,chlogstr);
 
+}
+
+static inline void sclass_fix_has_labels_fields(uint8_t sclassid) {
+	uint32_t i;
+	uint8_t has_labels;
+
+	has_labels = 0;
+	for (i=0 ; i<sclasstab[sclassid].create_labelscnt ; i++) {
+		if (sclasstab[sclassid].create_labelmasks[i][0]!=0) {
+			has_labels = 1;
+			break;
+		}
+	}
+	sclasstab[sclassid].has_create_labels = has_labels;
+	has_labels = 0;
+	for (i=0 ; i<sclasstab[sclassid].keep_labelscnt ; i++) {
+		if (sclasstab[sclassid].keep_labelmasks[i][0]!=0) {
+			has_labels = 1;
+			break;
+		}
+	}
+	sclasstab[sclassid].has_keep_labels = has_labels;
+	has_labels = 0;
+	for (i=0 ; i<sclasstab[sclassid].arch_labelscnt ; i++) {
+		if (sclasstab[sclassid].arch_labelmasks[i][0]!=0) {
+			has_labels = 1;
+			break;
+		}
+	}
+	sclasstab[sclassid].has_arch_labels = has_labels;
 }
 
 uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only,uint8_t create_mode,uint8_t create_labelscnt,uint32_t *create_labelmasks,uint8_t keep_labelscnt,uint32_t *keep_labelmasks,uint8_t arch_labelscnt,uint32_t *arch_labelmasks,uint16_t arch_delay) {
@@ -170,6 +200,7 @@ uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only
 		memcpy(sclasstab[fsclassid].arch_labelmasks[i],arch_labelmasks+(i*MASKORGROUP),MASKORGROUP*sizeof(uint32_t));
 	}
 	sclasstab[fsclassid].arch_delay = arch_delay;
+	sclass_fix_has_labels_fields(fsclassid);
 	sclass_make_changelog(fsclassid,1);
 	return MFS_STATUS_OK;
 }
@@ -249,6 +280,9 @@ uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,u
 	} else {
 		*arch_delay = sclasstab[fsclassid].arch_delay;
 	}
+	if (chgmask & (SCLASS_CHG_CREATE_MASKS|SCLASS_CHG_KEEP_MASKS|SCLASS_CHG_ARCH_MASKS)) {
+		sclass_fix_has_labels_fields(fsclassid);
+	}
 	if (chgmask!=0) {
 		sclass_make_changelog(fsclassid,0);
 	}
@@ -311,6 +345,7 @@ uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid
 		memcpy(sclasstab[fsclassid].arch_labelmasks[i],arch_labelmasks+(i*MASKORGROUP),MASKORGROUP*sizeof(uint32_t));
 	}
 	sclasstab[fsclassid].arch_delay = arch_delay;
+	sclass_fix_has_labels_fields(fsclassid);
 	meta_version_inc();
 	return MFS_STATUS_OK;
 }
@@ -360,14 +395,17 @@ static inline uint8_t sclass_univ_duplicate_entry(uint8_t oldnleng,const uint8_t
 	for (i=0 ; i<sclasstab[fssclassid].create_labelscnt ; i++) {
 		memcpy(sclasstab[fdsclassid].create_labelmasks[i],sclasstab[fssclassid].create_labelmasks[i],MASKORGROUP*sizeof(uint32_t));
 	}
+	sclasstab[fdsclassid].has_create_labels = sclasstab[fssclassid].has_create_labels;
 	sclasstab[fdsclassid].keep_labelscnt = sclasstab[fssclassid].keep_labelscnt;
 	for (i=0 ; i<sclasstab[fssclassid].keep_labelscnt ; i++) {
 		memcpy(sclasstab[fdsclassid].keep_labelmasks[i],sclasstab[fssclassid].keep_labelmasks[i],MASKORGROUP*sizeof(uint32_t));
 	}
+	sclasstab[fdsclassid].has_keep_labels = sclasstab[fssclassid].has_keep_labels;
 	sclasstab[fdsclassid].arch_labelscnt = sclasstab[fssclassid].arch_labelscnt;
 	for (i=0 ; i<sclasstab[fssclassid].arch_labelscnt ; i++) {
 		memcpy(sclasstab[fdsclassid].arch_labelmasks[i],sclasstab[fssclassid].arch_labelmasks[i],MASKORGROUP*sizeof(uint32_t));
 	}
+	sclasstab[fdsclassid].has_arch_labels = sclasstab[fssclassid].has_arch_labels;
 	sclasstab[fdsclassid].arch_delay = sclasstab[fssclassid].arch_delay;
 	if (essclassid==0 && edsclassid==0) {
 		changelog("%"PRIu32"|SCDUP(%s,%s):%"PRIu32",%"PRIu32,main_time(),changelog_escape_name(oldnleng,oldname),changelog_escape_name(newnleng,newname),fssclassid,fdsclassid);
@@ -602,7 +640,7 @@ uint8_t sclass_is_admin_only(uint16_t sclassid) {
 
 uint8_t sclass_has_create_labels(uint16_t sclassid) {
 	if (sclassid>=FIRSTSCLASSID) {
-		return sclasstab[sclassid].have_create_labels;
+		return sclasstab[sclassid].has_create_labels;
 	} else {
 		return 0;
 	}
@@ -611,9 +649,9 @@ uint8_t sclass_has_create_labels(uint16_t sclassid) {
 uint8_t sclass_has_keeparch_labels(uint16_t sclassid,uint8_t archflag) {
 	if (sclassid>=FIRSTSCLASSID) {
 		if (archflag) {
-			return sclasstab[sclassid].have_arch_labels;
+			return sclasstab[sclassid].has_arch_labels;
 		} else {
-			return sclasstab[sclassid].have_keep_labels;
+			return sclasstab[sclassid].has_keep_labels;
 		}
 	} else {
 		return 0;
@@ -789,9 +827,6 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 	uint8_t create_labelscnt;
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
-	uint8_t have_create_labels;
-	uint8_t have_keep_labels;
-	uint8_t have_arch_labels;
 	uint8_t descrleng;
 	uint8_t nleng;
 	uint8_t admin_only;
@@ -986,9 +1021,6 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 			}
 		}
 
-		have_create_labels = 0;
-		have_keep_labels = 0;
-		have_arch_labels = 0;
 		ptr = databuff;
 		for (i=0 ; i<create_labelscnt ; i++) {
 			for (j=0 ; j<MASKORGROUP ; j++) {
@@ -998,9 +1030,6 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 					labelmask = 0;
 				}
 				sclasstab[sclassid].create_labelmasks[i][j] = labelmask;
-				if (labelmask!=0) {
-					have_create_labels = 1;
-				}
 			}
 		}
 		for (i=0 ; i<keep_labelscnt ; i++) {
@@ -1015,9 +1044,6 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 					labelmask = sclasstab[sclassid].create_labelmasks[i][j];
 				}
 				sclasstab[sclassid].keep_labelmasks[i][j] = labelmask;
-				if (labelmask!=0) {
-					have_keep_labels = 1;
-				}
 			}
 		}
 		for (i=0 ; i<arch_labelscnt ; i++) {
@@ -1032,9 +1058,6 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 					labelmask = sclasstab[sclassid].keep_labelmasks[i][j];
 				}
 				sclasstab[sclassid].arch_labelmasks[i][j] = labelmask;
-				if (labelmask!=0) {
-					have_arch_labels = 1;
-				}
 			}
 		}
 		sclasstab[sclassid].create_mode = create_mode;
@@ -1042,9 +1065,6 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 		sclasstab[sclassid].create_labelscnt = create_labelscnt;
 		sclasstab[sclassid].keep_labelscnt = keep_labelscnt;
 		sclasstab[sclassid].arch_labelscnt = arch_labelscnt;
-		sclasstab[sclassid].have_create_labels = have_create_labels;
-		sclasstab[sclassid].have_keep_labels = have_keep_labels;
-		sclasstab[sclassid].have_arch_labels = have_arch_labels;
 		sclasstab[sclassid].admin_only = admin_only;
 		sclasstab[sclassid].nleng = nleng;
 		memcpy(sclasstab[sclassid].name,name,nleng);
@@ -1054,6 +1074,7 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 			sclasstab[sclassid].stdchunks[j] = 0;
 			sclasstab[sclassid].archchunks[j] = 0;
 		}
+		sclass_fix_has_labels_fields(sclassid);
 		if (sclassid>=firstneverused) {
 			firstneverused = sclassid+1;
 		}
@@ -1073,10 +1094,13 @@ void sclass_cleanup(void) {
 		sclasstab[i].nleng = 0;
 		sclasstab[i].name[0] = 0;
 		sclasstab[i].admin_only = 0;
-		sclasstab[i].create_labelscnt = 0;
-		sclasstab[i].keep_labelscnt = 0;
-		sclasstab[i].arch_labelscnt = 0;
 		sclasstab[i].create_mode = CREATE_MODE_STD;
+		sclasstab[i].has_create_labels = 0;
+		sclasstab[i].create_labelscnt = 0;
+		sclasstab[i].has_keep_labels = 0;
+		sclasstab[i].keep_labelscnt = 0;
+		sclasstab[i].has_arch_labels = 0;
+		sclasstab[i].arch_labelscnt = 0;
 		sclasstab[i].arch_delay = 0;
 		sclasstab[i].files = 0;
 		sclasstab[i].directories = 0;
@@ -1100,10 +1124,6 @@ void sclass_cleanup(void) {
 		for (j=0 ; j<i ; j++) {
 			memset(sclasstab[i].arch_labelmasks[j],0,MASKORGROUP*sizeof(uint32_t));
 		}
-//		sclasstab[i].create_mode = CREATE_MODE_STD;
-//		sclasstab[i].have_create_labels = 0;
-//		sclasstab[i].have_keep_labels = 0;
-//		sclasstab[i].labelsum = 0;
 	}
 	firstneverused = FIRSTSCLASSID;
 }
@@ -1116,11 +1136,11 @@ int sclass_init(void) {
 		sclasstab[i].name[0] = 0;
 		sclasstab[i].admin_only = 0;
 		sclasstab[i].create_mode = CREATE_MODE_STD;
-		sclasstab[i].have_create_labels = 0;
+		sclasstab[i].has_create_labels = 0;
 		sclasstab[i].create_labelscnt = 0;
-		sclasstab[i].have_keep_labels = 0;
+		sclasstab[i].has_keep_labels = 0;
 		sclasstab[i].keep_labelscnt = 0;
-		sclasstab[i].have_arch_labels = 0;
+		sclasstab[i].has_arch_labels = 0;
 		sclasstab[i].arch_labelscnt = 0;
 		sclasstab[i].arch_delay = 0;
 		sclasstab[i].files = 0;

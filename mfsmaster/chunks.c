@@ -193,7 +193,7 @@ typedef struct _csopchunk {
 	struct _csopchunk *next;
 } csopchunk;
 
-/* csdata.mfs_state */
+/* csdata.mfr_state */
 /* UNKNOWN_HARD - unknown after disconnect or creation */
 /* UNKNOWN_SOFT - unknown, loop in progress */
 /* CAN_BE_REMOVED - can be removed, whole loop has passed */

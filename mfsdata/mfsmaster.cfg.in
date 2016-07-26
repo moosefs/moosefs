@@ -14,6 +14,12 @@
 # whether to perform mlockall() to avoid swapping out mfsmaster process (default is 0, i.e. no)
 # LOCK_MEMORY = 0
 
+# Linux only: decrease malloc arenas to 8 - prevents server from using huge amount of virtual memory (default is 1)
+# CHANGE_GLIBC_MALLOC_ARENAS = 1
+
+# Linux only: disable out of memory killer (default is 1)
+# DISABLE_OOM_KILLER = 1
+
 # nice level to run daemon with (default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with)
 # NICE_LEVEL = -19
 

@@ -1425,26 +1425,26 @@ int main(int argc,char **argv) {
 
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	if (cfg_getuint8("DISABLE_OOM_KILLER",1)==1) {
-		FILE *fd;
-		int dis;
-		dis = 0;
+		FILE *oomfd;
+		int oomdis;
+		oomdis = 0;
 #if defined(OOM_DISABLE)
-		fd = fopen("/proc/self/oom_adj","w");
-		if (fd!=NULL) {
-			fprintf(fd,"%d\n",OOM_DISABLE);
-			fclose(fd);
-			dis = 1;
+		oomfd = fopen("/proc/self/oom_adj","w");
+		if (oomfd!=NULL) {
+			fprintf(oomfd,"%d\n",OOM_DISABLE);
+			fclose(oomfd);
+			oomdis = 1;
 		}
 #endif
 #if defined(OOM_SCORE_ADJ_MIN)
-		fd = fopen("/proc/self/oom_score_adj","w");
-		if (fd!=NULL) {
-			fprintf(fd,"%d\n",OOM_SCORE_ADJ_MIN);
-			fclose(fd);
-			dis = 1;
+		oomfd = fopen("/proc/self/oom_score_adj","w");
+		if (oomfd!=NULL) {
+			fprintf(oomfd,"%d\n",OOM_SCORE_ADJ_MIN);
+			fclose(oomfd);
+			oomdis = 1;
 		}
 #endif
-		if (dis) {
+		if (oomdis) {
 			syslog(LOG_NOTICE,"out of memory killer disabled");
 		} else {
 			syslog(LOG_NOTICE,"can't disable out of memory killer");

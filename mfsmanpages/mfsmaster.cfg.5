@@ -25,6 +25,12 @@ name of process to place in syslog messages; default is mfsmaster
 .B LOCK_MEMORY
 whether to perform mlockall() to avoid swapping out mfsmaster process; default is 0, i.e. no
 .TP
+.B CHANGE_GLIBC_MALLOC_ARENAS
+decrease malloc arenas to 8 - prevents server from using huge amount of virtual memory (Linux onty, default is 1)
+.TP
+.B DISABLE_OOM_KILLER
+disable out of memory killer (Linux only, default is 1)
+.TP
 .B NICE_LEVEL
 nice level to run daemon with; default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with
 .TP

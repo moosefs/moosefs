@@ -128,13 +128,13 @@ try to change limit of simultaneously opened file descriptors on startup
 try to change nice level to specified value on startup (default: -19)
 .TP
 \fB\-o mfswritecachesize=\fP\fIN\fP
-specify write cache size in MiB (in range: 16..2048 - default: 250)
+specify write cache size in MiB (in range: 16..2048 - default: 256)
 .TP
 \fB\-o mfsreadaheadsize=\fP\fIN\fP
-define size of all read ahead buffers in MiB (default: 128)
+define size of all read ahead buffers in MiB (in range: 16..2048 - default: 256)
 .TP
 \fB\-o mfsreadaheadleng=\fP\fIN\fP
-define amount of bytes to be additionally read (default: 1048576)
+define amount of bytes to be additionally read (in range: 128KiB..2MiB - default: 1048576)
 .TP
 \fB\-o mfsreadaheadtrigger=\fP\fIN\fP
 define amount of bytes read sequentially that turns on read ahead (default: 10 * \fBmfsreadaheadleng\fP)

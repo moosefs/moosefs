@@ -34,7 +34,10 @@
 #endif
 
 #if defined(HAVE_LINUX_OOM_H)
-#include <linux/oom.h>
+#  include <linux/oom.h>
+#  if defined(OOM_DISABLE) || defined(OOM_SCORE_ADJ_MIN)
+#    define OOM_ADJUSTABLE 1
+#  endif
 #endif
 
 #include <fuse.h>
@@ -170,7 +173,7 @@ struct mfsopts {
 #ifdef MFS_USE_MALLOPT
 	int limitarenas;
 #endif
-#if defined(__linux__) && defined(OOM_DISABLE)
+#if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	int oomdisable;
 #endif
 	int nostdmountoptions;
@@ -251,7 +254,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 #ifdef MFS_USE_MALLOPT
 	MFS_OPT("mfslimitarenas=%u", limitarenas, 0),
 #endif
-#if defined(__linux__) && defined(OOM_DISABLE)
+#if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	MFS_OPT("mfsoomdisable=%u", oomdisable, 0),
 #endif
 	MFS_OPT("mfswritecachesize=%u", writecachesize, 0),
@@ -361,7 +364,7 @@ static void usage(const char *progname) {
 #ifdef MFS_USE_MALLOPT
 	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 2)\n");
 #endif
-#if defined(__linux__) && defined(OOM_DISABLE)
+#if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	fprintf(stderr,"    -o mfsoomdisable=N          disable out of memory killer (default: 1)\n");
 #endif
 	fprintf(stderr,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)\n");
@@ -790,13 +793,28 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	}
 #endif /* glibc malloc tuning */
 
-#if defined(__linux__) && defined(OOM_DISABLE)
+#if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	if (mfsopts.oomdisable) {
 		FILE *fd;
+		int dis;
+		dis = 0;
+#if defined(OOM_DISABLE)
 		fd = fopen("/proc/self/oom_adj","w");
 		if (fd!=NULL) {
-			fprintf(fd,"%u\n",OOM_DISABLE);
+			fprintf(fd,"%d\n",OOM_DISABLE);
 			fclose(fd);
+			dis = 1;
+		}
+#endif
+#if defined(OOM_SCORE_ADJ_MIN)
+		fd = fopen("/proc/self/oom_score_adj","w");
+		if (fd!=NULL) {
+			fprintf(fd,"%d\n",OOM_SCORE_ADJ_MIN);
+			fclose(fd);
+			dis = 1;
+		}
+#endif
+		if (dis) {
 			syslog(LOG_NOTICE,"out of memory killer disabled");
 		} else {
 			syslog(LOG_NOTICE,"can't disable out of memory killer");

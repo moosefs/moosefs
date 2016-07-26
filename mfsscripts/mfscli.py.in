@@ -5517,7 +5517,7 @@ if "MS" in sectionset and leaderfound:
 				out.append("""		<th>cmd</th>""")
 				out.append("""	</tr>""")
 			elif ttymode:
-				tabcols = (19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
+				tabcols = (20 if masterconn.version_at_least(3,0,72) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
 				tab.append(("---","",tabcols))
 				tab.append(("Inactive mounts (parameters)","1c",tabcols))
 				tab.append(("---","",tabcols))
@@ -5541,7 +5541,7 @@ if "MS" in sectionset and leaderfound:
 				out.append("""		<td align="center"><a href="%s">click to remove</a></td>""" % createlink({"MSremove":("%u" % (sessionid))}))
 				out.append("""	</tr>""")
 			elif ttymode:
-				tabcols = (19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
+				tabcols = (20 if masterconn.version_at_least(3,0,72) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
 				dline = [sessionid,host,info,openfiles,expire,("%s -H %s -P %u -CRS/%u" % (sys.argv[0],masterhost,masterport,sessionid),"l",tabcols-5)]
 				tab.append(*dline)
 			else:

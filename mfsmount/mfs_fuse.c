@@ -3958,15 +3958,16 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 		fld->owner = owner;
 		fld->refs = 1;
 		fuse_req_interrupt_func(req,mfs_flock_interrupt,fld);
+		if (fuse_req_interrupted(req)==0) {
+			status = fs_flock(ino,reqid,owner,lock_mode);
+			status = mfs_errorconv(status);
+		} else {
+			status = EINTR;
+		}
 	} else {
-		fld = NULL;
-	}
-// flock code
-	if (fuse_req_interrupted(req)==0) {
 		status = fs_flock(ino,reqid,owner,lock_mode);
 		status = mfs_errorconv(status);
-	} else {
-		status = EINTR;
+		fld = NULL;
 	}
 	if (status==0) {
 		oplog_printf(&ctx,"flock (%"PRIu32",%lu,%016"PRIX64",%s): OK",reqid,(unsigned long int)ino,owner,lock_mode_str);
@@ -4221,8 +4222,14 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	}
 	if (type==POSIX_LOCK_UNLCK) {
 		mfs_do_fsync(fileinfo);
-	}
-	if (sl) {
+		status = fs_posixlock(ino,reqid,owner,POSIX_LOCK_CMD_SET,POSIX_LOCK_UNLCK,start,end,pid,NULL,NULL,NULL,NULL);
+		status = mfs_errorconv(status);
+		pld = NULL;
+	} else if (sl==0) {
+		status = fs_posixlock(ino,reqid,owner,POSIX_LOCK_CMD_TRY,type,start,end,pid,NULL,NULL,NULL,NULL);
+		status = mfs_errorconv(status);
+		pld = NULL;
+	} else {
 		pld = malloc(sizeof(plock_data));
 		passert(pld);
 		pld->reqid = reqid;
@@ -4233,14 +4240,12 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 		pld->ctype = ctype;
 		pld->refs = 1;
 		fuse_req_interrupt_func(req,mfs_plock_interrupt,pld);
-	} else {
-		pld = NULL;
-	}
-	if (fuse_req_interrupted(req)==0) {
-		status = fs_posixlock(ino,reqid,owner,sl?POSIX_LOCK_CMD_SET:POSIX_LOCK_CMD_TRY,type,start,end,pid,NULL,NULL,NULL,NULL);
-		status = mfs_errorconv(status);
-	} else {
-		status = EINTR;
+		if (fuse_req_interrupted(req)==0) {
+			status = fs_posixlock(ino,reqid,owner,POSIX_LOCK_CMD_SET,type,start,end,pid,NULL,NULL,NULL,NULL);
+			status = mfs_errorconv(status);
+		} else {
+			status = EINTR;
+		}
 	}
 	if (status==0) {
 		oplog_printf(&ctx,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c): OK",cmdname,(unsigned long int)ino,owner,start,end,ctype);

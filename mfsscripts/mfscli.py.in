@@ -284,31 +284,31 @@ else: # CLI mode
 	ccchartslist = [
 			('ucpu',0,0,'User cpu usage'),
 			('scpu',1,0,'System cpu usage'),
-			('masterin',2,1,'Data received from master'),     #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-			('masterout',3,1,'Data sent to master'),    #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-			('csrepin',4,1,'Data received by replicator'),      #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-			('csrepout',5,1,'Data sent by replicator'),     #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-			('csservin',6,1,'Data received by csserv'),     #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-			('csservout',7,1,'Data sent by csserv'),    #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-			('hdrbytesr',8,5,'Bytes read (headers)'),       #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
-			('hdrbytesw',9,5,'Bytes written (headers)'),       #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
-			('hdrllopr',10,1,'Low level reads (headers)'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-			('hdrllopw',11,1,'Low level writes (headers)'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-			('databytesr',12,5,'Bytes read (data)'),   #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
-			('databytesw',13,5,'Bytes written (data)'),   #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
-			('datallopr',14,1,'Low level reads (data)'),    #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-			('datallopw',15,1,'Low level writes (data)'),    #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-			('hlopr',16,1,'High level reads'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-			('hlopw',17,1,'High level writes'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-			('rtime',18,4,'Read time'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MICRO,   1,60}, \
-			('wtime',19,4,'Write time'),        #,CHARTS_MODE_ADD,0,CHARTS_SCALE_MICRO,   1,60}, \
+			('masterin',2,1,'Data received from master'),
+			('masterout',3,1,'Data sent to master'),
+			('csrepin',4,1,'Data received by replicator'),
+			('csrepout',5,1,'Data sent by replicator'),
+			('csservin',6,1,'Data received by csserv'),
+			('csservout',7,1,'Data sent by csserv'),
+			('hdrbytesr',8,5,'Bytes read (headers)'),
+			('hdrbytesw',9,5,'Bytes written (headers)'),
+			('hdrllopr',10,1,'Low level reads (headers)'),
+			('hdrllopw',11,1,'Low level writes (headers)'),
+			('databytesr',12,5,'Bytes read (data)'),
+			('databytesw',13,5,'Bytes written (data)'),
+			('datallopr',14,1,'Low level reads (data)'),
+			('datallopw',15,1,'Low level writes (data)'),
+			('hlopr',16,1,'High level reads'),
+			('hlopw',17,1,'High level writes'),
+			('rtime',18,4,'Read time'),
+			('wtime',19,4,'Write time'),
 			('repl',20,1,'Replicate chunk ops'),
 			('create',21,1,'Create chunk ops'),
 			('delete',22,1,'Delete chunk ops'),
 			('version',23,1,'Set version ops'),
 			('duplicate',24,1,'Duplicate ops'),
 			('truncate',25,1,'Truncate ops'),
-			('duptrunc',26,1,'Duplicate+truncate ops'),
+			('duptrunc',26,1,'Duptrunc (duplicate+truncate) ops'),
 			('test',27,1,'Test chunk ops'),
 			('load',28,3,'Server load'),
 			('memoryrss',29,2,'Resident memory usage'),

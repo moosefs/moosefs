@@ -1,12 +1,12 @@
 # Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
 # $FreeBSD$
 
-PORTNAME=		moosefs
+PORTNAME=		moosefs3
 PORTVERSION=		0.0.0
 CATEGORIES=		sysutils
 MASTER_SITES=		http://ppa.moosefs.com/src/
 PKGNAMESUFFIX?=		-master
-DISTNAME=		${PORTNAME}-${PORTVERSION}-1
+DISTNAME=		moosefs-${PORTVERSION}-1
 
 MAINTAINER=		freebsd@moosefs.com
 COMMENT?=		Fault-tolerant distributed filesystem
@@ -15,7 +15,7 @@ LICENSE=		GPLv2
 
 USES=			python:build
 GNU_CONFIGURE=		yes
-WRKSRC=			${WRKDIR}/${PORTNAME}-${PORTVERSION}
+WRKSRC=			${WRKDIR}/moosefs-${PORTVERSION}
 PLIST=			${.CURDIR}/pkg-plist
 DESCR=			${.CURDIR}/pkg-descr
 
@@ -30,6 +30,8 @@ GROUPS=			${MFS_GROUP}
 CONFIGURE_ARGS+=	--localstatedir=${MFS_WORKDIR} \
 			--with-default-user=${MFS_USER} \
 			--with-default-group=${MFS_GROUP}
+
+CONFLICTS=		moosefs2-${MFS_COMPONENT}-*
 
 .if ${MFS_COMPONENT} == cgi
 MFS_CGIDIR=		${PREFIX}/share/mfscgi
@@ -49,7 +51,7 @@ PKGMESSAGE=		${WRKDIR}/pkg-message-cgiserv
 PLIST_SUB+=		MFS_WORKDIR="${MFS_WORKDIR}"
 CONFIGURE_ARGS+=	--enable-mfscgiserv \
 			--with-mfscgiserv-dir=${MFS_CGISERVDIR}
-RUN_DEPENDS=		moosefs-cgi>0:sysutils/moosefs-cgi
+RUN_DEPENDS=		moosefs3-cgi>0:sysutils/moosefs3-cgi
 .else
 CONFIGURE_ARGS+=	--disable-mfscgiserv
 .endif

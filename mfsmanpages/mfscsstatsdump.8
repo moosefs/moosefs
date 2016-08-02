@@ -2,26 +2,30 @@
 .SH NAME
 mfscsstatsdump \- dump usage data from chunkserver stats file in csv or png format
 .SH SYNOPSIS
-.B mfsstatsdump 
-[\fB-i\fP \fIstats_file\fP] [\fB-r\fP \fIrange\fP] [\fB-f\fP \fIfields\fP] [\fB-s\fP \fIseparator\fP] [\fB-p\fP \fIpng_filename\fP [\fB-x\fP \fIchart_width\fP] [\fB-y\fP \fIchart_height\fP]] [\fB-hHd\fP]
-.PP
 .B mfscsstatsdump 
-[\fB-i\fP \fIstats_file\fP] [\fB-r\fP \fIrange\fP] [\fB-f\fP \fIfields\fP] [\fB-s\fP \fIseparator\fP] [\fB-p\fP \fIpng_filename\fP [\fB-x\fI \fIchart_width\fP] [\fB-y\fP \fIchart_height\fP]] [\fB-hHd\fP]
+\fB-f\fP \fIfields\fP [\fB-i\fP \fIstats_file\fP] [\fB-r\fP \fIrange\fP][\fB-s\fP \fIseparator\fP] [\fB-p\fP \fIpng_filename\fP [\fB-x\fI \fIchart_width\fP] [\fB-y\fP \fIchart_height\fP]] [\fB-hHd\fP]
 .SH DESCRIPTION
-\fBmfsstatsdump\fP and \fBmfscsstatsdump\fP sruty tuty
+\fBmfscsstatsdump\fP dumps usage data from chunkserver stats file.
+These are the same data sets that are used to make CGI charts. Output can be either in text format (csv)
+or in graphical format (png). That means \fB-p\fP, \fB-x\fP and \fB-y\fP options are mutually exlusive with
+\fB-h\fP, \fB-H\fP and \fB-d\fP options.
 .PP
-ala ma kota
-
+MooseFS chunkserver saves the stats file in the \fBDATA_PATH\fP directory - see 
+.BR mfschunkserver.cfg (5)
 .SH OPTIONS
 .TP
+\fB-f\fP
+field names separated by ',' (see FIELDS section); at least one field is mandatory; if an asterisk (*) is used,
+all fields are dumped
+.TP
 \fB-i\fP
-name of mfs binary stats file (default: stats.mfs)
+name of mfs binary stats file (default: \fIdefault_data_path\fP/csstats.mfs)
 .TP
 \fB-r\fP
-range type (see below)
-.TP
-\fB-f\fP
-field names separated by ','
+range type: 0 - short range (minute)
+1 - medium range (6 minutes)
+2 - long range (30 minutes)
+3 - very long range (day)
 .TP
 \fB-s\fP
 specify column separator (default: tabulator)
@@ -43,6 +47,132 @@ PNG chart height (should be divisible by 20 - if not then it will be adjusted; d
 .TP
 \fB-d\fP
 show timestamps in YYYY-MM-DD HH:MM format
+.SH FIELDS
+.TP 14
+ucpu
+User cpu usage
+.TP
+scpu
+System cpu usage
+.TP
+cpu
+Total cpu usage (in csv sum of scpu and ucpu, in png shows both in different colors)
+.TP
+masterin
+Data received from master
+.TP
+masterout
+Data sent to master
+.TP
+csrepin
+Data received by replicator
+.TP
+csrepout
+Data sent by replicator
+.TP
+csservin
+Data received by csserv
+.TP
+csservout
+Data sent by csserv
+.TP
+bwin
+Data bandwidth in (in csv sum of csrepin and csservin, in png shows both in different colors)
+.TP
+bwout
+Data bandwidth out (in csv sum of csrepout and csservout, in png shows both in different colors)
+.TP
+hdrbytesr
+Bytes read (headers)
+.TP
+hdrbytesw
+Bytes written (headers)
+.TP
+hdrllopr
+Low level reads (headers)
+.TP
+hdrllopw
+Low level writes (headers)
+.TP
+databytesr
+Bytes read (data)
+.TP
+databytesw
+Bytes written (data)
+.TP
+datallopr
+Low level reads (data)
+.TP
+datallopw
+Low level writes (data)
+.TP
+hddread
+HDD read (in csv sum of hdrbytesr and databytesr, in png shows both in different colors)
+.TP
+hddwrite
+HDD write (in csv sum of hdrbytesw and databytesw, in png shows both in different colors)
+.TP
+hddopsr
+HDD low level read (in csv sum of hdrllopr and datallopr, in png shows both in different colors)
+.TP
+hddopsw
+HDD low level write (in csv sum of hdrllopw and datallopw, in png shows both in different colors)
+.TP
+hlopr
+High level reads
+.TP
+hlopw
+High level writes
+.TP
+rtime
+Read time
+.TP
+wtime
+Write time
+.TP
+repl
+Replicate chunk ops
+.TP
+create
+Create chunk ops
+.TP
+delete
+Delete chunk ops
+.TP
+version
+Set version ops
+.TP
+duplicate
+Duplicate ops
+.TP
+truncate
+Truncate ops
+.TP
+duptrunc
+Duptrunc (duplicate+truncate) ops
+.TP
+test
+Test chunk ops
+.TP
+load
+Server load
+.TP
+memoryrss
+Resident memory usage
+.TP
+memoryvirt
+Virtual memory usage
+.TP
+mem
+Total memory usage (in csv is the same as memoryvirt, in png shows both memoryrss and memoryvirt using two colors)
+.SH OUTPUT
+Text output - text (csv) file where first column is a timestamp (or date if \fB-d\fP option
+was specified), the following column are what was specified with the \fB-f\fP options, formatted
+according to used options (none, \fB-s\fP and \fB-h\fP or \fB-H\fP)
+.PP
+Graphical output - one png file with a chart is created for every
+field specified with the \fB-f\fP option, according to the naming scheme declared
+with the \fB-p\fP option. Size may be adjusted with \fB-x\fP and \fB-y\fP options.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

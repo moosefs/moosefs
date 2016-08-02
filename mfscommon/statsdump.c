@@ -52,10 +52,10 @@ static const estatdef estatdefs[]=ESTATDEFS
 
 void usage(const char *appname) {
 	uint32_t i,j;
-	fprintf(stderr,"usage: %s [-i stats_file] [-r range] [-f fields] [-s separator] [-p png_filename [-x chart_width] [-y chart_height]] [-hHd]\n",appname);
-	fprintf(stderr,"\t-i - name of mfs binary stats file (default:stats.mfs)\n");
-	fprintf(stderr,"\t-r - range type (see below)\n");
+	fprintf(stderr,"usage: %s -f fields [-i stats_file] [-r range] [-s separator] [-p png_filename [-x chart_width] [-y chart_height]] [-hHd]\n",appname);
 	fprintf(stderr,"\t-f - field names separated by ',' or '*' for all fields\n");
+	fprintf(stderr,"\t-i - name of mfs binary stats file (default:%s/%s)\n",DATA_PATH,CHARTS_FILENAME);
+	fprintf(stderr,"\t-r - range type (see below)\n");
 	fprintf(stderr,"\t-s - specify column separator (default: tabulator)\n");
 	fprintf(stderr,"\t-p - optional PNG filename (field name will be added before .png ; YYYY -> YYYY_FIELD.png , YYYY.png -> YYYY_FIELD.png)\n");
 	fprintf(stderr,"\t-x - PNG chart width (default: 1600)\n");
@@ -548,7 +548,7 @@ int main (int argc,char **argv) {
 		goto err;
 	}
 	if (ifile==NULL) {
-		ifile = strdup(CHARTS_FILENAME);
+		ifile = strdup(DATA_PATH "/" CHARTS_FILENAME);
 	}
 	mycrc32_init();
 	strerr_init();

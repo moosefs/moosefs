@@ -3,26 +3,29 @@
 mfsstatsdump \- dump usage data from master stats file in csv or png format
 .SH SYNOPSIS
 .B mfsstatsdump
-[\fB-i\fP \fIstats_file\fP] [\fB-r\fP \fIrange\fP] [\fB-f\fP \fIfields\fP] [\fB-s\fP \fIseparator\fP] [\fB-p\fP \fIpng_filename\fP [\fB-x\fP \fIchart_width\fP] [\fB-y\fP \fIchart_height\fP]] [\fB-hHd\fP]
+\fB-f\fP \fIfields\fP [\fB-i\fP \fIstats_file\fP] [\fB-r\fP \fIrange\fP] [\fB-s\fP \fIseparator\fP] [\fB-p\fP \fIpng_filename\fP [\fB-x\fP \fIchart_width\fP] [\fB-y\fP \fIchart_height\fP]] [\fB-hHd\fP]
 .SH DESCRIPTION
 \fBmfsstatsdump\fP dumps usage data from master stats file.
-These are the same data that are used to make CGI charts. Output can be either in text format (csv)
+These are the same data sets that are used to make CGI charts. Output can be either in text format (csv)
 or in graphical format (png). That means \fB-p\fP, \fB-x\fP and \fB-y\fP options are mutually exlusive with
 \fB-h\fP, \fB-H\fP and \fB-d\fP options.
+.PP
+MooseFS master server saves the stats file in the \fBDATA_PATH\fP directory - see 
+.BR mfsmaster.cfg (5)
 .SH OPTIONS
 .TP
+\fB-f\fP
+field names separated by ',' (see FIELDS section); at least one field is mandatory; if an asterisk (*) is used,
+all fields are dumped
+.TP
 \fB-i\fP
-name of mfs binary stats file (default: stats.mfs)
+name of mfs binary stats file (default: \fIdefault_data_path\fP/stats.mfs)
 .TP
 \fB-r\fP
 range type: 0 - short range (minute)
 1 - medium range (6 minutes)
 2 - long range (30 minutes)
 3 - very long range (day)
-.TP
-\fB-f\fP
-field names separated by ',' (see FIELDS section); at least one field is mandatory; if an asterisk (*) is used,
-all fields are dumped
 .TP
 \fB-s\fP
 specify column separator (default: tabulator)
@@ -51,6 +54,9 @@ User cpu usage
 .TP
 scpu
 System cpu usage
+.TP
+cpu
+Total cpu usage (in csv sum of scpu and ucpu, in png shows both in different colors)
 .TP
 delete
 Number of chunk deletions
@@ -106,9 +112,6 @@ Number of read operations
 write
 Number of write operations
 .TP
-memoryrss
-Resident memory usage
-.TP
 prcvd
 Received packets
 .TP
@@ -121,14 +124,23 @@ Received bytes
 bsent
 Sent bytes
 .TP
+memoryrss
+Resident memory usage
+.TP
 memoryvirt
 Virtual memory usage
 .TP
-cpu
-Total cpu usage (in csv sum of scpu and ucpu, in png show both in different colors)
-.TP
 mem
 Total memory usage (in csv is the same as memoryvirt, in png shows both memoryrss and memoryvirt using two colors)
+.TP
+usedspace
+Used raw disk space
+.TP
+totalspace
+Total raw disk space
+.TP
+space
+Total raw disk space (in csv the same as totalspace, in png shows both usedspace and totalspace using two colors)
 .SH OUTPUT
 Text output - text (csv) file where first column is a timestamp (or date if \fB-d\fP option
 was specified), the following column are what was specified with the \fB-f\fP options, formatted

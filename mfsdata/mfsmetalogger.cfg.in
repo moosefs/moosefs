@@ -14,8 +14,8 @@
 # whether to perform mlockall() to avoid swapping out mfsmetalogger process (default is 0, i.e. no)
 # LOCK_MEMORY = 0
 
-# Linux only: decrease malloc arenas to 8 - prevents server from using huge amount of virtual memory (default is 1)
-# CHANGE_GLIBC_MALLOC_ARENAS = 1
+# Linux only: limit malloc arenas to given value - prevents server from using huge amount of virtual memory (default is 4)
+# LIMIT_GLIBC_MALLOC_ARENAS = 4
 
 # Linux only: disable out of memory killer (default is 1)
 # DISABLE_OOM_KILLER = 1

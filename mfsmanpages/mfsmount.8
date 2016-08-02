@@ -84,6 +84,15 @@ do not remember password in memory - more secure, but when session is lost then 
 \fB\-o mfsdebug\fP
 print some MooseFS-specific debugging information
 .TP
+\fB\-o mfsmemlock\fP
+try to lock memory (all allocated memory will be mapped to physical RAM - which also means no swapping)
+.TP
+\fP\-o allowoomkiller\fP
+do not disable out of memory killer (Linux only)
+.TP
+\fP\-o mfslimitarenas=\fP\fIN\fP
+if N>0 then limit glibc malloc arenas (Linux only - default: 4)
+.TP
 \fB\-o mfsflattrash\fP
 use flat trash structure in meta (option added for compatibility reasons - since version 3.0.64 trash is split into 4096 subfolders which reduces problems with big trashes)
 .TP
@@ -142,11 +151,26 @@ define amount of bytes read sequentially that turns on read ahead (default: 10 *
 \fB\-o mfsioretries=\fP\fIN\fP
 specify number of retiries before I/O error is returned (default: 30)
 .TP
-\fB\-o mfsfsyncbeforeclose\fP
-force fsync before last file close (safer but can be inefficient - especially in case of small files)
+\fB\-o mfstimeout=\fP\fIN\fP
+define maximum timeout in seconds before I/O error is returned (default: 0 - which means no timeout)
+.TP
+\fB\-o mfslogretry=\fP\fIN\fP
+define minimal retry counter on which system will start log I/O messages (default: 5)
+.TP
+\fB\-o mfsfsyncmintime=\fP\fISEC\fP
+force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)
 .TP
 \fB\-o mfspreflabels=\fP\fILABELEXPR\fP
 specify preferred labels for choosing chunkservers during I/O
+.TP
+\fB\-o mfsnoxattrs\fP
+turn off xattr support
+.TP
+\fB\-o mfsnoposixlocks\fP
+turn off support for global posix locks (lockf + ioctl) - locks will work locally
+.TP
+\fB\-o mfsnobsdlocks\fP
+turn off support for global BSD locks (flock) - locks will work locally
 .PP
 General mount options (see \fBmount\fP\|(8) manual):
 .TP

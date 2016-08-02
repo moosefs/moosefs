@@ -1148,6 +1148,9 @@ int main(int argc,char **argv) {
 	uint8_t movewarning;
 	uint8_t userconfig;
 	struct rlimit rls;
+#if defined(USE_PTHREADS) && defined(M_ARENA_MAX) && defined(M_ARENA_TEST) && defined(HAVE_MALLOPT)
+	uint32_t limit_glibc_arenas;
+#endif
 
 	strerr_init();
 	mycrc32_init();
@@ -1409,14 +1412,15 @@ int main(int argc,char **argv) {
 
 /* glibc malloc tuning */
 #if defined(USE_PTHREADS) && defined(M_ARENA_MAX) && defined(M_ARENA_TEST) && defined(HAVE_MALLOPT)
-	if (cfg_getuint8("CHANGE_GLIBC_MALLOC_ARENAS",1)==1) {
+	limit_glibc_arenas = cfg_getuint8("LIMIT_GLIBC_MALLOC_ARENAS",4);
+	if (limit_glibc_arenas) {
 		if (!getenv("MALLOC_ARENA_MAX")) {
-			mfs_syslog(LOG_NOTICE,"setting glibc malloc arena max to 8");
-			mallopt(M_ARENA_MAX, 8);
+			mfs_arg_syslog(LOG_NOTICE,"setting glibc malloc arena max to %"PRIu32,limit_glibc_arenas);
+			mallopt(M_ARENA_MAX, limit_glibc_arenas);
 		}
 		if (!getenv("MALLOC_ARENA_TEST")) {
-			mfs_syslog(LOG_NOTICE,"setting glibc malloc arena test to 1");
-			mallopt(M_ARENA_TEST, 1);
+			mfs_arg_syslog(LOG_NOTICE,"setting glibc malloc arena test to %"PRIu32,limit_glibc_arenas);
+			mallopt(M_ARENA_TEST, limit_glibc_arenas);
 		}
 	} else {
 		mfs_syslog(LOG_NOTICE,"setting glibc malloc arenas turned off");

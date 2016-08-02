@@ -174,7 +174,7 @@ struct mfsopts {
 	int limitarenas;
 #endif
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
-	int oomdisable;
+	int allowoomkiller;
 #endif
 	int nostdmountoptions;
 	int meta;
@@ -255,7 +255,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfslimitarenas=%u", limitarenas, 0),
 #endif
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
-	MFS_OPT("mfsoomdisable=%u", oomdisable, 0),
+	MFS_OPT("mfsallowoomkiller", allowoomkiller, 1),
 #endif
 	MFS_OPT("mfswritecachesize=%u", writecachesize, 0),
 	MFS_OPT("mfsreadaheadsize=%u", readaheadsize, 0),
@@ -362,10 +362,10 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfsmemlock               try to lock memory\n");
 #endif
 #ifdef MFS_USE_MALLOPT
-	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 2)\n");
+	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 4)\n");
 #endif
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
-	fprintf(stderr,"    -o mfsoomdisable=N          disable out of memory killer (default: 1)\n");
+	fprintf(stderr,"    -o mfsallowoomkiller        do not disable out of memory killer\n");
 #endif
 	fprintf(stderr,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)\n");
 	fprintf(stderr,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
@@ -785,8 +785,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 			mallopt(M_ARENA_MAX, mfsopts.limitarenas);
 		}
 		if (!getenv("MALLOC_ARENA_TEST")) {
-			syslog(LOG_NOTICE,"setting glibc malloc arena test to 1");
-			mallopt(M_ARENA_TEST, 1);
+			syslog(LOG_NOTICE,"setting glibc malloc arena test to %u",mfsopts.limitarenas);
+			mallopt(M_ARENA_TEST, mfsopts.limitarenas);
 		}
 	} else {
 		syslog(LOG_NOTICE,"setting glibc malloc arenas turned off");
@@ -794,7 +794,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 #endif /* glibc malloc tuning */
 
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
-	if (mfsopts.oomdisable) {
+	if (mfsopts.allowoomkiller==0) {
 		FILE *fd;
 		int dis;
 		dis = 0;
@@ -1173,10 +1173,10 @@ int main(int argc, char *argv[]) {
 	mfsopts.memlock = 0;
 #endif
 #ifdef MFS_USE_MALLOPT
-	mfsopts.limitarenas = 2;
+	mfsopts.limitarenas = 4;
 #endif
 #if defined(__linux__) && defined(OOM_DISABLE)
-	mfsopts.oomdisable = 1;
+	mfsopts.allowoomkiller = 0;
 #endif
 	mfsopts.nostdmountoptions = 0;
 	mfsopts.meta = 0;

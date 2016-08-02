@@ -1,7 +1,8 @@
 sbin_PROGRAMS=mfsmetalogger
 
-AM_CPPFLAGS=-I$(top_srcdir)/mfscommon -DAPPNAME=mfsmetalogger
-AM_LDFLAGS=$(ZLIB_LIBS)
+AM_CPPFLAGS=-I$(top_srcdir)/mfscommon
+AM_LDFLAGS=
+AM_CFLAGS=
 
 mfsmetalogger_SOURCES= \
 	masterconn.c masterconn.h \
@@ -16,8 +17,10 @@ mfsmetalogger_SOURCES= \
 	../mfscommon/slogger.h ../mfscommon/mfsalloc.h \
 	../mfscommon/MFSCommunication.h
 
+mfsmetalogger_LDFLAGS=$(ZLIB_LIBS)
+
+mfsmetalogger_CPPFLAGS=$(AM_CPPFLAGS) -DAPPNAME=mfsmetalogger
+
 distclean:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
-
-mfsmetalogger_CFLAGS=

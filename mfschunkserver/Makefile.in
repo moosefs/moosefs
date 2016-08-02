@@ -136,20 +136,21 @@ am__v_lt_0 = --silent
 am__v_lt_1 = 
 mfschunkserver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
-	$(mfschunkserver_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
-	$@
-am_mfschunktool_OBJECTS = mfschunktool-mfschunktool.$(OBJEXT) \
-	../mfscommon/mfschunktool-crc.$(OBJEXT)
+	$(mfschunkserver_CFLAGS) $(CFLAGS) $(mfschunkserver_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_mfschunktool_OBJECTS = mfschunktool.$(OBJEXT) \
+	../mfscommon/crc.$(OBJEXT)
 mfschunktool_OBJECTS = $(am_mfschunktool_OBJECTS)
 mfschunktool_LDADD = $(LDADD)
-mfschunktool_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(mfschunktool_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_mfscsstatsdump_OBJECTS = ../mfscommon/statsdump.$(OBJEXT) \
 	../mfscommon/strerr.$(OBJEXT) ../mfscommon/crc.$(OBJEXT) \
 	../mfscommon/charts.$(OBJEXT)
 mfscsstatsdump_OBJECTS = $(am_mfscsstatsdump_OBJECTS)
 mfscsstatsdump_LDADD = $(LDADD)
+mfscsstatsdump_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(AM_CFLAGS) $(CFLAGS) $(mfscsstatsdump_LDFLAGS) $(LDFLAGS) -o \
+	$@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -376,8 +377,9 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/mfscommon -DMFSMAXFILES=16384 -D_USE_PTHREADS $(PTHREAD_CPPFLAGS) -DAPPNAME=mfschunkserver -DUSE_CONNCACHE
-AM_LDFLAGS = $(PTHREAD_LIBS) $(ZLIB_LIBS)
+AM_CFLAGS = 
+AM_CPPFLAGS = -I$(top_srcdir)/mfscommon
+AM_LDFLAGS = 
 mfscsstatsdump_SOURCES = \
 	chartsdefs.h \
 	../mfscommon/statsdump.c \
@@ -385,6 +387,7 @@ mfscsstatsdump_SOURCES = \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/charts.c ../mfscommon/charts.h
 
+mfscsstatsdump_LDFLAGS = $(ZLIB_LIBS)
 mfschunkserver_SOURCES = \
 	bgjobs.c bgjobs.h \
 	csserv.c csserv.h \
@@ -414,14 +417,15 @@ mfschunkserver_SOURCES = \
 	../mfscommon/portable.h ../mfscommon/mfsalloc.h \
 	../mfscommon/MFSCommunication.h
 
+mfschunkserver_CFLAGS = $(PTHREAD_CFLAGS)
+mfschunkserver_CPPFLAGS = $(AM_CPPFLAGS) -DMFSMAXFILES=16384 -D_USE_PTHREADS $(PTHREAD_CPPFLAGS) -DAPPNAME=mfschunkserver -DUSE_CONNCACHE
+mfschunkserver_LDFLAGS = $(PTHREAD_LIBS) $(ZLIB_LIBS)
 mfschunktool_SOURCES = \
 	mfschunktool.c \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/datapack.h \
 	../mfscommon/MFSCommunication.h
 
-mfschunktool_CFLAGS = 
-mfschunkserver_CFLAGS = $(PTHREAD_CFLAGS)
 all: all-am
 
 .SUFFIXES:
@@ -556,24 +560,22 @@ clean-sbinPROGRAMS:
 mfschunkserver$(EXEEXT): $(mfschunkserver_OBJECTS) $(mfschunkserver_DEPENDENCIES) $(EXTRA_mfschunkserver_DEPENDENCIES) 
 	@rm -f mfschunkserver$(EXEEXT)
 	$(AM_V_CCLD)$(mfschunkserver_LINK) $(mfschunkserver_OBJECTS) $(mfschunkserver_LDADD) $(LIBS)
-../mfscommon/mfschunktool-crc.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+../mfscommon/crc.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 
 mfschunktool$(EXEEXT): $(mfschunktool_OBJECTS) $(mfschunktool_DEPENDENCIES) $(EXTRA_mfschunktool_DEPENDENCIES) 
 	@rm -f mfschunktool$(EXEEXT)
-	$(AM_V_CCLD)$(mfschunktool_LINK) $(mfschunktool_OBJECTS) $(mfschunktool_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(mfschunktool_OBJECTS) $(mfschunktool_LDADD) $(LIBS)
 ../mfscommon/statsdump.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/strerr.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
-	../mfscommon/$(DEPDIR)/$(am__dirstamp)
-../mfscommon/crc.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/charts.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 
 mfscsstatsdump$(EXEEXT): $(mfscsstatsdump_OBJECTS) $(mfscsstatsdump_DEPENDENCIES) $(EXTRA_mfscsstatsdump_DEPENDENCIES) 
 	@rm -f mfscsstatsdump$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(mfscsstatsdump_OBJECTS) $(mfscsstatsdump_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(mfscsstatsdump_LINK) $(mfscsstatsdump_OBJECTS) $(mfscsstatsdump_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -598,7 +600,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-random.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunktool-crc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/statsdump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfschunkserver-bgjobs.Po@am__quote@
@@ -608,7 +609,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfschunkserver-mainserv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfschunkserver-masterconn.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfschunkserver-replicator.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfschunktool-mfschunktool.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfschunktool.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -635,326 +636,298 @@ distclean-compile:
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
 mfschunkserver-bgjobs.o: bgjobs.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-bgjobs.o -MD -MP -MF $(DEPDIR)/mfschunkserver-bgjobs.Tpo -c -o mfschunkserver-bgjobs.o `test -f 'bgjobs.c' || echo '$(srcdir)/'`bgjobs.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-bgjobs.o -MD -MP -MF $(DEPDIR)/mfschunkserver-bgjobs.Tpo -c -o mfschunkserver-bgjobs.o `test -f 'bgjobs.c' || echo '$(srcdir)/'`bgjobs.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-bgjobs.Tpo $(DEPDIR)/mfschunkserver-bgjobs.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bgjobs.c' object='mfschunkserver-bgjobs.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-bgjobs.o `test -f 'bgjobs.c' || echo '$(srcdir)/'`bgjobs.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-bgjobs.o `test -f 'bgjobs.c' || echo '$(srcdir)/'`bgjobs.c
 
 mfschunkserver-bgjobs.obj: bgjobs.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-bgjobs.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-bgjobs.Tpo -c -o mfschunkserver-bgjobs.obj `if test -f 'bgjobs.c'; then $(CYGPATH_W) 'bgjobs.c'; else $(CYGPATH_W) '$(srcdir)/bgjobs.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-bgjobs.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-bgjobs.Tpo -c -o mfschunkserver-bgjobs.obj `if test -f 'bgjobs.c'; then $(CYGPATH_W) 'bgjobs.c'; else $(CYGPATH_W) '$(srcdir)/bgjobs.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-bgjobs.Tpo $(DEPDIR)/mfschunkserver-bgjobs.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bgjobs.c' object='mfschunkserver-bgjobs.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-bgjobs.obj `if test -f 'bgjobs.c'; then $(CYGPATH_W) 'bgjobs.c'; else $(CYGPATH_W) '$(srcdir)/bgjobs.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-bgjobs.obj `if test -f 'bgjobs.c'; then $(CYGPATH_W) 'bgjobs.c'; else $(CYGPATH_W) '$(srcdir)/bgjobs.c'; fi`
 
 mfschunkserver-csserv.o: csserv.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-csserv.o -MD -MP -MF $(DEPDIR)/mfschunkserver-csserv.Tpo -c -o mfschunkserver-csserv.o `test -f 'csserv.c' || echo '$(srcdir)/'`csserv.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-csserv.o -MD -MP -MF $(DEPDIR)/mfschunkserver-csserv.Tpo -c -o mfschunkserver-csserv.o `test -f 'csserv.c' || echo '$(srcdir)/'`csserv.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-csserv.Tpo $(DEPDIR)/mfschunkserver-csserv.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='csserv.c' object='mfschunkserver-csserv.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-csserv.o `test -f 'csserv.c' || echo '$(srcdir)/'`csserv.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-csserv.o `test -f 'csserv.c' || echo '$(srcdir)/'`csserv.c
 
 mfschunkserver-csserv.obj: csserv.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-csserv.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-csserv.Tpo -c -o mfschunkserver-csserv.obj `if test -f 'csserv.c'; then $(CYGPATH_W) 'csserv.c'; else $(CYGPATH_W) '$(srcdir)/csserv.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-csserv.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-csserv.Tpo -c -o mfschunkserver-csserv.obj `if test -f 'csserv.c'; then $(CYGPATH_W) 'csserv.c'; else $(CYGPATH_W) '$(srcdir)/csserv.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-csserv.Tpo $(DEPDIR)/mfschunkserver-csserv.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='csserv.c' object='mfschunkserver-csserv.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-csserv.obj `if test -f 'csserv.c'; then $(CYGPATH_W) 'csserv.c'; else $(CYGPATH_W) '$(srcdir)/csserv.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-csserv.obj `if test -f 'csserv.c'; then $(CYGPATH_W) 'csserv.c'; else $(CYGPATH_W) '$(srcdir)/csserv.c'; fi`
 
 mfschunkserver-mainserv.o: mainserv.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-mainserv.o -MD -MP -MF $(DEPDIR)/mfschunkserver-mainserv.Tpo -c -o mfschunkserver-mainserv.o `test -f 'mainserv.c' || echo '$(srcdir)/'`mainserv.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-mainserv.o -MD -MP -MF $(DEPDIR)/mfschunkserver-mainserv.Tpo -c -o mfschunkserver-mainserv.o `test -f 'mainserv.c' || echo '$(srcdir)/'`mainserv.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-mainserv.Tpo $(DEPDIR)/mfschunkserver-mainserv.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mainserv.c' object='mfschunkserver-mainserv.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-mainserv.o `test -f 'mainserv.c' || echo '$(srcdir)/'`mainserv.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-mainserv.o `test -f 'mainserv.c' || echo '$(srcdir)/'`mainserv.c
 
 mfschunkserver-mainserv.obj: mainserv.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-mainserv.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-mainserv.Tpo -c -o mfschunkserver-mainserv.obj `if test -f 'mainserv.c'; then $(CYGPATH_W) 'mainserv.c'; else $(CYGPATH_W) '$(srcdir)/mainserv.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-mainserv.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-mainserv.Tpo -c -o mfschunkserver-mainserv.obj `if test -f 'mainserv.c'; then $(CYGPATH_W) 'mainserv.c'; else $(CYGPATH_W) '$(srcdir)/mainserv.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-mainserv.Tpo $(DEPDIR)/mfschunkserver-mainserv.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mainserv.c' object='mfschunkserver-mainserv.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-mainserv.obj `if test -f 'mainserv.c'; then $(CYGPATH_W) 'mainserv.c'; else $(CYGPATH_W) '$(srcdir)/mainserv.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-mainserv.obj `if test -f 'mainserv.c'; then $(CYGPATH_W) 'mainserv.c'; else $(CYGPATH_W) '$(srcdir)/mainserv.c'; fi`
 
 mfschunkserver-hddspacemgr.o: hddspacemgr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-hddspacemgr.o -MD -MP -MF $(DEPDIR)/mfschunkserver-hddspacemgr.Tpo -c -o mfschunkserver-hddspacemgr.o `test -f 'hddspacemgr.c' || echo '$(srcdir)/'`hddspacemgr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-hddspacemgr.o -MD -MP -MF $(DEPDIR)/mfschunkserver-hddspacemgr.Tpo -c -o mfschunkserver-hddspacemgr.o `test -f 'hddspacemgr.c' || echo '$(srcdir)/'`hddspacemgr.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-hddspacemgr.Tpo $(DEPDIR)/mfschunkserver-hddspacemgr.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hddspacemgr.c' object='mfschunkserver-hddspacemgr.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-hddspacemgr.o `test -f 'hddspacemgr.c' || echo '$(srcdir)/'`hddspacemgr.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-hddspacemgr.o `test -f 'hddspacemgr.c' || echo '$(srcdir)/'`hddspacemgr.c
 
 mfschunkserver-hddspacemgr.obj: hddspacemgr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-hddspacemgr.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-hddspacemgr.Tpo -c -o mfschunkserver-hddspacemgr.obj `if test -f 'hddspacemgr.c'; then $(CYGPATH_W) 'hddspacemgr.c'; else $(CYGPATH_W) '$(srcdir)/hddspacemgr.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-hddspacemgr.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-hddspacemgr.Tpo -c -o mfschunkserver-hddspacemgr.obj `if test -f 'hddspacemgr.c'; then $(CYGPATH_W) 'hddspacemgr.c'; else $(CYGPATH_W) '$(srcdir)/hddspacemgr.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-hddspacemgr.Tpo $(DEPDIR)/mfschunkserver-hddspacemgr.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='hddspacemgr.c' object='mfschunkserver-hddspacemgr.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-hddspacemgr.obj `if test -f 'hddspacemgr.c'; then $(CYGPATH_W) 'hddspacemgr.c'; else $(CYGPATH_W) '$(srcdir)/hddspacemgr.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-hddspacemgr.obj `if test -f 'hddspacemgr.c'; then $(CYGPATH_W) 'hddspacemgr.c'; else $(CYGPATH_W) '$(srcdir)/hddspacemgr.c'; fi`
 
 mfschunkserver-masterconn.o: masterconn.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-masterconn.o -MD -MP -MF $(DEPDIR)/mfschunkserver-masterconn.Tpo -c -o mfschunkserver-masterconn.o `test -f 'masterconn.c' || echo '$(srcdir)/'`masterconn.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-masterconn.o -MD -MP -MF $(DEPDIR)/mfschunkserver-masterconn.Tpo -c -o mfschunkserver-masterconn.o `test -f 'masterconn.c' || echo '$(srcdir)/'`masterconn.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-masterconn.Tpo $(DEPDIR)/mfschunkserver-masterconn.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='masterconn.c' object='mfschunkserver-masterconn.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-masterconn.o `test -f 'masterconn.c' || echo '$(srcdir)/'`masterconn.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-masterconn.o `test -f 'masterconn.c' || echo '$(srcdir)/'`masterconn.c
 
 mfschunkserver-masterconn.obj: masterconn.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-masterconn.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-masterconn.Tpo -c -o mfschunkserver-masterconn.obj `if test -f 'masterconn.c'; then $(CYGPATH_W) 'masterconn.c'; else $(CYGPATH_W) '$(srcdir)/masterconn.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-masterconn.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-masterconn.Tpo -c -o mfschunkserver-masterconn.obj `if test -f 'masterconn.c'; then $(CYGPATH_W) 'masterconn.c'; else $(CYGPATH_W) '$(srcdir)/masterconn.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-masterconn.Tpo $(DEPDIR)/mfschunkserver-masterconn.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='masterconn.c' object='mfschunkserver-masterconn.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-masterconn.obj `if test -f 'masterconn.c'; then $(CYGPATH_W) 'masterconn.c'; else $(CYGPATH_W) '$(srcdir)/masterconn.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-masterconn.obj `if test -f 'masterconn.c'; then $(CYGPATH_W) 'masterconn.c'; else $(CYGPATH_W) '$(srcdir)/masterconn.c'; fi`
 
 mfschunkserver-replicator.o: replicator.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-replicator.o -MD -MP -MF $(DEPDIR)/mfschunkserver-replicator.Tpo -c -o mfschunkserver-replicator.o `test -f 'replicator.c' || echo '$(srcdir)/'`replicator.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-replicator.o -MD -MP -MF $(DEPDIR)/mfschunkserver-replicator.Tpo -c -o mfschunkserver-replicator.o `test -f 'replicator.c' || echo '$(srcdir)/'`replicator.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-replicator.Tpo $(DEPDIR)/mfschunkserver-replicator.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='replicator.c' object='mfschunkserver-replicator.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-replicator.o `test -f 'replicator.c' || echo '$(srcdir)/'`replicator.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-replicator.o `test -f 'replicator.c' || echo '$(srcdir)/'`replicator.c
 
 mfschunkserver-replicator.obj: replicator.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-replicator.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-replicator.Tpo -c -o mfschunkserver-replicator.obj `if test -f 'replicator.c'; then $(CYGPATH_W) 'replicator.c'; else $(CYGPATH_W) '$(srcdir)/replicator.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-replicator.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-replicator.Tpo -c -o mfschunkserver-replicator.obj `if test -f 'replicator.c'; then $(CYGPATH_W) 'replicator.c'; else $(CYGPATH_W) '$(srcdir)/replicator.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-replicator.Tpo $(DEPDIR)/mfschunkserver-replicator.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='replicator.c' object='mfschunkserver-replicator.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-replicator.obj `if test -f 'replicator.c'; then $(CYGPATH_W) 'replicator.c'; else $(CYGPATH_W) '$(srcdir)/replicator.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-replicator.obj `if test -f 'replicator.c'; then $(CYGPATH_W) 'replicator.c'; else $(CYGPATH_W) '$(srcdir)/replicator.c'; fi`
 
 mfschunkserver-chartsdata.o: chartsdata.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-chartsdata.o -MD -MP -MF $(DEPDIR)/mfschunkserver-chartsdata.Tpo -c -o mfschunkserver-chartsdata.o `test -f 'chartsdata.c' || echo '$(srcdir)/'`chartsdata.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-chartsdata.o -MD -MP -MF $(DEPDIR)/mfschunkserver-chartsdata.Tpo -c -o mfschunkserver-chartsdata.o `test -f 'chartsdata.c' || echo '$(srcdir)/'`chartsdata.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-chartsdata.Tpo $(DEPDIR)/mfschunkserver-chartsdata.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chartsdata.c' object='mfschunkserver-chartsdata.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-chartsdata.o `test -f 'chartsdata.c' || echo '$(srcdir)/'`chartsdata.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-chartsdata.o `test -f 'chartsdata.c' || echo '$(srcdir)/'`chartsdata.c
 
 mfschunkserver-chartsdata.obj: chartsdata.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-chartsdata.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-chartsdata.Tpo -c -o mfschunkserver-chartsdata.obj `if test -f 'chartsdata.c'; then $(CYGPATH_W) 'chartsdata.c'; else $(CYGPATH_W) '$(srcdir)/chartsdata.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT mfschunkserver-chartsdata.obj -MD -MP -MF $(DEPDIR)/mfschunkserver-chartsdata.Tpo -c -o mfschunkserver-chartsdata.obj `if test -f 'chartsdata.c'; then $(CYGPATH_W) 'chartsdata.c'; else $(CYGPATH_W) '$(srcdir)/chartsdata.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunkserver-chartsdata.Tpo $(DEPDIR)/mfschunkserver-chartsdata.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chartsdata.c' object='mfschunkserver-chartsdata.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-chartsdata.obj `if test -f 'chartsdata.c'; then $(CYGPATH_W) 'chartsdata.c'; else $(CYGPATH_W) '$(srcdir)/chartsdata.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o mfschunkserver-chartsdata.obj `if test -f 'chartsdata.c'; then $(CYGPATH_W) 'chartsdata.c'; else $(CYGPATH_W) '$(srcdir)/chartsdata.c'; fi`
 
 ../mfscommon/mfschunkserver-main.o: ../mfscommon/main.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-main.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-main.Tpo -c -o ../mfscommon/mfschunkserver-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-main.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-main.Tpo -c -o ../mfscommon/mfschunkserver-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-main.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-main.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/main.c' object='../mfscommon/mfschunkserver-main.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c
 
 ../mfscommon/mfschunkserver-main.obj: ../mfscommon/main.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-main.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-main.Tpo -c -o ../mfscommon/mfschunkserver-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-main.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-main.Tpo -c -o ../mfscommon/mfschunkserver-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-main.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-main.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/main.c' object='../mfscommon/mfschunkserver-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
 
 ../mfscommon/mfschunkserver-cfg.o: ../mfscommon/cfg.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cfg.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Tpo -c -o ../mfscommon/mfschunkserver-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cfg.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Tpo -c -o ../mfscommon/mfschunkserver-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/cfg.c' object='../mfscommon/mfschunkserver-cfg.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c
 
 ../mfscommon/mfschunkserver-cfg.obj: ../mfscommon/cfg.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cfg.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Tpo -c -o ../mfscommon/mfschunkserver-cfg.obj `if test -f '../mfscommon/cfg.c'; then $(CYGPATH_W) '../mfscommon/cfg.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cfg.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cfg.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Tpo -c -o ../mfscommon/mfschunkserver-cfg.obj `if test -f '../mfscommon/cfg.c'; then $(CYGPATH_W) '../mfscommon/cfg.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cfg.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/cfg.c' object='../mfscommon/mfschunkserver-cfg.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-cfg.obj `if test -f '../mfscommon/cfg.c'; then $(CYGPATH_W) '../mfscommon/cfg.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cfg.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-cfg.obj `if test -f '../mfscommon/cfg.c'; then $(CYGPATH_W) '../mfscommon/cfg.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cfg.c'; fi`
 
 ../mfscommon/mfschunkserver-md5.o: ../mfscommon/md5.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-md5.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-md5.Tpo -c -o ../mfscommon/mfschunkserver-md5.o `test -f '../mfscommon/md5.c' || echo '$(srcdir)/'`../mfscommon/md5.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-md5.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-md5.Tpo -c -o ../mfscommon/mfschunkserver-md5.o `test -f '../mfscommon/md5.c' || echo '$(srcdir)/'`../mfscommon/md5.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-md5.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-md5.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/md5.c' object='../mfscommon/mfschunkserver-md5.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-md5.o `test -f '../mfscommon/md5.c' || echo '$(srcdir)/'`../mfscommon/md5.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-md5.o `test -f '../mfscommon/md5.c' || echo '$(srcdir)/'`../mfscommon/md5.c
 
 ../mfscommon/mfschunkserver-md5.obj: ../mfscommon/md5.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-md5.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-md5.Tpo -c -o ../mfscommon/mfschunkserver-md5.obj `if test -f '../mfscommon/md5.c'; then $(CYGPATH_W) '../mfscommon/md5.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/md5.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-md5.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-md5.Tpo -c -o ../mfscommon/mfschunkserver-md5.obj `if test -f '../mfscommon/md5.c'; then $(CYGPATH_W) '../mfscommon/md5.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/md5.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-md5.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-md5.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/md5.c' object='../mfscommon/mfschunkserver-md5.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-md5.obj `if test -f '../mfscommon/md5.c'; then $(CYGPATH_W) '../mfscommon/md5.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/md5.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-md5.obj `if test -f '../mfscommon/md5.c'; then $(CYGPATH_W) '../mfscommon/md5.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/md5.c'; fi`
 
 ../mfscommon/mfschunkserver-random.o: ../mfscommon/random.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-random.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-random.Tpo -c -o ../mfscommon/mfschunkserver-random.o `test -f '../mfscommon/random.c' || echo '$(srcdir)/'`../mfscommon/random.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-random.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-random.Tpo -c -o ../mfscommon/mfschunkserver-random.o `test -f '../mfscommon/random.c' || echo '$(srcdir)/'`../mfscommon/random.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-random.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-random.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/random.c' object='../mfscommon/mfschunkserver-random.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-random.o `test -f '../mfscommon/random.c' || echo '$(srcdir)/'`../mfscommon/random.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-random.o `test -f '../mfscommon/random.c' || echo '$(srcdir)/'`../mfscommon/random.c
 
 ../mfscommon/mfschunkserver-random.obj: ../mfscommon/random.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-random.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-random.Tpo -c -o ../mfscommon/mfschunkserver-random.obj `if test -f '../mfscommon/random.c'; then $(CYGPATH_W) '../mfscommon/random.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/random.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-random.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-random.Tpo -c -o ../mfscommon/mfschunkserver-random.obj `if test -f '../mfscommon/random.c'; then $(CYGPATH_W) '../mfscommon/random.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/random.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-random.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-random.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/random.c' object='../mfscommon/mfschunkserver-random.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-random.obj `if test -f '../mfscommon/random.c'; then $(CYGPATH_W) '../mfscommon/random.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/random.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-random.obj `if test -f '../mfscommon/random.c'; then $(CYGPATH_W) '../mfscommon/random.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/random.c'; fi`
 
 ../mfscommon/mfschunkserver-pcqueue.o: ../mfscommon/pcqueue.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-pcqueue.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Tpo -c -o ../mfscommon/mfschunkserver-pcqueue.o `test -f '../mfscommon/pcqueue.c' || echo '$(srcdir)/'`../mfscommon/pcqueue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-pcqueue.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Tpo -c -o ../mfscommon/mfschunkserver-pcqueue.o `test -f '../mfscommon/pcqueue.c' || echo '$(srcdir)/'`../mfscommon/pcqueue.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/pcqueue.c' object='../mfscommon/mfschunkserver-pcqueue.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-pcqueue.o `test -f '../mfscommon/pcqueue.c' || echo '$(srcdir)/'`../mfscommon/pcqueue.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-pcqueue.o `test -f '../mfscommon/pcqueue.c' || echo '$(srcdir)/'`../mfscommon/pcqueue.c
 
 ../mfscommon/mfschunkserver-pcqueue.obj: ../mfscommon/pcqueue.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-pcqueue.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Tpo -c -o ../mfscommon/mfschunkserver-pcqueue.obj `if test -f '../mfscommon/pcqueue.c'; then $(CYGPATH_W) '../mfscommon/pcqueue.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/pcqueue.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-pcqueue.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Tpo -c -o ../mfscommon/mfschunkserver-pcqueue.obj `if test -f '../mfscommon/pcqueue.c'; then $(CYGPATH_W) '../mfscommon/pcqueue.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/pcqueue.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/pcqueue.c' object='../mfscommon/mfschunkserver-pcqueue.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-pcqueue.obj `if test -f '../mfscommon/pcqueue.c'; then $(CYGPATH_W) '../mfscommon/pcqueue.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/pcqueue.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-pcqueue.obj `if test -f '../mfscommon/pcqueue.c'; then $(CYGPATH_W) '../mfscommon/pcqueue.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/pcqueue.c'; fi`
 
 ../mfscommon/mfschunkserver-lwthread.o: ../mfscommon/lwthread.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-lwthread.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-lwthread.Tpo -c -o ../mfscommon/mfschunkserver-lwthread.o `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-lwthread.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-lwthread.Tpo -c -o ../mfscommon/mfschunkserver-lwthread.o `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-lwthread.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-lwthread.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/lwthread.c' object='../mfscommon/mfschunkserver-lwthread.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-lwthread.o `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-lwthread.o `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
 
 ../mfscommon/mfschunkserver-lwthread.obj: ../mfscommon/lwthread.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-lwthread.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-lwthread.Tpo -c -o ../mfscommon/mfschunkserver-lwthread.obj `if test -f '../mfscommon/lwthread.c'; then $(CYGPATH_W) '../mfscommon/lwthread.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/lwthread.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-lwthread.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-lwthread.Tpo -c -o ../mfscommon/mfschunkserver-lwthread.obj `if test -f '../mfscommon/lwthread.c'; then $(CYGPATH_W) '../mfscommon/lwthread.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/lwthread.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-lwthread.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-lwthread.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/lwthread.c' object='../mfscommon/mfschunkserver-lwthread.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-lwthread.obj `if test -f '../mfscommon/lwthread.c'; then $(CYGPATH_W) '../mfscommon/lwthread.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/lwthread.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-lwthread.obj `if test -f '../mfscommon/lwthread.c'; then $(CYGPATH_W) '../mfscommon/lwthread.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/lwthread.c'; fi`
 
 ../mfscommon/mfschunkserver-crc.o: ../mfscommon/crc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-crc.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-crc.Tpo -c -o ../mfscommon/mfschunkserver-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-crc.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-crc.Tpo -c -o ../mfscommon/mfschunkserver-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-crc.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-crc.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/crc.c' object='../mfscommon/mfschunkserver-crc.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
 
 ../mfscommon/mfschunkserver-crc.obj: ../mfscommon/crc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-crc.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-crc.Tpo -c -o ../mfscommon/mfschunkserver-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-crc.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-crc.Tpo -c -o ../mfscommon/mfschunkserver-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-crc.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-crc.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/crc.c' object='../mfscommon/mfschunkserver-crc.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
 
 ../mfscommon/mfschunkserver-sockets.o: ../mfscommon/sockets.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-sockets.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Tpo -c -o ../mfscommon/mfschunkserver-sockets.o `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-sockets.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Tpo -c -o ../mfscommon/mfschunkserver-sockets.o `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/sockets.c' object='../mfscommon/mfschunkserver-sockets.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-sockets.o `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-sockets.o `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
 
 ../mfscommon/mfschunkserver-sockets.obj: ../mfscommon/sockets.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-sockets.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Tpo -c -o ../mfscommon/mfschunkserver-sockets.obj `if test -f '../mfscommon/sockets.c'; then $(CYGPATH_W) '../mfscommon/sockets.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/sockets.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-sockets.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Tpo -c -o ../mfscommon/mfschunkserver-sockets.obj `if test -f '../mfscommon/sockets.c'; then $(CYGPATH_W) '../mfscommon/sockets.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/sockets.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/sockets.c' object='../mfscommon/mfschunkserver-sockets.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-sockets.obj `if test -f '../mfscommon/sockets.c'; then $(CYGPATH_W) '../mfscommon/sockets.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/sockets.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-sockets.obj `if test -f '../mfscommon/sockets.c'; then $(CYGPATH_W) '../mfscommon/sockets.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/sockets.c'; fi`
 
 ../mfscommon/mfschunkserver-conncache.o: ../mfscommon/conncache.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-conncache.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-conncache.Tpo -c -o ../mfscommon/mfschunkserver-conncache.o `test -f '../mfscommon/conncache.c' || echo '$(srcdir)/'`../mfscommon/conncache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-conncache.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-conncache.Tpo -c -o ../mfscommon/mfschunkserver-conncache.o `test -f '../mfscommon/conncache.c' || echo '$(srcdir)/'`../mfscommon/conncache.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-conncache.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-conncache.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/conncache.c' object='../mfscommon/mfschunkserver-conncache.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-conncache.o `test -f '../mfscommon/conncache.c' || echo '$(srcdir)/'`../mfscommon/conncache.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-conncache.o `test -f '../mfscommon/conncache.c' || echo '$(srcdir)/'`../mfscommon/conncache.c
 
 ../mfscommon/mfschunkserver-conncache.obj: ../mfscommon/conncache.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-conncache.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-conncache.Tpo -c -o ../mfscommon/mfschunkserver-conncache.obj `if test -f '../mfscommon/conncache.c'; then $(CYGPATH_W) '../mfscommon/conncache.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/conncache.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-conncache.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-conncache.Tpo -c -o ../mfscommon/mfschunkserver-conncache.obj `if test -f '../mfscommon/conncache.c'; then $(CYGPATH_W) '../mfscommon/conncache.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/conncache.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-conncache.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-conncache.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/conncache.c' object='../mfscommon/mfschunkserver-conncache.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-conncache.obj `if test -f '../mfscommon/conncache.c'; then $(CYGPATH_W) '../mfscommon/conncache.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/conncache.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-conncache.obj `if test -f '../mfscommon/conncache.c'; then $(CYGPATH_W) '../mfscommon/conncache.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/conncache.c'; fi`
 
 ../mfscommon/mfschunkserver-charts.o: ../mfscommon/charts.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-charts.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Tpo -c -o ../mfscommon/mfschunkserver-charts.o `test -f '../mfscommon/charts.c' || echo '$(srcdir)/'`../mfscommon/charts.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-charts.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Tpo -c -o ../mfscommon/mfschunkserver-charts.o `test -f '../mfscommon/charts.c' || echo '$(srcdir)/'`../mfscommon/charts.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/charts.c' object='../mfscommon/mfschunkserver-charts.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-charts.o `test -f '../mfscommon/charts.c' || echo '$(srcdir)/'`../mfscommon/charts.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-charts.o `test -f '../mfscommon/charts.c' || echo '$(srcdir)/'`../mfscommon/charts.c
 
 ../mfscommon/mfschunkserver-charts.obj: ../mfscommon/charts.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-charts.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Tpo -c -o ../mfscommon/mfschunkserver-charts.obj `if test -f '../mfscommon/charts.c'; then $(CYGPATH_W) '../mfscommon/charts.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/charts.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-charts.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Tpo -c -o ../mfscommon/mfschunkserver-charts.obj `if test -f '../mfscommon/charts.c'; then $(CYGPATH_W) '../mfscommon/charts.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/charts.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/charts.c' object='../mfscommon/mfschunkserver-charts.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-charts.obj `if test -f '../mfscommon/charts.c'; then $(CYGPATH_W) '../mfscommon/charts.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/charts.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-charts.obj `if test -f '../mfscommon/charts.c'; then $(CYGPATH_W) '../mfscommon/charts.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/charts.c'; fi`
 
 ../mfscommon/mfschunkserver-memusage.o: ../mfscommon/memusage.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-memusage.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Tpo -c -o ../mfscommon/mfschunkserver-memusage.o `test -f '../mfscommon/memusage.c' || echo '$(srcdir)/'`../mfscommon/memusage.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-memusage.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Tpo -c -o ../mfscommon/mfschunkserver-memusage.o `test -f '../mfscommon/memusage.c' || echo '$(srcdir)/'`../mfscommon/memusage.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/memusage.c' object='../mfscommon/mfschunkserver-memusage.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-memusage.o `test -f '../mfscommon/memusage.c' || echo '$(srcdir)/'`../mfscommon/memusage.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-memusage.o `test -f '../mfscommon/memusage.c' || echo '$(srcdir)/'`../mfscommon/memusage.c
 
 ../mfscommon/mfschunkserver-memusage.obj: ../mfscommon/memusage.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-memusage.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Tpo -c -o ../mfscommon/mfschunkserver-memusage.obj `if test -f '../mfscommon/memusage.c'; then $(CYGPATH_W) '../mfscommon/memusage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/memusage.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-memusage.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Tpo -c -o ../mfscommon/mfschunkserver-memusage.obj `if test -f '../mfscommon/memusage.c'; then $(CYGPATH_W) '../mfscommon/memusage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/memusage.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/memusage.c' object='../mfscommon/mfschunkserver-memusage.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-memusage.obj `if test -f '../mfscommon/memusage.c'; then $(CYGPATH_W) '../mfscommon/memusage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/memusage.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-memusage.obj `if test -f '../mfscommon/memusage.c'; then $(CYGPATH_W) '../mfscommon/memusage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/memusage.c'; fi`
 
 ../mfscommon/mfschunkserver-cpuusage.o: ../mfscommon/cpuusage.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cpuusage.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cpuusage.Tpo -c -o ../mfscommon/mfschunkserver-cpuusage.o `test -f '../mfscommon/cpuusage.c' || echo '$(srcdir)/'`../mfscommon/cpuusage.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cpuusage.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cpuusage.Tpo -c -o ../mfscommon/mfschunkserver-cpuusage.o `test -f '../mfscommon/cpuusage.c' || echo '$(srcdir)/'`../mfscommon/cpuusage.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-cpuusage.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-cpuusage.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/cpuusage.c' object='../mfscommon/mfschunkserver-cpuusage.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-cpuusage.o `test -f '../mfscommon/cpuusage.c' || echo '$(srcdir)/'`../mfscommon/cpuusage.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-cpuusage.o `test -f '../mfscommon/cpuusage.c' || echo '$(srcdir)/'`../mfscommon/cpuusage.c
 
 ../mfscommon/mfschunkserver-cpuusage.obj: ../mfscommon/cpuusage.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cpuusage.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cpuusage.Tpo -c -o ../mfscommon/mfschunkserver-cpuusage.obj `if test -f '../mfscommon/cpuusage.c'; then $(CYGPATH_W) '../mfscommon/cpuusage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cpuusage.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cpuusage.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cpuusage.Tpo -c -o ../mfscommon/mfschunkserver-cpuusage.obj `if test -f '../mfscommon/cpuusage.c'; then $(CYGPATH_W) '../mfscommon/cpuusage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cpuusage.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-cpuusage.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-cpuusage.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/cpuusage.c' object='../mfscommon/mfschunkserver-cpuusage.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-cpuusage.obj `if test -f '../mfscommon/cpuusage.c'; then $(CYGPATH_W) '../mfscommon/cpuusage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cpuusage.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-cpuusage.obj `if test -f '../mfscommon/cpuusage.c'; then $(CYGPATH_W) '../mfscommon/cpuusage.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cpuusage.c'; fi`
 
 ../mfscommon/mfschunkserver-clocks.o: ../mfscommon/clocks.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-clocks.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Tpo -c -o ../mfscommon/mfschunkserver-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-clocks.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Tpo -c -o ../mfscommon/mfschunkserver-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/clocks.c' object='../mfscommon/mfschunkserver-clocks.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
 
 ../mfscommon/mfschunkserver-clocks.obj: ../mfscommon/clocks.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-clocks.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Tpo -c -o ../mfscommon/mfschunkserver-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-clocks.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Tpo -c -o ../mfscommon/mfschunkserver-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/clocks.c' object='../mfscommon/mfschunkserver-clocks.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
 
 ../mfscommon/mfschunkserver-strerr.o: ../mfscommon/strerr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-strerr.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Tpo -c -o ../mfscommon/mfschunkserver-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-strerr.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Tpo -c -o ../mfscommon/mfschunkserver-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/mfschunkserver-strerr.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
 
 ../mfscommon/mfschunkserver-strerr.obj: ../mfscommon/strerr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-strerr.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Tpo -c -o ../mfscommon/mfschunkserver-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-strerr.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Tpo -c -o ../mfscommon/mfschunkserver-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/mfschunkserver-strerr.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
-
-mfschunktool-mfschunktool.o: mfschunktool.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunktool_CFLAGS) $(CFLAGS) -MT mfschunktool-mfschunktool.o -MD -MP -MF $(DEPDIR)/mfschunktool-mfschunktool.Tpo -c -o mfschunktool-mfschunktool.o `test -f 'mfschunktool.c' || echo '$(srcdir)/'`mfschunktool.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunktool-mfschunktool.Tpo $(DEPDIR)/mfschunktool-mfschunktool.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfschunktool.c' object='mfschunktool-mfschunktool.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunktool_CFLAGS) $(CFLAGS) -c -o mfschunktool-mfschunktool.o `test -f 'mfschunktool.c' || echo '$(srcdir)/'`mfschunktool.c
-
-mfschunktool-mfschunktool.obj: mfschunktool.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunktool_CFLAGS) $(CFLAGS) -MT mfschunktool-mfschunktool.obj -MD -MP -MF $(DEPDIR)/mfschunktool-mfschunktool.Tpo -c -o mfschunktool-mfschunktool.obj `if test -f 'mfschunktool.c'; then $(CYGPATH_W) 'mfschunktool.c'; else $(CYGPATH_W) '$(srcdir)/mfschunktool.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfschunktool-mfschunktool.Tpo $(DEPDIR)/mfschunktool-mfschunktool.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfschunktool.c' object='mfschunktool-mfschunktool.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunktool_CFLAGS) $(CFLAGS) -c -o mfschunktool-mfschunktool.obj `if test -f 'mfschunktool.c'; then $(CYGPATH_W) 'mfschunktool.c'; else $(CYGPATH_W) '$(srcdir)/mfschunktool.c'; fi`
-
-../mfscommon/mfschunktool-crc.o: ../mfscommon/crc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunktool_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunktool-crc.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunktool-crc.Tpo -c -o ../mfscommon/mfschunktool-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunktool-crc.Tpo ../mfscommon/$(DEPDIR)/mfschunktool-crc.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/crc.c' object='../mfscommon/mfschunktool-crc.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunktool_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunktool-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
-
-../mfscommon/mfschunktool-crc.obj: ../mfscommon/crc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunktool_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunktool-crc.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunktool-crc.Tpo -c -o ../mfscommon/mfschunktool-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunktool-crc.Tpo ../mfscommon/$(DEPDIR)/mfschunktool-crc.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/crc.c' object='../mfscommon/mfschunktool-crc.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfschunktool_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunktool-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

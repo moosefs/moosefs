@@ -120,8 +120,8 @@ am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
 mfsmetalogger_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(mfsmetalogger_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(mfsmetalogger_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -346,8 +346,9 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/mfscommon -DAPPNAME=mfsmetalogger
-AM_LDFLAGS = $(ZLIB_LIBS)
+AM_CPPFLAGS = -I$(top_srcdir)/mfscommon
+AM_LDFLAGS = 
+AM_CFLAGS = 
 mfsmetalogger_SOURCES = \
 	masterconn.c masterconn.h \
 	init.h \
@@ -361,7 +362,8 @@ mfsmetalogger_SOURCES = \
 	../mfscommon/slogger.h ../mfscommon/mfsalloc.h \
 	../mfscommon/MFSCommunication.h
 
-mfsmetalogger_CFLAGS = 
+mfsmetalogger_LDFLAGS = $(ZLIB_LIBS)
+mfsmetalogger_CPPFLAGS = $(AM_CPPFLAGS) -DAPPNAME=mfsmetalogger
 all: all-am
 
 .SUFFIXES:
@@ -513,102 +515,102 @@ distclean-compile:
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
 mfsmetalogger-masterconn.o: masterconn.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT mfsmetalogger-masterconn.o -MD -MP -MF $(DEPDIR)/mfsmetalogger-masterconn.Tpo -c -o mfsmetalogger-masterconn.o `test -f 'masterconn.c' || echo '$(srcdir)/'`masterconn.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mfsmetalogger-masterconn.o -MD -MP -MF $(DEPDIR)/mfsmetalogger-masterconn.Tpo -c -o mfsmetalogger-masterconn.o `test -f 'masterconn.c' || echo '$(srcdir)/'`masterconn.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmetalogger-masterconn.Tpo $(DEPDIR)/mfsmetalogger-masterconn.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='masterconn.c' object='mfsmetalogger-masterconn.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o mfsmetalogger-masterconn.o `test -f 'masterconn.c' || echo '$(srcdir)/'`masterconn.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mfsmetalogger-masterconn.o `test -f 'masterconn.c' || echo '$(srcdir)/'`masterconn.c
 
 mfsmetalogger-masterconn.obj: masterconn.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT mfsmetalogger-masterconn.obj -MD -MP -MF $(DEPDIR)/mfsmetalogger-masterconn.Tpo -c -o mfsmetalogger-masterconn.obj `if test -f 'masterconn.c'; then $(CYGPATH_W) 'masterconn.c'; else $(CYGPATH_W) '$(srcdir)/masterconn.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mfsmetalogger-masterconn.obj -MD -MP -MF $(DEPDIR)/mfsmetalogger-masterconn.Tpo -c -o mfsmetalogger-masterconn.obj `if test -f 'masterconn.c'; then $(CYGPATH_W) 'masterconn.c'; else $(CYGPATH_W) '$(srcdir)/masterconn.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmetalogger-masterconn.Tpo $(DEPDIR)/mfsmetalogger-masterconn.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='masterconn.c' object='mfsmetalogger-masterconn.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o mfsmetalogger-masterconn.obj `if test -f 'masterconn.c'; then $(CYGPATH_W) 'masterconn.c'; else $(CYGPATH_W) '$(srcdir)/masterconn.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mfsmetalogger-masterconn.obj `if test -f 'masterconn.c'; then $(CYGPATH_W) 'masterconn.c'; else $(CYGPATH_W) '$(srcdir)/masterconn.c'; fi`
 
 ../mfscommon/mfsmetalogger-main.o: ../mfscommon/main.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-main.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-main.Tpo -c -o ../mfscommon/mfsmetalogger-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-main.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-main.Tpo -c -o ../mfscommon/mfsmetalogger-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-main.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-main.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/main.c' object='../mfscommon/mfsmetalogger-main.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c
 
 ../mfscommon/mfsmetalogger-main.obj: ../mfscommon/main.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-main.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-main.Tpo -c -o ../mfscommon/mfsmetalogger-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-main.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-main.Tpo -c -o ../mfscommon/mfsmetalogger-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-main.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-main.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/main.c' object='../mfscommon/mfsmetalogger-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
 
 ../mfscommon/mfsmetalogger-clocks.o: ../mfscommon/clocks.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-clocks.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Tpo -c -o ../mfscommon/mfsmetalogger-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-clocks.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Tpo -c -o ../mfscommon/mfsmetalogger-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/clocks.c' object='../mfscommon/mfsmetalogger-clocks.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
 
 ../mfscommon/mfsmetalogger-clocks.obj: ../mfscommon/clocks.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-clocks.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Tpo -c -o ../mfscommon/mfsmetalogger-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-clocks.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Tpo -c -o ../mfscommon/mfsmetalogger-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/clocks.c' object='../mfscommon/mfsmetalogger-clocks.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-clocks.obj `if test -f '../mfscommon/clocks.c'; then $(CYGPATH_W) '../mfscommon/clocks.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/clocks.c'; fi`
 
 ../mfscommon/mfsmetalogger-cfg.o: ../mfscommon/cfg.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-cfg.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-cfg.Tpo -c -o ../mfscommon/mfsmetalogger-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-cfg.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-cfg.Tpo -c -o ../mfscommon/mfsmetalogger-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-cfg.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-cfg.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/cfg.c' object='../mfscommon/mfsmetalogger-cfg.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c
 
 ../mfscommon/mfsmetalogger-cfg.obj: ../mfscommon/cfg.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-cfg.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-cfg.Tpo -c -o ../mfscommon/mfsmetalogger-cfg.obj `if test -f '../mfscommon/cfg.c'; then $(CYGPATH_W) '../mfscommon/cfg.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cfg.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-cfg.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-cfg.Tpo -c -o ../mfscommon/mfsmetalogger-cfg.obj `if test -f '../mfscommon/cfg.c'; then $(CYGPATH_W) '../mfscommon/cfg.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cfg.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-cfg.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-cfg.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/cfg.c' object='../mfscommon/mfsmetalogger-cfg.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-cfg.obj `if test -f '../mfscommon/cfg.c'; then $(CYGPATH_W) '../mfscommon/cfg.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cfg.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-cfg.obj `if test -f '../mfscommon/cfg.c'; then $(CYGPATH_W) '../mfscommon/cfg.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cfg.c'; fi`
 
 ../mfscommon/mfsmetalogger-crc.o: ../mfscommon/crc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-crc.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Tpo -c -o ../mfscommon/mfsmetalogger-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-crc.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Tpo -c -o ../mfscommon/mfsmetalogger-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/crc.c' object='../mfscommon/mfsmetalogger-crc.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-crc.o `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
 
 ../mfscommon/mfsmetalogger-crc.obj: ../mfscommon/crc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-crc.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Tpo -c -o ../mfscommon/mfsmetalogger-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-crc.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Tpo -c -o ../mfscommon/mfsmetalogger-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/crc.c' object='../mfscommon/mfsmetalogger-crc.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-crc.obj `if test -f '../mfscommon/crc.c'; then $(CYGPATH_W) '../mfscommon/crc.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/crc.c'; fi`
 
 ../mfscommon/mfsmetalogger-sockets.o: ../mfscommon/sockets.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-sockets.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Tpo -c -o ../mfscommon/mfsmetalogger-sockets.o `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-sockets.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Tpo -c -o ../mfscommon/mfsmetalogger-sockets.o `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/sockets.c' object='../mfscommon/mfsmetalogger-sockets.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-sockets.o `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-sockets.o `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
 
 ../mfscommon/mfsmetalogger-sockets.obj: ../mfscommon/sockets.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-sockets.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Tpo -c -o ../mfscommon/mfsmetalogger-sockets.obj `if test -f '../mfscommon/sockets.c'; then $(CYGPATH_W) '../mfscommon/sockets.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/sockets.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-sockets.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Tpo -c -o ../mfscommon/mfsmetalogger-sockets.obj `if test -f '../mfscommon/sockets.c'; then $(CYGPATH_W) '../mfscommon/sockets.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/sockets.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/sockets.c' object='../mfscommon/mfsmetalogger-sockets.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-sockets.obj `if test -f '../mfscommon/sockets.c'; then $(CYGPATH_W) '../mfscommon/sockets.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/sockets.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-sockets.obj `if test -f '../mfscommon/sockets.c'; then $(CYGPATH_W) '../mfscommon/sockets.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/sockets.c'; fi`
 
 ../mfscommon/mfsmetalogger-strerr.o: ../mfscommon/strerr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-strerr.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Tpo -c -o ../mfscommon/mfsmetalogger-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-strerr.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Tpo -c -o ../mfscommon/mfsmetalogger-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/mfsmetalogger-strerr.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
 
 ../mfscommon/mfsmetalogger-strerr.obj: ../mfscommon/strerr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-strerr.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Tpo -c -o ../mfscommon/mfsmetalogger-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-strerr.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Tpo -c -o ../mfscommon/mfsmetalogger-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Po
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/mfsmetalogger-strerr.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mfsmetalogger_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

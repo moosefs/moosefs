@@ -1,7 +1,8 @@
 bin_PROGRAMS=mfsmount mfstools
 
 AM_CPPFLAGS=-I$(top_srcdir)/mfscommon
-
+AM_CFLAGS=
+AM_LDFLAGS=
 
 
 mfsmount_LDADD=$(PTHREAD_LIBS) $(FUSE_LIBS)
@@ -56,8 +57,6 @@ mfstools_SOURCES=\
 	../mfscommon/md5.c ../mfscommon/md5.h \
 	../mfscommon/datapack.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/MFSCommunication.h
-
-mfstools_CFLAGS=
 
 mfstools_links=\
 	mfscheckfile mfsdirinfo mfsfileinfo mfsfilerepair \

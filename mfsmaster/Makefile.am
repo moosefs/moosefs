@@ -1,7 +1,8 @@
 sbin_PROGRAMS=mfsmaster mfsstatsdump
 
-AM_CPPFLAGS=-I$(top_srcdir)/mfscommon -DMFSMAXFILES=16384 -DAPPNAME=mfsmaster
-AM_LDFLAGS=$(ZLIB_LIBS)
+AM_CPPFLAGS=-I$(top_srcdir)/mfscommon
+AM_LDFLAGS=
+AM_CFLAGS=
 
 mfsstatsdump_SOURCES=\
 	chartsdefs.h \
@@ -9,6 +10,9 @@ mfsstatsdump_SOURCES=\
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/charts.c ../mfscommon/charts.h
+
+mfsstatsdump_LDFLAGS=$(ZLIB_LIBS)
+
 
 mfsmaster_SOURCES=\
 	itree.h itree.c \
@@ -58,6 +62,9 @@ mfsmaster_SOURCES=\
 	../mfscommon/MFSCommunication.h
 
 
+mfsmaster_CPPFLAGS=$(AM_CPPFLAGS) -DMFSMAXFILES=16384 -DAPPNAME=mfsmaster
+mfsmaster_LDFLAGS=$(ZLIB_LIBS)
+
 EXTRA_DIST = $(sbin_SCRIPTS)
 
 sbin_SCRIPTS=\
@@ -66,5 +73,3 @@ sbin_SCRIPTS=\
 distclean:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
-
-mfsmaster_CFLAGS=

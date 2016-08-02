@@ -1,7 +1,8 @@
 sbin_PROGRAMS=mfschunkserver mfschunktool mfscsstatsdump
 
-AM_CPPFLAGS=-I$(top_srcdir)/mfscommon -DMFSMAXFILES=16384 -D_USE_PTHREADS $(PTHREAD_CPPFLAGS) -DAPPNAME=mfschunkserver -DUSE_CONNCACHE
-AM_LDFLAGS=$(PTHREAD_LIBS) $(ZLIB_LIBS)
+AM_CFLAGS=
+AM_CPPFLAGS=-I$(top_srcdir)/mfscommon
+AM_LDFLAGS=
 
 mfscsstatsdump_SOURCES=\
 	chartsdefs.h \
@@ -9,6 +10,8 @@ mfscsstatsdump_SOURCES=\
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/charts.c ../mfscommon/charts.h
+
+mfscsstatsdump_LDFLAGS=$(ZLIB_LIBS)
 
 mfschunkserver_SOURCES= \
 	bgjobs.c bgjobs.h \
@@ -40,16 +43,16 @@ mfschunkserver_SOURCES= \
 	../mfscommon/MFSCommunication.h
 
 
+mfschunkserver_CFLAGS=$(PTHREAD_CFLAGS)
+mfschunkserver_CPPFLAGS=$(AM_CPPFLAGS) -DMFSMAXFILES=16384 -D_USE_PTHREADS $(PTHREAD_CPPFLAGS) -DAPPNAME=mfschunkserver -DUSE_CONNCACHE
+mfschunkserver_LDFLAGS=$(PTHREAD_LIBS) $(ZLIB_LIBS)
+
 mfschunktool_SOURCES= \
 	mfschunktool.c \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/datapack.h \
 	../mfscommon/MFSCommunication.h
 
-mfschunktool_CFLAGS=
-
 distclean:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
-
-mfschunkserver_CFLAGS=$(PTHREAD_CFLAGS)

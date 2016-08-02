@@ -1,3 +1,17 @@
+moosefs (3.0.81-1) unstable; urgency=medium
+
+  * (mount) fixed oom killer disabling (setting oom_adj and oom_score_adj)
+  * (cli) fixed displaying inactive mounts
+  * (mount) added fsync before removing any locks
+  * (daemons) added disabling oom killer (Linux only)
+  * (all) small fixes in manpages
+  * (mount) fixed handling nonblocking lock commands (unlock and try) in both
+    locking mechanisms
+  * (daemons+mount) changed default settings for limiting malloc arenas (Linux
+    only)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 25 Jul 2016 13:00:00 +0200
+
 moosefs (3.0.80-1) unstable; urgency=medium
 
   * (master) fixed chunk loop (in some cases chunks from the last hash position

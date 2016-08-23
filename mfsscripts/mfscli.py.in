@@ -5256,7 +5256,7 @@ if "QU" in sectionset:
 			tab.header("","","","","","","","","","","value","% soft","% hard","value","% soft","% hard","value","% soft","% hard","value","% soft","% hard")
 			tab.defattr("l","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r","r")
 		else:
-			tab = Tabble("active quotas",14)
+			tab = Tabble("active quotas",15)
 		data,length = leaderconn.command(CLTOMA_QUOTA_INFO,MATOCL_QUOTA_INFO)
 		if length>=4 and leaderconn.version_at_least(1,7,0):
 			quotas = []

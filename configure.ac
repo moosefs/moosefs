@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [2.0.89], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [2.0.90], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -26,7 +26,7 @@ AC_DEFINE_UNQUOTED([VERSION2INT(maj,med,min)], [((maj)*0x10000+(med)*0x100+(((ma
 AC_DEFINE_UNQUOTED([VERSSTR], ["${PACKAGE_VERSION}-${release}"], [MFS version - string])
 
 # Checks for programs.
-AC_PROG_CC(myclang clang llvm-gcc gcc)
+AC_PROG_CC(mycc gcc llvm-gcc clang)
 dnl AC_PROG_CXX(clang++ llvm-g++ g++)
 AC_PROG_LN_S
 AC_PROG_LIBTOOL

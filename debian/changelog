@@ -1,3 +1,9 @@
+moosefs (2.0.90-1) unstable; urgency=medium
+
+  * (cli) fixed displaying quota info in plain mode
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 18 Aug 2016 13:00:00 +0200
+
 moosefs (2.0.89-1) unstable; urgency=medium
 
   * (master+mount) added fix for bug in FreeBSD kernel (kernel sends truncate

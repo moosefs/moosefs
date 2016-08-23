@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.90-1 (2016-08-18)
+
+  - (cli) fixed displaying quota info in plain mode
+
 * MooseFS 2.0.89-1 (2016-04-27)
 
   - (master+mount) added fix for bug in FreeBSD kernel (kernel sends truncate before first close - FreeBSD only)

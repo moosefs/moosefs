@@ -43,6 +43,7 @@
 #include "main.h"
 #include "massert.h"
 #include "strerr.h"
+#include "slogger.h"
 // #include "sustained_stats.h"
 
 #ifndef HAVE___SYNC_FETCH_AND_OP
@@ -185,7 +186,7 @@ void sinodes_pid_inodes(pid_t pid) {
 	name[3] = pid;
 	p = NULL;
 	if (sysctl(name, 4, NULL, &len, NULL, 0)<0) {
-		syslog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error: %m");
+		mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
 		return;
 	}
 	if (len==0) {
@@ -204,7 +205,7 @@ void sinodes_pid_inodes(pid_t pid) {
 		error = sysctl(name, 4, p, &len, NULL, 0);
 	} while (error < 0 && errno == ENOMEM && olen == len);
 	if (error<0) {
-		syslog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error: %m");
+		mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
 		free(p);
 		return;
 	}
@@ -305,7 +306,7 @@ void sinodes_all_pids(void) {
 	name[3] = 0;
 	p = NULL;
 	if (sysctl(name, 4, NULL, &len, NULL, 0)<0) {
-		syslog(LOG_NOTICE,"sysctl(kern.proc) error: %m");
+		mfs_errlog(LOG_NOTICE,"sysctl(kern.proc) error");
 		return;
 	}
 	if (len==0) {
@@ -324,7 +325,7 @@ void sinodes_all_pids(void) {
 		error = sysctl(name, 4, p, &len, NULL, 0);
 	} while (error < 0 && errno == ENOMEM && olen == len);
 	if (error<0) {
-		syslog(LOG_NOTICE,"sysctl(kern.proc) error: %m");
+		mfs_errlog(LOG_NOTICE,"sysctl(kern.proc) error");
 		free(p);
 		return;
 	}
@@ -382,7 +383,7 @@ void* sinodes_scanthread(void *arg) {
 	st.st_ino = 1;
 	while (stat(mountpoint,&st)<0 || st.st_ino!=1) {
 		if (st.st_ino==1) {
-			syslog(LOG_WARNING,"can't stat my mountpoint (%s): %s",mountpoint,strerr(errno));
+			mfs_arg_errlog(LOG_WARNING,"can't stat my mountpoint (%s)",mountpoint);
 		} else {
 			st.st_ino=1;
 		}

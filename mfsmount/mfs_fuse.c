@@ -2580,7 +2580,9 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	uint8_t oflags;
 	uint8_t attr[35];
+#if !(defined(__FreeBSD__) || defined(__APPLE__))
 	uint8_t mattr;
+#endif
 	int status;
 	struct fuse_ctx ctx;
 	groups *gids;
@@ -2734,13 +2736,13 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		return ;
 	}
 
-	mattr = mfs_attr_get_mattr(attr);
 	fileinfo = mfs_newfileinfo(fi->flags & O_ACCMODE,ino);
 	fi->fh = (unsigned long)fileinfo;
 #if defined(__FreeBSD__) || defined(__APPLE__)
 	fi->keep_cache = 0;
 	fi->direct_io = 1;
 #else
+	mattr = mfs_attr_get_mattr(attr);
 	if (keep_cache==1) {
 		fi->keep_cache=1;
 	} else if (keep_cache==2) {

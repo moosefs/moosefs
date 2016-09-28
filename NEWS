@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 2.0.91-1 (2016-09-28)
+
+  - (mount) fixed using connection cache in readdata module
+
 * MooseFS 2.0.90-1 (2016-08-18)
 
   - (cli) fixed displaying quota info in plain mode

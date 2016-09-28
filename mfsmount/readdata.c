@@ -924,7 +924,9 @@ void* read_worker(void *arg) {
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: readworker: closewaiting\n",monotonic_seconds());
 #endif
-				status = EINTR;
+				if (rreq!=NULL) {
+					status = EINTR;
+				}
 				break;
 			}
 			if (pfd[0].revents&POLLHUP) {

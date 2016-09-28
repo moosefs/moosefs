@@ -3,12 +3,12 @@
 
 PKGNAMESUFFIX=	-client
 
-COMMENT=	Moosefs client tools
+COMMENT=	MooseFS client tools
 
 LICENSE=	GPLv2
 
 MFS_COMPONENT=	client
 
-MASTERDIR=	${.CURDIR}/../moosefs-master
+MASTERDIR=	${.CURDIR}/../moosefs2-master
 
 .include "${MASTERDIR}/Makefile"

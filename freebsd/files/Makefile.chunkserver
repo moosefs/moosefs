@@ -3,12 +3,12 @@
 
 PKGNAMESUFFIX=	-chunkserver
 
-COMMENT=	Storing files data and synchronizing it among themselves
+COMMENT=	MooseFS data storage and synchronization component
 
 LICENSE=	GPLv2
 
 MFS_COMPONENT=	chunkserver
 
-MASTERDIR=	${.CURDIR}/../moosefs-master
+MASTERDIR=	${.CURDIR}/../moosefs2-master
 
 .include "${MASTERDIR}/Makefile"

@@ -32,11 +32,11 @@ PORTFILES="Makefile pkg-descr pkg-plist files"
 VERSION=2.0.91
 RELEASE=1
 
-cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^DISTNAME=.*$/DISTNAME=		\${PORTNAME}-\${PORTVERSION}-${RELEASE}/" | uniq > .tmp
+cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^DISTNAME=.*$/DISTNAME=		moosefs-\${PORTVERSION}-${RELEASE}/" | uniq > .tmp
 mv .tmp "${FILEBASEDIR}/files/Makefile.master"
 
 for portname in ${PORTNAMES}; do
-	portdir="${PORTBASE}/moosefs-${portname}"
+	portdir="${PORTBASE}/moosefs2-${portname}"
 	if [ -d "$portdir" ]; then
 		rm -rf "$portdir"
 	fi
@@ -49,5 +49,7 @@ for portname in ${PORTNAMES}; do
 			cp -R "${FILEBASEDIR}/files/${portfile}.${portname}" "${portdir}/${portfile}"
 		fi
 	done
-	make -C ${portdir} makesum
+	if [ "x${portname}" == "xmaster" ]; then
+		make -C ${portdir} makesum
+	fi
 done

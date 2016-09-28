@@ -3,12 +3,12 @@
 
 PKGNAMESUFFIX=	-cli
 
-COMMENT=	Cli moosefs interface
+COMMENT=	MooseFS command line interface
 
 LICENSE=	GPLv2
 
 MFS_COMPONENT=	cli
 
-MASTERDIR=	${.CURDIR}/../moosefs-master
+MASTERDIR=	${.CURDIR}/../moosefs2-master
 
 .include "${MASTERDIR}/Makefile"

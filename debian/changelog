@@ -1,3 +1,9 @@
+moosefs (2.0.91-1) unstable; urgency=medium
+
+  * (mount) fixed using connection cache in readdata module
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 28 Sep 2016 13:00:00 +0200
+
 moosefs (2.0.90-1) unstable; urgency=medium
 
   * (cli) fixed displaying quota info in plain mode

@@ -5154,7 +5154,7 @@ void* hdd_tester_thread(void* arg) {
 		}
 		zassert(pthread_mutex_unlock(&termlock));
 		en = monotonic_useconds();
-		if (en>st) {
+		if (en>=st) {
 			en-=st;
 			if (en<1000000) {
 				portable_usleep(1000000-en);

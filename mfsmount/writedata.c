@@ -57,6 +57,7 @@
 #include "portable.h"
 #include "pipestorage.h"
 #include "readdata.h"
+#include "chunkrwlock.h"
 #include "chunksdatacache.h"
 #include "MFSCommunication.h"
 #ifndef WIN32
@@ -721,6 +722,8 @@ void* write_worker(void *arg) {
 			continue;
 		}
 
+		chunkrwlock_wlock(ind->inode,chindx);
+
 		opbegin = 0; // make static code analysers happy
 		if (optimeout>0.0) {
 			opbegin = monotonic_seconds();
@@ -779,6 +782,7 @@ void* write_worker(void *arg) {
 					write_delayed_enqueue(chd,500000);
 				}
 			}
+			chunkrwlock_wunlock(ind->inode,chindx);
 			continue;	// get next job
 		}
 
@@ -817,6 +821,7 @@ void* write_worker(void *arg) {
 			} else {
 				write_delayed_enqueue(chd,60000000);
 			}
+			chunkrwlock_wunlock(ind->inode,chindx);
 			continue;
 		}
 		ip = chain[0].ip;
@@ -965,6 +970,7 @@ void* write_worker(void *arg) {
 			} else {
 				write_delayed_enqueue(chd,1000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
 			}
+			chunkrwlock_wunlock(ind->inode,chindx);
 			continue;
 		}
 		if (tcpnodelay(fd)<0) {
@@ -1435,6 +1441,7 @@ void* write_worker(void *arg) {
 				write_job_end(chd,0,0);
 			}
 		}
+		chunkrwlock_wunlock(ind->inode,chindx);
 	}
 }
 

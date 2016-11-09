@@ -27,6 +27,7 @@ mfsmount_SOURCES=\
 	masterproxy.c masterproxy.h \
 	csorder.c csorder.h \
 	chunksdatacache.c chunksdatacache.h \
+	chunkrwlock.c chunkrwlock.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
 	csdb.c csdb.h \

@@ -57,6 +57,7 @@
 #include "portable.h"
 #include "pipestorage.h"
 #include "readdata.h"
+#include "chunkrwlock.h"
 #include "chunksdatacache.h"
 #include "mfsalloc.h"
 #include "MFSCommunication.h"
@@ -677,6 +678,8 @@ void* read_worker(void *arg) {
 		}
 		zassert(pthread_mutex_unlock(&(ind->lock)));
 
+		chunkrwlock_rlock(inode,chindx);
+
 		if (master_version()>=VERSION2INT(3,0,74) && chunksdatacache_find(inode,chindx,&chunkid,&version,&csdataver,&csdata,&csdatasize)) {
 			rdstatus = MFS_STATUS_OK;
 #ifdef RDEBUG
@@ -733,6 +736,7 @@ void* read_worker(void *arg) {
 					read_delayed_enqueue(rreq,1000+((trycnt<30)?((trycnt-1)*300000):10000000));
 				}
 			}
+			chunkrwlock_runlock(inode,chindx);
 			continue;	// get next job
 		}
 
@@ -774,6 +778,7 @@ void* read_worker(void *arg) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 			}
 			read_job_end(rreq,0,0);
+			chunkrwlock_runlock(inode,chindx);
 
 			continue;
 		}
@@ -807,6 +812,7 @@ void* read_worker(void *arg) {
 				chunksdatacache_invalidate(inode,chindx);
 				read_delayed_enqueue(rreq,10000000);
 			}
+			chunkrwlock_runlock(inode,chindx);
 			continue;
 		}
 
@@ -856,6 +862,7 @@ void* read_worker(void *arg) {
 				chunksdatacache_invalidate(inode,chindx);
 				read_delayed_enqueue(rreq,10000000);
 			}
+			chunkrwlock_runlock(inode,chindx);
 			continue;
 		}
 
@@ -912,6 +919,7 @@ void* read_worker(void *arg) {
 				chunksdatacache_invalidate(inode,chindx);
 				read_delayed_enqueue(rreq,1000+((trycnt<30)?((trycnt-1)*300000):10000000));
 			}
+			chunkrwlock_runlock(inode,chindx);
 			continue;
 		}
 		if (tcpnodelay(fd)<0) {
@@ -1437,6 +1445,7 @@ void* read_worker(void *arg) {
 			zassert(pthread_mutex_unlock(&(ind->lock)));
 			read_job_end(rreq,0,0);
 		}
+		chunkrwlock_runlock(inode,chindx);
 	}
 	return NULL;
 }

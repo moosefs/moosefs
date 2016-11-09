@@ -79,6 +79,7 @@
 //#include "dircache.h"
 #include "chunksdatacache.h"
 #include "conncache.h"
+#include "chunkrwlock.h"
 #include "readdata.h"
 #include "writedata.h"
 #include "delayrun.h"
@@ -826,6 +827,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	syslog(LOG_NOTICE,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
 
 	conncache_init(200);
+	chunkrwlock_init();
 	chunksdatacache_init();
 	symlink_cache_init();
 	negentry_cache_init(mfsopts.negentrycacheto);
@@ -837,6 +839,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		negentry_cache_term();
 		symlink_cache_term();
 		chunksdatacache_term();
+		chunkrwlock_term();
 		conncache_term();
 		return 1;
 	}
@@ -845,6 +848,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //	negentry_cache_term();
 //	symlink_cache_term();
 //	chunksdatacache_term();
+//	chunkrwlock_term();
 //	conncache_term();
 //	return 1;
 
@@ -876,6 +880,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		negentry_cache_term();
 		symlink_cache_term();
 		chunksdatacache_term();
+		chunkrwlock_term();
 		conncache_term();
 		return 1;
 	}
@@ -909,6 +914,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		negentry_cache_term();
 		symlink_cache_term();
 		chunksdatacache_term();
+		chunkrwlock_term();
 		conncache_term();
 		return 1;
 	}
@@ -939,6 +945,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		negentry_cache_term();
 		symlink_cache_term();
 		chunksdatacache_term();
+		chunkrwlock_term();
 		conncache_term();
 		return 1;
 	}
@@ -991,6 +998,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	negentry_cache_term();
 	symlink_cache_term();
 	chunksdatacache_term();
+	chunkrwlock_term();
 	conncache_term();
 	return err ? 1 : 0;
 }

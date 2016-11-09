@@ -112,7 +112,7 @@ uint16_t posix_acl_getmode(uint32_t inode) {
 
 	acn = posix_acl_find(inode,POSIX_ACL_ACCESS);
 //	(acn->mask==0xFFFF) ???
-	return ((((acn->userperm)&7)<<6) | (((acn->mask)&7)<<3) | ((acn->otherperm)&7));
+	return ((acn->userperm & 7) << 6) | ((acn->mask & 7) << 3) | (acn->otherperm & 7);
 }
 
 void posix_acl_setmode(uint32_t inode,uint16_t mode) {
@@ -175,7 +175,7 @@ uint8_t posix_acl_accmode(uint32_t inode,uint32_t auid,uint32_t agids,uint32_t *
 	}
 }
 
-uint8_t posix_acl_copydefaults(uint32_t parent,uint32_t inode,uint8_t directory,uint16_t mode) {
+uint8_t posix_acl_copydefaults(uint32_t parent,uint32_t inode,uint8_t directory,uint16_t *mode) {
 	uint16_t i,acls;
 	uint8_t ret;
 	acl_node *pacn;
@@ -187,45 +187,48 @@ uint8_t posix_acl_copydefaults(uint32_t parent,uint32_t inode,uint8_t directory,
 		return ret;
 	}
 	acls = pacn->namedusers + pacn->namedgroups;
-	acn = posix_acl_find(inode,POSIX_ACL_ACCESS);
-	if (acn==NULL) {
-		acn = posix_acl_create(inode,POSIX_ACL_ACCESS);
-		ret |= 1;
-//		fs_set_aclflag(inode,0);
-	}
-	acn->userperm &= 0xFFF8;
-	acn->userperm |= (mode>>6)&7;
-	acn->userperm &= pacn->userperm;
-	acn->groupperm = pacn->groupperm;
-	acn->otherperm &= 0xFFF8;
-	acn->otherperm |= mode&7;
-	acn->otherperm &= pacn->otherperm;
-	acn->mask &= 0xFFF8;
-	acn->mask |= (mode>>3)&7;
-	acn->mask &= pacn->mask;
-	if (acn->namedusers+acn->namedgroups!=acls) {
-		if (acn->acltab!=NULL) {
-			free(acn->acltab);
+	if (acls==0 && pacn->userperm<=7 && pacn->groupperm<=7 && pacn->otherperm<=7 && pacn->mask==0xFFFF) { // simple ACL as DEFAULT - just modify mode
+		*mode &= 0xFE00 | (pacn->userperm << 6) | (pacn->groupperm << 3) | pacn->otherperm;
+	} else {
+		acn = posix_acl_find(inode,POSIX_ACL_ACCESS);
+		if (acn==NULL) {
+			acn = posix_acl_create(inode,POSIX_ACL_ACCESS);
+			ret |= 1;
 		}
-		if (acls>0) {
-			acn->acltab = malloc(sizeof(acl_entry)*acls);
-			passert(acn->acltab);
-		} else {
-			acn->acltab = NULL;
+		acn->userperm &= 0xFFF8;
+		acn->userperm |= ((*mode)>>6)&7;
+		acn->userperm &= pacn->userperm;
+		acn->groupperm = pacn->groupperm;
+		acn->otherperm &= 0xFFF8;
+		acn->otherperm |= (*mode)&7;
+		acn->otherperm &= pacn->otherperm;
+		acn->mask &= 0xFFF8;
+		acn->mask |= ((*mode)>>3)&7;
+		acn->mask &= pacn->mask;
+		*mode = ((*mode) & 0xFE00) | ((acn->userperm&7) << 6) | ((acn->groupperm&7) << 3) | (acn->otherperm&7); // groupperm not mask here !!!
+		if (acn->namedusers+acn->namedgroups!=acls) {
+			if (acn->acltab!=NULL) {
+				free(acn->acltab);
+			}
+			if (acls>0) {
+				acn->acltab = malloc(sizeof(acl_entry)*acls);
+				passert(acn->acltab);
+			} else {
+				acn->acltab = NULL;
+			}
 		}
-	}
-	acn->namedusers = pacn->namedusers;
-	acn->namedgroups = pacn->namedgroups;
-	for (i=0 ; i<acls ; i++) {
-		acn->acltab[i].id = pacn->acltab[i].id;
-		acn->acltab[i].perm = pacn->acltab[i].perm;
+		acn->namedusers = pacn->namedusers;
+		acn->namedgroups = pacn->namedgroups;
+		for (i=0 ; i<acls ; i++) {
+			acn->acltab[i].id = pacn->acltab[i].id;
+			acn->acltab[i].perm = pacn->acltab[i].perm;
+		}
 	}
 	if (directory) {
 		acn = posix_acl_find(inode,POSIX_ACL_DEFAULT);
 		if (acn==NULL) {
 			acn = posix_acl_create(inode,POSIX_ACL_DEFAULT);
 			ret |= 2;
-//			fs_set_aclflag(inode,1);
 		}
 		acn->userperm = pacn->userperm;
 		acn->groupperm = pacn->groupperm;
@@ -260,7 +263,7 @@ void posix_acl_set(uint32_t inode,uint8_t acltype,uint16_t userperm,uint16_t gro
 	uint16_t i,acls;
 	acl_node *acn;
 
-	if (((namedusers | namedgroups) == 0) && userperm<=7 && groupperm<=7 && otherperm<=7 && mask==0xFFFF) {
+	if (acltype==POSIX_ACL_ACCESS && ((namedusers | namedgroups) == 0) && userperm<=7 && groupperm<=7 && otherperm<=7 && mask==0xFFFF) {
 		posix_acl_delete(inode,acltype);
 		fs_del_aclflag(inode,acltype);
 		return;

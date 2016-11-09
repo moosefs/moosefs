@@ -28,8 +28,7 @@
 #include "datapack.h"
 #include "MFSCommunication.h"
 
-#define CHUNKHDRCRC 1024
-#define CHUNKHDRSIZE ((CHUNKHDRCRC)+4*1024)
+#define CHUNKCRCSIZE 4096
 
 static inline int hdd_check_filename(const char *fname,uint64_t *chunkid,uint32_t *version) {
 	uint64_t namechunkid;
@@ -85,6 +84,7 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 	uint8_t buff[MFSBLOCKSIZE];
 	uint32_t crc[1024];
 	uint32_t crcblock;
+	uint16_t hdrsize;
 	off_t s;
 	const uint8_t *rp;
 	uint8_t *wp;
@@ -149,13 +149,20 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 		}
 	}
 
+	s = lseek(fd,0,SEEK_END);
+	hdrsize = (s - CHUNKCRCSIZE) & MFSBLOCKMASK;
+	if (hdrsize!=1024 && hdrsize!=4096) {
+		fprintf(stderr,"%s: wrong file size\n",fname);
+		close(fd);
+		return -1;
+	}
 	// read crc
-	if (lseek(fd,CHUNKHDRCRC,SEEK_SET)!=CHUNKHDRCRC) {
+	if (lseek(fd,hdrsize,SEEK_SET)!=hdrsize) {
 		fprintf(stderr,"%s: error setting file pointer\n",fname);
 		close(fd);
 		return -1;
 	}
-	if (read(fd,buff,4096)!=4096) {
+	if (read(fd,buff,CHUNKCRCSIZE)!=CHUNKCRCSIZE) {
 		fprintf(stderr,"%s: error reading checksum block\n",fname);
 		close(fd);
 		return -1;
@@ -168,12 +175,12 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 	// check data crc
 	if (fastmode && repair==0) {
 		s = lseek(fd,-MFSBLOCKSIZE,SEEK_END);
-		if (s<MFSHDRSIZE) {
+		if (s<(hdrsize + CHUNKCRCSIZE)) {
 			fprintf(stderr,"%s: wrong file size\n",fname);
 			close(fd);
 			return -1;
 		}
-		s -= MFSHDRSIZE;
+		s -= (hdrsize + CHUNKCRCSIZE);
 		if ((s%MFSBLOCKSIZE)!=0) {
 			fprintf(stderr,"%s: wrong file size\n",fname);
 			close(fd);
@@ -191,7 +198,7 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 			ret |= 2;
 		}
 	} else {
-		if (lseek(fd,MFSHDRSIZE,SEEK_SET)!=MFSHDRSIZE) {
+		if (lseek(fd,(hdrsize + CHUNKCRCSIZE),SEEK_SET)!=(hdrsize + CHUNKCRCSIZE)) {
 			fprintf(stderr,"%s: error setting file pointer\n",fname);
 			close(fd);
 			return -1;
@@ -219,12 +226,12 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 			for (i=0 ; i<1024 ; i++) {
 				put32bit(&wp,crc[i]);
 			}
-			if (lseek(fd,CHUNKHDRCRC,SEEK_SET)!=CHUNKHDRCRC) {
+			if (lseek(fd,hdrsize,SEEK_SET)!=hdrsize) {
 				fprintf(stderr,"%s: error setting file pointer\n",fname);
 				close(fd);
 				return -1;
 			}
-			if (write(fd,buff,4096)!=4096) {
+			if (write(fd,buff,CHUNKCRCSIZE)!=CHUNKCRCSIZE) {
 				fprintf(stderr,"%s: error writing checksum block\n",fname);
 				close(fd);
 				return -1;

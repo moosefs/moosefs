@@ -1784,28 +1784,18 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 					uint8_t *p;
 					if (rversion==50) {
 						p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,5);
-						if (p) {
-							put8bit(&p,0);
-							put32bit(&p,VERSHEX);
-						} else {
-							eptr->mode = KILL;
-							return;
-						}
+						put8bit(&p,0);
+						put32bit(&p,VERSHEX);
 					} else {
 						uint8_t mode;
 					mode = (eptr->version >= VERSION2INT(2,0,33))?1:0;
 							p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,mode?17:9);
-							if (p) {
-								put8bit(&p,0);
-								put32bit(&p,VERSHEX);
-								put16bit(&p,eptr->timeout);
-								put16bit(&p,csdb_get_csid(eptr->csptr));
-								if (mode) {
-									put64bit(&p,meta_get_id());
-								}
-							} else {
-								eptr->mode = KILL;
-								return;
+							put8bit(&p,0);
+							put32bit(&p,VERSHEX);
+							put16bit(&p,eptr->timeout);
+							put16bit(&p,csdb_get_csid(eptr->csptr));
+							if (mode) {
+								put64bit(&p,meta_get_id());
 							}
 				}
 				}
@@ -1843,15 +1833,10 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 //				} else {
 					p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,1);
 //				}
-				if (p) {
-					put8bit(&p,0);
-//					if (eptr->version<VERSION2INT(2,0,0)) {
-//						put32bit(&p,VERSHEX);
-//					}
-				} else {
-					eptr->mode = KILL;
-					return;
-				}
+				put8bit(&p,0);
+//				if (eptr->version<VERSION2INT(2,0,0)) {
+//					put32bit(&p,VERSHEX);
+//				}
 			}
 			return;
 		} else if (rversion==52) {
@@ -2559,6 +2544,7 @@ void matocsserv_serve(struct pollfd *pdesc) {
 			}
 		}
 		if ((eptr->lastread+eptr->timeout)<now) {
+			syslog(LOG_NOTICE,"connection with %s:%u timed out",eptr->servstrip,eptr->servport);
 			eptr->mode = KILL;
 		}
 		if (eptr->mode==FINISH && eptr->outputhead==NULL) {
@@ -2642,13 +2628,6 @@ int matocsserv_no_more_pending_jobs(void) {
 	return 1;
 }
 
-void matocsserv_disconnect_all(void) {
-	matocsserventry *eptr;
-	for (eptr=matocsservhead ; eptr ; eptr=eptr->next) {
-		eptr->mode = KILL;
-	}
-	matocsserv_disconnection_loop();
-}
 
 uint8_t matocsserv_parse_ip(const char *ipstr,uint32_t *ipnum) {
 	uint32_t ip,octet,i;

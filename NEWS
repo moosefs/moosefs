@@ -1,5 +1,20 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.84-1 (2016-10-06)
+
+  - (master) fixed setting acl-default without named users or named groups
+  - (master) fixed master-follower synchronization after setting storage class
+
+* MooseFS 3.0.83-1 (2016-09-30)
+
+  - (cs) changed header size from 5k to 8k (due to 4k-sector hard disks)
+
+* MooseFS 3.0.82-1 (2016-09-28)
+
+  - (all) silenced message about using deprecated parameter 'oom_adj'
+  - (mount) fixed FreeBSD delayed release mechanism
+  - (mount) added rwlock for chunks
+
 * MooseFS 3.0.81-1 (2016-07-25)
 
   - (mount) fixed oom killer disabling (setting oom_adj and oom_score_adj)

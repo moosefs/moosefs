@@ -1084,7 +1084,7 @@ int do_symlink(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return fs_mr_symlink(ts,parent,strlen((char*)name),name,path,uid,gid,inode);
 }
 
-int do_spdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+int do_scdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint8_t name[256];
 	uint16_t spid;
 	(void)ts;
@@ -1097,7 +1097,7 @@ int do_spdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return sclass_mr_delete_entry(strlen((char*)name),name,spid);
 }
 
-int do_spdup(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+int do_scdup(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint8_t sname[256];
 	uint8_t dname[256];
 	uint16_t sspid,dspid;
@@ -1115,7 +1115,7 @@ int do_spdup(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return sclass_mr_duplicate_entry(strlen((char*)sname),sname,strlen((char*)dname),dname,sspid,dspid);
 }
 
-int do_spren(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+int do_scren(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint8_t sname[256];
 	uint8_t dname[256];
 	uint16_t spid;
@@ -1131,15 +1131,15 @@ int do_spren(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return sclass_mr_rename_entry(strlen((char*)sname),sname,strlen((char*)dname),dname,spid);
 }
 
-int do_spset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+int do_scset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint8_t name[256];
 	uint16_t spid;
 	uint16_t arch_delay;
 	uint8_t new_flag,adminonly;
 	uint8_t create_labelscnt,keep_labelscnt,arch_labelscnt,create_mode,i;
-	uint32_t create_labelmasks[9*MASKORGROUP];
-	uint32_t keep_labelmasks[9*MASKORGROUP];
-	uint32_t arch_labelmasks[9*MASKORGROUP];
+	uint32_t create_labelmasks[MAXLABELSCNT*MASKORGROUP];
+	uint32_t keep_labelmasks[MAXLABELSCNT*MASKORGROUP];
+	uint32_t arch_labelmasks[MAXLABELSCNT*MASKORGROUP];
 	(void)ts;
 	EAT(ptr,filename,lv,'(');
 	GETNAME(name,ptr,filename,lv,',');
@@ -1160,20 +1160,25 @@ int do_spset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETU16(arch_delay,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU8(adminonly,ptr);
-	if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9 || arch_labelscnt==0 || arch_labelscnt>9) {
+	if (create_labelscnt>MAXLABELSCNT || keep_labelscnt>MAXLABELSCNT || arch_labelscnt>MAXLABELSCNT) {
 		return MFS_ERROR_EINVAL;
 	}
-	for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
+	if (create_labelscnt+keep_labelscnt+arch_labelscnt==0) {
 		EAT(ptr,filename,lv,',');
-		GETU32(create_labelmasks[i],ptr);
-	}
-	for (i=0 ; i<keep_labelscnt*MASKORGROUP ; i++) {
-		EAT(ptr,filename,lv,',');
-		GETU32(keep_labelmasks[i],ptr);
-	}
-	for (i=0 ; i<arch_labelscnt*MASKORGROUP ; i++) {
-		EAT(ptr,filename,lv,',');
-		GETU32(arch_labelmasks[i],ptr);
+		EAT(ptr,filename,lv,'-');
+	} else {
+		for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
+			EAT(ptr,filename,lv,',');
+			GETU32(create_labelmasks[i],ptr);
+		}
+		for (i=0 ; i<keep_labelscnt*MASKORGROUP ; i++) {
+			EAT(ptr,filename,lv,',');
+			GETU32(keep_labelmasks[i],ptr);
+		}
+		for (i=0 ; i<arch_labelscnt*MASKORGROUP ; i++) {
+			EAT(ptr,filename,lv,',');
+			GETU32(arch_labelmasks[i],ptr);
+		}
 	}
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
@@ -1487,24 +1492,24 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 				return do_sesdisconnected(filename,lv,ts,ptr+15);
 			}
 			break;
-		case HASHCODE('S','P','D','E'):
-			if (strncmp(ptr,"SPDEL",5)==0) {
-				return do_spdel(filename,lv,ts,ptr+5);
+		case HASHCODE('S','C','D','E'):
+			if (strncmp(ptr,"SCDEL",5)==0) {
+				return do_scdel(filename,lv,ts,ptr+5);
 			}
 			break;
-		case HASHCODE('S','P','D','U'):
-			if (strncmp(ptr,"SPDUP",5)==0) {
-				return do_spdup(filename,lv,ts,ptr+5);
+		case HASHCODE('S','C','D','U'):
+			if (strncmp(ptr,"SCDUP",5)==0) {
+				return do_scdup(filename,lv,ts,ptr+5);
 			}
 			break;
-		case HASHCODE('S','P','R','E'):
-			if (strncmp(ptr,"SPREN",5)==0) {
-				return do_spren(filename,lv,ts,ptr+5);
+		case HASHCODE('S','C','R','E'):
+			if (strncmp(ptr,"SCREN",5)==0) {
+				return do_scren(filename,lv,ts,ptr+5);
 			}
 			break;
-		case HASHCODE('S','P','S','E'):
-			if (strncmp(ptr,"SPSET",5)==0) {
-				return do_spset(filename,lv,ts,ptr+5);
+		case HASHCODE('S','C','S','E'):
+			if (strncmp(ptr,"SCSET",5)==0) {
+				return do_scset(filename,lv,ts,ptr+5);
 			}
 			break;
 		case HASHCODE('T','R','U','N'):

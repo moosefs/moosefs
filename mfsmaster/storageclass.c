@@ -41,8 +41,6 @@
 
 #define MAXSCLASSNLENG 256
 
-#define MAXLABELSCNT 9
-
 #define REDUNDANCYCLASSES 3
 
 #define CHLOGSTRSIZE ((3*MAXLABELSCNT*10*MASKORGROUP)+1)
@@ -121,10 +119,10 @@ static inline void sclass_make_changelog(uint16_t sclassid,uint8_t new_flag) {
 	if (chlogstrleng>0) {
 		chlogstr[chlogstrleng-1]='\0';
 	} else {
-		chlogstr[0]='0';
+		chlogstr[0]='-';
 		chlogstr[1]='\0';
 	}
-	changelog("%"PRIu32"|SCSET(%s,%"PRIu8",W%"PRIu8",K%"PRIu8",A%"PRIu8",%"PRIu8",%"PRIu16",%"PRIu8",%s)",main_time(),changelog_escape_name(sclasstab[sclassid].nleng,sclasstab[sclassid].name),new_flag,sclasstab[sclassid].create_labelscnt,sclasstab[sclassid].keep_labelscnt,sclasstab[sclassid].arch_labelscnt,sclasstab[sclassid].create_mode,sclasstab[sclassid].arch_delay,sclasstab[sclassid].admin_only,chlogstr);
+	changelog("%"PRIu32"|SCSET(%s,%"PRIu8",W%"PRIu8",K%"PRIu8",A%"PRIu8",%"PRIu8",%"PRIu16",%"PRIu8",%s):%"PRIu16,main_time(),changelog_escape_name(sclasstab[sclassid].nleng,sclasstab[sclassid].name),new_flag,sclasstab[sclassid].create_labelscnt,sclasstab[sclassid].keep_labelscnt,sclasstab[sclassid].arch_labelscnt,sclasstab[sclassid].create_mode,sclasstab[sclassid].arch_delay,sclasstab[sclassid].admin_only,chlogstr,sclassid);
 
 }
 

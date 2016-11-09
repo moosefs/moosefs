@@ -2048,6 +2048,7 @@ static inline void fsnodes_link(uint32_t ts,fsnode *parent,fsnode *child,uint16_
 
 static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nleng,const uint8_t *name,uint8_t type,uint16_t mode,uint16_t cumask,uint32_t uid,uint32_t gid,uint8_t copysgid) {
 	fsnode *p;
+	uint8_t aclcopied;
 	switch (type) {
 		case TYPE_DIRECTORY:
 			p = fsnode_dir_malloc();
@@ -2096,8 +2097,10 @@ static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nlen
 		p->flags = node->flags & ~(EATTR_NOECACHE);
 	}
 	if (node->acldefflag) {
+		aclcopied = posix_acl_copydefaults(node->inode,p->inode,(type==TYPE_DIRECTORY)?1:0,&mode);
 		p->mode = mode;
 	} else {
+		aclcopied = 0;
 		p->mode = mode & ~cumask;
 	}
 	p->uid = uid;
@@ -2133,15 +2136,11 @@ static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nlen
 	p->parents = NULL;
 	fsnodes_node_add(p);
 	fsnodes_link(ts,node,p,nleng,name);
-	if (node->acldefflag) {
-		uint8_t aclcopied;
-		aclcopied = posix_acl_copydefaults(node->inode,p->inode,(type==TYPE_DIRECTORY)?1:0,mode);
-		if (aclcopied&1) {
-			p->aclpermflag = 1;
-		}
-		if (aclcopied&2) {
-			p->acldefflag = 1;
-		}
+	if (aclcopied&1) {
+		p->aclpermflag = 1;
+	}
+	if (aclcopied&2) {
+		p->acldefflag = 1;
 	}
 	return p;
 }

@@ -1432,22 +1432,30 @@ int main(int argc,char **argv) {
 		FILE *oomfd;
 		int oomdis;
 		oomdis = 0;
-#if defined(OOM_DISABLE)
+#  if defined(OOM_SCORE_ADJ_MIN)
+		oomfd = fopen("/proc/self/oom_score_adj","w");
+		if (oomfd!=NULL) {
+			fprintf(oomfd,"%d\n",OOM_SCORE_ADJ_MIN);
+			fclose(oomfd);
+			oomdis = 1;
+#    if defined(OOM_DISABLE)
+		} else {
+			oomfd = fopen("/proc/self/oom_adj","w");
+			if (oomfd!=NULL) {
+				fprintf(oomfd,"%d\n",OOM_DISABLE);
+				fclose(oomfd);
+				oomdis = 1;
+			}
+#    endif
+		}
+#  elif defined(OOM_DISABLE)
 		oomfd = fopen("/proc/self/oom_adj","w");
 		if (oomfd!=NULL) {
 			fprintf(oomfd,"%d\n",OOM_DISABLE);
 			fclose(oomfd);
 			oomdis = 1;
 		}
-#endif
-#if defined(OOM_SCORE_ADJ_MIN)
-		oomfd = fopen("/proc/self/oom_score_adj","w");
-		if (oomfd!=NULL) {
-			fprintf(oomfd,"%d\n",OOM_SCORE_ADJ_MIN);
-			fclose(oomfd);
-			oomdis = 1;
-		}
-#endif
+#  endif
 		if (oomdis) {
 			syslog(LOG_NOTICE,"out of memory killer disabled");
 		} else {

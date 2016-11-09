@@ -1,3 +1,24 @@
+moosefs (3.0.84-1) unstable; urgency=medium
+
+  * (master) fixed setting acl-default without named users or named groups
+  * (master) fixed master-follower synchronization after setting storage class
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 06 Oct 2016 13:00:00 +0200
+
+moosefs (3.0.83-1) unstable; urgency=medium
+
+  * (cs) changed header size from 5k to 8k (due to 4k-sector hard disks)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 30 Sep 2016 13:00:00 +0200
+
+moosefs (3.0.82-1) unstable; urgency=medium
+
+  * (all) silenced message about using deprecated parameter 'oom_adj'
+  * (mount) fixed FreeBSD delayed release mechanism
+  * (mount) added rwlock for chunks
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 28 Sep 2016 13:00:00 +0200
+
 moosefs (3.0.81-1) unstable; urgency=medium
 
   * (mount) fixed oom killer disabling (setting oom_adj and oom_score_adj)

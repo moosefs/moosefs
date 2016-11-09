@@ -299,6 +299,7 @@ inodedata* write_get_inodedata(uint32_t inode,uint64_t fleng) {
 	}
 
 	ind = malloc(sizeof(inodedata));
+	passert(ind);
 	ind->inode = inode;
 	ind->cacheblockcount = 0;
 	ind->maxfleng = fleng;
@@ -656,6 +657,10 @@ void* write_worker(void *arg) {
 	uint8_t firsttime = 1;
 	worker *w = (worker*)arg;
 
+	uint8_t valid_offsets;
+	uint64_t min_offset;
+	uint64_t max_offset;
+
 	inodedata *ind;
 	chunkdata *chd;
 	cblock *cb,*ncb,*rcb;
@@ -728,6 +733,10 @@ void* write_worker(void *arg) {
 		if (optimeout>0.0) {
 			opbegin = monotonic_seconds();
 		}
+
+		valid_offsets = 0;
+		min_offset = 0;
+		max_offset = 0;
 
 		// syslog(LOG_NOTICE,"file: %"PRIu32", index: %"PRIu16" - debug1",ind->inode,chindx);
 		// get chunk data from master
@@ -1081,6 +1090,9 @@ void* write_worker(void *arg) {
 					}
 				}
 				if (sending_mode==2) {
+					uint64_t offset_from;
+					uint64_t offset_to;
+
 					cb->writeid = nextwriteid++;
 // debug:				syslog(LOG_NOTICE,"writeworker: data packet prepared (writeid:%"PRIu32",pos:%"PRIu16")",cb->writeid,cb->pos);
 					waitforstatus++;
@@ -1102,6 +1114,24 @@ void* write_worker(void *arg) {
 					sent = 0;
 					lastblock = now;
 					lastsent = now;
+					offset_from = chindx;
+					offset_from <<= MFSCHUNKBITS;
+					offset_from += cb->pos*MFSBLOCKSIZE;
+					offset_to = offset_from;
+					offset_from += cb->from;
+					offset_to += cb->to;
+					if (valid_offsets) {
+						if (offset_from < min_offset) {
+							min_offset = offset_from;
+						}
+						if (offset_to > max_offset) {
+							max_offset = offset_to;
+						}
+					} else {
+						min_offset = offset_from;
+						max_offset = offset_to;
+						valid_offsets = 1;
+					}
 				} else if (lastsent+WORKER_NOP_INTERVAL<now && chainminver>=VERSION2INT(1,7,32)) {
 					wptr = sendbuff;
 					put32bit(&wptr,ANTOAN_NOP);
@@ -1437,12 +1467,16 @@ void* write_worker(void *arg) {
 					write_job_end(chd,0,1000+((chd->trycnt<30)?((chd->trycnt-1)*300000):10000000));
 				}
 			} else {
+				if (valid_offsets) {
+					read_inode_clear_cache(ind->inode,min_offset,max_offset-min_offset);
+				}
 				// read_inode_set_length_async(ind->inode,mfleng,0);
 				write_job_end(chd,0,0);
 			}
 		}
 		chunkrwlock_wunlock(ind->inode,chindx);
 	}
+	return NULL;
 }
 
 void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint32_t logretry) {
@@ -1471,6 +1505,7 @@ void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint3
 	zassert(pthread_cond_init(&fcbcond,NULL));
 	fcbwaiting=0;
 	cacheblocks = malloc(sizeof(cblock)*cacheblockcount);
+	passert(cacheblocks);
 	for (i=0 ; i<cacheblockcount-1 ; i++) {
 		cacheblocks[i].next = cacheblocks+(i+1);
 	}

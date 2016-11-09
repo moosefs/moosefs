@@ -2187,6 +2187,9 @@ static inline void read_data_dirty_region(inodedata *ind,uint64_t offset,uint32_
 		pthread_cond_wait(&(ind->writerscond),&(ind->lock));
 	}
 	ind->waiting_writers--;
+	if (offset+size>ind->fleng) {
+		ind->fleng = offset+size;
+	}
 	for (rreq = ind->reqhead ; rreq ; rreq=rreqn) {
 		rreqn = rreq->next;
 		sassert(rreq->lcnt==0);
@@ -2200,6 +2203,13 @@ static inline void read_data_dirty_region(inodedata *ind,uint64_t offset,uint32_
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: read_data_dirty_region: rreq (%"PRIu64":%"PRIu32") : refresh\n",monotonic_seconds(),rreq->offset,rreq->leng);
 #endif
+				if (rreq->rleng < rreq->leng && rreq->offset + rreq->rleng < ind->fleng) {
+					if (rreq->offset + rreq->leng < ind->fleng) {
+						rreq->rleng = ind->fleng - rreq->offset;
+					} else {
+						rreq->rleng = rreq->leng;
+					}
+				}
 				rreq->mode = REFRESH;
 				if (rreq->waitingworker) {
 					if (universal_write(rreq->pipe[1]," ",1)!=1) {
@@ -2207,14 +2217,19 @@ static inline void read_data_dirty_region(inodedata *ind,uint64_t offset,uint32_
 					}
 					rreq->waitingworker=0;
 				}
+			} else {
+				if (rreq->rleng < rreq->leng && rreq->offset + rreq->rleng < ind->fleng) {
+					if (rreq->offset + rreq->leng < ind->fleng) {
+						rreq->rleng = ind->fleng - rreq->offset;
+					} else {
+						rreq->rleng = rreq->leng;
+					}
+				}
 			}
 		}
 #ifdef RDEBUG
 		fprintf(stderr,"%.6lf: read_data_dirty_region: rreq (after): (%"PRIu64":%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),rreq->offset,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 #endif
-	}
-	if (offset+size>ind->fleng) {
-		ind->fleng = offset+size;
 	}
 	if (ind->waiting_writers>0) {
 		zassert(pthread_cond_signal(&(ind->writerscond)));
@@ -2415,6 +2430,7 @@ void read_data_set_length(inodedata *ind,uint64_t newlength,uint8_t active) {
 		pthread_cond_wait(&(ind->writerscond),&(ind->lock));
 	}
 	ind->waiting_writers--;
+	ind->fleng = newlength;
 	for (rreq = ind->reqhead ; rreq ; rreq=rreqn) {
 		rreqn = rreq->next;
 		sassert(rreq->lcnt==0);
@@ -2425,6 +2441,13 @@ void read_data_set_length(inodedata *ind,uint64_t newlength,uint8_t active) {
 #ifdef RDEBUG
 			fprintf(stderr,"%.6lf: read_data_set_length: block is busy - refresh\n",monotonic_seconds());
 #endif
+			if (rreq->rleng < rreq->leng && rreq->offset + rreq->rleng < ind->fleng) {
+				if (rreq->offset + rreq->leng < ind->fleng) {
+					rreq->rleng = ind->fleng - rreq->offset;
+				} else {
+					rreq->rleng = rreq->leng;
+				}
+			}
 			rreq->mode = REFRESH;
 			if (rreq->waitingworker) {
 				if (universal_write(rreq->pipe[1]," ",1)!=1) {
@@ -2439,6 +2462,14 @@ void read_data_set_length(inodedata *ind,uint64_t newlength,uint8_t active) {
 				read_delete_request(rreq);
 				rreq = NULL;
 			}
+		} else {
+			if (rreq->rleng < rreq->leng && rreq->offset + rreq->rleng < ind->fleng) {
+				if (rreq->offset + rreq->leng < ind->fleng) {
+					rreq->rleng = ind->fleng - rreq->offset;
+				} else {
+					rreq->rleng = rreq->leng;
+				}
+			}
 		}
 #ifdef RDEBUG
 		if (rreq) {
@@ -2448,7 +2479,6 @@ void read_data_set_length(inodedata *ind,uint64_t newlength,uint8_t active) {
 		}
 #endif
 	}
-	ind->fleng = newlength;
 	if (ind->closing && ind->reqhead==NULL) {
 		zassert(pthread_cond_broadcast(&(ind->closecond)));
 	}

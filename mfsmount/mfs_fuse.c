@@ -70,8 +70,8 @@
 #if defined(__FreeBSD__)
 // workaround for bug in FreeBSD Fuse version (kernel part)
 #  define FREEBSD_FALSE_TRUNCATE_WORKAROUND 1
-#  define FREEBSD_EARLY_RELEASE_BUG_WORKAROUND 1
-#  define FREEBSD_EARLY_RELEASE_DELAY 10.0
+#  define FREEBSD_DELAYED_RELEASE 1
+#  define FREEBSD_RELEASE_DELAY 10.0
 #endif
 
 #define READDIR_BUFFSIZE 50000
@@ -148,7 +148,8 @@ typedef struct _finfo {
 	double create;
 	pthread_mutex_t lock;
 	pthread_cond_t cond;
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+	uint32_t findex;
+#ifdef FREEBSD_DELAYED_RELEASE
 	uint32_t ops_in_progress;
 	double lastuse;
 #endif
@@ -329,8 +330,26 @@ static uint32_t finfo_first=1,finfo_size=0,finfo_max=1;
 static finfo* *finfo_tab=NULL;
 static pthread_mutex_t finfo_tab_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static void finfo_free_resources(finfo *fileinfo) {
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	if (fileinfo->rdata) {
+		read_data_end(fileinfo->rdata);
+	}
+	if (fileinfo->wdata) {
+		write_data_end(fileinfo->wdata);
+	}
+	fileinfo->rdata = fileinfo->wdata = NULL;
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+}
+
 static uint32_t finfo_new(void) {
-	uint32_t i;
+	uint32_t i,findex;
+#ifdef FREEBSD_DELAYED_RELEASE
+	double now;
+	uint8_t change_finfo_first;
+	now = monotonic_seconds();
+	change_finfo_first = 0;
+#endif
 	zassert(pthread_mutex_lock(&finfo_tab_lock));
 	for (i=finfo_first ; i<finfo_max ; i++) {
 		if (finfo_tab[i]==NULL) {
@@ -339,14 +358,60 @@ static uint32_t finfo_new(void) {
 			zassert(pthread_mutex_init(&(finfo_tab[i]->lock),NULL));
 			zassert(pthread_cond_init(&(finfo_tab[i]->cond),NULL));
 			finfo_tab[i]->valid = 1;
-			finfo_first = i+1;
+			findex = i;
+			findex += 0x1000000;
+			finfo_tab[i]->findex = findex;
+#ifdef FREEBSD_DELAYED_RELEASE
+			if (change_finfo_first) {
+#endif
+				finfo_first = i+1;
+#ifdef FREEBSD_DELAYED_RELEASE
+			}
+#endif
 			zassert(pthread_mutex_unlock(&finfo_tab_lock));
-			return i;
+			return findex;
 		} else if (finfo_tab[i]->valid==0) {
 			finfo_tab[i]->valid = 1;
-			finfo_first = i+1;
+			findex = finfo_tab[i]->findex;
+			massert((findex&0xFFFFFF)==i,"file info record index mismatch");
+			findex += 0x1000000;
+			if ((findex & 0xFF000000)==0) {
+				findex += 0x1000000;
+			}
+			finfo_tab[i]->findex = findex;
+#ifdef FREEBSD_DELAYED_RELEASE
+			if (change_finfo_first) {
+#endif
+				finfo_first = i+1;
+#ifdef FREEBSD_DELAYED_RELEASE
+			}
+#endif
 			zassert(pthread_mutex_unlock(&finfo_tab_lock));
-			return i;
+			return findex;
+#ifdef FREEBSD_DELAYED_RELEASE
+		} else if (finfo_tab[i]->valid==2 && finfo_tab[i]->ops_in_progress==0 && finfo_tab[i]->lastuse+FREEBSD_RELEASE_DELAY<now) {
+			finfo_tab[i]->valid = 3;
+			zassert(pthread_mutex_unlock(&finfo_tab_lock));
+
+			finfo_free_resources(finfo_tab[i]);
+
+			zassert(pthread_mutex_lock(&finfo_tab_lock));
+			finfo_tab[i]->valid = 1;
+			findex = finfo_tab[i]->findex;
+			massert((findex&0xFFFFFF)==i,"file info record index mismatch");
+			findex += 0x1000000;
+			if ((findex & 0xFF000000)==0) {
+				findex += 0x1000000;
+			}
+			finfo_tab[i]->findex = findex;
+			if (change_finfo_first) {
+				finfo_first = i+1;
+			}
+			zassert(pthread_mutex_unlock(&finfo_tab_lock));
+			return findex;
+		} else if (finfo_tab[i]->valid==2) {
+			change_finfo_first = 0;
+#endif
 		}
 	}
 	if (finfo_max>=finfo_size) {
@@ -357,6 +422,7 @@ static uint32_t finfo_new(void) {
 			finfo_tab[0] = NULL;
 		} else {
 			finfo_size *= 2;
+			massert(finfo_size<=0x1000000,"file handle tabble too big");
 			finfo_tab = mfsrealloc(finfo_tab,sizeof(finfo*)*finfo_size);
 			passert(finfo_tab);
 		}
@@ -367,25 +433,40 @@ static uint32_t finfo_new(void) {
 	zassert(pthread_mutex_init(&(finfo_tab[i]->lock),NULL));
 	zassert(pthread_cond_init(&(finfo_tab[i]->cond),NULL));
 	finfo_tab[i]->valid = 1;
-	finfo_first = i+1;
+	findex = i;
+	findex += 0x1000000;
+	finfo_tab[i]->findex = findex;
+#ifdef FREEBSD_DELAYED_RELEASE
+	if (change_finfo_first) {
+#endif
+		finfo_first = i+1;
+#ifdef FREEBSD_DELAYED_RELEASE
+	}
+#endif
 	finfo_max = i+1;
-	printf("finfo_max: %"PRIu32"\n",finfo_max);
 	zassert(pthread_mutex_unlock(&finfo_tab_lock));
-	return i;
+	return findex;
 }
 
-#ifndef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
 static void finfo_release(uint32_t findex) {
+	uint32_t tindex;
 	if (findex>0) {
+		tindex = findex & 0xFFFFFF;
 		zassert(pthread_mutex_lock(&finfo_tab_lock));
-		finfo_tab[findex]->valid = 0;
-		if (findex < finfo_first) {
-			finfo_first = findex;
+		if (tindex<finfo_max) {
+#ifndef FREEBSD_DELAYED_RELEASE
+			finfo_tab[tindex]->valid = 2;
+#else
+			finfo_tab[tindex]->valid = 0;
+			finfo_tab[tindex]->inode = 0;
+#endif
+			if (tindex < finfo_first) {
+				finfo_first = tindex;
+			}
 		}
 		zassert(pthread_mutex_unlock(&finfo_tab_lock));
 	}
 }
-#endif
 
 static void finfo_freeall(void) {
 	uint32_t i;
@@ -435,6 +516,29 @@ static void finfo_change_fleng(uint32_t inode,uint64_t fleng) {
 		}
 	}
 	zassert(pthread_mutex_unlock(&finfo_tab_lock));
+}
+
+static finfo* finfo_get(uint32_t findex) {
+	uint32_t tindex;
+	finfo *fileinfo;
+	if (findex>0) {
+		tindex = findex & 0xFFFFFF;
+		zassert(pthread_mutex_lock(&finfo_tab_lock));
+		if (tindex>=finfo_max) {
+			fileinfo = NULL;
+		} else {
+			fileinfo = finfo_tab[tindex];
+		}
+		if (fileinfo!=NULL) {
+			if (fileinfo->valid==0 || fileinfo->findex!=findex) {
+				fileinfo = NULL;
+			}
+		}
+		zassert(pthread_mutex_unlock(&finfo_tab_lock));
+	} else {
+		fileinfo = NULL;
+	}
+	return fileinfo;
 }
 
 static struct fuse_chan *fuse_ch = NULL;
@@ -1566,7 +1670,11 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	ctx = *(fuse_req_ctx(req));
 //	mfs_stats_inc(OP_GETATTR);
 	if (debug_mode) {
-		oplog_printf(&ctx,"getattr (%lu) ...",(unsigned long int)ino);
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"getattr (%lu) [handle:%08"PRIX32"] ...",(unsigned long int)ino,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"getattr (%lu) ...",(unsigned long int)ino);
+		}
 		fprintf(stderr,"getattr (%lu)\n",(unsigned long int)ino);
 	}
 //	if (ino==MASTER_INODE) {
@@ -1763,7 +1871,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 	mfs_make_setattr_str(setattr_str,150,stbuf,to_set);
 	mfs_stats_inc(OP_SETATTR);
 	if (debug_mode) {
-		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) ...",(unsigned long int)ino,to_set,setattr_str);
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"] ...",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) ...",(unsigned long int)ino,to_set,setattr_str);
+		}
 		fprintf(stderr,"setattr (%lu,0x%X,[%s])\n",(unsigned long int)ino,to_set,setattr_str);
 	}
 	if (ino==MASTERINFO_INODE) {
@@ -2569,7 +2681,7 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		dirinfo->wasread = 0;
 		pthread_mutex_unlock(&(dirinfo->lock));	// make valgrind happy
 		fi->fh = dindex;
-		oplog_printf(&ctx,"opendir (%lu): OK",(unsigned long int)ino);
+		oplog_printf(&ctx,"opendir (%lu): OK [handle:%08"PRIX32"]",(unsigned long int)ino,dindex);
 		if (fuse_reply_open(req,fi) == -ENOENT) {
 			dirbuf_release(dindex);
 			fi->fh = 0;
@@ -2579,7 +2691,7 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 
 void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi) {
 	int status;
-        dirbuf *dirinfo = dirbuf_tab[fi->fh];
+        dirbuf *dirinfo;
 	char buffer[READDIR_BUFFSIZE];
 	char name[MFS_NAME_MAX+1];
 	const uint8_t *ptr,*eptr;
@@ -2595,9 +2707,19 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_READDIR);
 	if (debug_mode) {
-		oplog_printf(&ctx,"readdir (%lu,%llu,%llu) ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"readdir (%lu,%llu,%llu) [handle:%08"PRIX32"] ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"readdir (%lu,%llu,%llu) ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+		}
 		fprintf(stderr,"readdir (%lu,%llu,%llu)\n",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
 	}
+	if (fi==NULL) {
+		oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	dirinfo = dirbuf_tab[fi->fh];
 	if (off<0) {
 		oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EINVAL));
 		fuse_reply_err(req,EINVAL);
@@ -2751,15 +2873,25 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 
 void mfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	(void)ino;
-	dirbuf *dirinfo = dirbuf_tab[fi->fh];
+	dirbuf *dirinfo;
 	struct fuse_ctx ctx;
 
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_RELEASEDIR);
 	if (debug_mode) {
-		oplog_printf(&ctx,"releasedir (%lu) ...",(unsigned long int)ino);
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"releasedir (%lu) [handle:%08"PRIX32"] ...",(unsigned long int)ino,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"releasedir (%lu) ...",(unsigned long int)ino);
+		}
 		fprintf(stderr,"releasedir (%lu)\n",(unsigned long int)ino);
 	}
+	if (fi==NULL) {
+		oplog_printf(&ctx,"releasedir (%lu): %s",(unsigned long int)ino,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	dirinfo = dirbuf_tab[fi->fh];
 	zassert(pthread_mutex_lock(&(dirinfo->lock)));
 	if (dirinfo->dcache) {
 		dcache_release(dirinfo->dcache);
@@ -2775,77 +2907,15 @@ void mfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	fuse_reply_err(req,0);
 }
 
-/*
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
-static void mfs_real_removefileinfo(finfo* fileinfo) {
-	zassert(pthread_mutex_lock(&(fileinfo->lock)));
-	if (fileinfo->rdata) {
-		read_data_end(fileinfo->rdata);
-	}
-	if (fileinfo->wdata) {
-		write_data_end(fileinfo->wdata);
-	}
-	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-	zassert(pthread_mutex_destroy(&(fileinfo->lock)));
-	free(fileinfo);
-}
-#endif
-*/
-
 static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng) {
 	finfo *fileinfo;
 	uint32_t findex;
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
-	uint32_t i;
-#endif
 	double now;
+
 	now = monotonic_seconds();
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
-	zassert(pthread_mutex_lock(&finfo_tab_lock));
-	if (finfo_tab!=NULL) {
-		for (i=0 ; i<finfo_max ; i++) {
-			fileinfo = finfo_tab[i];
-			if (fileinfo!=NULL && fileinfo->valid && fileinfo->ops_in_progress==0 && fileinfo->lastuse+FREEBSD_EARLY_RELEASE_DELAY<now) {
-				zassert(pthread_mutex_unlock(&finfo_tab_lock));
-
-				zassert(pthread_mutex_lock(&(fileinfo->lock)));
-				if (fileinfo->rdata) {
-					read_data_end(fileinfo->rdata);
-				}
-				if (fileinfo->wdata) {
-					write_data_end(fileinfo->wdata);
-				}
-				fileinfo->rdata = fileinfo->wdata = NULL;
-				zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-
-				zassert(pthread_mutex_lock(&finfo_tab_lock));
-				finfo_tab[i]->valid = 0;
-				if (i < finfo_first) {
-					finfo_first = i;
-				}
-			}
-		}
-	}
-	zassert(pthread_mutex_unlock(&finfo_tab_lock));
-/*
-	finfo **fileinfoptr;
-	zassert(pthread_mutex_lock(&finfo_list_lock));
-	fileinfoptr = &finfo_head;
-	while ((fileinfo=*fileinfoptr)) {
-		if (fileinfo->ops_in_progress==0 && fileinfo->lastuse+FREEBSD_EARLY_RELEASE_DELAY<now) {
-			*fileinfoptr = fileinfo->next;
-			mfs_real_removefileinfo(fileinfo);
-		} else {
-			fileinfoptr = &(fileinfo->next);
-		}
-	}
-	zassert(pthread_mutex_unlock(&finfo_list_lock));
-*/
-#endif
 	findex = finfo_new();
-	fileinfo = finfo_tab[findex];
-//	fileinfo = malloc(sizeof(finfo));
-//	zassert(pthread_mutex_init(&(fileinfo->lock),NULL));
+	fileinfo = finfo_get(findex);
+	passert(fileinfo);
 	pthread_mutex_lock(&(fileinfo->lock)); // make helgrind happy
 	fileinfo->fleng = fleng;
 	fileinfo->inode = inode;
@@ -2885,7 +2955,7 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng) {
 	}
 #endif
 	fileinfo->create = now;
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress = 0;
 	fileinfo->lastuse = now;
 //	fileinfo->next = NULL;
@@ -2895,23 +2965,17 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng) {
 }
 
 static void mfs_removefileinfo(uint32_t findex) {
-	finfo *fileinfo = finfo_tab[findex];
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
-	zassert(pthread_mutex_lock(&(fileinfo->lock)));
-	fileinfo->lastuse = monotonic_seconds();
-	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+	finfo *fileinfo = finfo_get(findex);
+	if (fileinfo!=NULL) {
+#ifdef FREEBSD_DELAYED_RELEASE
+		zassert(pthread_mutex_lock(&(fileinfo->lock)));
+		fileinfo->lastuse = monotonic_seconds();
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 #else
-	zassert(pthread_mutex_lock(&(fileinfo->lock)));
-	if (fileinfo->rdata) {
-		read_data_end(fileinfo->rdata);
-	}
-	if (fileinfo->wdata) {
-		write_data_end(fileinfo->wdata);
-	}
-	fileinfo->rdata = fileinfo->wdata = NULL;
-	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-	finfo_release(findex);
+		finfo_free_resources(fileinfo);
 #endif
+		finfo_release(findex);
+	}
 }
 
 void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, struct fuse_file_info *fi) {
@@ -3055,7 +3119,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:entry_cache_timeout;
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	mfs_makeattrstr(attrstr,256,&e.attr);
-	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s,%u,%u)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache);
+	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s) (direct_io:%u,keep_cache:%u) [handle:%08"PRIX32"]",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,findex);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
 		mfs_removefileinfo(findex);
 		fi->fh = 0;
@@ -3225,7 +3289,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 //	if (fi->keep_cache==0) {
 //		chunksdatacache_clear_inode(ino,0);
 //	}
-	oplog_printf(&ctx,"open (%lu)%s: OK (%u,%u)",(unsigned long int)ino,(fdrec)?" (using cached data from lookup)":"",(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache);
+	oplog_printf(&ctx,"open (%lu)%s: OK (direct_io:%u,keep_cache:%u) [handle:%08"PRIX32"]",(unsigned long int)ino,(fdrec)?" (using cached data from lookup)":"",(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,findex);
 	if (fuse_reply_open(req, fi) == -ENOENT) {
 		mfs_removefileinfo(findex);
 		fi->fh = 0;
@@ -3241,8 +3305,17 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_RELEASE);
 	if (debug_mode) {
-		oplog_printf(&ctx,"release (%lu) ...",(unsigned long int)ino);
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"release (%lu) [handle:%08"PRIX32"] ...",(unsigned long int)ino,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"release (%lu) ...",(unsigned long int)ino);
+		}
 		fprintf(stderr,"release (%lu)\n",(unsigned long int)ino);
+	}
+	if (fi==NULL) {
+		oplog_printf(&ctx,"release (%lu): %s",(unsigned long int)ino,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
 	}
 //	if (ino==MASTER_INODE) {
 //		minfo *masterinfo = (minfo*)(unsigned long)(fi->fh);
@@ -3288,21 +3361,24 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		return;
 	}
 	if (fi->fh>0) {
-		finfo *fileinfo = finfo_tab[fi->fh];
+		finfo *fileinfo;
 		uint8_t uselocks;
-		zassert(pthread_mutex_lock(&(fileinfo->lock)));
-		// rwlock_wait_for_unlock:
-		while (fileinfo->writing | fileinfo->writers_cnt | fileinfo->readers_cnt) {
-			zassert(pthread_cond_wait(&(fileinfo->cond),&(fileinfo->lock)));
-		}
+		fileinfo = finfo_get(fi->fh);
+		if (fileinfo!=NULL) {
+			zassert(pthread_mutex_lock(&(fileinfo->lock)));
+			// rwlock_wait_for_unlock:
+			while (fileinfo->writing | fileinfo->writers_cnt | fileinfo->readers_cnt) {
+				zassert(pthread_cond_wait(&(fileinfo->cond),&(fileinfo->lock)));
+			}
 #ifdef HAVE___SYNC_OP_AND_FETCH
-		uselocks = __sync_or_and_fetch(&(fileinfo->uselocks),0);
+			uselocks = __sync_or_and_fetch(&(fileinfo->uselocks),0);
 #else
-		uselocks = fileinfo->uselocks;
+			uselocks = fileinfo->uselocks;
 #endif
-		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-		if (uselocks&1) {
-			fs_flock(ino,0,fi->lock_owner,FLOCK_RELEASE);
+			zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+			if (uselocks&1) {
+				fs_flock(ino,0,fi->lock_owner,FLOCK_RELEASE);
+			}
 		}
 	}
 	dcache_invalidate_attr(ino);
@@ -3328,7 +3404,11 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	mfs_stats_inc(OP_READ);
 	if (debug_mode) {
 		if (ino!=OPLOG_INODE && ino!=OPHISTORY_INODE) {
-			oplog_printf(&ctx,"read (%lu,%llu,%llu) ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+			if (fi!=NULL) {
+				oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"] ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh));
+			} else {
+				oplog_printf(&ctx,"read (%lu,%llu,%llu) ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+			}
 		}
 		fprintf(stderr,"read from inode %lu up to %llu bytes from position %llu\n",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
 	}
@@ -3438,9 +3518,19 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		return;
 	}
 */
-	fileinfo = finfo_tab[fi->fh];
+	if (fi==NULL) {
+		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	fileinfo = finfo_get(fi->fh);
 	if (fi->fh==0 || fileinfo==NULL) {
 		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	if (fileinfo->inode!=ino) {
+		oplog_printf(&ctx,"read (%lu!=%lu,%llu,%llu): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -3477,13 +3567,13 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	}
 	fileinfo->readers_cnt++;
 	// rwlock_rdlock_end
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress++;
 #endif
 //	if (fileinfo->mode==IO_WRITE) {
 //		err = write_data_flush(fileinfo->wdata);
 //		if (err!=0) {
-//#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+//#ifdef FREEBSD_DELAYED_RELEASE
 //			fileinfo->ops_in_progress--;
 //			fileinfo->lastuse = monotonic_seconds();
 //#endif
@@ -3530,7 +3620,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		zassert(pthread_cond_signal(&(fileinfo->cond)));
 	}
 	// rwlock_rdunlock_end
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress--;
 	fileinfo->lastuse = monotonic_seconds();
 #endif
@@ -3545,7 +3635,11 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_WRITE);
 	if (debug_mode) {
-		oplog_printf(&ctx,"write (%lu,%llu,%llu) ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"] ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"write (%lu,%llu,%llu) ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+		}
 		fprintf(stderr,"write to inode %lu %llu bytes at position %llu\n",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
 	}
 	if (ino==MASTERINFO_INODE || ino==OPLOG_INODE || ino==OPHISTORY_INODE || ino==MOOSE_INODE) {
@@ -3574,9 +3668,19 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		return;
 	}
 */
-	fileinfo = finfo_tab[fi->fh];
+	if (fi==NULL) {
+		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	fileinfo = finfo_get(fi->fh);
 	if (fi->fh==0 || fileinfo==NULL) {
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	if (fileinfo->inode!=ino) {
+		oplog_printf(&ctx,"write (%lu!=%lu,%llu,%llu): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -3609,7 +3713,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	fileinfo->writers_cnt--;
 	fileinfo->writing = 1;
 	// rwlock_wrlock end
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress++;
 #endif
 	if (fileinfo->wdata==NULL) {
@@ -3626,7 +3730,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	fileinfo->writing = 0;
 	zassert(pthread_cond_broadcast(&(fileinfo->cond)));
 	// wrlock_wrunlock end
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress--;
 	fileinfo->lastuse = monotonic_seconds();
 #endif
@@ -3674,7 +3778,7 @@ static inline int mfs_do_fsync(finfo *fileinfo) {
 		fileinfo->writers_cnt--;
 		fileinfo->writing = 1;
 		// rwlock_wrlock end
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 		fileinfo->ops_in_progress++;
 #endif
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
@@ -3686,7 +3790,7 @@ static inline int mfs_do_fsync(finfo *fileinfo) {
 		fileinfo->writing = 0;
 		zassert(pthread_cond_broadcast(&(fileinfo->cond)));
 		// rwlock_wrunlock end
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 		fileinfo->ops_in_progress--;
 		fileinfo->lastuse = monotonic_seconds();
 #endif
@@ -3711,7 +3815,11 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_FLUSH);
 	if (debug_mode) {
-		oplog_printf(&ctx,"flush (%lu) ...",(unsigned long int)ino);
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"flush (%lu) [handle:%08"PRIX32"] ...",(unsigned long int)ino,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"flush (%lu) ...",(unsigned long int)ino);
+		}
 		fprintf(stderr,"flush (%lu)\n",(unsigned long int)ino);
 	}
 	if (IS_SPECIAL_INODE(ino)) {
@@ -3719,9 +3827,19 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_err(req,0);
 		return;
 	}
-	fileinfo = finfo_tab[fi->fh];
+	if (fi==NULL) {
+		oplog_printf(&ctx,"flush (%lu): %s",(unsigned long int)ino,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	fileinfo = finfo_get(fi->fh);
 	if (fi->fh==0 || fileinfo==NULL) {
 		oplog_printf(&ctx,"flush (%lu): %s",(unsigned long int)ino,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	if (fileinfo->inode!=ino) {
+		oplog_printf(&ctx,"flush (%lu!=%lu): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -3747,7 +3865,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fileinfo->writers_cnt--;
 		fileinfo->writing = 1;
 		// rwlock_wrlock end
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 		fileinfo->ops_in_progress++;
 #endif
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
@@ -3766,7 +3884,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fileinfo->writing = 0;
 		zassert(pthread_cond_broadcast(&(fileinfo->cond)));
 		// rwlock_wrunlock end
-#ifdef FREEBSD_EARLY_RELEASE_BUG_WORKAROUND
+#ifdef FREEBSD_DELAYED_RELEASE
 		fileinfo->ops_in_progress--;
 		fileinfo->lastuse = monotonic_seconds();
 #endif
@@ -3796,7 +3914,11 @@ void mfs_fsync(fuse_req_t req, fuse_ino_t ino, int datasync, struct fuse_file_in
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_FSYNC);
 	if (debug_mode) {
-		oplog_printf(&ctx,"fsync (%lu,%d) ...",(unsigned long int)ino,datasync);
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"fsync (%lu,%d) [handle:%08"PRIX32"] ...",(unsigned long int)ino,datasync,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"fsync (%lu,%d) ...",(unsigned long int)ino,datasync);
+		}
 		fprintf(stderr,"fsync (%lu,%d)\n",(unsigned long int)ino,datasync);
 	}
 	if (IS_SPECIAL_INODE(ino)) {
@@ -3804,9 +3926,19 @@ void mfs_fsync(fuse_req_t req, fuse_ino_t ino, int datasync, struct fuse_file_in
 		fuse_reply_err(req,0);
 		return;
 	}
-	fileinfo = finfo_tab[fi->fh];
+	if (fi==NULL) {
+		oplog_printf(&ctx,"fsync (%lu,%d): %s",(unsigned long int)ino,datasync,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	fileinfo = finfo_get(fi->fh);
 	if (fi->fh==0 || fileinfo==NULL) {
 		oplog_printf(&ctx,"fsync (%lu,%d): %s",(unsigned long int)ino,datasync,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	if (fileinfo->inode!=ino) {
+		oplog_printf(&ctx,"fsync (%lu!=%lu,%d): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,datasync,strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -3872,7 +4004,7 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 	uint64_t owner;
 	uint8_t lock_mode,lmvalid;
 	char *lock_mode_str;
-	finfo *fileinfo = finfo_tab[fi->fh];
+	finfo *fileinfo;
 	flock_data *fld;
 	uint32_t refs;
 
@@ -3917,12 +4049,37 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 		fuse_reply_err(req,EPERM);
 		return;
 	}
-	if (fi==NULL || lmvalid==0) {
+	if (lmvalid==0) {
 		if (debug_mode) {
 			oplog_printf(&ctx,"flock (-,%lu,-,%s): %s",(unsigned long int)ino,lock_mode_str,strerr(EINVAL));
 			fprintf(stderr,"flock (-,%lu,-,%s)\n",(unsigned long int)ino,lock_mode_str);
 		}
 		fuse_reply_err(req,EINVAL);
+		return;
+	}
+	if (fi==NULL) {
+		if (debug_mode) {
+			oplog_printf(&ctx,"flock (-,%lu,-,%s): %s",(unsigned long int)ino,lock_mode_str,strerr(EBADF));
+			fprintf(stderr,"flock (-,%lu,-,%s)\n",(unsigned long int)ino,lock_mode_str);
+		}
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	fileinfo = finfo_get(fi->fh);
+	if (fileinfo==NULL) {
+		if (debug_mode) {
+			oplog_printf(&ctx,"flock (-,%lu,-,%s): %s",(unsigned long int)ino,lock_mode_str,strerr(EBADF));
+			fprintf(stderr,"flock (-,%lu,-,%s)\n",(unsigned long int)ino,lock_mode_str);
+		}
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	if (fileinfo->inode!=ino) {
+		if (debug_mode) {
+			oplog_printf(&ctx,"flock (-,%lu!=%lu,-,%s): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,lock_mode_str,strerr(EBADF));
+			fprintf(stderr,"flock (-,%lu,-,%s)\n",(unsigned long int)ino,lock_mode_str);
+		}
+		fuse_reply_err(req,EBADF);
 		return;
 	}
 	owner = fi->lock_owner;
@@ -3944,7 +4101,7 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 #endif
 	if (debug_mode) {
-		oplog_printf(&ctx,"flock (%"PRIu32",%lu,%016"PRIX64",%s) ...",reqid,(unsigned long int)ino,owner,lock_mode_str);
+		oplog_printf(&ctx,"flock (%"PRIu32",%lu,%016"PRIX64",%s) [handle:%08"PRIX32"] ...",reqid,(unsigned long int)ino,owner,lock_mode_str,(uint32_t)(fi->fh));
 		fprintf(stderr,"flock (%"PRIu32",%lu,%016"PRIX64",%s)\n",reqid,(unsigned long int)ino,owner,lock_mode_str);
 	}
 	if (lock_mode==FLOCK_UNLOCK) {
@@ -4082,12 +4239,20 @@ void mfs_getlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	} else {
 		return;
 	}
-	if (fi==NULL || invalid) {
+	if (invalid) {
 		if (debug_mode) {
 			oplog_printf(&ctx,"getlk (inode:%lu owner:- start:- end:- type:-): %s",(unsigned long int)ino,strerr(EINVAL));
 			fprintf(stderr,"getlk (inode:%lu owner:- start:- end:- type:-)\n",(unsigned long int)ino);
 		}
 		fuse_reply_err(req,EINVAL);
+		return;
+	}
+	if (fi==NULL || finfo_get(fi->fh)==NULL) {
+		if (debug_mode) {
+			oplog_printf(&ctx,"getlk (inode:%lu owner:- start:- end:- type:-): %s",(unsigned long int)ino,strerr(EBADF));
+			fprintf(stderr,"getlk (inode:%lu owner:- start:- end:- type:-)\n",(unsigned long int)ino);
+		}
+		fuse_reply_err(req,EBADF);
 		return;
 	}
 	owner = fi->lock_owner;
@@ -4099,7 +4264,7 @@ void mfs_getlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	}
 	pid = ctx.pid;
 	if (debug_mode) {
-		oplog_printf(&ctx,"getlk (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c) ...",(unsigned long int)ino,owner,start,end,ctype);
+		oplog_printf(&ctx,"getlk (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c) [handle:%08"PRIX32"] ...",(unsigned long int)ino,owner,start,end,ctype,(uint32_t)(fi->fh));
 		fprintf(stderr,"getlk (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c)\n",(unsigned long int)ino,owner,start,end,ctype);
 	}
 	status = fs_posixlock(ino,0,owner,POSIX_LOCK_CMD_GET,type,start,end,pid,&rtype,&rstart,&rend,&rpid);
@@ -4142,7 +4307,7 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	uint8_t type;
 	uint8_t invalid;
 	char ctype;
-	finfo *fileinfo = finfo_tab[fi->fh];
+	finfo *fileinfo;
 	plock_data *pld;
 	uint32_t refs;
 	char *cmdname;
@@ -4183,12 +4348,37 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	} else {
 		return;
 	}
-	if (fi==NULL || invalid) {
+	if (invalid) {
 		if (debug_mode) {
 			oplog_printf(&ctx,"%s (inode:%lu owner:- start:- end:- type:-): %s",cmdname,(unsigned long int)ino,strerr(EINVAL));
 			fprintf(stderr,"%s (inode:%lu owner:- start:- end:- type:-)\n",cmdname,(unsigned long int)ino);
 		}
 		fuse_reply_err(req,EINVAL);
+		return;
+	}
+	if (fi==NULL) {
+		if (debug_mode) {
+			oplog_printf(&ctx,"%s (inode:%lu owner:- start:- end:- type:-): %s",cmdname,(unsigned long int)ino,strerr(EBADF));
+			fprintf(stderr,"%s (inode:%lu owner:- start:- end:- type:-)\n",cmdname,(unsigned long int)ino);
+		}
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	fileinfo = finfo_get(fi->fh);
+	if (fileinfo==NULL) {
+		if (debug_mode) {
+			oplog_printf(&ctx,"%s (inode:%lu owner:- start:- end:- type:-): %s",cmdname,(unsigned long int)ino,strerr(EBADF));
+			fprintf(stderr,"%s (inode:%lu owner:- start:- end:- type:-)\n",cmdname,(unsigned long int)ino);
+		}
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	if (fileinfo->inode!=ino) {
+		if (debug_mode) {
+			oplog_printf(&ctx,"%s (handle_inode:%lu != inode:%lu owner:- start:- end:- type:-): %s",cmdname,(unsigned long int)(fileinfo->inode),(unsigned long int)ino,strerr(EBADF));
+			fprintf(stderr,"%s (inode:%lu owner:- start:- end:- type:-)\n",cmdname,(unsigned long int)ino);
+		}
+		fuse_reply_err(req,EBADF);
 		return;
 	}
 	owner = fi->lock_owner;
@@ -4217,7 +4407,7 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 #endif
 	if (debug_mode) {
-		oplog_printf(&ctx,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c) ...",cmdname,(unsigned long int)ino,owner,start,end,ctype);
+		oplog_printf(&ctx,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c) [handle:%08"PRIX32"] ...",cmdname,(unsigned long int)ino,owner,start,end,ctype,(uint32_t)(fi->fh));
 		fprintf(stderr,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c)\n",cmdname,(unsigned long int)ino,owner,start,end,ctype);
 	}
 	if (type==POSIX_LOCK_UNLCK) {

@@ -27,6 +27,7 @@
 
 #define MAXSCLASS 256
 
+#define MAXLABELSCNT 9
 
 uint32_t sclass_info(uint8_t *buff);
 

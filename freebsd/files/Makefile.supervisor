@@ -3,7 +3,7 @@
 
 PKGNAMESUFFIX=	-supervisor
 
-COMMENT=	Masters supervising utility
+COMMENT=	MooseFS supervising utility
 
 LICENSE=	GPLv2
 

@@ -454,7 +454,7 @@ static void finfo_release(uint32_t findex) {
 		tindex = findex & 0xFFFFFF;
 		zassert(pthread_mutex_lock(&finfo_tab_lock));
 		if (tindex<finfo_max) {
-#ifndef FREEBSD_DELAYED_RELEASE
+#ifdef FREEBSD_DELAYED_RELEASE
 			finfo_tab[tindex]->valid = 2;
 #else
 			finfo_tab[tindex]->valid = 0;

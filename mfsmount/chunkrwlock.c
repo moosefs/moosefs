@@ -16,7 +16,7 @@ typedef struct chunkrec {
 	struct chunkrec *next,**prev;
 } chunkrec;
 
-pthread_mutex_t glock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t glock = PTHREAD_MUTEX_INITIALIZER;
 static chunkrec* hashtab[1024];
 static chunkrec* freeblocks;
 static uint32_t freeblockscnt;
@@ -49,7 +49,7 @@ void chunkrwlock_term(void) {
 	pthread_mutex_unlock(&glock);
 }
 
-chunkrec* chunkrwlock_get(uint32_t inode,uint32_t indx) {
+static inline chunkrec* chunkrwlock_get(uint32_t inode,uint32_t indx) {
 	chunkrec *cr;
 	uint32_t hash;
 	pthread_mutex_lock(&glock);
@@ -84,7 +84,7 @@ chunkrec* chunkrwlock_get(uint32_t inode,uint32_t indx) {
 	return cr;
 }
 
-void chunkrwlock_release(chunkrec *cr) {
+static inline void chunkrwlock_release(chunkrec *cr) {
 	if ((cr->writing | cr->active_readers_cnt | cr->waiting_readers_cnt | cr->waiting_writers_cnt)==0) {
 		*(cr->prev) = cr->next;
 		if (cr->next) {

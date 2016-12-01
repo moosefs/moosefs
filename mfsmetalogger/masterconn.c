@@ -234,7 +234,7 @@ void masterconn_sendregister(masterconn *eptr) {
 		put8bit(&buff,VERSMID);
 		put8bit(&buff,VERSMIN);
 		put16bit(&buff,Timeout);
-		put64bit(&buff,lastlogversion);
+		put64bit(&buff,lastlogversion+1);
 	} else {
 		buff = masterconn_createpacket(eptr,ANTOMA_REGISTER,1+4+2);
 		put8bit(&buff,1);

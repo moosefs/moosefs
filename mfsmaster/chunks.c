@@ -1029,7 +1029,7 @@ static inline int chunk_remove_diconnected_chunks(chunk *c) {
 	if (disc==0) {
 		return 0;
 	}
-	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
+	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && chunk_counters_in_progress()==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
 		changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 		chunk_delete(c);
 		return 1;
@@ -2272,7 +2272,7 @@ void chunk_lost(uint16_t csid,uint64_t chunkid) {
 			sptr = &(s->next);
 		}
 	}
-	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
+	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && chunk_counters_in_progress()==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
 		changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 		chunk_delete(c);
 	} else {
@@ -2467,7 +2467,7 @@ void chunk_got_delete_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
 			st = &(s->next);
 		}
 	}
-	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
+	if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && chunk_counters_in_progress()==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
 		changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 		chunk_delete(c);
 	}
@@ -3822,7 +3822,7 @@ void chunk_jobs_main(void) {
 			c = chunkhashtab[jobshpos>>HASHTAB_LOBITS][jobshpos&HASHTAB_MASK];
 			while (c) {
 				cn = c->next;
-				if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
+				if (c->lockedto<(uint32_t)main_time() && c->slisthead==NULL && c->fcount==0 && c->ondangerlist==0 && chunk_counters_in_progress()==0 && ((csdb_getdisconnecttime()+RemoveDelayDisconnect)<main_time())) {
 					changelog("%"PRIu32"|CHUNKDEL(%"PRIu64",%"PRIu32")",main_time(),c->chunkid,c->version);
 					chunk_delete(c);
 				} else {

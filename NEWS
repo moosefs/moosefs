@@ -1,5 +1,18 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.86-1 (2016-11-30)
+
+  - (master) fixed leader-follower resynchronization after reconnection (pro only)
+  - (masrer) fixed rehashing condition in edge/node/chunk hashmaps (change inspired by yinjiawind)
+
+* MooseFS 3.0.85-1 (2016-11-17)
+
+  - (mount) fixed memory leak (also efficiency) on Linux and potential segfaults on FreeBSD (negative condition)
+  - (mount) fixed race condition for inode value in write module
+  - (mount) better descriptors handling (lists of free elements, inode hash)
+  - (mount) better releasing descriptors on FreeBSD
+  - (cs) fixed time condition (patch send by yinjiawind)
+
 * MooseFS 3.0.84-1 (2016-10-06)
 
   - (master) fixed setting acl-default without named users or named groups

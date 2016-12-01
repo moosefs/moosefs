@@ -1779,6 +1779,14 @@ static int write_data_do_chunk_wait(inodedata *ind) {
 	return ret;
 }
 
+static int write_data_will_flush_wait(inodedata *ind) {
+	int ret;
+	zassert(pthread_mutex_lock(&(ind->lock)));
+	ret = ind->chunkscnt;
+	zassert(pthread_mutex_unlock(&(ind->lock)));
+	return ret;
+}
+
 static int write_data_do_flush(inodedata *ind,uint8_t releaseflag) {
 	int ret;
 	chunkdata *chd;
@@ -1884,6 +1892,14 @@ int write_data_flush_inode(uint32_t inode) {
 	}
 	ret = write_data_do_flush(ind,1);
 	return ret;
+}
+
+int write_data_will_end_wait(void *vid) {
+	if (vid!=NULL) {
+		return write_data_will_flush_wait((inodedata*)vid);
+	} else {
+		return 0;
+	}
 }
 
 int write_data_end(void *vid) {

@@ -590,7 +590,7 @@ static inline void chunk_hash_add(chunk *c) {
 		c->next = chunkhashtab[hash>>HASHTAB_LOBITS][hash&HASHTAB_MASK];
 		chunkhashtab[hash>>HASHTAB_LOBITS][hash&HASHTAB_MASK] = c;
 		chunkhashelem++;
-		if (chunkhashelem>chunkhashsize) {
+		if (chunkhashelem>chunkhashsize && (chunkhashsize>>HASHTAB_LOBITS)<HASHTAB_HISIZE) {
 			chunk_hash_rehash();
 		}
 	}

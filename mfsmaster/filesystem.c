@@ -1033,7 +1033,7 @@ static inline void fsnodes_edge_add(fsedge *e) {
 		e->next = edgehashtab[hash>>HASHTAB_LOBITS][hash&HASHTAB_MASK];
 		edgehashtab[hash>>HASHTAB_LOBITS][hash&HASHTAB_MASK] = e;
 		edgehashelem++;
-		if (edgehashelem>edgehashsize) {
+		if (edgehashelem>edgehashsize && (edgehashsize>>HASHTAB_LOBITS)<HASHTAB_HISIZE) {
 			fsnodes_edge_hash_rehash();
 		}
 	}
@@ -1206,7 +1206,7 @@ static inline void fsnodes_node_add(fsnode *p) {
 		p->next = nodehashtab[hash>>HASHTAB_LOBITS][hash&HASHTAB_MASK];
 		nodehashtab[hash>>HASHTAB_LOBITS][hash&HASHTAB_MASK] = p;
 		nodehashelem++;
-		if (nodehashelem>nodehashsize) {
+		if (nodehashelem>nodehashsize && (nodehashsize>>HASHTAB_LOBITS)<HASHTAB_HISIZE) {
 			fsnodes_node_hash_rehash();
 		}
 	}

@@ -186,7 +186,9 @@ void sinodes_pid_inodes(pid_t pid) {
 	name[3] = pid;
 	p = NULL;
 	if (sysctl(name, 4, NULL, &len, NULL, 0)<0) {
-		mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
+		if (errno!=ESRCH) {
+			mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
+		}
 		return;
 	}
 	if (len==0) {
@@ -205,7 +207,9 @@ void sinodes_pid_inodes(pid_t pid) {
 		error = sysctl(name, 4, p, &len, NULL, 0);
 	} while (error < 0 && errno == ENOMEM && olen == len);
 	if (error<0) {
-		mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
+		if (errno!=ESRCH) {
+			mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
+		}
 		free(p);
 		return;
 	}

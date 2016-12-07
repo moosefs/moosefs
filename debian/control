@@ -2,7 +2,7 @@ Source: moosefs
 Section: admin
 Priority: extra
 Maintainer: MooseFS Team <contact@moosefs.com>
-Build-Depends: debhelper (>= 7.0.15), autotools-dev, libc6-dev, libfuse-dev, pkg-config, zlib1g-dev, libpcap-dev, python (>= 2.5)
+Build-Depends: debhelper (>= 7.0.15), autotools-dev, libc6-dev, libfuse-dev, pkg-config, zlib1g-dev, libpcap0.8-dev, python (>= 2.5)
 Standards-Version: 3.7.3
 Homepage: http://moosefs.com/
 

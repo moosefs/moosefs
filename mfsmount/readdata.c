@@ -1828,7 +1828,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 			added = 0;
 			for (rreq = ind->reqhead ; rreq && added==0 ; rreq=rreq->next) {
 				if (!STATE_NOT_NEEDED(rreq->mode)) {
-					if (rreq->offset+rreq->leng > etab[i+1] && rreq->offset < etab[i]) {
+					if (rreq->offset<=etab[i] && rreq->offset+rreq->leng>=etab[i+1]) {
 						rl = malloc(sizeof(rlist));
 						passert(rl);
 						rl->rreq = rreq;
@@ -2007,11 +2007,12 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 		}
 		*iov = malloc(sizeof(struct iovec)*cnt);
 		passert(*iov);
-		*iovcnt = cnt;
-		for (rl=rhead, i=0; rl && i<cnt; rl=rl->next, i++) {
+		for (rl=rhead, i=0; i<cnt; rl=rl->next, i++) {
+			passert(rl);
 			(*iov)[i].iov_base = rl->rreq->data + rl->offsetadd;
 			(*iov)[i].iov_len = rl->reqleng;
 		}
+		*iovcnt = i;
 	} else {
 		*iovcnt = 0;
 		*iov = NULL;

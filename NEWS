@@ -10,6 +10,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) changed handling data invalidation in read module (sometimes could be less efficient, but it is much more safer)
   - (tools) fixed number parsing (patched by Pawel Gawronski)
   - (cli) fixed printed host/port options
+  - (mount) moved pipes from requests to workers (read and write - huge decrease of descriptors used by mount)
 
 * MooseFS 3.0.86-1 (2016-11-30)
 

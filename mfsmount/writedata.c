@@ -55,7 +55,6 @@
 #include "mastercomm.h"
 #include "clocks.h"
 #include "portable.h"
-#include "pipestorage.h"
 #include "readdata.h"
 #include "chunkrwlock.h"
 #include "chunksdatacache.h"
@@ -115,7 +114,7 @@ typedef struct chunkdata_s {
 	uint8_t chunkready;
 	uint8_t unbreakable;
 	uint8_t continueop;
-	int pipe[2];
+	int wakeup_fd;
 	cblock *datachainhead,*datachaintail;
 	struct inodedata_s *parent;
 	struct chunkdata_s *next,**prev;
@@ -353,19 +352,11 @@ void write_free_inodedata(inodedata *fid) {
 void write_enqueue(chunkdata *chd);
 
 void write_test_chunkdata(inodedata *ind) {
-	int pfd[2];
 	chunkdata *chd;
 
 	if (ind->chunkscnt<MAX_SIM_CHUNKS) {
 		if (ind->chunksnext!=NULL) {
-			if (ps_get_pipe(pfd)<0) {
-				fprintf(stderr,"pipe error\n");
-				syslog(LOG_WARNING,"pipe error: %s",strerr(errno));
-				return;
-			}
 			chd = ind->chunksnext;
-			chd->pipe[0] = pfd[0];
-			chd->pipe[1] = pfd[1];
 			ind->chunksnext = chd->next;
 			ind->chunkscnt++;
 			write_enqueue(chd);
@@ -373,10 +364,11 @@ void write_test_chunkdata(inodedata *ind) {
 	} else {
 		for (chd=ind->chunks ; chd!=NULL ; chd=chd->next) {
 			if (chd->waitingworker) {
-				if (universal_write(chd->pipe[1]," ",1)!=1) {
+				if (universal_write(chd->wakeup_fd," ",1)!=1) {
 					syslog(LOG_ERR,"can't write to pipe !!!");
 				}
-				chd->waitingworker=0;
+				chd->waitingworker = 0;
+				chd->wakeup_fd = -1;
 			}
 		}
 	}
@@ -388,8 +380,7 @@ chunkdata* write_new_chunkdata(inodedata *ind,uint32_t chindx) {
 	chd = malloc(sizeof(chunkdata));
 	passert(chd);
 	chd->chindx = chindx;
-	chd->pipe[0] = -1;
-	chd->pipe[1] = -1;
+	chd->wakeup_fd = -1;
 	chd->datachainhead = NULL;
 	chd->datachaintail = NULL;
 	chd->waitingworker = 0;
@@ -409,7 +400,6 @@ chunkdata* write_new_chunkdata(inodedata *ind,uint32_t chindx) {
 }
 
 void write_free_chunkdata(chunkdata *chd) {
-	ps_close_pipe(chd->pipe);
 	*(chd->prev) = chd->next;
 	if (chd->next) {
 		chd->next->prev = chd->prev;
@@ -605,6 +595,7 @@ void* write_worker(void *arg) {
 	struct iovec siov[2];
 #endif
 	uint8_t pipebuff[1024];
+	int pipefd[2];
 	uint8_t *wptr;
 	const uint8_t *rptr;
 
@@ -670,6 +661,11 @@ void* write_worker(void *arg) {
 	chainelements = 0;
 	chindx = 0;
 
+	if (pipe(pipefd)<0) {
+		syslog(LOG_WARNING,"pipe error: %s",strerr(errno));
+		return NULL;
+	}
+
 	for (;;) {
 		for (i=0 ; i<chainelements ; i++) {
 			csdb_writedec(chain[i].ip,chain[i].port);
@@ -683,6 +679,7 @@ void* write_worker(void *arg) {
 //				fprintf(stderr,"close worker (avail:%"PRIu32" ; total:%"PRIu32")\n",workers_avail,workers_total);
 				write_data_close_worker(w);
 				zassert(pthread_mutex_unlock(&workerslock));
+				close_pipe(pipefd);
 				return NULL;
 			}
 			zassert(pthread_mutex_unlock(&workerslock));
@@ -697,6 +694,7 @@ void* write_worker(void *arg) {
 		if (data==NULL) {
 			write_data_close_worker(w);
 			zassert(pthread_mutex_unlock(&workerslock));
+			close_pipe(pipefd);
 			return NULL;
 		}
 
@@ -1006,7 +1004,7 @@ void* write_worker(void *arg) {
 		nextwriteid=1;
 
 		pfd[0].fd = fd;
-		pfd[1].fd = chd->pipe[0];
+		pfd[1].fd = pipefd[0];
 		rcvd = 0;
 		sent = 0;
 		waitforstatus=1;
@@ -1076,6 +1074,7 @@ void* write_worker(void *arg) {
 			workingtime = now - start;
 
 			chd->waitingworker=1;
+			chd->wakeup_fd = pipefd[1];
 
 			if (sending_mode==0 && workingtime<WORKER_BUSY_LAST_SEND_TIMEOUT+((wtotal>HEAVYLOAD_WORKERS)?0:WORKER_BUSY_NOJOBS_INCREASE_TIMEOUT) && waitforstatus<64) {
 				if (cb==NULL) {
@@ -1088,7 +1087,8 @@ void* write_worker(void *arg) {
 						cb = ncb;
 						sending_mode = 2;
 					} else {
-						chd->waitingworker=2; // wait for block expand
+						chd->waitingworker = 2; // wait for block expand
+						chd->wakeup_fd = pipefd[1];
 					}
 				}
 				if (sending_mode==2) {
@@ -1148,13 +1148,15 @@ void* write_worker(void *arg) {
 #endif
 			if (waitforstatus>0) {
 				if (workingtime>WORKER_BUSY_LAST_SEND_TIMEOUT+WORKER_BUSY_WAIT_FOR_STATUS+((wtotal>HEAVYLOAD_WORKERS)?0:WORKER_BUSY_NOJOBS_INCREASE_TIMEOUT)) { // timeout
-					chd->waitingworker=0;
+					chd->waitingworker = 0;
+					chd->wakeup_fd = -1;
 					zassert(pthread_mutex_unlock(&(ind->lock)));
 					break;
 				}
 			} else {
 				if (lbdiff>=WORKER_IDLE_TIMEOUT || donotstayidle || wtotal>HEAVYLOAD_WORKERS) {
-					chd->waitingworker=0;
+					chd->waitingworker = 0;
+					chd->wakeup_fd = -1;
 					zassert(pthread_mutex_unlock(&(ind->lock)));
 					break;
 				}
@@ -1248,11 +1250,12 @@ void* write_worker(void *arg) {
 				}
 			}
 			zassert(pthread_mutex_lock(&(ind->lock)));	// make helgrind happy
-			chd->waitingworker=0;
+			chd->waitingworker = 0;
+			chd->wakeup_fd = -1;
 			donotstayidle = (ind->flushwaiting>0 || ind->status!=0 || ind->chunkscnt>=MAX_SIM_CHUNKS)?1:0;
 			zassert(pthread_mutex_unlock(&(ind->lock)));	// make helgrind happy
 			if (pfd[1].revents&POLLIN) {	// used just to break poll - so just read all data from pipe to empty it
-				i = universal_read(chd->pipe[0],pipebuff,1024);
+				i = universal_read(pipefd[0],pipebuff,1024);
 				if (i<0) { // mainly to make happy static code analyzers
 					if (chd->trycnt >= minlogretry) {
 						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - writeworker: read pipe error: %s (unfinished writes: %"PRIu8"; try counter: %"PRIu32")",inode,chindx,chunkid,version,strerr(errno),waitforstatus,chd->trycnt+1);
@@ -1611,10 +1614,11 @@ int write_cb_expand(chunkdata *chd,cblock *cb,uint32_t from,uint32_t to,const ui
 		cb->to = to;
 	}
 	if (cb->to-cb->from==MFSBLOCKSIZE && cb->next==NULL && chd->waitingworker==2) {
-		if (universal_write(chd->pipe[1]," ",1)!=1) {
+		if (universal_write(chd->wakeup_fd," ",1)!=1) {
 			syslog(LOG_ERR,"can't write to pipe !!!");
 		}
-		chd->waitingworker=0;
+		chd->waitingworker = 0;
+		chd->wakeup_fd = -1;
 	}
 	return 0;
 }
@@ -1663,10 +1667,11 @@ int write_block(inodedata *ind,uint32_t chindx,uint16_t pos,uint32_t from,uint32
 		write_test_chunkdata(ind);
 	} else {
 		if (chd->waitingworker) {
-			if (universal_write(chd->pipe[1]," ",1)!=1) {
+			if (universal_write(chd->wakeup_fd," ",1)!=1) {
 				syslog(LOG_ERR,"can't write to pipe !!!");
 			}
-			chd->waitingworker=0;
+			chd->waitingworker = 0;
+			chd->wakeup_fd = -1;
 		}
 	}
 	zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -1800,10 +1805,11 @@ static int write_data_do_flush(inodedata *ind,uint8_t releaseflag) {
 	while (ind->chunkscnt>0) {
 		for (chd = ind->chunks ; chd!=NULL ; chd=chd->next) {
 			if (chd->waitingworker) {
-				if (universal_write(chd->pipe[1]," ",1)!=1) {
+				if (universal_write(chd->wakeup_fd," ",1)!=1) {
 					syslog(LOG_ERR,"can't write to pipe !!!");
 				}
-				chd->waitingworker=0;
+				chd->waitingworker = 0;
+				chd->wakeup_fd = -1;
 			}
 		}
 #ifdef WDEBUG

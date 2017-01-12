@@ -41,7 +41,6 @@ mfsmount_SOURCES=\
 	../mfscommon/md5.c ../mfscommon/md5.h \
 	../mfscommon/sockets.c ../mfscommon/sockets.h \
 	../mfscommon/conncache.c ../mfscommon/conncache.h \
-	../mfscommon/pipestorage.c ../mfscommon/pipestorage.h \
 	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/datapack.h ../mfscommon/massert.h \

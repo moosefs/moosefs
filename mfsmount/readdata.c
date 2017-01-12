@@ -55,7 +55,6 @@
 #include "mastercomm.h"
 #include "clocks.h"
 #include "portable.h"
-#include "pipestorage.h"
 #include "readdata.h"
 #include "chunkrwlock.h"
 #include "chunksdatacache.h"
@@ -148,7 +147,7 @@ struct inodedata_s;
 
 typedef struct rrequest_s {
 	struct inodedata_s *ind;
-	int pipe[2];
+	int wakeup_fd;
 	uint8_t waitingworker;
 	uint8_t *data;
 	uint64_t offset;
@@ -160,7 +159,6 @@ typedef struct rrequest_s {
 	uint8_t refresh;
 	uint8_t mode;
 	uint16_t lcnt;
-//	uint16_t waiting;
 	pthread_cond_t cond;
 	struct rrequest_s *next,**prev;
 } rrequest;
@@ -170,21 +168,11 @@ typedef struct inodedata_s {
 	uint32_t seqdata;
 	uint64_t fleng;
 	int status;
-//	uint16_t closewaiting;
 	uint32_t trycnt;
 	uint8_t closing;
 	uint8_t inqueue;
 	uint8_t readahead;
 	uint64_t lastoffset;
-//	double mreq_time;
-//	uint32_t mreq_chindx;
-//	uint64_t mreq_chunkid;
-//	uint32_t mreq_version;
-//	uint8_t mreq_csdataver;
-//	uint32_t mreq_csdatasize;
-//	uint8_t *mreq_csdata;
-//	uint32_t mreq_csdatabuffsize;
-//	uint8_t laststatus;
 	uint16_t waiting_writers;
 	uint16_t readers_cnt;
 	uint16_t lcnt;
@@ -264,7 +252,6 @@ static inline rrequest* read_new_request(inodedata *ind,uint64_t *offset,uint64_
 	uint64_t chunkend;
 	uint32_t chunkleng;
 	uint32_t chindx;
-	int pfd[2];
 
 	sassert(blockend>*offset);
 
@@ -281,11 +268,6 @@ static inline rrequest* read_new_request(inodedata *ind,uint64_t *offset,uint64_
 		*offset = blockend;
 	}
 
-	if (ps_get_pipe(pfd)<0) {
-		syslog(LOG_WARNING,"pipe error: %s",strerr(errno));
-		return NULL;
-	}
-
 	rrequest *rreq;
 	rreq = malloc(sizeof(rrequest));
 	passert(rreq);
@@ -293,9 +275,8 @@ static inline rrequest* read_new_request(inodedata *ind,uint64_t *offset,uint64_
 	fprintf(stderr,"%.6lf: inode: %"PRIu32" - new request: chindx: %"PRIu32" chunkoffset: %"PRIu64" chunkleng: %"PRIu32"\n",monotonic_seconds(),ind->inode,chindx,chunkoffset,chunkleng);
 #endif
 	rreq->ind = ind;
-	rreq->pipe[0] = pfd[0];
-	rreq->pipe[1] = pfd[1];
 	rreq->modified = monotonic_seconds();
+	rreq->wakeup_fd = -1;
 	rreq->waitingworker = 0;
 	rreq->offset = chunkoffset;
 	rreq->leng = chunkleng;
@@ -358,7 +339,6 @@ static inline void read_delete_request(rrequest *rreq) {
 #endif
 	zassert(pthread_mutex_unlock(&buffsizelock));
 #endif
-	ps_close_pipe(rreq->pipe);
 	free(rreq->data);
 	free(rreq);
 #ifdef RDEBUG
@@ -549,6 +529,7 @@ void* read_worker(void *arg) {
 	struct iovec siov[2];
 #endif
 	uint8_t pipebuff[1024];
+	int pipefd[2];
 	uint8_t *wptr;
 	const uint8_t *rptr;
 
@@ -600,6 +581,11 @@ void* read_worker(void *arg) {
 	port = 0;
 	csstrip[0] = 0;
 
+	if (pipe(pipefd)<0) {
+		syslog(LOG_WARNING,"pipe error: %s",strerr(errno));
+		return NULL;
+	}
+
 	for (;;) {
 		if (ip || port) {
 			csdb_readdec(ip,port);
@@ -615,6 +601,7 @@ void* read_worker(void *arg) {
 //				fprintf(stderr,"close worker (avail:%"PRIu32" ; total:%"PRIu32")\n",workers_avail,workers_total);
 				read_data_close_worker(w);
 				zassert(pthread_mutex_unlock(&workers_lock));
+				close_pipe(pipefd);
 				return NULL;
 			}
 			zassert(pthread_mutex_unlock(&workers_lock));
@@ -630,6 +617,7 @@ void* read_worker(void *arg) {
 //			fprintf(stderr,"close worker (avail:%"PRIu32" ; total:%"PRIu32")\n",workers_avail,workers_total);
 			read_data_close_worker(w);
 			zassert(pthread_mutex_unlock(&workers_lock));
+			close_pipe(pipefd);
 			return NULL;
 		}
 
@@ -965,7 +953,7 @@ void* read_worker(void *arg) {
 		}
 
 		pfd[0].fd = fd;
-		pfd[1].fd = rreq->pipe[0];
+		pfd[1].fd = pipefd[0];
 		gotstatus = 0;
 		received = 0;
 		reqsend = 0;
@@ -1101,7 +1089,8 @@ void* read_worker(void *arg) {
 				}
 			}
 
-			rreq->waitingworker=1;
+			rreq->waitingworker = 1;
+			rreq->wakeup_fd = pipefd[1];
 			zassert(pthread_mutex_unlock(&(ind->lock)));
 
 			if (tosend==0 && (now - lastsend > (CHUNKSERVER_ACTIVITY_TIMEOUT/2.0))) {
@@ -1126,7 +1115,8 @@ void* read_worker(void *arg) {
 #endif
 						status = EIO;
 						zassert(pthread_mutex_lock(&(ind->lock)));
-						rreq->waitingworker=0;
+						rreq->waitingworker = 0;
+						rreq->wakeup_fd = -1;
 						zassert(pthread_mutex_unlock(&(ind->lock)));
 						break;
 					} else {
@@ -1160,7 +1150,8 @@ void* read_worker(void *arg) {
 				}
 			}
 			zassert(pthread_mutex_lock(&(ind->lock)));
-			rreq->waitingworker=0;
+			rreq->waitingworker = 0;
+			rreq->wakeup_fd = -1;
 			closing = (ind->closing>0)?1:0;
 			mode = rreq->mode;
 			zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -1168,7 +1159,7 @@ void* read_worker(void *arg) {
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: readworker: %"PRIu32" woken up by pipe\n",monotonic_seconds(),inode);
 #endif
-				i = universal_read(rreq->pipe[0],pipebuff,1024);
+				i = universal_read(pipefd[0],pipebuff,1024);
 				if (i<0) { // mainly to make happy static code analyzers
 					if (trycnt >= minlogretry) {
 						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: read pipe error: %s (received: %"PRIu32"/%"PRIu32"; try counter: %"PRIu32")",inode,chindx,chunkid,version,strerr(errno),currentpos,rleng,trycnt+1);
@@ -1640,10 +1631,11 @@ static inline rrequest* read_rreq_invalidate(rrequest *rreq) {
 			return rreq; // INQUEUE && lcnt>0
 		}
 		if (rreq->waitingworker) {
-			if (universal_write(rreq->pipe[1]," ",1)!=1) {
+			if (universal_write(rreq->wakeup_fd," ",1)!=1) {
 				syslog(LOG_ERR,"can't write to pipe !!!");
 			}
-			rreq->waitingworker=0;
+			rreq->waitingworker = 0;
+			rreq->wakeup_fd = -1;
 		}
 	}
 	return rreq;
@@ -1660,10 +1652,11 @@ static inline void read_rreq_not_needed(rrequest *rreq) {
 		if (rreq->lcnt==0) {
 			rreq->mode = BREAK;
 			if (rreq->waitingworker) {
-				if (universal_write(rreq->pipe[1]," ",1)!=1) {
+				if (universal_write(rreq->wakeup_fd," ",1)!=1) {
 					syslog(LOG_ERR,"can't write to pipe !!!");
 				}
-				rreq->waitingworker=0;
+				rreq->waitingworker = 0;
+				rreq->wakeup_fd = -1;
 			}
 		}
 	}
@@ -2323,10 +2316,11 @@ void read_data_end(void *vid) {
 		fprintf(stderr,"%.6lf: closing: %"PRIu32" ; reqhead: %s ; inqueue: %u\n",monotonic_seconds(),ind->inode,ind->reqhead?"NOT NULL":"NULL",ind->inqueue);
 #endif
 		if (ind->reqhead->waitingworker) {
-			if (universal_write(ind->reqhead->pipe[1]," ",1)!=1) {
+			if (universal_write(ind->reqhead->wakeup_fd," ",1)!=1) {
 				syslog(LOG_ERR,"can't write to pipe !!!");
 			}
-			ind->reqhead->waitingworker=0;
+			ind->reqhead->waitingworker = 0;
+			ind->reqhead->wakeup_fd = -1;
 		}
 #ifdef RDEBUG
 		fprintf(stderr,"%.6lf: inode: %"PRIu32" ; waiting for close\n",monotonic_seconds(),ind->inode);

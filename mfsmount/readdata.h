@@ -39,10 +39,9 @@ void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t read
 void read_data_term(void);
 int read_data(void *vid, uint64_t offset, uint32_t *size, void **rhead,struct iovec **iov,uint32_t *iovcnt);
 void read_data_free_buff(void *vid,void *vrhead,struct iovec *iov);
-void read_inode_dirty_region(uint32_t inode,uint64_t offset,uint32_t size,const char *buff);
 void read_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng);
-void read_inode_set_length_sync(uint32_t inode,uint64_t newlength,uint8_t active);
-void read_inode_set_length_async(uint32_t inode,uint64_t newlength,uint8_t active);
+void read_inode_set_length_active(uint32_t inode,uint64_t newlength);
+void read_inode_set_length_passive(uint32_t inode,uint64_t newlength);
 void* read_data_new(uint32_t inode,uint64_t fleng);
 void read_data_end(void *vid);
 

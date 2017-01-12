@@ -1619,7 +1619,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 		fdcache_insert(&ctx,inode,attr,lflags,csdataver,chunkid,version,csdata,csdatasize);
 	}
 	if (type==TYPE_FILE) {
-		read_inode_set_length_async(inode,e.attr.st_size,0);
+		read_inode_set_length_passive(inode,e.attr.st_size);
 		finfo_change_fleng(inode,e.attr.st_size);
 	}
 	fs_fix_amtime(inode,&(e.attr.st_atime),&(e.attr.st_mtime));
@@ -1784,7 +1784,7 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		mfs_attr_set_fleng(attr,maxfleng);
 	}
 	if (type==TYPE_FILE) {
-		read_inode_set_length_async(ino,o_stbuf.st_size,0);
+		read_inode_set_length_passive(ino,o_stbuf.st_size);
 		finfo_change_fleng(ino,o_stbuf.st_size);
 		fdcache_invalidate(ino);
 	}
@@ -2061,7 +2061,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		chunksdatacache_clear_inode(ino,stbuf->st_size/MFSCHUNKSIZE);
 		finfo_change_fleng(ino,stbuf->st_size);
 		write_data_inode_setmaxfleng(ino,stbuf->st_size);
-		read_inode_set_length_sync(ino,stbuf->st_size,1);
+		read_inode_set_length_active(ino,stbuf->st_size);
 	}
 	if (status!=0) {	// should never happened but better check than sorry
 		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
@@ -3737,9 +3737,8 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		}
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long long int)size);
 		if (newfleng>0) {
-			read_inode_set_length_async(ino,newfleng,0);
+			read_inode_set_length_passive(ino,newfleng);
 		}
-		read_inode_dirty_region(ino,off,size,buf);
 		fdcache_invalidate(ino);
 		fuse_reply_write(req,size);
 	}

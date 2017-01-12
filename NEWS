@@ -7,6 +7,7 @@ This file lists noteworthy changes in MooseFS.
   - (mfsmount) fixed invalidating chunk cache after truncate
   - (mfsmount) fixed fleng handling in read worker
   - (mfsmount) fixed handling BREAK state in read worker
+  - (mfsmount) changed handling data invalidation in read module (sometimes could be less efficient, but it is much more safer)
 
 * MooseFS 3.0.86-1 (2016-11-30)
 

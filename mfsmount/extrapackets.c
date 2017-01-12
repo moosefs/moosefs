@@ -87,7 +87,7 @@ void* ep_thread(void *arg) {
 				if (ep->truncflag) {
 					chunksdatacache_clear_inode(ep->inode,ep->chindx+1);
 					read_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,0);
-					read_inode_set_length_async(ep->inode,ep->fleng,0);
+					read_inode_set_length_passive(ep->inode,ep->fleng);
 #ifndef WIN32
 					fdcache_invalidate(ep->inode);
 					mfs_inode_change_fleng(ep->inode,ep->fleng);
@@ -102,7 +102,7 @@ void* ep_thread(void *arg) {
 				}
 				break;
 			case FLENG_CHANGED:
-				read_inode_set_length_async(ep->inode,ep->fleng,0);
+				read_inode_set_length_passive(ep->inode,ep->fleng);
 #ifndef WIN32
 				fdcache_invalidate(ep->inode);
 				mfs_inode_clear_cache(ep->inode,ep->fleng,0);

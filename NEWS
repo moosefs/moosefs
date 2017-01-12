@@ -2,12 +2,13 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 3.0.87-1 (WIP)
 
-  - (mfsmount) fix fleng in finfo after truncate (patched by Davies Liu)
-  - (mfsmount) fix overlapped read (patched by Davies Liu)
-  - (mfsmount) fixed invalidating chunk cache after truncate
-  - (mfsmount) fixed fleng handling in read worker
-  - (mfsmount) fixed handling BREAK state in read worker
-  - (mfsmount) changed handling data invalidation in read module (sometimes could be less efficient, but it is much more safer)
+  - (mount) fix fleng in finfo after truncate (patched by Davies Liu)
+  - (mount) fix overlapped read (patched by Davies Liu)
+  - (mount) fixed invalidating chunk cache after truncate
+  - (mount) fixed fleng handling in read worker
+  - (mount) fixed handling BREAK state in read worker
+  - (mount) changed handling data invalidation in read module (sometimes could be less efficient, but it is much more safer)
+  - (tools) fixed number parsing (patched by Pawel Gawronski)
 
 * MooseFS 3.0.86-1 (2016-11-30)
 

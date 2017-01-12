@@ -1462,6 +1462,7 @@ static inline uint32_t parse_period(char *str,char **endpos) {
 		while ((*str)>='0' && (*str)<='9') {
 			base += ((*str)-'0')*divisor;
 			divisor /= 10.0;
+			str++;
 		}
 	}
 	while ((*str)==' ') {

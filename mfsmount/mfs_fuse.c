@@ -2058,6 +2058,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			fuse_reply_err(req, status);
 			return;
 		}
+		chunksdatacache_clear_inode(ino,stbuf->st_size/MFSCHUNKSIZE);
 		finfo_change_fleng(ino,stbuf->st_size);
 		write_data_inode_setmaxfleng(ino,stbuf->st_size);
 		read_inode_set_length_sync(ino,stbuf->st_size,1);

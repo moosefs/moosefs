@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.87-1 (WIP)
+
+  - (mfsmount) fix fleng in finfo after truncate (patched by Davies Liu)
+  - (mfsmount) fix overlapped read (patched by Davies Liu)
+  - (mfsmount) fixed invalidating chunk cache after truncate
+
 * MooseFS 3.0.86-1 (2016-11-30)
 
   - (master) fixed leader-follower resynchronization after reconnection (pro only)

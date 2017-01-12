@@ -1828,7 +1828,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 			added = 0;
 			for (rreq = ind->reqhead ; rreq && added==0 ; rreq=rreq->next) {
 				if (!STATE_NOT_NEEDED(rreq->mode)) {
-					if (rreq->offset+rreq->leng > etab[i] && rreq->offset < etab[i+1]) {
+					if (rreq->offset<=etab[i] && rreq->offset+rreq->leng>=etab[i+1]) {
 						rl = malloc(sizeof(rlist));
 						passert(rl);
 						rl->rreq = rreq;
@@ -1977,12 +1977,10 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: read_data: inode: %"PRIu32" block %"PRIu64":%"PRIu64"/%"PRIu32" (data in block: %"PRIu32") has been read\n",monotonic_seconds(),ind->inode,rl->rreq->offset,rl->rreq->offset+rl->rreq->leng,rl->rreq->leng,rl->rreq->rleng);
 #endif
-				if (rl->rreq->rleng < rl->rreq->leng) {
+				if (rl->rreq->rleng < rl->offsetadd + rl->reqleng) {
 					if (rl->rreq->rleng > rl->offsetadd) {
 						cnt++;
-						if ((rl->offsetadd + rl->reqleng) > rl->rreq->rleng) {
-							rl->reqleng = (rl->rreq->rleng - rl->offsetadd);
-						}
+						rl->reqleng = (rl->rreq->rleng - rl->offsetadd);
 						*size += rl->reqleng;
 					}
 					break; // end of file
@@ -2009,22 +2007,12 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 		}
 		*iov = malloc(sizeof(struct iovec)*cnt);
 		passert(*iov);
-		cnt = 0;
-		for (rl = rhead ; rl ; rl=rl->next) {
-			if (rl->rreq->rleng < rl->rreq->leng) {
-				if (rl->rreq->rleng > rl->offsetadd) {
-					(*iov)[cnt].iov_base = rl->rreq->data + rl->offsetadd;
-					(*iov)[cnt].iov_len = rl->reqleng;
-					cnt++;
-				}
-				break;
-			} else {
-				(*iov)[cnt].iov_base = rl->rreq->data + rl->offsetadd;
-				(*iov)[cnt].iov_len = rl->reqleng;
-				cnt++;
-			}
+		for (rl=rhead, i=0; i<cnt; rl=rl->next, i++) {
+			passert(rl);
+			(*iov)[i].iov_base = rl->rreq->data + rl->offsetadd;
+			(*iov)[i].iov_len = rl->reqleng;
 		}
-		*iovcnt = cnt;
+		*iovcnt = i;
 	} else {
 		*iovcnt = 0;
 		*iov = NULL;

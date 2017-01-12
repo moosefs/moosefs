@@ -682,6 +682,12 @@ void* read_worker(void *arg) {
 		if (master_version()>=VERSION2INT(3,0,74) && chunksdatacache_find(inode,chindx,&chunkid,&version,&csdataver,&csdata,&csdatasize)) {
 			rdstatus = MFS_STATUS_OK;
 			zassert(pthread_mutex_lock(&(ind->lock)));
+			if (rreq->mode == BREAK) {
+				zassert(pthread_mutex_unlock(&(ind->lock)));
+				read_job_end(rreq,0,0);
+				chunkrwlock_runlock(inode,chindx);
+				continue;
+			}
 			mfleng = ind->fleng;
 			zassert(pthread_mutex_unlock(&(ind->lock)));
 #ifdef RDEBUG
@@ -695,6 +701,12 @@ void* read_worker(void *arg) {
 			if (rdstatus==MFS_STATUS_OK) {
 				chunksdatacache_insert(inode,chindx,chunkid,version,csdataver,csdata,csdatasize);
 				zassert(pthread_mutex_lock(&(ind->lock)));
+				if (rreq->mode == BREAK) {
+					zassert(pthread_mutex_unlock(&(ind->lock)));
+					read_job_end(rreq,0,0);
+					chunkrwlock_runlock(inode,chindx);
+					continue;
+				}
 				ind->fleng = mfleng;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 			}
@@ -739,9 +751,14 @@ void* read_worker(void *arg) {
 						read_job_end(rreq,EIO,0);
 					}
 				} else {
-					rreq->mode = INQUEUE;
-					zassert(pthread_mutex_unlock(&(ind->lock)));
-					read_delayed_enqueue(rreq,1000+((trycnt<30)?((trycnt-1)*300000):10000000));
+					if (rreq->mode == BREAK) {
+						zassert(pthread_mutex_unlock(&(ind->lock)));
+						read_job_end(rreq,0,0);
+					} else {
+						rreq->mode = INQUEUE;
+						zassert(pthread_mutex_unlock(&(ind->lock)));
+						read_delayed_enqueue(rreq,1000+((trycnt<30)?((trycnt-1)*300000):10000000));
+					}
 				}
 			}
 			chunkrwlock_runlock(inode,chindx);
@@ -752,38 +769,42 @@ void* read_worker(void *arg) {
 //		fprintf(stderr,"fs_readchunk time: %.3lf\n",now-start);
 		if (chunkid==0 && version==0) { // empty chunk
 			zassert(pthread_mutex_lock(&(ind->lock)));
-#ifdef RDEBUG
-			fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; mfleng: %"PRIu64" (empty chunk)\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,ind->fleng);
-#endif
-			if (rreq->offset > mfleng) {
-				rreq->rleng = 0;
-			} else if ((rreq->offset + rreq->leng) > mfleng) {
-				rreq->rleng = mfleng - rreq->offset;
-			} else {
-				rreq->rleng = rreq->leng;
-			}
-
-			if (rreq->rleng>0) {
-				memset(rreq->data,0,rreq->rleng);
-			}
-			zassert(pthread_mutex_unlock(&(ind->lock)));
-			if (chunksdatacache_check(inode,chindx,chunkid,version)==0) {
-				zassert(pthread_mutex_lock(&(ind->lock)));
-
-#ifdef RDEBUG
-				fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; chunksdatacache_check: chunkid: %"PRIu64" ; version: %"PRIu32" - chunk changed\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,chunkid,version);
-#endif
-				rreq->currentpos = 0;
-				rreq->mode = REFRESH;
+			if (rreq->mode == BREAK) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 			} else {
-				zassert(pthread_mutex_lock(&(ind->lock)));
 #ifdef RDEBUG
-				fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; chunksdatacache_check: chunkid: %"PRIu64" ; version: %"PRIu32" - chunk ok\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,chunkid,version);
+				fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; mfleng: %"PRIu64" (empty chunk)\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,ind->fleng);
 #endif
-				rreq->mode = FILLED;
-				rreq->modified = monotonic_seconds();
+				if (rreq->offset > mfleng) {
+					rreq->rleng = 0;
+				} else if ((rreq->offset + rreq->leng) > mfleng) {
+					rreq->rleng = mfleng - rreq->offset;
+				} else {
+					rreq->rleng = rreq->leng;
+				}
+
+				if (rreq->rleng>0) {
+					memset(rreq->data,0,rreq->rleng);
+				}
 				zassert(pthread_mutex_unlock(&(ind->lock)));
+				if (chunksdatacache_check(inode,chindx,chunkid,version)==0) {
+					zassert(pthread_mutex_lock(&(ind->lock)));
+
+#ifdef RDEBUG
+					fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; chunksdatacache_check: chunkid: %"PRIu64" ; version: %"PRIu32" - chunk changed\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,chunkid,version);
+#endif
+					rreq->currentpos = 0;
+					rreq->mode = REFRESH;
+					zassert(pthread_mutex_unlock(&(ind->lock)));
+				} else {
+					zassert(pthread_mutex_lock(&(ind->lock)));
+#ifdef RDEBUG
+					fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; chunksdatacache_check: chunkid: %"PRIu64" ; version: %"PRIu32" - chunk ok\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,chunkid,version);
+#endif
+					rreq->mode = FILLED;
+					rreq->modified = monotonic_seconds();
+					zassert(pthread_mutex_unlock(&(ind->lock)));
+				}
 			}
 			read_job_end(rreq,0,0);
 			chunkrwlock_runlock(inode,chindx);
@@ -814,6 +835,9 @@ void* read_worker(void *arg) {
 			if (ind->trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				read_job_end(rreq,ENXIO,0);
+			} else if (rreq->mode == BREAK) {
+				zassert(pthread_mutex_unlock(&(ind->lock)));
+				read_job_end(rreq,0,0);
 			} else {
 				rreq->mode = INQUEUE;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -864,6 +888,9 @@ void* read_worker(void *arg) {
 			if (ind->trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				read_job_end(rreq,ENXIO,0);
+			} else if (rreq->mode == BREAK) {
+				zassert(pthread_mutex_unlock(&(ind->lock)));
+				read_job_end(rreq,0,0);
 			} else {
 				rreq->mode = INQUEUE;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -921,6 +948,9 @@ void* read_worker(void *arg) {
 			if (trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				read_job_end(rreq,EIO,0);
+			} else if (rreq->mode == BREAK) {
+				zassert(pthread_mutex_unlock(&(ind->lock)));
+				read_job_end(rreq,0,0);
 			} else {
 				rreq->mode = INQUEUE;
 				zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -972,6 +1002,13 @@ void* read_worker(void *arg) {
 
 
 			mfleng = ind->fleng;
+
+			if (rreq->mode == BREAK) {
+				zassert(pthread_mutex_unlock(&(ind->lock)));
+				status = EINTR;
+				currentpos = 0;
+				break;
+			}
 
 			if (reqsend && gotstatus) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));

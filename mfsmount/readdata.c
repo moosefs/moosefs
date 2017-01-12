@@ -664,7 +664,6 @@ void* read_worker(void *arg) {
 		inode = ind->inode;
 		rleng = rreq->leng;
 		trycnt = ind->trycnt;
-		mfleng = ind->fleng;
 
 		if (status!=MFS_STATUS_OK) {
 			zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -682,16 +681,25 @@ void* read_worker(void *arg) {
 
 		if (master_version()>=VERSION2INT(3,0,74) && chunksdatacache_find(inode,chindx,&chunkid,&version,&csdataver,&csdata,&csdatasize)) {
 			rdstatus = MFS_STATUS_OK;
+			zassert(pthread_mutex_lock(&(ind->lock)));
+			mfleng = ind->fleng;
+			zassert(pthread_mutex_unlock(&(ind->lock)));
 #ifdef RDEBUG
 			fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; chunksdatacache_find: mfleng: %"PRIu64" ; chunkid: %"PRIu64" ; version: %"PRIu32" ; status:%"PRIu8"\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,mfleng,chunkid,version,rdstatus);
 #endif
 		} else {
+#ifdef RDEBUG
+			fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; fs_readchunk (before)\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode);
+#endif
 			rdstatus = fs_readchunk(inode,chindx,0,&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
 			if (rdstatus==MFS_STATUS_OK) {
 				chunksdatacache_insert(inode,chindx,chunkid,version,csdataver,csdata,csdatasize);
+				zassert(pthread_mutex_lock(&(ind->lock)));
+				ind->fleng = mfleng;
+				zassert(pthread_mutex_unlock(&(ind->lock)));
 			}
 #ifdef RDEBUG
-			fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; fs_readchunk: mfleng: %"PRIu64" ; chunkid: %"PRIu64" ; version: %"PRIu32" ; status:%"PRIu8"\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,mfleng,chunkid,version,rdstatus);
+			fprintf(stderr,"%.6lf: readworker (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" ; fs_readchunk (after): mfleng: %"PRIu64" ; chunkid: %"PRIu64" ; version: %"PRIu32" ; status:%"PRIu8"\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,inode,mfleng,chunkid,version,rdstatus);
 #endif
 		}
 
@@ -945,7 +953,6 @@ void* read_worker(void *arg) {
 		}
 #endif
 
-		ind->fleng = mfleng;
 #ifdef RDEBUG
 		fprintf(stderr,"%.6lf: readworker inode: %"PRIu32" ; mfleng: %"PRIu64"\n",monotonic_seconds(),inode,ind->fleng);
 #endif

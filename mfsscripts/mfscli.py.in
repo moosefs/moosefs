@@ -2354,7 +2354,7 @@ if leaderfound==0:
 		elif electfound:
 			print("Leader master server not found, but there is an elect, so make sure that all chnunkservers are running - elect should became a leader soon")
 		elif followerfound:
-			print("Leader master server not found !!! - maybe you should run 'mfssupervisor -f -x -h %s -p %u'" % (masterhost,mastercontrolport))
+			print("Leader master server not found !!! - maybe you should run 'mfssupervisor -f -x -H %s -P %u'" % (masterhost,mastercontrolport))
 		else:
 			print("Working master servers not found !!! - maybe you are using wrong port number or wrong dns name")
 	needseparator=1

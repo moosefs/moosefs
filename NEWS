@@ -9,6 +9,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) fixed handling BREAK state in read worker
   - (mount) changed handling data invalidation in read module (sometimes could be less efficient, but it is much more safer)
   - (tools) fixed number parsing (patched by Pawel Gawronski)
+  - (cli) fixed printed host/port options
 
 * MooseFS 3.0.86-1 (2016-11-30)
 

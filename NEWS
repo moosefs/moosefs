@@ -11,6 +11,7 @@ This file lists noteworthy changes in MooseFS.
   - (tools) fixed number parsing (patched by Pawel Gawronski)
   - (cli) fixed printed host/port options
   - (mount) moved pipes from requests to workers (read and write - huge decrease of descriptors used by mount)
+  - (mount) changed signal to broadcast in rwlock (fixed very rare read/write deadlock)
 
 * MooseFS 3.0.86-1 (2016-11-30)
 

@@ -3599,7 +3599,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	// rwlock_rdunlock begin
 	fileinfo->readers_cnt--;
 	if (fileinfo->readers_cnt==0) {
-		zassert(pthread_cond_signal(&(fileinfo->cond)));
+		zassert(pthread_cond_broadcast(&(fileinfo->cond)));
 	}
 	// rwlock_rdunlock_end
 #ifdef FREEBSD_DELAYED_RELEASE

@@ -188,9 +188,10 @@ static uint32_t bitmasksize;
 static uint32_t searchpos;
 static freenode *freelist,**freetail;
 
-static uint32_t trash_eid;
+static uint32_t trash_bid;
+static uint32_t sustained_bid;
 static fsedge *trash[TRASH_BUCKETS];
-static fsedge *sustained;
+static fsedge *sustained[SUSTAINED_BUCKETS];
 static fsnode *root;
 
 static fsedge **edgehashtab[HASHTAB_HISIZE];
@@ -2628,7 +2629,7 @@ static inline void fsnodes_remove_node(uint32_t ts,fsnode *toremove) {
 
 static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 	fsnode *child;
-	uint32_t trash_cid;
+	uint32_t bid;
 	uint16_t pleng=0;
 	uint8_t *path=NULL;
 
@@ -2642,7 +2643,7 @@ static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 	if (child->parents==NULL) {	// last link
 		if (child->type == TYPE_FILE) {
 			if (child->trashtime>0) {
-				trash_cid = child->inode % TRASH_BUCKETS;
+				bid = child->inode % TRASH_BUCKETS;
 				child->type = TYPE_TRASH;
 				child->ctime = ts;
 				e = fsedge_malloc(pleng);
@@ -2656,18 +2657,19 @@ static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 				memcpy((uint8_t*)(e->name),path,pleng);
 				e->child = child;
 				e->parent = NULL;
-				e->nextchild = trash[trash_cid];
+				e->nextchild = trash[bid];
 				e->nextparent = NULL;
-				e->prevchild = trash + trash_cid;
+				e->prevchild = trash + bid;
 				e->prevparent = &(child->parents);
 				if (e->nextchild) {
 					e->nextchild->prevchild = &(e->nextchild);
 				}
-				trash[trash_cid] = e;
+				trash[bid] = e;
 				child->parents = e;
 				trashspace += child->data.fdata.length;
 				trashnodes++;
 			} else if (of_isfileopened(child->inode)) {
+				bid = child->inode % SUSTAINED_BUCKETS;
 				child->type = TYPE_SUSTAINED;
 				e = fsedge_malloc(pleng);
 				passert(e);
@@ -2680,14 +2682,14 @@ static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 				memcpy((uint8_t*)(e->name),path,pleng);
 				e->child = child;
 				e->parent = NULL;
-				e->nextchild = sustained;
+				e->nextchild = sustained[bid];
 				e->nextparent = NULL;
-				e->prevchild = &sustained;
+				e->prevchild = sustained + bid;
 				e->prevparent = &(child->parents);
 				if (e->nextchild) {
 					e->nextchild->prevchild = &(e->nextchild);
 				}
-				sustained = e;
+				sustained[bid] = e;
 				child->parents = e;
 				sustainedspace += child->data.fdata.length;
 				sustainednodes++;
@@ -2704,6 +2706,7 @@ static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 }
 
 static inline int fsnodes_purge(uint32_t ts,fsnode *p) {
+	uint32_t bid;
 	fsedge *e;
 	e = p->parents;
 
@@ -2711,6 +2714,7 @@ static inline int fsnodes_purge(uint32_t ts,fsnode *p) {
 		trashspace -= p->data.fdata.length;
 		trashnodes--;
 		if (of_isfileopened(p->inode)) {
+			bid = p->inode % SUSTAINED_BUCKETS;
 			p->type = TYPE_SUSTAINED;
 			sustainedspace += p->data.fdata.length;
 			sustainednodes++;
@@ -2718,12 +2722,12 @@ static inline int fsnodes_purge(uint32_t ts,fsnode *p) {
 			if (e->nextchild) {
 				e->nextchild->prevchild = e->prevchild;
 			}
-			e->nextchild = sustained;
-			e->prevchild = &(sustained);
+			e->nextchild = sustained[bid];
+			e->prevchild = sustained + bid;
 			if (e->nextchild) {
 				e->nextchild->prevchild = &(e->nextchild);
 			}
-			sustained = e;
+			sustained[bid] = e;
 			return 0;
 		} else {
 			fsnodes_remove_edge(ts,e);
@@ -3693,48 +3697,54 @@ uint8_t fs_mr_access(uint32_t ts,uint32_t inode) {
 }
 
 uint8_t fs_readsustained_size(uint32_t rootinode,uint8_t sesflags,uint32_t *dbuffsize) {
+	uint32_t bid;
 	if (rootinode!=0) {
 		return MFS_ERROR_EPERM;
 	}
 	(void)sesflags;
-	*dbuffsize = fsnodes_getdetached(sustained,NULL);
+	for (bid=0 ; bid<SUSTAINED_BUCKETS ; bid++) {
+		*dbuffsize += fsnodes_getdetached(sustained[bid],NULL);
+	}
 	return MFS_STATUS_OK;
 }
 
 void fs_readsustained_data(uint32_t rootinode,uint8_t sesflags,uint8_t *dbuff) {
+	uint32_t pos,bid;
 	(void)rootinode;
 	(void)sesflags;
-	fsnodes_getdetached(sustained,dbuff);
+	pos = 0;
+	for (bid=0 ; bid<SUSTAINED_BUCKETS ; bid++) {
+		pos += fsnodes_getdetached(sustained[bid],dbuff+pos);
+	}
 }
 
-
-uint8_t fs_readtrash_size(uint32_t rootinode,uint8_t sesflags,uint32_t tid,uint32_t *dbuffsize) {
+uint8_t fs_readtrash_size(uint32_t rootinode,uint8_t sesflags,uint32_t bid,uint32_t *dbuffsize) {
 	if (rootinode!=0) {
 		return MFS_ERROR_EPERM;
 	}
 	(void)sesflags;
-	if (tid>=TRASH_BUCKETS) {
+	if (bid>=TRASH_BUCKETS) {
 		*dbuffsize = 0;
-		for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
-			*dbuffsize += fsnodes_getdetached(trash[tid],NULL);
+		for (bid=0 ; bid<TRASH_BUCKETS ; bid++) {
+			*dbuffsize += fsnodes_getdetached(trash[bid],NULL);
 		}
 	} else {
-		*dbuffsize = fsnodes_getdetached(trash[tid],NULL);
+		*dbuffsize = fsnodes_getdetached(trash[bid],NULL);
 	}
 	return MFS_STATUS_OK;
 }
 
-void fs_readtrash_data(uint32_t rootinode,uint8_t sesflags,uint32_t tid,uint8_t *dbuff) {
+void fs_readtrash_data(uint32_t rootinode,uint8_t sesflags,uint32_t bid,uint8_t *dbuff) {
 	(void)rootinode;
 	(void)sesflags;
-	if (tid>=TRASH_BUCKETS) {
+	if (bid>=TRASH_BUCKETS) {
 		uint32_t pos;
 		pos = 0;
-		for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
-			pos += fsnodes_getdetached(trash[tid],dbuff+pos);
+		for (bid=0 ; bid<TRASH_BUCKETS ; bid++) {
+			pos += fsnodes_getdetached(trash[bid],dbuff+pos);
 		}
 	} else {
-		fsnodes_getdetached(trash[tid],dbuff);
+		fsnodes_getdetached(trash[bid],dbuff);
 	}
 }
 
@@ -6618,7 +6628,6 @@ uint32_t fs_node_info(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_
 	return ret;
 }
 
-
 static inline void fs_add_file_to_chunks(fsnode *f) {
 	uint32_t i;
 	uint64_t chunkid;
@@ -6940,11 +6949,11 @@ void fs_test_files() {
 	}
 }
 
-static inline void fs_univ_empty_trash_part(uint32_t ts,uint32_t eid,uint32_t *fi,uint32_t *ri) {
+static inline void fs_univ_empty_trash_part(uint32_t ts,uint32_t bid,uint32_t *fi,uint32_t *ri) {
 	fsedge *e;
 	fsnode *p;
 	uint64_t trashseconds;
-	e = trash[eid];
+	e = trash[bid];
 	while (e) {
 		p = e->child;
 		e = e->nextchild;
@@ -6960,28 +6969,28 @@ static inline void fs_univ_empty_trash_part(uint32_t ts,uint32_t eid,uint32_t *f
 	}
 }
 
-uint8_t fs_univ_emptytrash(uint32_t ts,uint8_t sesflags,uint32_t eid,uint32_t freeinodes,uint32_t sustainedinodes) {
+uint8_t fs_univ_emptytrash(uint32_t ts,uint8_t sesflags,uint32_t bid,uint32_t freeinodes,uint32_t sustainedinodes) {
 	uint32_t fi,ri;
-	uint32_t tid;
+
 	fi=0;
 	ri=0;
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		eid = trash_eid;
-		trash_eid++;
-		if (trash_eid >= TRASH_BUCKETS) {
-			trash_eid = 0;
+		bid = trash_bid;
+		trash_bid++;
+		if (trash_bid >= TRASH_BUCKETS) {
+			trash_bid = 0;
 		}
 	}
-	if (eid>=TRASH_BUCKETS) {
-		for (tid = 0 ; tid<TRASH_BUCKETS ; tid++) {
-			fs_univ_empty_trash_part(ts,tid,&fi,&ri);
+	if (bid>=TRASH_BUCKETS) {
+		for (bid = 0 ; bid<TRASH_BUCKETS ; bid++) {
+			fs_univ_empty_trash_part(ts,bid,&fi,&ri);
 		}
 	} else {
-		fs_univ_empty_trash_part(ts,eid,&fi,&ri);
+		fs_univ_empty_trash_part(ts,bid,&fi,&ri);
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		if ((fi|ri)>0) {
-			changelog("%"PRIu32"|EMPTYTRASH(%"PRIu32"):%"PRIu32",%"PRIu32,ts,eid,fi,ri);
+			changelog("%"PRIu32"|EMPTYTRASH(%"PRIu32"):%"PRIu32",%"PRIu32,ts,bid,fi,ri);
 		}
 	} else {
 		meta_version_inc();
@@ -6996,29 +7005,45 @@ void fs_emptytrash(void) {
 	(void)fs_univ_emptytrash(main_time(),0,0,0,0);
 }
 
-uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t eid,uint32_t freeinodes,uint32_t sustainedinodes) {
-	return fs_univ_emptytrash(ts,SESFLAG_METARESTORE,eid,freeinodes,sustainedinodes);
+uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t bid,uint32_t freeinodes,uint32_t sustainedinodes) {
+	return fs_univ_emptytrash(ts,SESFLAG_METARESTORE,bid,freeinodes,sustainedinodes);
 }
 
-uint8_t fs_univ_emptysustained(uint32_t ts,uint8_t sesflags,uint32_t freeinodes) {
+static inline void fs_univ_empty_sustained_part(uint32_t ts,uint32_t bid,uint32_t *fi) {
 	fsedge *e;
 	fsnode *p;
-	uint32_t fi;
-
-	fi=0;
-	e = sustained;
+	e = sustained[bid];
 	while (e) {
 		p = e->child;
 		e = e->nextchild;
 		if (of_isfileopened(p->inode)==0) {
-//		if (p->data.fdata.sessionids==NULL) {
 			fsnodes_purge(ts,p);
-			fi++;
+			(*fi)++;
 		}
+	}
+}
+
+uint8_t fs_univ_emptysustained(uint32_t ts,uint8_t sesflags,uint32_t bid,uint32_t freeinodes) {
+	uint32_t fi;
+
+	fi=0;
+	if ((sesflags&SESFLAG_METARESTORE)==0) {
+		bid = sustained_bid;
+		sustained_bid++;
+		if (sustained_bid >= SUSTAINED_BUCKETS) {
+			sustained_bid = 0;
+		}
+	}
+	if (bid>=SUSTAINED_BUCKETS) {
+		for (bid = 0 ; bid<SUSTAINED_BUCKETS ; bid++) {
+			fs_univ_empty_sustained_part(ts,bid,&fi);
+		}
+	} else {
+		fs_univ_empty_sustained_part(ts,bid,&fi);
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		if (fi>0) {
-			changelog("%"PRIu32"|EMPTYSUSTAINED():%"PRIu32,ts,fi);
+			changelog("%"PRIu32"|EMPTYSUSTAINED(%"PRIu32"):%"PRIu32,ts,bid,fi);
 		}
 	} else {
 		meta_version_inc();
@@ -7030,11 +7055,11 @@ uint8_t fs_univ_emptysustained(uint32_t ts,uint8_t sesflags,uint32_t freeinodes)
 }
 
 void fs_emptysustained(void) {
-	(void)fs_univ_emptysustained(main_time(),0,0);
+	(void)fs_univ_emptysustained(main_time(),0,0,0);
 }
 
-uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t freeinodes) {
-	return fs_univ_emptysustained(ts,SESFLAG_METARESTORE,freeinodes);
+uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t bid,uint32_t freeinodes) {
+	return fs_univ_emptysustained(ts,SESFLAG_METARESTORE,bid,freeinodes);
 }
 
 static inline void fs_renumerate_edges(fsnode *p) {
@@ -7081,13 +7106,15 @@ void fs_renumerate_edge_test(void) {
 }
 
 void fs_cleanupedges(void) {
-	uint32_t tid;
+	uint32_t bid;
 	fsedge_cleanup();
 	fsnodes_edge_hash_cleanup();
-	for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
-		trash[tid] = NULL;
+	for (bid=0 ; bid<TRASH_BUCKETS ; bid++) {
+		trash[bid] = NULL;
 	}
-	sustained = NULL;
+	for (bid=0 ; bid<SUSTAINED_BUCKETS ; bid++) {
+		sustained[bid] = NULL;
+	}
 }
 
 void fs_cleanupnodes(void) {
@@ -7172,7 +7199,7 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 	uint32_t child_id;
 	uint64_t edgeid;
 	uint16_t nleng;
-	uint32_t trash_cid;
+	uint32_t bid;
 //	uint32_t hpos;
 	fsedge *e;
 	statsrecord sr;
@@ -7274,24 +7301,25 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 	}
 	if (parent_id==0) {
 		if (e->child->type==TYPE_TRASH) {
-			trash_cid = child_id % TRASH_BUCKETS;
+			bid = child_id % TRASH_BUCKETS;
 			e->parent = NULL;
-			e->nextchild = trash[trash_cid];
+			e->nextchild = trash[bid];
 			if (e->nextchild) {
 				e->nextchild->prevchild = &(e->nextchild);
 			}
-			trash[trash_cid] = e;
-			e->prevchild = trash + trash_cid;
+			trash[bid] = e;
+			e->prevchild = trash + bid;
 			trashspace += e->child->data.fdata.length;
 			trashnodes++;
 		} else if (e->child->type==TYPE_SUSTAINED) {
+			bid = child_id % SUSTAINED_BUCKETS;
 			e->parent = NULL;
-			e->nextchild = sustained;
+			e->nextchild = sustained[bid];
 			if (e->nextchild) {
 				e->nextchild->prevchild = &(e->nextchild);
 			}
-			sustained = e;
-			e->prevchild = &sustained;
+			sustained[bid] = e;
+			e->prevchild = sustained + bid;
 			sustainedspace += e->child->data.fdata.length;
 			sustainednodes++;
 		} else {
@@ -7823,7 +7851,7 @@ static inline void fs_storeedges_rec(fsnode *f,bio *fd) {
 }
 
 uint8_t fs_storeedges(bio *fd) {
-	uint32_t tid;
+	uint32_t bid;
 	uint8_t hdr[8];
 	uint8_t *ptr;
 
@@ -7838,10 +7866,12 @@ uint8_t fs_storeedges(bio *fd) {
 	}
 
 	fs_storeedges_rec(root,fd);
-	for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
-		fs_storeedgelist(trash[tid],fd);
+	for (bid=0 ; bid<TRASH_BUCKETS ; bid++) {
+		fs_storeedgelist(trash[bid],fd);
 	}
-	fs_storeedgelist(sustained,fd);
+	for (bid=0 ; bid<SUSTAINED_BUCKETS ; bid++) {
+		fs_storeedgelist(sustained[bid],fd);
+	}
 	fs_storeedge(NULL,fd);	// end marker
 	return 0;
 }
@@ -8302,13 +8332,16 @@ void fs_reload(void) {
 }
 
 int fs_strinit(void) {
-	uint32_t tid;
-	trash_eid = 0;
+	uint32_t bid;
+	trash_bid = 0;
+	sustained_bid = 0;
 	root = NULL;
-	for (tid=0 ; tid<TRASH_BUCKETS ; tid++) {
-		trash[tid] = NULL;
+	for (bid=0 ; bid<TRASH_BUCKETS ; bid++) {
+		trash[bid] = NULL;
 	}
-	sustained = NULL;
+	for (bid=0 ; bid<SUSTAINED_BUCKETS ; bid++) {
+		sustained[bid] = NULL;
+	}
 	trashspace = 0;
 	sustainedspace = 0;
 	trashnodes = 0;
@@ -8330,7 +8363,7 @@ int fs_strinit(void) {
 	main_msectime_register(100,0,fs_test_files);
 	main_time_register(1,0,fsnodes_check_all_quotas);
 	main_time_register(1,0,fs_emptytrash);
-	main_time_register(60,0,fs_emptysustained);
+	main_time_register(1,0,fs_emptysustained);
 	main_time_register(60,0,fsnodes_freeinodes);
 	return 0;
 }

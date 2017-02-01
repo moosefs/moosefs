@@ -14,6 +14,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) changed signal to broadcast in rwlock (fixed very rare read/write deadlock)
   - (mount) fixed 'open descriptors' leak (lookup(with data for open)->open(with cached data)->close)
   - (mount) fixed potential 'race condition' - free 'csdata' during access
+  - (master) split (only internally) sustained folder into 256 subfolders (too many sustained files caused socket timeouts in master)
 
 * MooseFS 3.0.86-1 (2016-11-30)
 

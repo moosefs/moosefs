@@ -417,12 +417,12 @@ int do_chunkdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 }
 
 int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t sustainedinodes,freeinodes,tid;
+	uint32_t sustainedinodes,freeinodes,bid;
 	EAT(ptr,filename,lv,'(');
 	if (*ptr!=')') {
-		GETU32(tid,ptr);
+		GETU32(bid,ptr);
 	} else {
-		tid = 0xFFFFFFFF;
+		bid = 0xFFFFFFFF;
 	}
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
@@ -430,17 +430,22 @@ int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,',');
 	GETU32(sustainedinodes,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_emptytrash(ts,tid,freeinodes,sustainedinodes);
+	return fs_mr_emptytrash(ts,bid,freeinodes,sustainedinodes);
 }
 
 int do_emptysustained(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t freeinodes;
+	uint32_t freeinodes,bid;
 	EAT(ptr,filename,lv,'(');
+	if (*ptr!=')') {
+		GETU32(bid,ptr);
+	} else {
+		bid = 0xFFFFFFFF;
+	}
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(freeinodes,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_emptysustained(ts,freeinodes);
+	return fs_mr_emptysustained(ts,bid,freeinodes);
 }
 
 int do_flock(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

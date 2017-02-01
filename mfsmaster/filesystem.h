@@ -33,8 +33,8 @@ uint8_t fs_mr_amtime(uint32_t inode,uint32_t atime,uint32_t mtime,uint32_t ctime
 // int fs_copy(uint32_t ts,inode,parent,strlen(name),name);
 uint8_t fs_mr_create(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *name,uint8_t type,uint16_t mode,uint16_t cumask,uint32_t uid,uint32_t gid,uint32_t rdev,uint32_t inode);
 uint8_t fs_mr_session(uint32_t sessionid);
-uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t eid,uint32_t freeinodes,uint32_t sustainedinodes);
-uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t freeinodes);
+uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t bid,uint32_t freeinodes,uint32_t sustainedinodes);
+uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t bid,uint32_t freeinodes);
 uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t freeinodes,uint32_t sustainedinodes);
 uint8_t fs_mr_link(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint32_t nleng_dst,uint8_t *name_dst);
 uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length,uint8_t canmodmtime);

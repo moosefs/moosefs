@@ -35,6 +35,7 @@
 #include <stdio.h>
 #else
 #include <sys/select.h>
+#include <unistd.h>
 #endif
 
 #ifdef HAVE_NANOSLEEP
@@ -231,6 +232,30 @@ static inline int pipe(int handles[2]) {
 	closesocket(s);
 	return 0;
 }
+
+#endif
+
+static inline int close_pipe(int handles[2]) {
+	int res=0;
+#ifdef WIN32
+	if (closesocket(handles[0])<0) {
+		res = -1;
+	}
+	if (closesocket(handles[1])<0) {
+		res = -1;
+	}
+#else
+	if (close(handles[0])<0) {
+		res = -1;
+	}
+	if (close(handles[1])<0) {
+		res = -1;
+	}
+#endif
+	return res;
+}
+
+#ifdef WIN32
 
 /* define structure iovec */
 

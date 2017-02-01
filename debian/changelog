@@ -1,3 +1,26 @@
+moosefs (3.0.87-1) unstable; urgency=medium
+
+  * (mount) fix fleng in finfo after truncate (patched by Davies Liu)
+  * (mount) fix overlapped read (patched by Davies Liu)
+  * (mount) fixed invalidating chunk cache after truncate
+  * (mount) fixed fleng handling in read worker
+  * (mount) fixed handling BREAK state in read worker
+  * (mount) changed handling data invalidation in read module (sometimes could
+    be less efficient, but it is much more safer)
+  * (tools) fixed number parsing (patched by Pawel Gawronski)
+  * (cli) fixed printed host/port options
+  * (mount) moved pipes from requests to workers (read and write - huge
+    decrease of descriptors used by mount)
+  * (mount) changed signal to broadcast in rwlock (fixed very rare read/write
+    deadlock)
+  * (mount) fixed 'open descriptors' leak (lookup(with data for
+    open)->open(with cached data)->close)
+  * (mount) fixed potential 'race condition' - free 'csdata' during access
+  * (master) split (only internally) sustained folder into 256 subfolders (too
+    many sustained files caused socket timeouts in master)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 01 Feb 2017 12:00:00 +0100
+
 moosefs (3.0.86-1) unstable; urgency=medium
 
   * (master) fixed leader-follower resynchronization after reconnection (pro

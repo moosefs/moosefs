@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.87-1 (WIP)
+* MooseFS 3.0.87-1 (2017-02-01)
 
   - (mount) fix fleng in finfo after truncate (patched by Davies Liu)
   - (mount) fix overlapped read (patched by Davies Liu)

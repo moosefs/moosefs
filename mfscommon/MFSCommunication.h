@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+ * Copyright (C) 2017 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
  * 
  * This file is part of MooseFS.
  * 
@@ -79,6 +79,7 @@
 #define MFS_INODE_REUSE_DELAY 86400
 
 #define TRASH_BUCKETS 4096
+#define SUSTAINED_BUCKETS 256
 
 #define MFS_STATUS_OK              0    // OK
 

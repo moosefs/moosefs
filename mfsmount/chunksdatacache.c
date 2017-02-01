@@ -282,7 +282,7 @@ void chunksdatacache_insert(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint
 	pthread_mutex_unlock(&lock);
 }
 
-uint8_t chunksdatacache_find(uint32_t inode,uint32_t chindx,uint64_t *chunkid,uint32_t *version,uint8_t *csdataver,const uint8_t **csdata,uint32_t *csdatasize) {
+uint8_t chunksdatacache_find(uint32_t inode,uint32_t chindx,uint64_t *chunkid,uint32_t *version,uint8_t *csdataver,uint8_t *csdata,uint32_t *csdatasize) {
 	chunks_data_entry *ca;
 	uint32_t hash;
 
@@ -291,10 +291,14 @@ uint8_t chunksdatacache_find(uint32_t inode,uint32_t chindx,uint64_t *chunkid,ui
 	for (ca = chunks_data_hash[hash] ; ca ; ca=ca->nextdata) {
 		if (ca->inode==inode && ca->chindx==chindx) {
 //			chunks_lru_move(ca);
+			if (*csdatasize < ca->csdatasize) { // not enough space in external buffer
+				pthread_mutex_unlock(&lock);
+				return 0;
+			}
 			*chunkid = ca->chunkid;
 			*version = ca->version;
 			*csdataver = ca->csdataver;
-			*csdata = ca->csdata;
+			memcpy(csdata,ca->csdata,ca->csdatasize);
 			*csdatasize = ca->csdatasize;
 			pthread_mutex_unlock(&lock);
 			return 1;

@@ -667,8 +667,10 @@ void* read_worker(void *arg) {
 
 		chunkrwlock_rlock(inode,chindx);
 
-		if (master_version()>=VERSION2INT(3,0,74) && chunksdatacache_find(inode,chindx,&chunkid,&version,&csdataver,&csdata,&csdatasize)) {
+		csdatasize = 1024; // pipebuff here is used as a temporary data buffer
+		if (master_version()>=VERSION2INT(3,0,74) && chunksdatacache_find(inode,chindx,&chunkid,&version,&csdataver,pipebuff,&csdatasize)) {
 			rdstatus = MFS_STATUS_OK;
+			csdata = pipebuff;
 			zassert(pthread_mutex_lock(&(ind->lock)));
 			if (rreq->mode == BREAK) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));

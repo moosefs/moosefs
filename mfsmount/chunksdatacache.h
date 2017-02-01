@@ -28,7 +28,7 @@ void chunksdatacache_invalidate(uint32_t inode,uint32_t chindx);
 uint8_t chunksdatacache_check(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version);
 void chunksdatacache_change(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version);
 void chunksdatacache_insert(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint8_t csdataver,const uint8_t *csdata,uint32_t csdatasize);
-uint8_t chunksdatacache_find(uint32_t inode,uint32_t chindx,uint64_t *chunkid,uint32_t *version,uint8_t *csdataver,const uint8_t **csdata,uint32_t *csdatasize);
+uint8_t chunksdatacache_find(uint32_t inode,uint32_t chindx,uint64_t *chunkid,uint32_t *version,uint8_t *csdataver,uint8_t *csdata,uint32_t *csdatasize);
 void chunksdatacache_cleanup(void);
 void chunksdatacache_term(void);
 void chunksdatacache_init(void);

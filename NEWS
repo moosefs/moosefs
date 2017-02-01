@@ -12,6 +12,7 @@ This file lists noteworthy changes in MooseFS.
   - (cli) fixed printed host/port options
   - (mount) moved pipes from requests to workers (read and write - huge decrease of descriptors used by mount)
   - (mount) changed signal to broadcast in rwlock (fixed very rare read/write deadlock)
+  - (mount) fixed 'open descriptors' leak (lookup(with data for open)->open(with cached data)->close)
 
 * MooseFS 3.0.86-1 (2016-11-30)
 

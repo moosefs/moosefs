@@ -3565,7 +3565,7 @@ uint8_t fs_create(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mod
 		fs_disconnect();
 		ret = MFS_ERROR_IO;
 	} else {
-		fs_inc_acnt((*inode = get32bit(&rptr)));
+		*inode = get32bit(&rptr);
 		memcpy(attr,rptr,35);
 		ret = MFS_STATUS_OK;
 	}
@@ -3607,7 +3607,6 @@ uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uin
 		}
 	}
 	put8bit(&wptr,flags);
-	fs_inc_acnt(inode);
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_OPEN,&i);
 	if (rptr==NULL) {
 		ret = MFS_ERROR_IO;
@@ -3625,39 +3624,8 @@ uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uin
 		fs_disconnect();
 		ret = MFS_ERROR_IO;
 	}
-	if (ret) {	// release on error
-		fs_dec_acnt(inode);
-	}
 	return ret;
 }
-
-void fs_release(uint32_t inode) {
-	fs_dec_acnt(inode);
-}
-
-// release - decrease acquire cnt - if reach 0 send CLTOMA_FUSE_RELEASE
-/*
-uint8_t fs_release(uint32_t inode) {
-	uint8_t *ptr;
-	uint32_t i;
-	uint8_t ret;
-	ptr = fs_createpacket(rec,CLTOMA_FUSE_RELEASE,4);
-	if (wptr==NULL) {
-		return MFS_ERROR_IO;
-	}
-	put32bit(&ptr,inode);
-	ptr = fs_sendandreceive(rec,MATOCL_FUSE_RELEASE,&i);
-	if (ptr==NULL) {
-		ret = MFS_ERROR_IO;
-	} else if (i==1) {
-		ret = ptr[0];
-	} else {
-		fs_disconnect();
-		ret = MFS_ERROR_IO;
-	}
-	return ret;
-}
-*/
 
 uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
 	uint8_t *wptr;

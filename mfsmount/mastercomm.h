@@ -41,6 +41,8 @@ void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes);
 //int fs_direct_read(int rfd,uint8_t *buff,uint32_t size);
 void fs_add_entry(uint32_t inode);
 void fs_forget_entry(uint32_t inode);
+void fs_inc_acnt(uint32_t inode);
+void fs_dec_acnt(uint32_t inode);
 // uint8_t fs_is_sustained_entry(uint32_t inode);
 
 void fs_get_fleng(uint32_t inode,uint64_t *fleng);
@@ -72,7 +74,6 @@ uint8_t fs_readdir(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint8
 
 uint8_t fs_create(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mode,uint16_t cumask,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[35]);
 uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t flags,uint8_t attr[35]);
-void fs_release(uint32_t inode);
 
 uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
 uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);

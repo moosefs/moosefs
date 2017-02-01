@@ -3102,7 +3102,9 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	mfs_makeattrstr(attrstr,256,&e.attr);
 	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s) (direct_io:%u,keep_cache:%u) [handle:%08"PRIX32"]",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,findex);
+	fs_inc_acnt(inode);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
+		fs_dec_acnt(inode);
 		mfs_removefileinfo(findex);
 		fi->fh = 0;
 	}
@@ -3272,8 +3274,10 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 //		chunksdatacache_clear_inode(ino,0);
 //	}
 	oplog_printf(&ctx,"open (%lu)%s: OK (direct_io:%u,keep_cache:%u) [handle:%08"PRIX32"]",(unsigned long int)ino,(fdrec)?" (using cached data from lookup)":"",(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,findex);
+	fs_inc_acnt(ino);
 	if (fuse_reply_open(req, fi) == -ENOENT) {
 		mfs_removefileinfo(findex);
+		fs_dec_acnt(ino);
 		fi->fh = 0;
 	} else if (fdrec) {
 		uint32_t gidtmp = 0;
@@ -3364,12 +3368,12 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		}
 	}
 	dcache_invalidate_attr(ino);
-	fs_release(ino);
 	oplog_printf(&ctx,"release (%lu): OK",(unsigned long int)ino);
 	fuse_reply_err(req,0);
 	if (fi->fh>0) {
 		mfs_removefileinfo(fi->fh); // after writes it waits for data sync, so do it after everything
 	}
+	fs_dec_acnt(ino);
 }
 
 void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi) {

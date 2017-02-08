@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.88-1 (WIP)
 
   - (mount) added read cache clean on write (same file access using different descriptors)
+  - (mount) added missing cond_destroy in readdata.c (fix sent by Jakub Ratajczak)
 
 * MooseFS 3.0.87-1 (2017-02-01)
 

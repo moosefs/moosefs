@@ -340,6 +340,7 @@ static inline void read_delete_request(rrequest *rreq) {
 	zassert(pthread_mutex_unlock(&buffsizelock));
 #endif
 	free(rreq->data);
+	zassert(pthread_cond_destroy(&(rreq->cond)));
 	free(rreq);
 #ifdef RDEBUG
 	return rbuffsize;

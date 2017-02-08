@@ -5,6 +5,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) added read cache clean on write (same file access using different descriptors)
   - (mount) added missing cond_destroy in readdata.c (fix sent by Jakub Ratajczak)
   - (master) fixed initializing packet size for reading 'sustained' directory
+  - (all) fixed zassert for printing correct statuses in case of pthread functions
 
 * MooseFS 3.0.87-1 (2017-02-01)
 

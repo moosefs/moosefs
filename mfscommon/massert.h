@@ -54,9 +54,15 @@
 #define zassert(e) { \
 	int _mfs_assert_ret = (e); \
 	if (_mfs_assert_ret!=0) { \
-		const char *_mfs_errorstring = strerr(errno); \
-		syslog(LOG_ERR,"%s:%u - unexpected status, '%s' returned: %d (errno: %s)",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
-		fprintf(stderr,"%s:%u - unexpected status, '%s' returned: %d (errno: %s)\n",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
+		if (errno!=0) { \
+			const char *_mfs_errorstring = strerr(errno); \
+			syslog(LOG_ERR,"%s:%u - unexpected status, '%s' returned: %d (errno: %s)",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
+			fprintf(stderr,"%s:%u - unexpected status, '%s' returned: %d (errno: %s)\n",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
+		} else { \
+			const char *_mfs_errorstring = strerr(_mfs_assert_ret); \
+			syslog(LOG_ERR,"%s:%u - unexpected status, '%s' returned: %d (%s)",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
+			fprintf(stderr,"%s:%u - unexpected status, '%s' returned: %d (%s)\n",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
+		} \
 		abort(); \
 	} \
 }

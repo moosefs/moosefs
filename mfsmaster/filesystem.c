@@ -3702,6 +3702,7 @@ uint8_t fs_readsustained_size(uint32_t rootinode,uint8_t sesflags,uint32_t *dbuf
 		return MFS_ERROR_EPERM;
 	}
 	(void)sesflags;
+	*dbuffsize = 0;
 	for (bid=0 ; bid<SUSTAINED_BUCKETS ; bid++) {
 		*dbuffsize += fsnodes_getdetached(sustained[bid],NULL);
 	}

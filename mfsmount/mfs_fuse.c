@@ -3743,6 +3743,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		if (newfleng>0) {
 			read_inode_set_length_passive(ino,newfleng);
 		}
+		read_inode_clear_cache(ino,off,size);
 		fdcache_invalidate(ino);
 		fuse_reply_write(req,size);
 	}

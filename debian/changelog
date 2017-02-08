@@ -1,3 +1,15 @@
+moosefs (3.0.88-1) unstable; urgency=medium
+
+  * (mount) added read cache clean on write (same file access using different
+    descriptors)
+  * (mount) added missing cond_destroy in readdata.c (fix sent by Jakub
+    Ratajczak)
+  * (master) fixed initializing packet size for reading 'sustained' directory
+  * (all) fixed zassert for printing correct statuses in case of pthread
+    functions
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 08 Feb 2017 12:00:00 +0100
+
 moosefs (3.0.87-1) unstable; urgency=medium
 
   * (mount) fix fleng in finfo after truncate (patched by Davies Liu)

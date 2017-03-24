@@ -2,6 +2,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 3.0.89-1 (WIP)
 
+  - (cs) increased verbosity of crc-error messages
   - (cs) fixed invalidating preserved block in case of truncate down followed by truncate up
   - (mount) increased master-proxy buffer sizes
 

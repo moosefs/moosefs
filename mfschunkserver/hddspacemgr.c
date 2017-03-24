@@ -3712,6 +3712,11 @@ static int hdd_int_truncate(uint64_t chunkid,uint32_t version,uint32_t newversio
 			hdd_chunk_release(c);
 			return MFS_ERROR_IO;
 		}
+#ifdef PRESERVE_BLOCK
+		if (c->blockno>=blocks) {
+			c->blockno = 0xFFFF;	// invalidate truncated block
+		}
+#endif
 		if (blocksize>0) {
 			if (ftruncate(c->fd,c->hdrsize+CHUNKCRCSIZE+(blocks<<MFSBLOCKBITS))<0) {
 				hdd_error_occured(c);	// uses and preserves errno !!!
@@ -3721,10 +3726,7 @@ static int hdd_int_truncate(uint64_t chunkid,uint32_t version,uint32_t newversio
 				return MFS_ERROR_IO;
 			}
 #ifdef PRESERVE_BLOCK
-			if (c->blockno>=blocks) {
-				c->blockno = 0xFFFF;	// invalidate truncated block
-			}
-			if (c->blockno!=(blockpos>>MFSBLOCKBITS)) {
+			if (c->blockno!=blocknum) {
 
 #ifdef USE_PIO
 				if (pread(c->fd,c->block,blocksize,c->hdrsize+CHUNKCRCSIZE+blockpos)!=(signed)blocksize) {
@@ -3750,7 +3752,7 @@ static int hdd_int_truncate(uint64_t chunkid,uint32_t version,uint32_t newversio
 #ifdef PRESERVE_BLOCK
 			}
 			memset(c->block+blocksize,0,MFSBLOCKSIZE-blocksize);
-			c->blockno = blockpos>>MFSBLOCKBITS;
+			c->blockno = blocknum;
 			i = mycrc32_zeroexpanded(0,c->block,blocksize,MFSBLOCKSIZE-blocksize);
 #else /* PRESERVE_BLOCK */
 			i = mycrc32_zeroexpanded(0,blockbuffer,blocksize,MFSBLOCKSIZE-blocksize);
@@ -6495,6 +6497,27 @@ int hdd_init(void) {
 	for (hp=0 ; hp<DHASHSIZE ; hp++) {
 		dophashtab[hp] = NULL;
 	}
+
+#if 0
+	fprintf(stderr,"compiled with features: ");
+#ifdef PRESERVE_BLOCK
+	fprintf(stderr,"PRESERVE_BLOCK,");
+#endif
+#ifdef MMAP_ALLOC
+	fprintf(stderr,"MMAP_ALLOC,");
+#endif
+#ifdef HAVE___SYNC_OP_AND_FETCH
+	fprintf(stderr,"SYNC_OP_AND_FETCH,");
+#endif
+#ifdef HAVE___SYNC_FETCH_AND_OP
+	fprintf(stderr,"SYNC_FETCH_AND_OP,");
+#endif
+#ifdef USE_PIO
+	fprintf(stderr,"PREAD/PWRITE\n");
+#else
+	fprintf(stderr,"SEEK+READ/WRITE\n");
+#endif
+#endif
 
 #ifndef PRESERVE_BLOCK
 	zassert(pthread_key_create(&hdrbufferkey,free));

@@ -34,8 +34,8 @@
 #include "MFSCommunication.h"
 #include "negentrycache.h"
 
-#define QUERYSIZE 10000
-#define ANSSIZE 10000
+#define QUERYSIZE 50000
+#define ANSSIZE 4000000
 
 static int lsock = -1;
 static pthread_t proxythread;
@@ -58,8 +58,8 @@ void masterproxy_getlocation(uint8_t *masterinfo) {
 
 static void* masterproxy_server(void *args) {
 	uint8_t header[8];
-	uint8_t querybuffer[QUERYSIZE];
-	uint8_t ansbuffer[ANSSIZE];
+	uint8_t *querybuffer;
+	uint8_t *ansbuffer;
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	int sock = *((int*)args);
@@ -67,10 +67,12 @@ static void* masterproxy_server(void *args) {
 
 	free(args);
 
+	querybuffer = malloc(QUERYSIZE);
+	ansbuffer = malloc(ANSSIZE);
+
 	for (;;) {
 		if (tcptoread(sock,header,8,1000)!=8) {
-			tcpclose(sock);
-			return NULL;
+			break;
 		}
 
 		rptr = header;
@@ -79,23 +81,19 @@ static void* masterproxy_server(void *args) {
 		if (cmd==CLTOMA_FUSE_REGISTER) {	// special case: register
 			// if (psize>QUERYSIZE) {
 			if (psize!=73) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 
 			if (tcptoread(sock,querybuffer,psize,1000)!=(int32_t)(psize)) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 
 			if (memcmp(querybuffer,FUSE_REGISTER_BLOB_ACL,64)!=0) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 
 			if (querybuffer[64]!=REGISTER_TOOLS) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 
 			wptr = ansbuffer;
@@ -104,18 +102,15 @@ static void* masterproxy_server(void *args) {
 			put8bit(&wptr,MFS_STATUS_OK);
 
 			if (tcptowrite(sock,ansbuffer,9,1000)!=9) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 		} else {
 			if (psize<4 || psize>QUERYSIZE) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 
 			if (tcptoread(sock,querybuffer,psize,1000)!=(int32_t)(psize)) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 
 			rptr = querybuffer;
@@ -123,8 +118,7 @@ static void* masterproxy_server(void *args) {
 
 			asize = ANSSIZE-12;
 			if (fs_custom(cmd,querybuffer+4,psize-4,&acmd,ansbuffer+12,&asize)!=MFS_STATUS_OK) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 
 			if (cmd==CLTOMA_FUSE_SNAPSHOT && acmd==MATOCL_FUSE_SNAPSHOT) {
@@ -137,11 +131,14 @@ static void* masterproxy_server(void *args) {
 			put32bit(&wptr,msgid);
 
 			if (tcptowrite(sock,ansbuffer,asize+12,1000)!=(int32_t)(asize+12)) {
-				tcpclose(sock);
-				return NULL;
+				break;
 			}
 		}
 	}
+	tcpclose(sock);
+	free(ansbuffer);
+	free(querybuffer);
+	return NULL;
 }
 
 static void* masterproxy_acceptor(void *args) {

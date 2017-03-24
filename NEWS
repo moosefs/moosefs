@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.89-1 (WIP)
+
+  - (mount) increased master-proxy buffer sizes
+
 * MooseFS 3.0.88-1 (2017-02-08)
 
   - (mount) added read cache clean on write (same file access using different descriptors)

@@ -165,13 +165,13 @@ typedef struct chunk {
 	uint16_t hdrsize;
 	double opento;
 	double crcto;
-	unsigned crcchanged:1;
-	unsigned fsyncneeded:1;
+	uint8_t crcchanged;
+	uint8_t fsyncneeded;
 #define CH_AVAIL 0
 #define CH_LOCKED 1
 #define CH_DELETED 2
 #define CH_TOBEDELETED 3
-	unsigned state:2;	// CH_AVAIL,CH_LOCKED,CH_DELETED
+	uint8_t state;	// CH_AVAIL,CH_LOCKED,CH_DELETED
 	cntcond *ccond;
 	uint8_t *crc;
 	int fd;

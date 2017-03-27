@@ -2,6 +2,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 3.0.89-1 (WIP)
 
+  - (cs) split bitfiled into separate bytes (fixed potential race condition)
   - (master) setting operation to NONE before sending status (silence unnecessary messages in some cases)
   - (cs) increased verbosity of crc-error messages
   - (cs) fixed invalidating preserved block in case of truncate down followed by truncate up

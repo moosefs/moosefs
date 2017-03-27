@@ -1,7 +1,8 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.89-1 (WIP)
+* MooseFS 3.0.89-1 (2017-02-21)
 
+  - (mount) added fixing file length in all inodes after write
   - (cs) split bitfiled into separate bytes (fixed potential race condition)
   - (master) setting operation to NONE before sending status (silence unnecessary messages in some cases)
   - (cs) increased verbosity of crc-error messages

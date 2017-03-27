@@ -3742,6 +3742,8 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long long int)size);
 		if (newfleng>0) {
 			read_inode_set_length_passive(ino,newfleng);
+			write_data_inode_setmaxfleng(ino,newfleng);
+			finfo_change_fleng(ino,newfleng);
 		}
 		read_inode_clear_cache(ino,off,size);
 		fdcache_invalidate(ino);

@@ -59,6 +59,7 @@ mfsmaster_SOURCES=\
 	../mfscommon/slogger.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/hashfn.h ../mfscommon/median.h \
 	../mfscommon/buckets.h ../mfscommon/mfsalloc.h \
+	../mfscommon/cuckoohash.c ../mfscommon/cuckoohash.h \
 	../mfscommon/MFSCommunication.h
 
 

@@ -65,6 +65,7 @@
 #include "cfg.h"
 #include "main.h"
 #include "changelog.h"
+#include "cuckoohash.h"
 #include "buckets.h"
 #include "clocks.h"
 #include "storageclass.h"
@@ -219,6 +220,8 @@ static uint32_t dirnodes;
 
 static uint64_t *edgeid_id_hashtab;
 static fsedge **edgeid_ptr_hashtab;
+
+static void *snapshot_inodehash;
 
 #define MSGBUFFSIZE 1000000
 
@@ -3383,10 +3386,17 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 				dstnode->ctime = ts;
 			}
 		}
-		dstnode->flags |= EATTR_SNAPSHOT;
+		dstnode->eattr |= EATTR_SNAPSHOT;
 	} else { // new element
 		if (srcnode->type==TYPE_FILE || srcnode->type==TYPE_DIRECTORY || srcnode->type==TYPE_SYMLINK || srcnode->type==TYPE_BLOCKDEV || srcnode->type==TYPE_CHARDEV || srcnode->type==TYPE_SOCKET || srcnode->type==TYPE_FIFO) {
 			statsrecord psr,nsr;
+			if (smode&SNAPSHOT_MODE_PRESERVE_HARDLINKS && srcnode->type!=TYPE_DIRECTORY && srcnode->parents->nextparent!=NULL) {
+				dstnode = chash_find(snapshot_inodehash,srcnode->inode);
+				if (dstnode!=NULL) {
+					fsnodes_link(ts,parentnode,dstnode,nleng,name);
+					return;
+				}
+			}
 			if (smode&SNAPSHOT_MODE_CPLIKE_ATTR) {
 				dstnode = fsnodes_create_node(ts,parentnode,nleng,name,srcnode->type,srcnode->mode,cumask,uid,gid[0],0);
 			} else {
@@ -3395,6 +3405,9 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 				} else {
 					dstnode = fsnodes_create_node(ts,parentnode,nleng,name,srcnode->type,srcnode->mode&0x3FF,0,uid,gid[0],0);
 				}
+			}
+			if (smode&SNAPSHOT_MODE_PRESERVE_HARDLINKS && srcnode->type!=TYPE_DIRECTORY && srcnode->parents->nextparent!=NULL) {
+				chash_add(snapshot_inodehash,srcnode->inode,dstnode);
 			}
 			fsnodes_get_stats(dstnode,&psr);
 			if ((smode&SNAPSHOT_MODE_CPLIKE_ATTR)==0) {
@@ -5066,8 +5079,13 @@ uint8_t fs_univ_snapshot(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_
 				return MFS_ERROR_QUOTA;
 			}
 		}
-
+//		if (smode & SNAPSHOT_MODE_PRESERVE_HARDLINKS) {
+//			chash_erase(snapshot_inodehash);
+//		}
 		fsnodes_snapshot(ts,sp,dwd,nleng_dst,name_dst,smode,sesflags,uid,gids,gid,cumask,((sesflags&SESFLAG_METARESTORE)==0)?0:1);
+		if (smode & SNAPSHOT_MODE_PRESERVE_HARDLINKS) {
+			chash_erase(snapshot_inodehash);
+		}
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		changelog("%"PRIu32"|SNAPSHOT(%"PRIu32",%"PRIu32",%s,%"PRIu8",%"PRIu8",%"PRIu32",%"PRIu32",%s,%"PRIu16")",ts,inode_src,parent_dst,changelog_escape_name(nleng_dst,name_dst),smode,sesflags,uid,gids,changelog_escape_name(gids*4,(const uint8_t*)gid),cumask);
@@ -8365,6 +8383,7 @@ int fs_strinit(void) {
 	chunktab_init();
 	test_start_time = main_time()+900;
 	fs_reload();
+	snapshot_inodehash = chash_new();
 
 	main_reload_register(fs_reload);
 	main_msectime_register(100,0,fs_test_files);

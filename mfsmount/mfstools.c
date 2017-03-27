@@ -4933,9 +4933,10 @@ void usage(int f) {
 			print_numberformat_options();
 			break;
 		case MFSMAKESNAPSHOT:
-			fprintf(stderr,"make snapshot (lazy copy)\n\nusage: mfsmakesnapshot [-op] src [src ...] dst\n");
+			fprintf(stderr,"make snapshot (lazy copy)\n\nusage: mfsmakesnapshot [-ocp] src [src ...] dst\n");
 			fprintf(stderr," -o - allow to overwrite existing objects\n");
 			fprintf(stderr," -c - 'cp' mode for attributes (create objects using current uid,gid,umask etc.)\n");
+			fprintf(stderr," -p - preserve hardlinks\n");
 			break;
 		case MFSRMSNAPSHOT:
 			fprintf(stderr,"remove snapshot (quick rm -r)\n\nusage: mfsrmsnapshot [-f] name [name ...]\n");
@@ -5300,13 +5301,16 @@ int main(int argc,char **argv) {
 	// parse options
 	switch (f) {
 	case MFSMAKESNAPSHOT:
-		while ((ch=getopt(argc,argv,"oc"))!=-1) {
+		while ((ch=getopt(argc,argv,"ocp"))!=-1) {
 			switch(ch) {
 			case 'o':
 				snapmode |= SNAPSHOT_MODE_CAN_OVERWRITE;
 				break;
 			case 'c':
 				snapmode |= SNAPSHOT_MODE_CPLIKE_ATTR;
+				break;
+			case 'p':
+				snapmode |= SNAPSHOT_MODE_PRESERVE_HARDLINKS;
 				break;
 			}
 		}

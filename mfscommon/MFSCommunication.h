@@ -837,15 +837,19 @@
 // msgid:32 status:8
 
 #define CLTOMA_SCLASS_LIST 360
-// msgid:32
+// msgid:32 fver:8
 
 #define MATOCL_SCLASS_LIST 361
-// msgid:32 N * [ storage_class_name:NAME ]
+// msgid:32
+// fver==0:
+//	N * [ storage_class_name:NAME ]
+// fver!=0:
+//	N * [ storage_class_name:NAME admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] ]
 
 
 // Fuse
 
-// attr record
+// attr record (deprecated - versions < 1.7.32)
 //   type:8 mode:16 uid:32 gid:32 atime:32 mtime:32 ctime:32 nlink:32 length:64
 //   total: 35B
 //
@@ -856,9 +860,9 @@
 //
 // attr record (1.7.32 and up):
 //
-//   flags:8 type:4 mode:12 uid:32 gid:32 atime:32 mtime:32 ctime:32 nlink:32 [ length:64 | mojor:16 minor:16 empty:32 ]
+//   flags:8 type:4 mode:12 uid:32 gid:32 atime:32 mtime:32 ctime:32 nlink:32 [ length:64 | major:16 minor:16 empty:32 ]
 //
-//   in case of BLOCKDEV and CHARDEV instead of 'length:64' on the end there is 'mojor:16 minor:16 empty:32'
+//   in case of BLOCKDEV and CHARDEV instead of 'length:64' on the end there is 'major:16 minor:16 empty:32'
 
 
 // NAME type:

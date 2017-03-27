@@ -2610,9 +2610,9 @@ void chunk_operation_status(chunk *c,uint8_t status,uint16_t csid) {
 			if (c->interrupted) {
 				chunk_emergency_increase_version(c);
 			} else {
-				matoclserv_chunk_status(c->chunkid,MFS_STATUS_OK);
 				c->operation = NONE;
 				c->needverincrease = 0;
+				matoclserv_chunk_status(c->chunkid,MFS_STATUS_OK);
 				if (c->lockedto==0) {
 					matoclserv_chunk_unlocked(c->chunkid,c);
 				}

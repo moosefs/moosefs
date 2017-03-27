@@ -61,7 +61,6 @@ uint8_t sclass_is_admin_only(uint16_t sclassid);
 uint8_t sclass_has_create_labels(uint16_t sclassid);
 uint8_t sclass_has_keeparch_labels(uint16_t sclassid,uint8_t archflag);
 uint16_t sclass_get_arch_delay(uint16_t sclassid);
-void sclass_state_change(uint16_t oldsclassid,uint8_t oldarchflag,uint8_t oldrvc,uint16_t newsclassid,uint8_t newarchflag,uint8_t newrvc);
 uint8_t sclass_store(bio *fd);
 int sclass_load(bio *fd,uint8_t mver,int ignoreflag);
 void sclass_cleanup(void);

@@ -295,8 +295,8 @@ static uint32_t chunks;
 
 static uint32_t last_rebalance=0;
 
-uint32_t allchunkcounts[11][11];
-uint32_t regularchunkcounts[11][11];
+static uint32_t **allchunkcounts;
+static uint32_t **regularchunkcounts;
 
 static uint32_t stats_deletions=0;
 static uint32_t stats_replications=0;
@@ -624,7 +624,6 @@ chunk* chunk_new(uint64_t chunkid) {
 	lastchunkid = chunkid;
 	lastchunkptr = newchunk;
 	chunk_hash_add(newchunk);
-	// sclass_state_change(0,0,0,c->sclassid,c->archflag,c->regularvalidcopies); - not needed since sclassid==0 , archflag==0 and regularvalidcopies==0
 	return newchunk;
 }
 
@@ -645,27 +644,22 @@ chunk* chunk_find(uint64_t chunkid) {
 }
 
 void chunk_delete(chunk* c) {
+	uint32_t indx;
 	if (lastchunkptr==c) {
 		lastchunkid=0;
 		lastchunkptr=NULL;
 	}
 	chunks--;
-	allchunkcounts[sclass_get_keeparch_goal(c->sclassid,c->archflag)][0]--;
-	regularchunkcounts[sclass_get_keeparch_goal(c->sclassid,c->archflag)][0]--;
-	sclass_state_change(c->sclassid,c->archflag,c->regularvalidcopies,0,0,0);
+	indx = c->sclassid + (c->archflag?MAXSCLASS:0);
+	allchunkcounts[indx][0]--;
+	regularchunkcounts[indx][0]--;
 	chunk_hash_delete(c);
 	chunk_free(c);
 }
 
 static inline void chunk_state_change(uint8_t oldsclassid,uint8_t newsclassid,uint8_t oldarchflag,uint8_t newarchflag,uint8_t oldavc,uint8_t newavc,uint8_t oldrvc,uint8_t newrvc) {
-	uint8_t oldgoal = sclass_get_keeparch_goal(oldsclassid,oldarchflag);
-	uint8_t newgoal = sclass_get_keeparch_goal(newsclassid,newarchflag);
-	if (oldgoal>9) {
-		oldgoal=10;
-	}
-	if (newgoal>9) {
-		newgoal=10;
-	}
+	uint32_t oldindx = oldsclassid + (oldarchflag?MAXSCLASS:0);
+	uint32_t newindx = newsclassid + (newarchflag?MAXSCLASS:0);
 	if (oldavc>9) {
 		oldavc=10;
 	}
@@ -678,15 +672,32 @@ static inline void chunk_state_change(uint8_t oldsclassid,uint8_t newsclassid,ui
 	if (newrvc>9) {
 		newrvc=10;
 	}
-	sclass_state_change(oldsclassid,oldarchflag,oldrvc,newsclassid,newarchflag,newrvc);
-	allchunkcounts[oldgoal][oldavc]--;
-	allchunkcounts[newgoal][newavc]++;
-	regularchunkcounts[oldgoal][oldrvc]--;
-	regularchunkcounts[newgoal][newrvc]++;
+	allchunkcounts[oldindx][oldavc]--;
+	allchunkcounts[newindx][newavc]++;
+	regularchunkcounts[oldindx][oldrvc]--;
+	regularchunkcounts[newindx][newrvc]++;
 }
 
 uint32_t chunk_count(void) {
 	return chunks;
+}
+
+void chunk_sclass_counters(uint8_t sclassid,uint8_t archflag,uint8_t goal,uint64_t *undergoal,uint64_t *exactgoal,uint64_t *overgoal) {
+	uint32_t indx = sclassid + (archflag?MAXSCLASS:0);
+	uint32_t i;
+
+	*undergoal = 0;
+	*exactgoal = 0;
+	*overgoal = 0;
+	for (i=0 ; i<11 ; i++) {
+		if (i<goal) {
+			*undergoal += regularchunkcounts[indx][i];
+		} else if (i>goal) {
+			*overgoal += regularchunkcounts[indx][i];
+		} else {
+			*exactgoal = regularchunkcounts[indx][i];
+		}
+	}
 }
 
 void chunk_info(uint32_t *allchunks,uint32_t *allcopies,uint32_t *regularvalidcopies) {
@@ -697,7 +708,7 @@ void chunk_info(uint32_t *allchunks,uint32_t *allcopies,uint32_t *regularvalidco
 	for (i=1 ; i<=10 ; i++) {
 		ag=0;
 		rg=0;
-		for (j=0 ; j<=10 ; j++) {
+		for (j=0 ; j<MAXSCLASS*2 ; j++) {
 			ag += allchunkcounts[j][i];
 			rg += regularchunkcounts[j][i];
 		}
@@ -708,9 +719,9 @@ void chunk_info(uint32_t *allchunks,uint32_t *allcopies,uint32_t *regularvalidco
 
 uint32_t chunk_get_missing_count(void) {
 	uint32_t res=0;
-	uint8_t i;
+	uint32_t i;
 
-	for (i=1 ; i<=10 ; i++) {
+	for (i=1 ; i<MAXSCLASS*2 ; i++) {
 		res+=allchunkcounts[i][0];
 	}
 	return res;
@@ -722,21 +733,41 @@ uint8_t chunk_counters_in_progress(void) {
 }
 
 void chunk_store_chunkcounters(uint8_t *buff,uint8_t matrixid) {
-	uint8_t i,j;
+	uint32_t i,j,indx;
+	uint32_t counts[11][11];
+
+	for (i=0 ; i<=10 ; i++) {
+		for (j=0 ; j<=10 ; j++) {
+			counts[i][j]=0;
+		}
+	}
+
 	if (matrixid==0) {
-		for (i=0 ; i<=10 ; i++) {
+		for (i=0 ; i<MAXSCLASS*2 ; i++) {
+			indx = sclass_get_keeparch_goal(i%MAXSCLASS,i/MAXSCLASS);
+			if (indx>10) {
+				indx=10;
+			}
 			for (j=0 ; j<=10 ; j++) {
-				put32bit(&buff,allchunkcounts[i][j]);
+				counts[indx][j] += allchunkcounts[i][j];
 			}
 		}
 	} else if (matrixid==1) {
-		for (i=0 ; i<=10 ; i++) {
+		for (i=0 ; i<MAXSCLASS*2 ; i++) {
+			indx = sclass_get_keeparch_goal(i%MAXSCLASS,i/MAXSCLASS);
+			if (indx>10) {
+				indx=10;
+			}
 			for (j=0 ; j<=10 ; j++) {
-				put32bit(&buff,regularchunkcounts[i][j]);
+				counts[indx][j] += regularchunkcounts[i][j];
 			}
 		}
-	} else {
-		memset(buff,0,11*11*4);
+	}
+
+	for (i=0 ; i<=10 ; i++) {
+		for (j=0 ; j<=10 ; j++) {
+			put32bit(&buff,counts[i][j]);
+		}
 	}
 }
 
@@ -4016,7 +4047,7 @@ void chunk_cleanup(void) {
 	cstab[0].prev = MAXCSCOUNT;
 	csfreehead = 0;
 	csusedhead = MAXCSCOUNT;
-	for (i=0 ; i<11 ; i++) {
+	for (i=0 ; i<MAXSCLASS*2 ; i++) {
 		for (j=0 ; j<11 ; j++) {
 			allchunkcounts[i][j]=0;
 			regularchunkcounts[i][j]=0;
@@ -4073,8 +4104,15 @@ int chunk_parse_rep_list(char *strlist,double *replist) {
 }
 
 void chunk_term(void) {
+	uint32_t i;
 	chunk_priority_queue_check(NULL,1); // free tabs
 	chunk_do_jobs(NULL,JOBS_TERM,0,main_time(),0); // free tabs
+	for (i=0 ; i<MAXSCLASS*2 ; i++) {
+		free(allchunkcounts[i]);
+		free(regularchunkcounts[i]);
+	}
+	free(allchunkcounts);
+	free(regularchunkcounts);
 }
 
 void chunk_reload(void) {
@@ -4346,7 +4384,15 @@ int chunk_strinit(void) {
 	cstab[0].prev = MAXCSCOUNT;
 	csfreehead = 0;
 	csusedhead = MAXCSCOUNT;
-	for (i=0 ; i<11 ; i++) {
+	allchunkcounts = malloc(sizeof(uint32_t*)*MAXSCLASS*2);
+	passert(allchunkcounts);
+	regularchunkcounts = malloc(sizeof(uint32_t*)*MAXSCLASS*2);
+	passert(regularchunkcounts);
+	for (i=0 ; i<MAXSCLASS*2 ; i++) {
+		allchunkcounts[i] = malloc(sizeof(uint32_t)*11);
+		passert(allchunkcounts[i]);
+		regularchunkcounts[i] = malloc(sizeof(uint32_t)*11);
+		passert(regularchunkcounts[i]);
 		for (j=0 ; j<11 ; j++) {
 			allchunkcounts[i][j]=0;
 			regularchunkcounts[i][j]=0;

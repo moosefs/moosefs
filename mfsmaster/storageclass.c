@@ -41,8 +41,6 @@
 
 #define MAXSCLASSNLENG 256
 
-#define REDUNDANCYCLASSES 3
-
 #define CHLOGSTRSIZE ((3*MAXLABELSCNT*10*MASKORGROUP)+1)
 
 /* label sets */
@@ -55,20 +53,15 @@ typedef struct _storageclass {
 	uint8_t create_labelscnt;
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
-//	uint8_t trash_labelscnt;
 	uint8_t has_create_labels;
 	uint8_t has_keep_labels;
 	uint8_t has_arch_labels;
-//	uint8_t has_trash_labels;
 	uint32_t *create_labelmasks[MAXLABELSCNT];
 	uint32_t *keep_labelmasks[MAXLABELSCNT];
 	uint32_t *arch_labelmasks[MAXLABELSCNT];
-//	uint32_t **trash_labelmasks;
 	uint16_t arch_delay;
 	uint32_t files;
 	uint32_t directories;
-	uint64_t stdchunks[REDUNDANCYCLASSES];
-	uint64_t archchunks[REDUNDANCYCLASSES];
 } storageclass;
 
 #define FIRSTSCLASSID 10
@@ -660,47 +653,16 @@ uint16_t sclass_get_arch_delay(uint16_t sclassid) {
 	return sclasstab[sclassid].arch_delay;
 }
 
-void sclass_state_change(uint16_t oldsclassid,uint8_t oldarchflag,uint8_t oldrvc,uint16_t newsclassid,uint8_t newarchflag,uint8_t newrvc) {
-	uint8_t refgoal,class;
-	if (oldsclassid>0) {
-		refgoal = oldarchflag?sclasstab[oldsclassid].arch_labelscnt:sclasstab[oldsclassid].keep_labelscnt;
-		if (oldrvc > refgoal) {
-			class = 2;
-		} else if (oldrvc == refgoal) {
-			class = 1;
-		} else {
-			class = 0;
-		}
-		if (oldarchflag==0) {
-			sclasstab[oldsclassid].stdchunks[class]--;
-		} else {
-			sclasstab[oldsclassid].archchunks[class]--;
-		}
-	}
-	if (newsclassid>0) {
-		refgoal = newarchflag?sclasstab[newsclassid].arch_labelscnt:sclasstab[newsclassid].keep_labelscnt;
-		if (newrvc > refgoal) {
-			class = 2;
-		} else if (newrvc == refgoal) {
-			class = 1;
-		} else {
-			class = 0;
-		}
-		if (newarchflag==0) {
-			sclasstab[newsclassid].stdchunks[class]++;
-		} else {
-			sclasstab[newsclassid].archchunks[class]++;
-		}
-	}
-}
-
 uint32_t sclass_info(uint8_t *buff) {
 	uint32_t leng,i,j,k;
+	uint64_t sunder,sexact,sover;
+	uint64_t aunder,aexact,aover;
+
 	if (buff==NULL) {
 		leng = 2;
 		for (i=1 ; i<firstneverused ; i++) {
 			if (sclasstab[i].nleng>0) {
-				leng += 20 + REDUNDANCYCLASSES * 16;
+				leng += 20 + 3 * 16;
 				leng += sclasstab[i].nleng;
 				leng += ((uint32_t)sclasstab[i].create_labelscnt) * ( MASKORGROUP * 4 + 2 );
 				leng += ((uint32_t)sclasstab[i].keep_labelscnt) * ( MASKORGROUP * 4 + 2 );
@@ -719,10 +681,14 @@ uint32_t sclass_info(uint8_t *buff) {
 				buff+=sclasstab[i].nleng;
 				put32bit(&buff,sclasstab[i].files);
 				put32bit(&buff,sclasstab[i].directories);
-				for (j=0 ; j<REDUNDANCYCLASSES ; j++) {
-					put64bit(&buff,sclasstab[i].stdchunks[j]);
-					put64bit(&buff,sclasstab[i].archchunks[j]);
-				}
+				chunk_sclass_counters(i,0,sclasstab[i].keep_labelscnt,&sunder,&sexact,&sover);
+				chunk_sclass_counters(i,1,sclasstab[i].arch_labelscnt,&aunder,&aexact,&aover);
+				put64bit(&buff,sunder);
+				put64bit(&buff,aunder);
+				put64bit(&buff,sexact);
+				put64bit(&buff,aexact);
+				put64bit(&buff,sover);
+				put64bit(&buff,aover);
 				put8bit(&buff,sclasstab[i].admin_only);
 				put8bit(&buff,sclasstab[i].create_mode);
 				put16bit(&buff,sclasstab[i].arch_delay);
@@ -1068,10 +1034,6 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 		memcpy(sclasstab[sclassid].name,name,nleng);
 		sclasstab[sclassid].files = 0;
 		sclasstab[sclassid].directories = 0;
-		for (j=0 ; j<REDUNDANCYCLASSES ; j++) {
-			sclasstab[sclassid].stdchunks[j] = 0;
-			sclasstab[sclassid].archchunks[j] = 0;
-		}
 		sclass_fix_has_labels_fields(sclassid);
 		if (sclassid>=firstneverused) {
 			firstneverused = sclassid+1;
@@ -1102,10 +1064,6 @@ void sclass_cleanup(void) {
 		sclasstab[i].arch_delay = 0;
 		sclasstab[i].files = 0;
 		sclasstab[i].directories = 0;
-		for (j=0 ; j<REDUNDANCYCLASSES ; j++) {
-			sclasstab[i].stdchunks[j] = 0;
-			sclasstab[i].archchunks[j] = 0;
-		}
 	}
 
 	for (i=1 ; i<FIRSTSCLASSID ; i++) {
@@ -1150,10 +1108,6 @@ int sclass_init(void) {
 			passert(sclasstab[i].keep_labelmasks[j]);
 			sclasstab[i].arch_labelmasks[j]=malloc(MASKORGROUP*sizeof(uint32_t));
 			passert(sclasstab[i].arch_labelmasks[j]);
-		}
-		for (j=0 ; j<REDUNDANCYCLASSES ; j++) {
-			sclasstab[i].stdchunks[j] = 0;
-			sclasstab[i].archchunks[j] = 0;
 		}
 	}
 

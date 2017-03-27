@@ -3412,6 +3412,12 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 				if (srcnode->xattrflag) {
 					dstnode->xattrflag = xattr_copy(srcnode->inode,dstnode->inode);
 				}
+				if (srcnode->aclpermflag) {
+					dstnode->aclpermflag = posix_acl_copy(srcnode->inode,dstnode->inode,POSIX_ACL_ACCESS);
+				}
+				if (srcnode->acldefflag) {
+					dstnode->acldefflag = posix_acl_copy(srcnode->inode,dstnode->inode,POSIX_ACL_DEFAULT);
+				}
 			}
 			dstnode->flags |= EATTR_SNAPSHOT;
 			if (srcnode->type==TYPE_DIRECTORY) {

@@ -331,6 +331,54 @@ void posix_acl_get_data(void *aclnode,uint16_t *userperm,uint16_t *groupperm,uin
 	}
 }
 
+uint8_t posix_acl_copy(uint32_t srcinode,uint32_t dstinode,uint8_t acltype) {
+	uint32_t h,acls;
+	acl_node *sacn,*dacn;
+
+	h = HASHFN(srcinode,acltype);
+	for (sacn=hashtab[h] ; sacn!=NULL ; sacn=sacn->next) {
+		if (sacn->inode == srcinode && sacn->acltype == acltype) {
+			break;
+		}
+	}
+	if (sacn==NULL) {
+		return 0;
+	}
+	h = HASHFN(dstinode,acltype);
+	for (dacn=hashtab[h] ; dacn!=NULL ; dacn=dacn->next) {
+		if (dacn->inode == dstinode && dacn->acltype == acltype) {
+			break;
+		}
+	}
+	if (dacn==NULL) {
+		dacn = malloc(sizeof(acl_node));
+		passert(dacn);
+		dacn->inode = dstinode;
+		dacn->acltype = acltype;
+		dacn->next = hashtab[h];
+		hashtab[h] = dacn;
+	} else {
+		if (dacn->acltab!=NULL) {
+			free(dacn->acltab);
+		}
+	}
+	dacn->userperm = sacn->userperm;
+	dacn->groupperm = sacn->groupperm;
+	dacn->otherperm = sacn->otherperm;
+	dacn->mask = sacn->mask;
+	dacn->namedusers = sacn->namedusers;
+	dacn->namedgroups = sacn->namedgroups;
+	acls = sacn->namedusers + sacn->namedgroups;
+	if (acls>0) {
+		dacn->acltab = malloc(sizeof(acl_entry)*acls);
+		passert(dacn->acltab);
+		memcpy(dacn->acltab,sacn->acltab,sizeof(acl_entry)*acls);
+	} else {
+		dacn->acltab = NULL;
+	}
+	return 1;
+}
+
 void posix_acl_cleanup(void) {
 	uint32_t h;
 	acl_node *acn,*nacn;

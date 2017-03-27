@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.90-1 (WIP)
+
+  - (master) fixed acl copying during mfsmakesnapshot
+
 * MooseFS 3.0.89-1 (2017-02-21)
 
   - (mount) added fixing file length in all inodes after write

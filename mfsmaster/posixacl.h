@@ -34,6 +34,7 @@ int posix_acl_set(uint32_t inode,uint8_t acltype,uint16_t userperm,uint16_t grou
 int32_t posix_acl_get_blobsize(uint32_t inode,uint8_t acltype,void **aclnode);
 void posix_acl_get_data(void *aclnode,uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *mask,uint16_t *namedusers,uint16_t *namedgroups,uint8_t *aclblob);
 void posix_acl_cleanup(void);
+uint8_t posix_acl_copy(uint32_t srcinode,uint32_t dstinode,uint8_t acltype);
 uint8_t posix_acl_store(bio *fd);
 int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag);
 int posix_acl_init(void);

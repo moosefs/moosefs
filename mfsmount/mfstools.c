@@ -2435,7 +2435,11 @@ int set_sclass(const char *fname,uint8_t goal,const char src_storage_class_name[
 				printf("%s: goal: %"PRIu8"\n",fname,goal);
 			}
 		} else {
-			printf("%s: goal not changed\n",fname);
+			if (goal==0xFF) {
+				printf("%s: storage class not changed\n",fname);
+			} else {
+				printf("%s: goal not changed\n",fname);
+			}
 		}
 	} else {
 		printf("%s:\n",fname);

@@ -1,3 +1,25 @@
+moosefs (3.0.90-1) unstable; urgency=medium
+
+  * (master) fixed 'move/rename' with quota
+  * (master) fixed chunk counters shown in cli/cgi
+  * (master+tools) added option 'preserve hardlinks' to mfsmakesnapshot
+  * (master) fixed acl copying during mfsmakesnapshot
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 15 Mar 2017 12:00:00 +0100
+
+moosefs (3.0.89-1) unstable; urgency=medium
+
+  * (mount) added fixing file length in all inodes after write
+  * (cs) split bitfiled into separate bytes (fixed potential race condition)
+  * (master) setting operation to NONE before sending status (silence
+    unnecessary messages in some cases)
+  * (cs) increased verbosity of crc-error messages
+  * (cs) fixed invalidating preserved block in case of truncate down followed
+    by truncate up
+  * (mount) increased master-proxy buffer sizes
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 21 Feb 2017 12:00:00 +0100
+
 moosefs (3.0.88-1) unstable; urgency=medium
 
   * (mount) added read cache clean on write (same file access using different

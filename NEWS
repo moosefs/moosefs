@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.90-1 (WIP)
+* MooseFS 3.0.90-1 (2017-03-15)
 
   - (master) fixed 'move/rename' with quota
   - (master) fixed chunk counters shown in cli/cgi

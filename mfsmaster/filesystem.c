@@ -1226,6 +1226,7 @@ static inline int fsnodes_isancestor(fsnode *f,fsnode *p) {
 				return 1;
 			}
 			if (p->parents) {
+				massert(p->parents->nextparent==NULL,"directory has more than one parent !!!");
 				p = p->parents->parent;	// here 'p' is always a directory so it should have only one parent
 			} else {
 				p = NULL;
@@ -1464,6 +1465,75 @@ static inline uint8_t fsnodes_test_quota(fsnode *node,uint32_t inodes,uint64_t l
 		}
 	}
 	return 0;
+}
+
+static inline uint8_t fsnodes_test_quota_for_uncommon_nodes(fsnode *dstnode,fsnode *srcnode,uint32_t inodes,uint64_t length,uint64_t size,uint64_t realsize) {
+	fsedge *e;
+	struct _node_list {
+		fsnode *node;
+		struct _node_list *next;
+	} *dhead,*shead,*nlptr;
+	uint8_t ret = 0;
+
+	if (dstnode==srcnode) {
+		return 0;
+	}
+	dhead = NULL;
+	while (dstnode!=NULL) {
+		if (dstnode->data.ddata.quota!=NULL) {
+			nlptr = malloc(sizeof(struct _node_list));
+			passert(nlptr);
+			nlptr->node = dstnode;
+			nlptr->next = dhead;
+			dhead = nlptr;
+		}
+		e = dstnode->parents;
+		if (e!=NULL) {
+			massert(e->nextparent==NULL,"directory has more than one parent !!!");
+			dstnode = e->parent;
+		} else {
+			dstnode = NULL;
+		}
+	}
+	shead = NULL;
+	if (srcnode!=NULL) {
+		if (srcnode->data.ddata.quota!=NULL) {
+			nlptr = malloc(sizeof(struct _node_list));
+			passert(nlptr);
+			nlptr->node = srcnode;
+			nlptr->next = shead;
+			shead = nlptr;
+		}
+		e = srcnode->parents;
+		if (e!=NULL) {
+			massert(e->nextparent==NULL,"directory has more than one parent !!!");
+			srcnode = e->parent;
+		} else {
+			srcnode = NULL;
+		}
+	}
+	while (shead!=NULL && dhead!=NULL && shead->node==dhead->node) { // skip common nodes
+		nlptr = shead;
+		shead = shead->next;
+		free(nlptr);
+		nlptr = dhead;
+		dhead = dhead->next;
+		free(nlptr);
+	}
+	while (shead!=NULL) { // ignore other source nodes
+		nlptr = shead;
+		shead = shead->next;
+		free(nlptr);
+	}
+	while (dhead!=NULL) { // check quota for other destination nodes
+		if (fsnodes_test_quota(dhead->node,inodes,length,size,realsize)) {
+			ret = 1;
+		}
+		nlptr = dhead;
+		dhead = dhead->next;
+		free(nlptr);
+	}
+	return ret;
 }
 
 // stats
@@ -4854,7 +4924,7 @@ uint8_t fs_univ_move(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t pa
 				ssr.realsize = 0;
 			}
 		}
-		if (fsnodes_test_quota(dwd,ssr.inodes,ssr.length,ssr.size,ssr.realsize)) {
+		if (fsnodes_test_quota_for_uncommon_nodes(dwd,swd,ssr.inodes,ssr.length,ssr.size,ssr.realsize)) {
 			return MFS_ERROR_QUOTA;
 		}
 	}

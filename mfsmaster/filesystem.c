@@ -139,15 +139,16 @@ static uint8_t AtimeMode;
 typedef struct _fsnode {
 	uint32_t inode;
 	uint32_t ctime,mtime,atime;
+	uint32_t uid;
+	uint32_t gid;
 	unsigned xattrflag:1;
 	unsigned aclpermflag:1;
 	unsigned acldefflag:1;
-	unsigned flags:5;
-	unsigned sclassid:8;
 	unsigned type:4;
 	unsigned mode:12;
-	uint32_t uid;
-	uint32_t gid;
+	uint8_t sclassid;
+	uint8_t eattr;
+	uint8_t winattr;
 	uint16_t trashtime;
 	fsedge *parents;
 	struct _fsnode *next;
@@ -1728,7 +1729,7 @@ static inline uint8_t fsnodes_accessmode(fsnode *node,uint32_t uid,uint32_t gids
 	}
 	if (node->aclpermflag) {
 		return posix_acl_accmode(node->inode,uid,gids,gid,node->uid,node->gid);
-	} else if (uid==node->uid || (node->flags&EATTR_NOOWNER)) {
+	} else if (uid==node->uid || (node->eattr&EATTR_NOOWNER)) {
 		return modetoaccmode[((node->mode)>>6) & 7];
 	} else if (sesflags&SESFLAG_IGNOREGID) {
 		return modetoaccmode[(((node->mode)>>3) | (node->mode)) & 7];
@@ -1751,7 +1752,7 @@ static inline int fsnodes_sticky_access(fsnode *parent,fsnode *node,uint32_t uid
 	if (uid==0 || (parent->mode&01000)==0) {	// super user or sticky bit is not set
 		return 1;
 	}
-	if (uid==parent->uid || (parent->flags&EATTR_NOOWNER) || uid==node->uid || (node->flags&EATTR_NOOWNER)) {
+	if (uid==parent->uid || (parent->eattr&EATTR_NOOWNER) || uid==node->uid || (node->eattr&EATTR_NOOWNER)) {
 		return 1;
 	}
 	return 0;
@@ -1908,14 +1909,14 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 	}
 	flags = 0;
 	if (parent) {
-		if (parent->flags&EATTR_NOECACHE) {
+		if (parent->eattr&EATTR_NOECACHE) {
 			flags |= MATTR_NOECACHE;
 		}
 	}
-	if ((node->flags&(EATTR_NOOWNER|EATTR_NOACACHE)) || (sesflags&SESFLAG_MAPALL)) {
+	if ((node->eattr&(EATTR_NOOWNER|EATTR_NOACACHE)) || (sesflags&SESFLAG_MAPALL)) {
 		flags |= MATTR_NOACACHE;
 	}
-	if ((node->flags&EATTR_NODATACACHE)==0) {
+	if ((node->eattr&EATTR_NODATACACHE)==0) {
 		flags |= MATTR_ALLOWDATACACHE;
 	} else {
 		flags |= MATTR_DIRECTMODE;
@@ -1928,7 +1929,7 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 	} else {
 		mode = node->mode & 07777;
 	}
-	if ((node->flags&EATTR_NOOWNER) && uid!=0) {
+	if ((node->eattr&EATTR_NOOWNER) && uid!=0) {
 		// copy owner rights to group and other
 		mode &= 07700;
 		mode |= (mode&0700)>>3;
@@ -2166,10 +2167,11 @@ static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nlen
 		p->trashtime = DEFAULT_TRASHTIME;
 	}
 	if (type==TYPE_DIRECTORY) {
-		p->flags = node->flags;
+		p->eattr = node->eattr;
 	} else {
-		p->flags = node->flags & ~(EATTR_NOECACHE);
+		p->eattr = node->eattr & ~(EATTR_NOECACHE);
 	}
+	p->winattr = 0;
 	if (node->acldefflag) {
 		aclcopied = posix_acl_copydefaults(node->inode,p->inode,(type==TYPE_DIRECTORY)?1:0,&mode);
 		p->mode = mode;
@@ -3001,9 +3003,9 @@ static inline void fsnodes_geteattr_recursive(fsnode *node,uint8_t gmode,uint32_
 
 	fsnodes_keep_alive_check();
 	if (node->type!=TYPE_DIRECTORY) {
-		feattrtab[(node->flags)&(EATTR_NOOWNER|EATTR_NOACACHE|EATTR_NODATACACHE|EATTR_SNAPSHOT)]++;
+		feattrtab[(node->eattr)&(EATTR_NOOWNER|EATTR_NOACACHE|EATTR_NODATACACHE|EATTR_SNAPSHOT)]++;
 	} else {
-		deattrtab[(node->flags)]++;
+		deattrtab[(node->eattr)]++;
 		if (gmode==GMODE_RECURSIVE) {
 			for (e = node->data.ddata.children ; e ; e=e->nextchild) {
 				fsnodes_geteattr_recursive(e->child,gmode,feattrtab,deattrtab);
@@ -3075,7 +3077,7 @@ static inline uint64_t fsnodes_setsclass_recursive_test_quota(fsnode *node,uint3
 		(*realsize) += rs;
 		return 0;
 	} else if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
-		if (!((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid)) {
+		if (!((node->eattr&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid)) {
 			if (goal>sclass_get_keepmax_goal(node->sclassid)) {
 				size = 0;
 				if (node->data.fdata.length>0) {
@@ -3113,7 +3115,7 @@ static inline void fsnodes_setsclass_recursive(fsnode *node,uint32_t ts,uint32_t
 
 	fsnodes_keep_alive_check();
 	if (node->type==TYPE_FILE || node->type==TYPE_DIRECTORY || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
-		if (((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) || ((sclass_is_admin_only(node->sclassid) || sclass_is_admin_only(dst_sclassid)) && admin==0)) {
+		if (((node->eattr&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) || ((sclass_is_admin_only(node->sclassid) || sclass_is_admin_only(dst_sclassid)) && admin==0)) {
 			(*nsinodes)++;
 		} else {
 			set=0;
@@ -3168,7 +3170,7 @@ static inline void fsnodes_settrashtime_recursive(fsnode *node,uint32_t ts,uint3
 
 	fsnodes_keep_alive_check();
 	if (node->type==TYPE_FILE || node->type==TYPE_DIRECTORY || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
-		if ((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) {
+		if ((node->eattr&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) {
 			(*nsinodes)++;
 		} else {
 			set=0;
@@ -3212,15 +3214,15 @@ static inline void fsnodes_seteattr_recursive(fsnode *node,uint32_t ts,uint32_t 
 	uint8_t neweattr,seattr;
 
 	fsnodes_keep_alive_check();
-	if ((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) {
+	if ((node->eattr&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) {
 		(*nsinodes)++;
 	} else {
 		seattr = eattr;
 		if (node->type!=TYPE_DIRECTORY) {
-			node->flags &= ~(EATTR_NOECACHE);
+			node->eattr &= ~(EATTR_NOECACHE);
 			seattr &= ~(EATTR_NOECACHE);
 		}
-		neweattr = node->flags;
+		neweattr = node->eattr;
 		switch (smode&SMODE_TMASK) {
 			case SMODE_SET:
 				neweattr = seattr;
@@ -3232,8 +3234,8 @@ static inline void fsnodes_seteattr_recursive(fsnode *node,uint32_t ts,uint32_t 
 				neweattr &= ~seattr;
 				break;
 		}
-		if (neweattr!=node->flags) {
-			node->flags = neweattr;
+		if (neweattr!=node->eattr) {
+			node->eattr = neweattr;
 //			node->mode = (node->mode&0xFFF) | (((uint16_t)neweattr)<<12);
 			(*sinodes)++;
 			node->ctime = ts;
@@ -3257,7 +3259,7 @@ static inline void fsnodes_chgarch_recursive(fsnode *node,uint32_t ts,uint32_t u
 
 	fsnodes_keep_alive_check();
 	if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
-		if ((node->flags&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) {
+		if ((node->eattr&EATTR_NOOWNER)==0 && uid!=0 && node->uid!=uid) {
 			(*nsinodes)++;
 		} else {
 			aflagchanged = 0;
@@ -3301,7 +3303,7 @@ static inline uint8_t fsnodes_remove_snapshot_test(fsedge *e,uint32_t sesflags,u
 			return MFS_ERROR_EACCES;
 		}
 	}
-	if ((n->flags & EATTR_SNAPSHOT) == 0) {
+	if ((n->eattr & EATTR_SNAPSHOT) == 0) {
 		return MFS_ERROR_EPERM;
 	}
 	return MFS_STATUS_OK;
@@ -3323,7 +3325,7 @@ static inline void fsnodes_remove_snapshot(uint32_t ts,fsedge *e,uint32_t sesfla
 			return;
 		}
 	}
-	if (n->flags & EATTR_SNAPSHOT) {
+	if (n->eattr & EATTR_SNAPSHOT) {
 		n->trashtime = 0;
 		fsnodes_unlink(ts,e);
 	}
@@ -3485,7 +3487,8 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 				dstnode->sclassid = srcnode->sclassid;
 				sclass_incref(dstnode->sclassid,dstnode->type);
 				dstnode->trashtime = srcnode->trashtime;
-				dstnode->flags = srcnode->flags;
+				dstnode->eattr = srcnode->eattr;
+				dstnode->winattr = srcnode->winattr;
 				dstnode->mode = srcnode->mode;
 				if (uid!=0 && uid!=srcnode->uid) {
 					dstnode->mode &= 0x3FF; // clear suid+sgid
@@ -3502,7 +3505,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 					dstnode->acldefflag = posix_acl_copy(srcnode->inode,dstnode->inode,POSIX_ACL_DEFAULT);
 				}
 			}
-			dstnode->flags |= EATTR_SNAPSHOT;
+			dstnode->eattr |= EATTR_SNAPSHOT;
 			if (srcnode->type==TYPE_DIRECTORY) {
 				if (rec) {
 					for (e = srcnode->data.ddata.children ; e ; e=e->nextchild) {
@@ -4215,7 +4218,7 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 	}
 	e = fsnodes_lookup(wd,nleng,name);
 	if (!e) {
-		if (wd->flags&EATTR_NOECACHE) {
+		if (wd->eattr&EATTR_NOECACHE) {
 			return MFS_ERROR_ENOENT_NOCACHE;
 		} else {
 			return MFS_ERROR_ENOENT;
@@ -4420,7 +4423,7 @@ uint8_t fs_setattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	if (uid!=0 && (sesflags&SESFLAG_MAPALL) && (setmask&(SET_UID_FLAG|SET_GID_FLAG))) {
 		return MFS_ERROR_EPERM;
 	}
-	if ((p->flags&EATTR_NOOWNER)==0) {
+	if ((p->eattr&EATTR_NOOWNER)==0) {
 		if (uid!=0 && uid!=p->uid && (setmask&(SET_MODE_FLAG|SET_UID_FLAG|SET_GID_FLAG|SET_ATIME_FLAG|SET_MTIME_FLAG))) {
 			return MFS_ERROR_EPERM;
 		}
@@ -6069,7 +6072,7 @@ uint8_t fs_setxattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t o
 			return MFS_ERROR_EPERM;
 		}
 	}
-	if ((p->flags&EATTR_NOOWNER)==0 && uid!=0 && uid!=p->uid) {
+	if ((p->eattr&EATTR_NOOWNER)==0 && uid!=0 && uid!=p->uid) {
 		if (anleng>=7 && memcmp(attrname,"system.",7)==0) {
 			return MFS_ERROR_EPERM;
 		}
@@ -6148,7 +6151,7 @@ uint8_t fs_setacl(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t ui
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
 		return MFS_ERROR_ENOENT;
 	}
-	if ((p->flags&EATTR_NOOWNER)==0 && uid!=0 && uid!=p->uid) {
+	if ((p->eattr&EATTR_NOOWNER)==0 && uid!=0 && uid!=p->uid) {
 		return MFS_ERROR_EPERM;
 	}
 //	if (opened==0) {
@@ -7559,10 +7562,9 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 }
 
 static inline void fs_storenode(fsnode *f,bio *fd) {
-	uint8_t unodebuff[1+4+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4];
+	uint8_t unodebuff[1+4+1+1+1+2+4+4+4+4+4+2+8+4+2+8*65536+4*65536+4];
 	uint8_t *ptr,*chptr;
 	uint32_t i,indx,ch;
-	uint32_t trashseconds;
 
 	if (f==NULL) {	// last node
 		if (bio_write(fd,"\0",1)!=1) {
@@ -7574,21 +7576,20 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 	put8bit(&ptr,f->type);
 	put32bit(&ptr,f->inode);
 	put8bit(&ptr,f->sclassid);
-	put8bit(&ptr,f->flags);
+	put8bit(&ptr,f->eattr);
+	put8bit(&ptr,f->winattr);
 	put16bit(&ptr,f->mode);
 	put32bit(&ptr,f->uid);
 	put32bit(&ptr,f->gid);
 	put32bit(&ptr,f->atime);
 	put32bit(&ptr,f->mtime);
 	put32bit(&ptr,f->ctime);
-	trashseconds = f->trashtime;
-	trashseconds *= 3600;
-	put32bit(&ptr,trashseconds);
+	put16bit(&ptr,f->trashtime);
 	switch (f->type) {
 	case TYPE_DIRECTORY:
 	case TYPE_SOCKET:
 	case TYPE_FIFO:
-		if (bio_write(fd,unodebuff,1+4+1+1+2+4+4+4+4+4+4)!=(1+4+1+1+2+4+4+4+4+4+4)) {
+		if (bio_write(fd,unodebuff,1+4+1+1+1+2+4+4+4+4+4+2)!=(1+4+1+1+1+2+4+4+4+4+4+2)) {
 			syslog(LOG_NOTICE,"write error");
 			return;
 		}
@@ -7596,14 +7597,14 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 	case TYPE_BLOCKDEV:
 	case TYPE_CHARDEV:
 		put32bit(&ptr,f->data.devdata.rdev);
-		if (bio_write(fd,unodebuff,1+4+1+1+2+4+4+4+4+4+4+4)!=(1+4+1+1+2+4+4+4+4+4+4+4)) {
+		if (bio_write(fd,unodebuff,1+4+1+1+1+2+4+4+4+4+4+2+4)!=(1+4+1+1+1+2+4+4+4+4+4+2+4)) {
 			syslog(LOG_NOTICE,"write error");
 			return;
 		}
 		break;
 	case TYPE_SYMLINK:
 		put32bit(&ptr,f->data.sdata.pleng);
-		if (bio_write(fd,unodebuff,1+4+1+1+2+4+4+4+4+4+4+4)!=(1+4+1+1+2+4+4+4+4+4+4+4)) {
+		if (bio_write(fd,unodebuff,1+4+1+1+1+2+4+4+4+4+4+2+4)!=(1+4+1+1+1+2+4+4+4+4+4+2+4)) {
 			syslog(LOG_NOTICE,"write error");
 			return;
 		}
@@ -7623,9 +7624,8 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 			}
 		}
 		put32bit(&ptr,ch);
-		put16bit(&ptr,0);
 
-		if (bio_write(fd,unodebuff,1+4+1+1+2+4+4+4+4+4+4+8+4+2)!=(1+4+1+1+2+4+4+4+4+4+4+8+4+2)) {
+		if (bio_write(fd,unodebuff,1+4+1+1+1+2+4+4+4+4+4+2+8+4)!=(1+4+1+1+1+2+4+4+4+4+4+2+8+4)) {
 			syslog(LOG_NOTICE,"write error");
 			return;
 		}
@@ -7659,7 +7659,7 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 }
 
 static inline int fs_loadnode(bio *fd,uint8_t mver) {
-	uint8_t unodebuff[4+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4];
+	uint8_t unodebuff[4+1+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4];
 	const uint8_t *ptr,*chptr;
 	uint8_t type;
 	uint32_t trashseconds;
@@ -7681,12 +7681,13 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	}
 	if (mver<=0x11) {
 		hdrsize = 4+1+2+6*4;
-		type = fsnodes_type_convert(type);
-	} else {
+	} else if (mver<=0x13) {
 		hdrsize = 4+1+1+2+6*4;
-		if (mver<=0x12) {
-			type = fsnodes_type_convert(type);
-		}
+	} else { // mver==0x14
+		hdrsize = 4+1+1+1+2+5*4+2;
+	}
+	if (mver<=0x12) {
+		type = fsnodes_type_convert(type);
 	}
 	switch (type) {
 	case TYPE_DIRECTORY:
@@ -7720,15 +7721,28 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	case TYPE_FILE:
 	case TYPE_TRASH:
 	case TYPE_SUSTAINED:
-		if (bio_read(fd,unodebuff,hdrsize+8+4+2)!=(hdrsize+8+4+2)) {
-			int err = errno;
-			if (nl) {
-				fputc('\n',stderr);
-				nl=0;
+		if (mver<=0x13) {
+			if (bio_read(fd,unodebuff,hdrsize+8+4+2)!=(hdrsize+8+4+2)) {
+				int err = errno;
+				if (nl) {
+					fputc('\n',stderr);
+					nl=0;
+				}
+				errno = err;
+				mfs_errlog(LOG_ERR,"loading node: read error");
+				return -1;
 			}
-			errno = err;
-			mfs_errlog(LOG_ERR,"loading node: read error");
-			return -1;
+		} else {
+			if (bio_read(fd,unodebuff,hdrsize+8+4)!=(hdrsize+8+4)) {
+				int err = errno;
+				if (nl) {
+					fputc('\n',stderr);
+					nl=0;
+				}
+				errno = err;
+				mfs_errlog(LOG_ERR,"loading node: read error");
+				return -1;
+			}
 		}
 		break;
 	default:
@@ -7772,10 +7786,16 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	sclass_incref(p->sclassid,p->type);
 	if (mver<=0x11) {
 		uint16_t flagsmode = get16bit(&ptr);
-		p->flags = flagsmode>>12;
+		p->eattr = flagsmode>>12;
+		p->winattr = 0;
 		p->mode = flagsmode&0xFFF;
 	} else {
-		p->flags = get8bit(&ptr);
+		p->eattr = get8bit(&ptr);
+		if (mver>=0x14) {
+			p->winattr = get8bit(&ptr);
+		} else {
+			p->winattr = 0;
+		}
 		p->mode = get16bit(&ptr);
 	}
 	p->uid = get32bit(&ptr);
@@ -7783,8 +7803,12 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	p->atime = get32bit(&ptr);
 	p->mtime = get32bit(&ptr);
 	p->ctime = get32bit(&ptr);
-	trashseconds = get32bit(&ptr);
-	p->trashtime = (trashseconds+3599)/3600;
+	if (mver<=0x13) {
+		trashseconds = get32bit(&ptr);
+		p->trashtime = (trashseconds+3599)/3600;
+	} else {
+		p->trashtime = get16bit(&ptr);
+	}
 	switch (type) {
 	case TYPE_DIRECTORY:
 		memset(&(p->data.ddata.stats),0,sizeof(statsrecord));
@@ -7835,7 +7859,11 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 		p->data.fdata.length = get64bit(&ptr);
 		ch = get32bit(&ptr);
 		p->data.fdata.chunks = ch;
-		sessionids = get16bit(&ptr);
+		if (mver<=0x13) {
+			sessionids = get16bit(&ptr);
+		} else {
+			sessionids = 0;
+		}
 		if (ch>0) {
 			p->data.fdata.chunktab = chunktab_malloc(ch);
 			passert(p->data.fdata.chunktab);
@@ -7910,7 +7938,7 @@ uint8_t fs_storenodes(bio *fd) {
 	fsnode *p;
 
 	if (fd==NULL) {
-		return 0x13;
+		return 0x14;
 	}
 	ptr = hdr;
 	put32bit(&ptr,maxnodeid);
@@ -8364,7 +8392,8 @@ void fs_new(void) {
 	root->sclassid = DEFAULT_SCLASS;
 	sclass_incref(root->sclassid,root->type);
 	root->trashtime = DEFAULT_TRASHTIME;
-	root->flags = 0;
+	root->eattr = 0;
+	root->winattr = 0;
 	root->mode = 0777;
 	root->uid = 0;
 	root->gid = 0;

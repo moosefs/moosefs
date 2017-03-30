@@ -37,9 +37,9 @@ MooseFS can be installed on any POSIX compliant operating system including diffe
 * MacOS X
 * Raspberry Pi 3
 
-MooseFS client uses [FUSE](https://github.com/libfuse/libfuse).
+MooseFS Client uses [FUSE](https://github.com/libfuse/libfuse).
 
-There is a separate MS Windows MooseFS client available, built on top of [DOKANY](https://github.com/dokan-dev/dokany).
+There is a separate MooseFS Client for MS Windows available, built on top of [Dokany](https://github.com/dokan-dev/dokany).
 
 ## Getting started
 You can install MooseFS using your favorite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download/install.html):

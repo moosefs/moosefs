@@ -6,7 +6,7 @@ MooseFS is a Petabyte Open Source Network Distributed File System. It is easy to
 MooseFS spreads data over several physical commodity servers, which are visible to the user as one big volume. For standard file operations MooseFS acts like ordinary Unix-like file system:
 
 * A hierarchical structure (directory tree)
-* Stores POSIX file attributes (permissions, last access and modification times)
+* Stores POSIX file attributes (permissions, last access and modification times, etc.)
 * Supports ACLs
 * Supports POSIX and BSD locks
 * Supports special files (block and character devices, pipes and sockets)
@@ -22,7 +22,7 @@ Distinctive MooseFS features:
 * Deleted files are retained for a configurable period of time (a file system level "trash bin")
 * Coherent, "atomic" snapshots of files, even while the file is being written/accessed
 * Access to the file system can be limited based on IP address and/or password (similarly as in NFS)
-* Data tiering - supports different storage policies for different files/folders
+* Data tiering - supports different storage policies for different files/directories
 * Efficient, pure C implementation
 * Ethernet support
 
@@ -53,7 +53,7 @@ You can install MooseFS using your favorite package manager on one of the follow
 * Raspberry Pi 3
 
 Minimal set of packages, which are needed to run MooseFS:
-* `moosefs-master` Moosefs Master Server for metadata servers,
+* `moosefs-master` MooseFS Master Server for metadata servers,
 * `moosefs-chunkserver` MooseFS Chunkserver for data storage servers,
 * `moosefs-client` MooseFS Client - client side package to mount the filesystem.
 
@@ -73,10 +73,11 @@ cd /etc/mfs
 cp mfsmaster.cfg.sample mfsmaster.cfg
 cp mfsexports.cfg.sample mfsexports.cfg
 ```
-3. Prepare metadata file (as `root`):
+3. Prepare the metadata file (as `root`):
 ```
 cd /var/lib/mfs
 cp metadata.mfs.empty metadata.mfs
+chown mfs:mfs metadata.mfs
 rm metadata.mfs.empty
 ```
 4. Run Master Server (as `root`): `mfsmaster start`
@@ -96,14 +97,15 @@ cp mfshdd.cfg.sample mfshdd.cfg
 /mnt/chunks2
 /mnt/chunks3
 ```
-We recommend XFS as an underlying filesystem for disks designated to store chunks.
+It is recommended to use XFS as an underlying filesystem for disks designated to store chunks.
 
-4. Change ownership and permissions to `mfs:mfs` to above mentioned locations, e.g.:
+4. Change the ownership and permissions to `mfs:mfs` to above mentioned locations, e.g.:
 ```
 chown mfs:mfs /mnt/chunks1 /mnt/chunks2 /mnt/chunks3
 chmod 770 /mnt/chunks1 /mnt/chunks2 /mnt/chunks3
 ```
 5. Start the Chunkserver: `mfschunkserver start`
+
 Repeat steps above for second (third, ...) Chunkserver.
 
 #### 3. Client side: mount MooseFS filesystem
@@ -126,10 +128,11 @@ MooseFS, for testing purposes, can be installed even on one machine!
 
 #### Additional tools
 Setting up `moosefs-cli` or `moosefs-cgi` both with `moosefs-cgiserv` is also recommended - it gives you a possibility to monitor the cluster online:
-1. Install `moosefs-cli moosefs-cgi moosefs-cgiserv` packages (they are typically set up the Master Server)
+1. Install `moosefs-cli moosefs-cgi moosefs-cgiserv` packages (they are typically set up on the Master Server)
 2. Run MooseFS CGI Server (as `root`): `mfscgiserv start`
 3. Open http://mfsmaster:9425 in your web browser
-We also strongly recommend to set up at least one Metalogger on a different machine than Master Server (e.g. on one of Chunkservers). Metalogger constantly synchronizes and backups the metadata:
+
+It is also strongly recommended to set up at least one Metalogger on a different machine than Master Server (e.g. on one of Chunkservers). Metalogger constantly synchronizes and backups the metadata:
 1. Install `moosefs-metalogger` package
 2. Prepare default config (as `root`):
 ```

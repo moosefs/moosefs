@@ -161,7 +161,7 @@ void* conncache_keepalive_thread(void* arg) {
 		}
 		ka = keep_alive;
 		zassert(pthread_mutex_unlock(&glock));
-		portable_usleep(10000);
+		portable_usleep(2500); // 200 * 2500 = 500000 = 0.5s (send nops every half second)
 	}
 	return arg;
 }

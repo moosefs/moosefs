@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.91-1 (WIP)
 
   - (all) added README.md to distribution
+  - (cs+mount) decreased delay in conncache
 
 * MooseFS 3.0.90-1 (2017-03-15)
 

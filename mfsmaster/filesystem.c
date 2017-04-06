@@ -1497,7 +1497,7 @@ static inline uint8_t fsnodes_test_quota_for_uncommon_nodes(fsnode *dstnode,fsno
 		}
 	}
 	shead = NULL;
-	if (srcnode!=NULL) {
+	while (srcnode!=NULL) {
 		if (srcnode->data.ddata.quota!=NULL) {
 			nlptr = malloc(sizeof(struct _node_list));
 			passert(nlptr);

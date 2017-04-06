@@ -4111,7 +4111,7 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 					seconds = monotonic_seconds();
 					if (lseconds+0.1<seconds) {
 						lseconds = seconds;
-						printf("\r%2u.%02u%% complete ",progress/100,progress%100);fflush(stdout);
+						printf("\r%2u.%02u%% complete ",(unsigned int)(progress/100),(unsigned int)(progress%100));fflush(stdout);
 					}
 				}
 			}

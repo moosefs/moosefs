@@ -244,8 +244,11 @@ void* masterconn_create_detached_packet(masterconn *eptr,uint32_t type,uint32_t 
 	uint32_t psize;
 
 	psize = size+8;
-	outpacket=malloc(offsetof(out_packetstruct,data)+psize);
+	outpacket = malloc(offsetof(out_packetstruct,data)+psize);
+#ifndef __clang_analyzer__
 	passert(outpacket);
+	// clang analyzer has problem with testing for (void*)(-1) which is needed for memory allocated by mmap
+#endif
 	outpacket->bytesleft = psize;
 	ptr = outpacket->data;
 	put32bit(&ptr,type);
@@ -277,8 +280,11 @@ uint8_t* masterconn_create_attached_packet(masterconn *eptr,uint32_t type,uint32
 	uint32_t psize;
 
 	psize = size+8;
-	outpacket=malloc(offsetof(out_packetstruct,data)+psize);
+	outpacket = malloc(offsetof(out_packetstruct,data)+psize);
+#ifndef __clang_analyzer__
 	passert(outpacket);
+	// clang analyzer has problem with testing for (void*)(-1) which is needed for memory allocated by mmap
+#endif
 	outpacket->bytesleft = psize;
 	ptr = outpacket->data;
 	put32bit(&ptr,type);
@@ -383,7 +389,7 @@ void masterconn_sendchunksinfo(masterconn *eptr) {
 	uint32_t chunkcount,tdchunkcount;
 
 #ifdef MFSDEBUG
-	syslog(LOG_NOTICE,"register ver. %u - chunks info",(eptr->new_register_mode)?6:5);
+	syslog(LOG_NOTICE,"register ver. %u - chunks info",(unsigned int)((eptr->new_register_mode)?6:5));
 #endif
 	hdd_get_chunks_begin(0);
 	while ((chunks = hdd_get_chunks_next_list_count())) {

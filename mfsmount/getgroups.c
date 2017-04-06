@@ -414,6 +414,9 @@ void* groups_debug_thread(void* arg) {
 
 void groups_term(void) {
 	uint32_t i;
+#ifdef __clang_analyzer__
+	groups *gn;
+#endif
 	zassert(pthread_mutex_lock(&glock));
 	keep_alive = 0;
 	zassert(pthread_mutex_unlock(&glock));
@@ -421,7 +424,14 @@ void groups_term(void) {
 	zassert(pthread_mutex_lock(&glock));
 	for (i=0 ; i<HASHSIZE ; i++) {
 		while (groups_hashtab[i]) {
+#ifdef __clang_analyzer__
+			gn = groups_hashtab[i]->next;
+#endif
 			groups_remove(groups_hashtab[i]);
+#ifdef __clang_analyzer__
+			// groups_hashtab[i] is changed by using 'prev' pointer, so after groups_remove variable groups_hashtab[i] has different value and can be used in while !!!
+			groups_hashtab[i] = gn;
+#endif
 		}
 	}
 	free(groups_hashtab);

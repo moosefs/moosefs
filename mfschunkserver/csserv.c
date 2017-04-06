@@ -124,8 +124,11 @@ uint8_t* csserv_create_packet(csserventry *eptr,uint32_t type,uint32_t size) {
 	uint8_t *ptr;
 	uint32_t psize;
 
-	outpacket=(packetstruct*)malloc(sizeof(packetstruct));
+	outpacket = malloc(sizeof(packetstruct));
+#ifndef __clang_analyzer__
 	passert(outpacket);
+	// clang analyzer has problem with testing for (void*)(-1) which is needed for memory allocated by mmap
+#endif
 	psize = size+8;
 	outpacket->packet=malloc(psize);
 	passert(outpacket->packet);

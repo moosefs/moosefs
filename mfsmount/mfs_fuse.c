@@ -3424,7 +3424,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		return;
 	}
 	if (ino==STATS_INODE) {
-		sinfo *statsinfo = sinfo_get(fi->fh);
+		sinfo *statsinfo = (fi!=NULL)?sinfo_get(fi->fh):NULL;
 		if (statsinfo!=NULL) {
 			pthread_mutex_lock(&(statsinfo->lock));		// make helgrind happy
 			if (off>=statsinfo->leng) {
@@ -3634,7 +3634,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		return;
 	}
 	if (ino==STATS_INODE) {
-		sinfo *statsinfo = sinfo_get(fi->fh);
+		sinfo *statsinfo = (fi!=NULL)?sinfo_get(fi->fh):NULL;
 		if (statsinfo!=NULL) {
 			pthread_mutex_lock(&(statsinfo->lock));		// make helgrind happy
 			statsinfo->reset=1;

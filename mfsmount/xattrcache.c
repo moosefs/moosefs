@@ -238,9 +238,20 @@ void xattr_cache_rel(void *vv) {
 }
 
 void xattr_cache_term(void) {
+#ifdef __clang_analyzer__
+	xattr_cache_entry *lhn;
+#endif
 	zassert(pthread_mutex_lock(&glock));
 	while (lruhead!=NULL) {
+#ifdef __clang_analyzer__
+		lhn = lruhead->lrunext;
+#endif
 		xattr_cache_remove_entry(lruhead);
+#ifdef __clang_analyzer__
+		lruhead = lhn;
+		// lru list is double linked list, so xattr_cache_remove_entry changes lruhead using 'prev' pointer !!!
+		// static analyzers (namely clang) are too stupid to understand such construction - ignore warnings !!!
+#endif
 	}
 	free(hashtab);
 	zassert(pthread_mutex_unlock(&glock));

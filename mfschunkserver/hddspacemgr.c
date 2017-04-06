@@ -3921,7 +3921,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 	lseek(oc->fd,oc->hdrsize+CHUNKCRCSIZE,SEEK_SET);
 #endif /* PRESERVE_BLOCK */
 	if (blocks>oc->blocks) { // expanding
-		truncneeded = 0;
+//		truncneeded = 0; - always expanding here
 		for (block=0 ; block<oc->blocks ; block++) {
 #ifdef PRESERVE_BLOCK
 			if (oc->blockno==block) {
@@ -4007,11 +4007,11 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				return MFS_ERROR_IO;	//write error
 			}
 			hdd_stats_write(nzend-nzstart);
-			if (nzend!=MFSBLOCKSIZE) {
-				truncneeded = 1;
-			} else {
-				truncneeded = 0;
-			}
+//			if (nzend!=MFSBLOCKSIZE) { // at the end we always have truncate, so we don't need to calculate this here (code left as comment to be sure that it is commented out on purpose)
+//				truncneeded = 1;
+//			} else {
+//				truncneeded = 0;
+//			}
 #ifdef PRESERVE_BLOCK
 			c->blockno = block;
 #endif /* PRESERVE_BLOCK */
@@ -4144,7 +4144,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 				}
 			}
 		} else { // misaligned shrink
-			truncneeded = 0;
+//			truncneeded = 0; - we need to check it only in last block
 			for (block=0 ; block<blocks-1 ; block++) {
 #ifdef PRESERVE_BLOCK
 				if (oc->blockno==block) {
@@ -4230,11 +4230,11 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 					return MFS_ERROR_IO;	//write error
 				}
 				hdd_stats_write(nzend-nzstart);
-				if (nzend!=MFSBLOCKSIZE) {
-					truncneeded = 1;
-				} else {
-					truncneeded = 0;
-				}
+//				if (nzend!=MFSBLOCKSIZE) { // we need to check it only in last block (below) - left as a comment on purpose
+//					truncneeded = 1;
+//				} else {
+//					truncneeded = 0;
+//				}
 			}
 			block = blocks-1;
 #ifdef PRESERVE_BLOCK

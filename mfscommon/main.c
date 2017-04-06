@@ -797,14 +797,15 @@ void changeugid(void) {
 			wrk_gid = strtol(wgroup+1,NULL,10);
 			gidok = 1;
 		} else if (wgroup[0]) {
-			getgrnam_r(wgroup,&grp,pwdgrpbuff,16384,&gr);
+			if (getgrnam_r(wgroup,&grp,pwdgrpbuff,16384,&gr)!=0) {
+				gr = NULL;
+			}
 			if (gr==NULL) {
 				mfs_arg_syslog(LOG_WARNING,"%s: no such group !!!",wgroup);
 				exit(1);
-			} else {
-				wrk_gid = gr->gr_gid;
-				gidok = 1;
 			}
+			wrk_gid = gr->gr_gid;
+			gidok = 1;
 		}
 
 		if (wuser[0]=='#') {
@@ -818,7 +819,9 @@ void changeugid(void) {
 				wrk_gid = pw->pw_gid;
 			}
 		} else {
-			getpwnam_r(wuser,&pwd,pwdgrpbuff,16384,&pw);
+			if (getpwnam_r(wuser,&pwd,pwdgrpbuff,16384,&pw)!=0) {
+				pw = NULL;
+			}
 			if (pw==NULL) {
 				mfs_arg_syslog(LOG_ERR,"%s: no such user !!!",wuser);
 				exit(1);

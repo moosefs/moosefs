@@ -659,8 +659,9 @@ int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint32_t *r
 			eptr++;
 		}
 		if (*eptr!=0) {	// not only digits - treat it as a groupname
-			getgrnam_r(gptr+1,&grp,pwgrbuff,16384,&grrec);
-//			grrec = getgrnam(gptr+1);
+			if (getgrnam_r(gptr+1,&grp,pwgrbuff,16384,&grrec)!=0) {
+				grrec = NULL;
+			}
 			if (grrec==NULL) {
 				mfs_arg_syslog(LOG_WARNING,"mfsexports/maproot: can't find group named '%s' defined in line: %"PRIu32,gptr+1,lineno);
 				return -1;
@@ -682,8 +683,9 @@ int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint32_t *r
 		eptr++;
 	}
 	if (*eptr!=0) {	// not only digits - treat it as a username
-		getpwnam_r(uptr,&pwd,pwgrbuff,16384,&pwrec);
-//		pwrec = getpwnam(uptr);
+		if (getpwnam_r(uptr,&pwd,pwgrbuff,16384,&pwrec)!=0) {
+			pwrec = NULL;
+		}
 		if (pwrec==NULL) {
 			mfs_arg_syslog(LOG_WARNING,"mfsexports/maproot: can't find user named '%s' defined in line: %"PRIu32,uptr,lineno);
 			return -1;
@@ -700,8 +702,9 @@ int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint32_t *r
 		*rgid = gid;
 		return 0;
 	} else {
-		getpwuid_r(uid,&pwd,pwgrbuff,16384,&pwrec);
-//		pwrec = getpwuid(uid);
+		if (getpwuid_r(uid,&pwd,pwgrbuff,16384,&pwrec)!=0) {
+			pwrec = NULL;
+		}
 		if (pwrec==NULL) {
 			mfs_arg_syslog(LOG_WARNING,"mfsexports/maproot: can't determine gid, because can't find user with uid %"PRIu32" defined in line: %"PRIu32,uid,lineno);
 			return -1;

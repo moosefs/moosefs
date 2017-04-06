@@ -749,8 +749,11 @@ uint8_t* matoclserv_createpacket(matoclserventry *eptr,uint32_t type,uint32_t si
 	uint32_t psize;
 
 	psize = size+8;
-	outpacket=malloc(offsetof(out_packetstruct,data)+psize);
+	outpacket = malloc(offsetof(out_packetstruct,data)+psize);
+#ifndef __clang_analyzer__
 	passert(outpacket);
+	// clang analyzer has problem with testing for (void*)(-1) which is needed for memory allocated by mmap
+#endif
 	outpacket->bytesleft = psize;
 	ptr = outpacket->data;
 	put32bit(&ptr,type);
@@ -5046,6 +5049,9 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 		eptr->mode = KILL;
 		return;
 	}
+	create_labelscnt = 0; // silence cppcheck false warnings
+	keep_labelscnt = 0; // silence cppcheck false warnings
+	arch_labelscnt = 0; // silence cppcheck false warnings
 	fver = get8bit(&data);
 	if (fver==0) {
 		if (length<15U+nleng) {

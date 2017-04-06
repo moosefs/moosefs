@@ -1035,11 +1035,9 @@ void* read_worker(void *arg) {
 #endif
 					if (trycnt >= minlogretry) {
 						read_prepare_ip(csstrip,ip);
-						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was timed out (lastrcvd:%.6lf,now:%.6lf,lrdiff:%.6lf received: %"PRIu32"/%"PRIu32", try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,lastrcvd,now,lrdiff,currentpos,(rreq?rreq->rleng:0),trycnt+1);
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32", chunk: %"PRIu64", version: %"PRIu32" - readworker: connection with (%s:%"PRIu16") was timed out (lastrcvd:%.6lf,now:%.6lf,lrdiff:%.6lf received: %"PRIu32"/%"PRIu32", try counter: %"PRIu32")",inode,chindx,chunkid,version,csstrip,port,lastrcvd,now,lrdiff,currentpos,rreq->rleng,trycnt+1);
 					}
-					if (rreq) {
-						status = EIO;
-					}
+					status = EIO;
 					zassert(pthread_mutex_unlock(&(ind->lock)));
 					break;
 				}
@@ -1254,15 +1252,7 @@ void* read_worker(void *arg) {
 								break;
 							}
 						} else if (reccmd==CSTOCL_READ_DATA) {
-							if (rreq==NULL) {
-								syslog(LOG_WARNING,"readworker: got unexpected data from chunkserver (leng:%"PRIu32")",recleng);
-#ifdef RDEBUG
-								fprintf(stderr,"%.6lf: readworker inode: %"PRIu32" ; rreq: NULL ; got unexpected data from chunkserver (leng:%"PRIu32")\n",monotonic_seconds(),inode,recleng);
-#endif
-								status = EIO;
-								currentpos = 0; // start again from beginning
-								break;
-							} else if (recleng<20) {
+							if (recleng<20) {
 								syslog(LOG_WARNING,"readworker: got too short data packet from chunkserver (leng:%"PRIu32")",recleng);
 #ifdef RDEBUG
 								fprintf(stderr,"%.6lf: readworker inode: %"PRIu32" ; rreq: %"PRIu64":%"PRIu64"/%"PRIu32" ; got too short data packet from chunkserver (leng:%"PRIu32")\n",monotonic_seconds(),inode,rreq->offset,rreq->offset+rreq->leng,rreq->leng,recleng);
@@ -2155,14 +2145,14 @@ void read_data_set_length_active(inodedata *ind,uint64_t newlength) {
 		sassert(rreq->lcnt==0);
 #ifdef RDEBUG
 		fprintf(stderr,"%.6lf: read_data_set_length_active: rreq (before): (%"PRIu64":%"PRIu64"/%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
-#endif
 		rreq = read_rreq_invalidate(rreq);
-#ifdef RDEBUG
 		if (rreq) {
 			fprintf(stderr,"%.6lf: read_data_set_length_active: rreq (after): (%"PRIu64":%"PRIu64"/%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 		} else {
 			fprintf(stderr,"%.6lf: read_data_set_length_active: rreq (after): NULL\n",monotonic_seconds());
 		}
+#else
+		read_rreq_invalidate(rreq);
 #endif
 	}
 	if (ind->closing && ind->reqhead==NULL) {
@@ -2229,7 +2219,7 @@ void read_inode_set_length_passive(uint32_t inode,uint64_t newlength) {
 				for (rreq = ind->reqhead ; rreq ; rreq=rreqn) {
 					rreqn = rreq->next;
 					if ((rreq->offset < maxfleng) && (rreq->offset + rreq->leng > minfleng)) {
-						rreq = read_rreq_invalidate(rreq);
+						read_rreq_invalidate(rreq);
 					}
 				}
 				ind->fleng = newlength;
@@ -2310,7 +2300,16 @@ void read_data_end(void *vid) {
 		fprintf(stderr,"%.6lf: closing: %"PRIu32" ; free rreq (%"PRIu64":%"PRIu64"/%"PRIu32" ; lcnt:%u ; mode:%s)\n",monotonic_seconds(),ind->inode,rreq->offset,rreq->offset+rreq->leng,rreq->leng,rreq->lcnt,read_data_modename(rreq->mode));
 #endif
 		if (rreq->lcnt==0 && !STATE_BG_JOBS(rreq->mode)) {
+#ifdef __clang_analyzer__
+			uint8_t ca_ch = (rreq==ind->reqhead)?1:0;
+#endif
 			read_delete_request(rreq);
+#ifdef __clang_analyzer__
+			if (ca_ch) {
+				ind->reqhead = rreqn;
+			}
+			// double linked list with pointer to pointer to previous 'next' is too much for clang analyzer
+#endif
 		}
 	}
 //	ind->closewaiting++;

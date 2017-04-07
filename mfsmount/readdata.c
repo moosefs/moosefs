@@ -1638,7 +1638,7 @@ static inline void read_rreq_not_needed(rrequest *rreq) {
 	if (!STATE_BG_JOBS(rreq->mode)) {
 		if (rreq->lcnt==0) {
 			read_delete_request(rreq); // nobody wants it anymore, so delete it
-		} else if (rreq->mode==NEW || rreq->mode==READY) {
+		} else if (rreq->mode==READY) {
 			rreq->mode = NOTNEEDED; // somebody still using it, so mark it for removal
 		}
 	} else {

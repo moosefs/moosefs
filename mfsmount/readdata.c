@@ -602,7 +602,7 @@ void* read_worker(void *arg) {
 //				fprintf(stderr,"close worker (avail:%"PRIu32" ; total:%"PRIu32")\n",workers_avail,workers_total);
 				read_data_close_worker(w);
 				zassert(pthread_mutex_unlock(&workers_lock));
-				close_pipe(pipefd);
+				close(pipefd);
 				return NULL;
 			}
 			zassert(pthread_mutex_unlock(&workers_lock));
@@ -618,7 +618,7 @@ void* read_worker(void *arg) {
 //			fprintf(stderr,"close worker (avail:%"PRIu32" ; total:%"PRIu32")\n",workers_avail,workers_total);
 			read_data_close_worker(w);
 			zassert(pthread_mutex_unlock(&workers_lock));
-			close_pipe(pipefd);
+			close(pipefd);
 			return NULL;
 		}
 

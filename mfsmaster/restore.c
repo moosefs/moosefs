@@ -229,13 +229,23 @@ int do_access(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 
 int do_append(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,inode_src;
+	uint32_t slice_from,slice_to;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(inode_src,ptr);
+	if (*ptr==')') {
+		slice_from = 0xFFFFFFFF;
+		slice_to = 0;
+	} else {
+		EAT(ptr,filename,lv,',');
+		GETU32(slice_from,ptr);
+		EAT(ptr,filename,lv,',');
+		GETU32(slice_to,ptr);
+	}
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_append(ts,inode,inode_src);
+	return fs_mr_append_slice(ts,inode,inode_src,slice_from,slice_to);
 }
 
 int do_acquire(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

@@ -2499,31 +2499,46 @@ static inline void fsnodes_checkfile(fsnode *p,uint32_t chunkcount[12]) {
 	}
 }
 
-static inline uint8_t fsnodes_appendchunks(uint32_t ts,fsnode *dstobj,fsnode *srcobj) {
+static inline uint8_t fsnodes_append_slice_of_chunks(uint32_t ts,fsnode *dstobj,fsnode *srcobj,uint32_t slice_from,uint32_t slice_to) {
 	uint64_t chunkid,length;
 	uint32_t i;
-	uint32_t srcchunks,dstchunks;
+	uint32_t srcchunks,dstchunks,newchunks,lastsrcchunk;
 	statsrecord psr,nsr;
 	fsedge *e;
 
-	srcchunks=srcobj->data.fdata.chunks;
-	while (srcchunks>0 && srcobj->data.fdata.chunktab[srcchunks-1]==0) {
-		srcchunks--;
+	if (srcobj->data.fdata.length>0) {
+		lastsrcchunk = (srcobj->data.fdata.length-1)>>MFSCHUNKBITS;
+	} else {
+		lastsrcchunk = 0;
 	}
-	if (srcchunks==0) {
-		return MFS_STATUS_OK;
+	if (slice_from==0xFFFFFFFF && slice_to==0) { // special case - compatibility with old append (append whole file)
+		slice_from = 0;
+		slice_to = lastsrcchunk;
 	}
-	dstchunks=dstobj->data.fdata.chunks;
-	while (dstchunks>0 && dstobj->data.fdata.chunktab[dstchunks-1]==0) {
-		dstchunks--;
+	if (slice_to > lastsrcchunk || slice_from > lastsrcchunk || slice_from > slice_to) {
+		return MFS_ERROR_EINVAL;
 	}
-	i = srcchunks+dstchunks-1;	// last new chunk pos
-	if (i>MAX_INDEX) {	// chain too long
+
+	srcchunks = (slice_to - slice_from) + 1;
+
+	if (dstobj->data.fdata.length>0) {
+		dstchunks = 1+((dstobj->data.fdata.length-1)>>MFSCHUNKBITS);
+	} else {
+		dstchunks = 0;
+	}
+
+	newchunks = srcchunks + dstchunks;
+
+	if (newchunks < dstchunks) { // overflow
 		return MFS_ERROR_INDEXTOOBIG;
 	}
+
+	if ((newchunks-1)>MAX_INDEX) {	// chain too long
+		return MFS_ERROR_INDEXTOOBIG;
+	}
+
 	fsnodes_get_stats(dstobj,&psr);
-	if (i>=dstobj->data.fdata.chunks) {
-		uint32_t newchunks = i+1;
+	if (newchunks>dstobj->data.fdata.chunks) {
 		if (dstobj->data.fdata.chunktab==NULL) {
 			dstobj->data.fdata.chunktab = chunktab_malloc(newchunks);
 		} else {
@@ -2536,17 +2551,32 @@ static inline uint8_t fsnodes_appendchunks(uint32_t ts,fsnode *dstobj,fsnode *sr
 		dstobj->data.fdata.chunks = newchunks;
 	}
 
+	for (i=dstchunks ; i<dstobj->data.fdata.chunks ; i++) { // pro forma
+		chunkid = dstobj->data.fdata.chunktab[i];
+		if (chunkid>0) {
+			if (chunk_delete_file(chunkid,dstobj->sclassid)!=MFS_STATUS_OK) {
+				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,dstobj->inode,i);
+			}
+		}
+		dstobj->data.fdata.chunktab[i]=0;
+	}
+
 	for (i=0 ; i<srcchunks ; i++) {
-		chunkid = srcobj->data.fdata.chunktab[i];
+		chunkid = srcobj->data.fdata.chunktab[slice_from+i];
 		dstobj->data.fdata.chunktab[i+dstchunks] = chunkid;
 		if (chunkid>0) {
 			if (chunk_add_file(chunkid,dstobj->sclassid)!=MFS_STATUS_OK) {
-				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcobj->inode,i);
+				syslog(LOG_ERR,"structure error - chunk %016"PRIX64" not found (inode: %"PRIu32" ; index: %"PRIu32")",chunkid,srcobj->inode,i+slice_from);
 			}
 		}
 	}
 
-	length = (((uint64_t)dstchunks)<<MFSCHUNKBITS)+srcobj->data.fdata.length;
+	if (slice_to>=lastsrcchunk) {
+		length = (((uint64_t)dstchunks)<<MFSCHUNKBITS) + srcobj->data.fdata.length - (((uint64_t)slice_from)<<MFSCHUNKBITS);
+	} else {
+		length = (((uint64_t)newchunks)<<MFSCHUNKBITS);
+	}
+
 	if (dstobj->type==TYPE_TRASH) {
 		trashspace -= dstobj->data.fdata.length;
 		trashspace += length;
@@ -5176,9 +5206,12 @@ uint8_t fs_mr_snapshot(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint16
 	return fs_univ_snapshot(ts,0,sesflags|SESFLAG_METARESTORE,inode_src,parent_dst,nleng_dst,name_dst,uid,gids,gid,smode,cumask);
 }
 
-uint8_t fs_univ_append(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t inode_src,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *fleng) {
-	uint32_t pchunks,lastchunk,lastchunksize,i;
-	uint64_t newlength,lengdiff,sizediff;
+uint8_t fs_univ_append_slice(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint8_t flags,uint32_t inode,uint32_t inode_src,uint32_t slice_from,uint32_t slice_to,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *fleng) {
+	uint32_t dstchunks,i;
+	uint32_t lastsrcchunk,lastsrcchunksize;
+	uint32_t lastdstchunk,lastdstchunksize;
+	uint64_t addlength,newlength;
+	uint64_t lengdiff,sizediff;
 	uint8_t status;
 	fsnode *p,*sp;
 	if (inode==inode_src) {
@@ -5202,49 +5235,85 @@ uint8_t fs_univ_append(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 	if ((sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_W,sesflags))) {
 		return MFS_ERROR_EACCES;
 	}
-
+	if (sp->data.fdata.length==0) {
+		if ((sesflags&SESFLAG_METARESTORE)!=0) {
+			meta_version_inc();
+		} else if (fleng!=NULL) {
+			*fleng = p->data.fdata.length;
+		}
+		return MFS_STATUS_OK;
+	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		// quota
-		pchunks = p->data.fdata.chunks;
-		while (pchunks>0 && p->data.fdata.chunktab[pchunks-1]==0) {
-			pchunks--;
+		// fix slices and check quota
+		lastsrcchunk = (sp->data.fdata.length-1)>>MFSCHUNKBITS;
+		if (flags&APPEND_SLICE_FROM_NEG) {
+			if (slice_from>lastsrcchunk+1) {
+				slice_from = 0;
+			} else {
+				slice_from = lastsrcchunk+1-slice_from;
+			}
 		}
-		newlength = (((uint64_t)pchunks)<<MFSCHUNKBITS)+sp->data.fdata.length;
-		if (newlength>p->data.fdata.length) {
-			lengdiff = newlength - p->data.fdata.length;
+		if (flags&APPEND_SLICE_TO_NEG) {
+			if (slice_to>lastsrcchunk+1) {
+				if (fleng!=NULL) {
+					*fleng = p->data.fdata.length;
+				}
+				return MFS_STATUS_OK;
+			} else {
+				slice_to = lastsrcchunk+1-slice_to;
+			}
+		}
+		slice_to--; // change [from,to) -> [from,to] ; 0 can become 0xFFFFFFFF here - it is ok, because 0 means end of file
+		if (slice_to>=lastsrcchunk) {
+			slice_to = lastsrcchunk;
+			if (slice_to<slice_from) {
+				if (fleng!=NULL) {
+					*fleng = p->data.fdata.length;
+				}
+				return MFS_STATUS_OK;
+			}
+			addlength = sp->data.fdata.length - (((uint64_t)slice_from)<<MFSCHUNKBITS);
+			lastsrcchunksize = ((((sp->data.fdata.length-1)&MFSCHUNKMASK)+MFSBLOCKSIZE)&MFSBLOCKNEGMASK)+MFSHDRSIZE;
 		} else {
-			lengdiff = 0;
+			if (slice_to<slice_from) {
+				if (fleng!=NULL) {
+					*fleng = p->data.fdata.length;
+				}
+				return MFS_STATUS_OK;
+			}
+			addlength = ((uint64_t)(1+slice_to-slice_from))<<MFSCHUNKBITS;
+			lastsrcchunksize = MFSCHUNKSIZE+MFSHDRSIZE;
 		}
-		sizediff = 0;
 		if (p->data.fdata.length>0) {
-			lastchunk = (p->data.fdata.length-1)>>MFSCHUNKBITS;
-			lastchunksize = ((((p->data.fdata.length-1)&MFSCHUNKMASK)+MFSBLOCKSIZE)&MFSBLOCKNEGMASK)+MFSHDRSIZE;
+			lastdstchunk = (p->data.fdata.length-1)>>MFSCHUNKBITS;
+			dstchunks = lastdstchunk+1;
+			lastdstchunksize = ((((p->data.fdata.length-1)&MFSCHUNKMASK)+MFSBLOCKSIZE)&MFSBLOCKNEGMASK)+MFSHDRSIZE;
 		} else {
-			lastchunk = 0;
-			lastchunksize = MFSHDRSIZE;
+			lastdstchunk = 0xFFFFFFFF;
+			dstchunks = 0;
+			lastdstchunksize = MFSHDRSIZE;
 		}
-		for (i=0 ; i<p->data.fdata.chunks ; i++) {
-			if (p->data.fdata.chunktab[i]>0) {
-				if (i>lastchunk) {
+		newlength = (((uint64_t)dstchunks)<<MFSCHUNKBITS) + addlength;
+		if (newlength < p->data.fdata.length) { // length overflow
+			return MFS_ERROR_EINVAL;
+		}
+		lengdiff = newlength - p->data.fdata.length;
+		sizediff = 0;
+		for (i=slice_from ; i<=slice_to ; i++) {
+			if (i<sp->data.fdata.chunks && sp->data.fdata.chunktab[i]>0) {
+				if (i<lastsrcchunk) {
 					sizediff += MFSCHUNKSIZE+MFSHDRSIZE;
-				} else if (i==lastchunk) {
-					sizediff += (MFSCHUNKSIZE+MFSHDRSIZE) - lastchunksize;
+				} else if (i==lastsrcchunk) {
+					sizediff += lastsrcchunksize;
 				}
 			}
 		}
-		if (sp->data.fdata.length>0) {
-			lastchunk = (sp->data.fdata.length-1)>>MFSCHUNKBITS;
-			lastchunksize = ((((sp->data.fdata.length-1)&MFSCHUNKMASK)+MFSBLOCKSIZE)&MFSBLOCKNEGMASK)+MFSHDRSIZE;
-		} else {
-			lastchunk = 0;
-			lastchunksize = MFSHDRSIZE;
-		}
-		for (i=0 ; i<sp->data.fdata.chunks ; i++) {
-			if (sp->data.fdata.chunktab[i]>0) {
-				if (i<lastchunk) {
-					sizediff += MFSCHUNKSIZE+MFSHDRSIZE;
-				} else if (i==lastchunk) {
-					sizediff += lastchunksize;
+		for (i=0 ; i<p->data.fdata.chunks ; i++) {
+			if (p->data.fdata.chunktab[i]>0) {
+				if (i>lastdstchunk || dstchunks==0) {
+					sizediff -= MFSCHUNKSIZE+MFSHDRSIZE;
+				} else if (i==lastdstchunk) {
+					sizediff += (MFSCHUNKSIZE+MFSHDRSIZE) - lastdstchunksize;
 				}
 			}
 		}
@@ -5252,27 +5321,29 @@ uint8_t fs_univ_append(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 			return MFS_ERROR_QUOTA;
 		}
 	}
-	status = fsnodes_appendchunks(ts,p,sp);
+	status = fsnodes_append_slice_of_chunks(ts,p,sp,slice_from,slice_to);
 	if (status!=MFS_STATUS_OK) {
 		return status;
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		changelog("%"PRIu32"|APPEND(%"PRIu32",%"PRIu32")",ts,inode,inode_src);
+		changelog("%"PRIu32"|APPEND(%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32")",ts,inode,inode_src,slice_from,slice_to);
+		if (fleng!=NULL) {
+			*fleng = p->data.fdata.length;
+		}
 	} else {
 		meta_version_inc();
-	}
-	if (fleng!=NULL) {
-		*fleng = p->data.fdata.length;
 	}
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_append(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t inode_src,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *fleng) {
-	return fs_univ_append(main_time(),rootinode,sesflags,inode,inode_src,uid,gids,gid,fleng);
+// slice - [from,to) and uses 'negative' flags
+uint8_t fs_append_slice(uint32_t rootinode,uint8_t sesflags,uint8_t flags,uint32_t inode,uint32_t inode_src,uint32_t slice_from,uint32_t slice_to,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *fleng) {
+	return fs_univ_append_slice(main_time(),rootinode,sesflags,flags,inode,inode_src,slice_from,slice_to,uid,gids,gid,fleng);
 }
 
-uint8_t fs_mr_append(uint32_t ts,uint32_t inode,uint32_t inode_src) {
-	return fs_univ_append(ts,0,SESFLAG_METARESTORE,inode,inode_src,0,0,NULL,NULL);
+// slice - [from,to]
+uint8_t fs_mr_append_slice(uint32_t ts,uint32_t inode,uint32_t inode_src,uint32_t slice_from,uint32_t slice_to) {
+	return fs_univ_append_slice(ts,0,SESFLAG_METARESTORE,0,inode,inode_src,slice_from,slice_to,0,0,NULL,NULL);
 }
 
 uint8_t fs_readdir_size(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t flags,uint32_t maxentries,uint64_t nedgeid,void **dnode,void **dedge,uint32_t *dbuffsize) {

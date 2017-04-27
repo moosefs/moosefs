@@ -1440,6 +1440,28 @@ static inline int parse_label_expr(char *exprstr,uint8_t *labelscnt,uint32_t lab
 }
 #endif
 
+static inline int parse_slice_expr(char *p,int64_t *slice_from,int64_t *slice_to) {
+	if (*p==':') {
+		*slice_from = 0;
+		p++;
+	} else {
+		*slice_from = strtoll(p,&p,10);
+		if (*p!=':') {
+			return -1;
+		}
+		p++;
+	}
+	if (*p=='\0') {
+		*slice_to = 0x80000000;
+	} else {
+		*slice_to = strtoll(p,&p,10);
+	}
+	if (*p!='\0') {
+		return -1;
+	}
+	return 0;
+}
+
 // formats:
 //  #     - number of seconds
 //  #s    - number of seconds
@@ -3736,15 +3758,37 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	return 0;
 }
 
-int append_file(const char *fname,const char *afname) {
-	uint8_t reqbuff[28+NGROUPS_MAX*4+4],*wptr,*buff;
+int append_file(const char *fname,const char *afname,int64_t slice_from,int64_t slice_to) {
+	uint8_t reqbuff[37+NGROUPS_MAX*4+4],*wptr,*buff;
 	const uint8_t *rptr;
 	uint32_t cmd,leng,inode,ainode,uid,gid;
+	uint32_t slice_from_abs,slice_to_abs;
+	int32_t psize;
+	uint8_t flags;
 	gid_t grouplist[NGROUPS_MAX];
 	uint32_t i,gids;
 	uint8_t addmaingroup;
 	mode_t dmode,smode;
 	int fd;
+
+	if (slice_from < INT64_C(-0xFFFFFFFF) || slice_to > INT64_C(0xFFFFFFFF) || slice_to < INT64_C(-0xFFFFFFFF) || slice_to > INT64_C(0xFFFFFFFF)) {
+		printf("bad slice indexes\n");
+		return -1;
+	}
+	flags = 0;
+	if (slice_from<0) {
+		slice_from_abs = -slice_from;
+		flags |= APPEND_SLICE_FROM_NEG;
+	} else {
+		slice_from_abs = slice_from;
+	}
+	if (slice_to<0) {
+		slice_to_abs = -slice_to;
+		flags |= APPEND_SLICE_TO_NEG;
+	} else {
+		slice_to_abs = slice_to;
+	}
+
 	fd = open_master_conn(fname,&inode,&dmode,NULL,0,1);
 	if (fd<0) {
 		return -1;
@@ -3753,11 +3797,18 @@ int append_file(const char *fname,const char *afname) {
 		return -1;
 	}
 
+	if ((slice_from!=0 || slice_to!=0x80000000) && masterversion<VERSION2INT(3,0,92)) {
+		close_master_conn(0);
+		printf("slices not supported in your master - please upgrade it\n");
+		return -1;
+	}
 	if ((smode&S_IFMT)!=S_IFREG) {
+		close_master_conn(0);
 		printf("%s: not a file\n",afname);
 		return -1;
 	}
 	if ((dmode&S_IFMT)!=S_IFREG) {
+		close_master_conn(0);
 		printf("%s: not a file\n",fname);
 		return -1;
 	}
@@ -3776,11 +3827,23 @@ int append_file(const char *fname,const char *afname) {
 		addmaingroup = 0;
 	}
 	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_APPEND);
-	put32bit(&wptr,20+(addmaingroup+gids)*4);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put32bit(&wptr,ainode);
+	put32bit(&wptr,CLTOMA_FUSE_APPEND_SLICE);
+	if (masterversion>=VERSION2INT(3,0,92)) {
+		put32bit(&wptr,29+(addmaingroup+gids)*4);
+		put32bit(&wptr,0);
+		put8bit(&wptr,flags);
+		put32bit(&wptr,inode);
+		put32bit(&wptr,ainode);
+		put32bit(&wptr,slice_from_abs);
+		put32bit(&wptr,slice_to_abs);
+		psize = 37;
+	} else {
+		put32bit(&wptr,20+(addmaingroup+gids)*4);
+		put32bit(&wptr,0);
+		put32bit(&wptr,inode);
+		put32bit(&wptr,ainode);
+		psize = 28;
+	}
 	put32bit(&wptr,uid);
 	if (masterversion<VERSION2INT(2,0,0)) {
 		put32bit(&wptr,gid);
@@ -3793,7 +3856,7 @@ int append_file(const char *fname,const char *afname) {
 			put32bit(&wptr,grouplist[i]);
 		}
 	}
-	if (tcpwrite(fd,reqbuff,28+(addmaingroup+gids)*4)!=(int32_t)(28+(addmaingroup+gids)*4)) {
+	if (tcpwrite(fd,reqbuff,psize+(addmaingroup+gids)*4)!=(int32_t)(psize+(addmaingroup+gids)*4)) {
 		printf("%s: master query: send error\n",fname);
 		close_master_conn(1);
 		return -1;
@@ -3806,7 +3869,7 @@ int append_file(const char *fname,const char *afname) {
 	rptr = reqbuff;
 	cmd = get32bit(&rptr);
 	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_APPEND) {
+	if (cmd!=MATOCL_FUSE_APPEND_SLICE) {
 		printf("%s: master query: wrong answer (type)\n",fname);
 		close_master_conn(1);
 		return -1;
@@ -4913,7 +4976,7 @@ void usage(int f) {
 			fprintf(stderr," -s - calculate file signature (using checksums)\n");
 			break;
 		case MFSAPPENDCHUNKS:
-			fprintf(stderr,"append file chunks to another file. If destination file doesn't exist then it's created as empty file and then chunks are appended\n\nusage: mfsappendchunks dstfile name [name ...]\n");
+			fprintf(stderr,"append file chunks to another file. If destination file doesn't exist then it's created as empty file and then chunks are appended\n\nusage: mfsappendchunks [-s slice_from:slice_to] dstfile name [name ...]\n");
 			break;
 		case MFSDIRINFO:
 			fprintf(stderr,"show directories stats\n\nusage: mfsdirinfo [-nhHkmg] [-idfclsr] [-p] name [name ...]\n");
@@ -5070,6 +5133,7 @@ int main(int argc,char **argv) {
 	uint32_t graceperiod = 0;
 	uint8_t qflags = 0;
 	uint32_t scnleng;
+	int64_t slice_from = 0,slice_to = 0x80000000;
 	char *scadmin_mp = NULL;
 	char *appendfname = NULL;
 	char *srcname = NULL;
@@ -5488,9 +5552,6 @@ int main(int argc,char **argv) {
 	case MFSGETTRASHTIME:
 	case MFSSETTRASHTIME:
 	case MFSGETEATTR:
-	case MFSCHKARCHIVE:
-	case MFSSETARCHIVE:
-	case MFSCLRARCHIVE:
 		while ((ch=getopt(argc,argv,"rnhHkmg"))!=-1) {
 			switch(ch) {
 			case 'n':
@@ -5602,6 +5663,9 @@ int main(int argc,char **argv) {
 	case MFSFILEREPAIR:
 	case MFSGETQUOTA:
 	case MFSCHECKFILE:
+	case MFSCHKARCHIVE:
+	case MFSSETARCHIVE:
+	case MFSCLRARCHIVE:
 		while ((ch=getopt(argc,argv,"nhHkmg"))!=-1) {
 			switch(ch) {
 			case 'n':
@@ -6117,6 +6181,19 @@ int main(int argc,char **argv) {
 			}
 		}
 		return list_sc(scadmin_mp,longmode);
+	case MFSAPPENDCHUNKS:
+		while ((ch=getopt(argc,argv,"s:"))!=-1) {
+			switch(ch) {
+			case 's':
+				if (parse_slice_expr(optarg,&slice_from,&slice_to)<0) {
+					usage(f);
+				}
+				break;
+			}
+		}
+		argc -= optind;
+		argv += optind;
+		break;
 	case MFSRMSC:
 	default:
 		while (getopt(argc,argv,"")!=-1);
@@ -6204,7 +6281,7 @@ int main(int argc,char **argv) {
 			}
 			break;
 		case MFSAPPENDCHUNKS:
-			if (append_file(appendfname,*argv)<0) {
+			if (append_file(appendfname,*argv,slice_from,slice_to)<0) {
 				status = 1;
 			}
 			break;

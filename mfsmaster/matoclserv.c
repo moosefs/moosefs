@@ -4722,22 +4722,36 @@ void matoclserv_fuse_setfilechunks(matoclserventry *eptr,const uint8_t *data,uin
 }
 */
 
-void matoclserv_fuse_append(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_fuse_append_slice(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode,inode_src,uid,gids;
+	uint32_t slice_from,slice_to;
 	uint32_t *gid;
 	uint32_t i;
 	uint32_t msgid;
 	uint64_t fleng;
 	uint8_t *ptr;
 	uint8_t status;
-	if (length<20) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_APPEND - wrong size (%"PRIu32"/20)",length);
+	uint8_t flags;
+	if (length<20 || ((length&1)==1 && length<29)) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_APPEND_SLICE - wrong size (%"PRIu32"/20+|29+)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
+	if (length&1) {
+		flags = get8bit(&data);
+	} else {
+		flags = 0;
+	}
 	inode = get32bit(&data);
 	inode_src = get32bit(&data);
+	if (length&1) {
+		slice_from = get32bit(&data);
+		slice_to = get32bit(&data);
+	} else {
+		slice_from = 0;
+		slice_to = 0;
+	}
 	uid = get32bit(&data);
 	if (length==20) {
 		gids = 1;
@@ -4745,8 +4759,8 @@ void matoclserv_fuse_append(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		gid[0] = get32bit(&data);
 	} else {
 		gids = get32bit(&data);
-		if (length!=20+4*gids) {
-			syslog(LOG_NOTICE,"CLTOMA_FUSE_APPEND - wrong size (%"PRIu32":gids=%"PRIu32")",length,gids);
+		if (length!=20+4*gids && length!=29+4*gids) {
+			syslog(LOG_NOTICE,"CLTOMA_FUSE_APPEND_SLICE - wrong size (%"PRIu32":gids=%"PRIu32")",length,gids);
 			eptr->mode = KILL;
 			return;
 		}
@@ -4756,11 +4770,11 @@ void matoclserv_fuse_append(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_append(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_src,uid,gids,gid,&fleng);
+	status = fs_append_slice(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),flags,inode,inode_src,slice_from,slice_to,uid,gids,gid,&fleng);
 	if (status==MFS_STATUS_OK) {
 		matoclserv_fuse_fleng_has_changed(NULL,inode,fleng);
 	}
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_APPEND,5);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_APPEND_SLICE,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
 }
@@ -5503,52 +5517,7 @@ void matoclserv_fuse_getsustained(matoclserventry *eptr,const uint8_t *data,uint
 	}
 }
 
-/*
-void matocl_session_timedout(session *sesdata) {
-	filelist *fl,*afl;
-	fl=sesdata->openedfiles;
-	while (fl) {
-		afl = fl;
-		fl=fl->next;
-		fs_release(afl->inode,sesdata->sessionid);
-		free(afl);
-	}
-	sesdata->openedfiles=NULL;
-	if (sesdata->info) {
-		free(sesdata->info);
-	}
-}
-
-void matocl_session_check(void) {
-	session **sesdata,*asesdata;
-	uint32_t now;
-
-	now = main_time();
-	sesdata = &(sessionshead);
-	while ((asesdata=*sesdata)) {
-		// syslog(LOG_NOTICE,"session: %u ; nsocks: %u ; state: %u ; disconnected: %u",asesdata->sessionid,asesdata->nsocks,asesdata->newsession,asesdata->disconnected);
-		if (asesdata->nsocks==0 && ((asesdata->newsession>1 && asesdata->disconnected<now) || (asesdata->newsession==1 && asesdata->disconnected+SessionSustainTime<now) || (asesdata->newsession==0 && asesdata->disconnected+120<now))) {
-			syslog(LOG_NOTICE,"remove session: %u",asesdata->sessionid);
-			matocl_session_timedout(asesdata);
-			*sesdata = asesdata->next;
-			free(asesdata);
-		} else {
-			sesdata = &(asesdata->next);
-		}
-	}
-//	matoclserv_show_notification_dirs();
-}
-
-void matocl_session_statsmove(void) {
-	session *sesdata;
-	for (sesdata = sessionshead ; sesdata ; sesdata=sesdata->next) {
-		memcpy(sesdata->lasthouropstats,sesdata->currentopstats,4*SESSION_STATS);
-		memset(sesdata->currentopstats,0,4*SESSION_STATS);
-	}
-	matoclserv_store_sessions();
-}
-*/
-void matocl_beforedisconnect(matoclserventry *eptr) {
+void matoclserv_beforedisconnect(matoclserventry *eptr) {
 	swchunks *swc,**pswc;
 	lwchunks *lwc,**plwc;
 	uint32_t i;
@@ -5821,8 +5790,8 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_SETSCLASS:
 				matoclserv_fuse_setsclass(eptr,data,length);
 				break;
-			case CLTOMA_FUSE_APPEND:
-				matoclserv_fuse_append(eptr,data,length);
+			case CLTOMA_FUSE_APPEND_SLICE:
+				matoclserv_fuse_append_slice(eptr,data,length);
 				break;
 //			case CLTOMA_FUSE_SETFILECHUNKS:
 //				matoclserv_fuse_setfilechunks(eptr,data,length);
@@ -5991,8 +5960,8 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_SETSCLASS:
 				matoclserv_fuse_setsclass(eptr,data,length);
 				break;
-			case CLTOMA_FUSE_APPEND:
-				matoclserv_fuse_append(eptr,data,length);
+			case CLTOMA_FUSE_APPEND_SLICE:
+				matoclserv_fuse_append_slice(eptr,data,length);
 				break;
 //			case CLTOMA_FUSE_SETFILECHUNKS:
 //				matoclserv_fuse_setfilechunks(eptr,data,length);
@@ -6321,7 +6290,7 @@ void matoclserv_disconnection_loop(void) {
 	kptr = &matoclservhead;
 	while ((eptr=*kptr)) {
 		if (eptr->mode == KILL) {
-			matocl_beforedisconnect(eptr);
+			matoclserv_beforedisconnect(eptr);
 			tcpclose(eptr->sock);
 			if (eptr->input_packet) {
 				free(eptr->input_packet);
@@ -6703,8 +6672,6 @@ int matoclserv_init(void) {
 
 	main_time_register(10,0,matoclserv_start_cond_check);
 	main_time_register(1,0,matoclserv_timeout_waiting_ops);
-//	main_time_register(10,0,matocl_session_check);
-//	main_time_register(3600,0,matocl_session_statsmove);
 	main_reload_register(matoclserv_reload);
 	main_destruct_register(matoclserv_term);
 	main_poll_register(matoclserv_desc,matoclserv_serve);

@@ -3,10 +3,10 @@
 mfssnapshots \- \fBMooseFS\fP snapshot tools
 .SH SYNOPSIS
 .B mfsappendchunks
-\fISNAPSHOT_FILE\fP \fIOBJECT\fP...
+[\fB-s \fIFROM\fP,\fITO\fP] \fISNAPSHOT_FILE\fP \fIOBJECT\fP...
 .PP
 .B mfsmakesnapshot
-[\fB-o\fP] \fISOURCE\fP... \fIDESTINATION\fP
+[\fB-o\fP|\fB-c\fP|\fB-p\fP] \fISOURCE\fP... \fIDESTINATION\fP
 .PP
 .B mfsrmsnapshot
 [\fB-f\fP] \fIOBJECT\fP...
@@ -14,10 +14,10 @@ mfssnapshots \- \fBMooseFS\fP snapshot tools
 \fBmfsappendchunks\fP (equivalent of \fBmfssnapshot\fP from MooseFS 1.5)
 appends a lazy copy of specified file(s) to specified snapshot file ("lazy"
 means that creation of new chunks is delayed to the moment one copy is
-modified).
-If multiple files are given, they are merged into one target file in such a way
+modified). If multiple files are given, they are merged into one target file in such a way
 that each file begins at \fIchunk\fP (64MB) boundary; padding space is left
-empty.
+empty. Optionally only slice of chunks can be appended (option \fB-s\fP). Slice definition is similar to Python: \fIFROM\fP is included, \fITO\fP excluded, negative numbers mean backwards from the end. If \fIFROM\fP or \fTO\fP is not specified then it means from the beginning or to the end of file respectively. See examples below.
+
 .PP
 \fBmfsmakesnapshot\fP makes a "real" snapshot (lazy copy, like in case of
 \fBmfsappendchunks\fP) of some object(s) or subtree (similarly to \fBcp -r\fP
@@ -25,7 +25,7 @@ command). It's atomic with respect to each \fISOURCE\fP argument separately.
 If \fIDESTINATION\fP points to already existing file, error will be reported
 unless \fB-o\fP (overwrite) option is given. Note: if \fISOURCE\fP is
 a directory, it is copied as a whole; but if it's followed by trailing slash,
-only directory content is copied.
+only directory content is copied. When \fB-c\fP option is given then attributes of newly created files are more similar to those created by ordinary \fBcp\fP (without attribute preserving). Option \fB-p\fP preserves hardlinks in \fISOURCE\fP (when two or more objects inside \fISOURCE\fP are hardlinked to each other then in \fIDESTINATION\fP folder those objects will be hardlinked to each other as well).
 .PP
 \fBmfsrmsnapshot\fP removes objects created as a result of
 \fBmfsmakesnapshot\fP (similarly to \fBrm -r\fP, but much faster). For safety
@@ -37,6 +37,18 @@ whole directory; otherwise the command will not remove anything. This behavior
 can be overridden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
 remove only those files/directories that have \fBsnapshot\fP attribute set and
 will leave everything else untouched.
+.SH "SLICES"
+\fIFROM\fP,\fITO\fP for source file with chunks 0,1,2,...,N-1,N:
+.PP
+2,4 = chunks 2 and 3
+.PP
+3, = chunks 3,4,...,N
+.PP
+,5 = chunks 0,1,2,3,4
+.PP
+,-1 = chunks 0,1,2,3,...,N-1
+.PP
+-4,-2 = chunks N-3,N-2
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

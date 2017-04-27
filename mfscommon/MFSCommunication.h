@@ -384,6 +384,10 @@
 #define QUOTA_FLAG_HREALSIZE   0x80
 #define QUOTA_FLAG_HALL        0xF0
 
+// append slice
+#define APPEND_SLICE_FROM_NEG  0x01
+#define APPEND_SLICE_TO_NEG    0x02
+
 // acl:
 #define POSIX_ACL_ACCESS       1
 #define POSIX_ACL_DEFAULT      2
@@ -1140,12 +1144,13 @@
 
 
 // 0x01B6
-#define CLTOMA_FUSE_APPEND (PROTO_BASE+438)
+#define CLTOMA_FUSE_APPEND_SLICE (PROTO_BASE+438)
 // msgid:32 inode:32 srcinode:32 uid:32 gid:32 - version < 2.0.0
-// msgid:32 inode:32 srcinode:32 uid:32 gcnt:32 gcnt * [ gid:32 ]
+// msgid:32 inode:32 srcinode:32 uid:32 gcnt:32 gcnt * [ gid:32 ] - version < 3.0.91
+// msgid:32 flags:8 inode:32 srcinode:32 slice_from:32 slice_to:32 uid:32 gcnt:32 gcnt * [ gid:32 ]
 
 // 0x01B7
-#define MATOCL_FUSE_APPEND (PROTO_BASE+439)
+#define MATOCL_FUSE_APPEND_SLICE (PROTO_BASE+439)
 // msgid:32 status:8
 
 

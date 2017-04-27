@@ -20,7 +20,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	3.0.91
+Version:	3.0.92
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -373,6 +373,9 @@ exit 0
 %{_bindir}/mfssetquota
 %{_bindir}/mfsdelquota
 %{_bindir}/mfscopyquota
+%{_bindir}/mfschkarchive
+%{_bindir}/mfsclrarchive
+%{_bindir}/mfssetarchive
 %{_bindir}/mfsfilepaths
 %{_bindir}/mfsscadmin
 %attr(755,root,root) %{_bindir}/mfstools
@@ -408,11 +411,15 @@ exit 0
 %{_mandir}/man1/mfssetquota.1*
 %{_mandir}/man1/mfsdelquota.1*
 %{_mandir}/man1/mfscopyquota.1*
+%{_mandir}/man1/mfschkarchive.1*
+%{_mandir}/man1/mfsclrarchive.1*
+%{_mandir}/man1/mfssetarchive.1*
 %{_mandir}/man1/mfsfilepaths.1*
 %{_mandir}/man1/mfsgoal.1*
 %{_mandir}/man1/mfstrashtime.1*
 %{_mandir}/man1/mfseattr.1*
 %{_mandir}/man1/mfsquota.1*
+%{_mandir}/man1/mfsarchive.1*
 %{_mandir}/man1/mfssnapshots.1*
 %{_mandir}/man1/mfsdiagtools.1*
 %{_mandir}/man1/mfssclass.1*

@@ -1,0 +1,56 @@
+.TH mfsarchive "1" "April 2017" "MooseFS 3.0.92-1" "This is part of MooseFS"
+.SH NAME
+mfsarchive \- \fBMooseFS\fP archive storage mode management tools
+.SH SYNOPSIS
+.B mfschkarchive
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfsclrarchive
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.PP
+.B mfssetarchive
+[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+.SH DESCRIPTION
+These tools operate on object's archive bit. This bit is usually set automatically acording to storage class definition (\fBARCH_DELAY\fP). When this bit is set then \fBARCH_LABELS\fP from storage class definition are used, otherwise \fBKEEP_LABES\fP are used.
+.PP
+\fBmfschkarchive\fP prints current \fIarchive\fP bit value of given object(s). If given \fIOBJECT\fP is a \fIDIRECTORY\fP then it prints current
+\fIarchive\fP bit value of all contained files (recursively).
+.PP
+\fBmfsclrarchive\fP and \fBmfssetarchive\fP clears/sets current \fIarchive\fP bit of given object(s). As in \fBmfschkarchive\fP if \fIOBJECT\fP is a \fIDIRECTORY\fP then this tool works recursively.
+.SH GENERAL OPTIONS
+Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
+options to select
+format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
+uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
+prefixes (k, M, G as 10^3, 10^6 etc.). \fB-k\fP, \fB-m\fP and \fB-g\fP show plain numbers
+respectivaly in kibis (binary kilo - 1024), mebis (binary mega - 1024^2)
+and gibis (binary giga - 1024^3).
+The same can be achieved by setting
+\fBMFSHRFORMAT\fP environment variable to: \fB0\fP (exact numbers), \fB1\fP
+or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
+\fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
+numbers and SI prefixes). The default is to print just exact numbers.
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2017 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR mfstools (1),
+.BR mfssclass (1)

@@ -431,6 +431,7 @@ mfstools_links = \
 	mfsgetsclass mfssetsclass mfscopysclass mfsxchgsclass mfslistsclass \
 	mfsgeteattr mfsseteattr mfsdeleattr mfscopyeattr \
 	mfsgetquota mfssetquota mfsdelquota mfscopyquota \
+	mfschkarchive mfsclrarchive mfssetarchive \
 	mfsmakesnapshot mfsrmsnapshot mfsappendchunks mfsfilepaths
 
 all: all-am

@@ -30,6 +30,9 @@ usr/bin/mfsgetquota
 usr/bin/mfssetquota
 usr/bin/mfsdelquota
 usr/bin/mfscopyquota
+usr/bin/mfschkarchive
+usr/bin/mfsclrarchive
+usr/bin/mfssetarchive
 usr/bin/mfsfilepaths
 usr/bin/mfsscadmin
 usr/bin/mfstools
@@ -64,11 +67,15 @@ usr/share/man/man1/mfsgetquota.1
 usr/share/man/man1/mfssetquota.1
 usr/share/man/man1/mfsdelquota.1
 usr/share/man/man1/mfscopyquota.1
+usr/share/man/man1/mfschkarchive.1
+usr/share/man/man1/mfsclrarchive.1
+usr/share/man/man1/mfssetarchive.1
 usr/share/man/man1/mfsfilepaths.1
 usr/share/man/man1/mfsgoal.1
 usr/share/man/man1/mfstrashtime.1
 usr/share/man/man1/mfseattr.1
 usr/share/man/man1/mfsquota.1
+usr/share/man/man1/mfsarchive.1
 usr/share/man/man1/mfssnapshots.1
 usr/share/man/man1/mfsdiagtools.1
 usr/share/man/man1/mfssclass.1

@@ -335,7 +335,7 @@ cgiserv_mans = mfscgiserv.8
 metalogger_mans = mfsmetalogger.8 mfsmetalogger.cfg.5
 netdump_mans = mfsnetdump.8
 mount_mans = \
-	mfsmount.8 mfstools.1 mfsgoal.1 mfssclass.1 mfstrashtime.1 \
+	mfsmount.8 mfstools.1 mfsgoal.1 mfssclass.1 mfstrashtime.1 mfsarchive.1 \
 	mfseattr.1 mfsquota.1 mfssnapshots.1 mfsdiagtools.1 mfsscadmin.1 \
 	mfscheckfile.1 mfsdirinfo.1 mfsfileinfo.1 mfsfilerepair.1 \
 	mfsgetgoal.1 mfsgettrashtime.1 mfsrgetgoal.1 mfsrgettrashtime.1 \
@@ -344,6 +344,7 @@ mount_mans = \
 	mfssetsclass.1 mfsgetsclass.1 mfscopysclass.1 mfsxchgsclass.1 mfslistsclass.1 \
 	mfsgeteattr.1 mfsseteattr.1 mfsdeleattr.1 mfscopyeattr.1 \
 	mfsgetquota.1 mfssetquota.1 mfsdelquota.1 mfscopyquota.1 \
+	mfschkarchive.1 mfsclrarchive.1 mfssetarchive.1 \
 	mfsappendchunks.1 mfsmakesnapshot.1 mfsrmsnapshot.1 mfsfilepaths.1
 
 mount_extra_man = mount.moosefs.8

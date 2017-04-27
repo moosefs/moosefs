@@ -4,7 +4,6 @@ AM_CPPFLAGS=-I$(top_srcdir)/mfscommon
 AM_CFLAGS=
 AM_LDFLAGS=
 
-
 mfsmount_LDADD=$(PTHREAD_LIBS) $(FUSE_LIBS)
 mfsmount_CFLAGS=$(PTHREAD_CFLAGS) -D_USE_PTHREADS $(FUSE_CFLAGS) -DFUSE_USE_VERSION=29 -DAPPNAME=mfsmount
 mfsmount_CPPFLAGS=$(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
@@ -66,6 +65,7 @@ mfstools_links=\
 	mfsgetsclass mfssetsclass mfscopysclass mfsxchgsclass mfslistsclass \
 	mfsgeteattr mfsseteattr mfsdeleattr mfscopyeattr \
 	mfsgetquota mfssetquota mfsdelquota mfscopyquota \
+	mfschkarchive mfsclrarchive mfssetarchive \
 	mfsmakesnapshot mfsrmsnapshot mfsappendchunks mfsfilepaths
 
 install-exec-hook:

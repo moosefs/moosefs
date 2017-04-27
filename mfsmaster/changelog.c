@@ -134,7 +134,7 @@ uint32_t changelog_get_old_changes(uint64_t version,void (*sendfn)(void *,uint64
 		if (start) {
 			for (i=0 ; i<oc->entries ; i++) {
 				oce = oc->old_changes_block + i;
-				if (version<=oce->version) {
+				if (version<oce->version) {
 					if (j<limit) {
 						sendfn(userdata,oce->version,oce->data,oce->length);
 						j++;

@@ -465,6 +465,10 @@ static inline void chunk_hash_rehash(void) {
 	uint16_t i;
 	chunkrehashpos = chunkhashsize;
 	chunkhashsize *= 2;
+    if ((chunkhashsize>>HASHTAB_LOBITS) > HASHTAB_HISIZE) {
+        syslog(LOG_ERR,"there is no space to rehash chunks");
+        return;
+    }
 	for (i=(chunkhashsize>>HASHTAB_LOBITS)/2 ; i<chunkhashsize>>HASHTAB_LOBITS ; i++) {
 #ifdef HAVE_MMAP
 		chunkhashtab[i] = mmap(NULL,sizeof(chunk*)*HASHTAB_LOSIZE,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);

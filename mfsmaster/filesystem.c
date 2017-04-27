@@ -4569,14 +4569,14 @@ uint8_t fs_setattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	if (setmask&SET_MTIME_NOW_FLAG) {
 		p->mtime = ts;
 	}
-	changelog("%"PRIu32"|ATTR(%"PRIu32",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32")",ts,inode,(uint16_t)(p->mode),p->uid,p->gid,p->atime,p->mtime);
+	changelog("%"PRIu32"|ATTR(%"PRIu32",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu16")",ts,inode,(uint16_t)(p->mode),p->uid,p->gid,p->atime,p->mtime,attrmode);
 	p->ctime = ts;
 	fsnodes_fill_attr(p,NULL,uid,gid[0],auid,agid,sesflags,attr);
 	stats_setattr++;
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_t gid,uint32_t atime,uint32_t mtime) {
+uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_t gid,uint32_t atime,uint32_t mtime,uint16_t attrmode) {
 	fsnode *p;
 	p = fsnodes_node_find(inode);
 	if (!p) {
@@ -4587,7 +4587,7 @@ uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_
 	}
 	p->mode = mode;
 	if (p->aclpermflag) {
-		posix_acl_setmode(p->inode,mode);
+		posix_acl_setmode(p->inode,attrmode);
 	}
 	p->uid = uid;
 	p->gid = gid;

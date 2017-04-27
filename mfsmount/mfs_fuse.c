@@ -4460,7 +4460,7 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 //     10 - mask
 //     20 - other
 
-int mfs_getacl(fuse_req_t req, fuse_ino_t ino, uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t aclxattr,const uint8_t **buff,uint32_t *leng) {
+int mfs_getfacl(fuse_req_t req,fuse_ino_t ino,/*uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,*/uint8_t aclxattr,const uint8_t **buff,uint32_t *leng) {
 	uint16_t userperm;
 	uint16_t groupperm;
 	uint16_t otherperm;
@@ -4477,7 +4477,7 @@ int mfs_getacl(fuse_req_t req, fuse_ino_t ino, uint8_t opened,uint32_t uid,uint3
 	(void)req;
 	*buff = NULL;
 	*leng = 0;
-	status = fs_getacl(ino,opened,uid,gids,gid,aclxattr,&userperm,&groupperm,&otherperm,&maskperm,&namedusers,&namedgroups,&namedacls,&namedaclssize);
+	status = fs_getfacl(ino,/*opened,uid,gids,gid,*/aclxattr,&userperm,&groupperm,&otherperm,&maskperm,&namedusers,&namedgroups,&namedacls,&namedaclssize);
 
 	if (status!=MFS_STATUS_OK) {
 		return status;
@@ -4530,7 +4530,7 @@ int mfs_getacl(fuse_req_t req, fuse_ino_t ino, uint8_t opened,uint32_t uid,uint3
 	return MFS_STATUS_OK;
 }
 
-int mfs_setacl(fuse_req_t req,fuse_ino_t ino,uint32_t uid,uint8_t aclxattr,const char *buff,uint32_t leng) {
+int mfs_setfacl(fuse_req_t req,fuse_ino_t ino,uint32_t uid,uint8_t aclxattr,const char *buff,uint32_t leng) {
 	uint16_t userperm;
 	uint16_t groupperm;
 	uint16_t otherperm;
@@ -4614,7 +4614,7 @@ int mfs_setacl(fuse_req_t req,fuse_ino_t ino,uint32_t uid,uint8_t aclxattr,const
 		}
 	}
 //	fprintf(stderr,"namedacls end ptr: %p\n",(void*)p);
-	return fs_setacl(ino,uid,aclxattr,userperm,groupperm,otherperm,maskperm,namedusers,namedgroups,namedacls,(namedusers+namedgroups)*6);
+	return fs_setfacl(ino,uid,aclxattr,userperm,groupperm,otherperm,maskperm,namedusers,namedgroups,namedacls,(namedusers+namedgroups)*6);
 }
 
 #if defined(__APPLE__)
@@ -4699,7 +4699,7 @@ void mfs_setxattr (fuse_req_t req, fuse_ino_t ino, const char *name, const char 
 		return;
 	}
 	if (aclxattr) {
-		status = mfs_setacl(req,ino,ctx.uid,aclxattr,value,size);
+		status = mfs_setfacl(req,ino,ctx.uid,aclxattr,value,size);
 	} else {
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
@@ -4797,7 +4797,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	} else {
 		xattr_value_release = NULL;
 	}
-	if (full_permissions && xattr_value_release==NULL) { // and get groups only if data were not found in cache
+	if (aclxattr==0 && full_permissions && xattr_value_release==NULL) { // and get groups only if data were not found in cache
 		if (strcmp(name,"com.apple.quarantine")==0) { // special case - obtaining groups from the kernel here leads to freeze, so avoid it
 			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,1);
 		} else {
@@ -4813,13 +4813,8 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 				buff = NULL;
 				leng = 0;
 			} else {
-				if (aclxattr) {
-					if (gids!=NULL) { // full_permissions
-						status = mfs_getacl(req,ino,0,ctx.uid,gids->gidcnt,gids->gidtab,aclxattr,&buff,&leng);
-					} else {
-						uint32_t gidtmp = ctx.gid;
-						status = mfs_getacl(req,ino,0,ctx.uid,1,&gidtmp,aclxattr,&buff,&leng);
-					}
+				if (aclxattr!=0) {
+					status = mfs_getfacl(req,ino,aclxattr,&buff,&leng);
 				} else {
 					if (gids!=NULL) { // full_permissions
 						status = fs_getxattr(ino,0,ctx.uid,gids->gidcnt,gids->gidtab,nleng,(const uint8_t*)name,MFS_XATTR_GETA_DATA,&buff,&leng);
@@ -4839,13 +4834,8 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 			buff = NULL;
 			leng = 0;
 		} else {
-			if (aclxattr) {
-				if (gids!=NULL) { // full_permissions
-					status = mfs_getacl(req,ino,0,ctx.uid,gids->gidcnt,gids->gidtab,aclxattr,&buff,&leng);
-				} else {
-					uint32_t gidtmp = ctx.gid;
-					status = mfs_getacl(req,ino,0,ctx.uid,1,&gidtmp,aclxattr,&buff,&leng);
-				}
+			if (aclxattr!=0) {
+				status = mfs_getfacl(req,ino,aclxattr,&buff,&leng);
 			} else {
 				if (gids!=NULL) { // full_permissions
 					status = fs_getxattr(ino,0,ctx.uid,gids->gidcnt,gids->gidtab,nleng,(const uint8_t*)name,mode,&buff,&leng);
@@ -5013,7 +5003,7 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 	}
 	if (usecache == 0) {
 		if (aclxattr) {
-			status = fs_setacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
+			status = fs_setfacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
 		} else {
 			if (full_permissions) {
 				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
@@ -5038,7 +5028,7 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 	}
 	if (usecache) {
 		if (aclxattr) {
-			status = fs_setacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
+			status = fs_setfacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
 		} else {
 			if (full_permissions) {
 				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);

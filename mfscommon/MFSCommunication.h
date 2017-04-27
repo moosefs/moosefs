@@ -1423,20 +1423,21 @@
 // msgid:32 N*[ length:32 path:lengthB ]
 
 // 0x01E8
-#define CLTOMA_FUSE_GETACL (PROTO_BASE+488)
-// msgid:32 inode:32 acltype:8 opened:8 uid:32 gcnt:32 gcnt * [ gid:32 ]
+#define CLTOMA_FUSE_GETFACL (PROTO_BASE+488)
+// msgid:32 inode:32 acltype:8 opened:8 uid:32 gcnt:32 gcnt * [ gid:32 ] (version < 3.0.92)
+// msgid:32 inode:32 acltype:8 (version >= 3.0.92)
 
 // 0x01E9
-#define MATOCL_FUSE_GETACL (PROTO_BASE+489)
+#define MATOCL_FUSE_GETFACL (PROTO_BASE+489)
 // msgid:32 status:8
 // msgid:32 userperm:16 groupperm:16 otherperm:16 mask:16 namedusers:16 namedgroups:16 namedusers * [ id:32 perm:16 ] namedgroups * [ id:32 perm:16 ]
 
 // 0x01EA
-#define CLTOMA_FUSE_SETACL (PROTO_BASE+490)
+#define CLTOMA_FUSE_SETFACL (PROTO_BASE+490)
 // msgid:32 inode:32 uid:32 acltype:8 userperm:16 groupperm:16 otherperm:16 mask:16 namedusers:16 namedgroups:16 namedusers * [ id:32 perm:16 ] namedgroups * [ id:32 perm:16 ]
 
 // 0x01EB
-#define MATOCL_FUSE_SETACL (PROTO_BASE+491)
+#define MATOCL_FUSE_SETFACL (PROTO_BASE+491)
 // msgid:32 status:8
 
 // 0x01EC

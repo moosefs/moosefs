@@ -4,6 +4,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (master+tools) added chunk slices to mfsappendchunks
   - (tools) added archive mode tools
+  - (master+mount) fixed getfacl (unnecessary check for read rights for uid/gid)
 
 * MooseFS 3.0.91-1 (2017-04-07)
 

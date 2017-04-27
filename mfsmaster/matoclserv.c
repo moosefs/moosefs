@@ -4593,11 +4593,12 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	put8bit(&ptr,status);
 }
 
-void matoclserv_fuse_getacl(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t inode,uid,gids;
-	uint32_t *gid;
-	uint32_t i;
-	uint8_t opened;
+void matoclserv_fuse_getfacl(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t inode;
+//	uint32_t uid,gids;
+//	uint32_t *gid;
+//	uint32_t i;
+//	uint8_t opened;
 	uint32_t msgid;
 	uint8_t acltype;
 	uint8_t *ptr;
@@ -4610,14 +4611,32 @@ void matoclserv_fuse_getacl(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint16_t namedusers;
 	uint16_t namedgroups;
 	uint32_t aclleng;
-	if (length<18) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_GETACL - wrong size (%"PRIu32")",length);
+	if (length<9) {
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_GETFACL - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	acltype = get8bit(&data);
+	if (length>9) { // just sanity length check
+		if (length<18) {
+			syslog(LOG_NOTICE,"CLTOMA_FUSE_GETFACL - wrong size (%"PRIu32")",length);
+			eptr->mode = KILL;
+			return;
+		} else if (length>18) {
+			uint32_t gids;
+			data+=5;
+			gids = get32bit(&data);
+			if (length!=18+4*gids) {
+				syslog(LOG_NOTICE,"CLTOMA_FUSE_GETFACL - wrong size (%"PRIu32":gids=%"PRIu32")",length,gids);
+				eptr->mode = KILL;
+				return;
+			}
+		}
+	}
+#if 0
+	// for future use (rich acl)
 	opened = get8bit(&data);
 	uid = get32bit(&data);
 	if (length==18) {
@@ -4627,7 +4646,7 @@ void matoclserv_fuse_getacl(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	} else {
 		gids = get32bit(&data);
 		if (length!=18+4*gids) {
-			syslog(LOG_NOTICE,"CLTOMA_FUSE_GETACL - wrong size (%"PRIu32":gids=%"PRIu32")",length,gids);
+			syslog(LOG_NOTICE,"CLTOMA_FUSE_GETFACL - wrong size (%"PRIu32":gids=%"PRIu32")",length,gids);
 			eptr->mode = KILL;
 			return;
 		}
@@ -4637,13 +4656,14 @@ void matoclserv_fuse_getacl(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_getacl_size(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,opened,uid,gids,gid,acltype,&c,&aclleng);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETACL,(status!=MFS_STATUS_OK)?5:16+aclleng);
+#endif
+	status = fs_getfacl_size(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,/*opened,uid,gids,gid,*/acltype,&c,&aclleng);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETFACL,(status!=MFS_STATUS_OK)?5:16+aclleng);
 	if (status!=MFS_STATUS_OK) {
 		put32bit(&ptr,msgid);
 		put8bit(&ptr,status);
 	} else {
-		fs_getacl_data(c,&userperm,&groupperm,&otherperm,&mask,&namedusers,&namedgroups,ptr+16);
+		fs_getfacl_data(c,&userperm,&groupperm,&otherperm,&mask,&namedusers,&namedgroups,ptr+16);
 		put32bit(&ptr,msgid);
 		put16bit(&ptr,userperm);
 		put16bit(&ptr,groupperm);
@@ -4654,7 +4674,7 @@ void matoclserv_fuse_getacl(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	}
 }
 
-void matoclserv_fuse_setacl(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+void matoclserv_fuse_setfacl(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t inode;
 	uint32_t uid;
 	uint32_t msgid;
@@ -4668,7 +4688,7 @@ void matoclserv_fuse_setacl(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t *ptr;
 	uint8_t status;
 	if (length<25) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_SETACL - wrong size (%"PRIu32")",length);
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_SETFACL - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -4683,15 +4703,15 @@ void matoclserv_fuse_setacl(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	namedusers = get16bit(&data);
 	namedgroups = get16bit(&data);
 	if (length!=(namedusers+namedgroups)*6U+25U) {
-		syslog(LOG_NOTICE,"CLTOMA_FUSE_SETACL - wrong size (%"PRIu32":namedusers=%"PRIu16":namedgroups=%"PRIu16")",length,namedusers,namedgroups);
+		syslog(LOG_NOTICE,"CLTOMA_FUSE_SETFACL - wrong size (%"PRIu32":namedusers=%"PRIu16":namedgroups=%"PRIu16")",length,namedusers,namedgroups);
 		eptr->mode = KILL;
 		return;
 	}
 //	uid = get32bit(&data);
 //	gid = get32bit(&data);
 //	sessions_ugid_remap(eptr->sesdata,&uid,&gid);
-	status = fs_setacl(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,data);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETACL,5);
+	status = fs_setfacl(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,data);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETFACL,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
 }
@@ -5826,11 +5846,11 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_FUSE_SETXATTR:
 				matoclserv_fuse_setxattr(eptr,data,length);
 				break;
-			case CLTOMA_FUSE_GETACL:
-				matoclserv_fuse_getacl(eptr,data,length);
+			case CLTOMA_FUSE_GETFACL:
+				matoclserv_fuse_getfacl(eptr,data,length);
 				break;
-			case CLTOMA_FUSE_SETACL:
-				matoclserv_fuse_setacl(eptr,data,length);
+			case CLTOMA_FUSE_SETFACL:
+				matoclserv_fuse_setfacl(eptr,data,length);
 				break;
 			case CLTOMA_FUSE_QUOTACONTROL:
 				matoclserv_fuse_quotacontrol(eptr,data,length);

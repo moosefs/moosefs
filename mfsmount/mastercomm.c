@@ -4101,7 +4101,7 @@ uint8_t fs_purge(uint32_t inode) {
 	return ret;
 }
 
-uint8_t fs_getacl(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t acltype,uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *maskperm,uint16_t *namedusers,uint16_t *namedgroups,const uint8_t **namedacls,uint32_t *namedaclssize) {
+uint8_t fs_getfacl(uint32_t inode,/*uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,*/uint8_t acltype,uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *maskperm,uint16_t *namedusers,uint16_t *namedgroups,const uint8_t **namedacls,uint32_t *namedaclssize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -4112,23 +4112,35 @@ uint8_t fs_getacl(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint3
 	if (master_version()<VERSION2INT(2,0,0)) {
 		return MFS_ERROR_ENOTSUP;
 	}
-	wptr = fs_createpacket(rec,CLTOMA_FUSE_GETACL,14+4*gids);
-	if (wptr==NULL) {
-		return MFS_ERROR_IO;
-	}
-	put32bit(&wptr,inode);
-	put8bit(&wptr,acltype);
-	put8bit(&wptr,opened);
-	put32bit(&wptr,uid);
-	if (gids>0) {
-		put32bit(&wptr,gids);
-		for (i=0 ; i<gids ; i++) {
-			put32bit(&wptr,gid[i]);
+	if (master_version()<VERSION2INT(3,0,91)) {
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETFACL,14);
+		if (wptr==NULL) {
+			return MFS_ERROR_IO;
 		}
+		put32bit(&wptr,inode);
+		put8bit(&wptr,acltype);
+		put8bit(&wptr,1);
+		put32bit(&wptr,0);
+		put32bit(&wptr,0);
 	} else {
-		put32bit(&wptr,0xFFFFFFFFU);
+		wptr = fs_createpacket(rec,CLTOMA_FUSE_GETFACL,5);
+		if (wptr==NULL) {
+			return MFS_ERROR_IO;
+		}
+		put32bit(&wptr,inode);
+		put8bit(&wptr,acltype);
 	}
-	rptr = fs_sendandreceive(rec,MATOCL_FUSE_GETACL,&i);
+//	put8bit(&wptr,opened);
+//	put32bit(&wptr,uid);
+//	if (gids>0) {
+//		put32bit(&wptr,gids);
+//		for (i=0 ; i<gids ; i++) {
+//			put32bit(&wptr,gid[i]);
+//		}
+//	} else {
+//		put32bit(&wptr,0xFFFFFFFFU);
+//	}
+	rptr = fs_sendandreceive(rec,MATOCL_FUSE_GETFACL,&i);
 	if (rptr==NULL) {
 		ret = MFS_ERROR_IO;
 	} else if (i==1) {
@@ -4150,7 +4162,7 @@ uint8_t fs_getacl(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint3
 	return ret;
 }
 
-uint8_t fs_setacl(uint32_t inode,uint32_t uid,uint8_t acltype,uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t maskperm,uint16_t namedusers,uint16_t namedgroups,uint8_t *namedacls,uint32_t namedaclssize) {
+uint8_t fs_setfacl(uint32_t inode,uint32_t uid,uint8_t acltype,uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t maskperm,uint16_t namedusers,uint16_t namedgroups,uint8_t *namedacls,uint32_t namedaclssize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -4159,7 +4171,7 @@ uint8_t fs_setacl(uint32_t inode,uint32_t uid,uint8_t acltype,uint16_t userperm,
 	if (master_version()<VERSION2INT(2,0,0)) {
 		return MFS_ERROR_ENOTSUP;
 	}
-	wptr = fs_createpacket(rec,CLTOMA_FUSE_SETACL,21+namedaclssize);
+	wptr = fs_createpacket(rec,CLTOMA_FUSE_SETFACL,21+namedaclssize);
 	if (wptr==NULL) {
 		return MFS_ERROR_IO;
 	}
@@ -4173,7 +4185,7 @@ uint8_t fs_setacl(uint32_t inode,uint32_t uid,uint8_t acltype,uint16_t userperm,
 	put16bit(&wptr,namedusers);
 	put16bit(&wptr,namedgroups);
 	memcpy(wptr,namedacls,namedaclssize);
-	rptr = fs_sendandreceive(rec,MATOCL_FUSE_SETACL,&i);
+	rptr = fs_sendandreceive(rec,MATOCL_FUSE_SETFACL,&i);
 	if (rptr==NULL) {
 		ret = MFS_ERROR_IO;
 	} else if (i==1) {

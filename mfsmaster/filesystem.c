@@ -6210,7 +6210,7 @@ uint8_t fs_mr_setxattr(uint32_t ts,uint32_t inode,uint32_t anleng,const uint8_t 
 	return status;
 }
 
-uint8_t fs_setacl(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t acltype,uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t mask,uint16_t namedusers,uint16_t namedgroups,const uint8_t *aclblob) {
+uint8_t fs_setfacl(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint8_t acltype,uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t mask,uint16_t namedusers,uint16_t namedgroups,const uint8_t *aclblob) {
 	uint32_t ts;
 	uint16_t pmode;
 	fsnode *p;
@@ -6255,18 +6255,18 @@ uint8_t fs_setacl(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t ui
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_getacl_size(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t acltype,void **custom,uint32_t *aclblobsize) {
+uint8_t fs_getfacl_size(uint32_t rootinode,uint8_t sesflags,uint32_t inode,/*uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,*/uint8_t acltype,void **custom,uint32_t *aclblobsize) {
 	fsnode *p;
 	int32_t bsize;
 
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
 		return MFS_ERROR_ENOENT;
 	}
-	if (opened==0) {
-		if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_R,sesflags)) {
-			return MFS_ERROR_EACCES;
-		}
-	}
+//	if (opened==0) {
+//		if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_R,sesflags)) {
+//			return MFS_ERROR_EACCES;
+//		}
+//	}
 	if ((acltype==POSIX_ACL_ACCESS && p->aclpermflag==0) || (acltype==POSIX_ACL_DEFAULT && p->acldefflag==0)) {
 		return MFS_ERROR_ENOATTR;
 	}
@@ -6278,7 +6278,7 @@ uint8_t fs_getacl_size(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_
 	return MFS_STATUS_OK;
 }
 
-void fs_getacl_data(void *custom,uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *mask,uint16_t *namedusers,uint16_t *namedgroups,uint8_t *aclblob) {
+void fs_getfacl_data(void *custom,uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *mask,uint16_t *namedusers,uint16_t *namedgroups,uint8_t *aclblob) {
 	posix_acl_get_data(custom,userperm,groupperm,otherperm,mask,namedusers,namedgroups,aclblob);
 }
 

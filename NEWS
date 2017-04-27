@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.92-1 (WIP)
+* MooseFS 3.0.92-1 (2017-04-27)
 
   - (master+tools) added chunk slices to mfsappendchunks
   - (tools) added archive mode tools

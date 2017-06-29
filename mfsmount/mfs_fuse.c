@@ -39,6 +39,12 @@
 #include <syslog.h>
 #include <inttypes.h>
 #include <pthread.h>
+#ifdef HAVE_SYS_XATTR_H
+#include <sys/xattr.h>
+#endif
+#ifdef HAVE_ATTR_XATTR_H
+#include <attr/xattr.h>
+#endif
 
 #include "stats.h"
 #include "oplog.h"
@@ -65,6 +71,14 @@
 
 #if MFS_ROOT_ID != FUSE_ROOT_ID
 #error FUSE_ROOT_ID is not equal to MFS_ROOT_ID
+#endif
+
+/* check for well known constants and define them if necessary */
+#ifndef XATTR_CREATE
+#define XATTR_CREATE 1
+#endif
+#ifndef XATTR_REPLACE
+#define XATTR_REPLACE 2
 #endif
 
 #if defined(__FreeBSD__)
@@ -4643,32 +4657,28 @@ void mfs_setxattr (fuse_req_t req, fuse_ino_t ino, const char *name, const char 
 		fuse_reply_err(req,EINVAL);
 		return;
 	}
-#if defined(XATTR_CREATE) && defined(XATTR_REPLACE)
 	if ((flags&XATTR_CREATE) && (flags&XATTR_REPLACE)) {
 		oplog_printf(&ctx,"setxattr (%lu,%s,%llu,%d): %s",(unsigned long int)ino,name,(unsigned long long int)size,flags,strerr(EINVAL));
 		fuse_reply_err(req,EINVAL);
 		return;
 	}
 	mode = (flags==XATTR_CREATE)?MFS_XATTR_CREATE_ONLY:(flags==XATTR_REPLACE)?MFS_XATTR_REPLACE_ONLY:MFS_XATTR_CREATE_OR_REPLACE;
-#else
-	mode = 0;
-#endif
-	aclxattr = 0;
+	aclxattr = POSIX_ACL_NONE;
 	if (strcmp(name,"system.posix_acl_access")==0) {
-		aclxattr=1;
+		aclxattr = POSIX_ACL_ACCESS;
 	} else if (strcmp(name,"system.posix_acl_default")==0) {
-		aclxattr=2;
+		aclxattr = POSIX_ACL_DEFAULT;
 	}
 	(void)position;
 	if (xattr_cache_on) {
 		xattr_cache_del(ino,nleng,(const uint8_t*)name);
 	}
-	if (aclxattr && xattr_acl_support==0) {
+	if (aclxattr!=POSIX_ACL_NONE && xattr_acl_support==0) {
 		oplog_printf(&ctx,"setxattr (%lu,%s,%llu,%d): %s",(unsigned long int)ino,name,(unsigned long long int)size,flags,strerr(ENOTSUP));
 		fuse_reply_err(req,ENOTSUP);
 		return;
 	}
-	if (aclxattr) {
+	if (aclxattr!=POSIX_ACL_NONE) {
 		status = mfs_setfacl(req,ino,ctx.uid,aclxattr,value,size);
 	} else {
 		if (full_permissions) {
@@ -4750,13 +4760,13 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	} else {
 		mode = MFS_XATTR_GETA_DATA;
 	}
-	aclxattr = 0;
+	aclxattr = POSIX_ACL_NONE;
 	if (strcmp(name,"system.posix_acl_access")==0) {
-		aclxattr=1;
+		aclxattr = POSIX_ACL_ACCESS;
 	} else if (strcmp(name,"system.posix_acl_default")==0) {
-		aclxattr=2;
+		aclxattr = POSIX_ACL_DEFAULT;
 	}
-	if (aclxattr && xattr_acl_support==0) {
+	if (aclxattr!=POSIX_ACL_NONE && xattr_acl_support==0) {
 		oplog_printf(&ctx,"getxattr (%lu,%s,%llu): %s",(unsigned long int)ino,name,(unsigned long long int)size,strerr(ENOTSUP));
 		fuse_reply_err(req,ENOTSUP);
 		return;
@@ -4767,7 +4777,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	} else {
 		xattr_value_release = NULL;
 	}
-	if (aclxattr==0 && full_permissions && xattr_value_release==NULL) { // and get groups only if data were not found in cache
+	if (aclxattr==POSIX_ACL_NONE && full_permissions && xattr_value_release==NULL) { // and get groups only if data were not found in cache
 		if (strcmp(name,"com.apple.quarantine")==0) { // special case - obtaining groups from the kernel here leads to freeze, so avoid it
 			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,1);
 		} else {
@@ -4783,7 +4793,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 				buff = NULL;
 				leng = 0;
 			} else {
-				if (aclxattr!=0) {
+				if (aclxattr!=POSIX_ACL_NONE) {
 					status = mfs_getfacl(req,ino,aclxattr,&buff,&leng);
 				} else {
 					if (gids!=NULL) { // full_permissions
@@ -4804,7 +4814,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 			buff = NULL;
 			leng = 0;
 		} else {
-			if (aclxattr!=0) {
+			if (aclxattr!=POSIX_ACL_NONE) {
 				status = mfs_getfacl(req,ino,aclxattr,&buff,&leng);
 			} else {
 				if (gids!=NULL) { // full_permissions
@@ -4874,6 +4884,7 @@ void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 	} else {
 		mode = MFS_XATTR_GETA_DATA;
 	}
+	// posix_acl_XXX are not added here - on purpose (on XFS getfattr doesn't list those ACL-like xattrs)
 	if (usedircache && dcache_getattr(&ctx,ino,attr) && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
 		status = MFS_STATUS_OK;
 		buff = NULL;
@@ -4932,13 +4943,13 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 		fuse_reply_err(req,EPERM);
 		return;
 	}
-	aclxattr = 0;
+	aclxattr = POSIX_ACL_NONE;
 	if (strcmp(name,"system.posix_acl_access")==0) {
-		aclxattr=1;
+		aclxattr = POSIX_ACL_ACCESS;
 	} else if (strcmp(name,"system.posix_acl_default")==0) {
-		aclxattr=2;
+		aclxattr = POSIX_ACL_DEFAULT;
 	}
-	if (aclxattr && xattr_acl_support==0) {
+	if (aclxattr!=POSIX_ACL_NONE && xattr_acl_support==0) {
 		oplog_printf(&ctx,"removexattr (%lu,%s): %s",(unsigned long int)ino,name,strerr(ENOTSUP));
 		fuse_reply_err(req,ENOTSUP);
 		return;
@@ -4972,7 +4983,7 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 		}
 	}
 	if (usecache == 0) {
-		if (aclxattr) {
+		if (aclxattr!=POSIX_ACL_NONE) {
 			status = fs_setfacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
 		} else {
 			if (full_permissions) {
@@ -4997,7 +5008,7 @@ void mfs_removexattr (fuse_req_t req, fuse_ino_t ino, const char *name) {
 		fuse_reply_err(req,0);
 	}
 	if (usecache) {
-		if (aclxattr) {
+		if (aclxattr!=POSIX_ACL_NONE) {
 			status = fs_setfacl(ino,ctx.uid,aclxattr,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0,0,NULL,0);
 		} else {
 			if (full_permissions) {

@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.94-1 (2017-06-22)
+
+  - (mount) fixed support for CREATE/REPLACE flags in setxattr
+
 * MooseFS 3.0.93-1 (2017-06-01)
 
   - (master) redesigned xattr storage (much faster and uses less memory)

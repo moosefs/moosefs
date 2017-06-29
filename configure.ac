@@ -185,6 +185,10 @@ AC_CHECK_FUNCS([dup2 mlockall getcwd])
 AC_CHECK_HEADERS([sys/mman.h], [AC_CHECK_FUNCS([mmap])])
 dnl AC_CHECK_HEADERS([sys/mman.h])
 
+# check for xattr support
+AC_CHECK_HEADERS([attr/xattr.h])
+AC_CHECK_HEADERS([sys/xattr.h])
+
 # optional I/O functions
 AC_CHECK_FUNCS([pread pwrite readv writev])
 

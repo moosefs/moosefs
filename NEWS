@@ -8,6 +8,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed using fsync on closed descriptors (after change FSYNC_BEFORE_CLOSE option)
   - (master) fixed removing default acl
   - (master+mount) added support for basic Windows attributes (hidden,ro,system,archive)
+  - (cgi+cli) fixed working with followers only
 
 * MooseFS 3.0.92-1 (2017-04-27)
 

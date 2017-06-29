@@ -1856,6 +1856,9 @@ for mhost,mport in masterlist:
 						if sync==0:
 							statestr += " (DESYNC)"
 						followerfound = 1
+						followerconn = conn
+						followerinfo = data
+						follower_exports_checksum = exports_checksum
 					if workingstate==STATE_ELECT and electfound==0:
 						electfound = 1
 						electconn = conn
@@ -1895,6 +1898,11 @@ elif electfound:
 	masterinfo = electinfo
 	masterispro = 1
 	master_exports_checksum = elect_exports_checksum
+elif followerfound:
+	masterconn = followerconn
+	masterinfo = followerinfo
+	masterispro = 1
+	master_exports_checksum = follower_exports_checksum
 else:
 	masterconn = None
 	master_exports_checksum = 0
@@ -2359,6 +2367,29 @@ if leaderfound==0:
 		else:
 			print("Working master servers not found !!! - maybe you are using wrong port number or wrong dns name")
 	needseparator=1
+
+if not cgimode:
+	if leaderfound:
+		if masterconn.version_less_than(1,7,0):
+			allowedsections = ["IN","CS","HD","EX","MS","MO","MC","CC"]
+		elif masterconn.version_less_than(2,1,0):
+			allowedsections = ["IN","CS","HD","EX","MS","MO","QU","MC","CC"]
+		else:
+			allowedsections = ["IN","CS","HD","EX","MS","MO","RS","QU","MC","CC"]
+	elif electfound:
+		allowedsections = ["IN","CS","HD","EX","QU","MC","CC"]
+	elif followerfound:
+		allowedsections = ["IN","MC"]
+	else:
+		allowedsections = ["IN"]
+
+	filtered_sectionset = []
+	for section in sectionset:
+		if section in allowedsections:
+			filtered_sectionset.append(section)
+		else:
+			print("""section '%s' not allowed""" % section)
+	sectionset = filtered_sectionset
 
 # parse cgi parameters
 if cgimode:

@@ -423,7 +423,7 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 			fprintf(stderr,"%.6lf: readworker end (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" - rreq->mode: NEW->INQUEUE\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,ind->inode);
 #endif
 			rreq->mode=INQUEUE;
-		        read_delayed_enqueue(rreq,delay);
+			read_delayed_enqueue(rreq,delay);
 			ind->inqueue++;
 		}
 #ifdef RDEBUG
@@ -435,13 +435,13 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: readworker end (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" - rreq->mode: NEW->INQUEUE\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,ind->inode);
 #endif
-		                // read_delayed_enqueue(rreq,delay);
-		                read_enqueue(rreq);
+				// read_delayed_enqueue(rreq,delay);
+				read_enqueue(rreq);
 				ind->inqueue++;
 			}
 		}
-        }
-        zassert(pthread_mutex_unlock(&(ind->lock)));
+	}
+	zassert(pthread_mutex_unlock(&(ind->lock)));
 }
 
 void* read_worker(void *arg);
@@ -1156,7 +1156,7 @@ void* read_worker(void *arg) {
 			closing = (ind->closing>0)?1:0;
 			mode = rreq->mode;
 			zassert(pthread_mutex_unlock(&(ind->lock)));
-			if (pfd[1].revents&POLLIN) {    // used just to break poll - so just read all data from pipe to empty it
+			if (pfd[1].revents&POLLIN) { // used just to break poll - so just read all data from pipe to empty it
 #ifdef RDEBUG
 				fprintf(stderr,"%.6lf: readworker: %"PRIu32" woken up by pipe\n",monotonic_seconds(),inode);
 #endif
@@ -1239,7 +1239,7 @@ void* read_worker(void *arg) {
 					if (received == 8) { // full header
 						rptr = recvbuff;
 
-					        reccmd = get32bit(&rptr);
+						reccmd = get32bit(&rptr);
 						recleng = get32bit(&rptr);
 						if (reccmd==CSTOCL_READ_STATUS) {
 							if (recleng!=9) {
@@ -1485,7 +1485,7 @@ void read_data_ranges_free(void* ptr) {
 }
 
 void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t timeout,uint32_t logretry) {
-        uint32_t i;
+	uint32_t i;
 	size_t mystacksize;
 //	sigset_t oldset;
 //	sigset_t newset;
@@ -1519,7 +1519,7 @@ void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t read
 //	dqueue = queue_new(0);
 	jqueue = queue_new(0);
 
-        zassert(pthread_attr_init(&worker_thattr));
+	zassert(pthread_attr_init(&worker_thattr));
 #ifdef PTHREAD_STACK_MIN
 	mystacksize = PTHREAD_STACK_MIN;
 	if (mystacksize < 0x20000) {
@@ -1528,7 +1528,7 @@ void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t read
 #else
 	mystacksize = 0x20000;
 #endif
-        zassert(pthread_attr_setstacksize(&worker_thattr,mystacksize));
+	zassert(pthread_attr_setstacksize(&worker_thattr,mystacksize));
 
 //	sigemptyset(&newset);
 //	sigaddset(&newset, SIGTERM);
@@ -1549,7 +1549,7 @@ void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t read
 //	fprintf(stderr,"spawn worker (avail:%"PRIu32" ; total:%"PRIu32")\n",workers_avail,workers_total);
 
 //#ifdef BUFFER_DEBUG
-//        pthread_create(&info_worker_th,&thattr,read_info_worker,NULL);
+//	pthread_create(&info_worker_th,&thattr,read_info_worker,NULL);
 //#endif
 //	for (i=0 ; i<WORKERS ; i++) {
 //		zassert(pthread_create(read_worker_th+i,&thattr,read_worker,(void*)(unsigned long)(i)));
@@ -1587,8 +1587,8 @@ void read_data_term(void) {
 	zassert(pthread_mutex_unlock(&inode_lock));
 	zassert(pthread_attr_destroy(&worker_thattr));
 	zassert(pthread_cond_destroy(&worker_term_cond));
-        zassert(pthread_mutex_destroy(&workers_lock));
-        zassert(pthread_mutex_destroy(&inode_lock));
+	zassert(pthread_mutex_destroy(&workers_lock));
+	zassert(pthread_mutex_destroy(&inode_lock));
 #ifndef HAVE___SYNC_OP_AND_FETCH
 	zassert(pthread_mutex_destroy(&buffsizelock));
 #endif

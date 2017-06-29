@@ -33,6 +33,7 @@
 
 #include "strerr.h"
 
+#define uassert(msg) (fprintf(stderr,"%s:%u - unexpected event: %s\n",__FILE__,(unsigned)__LINE__,(msg)),syslog(LOG_ERR,"%s:%u - unexpected event: %s",__FILE__,(unsigned)__LINE__,(msg)),abort())
 #define massert(e,msg) ((e) ? (void)0 : (fprintf(stderr,"%s:%u - failed assertion '%s' : %s\n",__FILE__,(unsigned)__LINE__,#e,(msg)),syslog(LOG_ERR,"%s:%u - failed assertion '%s' : %s",__FILE__,(unsigned)__LINE__,#e,(msg)),abort()))
 #define sassert(e) ((e) ? (void)0 : (fprintf(stderr,"%s:%u - failed assertion '%s'\n",__FILE__,(unsigned)__LINE__,#e),syslog(LOG_ERR,"%s:%u - failed assertion '%s'",__FILE__,(unsigned)__LINE__,#e),abort()))
 #define passert(ptr) if (ptr==NULL) { \

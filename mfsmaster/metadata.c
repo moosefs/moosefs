@@ -822,7 +822,7 @@ void meta_cleanup(void) {
 	fflush(stderr);
 	sclass_cleanup();
 	fprintf(stderr,"done\n");
-	fprintf(stderr,"cleaning dictioanry data ...");
+	fprintf(stderr,"cleaning dictionary data ...");
 	fflush(stderr);
 	dict_cleanup();
 	fprintf(stderr,"done\n");

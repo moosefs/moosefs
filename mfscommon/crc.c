@@ -143,7 +143,7 @@ uint32_t mycrc32(uint32_t crc,const uint8_t *block,uint32_t leng) {
 #define CRC_EIGHT_BYTES { \
 	crc = (*block4++) ^ crc; \
 	next = (*block4++); \
-       	crc = crc_table[0][next>>24] ^ crc_table[1][(next>>16)&0xFF] ^ crc_table[2][(next>>8)&0xFF] ^ crc_table[3][next&0xFF] ^ crc_table[4][crc>>24] ^ crc_table[5][(crc>>16)&0xFF] ^ crc_table[6][(crc>>8)&0xFF] ^ crc_table[7][crc&0xFF]; \
+	crc = crc_table[0][next>>24] ^ crc_table[1][(next>>16)&0xFF] ^ crc_table[2][(next>>8)&0xFF] ^ crc_table[3][next&0xFF] ^ crc_table[4][crc>>24] ^ crc_table[5][(crc>>16)&0xFF] ^ crc_table[6][(crc>>8)&0xFF] ^ crc_table[7][crc&0xFF]; \
 }
 #endif
 	CRC_REORDER;

@@ -111,7 +111,7 @@ uint64_t monotonic_nseconds() {
 }
 
 uint64_t monotonic_useconds() {
-	        return monotonic_nseconds()/1000;
+	return monotonic_nseconds()/1000;
 }
 
 const char* monotonic_method() {

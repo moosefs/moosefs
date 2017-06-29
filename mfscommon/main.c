@@ -681,6 +681,7 @@ static int ignoresignal[]={
 };
 
 static int alarmsignal[]={
+#ifndef GPERFTOOLS
 #ifdef SIGALRM
 	SIGALRM,
 #endif
@@ -689,6 +690,7 @@ static int alarmsignal[]={
 #endif
 #ifdef SIGPROF
 	SIGPROF,
+#endif
 #endif
 	-1
 };

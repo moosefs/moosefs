@@ -434,7 +434,7 @@ void* job_pool_new(uint32_t jobs) {
 	if (pipe(fd)<0) {
 		return NULL;
 	}
-       	jp=malloc(sizeof(jobpool));
+	jp=malloc(sizeof(jobpool));
 	passert(jp);
 //	syslog(LOG_WARNING,"new pool of workers (%p:%"PRIu8")",(void*)jp,workers);
 	jp->rpipe = fd[0];

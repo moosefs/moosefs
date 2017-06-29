@@ -58,6 +58,9 @@ void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount
 
 uint8_t hdd_is_rebalance_on(void);
 
+/* emergency chunk read - ignore errors, do retries */
+int hdd_emergency_read(uint64_t chunkid,uint32_t *version,uint16_t blocknum,uint8_t buffer[MFSBLOCKSIZE],uint8_t retries,uint8_t *errorflags);
+
 /* I/O operations */
 int hdd_open(uint64_t chunkid,uint32_t version);
 int hdd_close(uint64_t chunkid);
@@ -73,13 +76,13 @@ int hdd_get_checksum_tab(uint64_t chunkid, uint32_t version, uint8_t *checksum_t
 /* chunk operations */
 
 /* all chunk operations in one call */
-// newversion>0 && length==0xFFFFFFFF && copychunkid==0    -> change version
-// newversion>0 && length==0xFFFFFFFF && copychunkid>0     -> duplicate
+// newversion>0 && length==0xFFFFFFFF && copychunkid==0       -> change version
+// newversion>0 && length==0xFFFFFFFF && copychunkid>0        -> duplicate
 // newversion>0 && length<=MFSCHUNKSIZE && copychunkid==0     -> truncate
 // newversion>0 && length<=MFSCHUNKSIZE && copychunkid>0      -> duplicate and truncate
-// newversion==0 && length==0                              -> delete
-// newversion==0 && length==1                              -> create
-// newversion==0 && length==2                              -> test
+// newversion==0 && length==0                                 -> delete
+// newversion==0 && length==1                                 -> create
+// newversion==0 && length==2                                 -> test
 int hdd_chunkop(uint64_t chunkid,uint32_t version,uint32_t newversion,uint64_t copychunkid,uint32_t copyversion,uint32_t length);
 
 #define hdd_delete(_chunkid,_version) hdd_chunkop(_chunkid,_version,0,0,0,0)

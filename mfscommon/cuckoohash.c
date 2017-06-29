@@ -342,7 +342,7 @@ void* chash_find(void *h,hash_key_t x) {
 	hentry *he;
 	uint32_t i,hash;
 
-       	hash = HASHFN1(x,ht->mask);
+	hash = HASHFN1(x,ht->mask);
 	if (hash >= ht->rehashpos) {
 		hash = hash & (ht->mask>>1);
 	}
@@ -353,7 +353,7 @@ void* chash_find(void *h,hash_key_t x) {
 		}
 	}
 
-       	hash = HASHFN2(x,ht->mask);
+	hash = HASHFN2(x,ht->mask);
 	if (hash >= ht->rehashpos) {
 		hash = hash & (ht->mask>>1);
 	}
@@ -418,11 +418,11 @@ void chash_add(void *h,hash_key_t x,void *v) {
 
 	hash_rehash_job(ht);
 
-       	hash1 = HASHFN1(x,ht->mask);
+	hash1 = HASHFN1(x,ht->mask);
 	if (hash1 >= ht->rehashpos) {
 		hash1 = hash1 & (ht->mask>>1);
 	}
-       	hash2 = HASHFN2(x,ht->mask);
+	hash2 = HASHFN2(x,ht->mask);
 	if (hash2 >= ht->rehashpos) {
 		hash2 = hash2 & (ht->mask>>1);
 	}

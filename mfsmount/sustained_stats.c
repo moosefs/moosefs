@@ -260,9 +260,9 @@ void sstats_init(void) {
 	}
 
 #ifdef HAVE___SYNC_FETCH_AND_OP
-        __sync_fetch_and_and(&term,0);
+	__sync_fetch_and_and(&term,0);
 #else
-        zassert(pthread_mutex_init(&glock,NULL));
+	zassert(pthread_mutex_init(&glock,NULL));
 	zassert(pthread_mutex_lock(&glock));
 	term = 0;
 	zassert(pthread_mutex_unlock(&glock));

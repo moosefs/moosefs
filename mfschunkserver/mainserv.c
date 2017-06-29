@@ -118,7 +118,7 @@ static inline void mainserv_bytesout(uint64_t bytes) {
 
 static inline int32_t mainserv_toread(int sock,uint8_t *ptr,uint32_t leng,uint32_t timeout) {
 	int32_t r;
-       	r = tcptoread(sock,ptr,leng,timeout);
+	r = tcptoread(sock,ptr,leng,timeout);
 	if (r>0) {
 		mainserv_bytesin(r);
 	}
@@ -127,7 +127,7 @@ static inline int32_t mainserv_toread(int sock,uint8_t *ptr,uint32_t leng,uint32
 
 static inline int32_t mainserv_towrite(int sock,const uint8_t *ptr,uint32_t leng,uint32_t timeout) {
 	int32_t r;
-       	r = tcptowrite(sock,ptr,leng,timeout);
+	r = tcptowrite(sock,ptr,leng,timeout);
 	if (r>0) {
 		mainserv_bytesout(r);
 	}
@@ -1291,7 +1291,7 @@ uint8_t mainserv_hdd_list_v1(int sock,const uint8_t *data,uint32_t length) {
 		syslog(LOG_NOTICE,"CLTOCS_HDD_LIST(1) - wrong size (%"PRIu32"/0)",length);
 		return 0;
 	}
-	l = hdd_diskinfo_v1_size();     // lock
+	l = hdd_diskinfo_v1_size();      // lock
 	packet = mainserv_create_packet(&wptr,CSTOCL_HDD_LIST_V1,l);
 	hdd_diskinfo_v1_data(wptr);      // unlock
 	return mainserv_send_and_free(sock,packet,l);
@@ -1306,7 +1306,7 @@ uint8_t mainserv_hdd_list_v2(int sock,const uint8_t *data,uint32_t length) {
 		syslog(LOG_NOTICE,"CLTOCS_HDD_LIST(2) - wrong size (%"PRIu32"/0)",length);
 		return 0;
 	}
-	l = hdd_diskinfo_v2_size();     // lock
+	l = hdd_diskinfo_v2_size();      // lock
 	packet = mainserv_create_packet(&wptr,CSTOCL_HDD_LIST_V2,l);
 	hdd_diskinfo_v2_data(wptr);      // unlock
 	return mainserv_send_and_free(sock,packet,l);

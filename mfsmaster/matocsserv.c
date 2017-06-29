@@ -757,7 +757,7 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
 			allcsids[*allcscnt] = eptr->csid;
 			(*allcscnt)++;
-		       	if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
+			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
 				totalcnt++;
 				olcsids[*olcscnt] = eptr->csid;
 				(*olcscnt)++;
@@ -823,7 +823,7 @@ uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *over
 
 	for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
 		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
-		       	if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
+			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
 				totalcnt++;
 				if ((eptr->privflag & 2) == 0) {
 	//			if (eptr->cancreatechunks) {
@@ -881,7 +881,7 @@ uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replim
 	for (eptr = matocsservhead ; eptr && j<MAXCSCOUNT; eptr=eptr->next) {
 		a = ((uint32_t)(eptr->csid*UINT32_C(0x9874BF31)+now*UINT32_C(0xB489FC37)))/4294967296.0;
 		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(eptr->totalspace/100) && eptr->csptr!=NULL) {
-		       	if ((eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0) {
+			if ((eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0) {
 				if (eptr->wrepcounter+a<replimit) {
 					csids[j] = eptr->csid;
 					j++;

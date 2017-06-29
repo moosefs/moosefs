@@ -1316,7 +1316,7 @@ void* write_worker(void *arg) {
 					recchunkid = get64bit(&rptr);
 					recwriteid = get32bit(&rptr);
 					recstatus = get8bit(&rptr);
-					if (reccmd!=CSTOCL_WRITE_STATUS ||  recleng!=13) {
+					if (reccmd!=CSTOCL_WRITE_STATUS || recleng!=13) {
 						syslog(LOG_WARNING,"writeworker: got unrecognized packet from chunkserver (cmd:%"PRIu32",leng:%"PRIu32")",reccmd,recleng);
 						status=EIO;
 						break;
@@ -1527,7 +1527,7 @@ void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint3
 //	dqueue = queue_new(0);
 	jqueue = queue_new(0);
 
-        zassert(pthread_attr_init(&worker_thattr));
+	zassert(pthread_attr_init(&worker_thattr));
 #ifdef PTHREAD_STACK_MIN
 	mystacksize = PTHREAD_STACK_MIN;
 	if (mystacksize < 0x20000) {
@@ -1536,7 +1536,7 @@ void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint3
 #else
 	mystacksize = 0x20000;
 #endif
-        zassert(pthread_attr_setstacksize(&worker_thattr,mystacksize));
+	zassert(pthread_attr_setstacksize(&worker_thattr,mystacksize));
 
 //	sigemptyset(&newset);
 //	sigaddset(&newset, SIGTERM);

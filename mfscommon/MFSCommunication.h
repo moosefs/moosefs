@@ -207,43 +207,43 @@
 	"Class in use", \
 	"Unknown MFS error"
 
-#define SCLASS_CHG_ADMIN_ONLY        0x0001
-#define SCLASS_CHG_CREATE_MODE       0x0002
-#define SCLASS_CHG_CREATE_MASKS      0x0004
-#define SCLASS_CHG_KEEP_MASKS        0x0008
-#define SCLASS_CHG_ARCH_MASKS        0x0010
-#define SCLASS_CHG_ARCH_DELAY        0x0020
-#define SCLASS_CHG_FORCE             0x8000
+#define SCLASS_CHG_ADMIN_ONLY              0x0001
+#define SCLASS_CHG_CREATE_MODE             0x0002
+#define SCLASS_CHG_CREATE_MASKS            0x0004
+#define SCLASS_CHG_KEEP_MASKS              0x0008
+#define SCLASS_CHG_ARCH_MASKS              0x0010
+#define SCLASS_CHG_ARCH_DELAY              0x0020
+#define SCLASS_CHG_FORCE                   0x8000
 
 /* type for readdir command */
-#define DISP_TYPE_FILE         'f'
-#define DISP_TYPE_DIRECTORY    'd'
-#define DISP_TYPE_SYMLINK      'l'
-#define DISP_TYPE_FIFO         'q'
-#define DISP_TYPE_BLOCKDEV     'b'
-#define DISP_TYPE_CHARDEV      'c'
-#define DISP_TYPE_SOCKET       's'
+#define DISP_TYPE_FILE                     'f'
+#define DISP_TYPE_DIRECTORY                'd'
+#define DISP_TYPE_SYMLINK                  'l'
+#define DISP_TYPE_FIFO                     'q'
+#define DISP_TYPE_BLOCKDEV                 'b'
+#define DISP_TYPE_CHARDEV                  'c'
+#define DISP_TYPE_SOCKET                   's'
 // 't' and 'r' are only for internal master use - they are in readdir shown as 'f'
-#define DISP_TYPE_TRASH        't'
-#define DISP_TYPE_SUSTAINED    'r'
-#define DISP_TYPE_UNKNOWN      '?'
+#define DISP_TYPE_TRASH                    't'
+#define DISP_TYPE_SUSTAINED                'r'
+#define DISP_TYPE_UNKNOWN                  '?'
 
-#define DISP_TYPE_REMAP_STR    "?fdlqbcstr??????"
+#define DISP_TYPE_REMAP_STR                "?fdlqbcstr??????"
 
-#define TYPE_FILE              1
-#define TYPE_DIRECTORY         2
-#define TYPE_SYMLINK           3
-#define TYPE_FIFO              4
-#define TYPE_BLOCKDEV          5
-#define TYPE_CHARDEV           6
-#define TYPE_SOCKET            7
-#define TYPE_TRASH             8
-#define TYPE_SUSTAINED         9
+#define TYPE_FILE                          1
+#define TYPE_DIRECTORY                     2
+#define TYPE_SYMLINK                       3
+#define TYPE_FIFO                          4
+#define TYPE_BLOCKDEV                      5
+#define TYPE_CHARDEV                       6
+#define TYPE_SOCKET                        7
+#define TYPE_TRASH                         8
+#define TYPE_SUSTAINED                     9
 
-// mode mask:  "modemask" field in "CLTOMA_FUSE_ACCESS"
-#define MODE_MASK_R            4
-#define MODE_MASK_W            2
-#define MODE_MASK_X            1
+// mode mask: "modemask" field in "CLTOMA_FUSE_ACCESS"
+#define MODE_MASK_R                        4
+#define MODE_MASK_W                        2
+#define MODE_MASK_X                        1
 
 // flags: "setmask" field in "CLTOMA_FUSE_SETATTR"
 // SET_GOAL_FLAG,SET_DELETE_FLAG are no longer supported
@@ -255,101 +255,97 @@
 // SET_CURRENTTIME_FLAG - version > 2.1.12
 
 // lookup.lflags (acl's must be checked separatelly - A:r,B:w doesn't give user belonging to A and B both r and w rights)
-#define LOOKUP_ACCESS_MODE_0   0x0001
-#define LOOKUP_ACCESS_MODE_X   0x0002
-#define LOOKUP_ACCESS_MODE_W   0x0004
-#define LOOKUP_ACCESS_MODE_WX  0x0008
-#define LOOKUP_ACCESS_MODE_R   0x0010
-#define LOOKUP_ACCESS_MODE_RX  0x0020
-#define LOOKUP_ACCESS_MODE_RW  0x0040
-#define LOOKUP_ACCESS_MODE_RWX 0x0080
-#define LOOKUP_ACCESS_BITS     0x00FF
-#define LOOKUP_CHUNK_ZERO_DATA 0x0100
+#define LOOKUP_ACCESS_MODE_0               0x0001
+#define LOOKUP_ACCESS_MODE_X               0x0002
+#define LOOKUP_ACCESS_MODE_W               0x0004
+#define LOOKUP_ACCESS_MODE_WX              0x0008
+#define LOOKUP_ACCESS_MODE_R               0x0010
+#define LOOKUP_ACCESS_MODE_RX              0x0020
+#define LOOKUP_ACCESS_MODE_RW              0x0040
+#define LOOKUP_ACCESS_MODE_RWX             0x0080
+#define LOOKUP_ACCESS_BITS                 0x00FF
+#define LOOKUP_CHUNK_ZERO_DATA             0x0100
 
 // combinations of MODE_MASK to LOOKUP_ACCESS_MODE
 #define MODE_TO_ACCMODE {0x01,0x03,0x05,0x0F,0x11,0x33,0x55,0xFF}
 
-// #define SET_GOAL_FLAG          0x0001
-#define SET_INVAL_FLAG         0x01
-#define SET_MODE_FLAG          0x02
-#define SET_UID_FLAG           0x04
-#define SET_GID_FLAG           0x08
-// #define SET_LENGTH_FLAG        0x0010
-#define SET_MTIME_NOW_FLAG     0x10
-#define SET_MTIME_FLAG         0x20
-#define SET_ATIME_FLAG         0x40
-#define SET_ATIME_NOW_FLAG     0x80
-// #define SET_OPENED_FLAG        0x0080
-// #define SET_DELETE_FLAG        0x0100
+#define SET_WINATTR_FLAG                   0x01
+#define SET_MODE_FLAG                      0x02
+#define SET_UID_FLAG                       0x04
+#define SET_GID_FLAG                       0x08
+#define SET_MTIME_NOW_FLAG                 0x10
+#define SET_MTIME_FLAG                     0x20
+#define SET_ATIME_FLAG                     0x40
+#define SET_ATIME_NOW_FLAG                 0x80
 
 // check.type:
-#define CHECK_VALID            0
-#define CHECK_MARKEDFORREMOVAL 1
-#define CHECK_WRONGVERSION     2
-#define CHECK_WV_AND_MFR       3
-#define CHECK_INVALID          4
+#define CHECK_VALID                        0
+#define CHECK_MARKEDFORREMOVAL             1
+#define CHECK_WRONGVERSION                 2
+#define CHECK_WV_AND_MFR                   3
+#define CHECK_INVALID                      4
 
 // flock.cmd:
-#define FLOCK_UNLOCK           0
-#define FLOCK_TRY_SHARED       1
-#define FLOCK_LOCK_SHARED      2
-#define FLOCK_TRY_EXCLUSIVE    3
-#define FLOCK_LOCK_EXCLUSIVE   4
-#define FLOCK_INTERRUPT        5
-#define FLOCK_RELEASE          6
+#define FLOCK_UNLOCK                       0
+#define FLOCK_TRY_SHARED                   1
+#define FLOCK_LOCK_SHARED                  2
+#define FLOCK_TRY_EXCLUSIVE                3
+#define FLOCK_LOCK_EXCLUSIVE               4
+#define FLOCK_INTERRUPT                    5
+#define FLOCK_RELEASE                      6
 
 // posix_locks.cmd:
-#define POSIX_LOCK_CMD_GET     0
-#define POSIX_LOCK_CMD_SET     1
-#define POSIX_LOCK_CMD_TRY     2
-#define POSIX_LOCK_CMD_INT     3
+#define POSIX_LOCK_CMD_GET                 0
+#define POSIX_LOCK_CMD_SET                 1
+#define POSIX_LOCK_CMD_TRY                 2
+#define POSIX_LOCK_CMD_INT                 3
 
 // posix_locks.type:
-#define POSIX_LOCK_UNLCK       0
-#define POSIX_LOCK_RDLCK       1
-#define POSIX_LOCK_WRLCK       2
+#define POSIX_LOCK_UNLCK                   0
+#define POSIX_LOCK_RDLCK                   1
+#define POSIX_LOCK_WRLCK                   2
 
 // dtypes:
-#define DTYPE_UNKNOWN          0
-#define DTYPE_TRASH            1
-#define DTYPE_SUSTAINED        2
-#define DTYPE_ISVALID(x)       (((uint32_t)(x))<=2)
+#define DTYPE_UNKNOWN                      0
+#define DTYPE_TRASH                        1
+#define DTYPE_SUSTAINED                    2
+#define DTYPE_ISVALID(x)                   (((uint32_t)(x))<=2)
 
 // smode:
-#define SMODE_SET              0
-#define SMODE_INCREASE         1
-#define SMODE_DECREASE         2
-#define SMODE_EXCHANGE         3
-#define SMODE_RSET             4
-#define SMODE_RINCREASE        5
-#define SMODE_RDECREASE        6
-#define SMODE_REXCHANGE        7
-#define SMODE_TMASK            3
-#define SMODE_RMASK            4
-#define SMODE_ISVALID(x)       (((uint32_t)(x))<=7)
+#define SMODE_SET                          0
+#define SMODE_INCREASE                     1
+#define SMODE_DECREASE                     2
+#define SMODE_EXCHANGE                     3
+#define SMODE_RSET                         4
+#define SMODE_RINCREASE                    5
+#define SMODE_RDECREASE                    6
+#define SMODE_REXCHANGE                    7
+#define SMODE_TMASK                        3
+#define SMODE_RMASK                        4
+#define SMODE_ISVALID(x)                   (((uint32_t)(x))<=7)
 
 // gmode:
-#define GMODE_NORMAL           0
-#define GMODE_RECURSIVE        1
-#define GMODE_ISVALID(x)       (((uint32_t)(x))<=1)
+#define GMODE_NORMAL                       0
+#define GMODE_RECURSIVE                    1
+#define GMODE_ISVALID(x)                   (((uint32_t)(x))<=1)
 
 // create_mode:
 // loose = use other labels when servers are overloaded or full
 // std = use other labels when servers are full
 // strict = never use other labels
-#define CREATE_MODE_LOOSE       0
-#define CREATE_MODE_STD         1
-#define CREATE_MODE_STRICT      2
+#define CREATE_MODE_LOOSE                  0
+#define CREATE_MODE_STD                    1
+#define CREATE_MODE_STRICT                 2
 
 // extraattr:
 
-#define EATTR_BITS             5
+#define EATTR_BITS                         5
 
-#define EATTR_NOOWNER          0x01
-#define EATTR_NOACACHE         0x02
-#define EATTR_NOECACHE         0x04
-#define EATTR_NODATACACHE      0x08
-#define EATTR_SNAPSHOT         0x10
+#define EATTR_NOOWNER                      0x01
+#define EATTR_NOACACHE                     0x02
+#define EATTR_NOECACHE                     0x04
+#define EATTR_NODATACACHE                  0x08
+#define EATTR_SNAPSHOT                     0x10
 
 #define EATTR_STRINGS \
 	"noowner", \
@@ -366,56 +362,57 @@
 	"node was created using makesnapshot command (or inside snapshot)"
 
 // mode attr / attribute flags
-#define MATTR_NOACACHE         0x01
-#define MATTR_NOECACHE         0x02
-#define MATTR_ALLOWDATACACHE   0x04
-#define MATTR_NOXATTR          0x08
-#define MATTR_DIRECTMODE       0x10
+#define MATTR_NOACACHE                     0x01
+#define MATTR_NOECACHE                     0x02
+#define MATTR_ALLOWDATACACHE               0x04
+#define MATTR_NOXATTR                      0x08
+#define MATTR_DIRECTMODE                   0x10
 
 // quota:
-#define QUOTA_FLAG_SINODES     0x01
-#define QUOTA_FLAG_SLENGTH     0x02
-#define QUOTA_FLAG_SSIZE       0x04
-#define QUOTA_FLAG_SREALSIZE   0x08
-#define QUOTA_FLAG_SALL        0x0F
-#define QUOTA_FLAG_HINODES     0x10
-#define QUOTA_FLAG_HLENGTH     0x20
-#define QUOTA_FLAG_HSIZE       0x40
-#define QUOTA_FLAG_HREALSIZE   0x80
-#define QUOTA_FLAG_HALL        0xF0
+#define QUOTA_FLAG_SINODES                 0x01
+#define QUOTA_FLAG_SLENGTH                 0x02
+#define QUOTA_FLAG_SSIZE                   0x04
+#define QUOTA_FLAG_SREALSIZE               0x08
+#define QUOTA_FLAG_SALL                    0x0F
+#define QUOTA_FLAG_HINODES                 0x10
+#define QUOTA_FLAG_HLENGTH                 0x20
+#define QUOTA_FLAG_HSIZE                   0x40
+#define QUOTA_FLAG_HREALSIZE               0x80
+#define QUOTA_FLAG_HALL                    0xF0
 
 // append slice
-#define APPEND_SLICE_FROM_NEG  0x01
-#define APPEND_SLICE_TO_NEG    0x02
+#define APPEND_SLICE_FROM_NEG              0x01
+#define APPEND_SLICE_TO_NEG                0x02
 
 // acl:
-#define POSIX_ACL_ACCESS       1
-#define POSIX_ACL_DEFAULT      2
+#define POSIX_ACL_NONE                     0
+#define POSIX_ACL_ACCESS                   1
+#define POSIX_ACL_DEFAULT                  2
 
 // archctl:
-#define ARCHCTL_CLR            0
-#define ARCHCTL_SET            1
-#define ARCHCTL_GET            2
+#define ARCHCTL_CLR                        0
+#define ARCHCTL_SET                        1
+#define ARCHCTL_GET                        2
 
 // getdir:
-#define GETDIR_FLAG_WITHATTR   0x01
-#define GETDIR_FLAG_ADDTOCACHE 0x02
+#define GETDIR_FLAG_WITHATTR               0x01
+#define GETDIR_FLAG_ADDTOCACHE             0x02
 
 // truncate:
-#define TRUNCATE_FLAG_OPENED   0x01
-#define TRUNCATE_FLAG_UPDATE   0x02
-#define TRUNCATE_FLAG_TIMEFIX  0x04
+#define TRUNCATE_FLAG_OPENED               0x01
+#define TRUNCATE_FLAG_UPDATE               0x02
+#define TRUNCATE_FLAG_TIMEFIX              0x04
 
 // register sesflags:
-#define SESFLAG_READONLY       0x01	// meaning is obvious
-#define SESFLAG_DYNAMICIP      0x02	// sessionid can be used by any IP - dangerous for high privileged sessions - one could connect from different computer using stolen session id
-#define SESFLAG_IGNOREGID      0x04	// gid is ignored during access testing (when user id is different from object's uid then or'ed 'group' and 'other' rights are used)
-#define SESFLAG_ADMIN          0x08	// extra permissions (currently only used for quotas - quota can be set and deleted)
-#define SESFLAG_MAPALL         0x10	// all users (except root) are mapped to specific uid and gid
+#define SESFLAG_READONLY                   0x01	// meaning is obvious
+#define SESFLAG_DYNAMICIP                  0x02	// sessionid can be used by any IP - dangerous for high privileged sessions - one could connect from different computer using stolen session id
+#define SESFLAG_IGNOREGID                  0x04	// gid is ignored during access testing (when user id is different from object's uid then or'ed 'group' and 'other' rights are used)
+#define SESFLAG_ADMIN                      0x08	// extra permissions (currently only used for quotas - quota can be set and deleted)
+#define SESFLAG_MAPALL                     0x10	// all users (except root) are mapped to specific uid and gid
 
-#define SESFLAG_ATTRBIT        0x40	// client can understand new attr record (ver >= 1.7.29)
+#define SESFLAG_ATTRBIT                    0x40	// client can understand new attr record (ver >= 1.7.29)
 
-#define SESFLAG_METARESTORE    0x80	// this is metarestore session
+#define SESFLAG_METARESTORE                0x80	// this is metarestore session
 
 #define SESFLAG_POS_STRINGS \
 	"read-only", \
@@ -438,14 +435,14 @@
 	NULL
 
 // sugicclearmode in fs_setattr
-#define SUGID_CLEAR_MODE_NEVER 0
-#define SUGID_CLEAR_MODE_ALWAYS 1
-#define SUGID_CLEAR_MODE_OSX 2
-#define SUGID_CLEAR_MODE_BSD 3
-#define SUGID_CLEAR_MODE_EXT 4
-#define SUGID_CLEAR_MODE_XFS 5
+#define SUGID_CLEAR_MODE_NEVER             0
+#define SUGID_CLEAR_MODE_ALWAYS            1
+#define SUGID_CLEAR_MODE_OSX               2
+#define SUGID_CLEAR_MODE_BSD               3
+#define SUGID_CLEAR_MODE_EXT               4
+#define SUGID_CLEAR_MODE_XFS               5
 
-#define SUGID_CLEAR_MODE_OPTIONS 6
+#define SUGID_CLEAR_MODE_OPTIONS           6
 
 #define SUGID_CLEAR_MODE_STRINGS \
 	"never", \
@@ -456,60 +453,60 @@
 	"xfs"
 
 // snapshot mode: "smode" field in "CLTOMA_FUSE_SNAPSHOT"
-#define SNAPSHOT_MODE_CAN_OVERWRITE 1
-#define SNAPSHOT_MODE_CPLIKE_ATTR 2
-#define SNAPSHOT_MODE_FORCE_REMOVAL 4
-#define SNAPSHOT_MODE_PRESERVE_HARDLINKS 8
-#define SNAPSHOT_MODE_DELETE 0x80
+#define SNAPSHOT_MODE_CAN_OVERWRITE        0x01
+#define SNAPSHOT_MODE_CPLIKE_ATTR          0x02
+#define SNAPSHOT_MODE_FORCE_REMOVAL        0x04
+#define SNAPSHOT_MODE_PRESERVE_HARDLINKS   0x08
+#define SNAPSHOT_MODE_DELETE               0x80
 
 // OK,OVERLOADED and REBALANCE are used as hlstatus field in "CSTOMA_CURRENT_LOAD", others only internally in master
-#define HLSTATUS_DEFAULT 0
-#define HLSTATUS_OK 1
-#define HLSTATUS_OVERLOADED 2
-#define HLSTATUS_REBALANCE 3
-#define HLSTATUS_GRACEFUL 4
+#define HLSTATUS_DEFAULT                   0
+#define HLSTATUS_OK                        1
+#define HLSTATUS_OVERLOADED                2
+#define HLSTATUS_REBALANCE                 3
+#define HLSTATUS_GRACEFUL                  4
 
 // flags: "flags" fileld in "CLTOMA_FUSE_AQUIRE"
-#define WANT_READ 1
-#define WANT_WRITE 2
-#define AFTER_CREATE 4
+#define WANT_READ                          1
+#define WANT_WRITE                         2
+#define AFTER_CREATE                       4
 
 
-#define MFS_XATTR_CREATE_OR_REPLACE 0
-#define MFS_XATTR_CREATE_ONLY 1
-#define MFS_XATTR_REPLACE_ONLY 2
-#define MFS_XATTR_REMOVE 3
+#define MFS_XATTR_CREATE_OR_REPLACE        0
+#define MFS_XATTR_CREATE_ONLY              1
+#define MFS_XATTR_REPLACE_ONLY             2
+#define MFS_XATTR_REMOVE                   3
 
-#define MFS_XATTR_GETA_DATA 0
-#define MFS_XATTR_LENGTH_ONLY 1
+#define MFS_XATTR_GETA_DATA                0
+#define MFS_XATTR_LENGTH_ONLY              1
 
-#define MFS_CSSERV_COMMAND_REMOVE 0
-#define MFS_CSSERV_COMMAND_BACKTOWORK 1
-#define MFS_CSSERV_COMMAND_MAINTENANCEON 2
-#define MFS_CSSERV_COMMAND_MAINTENANCEOFF 3
-#define MFS_CSSERV_COMMAND_TMPREMOVE 4
+#define MFS_CSSERV_COMMAND_REMOVE          0
+#define MFS_CSSERV_COMMAND_BACKTOWORK      1
+#define MFS_CSSERV_COMMAND_MAINTENANCEON   2
+#define MFS_CSSERV_COMMAND_MAINTENANCEOFF  3
+#define MFS_CSSERV_COMMAND_TMPREMOVE       4
 
-#define MFS_SESSION_COMMAND_REMOVE 0
+#define MFS_SESSION_COMMAND_REMOVE         0
 
 // MFS uses Linux limits
-#define MFS_XATTR_NAME_MAX 255
-#define MFS_XATTR_SIZE_MAX 65536
-#define MFS_XATTR_LIST_MAX 65536
+#define MFS_XATTR_NAME_MAX                 255
+#define MFS_XATTR_SIZE_MAX                 65536
+#define MFS_XATTR_LIST_MAX                 65536
 
 // CLTOMA_FUSE_READ_CHUNK,CLTOMA_FUSE_WRITE_CHUNK,CLTOMA_FUSE_WRITE_CHUNK_END - chunkopflags
-#define CHUNKOPFLAG_CANMODTIME 1
-#define CHUNKOPFLAG_CONTINUEOP 2
+#define CHUNKOPFLAG_CANMODTIME             1
+#define CHUNKOPFLAG_CONTINUEOP             2
 
-#define MODULE_TYPE_UNKNOWN 0
-#define MODULE_TYPE_MASTER 1
-#define MODULE_TYPE_CHUNKSERVER 2
+#define MODULE_TYPE_UNKNOWN                0
+#define MODULE_TYPE_MASTER                 1
+#define MODULE_TYPE_CHUNKSERVER            2
 
 // atime mode
-#define ATIME_ALWAYS 0
-#define ATIME_FILES_ONLY 1
-#define ATIME_RELATIVE_ONLY 2
-#define ATIME_FILES_AND_RELATIVE_ONLY 3
-#define ATIME_NEVER 4
+#define ATIME_ALWAYS                       0
+#define ATIME_FILES_ONLY                   1
+#define ATIME_RELATIVE_ONLY                2
+#define ATIME_FILES_AND_RELATIVE_ONLY      3
+#define ATIME_NEVER                        4
 
 
 #define ATTR_RECORD_SIZE                   36
@@ -601,12 +598,12 @@
 // 	rver==4:
 // 		( rver:8 ) version:32 myip:32 myport:16 tcptimeout:16 usedspace:64 totalspace:64 chunks:32 tdusedspace:64 tdtotalspace:64 tdchunks:32 N*[ chunkid:64 version:32 ]
 // - version 5:
-//      rver==50:	// version 5 / BEGIN
-//      	( rver:8 ) version:32 myip:32 myport:16 tcptimeout:16
-//      rver==51:	// version 5 / CHUNKS
-//      	( rver:8 ) N*[chunkid:64 version:32]
-//      rver==52:	// version 5 / END
-//      	( rver:8 ) usedspace:64 totalspace:64 chunks:32 tdusedspace:64 tdtotalspace:64 tdchunks:32
+//	rver==50:	// version 5 / BEGIN
+//		( rver:8 ) version:32 myip:32 myport:16 tcptimeout:16
+//	rver==51:	// version 5 / CHUNKS
+//		( rver:8 ) N*[chunkid:64 version:32]
+//	rver==52:	// version 5 / END
+//		( rver:8 ) usedspace:64 totalspace:64 chunks:32 tdusedspace:64 tdtotalspace:64 tdchunks:32
 // - version 6:
 //	rver==60:	// version 6 / BEGIN
 //		( rver:8 ) [ passcode:16B ] version:32 myip:32 myport:16 tcptimeout:16 csid:16 usedspace:64 totalspace:64 chunks:32 tdusedspace:64 tdtotalspace:64 tdchunks:32
@@ -1124,8 +1121,8 @@
 // maxsize=4096
 // msgid:32 status:8
 // msgid:32 length:64 chunkid:64 version:32 N*[ ip:32 port:16 ]
-// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32 - protocolid==1)
-// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 labelmask:32 ] (master and client both versions >= 3.0.10 - protocolid==2)
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N * [ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32 - protocolid==1)
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N * [ ip:32 port:16 cs_ver:32 labelmask:32 ] (master and client both versions >= 3.0.10 - protocolid==2)
 
 // 0x01B2
 #define CLTOMA_FUSE_WRITE_CHUNK (PROTO_BASE+434)
@@ -1137,8 +1134,8 @@
 // maxsize=4096
 // msgid:32 status:8
 // msgid:32 length:64 chunkid:64 version:32 N*[ ip:32 port:16 ]
-// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32 - protocolid==1)
-// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 labelmask:32 ] (master and client both versions >= 3.0.10 - protocolid==2)
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N * [ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32 - protocolid==1)
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 N * [ ip:32 port:16 cs_ver:32 labelmask:32 ] (master and client both versions >= 3.0.10 - protocolid==2)
 
 // 0x01B4
 #define CLTOMA_FUSE_WRITE_CHUNK_END (PROTO_BASE+436)

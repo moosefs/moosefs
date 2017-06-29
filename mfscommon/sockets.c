@@ -23,20 +23,24 @@
 #endif
 
 #ifdef WIN32
-#include "portable.h" // poll wrapper
+# include "portable.h" // poll wrapper
 //#include <winsock2.h>
 //#include <windows.h>
-#include <Ws2def.h>
-#include <Ws2tcpip.h>
-#include <mstcpip.h>
+# include <Ws2def.h>
+# include <Ws2tcpip.h>
+# include <mstcpip.h>
 #else
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/poll.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <netdb.h>
+# include <sys/socket.h>
+# include <sys/un.h>
+# ifdef HAVE_POLL_H
+#  include <poll.h>
+# else
+#  include <sys/poll.h>
+# endif
+# include <netinet/in.h>
+# include <netinet/tcp.h>
+# include <arpa/inet.h>
+# include <netdb.h>
 #endif
 #include <sys/types.h>
 #include <sys/time.h>
@@ -221,7 +225,7 @@ static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t ms
 			return rcvd;
 		}
 		if (i>0) {
-		       rcvd += i;
+			rcvd += i;
 		} else if (ERRNO_ERROR) {
 			return -1;
 		}
@@ -294,7 +298,7 @@ static inline int32_t streamtowrite(int sock,const void *buff,uint32_t leng,uint
 			return 0;
 		}
 		if (i>0) {
-		       sent += i;
+			sent += i;
 		} else if (ERRNO_ERROR) {
 			return -1;
 		}
@@ -364,7 +368,7 @@ static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_
 				leng = rcvd;
 			}
 			if (i>0) {
-			       rcvd += i;
+				rcvd += i;
 			} else if (ERRNO_ERROR) {
 				return -1;
 			}
@@ -389,7 +393,7 @@ static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_
 			i = write(dstsock,((uint8_t*)buff)+sent,rcvd-sent);
 #endif
 			if (i>0) {
-			       sent += i;
+				sent += i;
 			} else if (ERRNO_ERROR) {
 				return -1;
 			}

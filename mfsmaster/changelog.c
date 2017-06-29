@@ -316,7 +316,7 @@ uint64_t changelog_findfirstversion(const char *fname) {
 
 uint64_t changelog_findlastversion(const char *fname) {
 	struct stat st;
-	uint8_t buff[32800];    // 32800 = 32768 + 32
+	uint8_t buff[32800]; // 32800 = 32768 + 32
 	uint64_t size;
 	uint32_t buffpos;
 	uint64_t lastnewline,lv;
@@ -358,7 +358,7 @@ uint64_t changelog_findlastversion(const char *fname) {
 				if (lastnewline==0) {
 					lastnewline = size + buffpos;
 				} else {
-					if (lastnewline+1 != (uint64_t)(st.st_size)) {  // garbage at the end of file
+					if (lastnewline+1 != (uint64_t)(st.st_size)) { // garbage at the end of file
 						close(fd);
 						return 0;
 					}
@@ -385,37 +385,37 @@ uint64_t changelog_findlastversion(const char *fname) {
 }
 
 int changelog_checkname(const char *fname) {
-        const char *ptr = fname;
-        if (strncmp(ptr,"changelog.",10)==0) {
-                ptr+=10;
-                if (*ptr>='0' && *ptr<='9') {
-                        while (*ptr>='0' && *ptr<='9') {
-                                ptr++;
-                        }
-                        if (strcmp(ptr,".mfs")==0) {
-                                return 1;
-                        }
-                }
-        } else if (strncmp(ptr,"changelog_ml.",13)==0) {
-                ptr+=13;
-                if (*ptr>='0' && *ptr<='9') {
-                        while (*ptr>='0' && *ptr<='9') {
-                                ptr++;
-                        }
-                        if (strcmp(ptr,".mfs")==0) {
-                                return 1;
-                        }
-                }
-        } else if (strncmp(ptr,"changelog_ml_back.",18)==0) {
-                ptr+=18;
-                if (*ptr>='0' && *ptr<='9') {
-                        while (*ptr>='0' && *ptr<='9') {
-                                ptr++;
-                        }
-                        if (strcmp(ptr,".mfs")==0) {
-                                return 1;
-                        }
-                }
-        }
-        return 0;
+	const char *ptr = fname;
+	if (strncmp(ptr,"changelog.",10)==0) {
+		ptr+=10;
+		if (*ptr>='0' && *ptr<='9') {
+			while (*ptr>='0' && *ptr<='9') {
+				ptr++;
+			}
+			if (strcmp(ptr,".mfs")==0) {
+				return 1;
+			}
+		}
+	} else if (strncmp(ptr,"changelog_ml.",13)==0) {
+		ptr+=13;
+		if (*ptr>='0' && *ptr<='9') {
+			while (*ptr>='0' && *ptr<='9') {
+				ptr++;
+			}
+			if (strcmp(ptr,".mfs")==0) {
+				return 1;
+			}
+		}
+	} else if (strncmp(ptr,"changelog_ml_back.",18)==0) {
+		ptr+=18;
+		if (*ptr>='0' && *ptr<='9') {
+			while (*ptr>='0' && *ptr<='9') {
+				ptr++;
+			}
+			if (strcmp(ptr,".mfs")==0) {
+				return 1;
+			}
+		}
+	}
+	return 0;
 }

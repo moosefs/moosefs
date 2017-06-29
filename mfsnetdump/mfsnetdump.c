@@ -129,7 +129,7 @@ const char* commands_find(uint32_t cmd,uint8_t *color,uint8_t *display) {
 	while (first<=last) {
 		if (mfscmdtab[middle].command<cmd) {
 			first = middle + 1;
-		} else if (mfscmdtab[middle].command>cmd)  {
+		} else if (mfscmdtab[middle].command>cmd) {
 			last = middle - 1;
 		} else {
 			*color = mfscmdtab[middle].colorcode;

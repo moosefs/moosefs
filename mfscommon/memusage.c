@@ -63,14 +63,14 @@ uint8_t mem_used(uint64_t *rss,uint64_t *virt) {
 	static kvm_t* kd = NULL;
 	
 	if ( kd == NULL) {
-		kd = kvm_open( NULL, "/dev/null", NULL, O_RDONLY, "kvm_open" );  // open once
+		kd = kvm_open( NULL, "/dev/null", NULL, O_RDONLY, "kvm_open" ); // open once
 	}
 	if ( kd != NULL ) {
 		// Use FreeBSD kvm function to get the size of resident pages (RSS).
 		int pc = 0;
 		struct kinfo_proc* kp;
-		kp = kvm_getprocs(kd,KERN_PROC_PID,getpid(),&pc);  // do not free returned struct
-		if ( (kp != NULL) && (pc >= 1) ) {   // in case multiple threads have the same PID
+		kp = kvm_getprocs(kd,KERN_PROC_PID,getpid(),&pc); // do not free returned struct
+		if ( (kp != NULL) && (pc >= 1) ) { // in case multiple threads have the same PID
 			*rss = kp->ki_rssize * getpagesize();
 			*virt = kp->ki_size;
 			return 1; // success
@@ -78,10 +78,10 @@ uint8_t mem_used(uint64_t *rss,uint64_t *virt) {
 	}
 	*rss = 0;
 	*virt = 0;
-	return 0;  // failed
+	return 0; // failed
 #elif __APPLE__
 	struct task_basic_info machInfo;
-	mach_port_t machTask  = mach_task_self();
+	mach_port_t machTask = mach_task_self();
 	mach_msg_type_number_t machCount = TASK_BASIC_INFO_COUNT;
 	if ( task_info( machTask, TASK_BASIC_INFO, (task_info_t)&machInfo, &machCount ) == KERN_SUCCESS ) {
 		*rss = machInfo.resident_size;
@@ -90,7 +90,7 @@ uint8_t mem_used(uint64_t *rss,uint64_t *virt) {
 	}
 	*rss = 0;
 	*virt = 0;
-	return 0;  // error
+	return 0; // error
 #elif __linux__
 	int fd = open("/proc/self/statm",O_RDONLY);
 	char statbuff[1000],*p;

@@ -582,15 +582,15 @@ int xattr_load(FILE *fd,uint8_t mver) {
 		return -1;
 	}
 
-        while (1) {
-                if (fread(hdrbuff,1,4+1+4,fd)!=4+1+4) {
-                        fprintf(stderr,"loading xattr: read error");
-                        return -1;
-                }
-                ptr = hdrbuff;
-                inode = get32bit(&ptr);
-                anleng = get8bit(&ptr);
-                avleng = get32bit(&ptr);
+	while (1) {
+		if (fread(hdrbuff,1,4+1+4,fd)!=4+1+4) {
+			fprintf(stderr,"loading xattr: read error");
+			return -1;
+		}
+		ptr = hdrbuff;
+		inode = get32bit(&ptr);
+		anleng = get8bit(&ptr);
+		avleng = get32bit(&ptr);
 		if (inode==0) {
 			return 0;
 		}
@@ -629,22 +629,22 @@ int posix_acl_load(FILE *fd,uint8_t mver) {
 	}
 
 	while (1) {
-                if (fread(hdrbuff,1,4+1+2*6,fd)!=4+1+2*6) {
-                        fprintf(stderr,"loading posix_acl: read error");
-                        return -1;
-                }
-                ptr = hdrbuff;
-                inode = get32bit(&ptr);
+		if (fread(hdrbuff,1,4+1+2*6,fd)!=4+1+2*6) {
+			fprintf(stderr,"loading posix_acl: read error");
+			return -1;
+		}
+		ptr = hdrbuff;
+		inode = get32bit(&ptr);
 		if (inode==0) {
 			return 0;
 		}
-                acltype = get8bit(&ptr);
-                userperm = get16bit(&ptr);
-                groupperm = get16bit(&ptr);
-                otherperm = get16bit(&ptr);
-                mask = get16bit(&ptr);
-                namedusers = get16bit(&ptr);
-                namedgroups = get16bit(&ptr);
+		acltype = get8bit(&ptr);
+		userperm = get16bit(&ptr);
+		groupperm = get16bit(&ptr);
+		otherperm = get16bit(&ptr);
+		mask = get16bit(&ptr);
+		namedusers = get16bit(&ptr);
+		namedgroups = get16bit(&ptr);
 		printf("POSIXACL|i:%10"PRIu32"|t:%"PRIu8"|u:%"PRIo16"|g:%"PRIo16"|o:%"PRIo16"|m:%"PRIo16"|n:(",inode,acltype,userperm,groupperm,otherperm,mask);
 		acls = namedusers+namedgroups;
 		acbcnt = 0;
@@ -896,7 +896,7 @@ int of_load(FILE *fd,uint8_t mver) {
 			return 0;
 		}
 	}
-	return 0;       // unreachable
+	return 0;	// unreachable
 }
 
 int flock_load(FILE *fd,uint8_t mver) {

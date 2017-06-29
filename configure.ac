@@ -41,7 +41,7 @@ fi
 if test "$GCC" = "yes"; then
 	if test "$enable_externalcflags" != "yes" ; then
 		if test "$enable_gperftools" = "yes" -o "$enable_debug" = "yes" ; then
-			CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG  -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
+			CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
 		else
 			CFLAGS="-O2 $CFLAGS -g -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
 		fi

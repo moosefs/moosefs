@@ -152,7 +152,7 @@ void sinodes_pid_inodes(pid_t pid) {
 //	printf("pid: %d\n",ki->ki_pid);
 
 #if defined(__linux__) || defined(__NetBSD__)
-        char path[100];
+	char path[100];
 	struct stat st;
 	snprintf(path,100,"/proc/%lld/cwd",(long long int)pid);
 	if (stat(path,&st)>=0) {
@@ -167,8 +167,8 @@ void sinodes_pid_inodes(pid_t pid) {
 
 	proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &vnpi, sizeof(vnpi));
 
-        devid = vnpi.pvi_cdir.vip_vi.vi_stat.vst_dev;
-        inode = vnpi.pvi_cdir.vip_vi.vi_stat.vst_ino;
+	devid = vnpi.pvi_cdir.vip_vi.vi_stat.vst_dev;
+	inode = vnpi.pvi_cdir.vip_vi.vi_stat.vst_ino;
 	if (devid==mydevid) {
 		sinodes_process_inode(inode);
 	}
@@ -440,16 +440,16 @@ void* sinodes_scanthread(void *arg) {
 
 void sinodes_term(void) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
-        __sync_fetch_and_or(&term,1);
+	__sync_fetch_and_or(&term,1);
 #else
-        zassert(pthread_mutex_lock(&glock));
-        term = 1;
-        zassert(pthread_mutex_unlock(&glock));
+	zassert(pthread_mutex_lock(&glock));
+	term = 1;
+	zassert(pthread_mutex_unlock(&glock));
 #endif
 	pthread_join(clthread,NULL);
 	sinodes_end();
 #ifndef HAVE___SYNC_FETCH_AND_OP
-        zassert(pthread_mutex_destroy(&glock));
+	zassert(pthread_mutex_destroy(&glock));
 #endif
 }
 

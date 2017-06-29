@@ -22,6 +22,10 @@
 #include "config.h"
 #endif
 
+#if defined(GPERFTOOLS) && defined(HAVE_SETITIMER)
+#undef HAVE_SETITIMER
+#endif
+
 #if defined(HAVE_SETITIMER)
 #  include <sys/time.h>
 #  ifndef ITIMER_REAL

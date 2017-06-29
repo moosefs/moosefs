@@ -791,7 +791,7 @@ int posix_lock_load(bio *fd,uint8_t mver,uint8_t ignoreflag) {
 			fses = 0;
 		}
 		if (lasttype!=POSIX_LOCK_UNLCK) {
-		       	if (start<lastend) {
+			if (start<lastend) {
 				if (ignoreflag) {
 					mfs_syslog(LOG_ERR,"loading posix_locks: lock range not in order !!! (ignoring)");
 					continue;

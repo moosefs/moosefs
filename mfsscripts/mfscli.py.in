@@ -1154,12 +1154,13 @@ else: # CLI mode
 
 def getmasteraddresses():
 	m = []
-	try:
-		for i in socket.getaddrinfo(masterhost,masterport,socket.AF_INET,socket.SOCK_STREAM,socket.SOL_TCP):
-			if i[0]==socket.AF_INET and i[1]==socket.SOCK_STREAM and i[2]==socket.SOL_TCP:
-				m.append(i[4])
-	except Exception:
-		pass
+	for mhost in masterhost.replace(';',' ').replace(',',' ').split():
+		try:
+			for i in socket.getaddrinfo(mhost,masterport,socket.AF_INET,socket.SOCK_STREAM,socket.SOL_TCP):
+				if i[0]==socket.AF_INET and i[1]==socket.SOCK_STREAM and i[2]==socket.SOL_TCP:
+					m.append(i[4])
+		except Exception:
+			pass
 	return m
 
 #def mysend(socket,msg):

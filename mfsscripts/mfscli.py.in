@@ -7269,13 +7269,13 @@ if "MC" in sectionset:
 						if no==100:
 							datalist1 = MCresult[(host,port,0)]
 							datalist2 = MCresult[(host,port,1)]
-							if (datalist1!=None and datalist2!=None):
+							if (datalist1!=None and datalist2!=None and datalist1[e]<((2**64)-1) and datalist2[e]<((2**64)-1)):
 								data = datalist1[e]+datalist2[e]
 							else:
 								data = None
 						else:
 							datalist = MCresult[(host,port,no)]
-							if datalist!=None:
+							if datalist!=None and datalist[e]<((2**64)-1):
 								data = datalist[e]
 							else:
 								data = None

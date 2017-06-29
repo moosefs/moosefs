@@ -45,6 +45,9 @@
 #ifdef HAVE_ATTR_XATTR_H
 #include <attr/xattr.h>
 #endif
+#ifdef HAVE_SYS_FILE_H
+#include <sys/file.h>
+#endif
 
 #include "stats.h"
 #include "oplog.h"
@@ -79,6 +82,18 @@
 #endif
 #ifndef XATTR_REPLACE
 #define XATTR_REPLACE 2
+#endif
+#ifndef LOCK_SH
+#define LOCK_SH 1
+#endif
+#ifndef LOCK_EX
+#define LOCK_EX 2
+#endif
+#ifndef LOCK_NB
+#define LOCK_NB 4
+#endif
+#ifndef LOCK_UN
+#define LOCK_UN 8
 #endif
 
 #if defined(__FreeBSD__)

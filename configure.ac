@@ -189,6 +189,9 @@ dnl AC_CHECK_HEADERS([sys/mman.h])
 AC_CHECK_HEADERS([attr/xattr.h])
 AC_CHECK_HEADERS([sys/xattr.h])
 
+# check for bsd-locks (flock) optional header
+AC_CHECK_HEADERS([sys/file.h])
+
 # optional I/O functions
 AC_CHECK_FUNCS([pread pwrite readv writev])
 

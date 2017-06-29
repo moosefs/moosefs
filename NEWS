@@ -5,6 +5,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) fixed support for CREATE/REPLACE flags in setxattr
   - (mount) added headers for flock defines
   - (all) added check for poll.h header file and use it instead of sys/poll.h if possible
+  - (master) added test for WRITE access on directory during moving between different parents
 
 * MooseFS 3.0.93-1 (2017-06-01)
 

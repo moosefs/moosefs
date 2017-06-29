@@ -4956,9 +4956,12 @@ uint8_t fs_univ_move(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t pa
 	if ((sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_access_ext(dwd,uid,gids,gid,MODE_MASK_W|MODE_MASK_X,sesflags))) {
 		return MFS_ERROR_EACCES;
 	}
-	if (se->child->type==TYPE_DIRECTORY) {
-		if (fsnodes_isancestor(se->child,dwd)) {
+	if (node->type==TYPE_DIRECTORY) {
+		if (fsnodes_isancestor(node,dwd)) {
 			return MFS_ERROR_EINVAL;
+		}
+		if (parent_src!=parent_dst && (sesflags&SESFLAG_METARESTORE)==0 && (!fsnodes_access_ext(node,uid,gids,gid,MODE_MASK_W,sesflags))) { // '..' link has to be formally changed during such operation - we need 'W' access
+			return MFS_ERROR_EACCES;
 		}
 	}
 	if (fsnodes_namecheck(nleng_dst,name_dst)<0) {

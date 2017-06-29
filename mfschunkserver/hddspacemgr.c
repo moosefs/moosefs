@@ -2260,7 +2260,7 @@ void hdd_delayed_ops() {
 				ccp = &(cc->next);
 			} else {
 				double now;
-				if (c->fsyncneeded && DoFsyncBeforeClose) {
+				if (c->fd>=0 && c->fsyncneeded && DoFsyncBeforeClose) {
 					ts = monotonic_nseconds();
 #ifdef F_FULLFSYNC
 					if (fcntl(c->fd,F_FULLFSYNC)<0) {

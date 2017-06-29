@@ -5,6 +5,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) redesigned xattr storage (much faster and uses less memory)
   - (master) improved hash map in xattr and acl (static -> dynamic)
   - (cgi+cli) added possibility to define master group as set of IP adresses divided by comma or semicolon
+  - (cs) fixed using fsync on closed descriptors (after change FSYNC_BEFORE_CLOSE option)
 
 * MooseFS 3.0.92-1 (2017-04-27)
 

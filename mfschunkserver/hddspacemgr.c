@@ -2448,7 +2448,76 @@ static int hdd_io_end(chunk *c) {
 }
 
 
+/* emergency read - not optimal - used only for data recovery */
 
+int hdd_emergency_read(uint64_t chunkid,uint32_t *version,uint16_t blocknum,uint8_t buffer[MFSBLOCKSIZE],uint8_t retries,uint8_t *errorflags) {
+	chunk *c;
+	int fd;
+	int ret,try;
+	char fname[PATH_MAX];
+	const uint8_t *rptr;
+	uint32_t crc;
+
+	if (retries==0) {
+		return MFS_ERROR_EINVAL;
+	}
+	c = hdd_chunk_find(chunkid);
+	if (c==NULL) {
+		return MFS_ERROR_NOCHUNK;
+	}
+	if (blocknum>=MFSBLOCKSINCHUNK) {
+		hdd_chunk_release(c);
+		return MFS_ERROR_BNUMTOOBIG;
+	}
+	*version = c->version;
+	hdd_generate_filename(fname,c);
+	fd = open(fname,O_RDONLY);
+	if (fd<0) {
+		hdd_chunk_release(c);
+		return MFS_ERROR_IO;
+	}
+	*errorflags = 0;
+	ret = 0;
+
+	for (try=0 ; try<retries ; try++) {
+#ifdef USE_PIO
+		ret = pread(fd,buffer,4,c->hdrsize+4U*blocknum);
+#else /* USE_PIO */
+		lseek(fd,c->hdrsize+4U*blocknum,SEEK_SET);
+		ret = read(fd,buffer,4);
+#endif /* USE_PIO */
+		if (ret==4) {
+			break;
+		}
+	}
+	if (ret!=4) {
+		crc = 0;
+		*errorflags |= 1; // can't read CRC
+	} else {
+		rptr = buffer;
+		crc = get32bit(&rptr);
+	}
+	for (try=0 ; try<retries ; try++) {
+#ifdef USE_PIO
+		ret = pread(fd,buffer,MFSBLOCKSIZE,c->hdrsize+CHUNKCRCSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS));
+#else /* USE_PIO */
+		lseek(fd,c->hdrsize+CHUNKCRCSIZE+(((uint32_t)blocknum)<<MFSBLOCKBITS),SEEK_SET);
+		ret = read(fd,buffer,MFSBLOCKSIZE);
+#endif /* USE_PIO */
+		if (ret==MFSBLOCKSIZE) {
+			break;
+		}
+	}
+	if (ret!=MFSBLOCKSIZE) {
+		*errorflags |= 2; // can't read block
+	}
+	if (crc!=mycrc32(0,buffer,MFSBLOCKSIZE)) {
+		*errorflags |= 4; // crc mismatch
+	}
+	close(fd);
+	hdd_chunk_release(c);
+	return MFS_STATUS_OK;
+}
 
 /* I/O operations */
 
@@ -3343,7 +3412,7 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 		hdd_generate_filename(fname,oc);
 		if (rename(ofname,fname)<0) {
 			oc->version = version;
-			hdd_error_occured(oc);  // uses and preserves errno !!!
+			hdd_error_occured(oc); // uses and preserves errno !!!
 			mfs_arg_errlog_silent(LOG_WARNING,"duplicate_chunk: file:%s->%s - rename error",ofname,fname);
 			hdd_chunk_delete(c);
 			hdd_chunk_release(oc);
@@ -3855,7 +3924,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 		hdd_generate_filename(fname,oc);
 		if (rename(ofname,fname)<0) {
 			oc->version = version;
-			hdd_error_occured(oc);  // uses and preserves errno !!!
+			hdd_error_occured(oc); // uses and preserves errno !!!
 			mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s->%s - rename error",ofname,fname);
 			hdd_chunk_delete(c);
 			hdd_chunk_release(oc);
@@ -4432,13 +4501,13 @@ static int hdd_int_delete(uint64_t chunkid,uint32_t version) {
 }
 
 /* all chunk operations in one call */
-// newversion>0 && length==0xFFFFFFFF && copychunkid==0   -> change version
-// newversion>0 && length==0xFFFFFFFF && copychunkid>0    -> duplicate
+// newversion>0 && length==0xFFFFFFFF && copychunkid==0      -> change version
+// newversion>0 && length==0xFFFFFFFF && copychunkid>0       -> duplicate
 // newversion>0 && length<=MFSCHUNKSIZE && copychunkid==0    -> truncate
 // newversion>0 && length<=MFSCHUNKSIZE && copychunkid>0     -> duplicate and truncate
-// newversion==0 && length==0                             -> delete
-// newversion==0 && length==1                             -> create
-// newversion==0 && length==2                             -> check chunk contents
+// newversion==0 && length==0                                -> delete
+// newversion==0 && length==1                                -> create
+// newversion==0 && length==2                                -> check chunk contents
 int hdd_chunkop(uint64_t chunkid,uint32_t version,uint32_t newversion,uint64_t copychunkid,uint32_t copyversion,uint32_t length) {
 	zassert(pthread_mutex_lock(&statslock));
 	if (newversion>0) {

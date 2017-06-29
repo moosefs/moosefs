@@ -374,6 +374,39 @@ void matomlserv_get_version(matomlserventry *eptr,const uint8_t *data,uint32_t l
 	memcpy(ptr,vstring,strlen(vstring));
 }
 
+void matomlserv_get_config(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	char name[256];
+	uint8_t nleng;
+	uint32_t vleng;
+	char *val;
+	uint8_t *ptr;
+
+	if (length<5) {
+		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	nleng = get8bit(&data);
+	if (length!=5U+(uint32_t)nleng) {
+		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		eptr->mode = KILL;
+		return;
+	}
+	memcpy(name,data,nleng);
+	name[nleng] = 0;
+	val = cfg_getstr(name,"");
+	vleng = strlen(val);
+	if (vleng>255) {
+		vleng=255;
+	}
+	ptr = matomlserv_createpacket(eptr,ANTOAN_CONFIG_VALUE,5+vleng);
+	put32bit(&ptr,msgid);
+	put8bit(&ptr,vleng);
+	memcpy(ptr,val,vleng);
+}
+
 
 void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t rversion;
@@ -604,6 +637,9 @@ void matomlserv_gotpacket(matomlserventry *eptr,uint32_t type,const uint8_t *dat
 			break;
 		case ANTOAN_GET_VERSION:
 			matomlserv_get_version(eptr,data,length);
+			break;
+		case ANTOAN_GET_CONFIG:
+			matomlserv_get_config(eptr,data,length);
 			break;
 		case ANTOMA_REGISTER:
 			matomlserv_register(eptr,data,length);

@@ -581,6 +581,14 @@
 // -
 
 
+// 0x0050
+#define ANTOAN_GET_CONFIG (PROTO_BASE+80)
+// msgid:32 option_name:NAME
+
+// 0x0051
+#define ANTOAN_CONFIG_VALUE (PROTO_BASE+81)
+// msgid:32 option_value:NAME
+
 // CHUNKSERVER <-> MASTER
 
 // 0x0064

@@ -54,6 +54,7 @@ void fs_inc_fleng(uint32_t inode,uint64_t fleng);
 uint8_t fs_simple_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);
 #endif
 
+uint8_t fs_get_cfg(const char *opt_name,char opt_value[256]);
 void fs_statfs(uint64_t *totalspace,uint64_t *availspace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes);
 uint8_t fs_access(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t modemask);
 // uint8_t fs_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);

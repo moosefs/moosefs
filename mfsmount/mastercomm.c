@@ -2550,6 +2550,38 @@ void fs_term(void) {
 	ep_term();
 }
 
+uint8_t fs_get_cfg(const char *opt_name,char opt_value[256]) {
+	uint8_t *wptr;
+	const uint8_t *rptr;
+	uint32_t i;
+	uint32_t nleng;
+	threc *rec = fs_get_my_threc();
+
+	nleng = strlen(opt_name);
+	if (nleng>255) {
+		return MFS_ERROR_EINVAL;
+	}
+	wptr = fs_createpacket(rec,ANTOAN_GET_CONFIG,1+nleng);
+	put8bit(&wptr,nleng);
+	memcpy(wptr,opt_name,nleng);
+	rptr = fs_sendandreceive(rec,ANTOAN_CONFIG_VALUE,&i);
+	if (rptr==NULL) {
+		return MFS_ERROR_IO;
+	} else if (i==0 || i>255) {
+		fs_disconnect();
+		return MFS_ERROR_IO;
+	} else {
+		nleng = get8bit(&rptr);
+		if (i!=(1U+nleng)) {
+			fs_disconnect();
+			return MFS_ERROR_IO;
+		}
+		memcpy(opt_value,rptr,nleng);
+		opt_value[nleng]=0;
+		return MFS_STATUS_OK;
+	}
+}
+
 void fs_statfs(uint64_t *totalspace,uint64_t *availspace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes) {
 	uint8_t *wptr;
 	const uint8_t *rptr;

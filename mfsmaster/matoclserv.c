@@ -875,6 +875,39 @@ void matoclserv_get_version(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	memcpy(ptr,vstring,strlen(vstring));
 }
 
+void matoclserv_get_config(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	char name[256];
+	uint8_t nleng;
+	uint32_t vleng;
+	char *val;
+	uint8_t *ptr;
+
+	if (length<5) {
+		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	nleng = get8bit(&data);
+	if (length!=5U+(uint32_t)nleng) {
+		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		eptr->mode = KILL;
+		return;
+	}
+	memcpy(name,data,nleng);
+	name[nleng] = 0;
+	val = cfg_getstr(name,"");
+	vleng = strlen(val);
+	if (vleng>255) {
+		vleng=255;
+	}
+	ptr = matoclserv_createpacket(eptr,ANTOAN_CONFIG_VALUE,5+vleng);
+	put32bit(&ptr,msgid);
+	put8bit(&ptr,vleng);
+	memcpy(ptr,val,vleng);
+}
+
 void matoclserv_module_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid = 0;
 	uint8_t *ptr;
@@ -4745,6 +4778,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case ANTOAN_GET_VERSION:
 				matoclserv_get_version(eptr,data,length);
 				break;
+			case ANTOAN_GET_CONFIG:
+				matoclserv_get_config(eptr,data,length);
+				break;
 			case CLTOMA_FUSE_REGISTER:
 //				printf("REGISTER\n");
 				matoclserv_fuse_register(eptr,data,length);
@@ -4828,6 +4864,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 		switch (type) {
 			case ANTOAN_GET_VERSION:
 				matoclserv_get_version(eptr,data,length);
+				break;
+			case ANTOAN_GET_CONFIG:
+				matoclserv_get_config(eptr,data,length);
 				break;
 			case CLTOMA_FUSE_REGISTER:
 				matoclserv_fuse_register(eptr,data,length);
@@ -5087,6 +5126,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 // extra (external tools)
 			case ANTOAN_GET_VERSION:
 				matoclserv_get_version(eptr,data,length);
+				break;
+			case ANTOAN_GET_CONFIG:
+				matoclserv_get_config(eptr,data,length);
 				break;
 			case CLTOMA_FUSE_REGISTER:
 				matoclserv_fuse_register(eptr,data,length);

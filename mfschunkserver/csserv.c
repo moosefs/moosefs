@@ -168,6 +168,39 @@ void csserv_get_version(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	memcpy(ptr,vstring,strlen(vstring));
 }
 
+void csserv_get_config(csserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	char name[256];
+	uint8_t nleng;
+	uint32_t vleng;
+	char *val;
+	uint8_t *ptr;
+
+	if (length<5) {
+		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32")",length);
+		eptr->state = CLOSE;
+		return;
+	}
+	msgid = get32bit(&data);
+	nleng = get8bit(&data);
+	if (length!=5U+(uint32_t)nleng) {
+		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		eptr->state = CLOSE;
+		return;
+	}
+	memcpy(name,data,nleng);
+	name[nleng] = 0;
+	val = cfg_getstr(name,"");
+	vleng = strlen(val);
+	if (vleng>255) {
+		vleng=255;
+	}
+	ptr = csserv_create_packet(eptr,ANTOAN_CONFIG_VALUE,5+vleng);
+	put32bit(&ptr,msgid);
+	put8bit(&ptr,vleng);
+	memcpy(ptr,val,vleng);
+}
+
 void csserv_iothread_finished(uint8_t status,void *e) {
 	csserventry *eptr = (csserventry*)e;
 	if (status==0) {
@@ -445,6 +478,9 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 		switch (type) {
 		case ANTOAN_GET_VERSION:
 			csserv_get_version(eptr,data,length);
+			break;
+		case ANTOAN_GET_CONFIG:
+			csserv_get_config(eptr,data,length);
 			break;
 		case CLTOCS_READ:
 			csserv_read_init(eptr,data,length);

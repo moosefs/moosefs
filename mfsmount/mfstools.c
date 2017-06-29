@@ -49,8 +49,8 @@
 #include "md5.h"
 #include "MFSCommunication.h"
 
-#define tcpread(s,b,l) tcptoread(s,b,l,10000)
-#define tcpwrite(s,b,l) tcptowrite(s,b,l,10000)
+#define tcpread(s,b,l) tcptoread(s,b,l,20000)
+#define tcpwrite(s,b,l) tcptowrite(s,b,l,20000)
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)

@@ -6168,7 +6168,7 @@ uint8_t fs_setxattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t o
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_getxattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t anleng,const uint8_t *attrname,uint32_t *avleng,uint8_t **attrvalue) {
+uint8_t fs_getxattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t anleng,const uint8_t *attrname,uint32_t *avleng,const uint8_t **attrvalue) {
 	fsnode *p;
 
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,opened)==0) {
@@ -6234,22 +6234,31 @@ uint8_t fs_setfacl(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t u
 		return MFS_ERROR_EINVAL;
 	}
 	pmode = p->mode;
-	if (userperm==0xFFFF) {
-		userperm = (p->mode >> 6) & 7;
-	}
-	if (groupperm==0xFFFF) {
-		groupperm = (p->mode >> 3) & 7;
-	}
-	if (otherperm==0xFFFF) {
-		otherperm = p->mode & 7;
-	}
-	posix_acl_set(inode,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,aclblob);
-	if (acltype==POSIX_ACL_ACCESS) {
-		p->mode &= 07000;
-		p->mode |= ((userperm&7)<<6) | ((groupperm&7)<<3) | (otherperm&7);
-	}
-	if (p->mode!=pmode) {
-		p->ctime = ts;
+	if ((userperm&groupperm&otherperm&mask)==0xFFFF && (namedusers|namedgroups)==0) { // special case (remove)
+		posix_acl_remove(inode,acltype);
+		if (acltype==POSIX_ACL_ACCESS) {
+			p->aclpermflag = 0;
+		} else if (acltype==POSIX_ACL_DEFAULT) {
+			p->acldefflag = 0;
+		}
+	} else {
+		if (userperm==0xFFFF) {
+			userperm = (p->mode >> 6) & 7;
+		}
+		if (groupperm==0xFFFF) {
+			groupperm = (p->mode >> 3) & 7;
+		}
+		if (otherperm==0xFFFF) {
+			otherperm = p->mode & 7;
+		}
+		posix_acl_set(inode,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,aclblob);
+		if (acltype==POSIX_ACL_ACCESS) {
+			p->mode &= 07000;
+			p->mode |= ((userperm&7)<<6) | ((groupperm&7)<<3) | (otherperm&7);
+		}
+		if (p->mode!=pmode) {
+			p->ctime = ts;
+		}
 	}
 	changelog("%"PRIu32"|SETACL(%"PRIu32",%u,%u,%"PRIu8",%"PRIu16",%"PRIu16",%"PRIu16",%"PRIu16",%"PRIu16",%"PRIu16",%s)",ts,inode,p->mode,(p->ctime==ts)?1U:0U,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,changelog_escape_name((namedusers+namedgroups)*6,aclblob));
 	return MFS_STATUS_OK;
@@ -6291,10 +6300,19 @@ uint8_t fs_mr_setacl(uint32_t ts,uint32_t inode,uint16_t mode,uint8_t changectim
 	if (acltype!=POSIX_ACL_ACCESS && acltype!=POSIX_ACL_DEFAULT) {
 		return MFS_ERROR_EINVAL;
 	}
-	posix_acl_set(inode,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,aclblob);
-	p->mode = mode;
-	if (changectime) {
-		p->ctime = ts;
+	if ((userperm&groupperm&otherperm&mask)==0xFFFF && (namedusers|namedgroups)==0) { // special case (remove)
+		posix_acl_remove(inode,acltype);
+		if (acltype==POSIX_ACL_ACCESS) {
+			p->aclpermflag = 0;
+		} else if (acltype==POSIX_ACL_DEFAULT) {
+			p->acldefflag = 0;
+		}
+	} else {
+		posix_acl_set(inode,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,aclblob);
+		p->mode = mode;
+		if (changectime) {
+			p->ctime = ts;
+		}
 	}
 	meta_version_inc();
 	return MFS_STATUS_OK;

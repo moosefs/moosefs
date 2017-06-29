@@ -4505,7 +4505,7 @@ void matoclserv_fuse_getxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 		}
 	} else {
-		uint8_t *attrvalue;
+		const uint8_t *attrvalue;
 		uint32_t avleng;
 		status = fs_getxattr(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,opened,uid,gids,gid,anleng,attrname,&avleng,&attrvalue);
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_GETXATTR,(status!=MFS_STATUS_OK)?5:8+((mode==MFS_XATTR_GETA_DATA)?avleng:0));

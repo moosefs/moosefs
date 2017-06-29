@@ -21,11 +21,15 @@
 #ifndef _DIRATTRCACHE_H_
 #define _DIRATTRCACHE_H_
 
-void* dcache_new(const struct fuse_ctx *ctx,uint32_t parent,const uint8_t *dbuff,uint32_t dsize);
+#include <fuse_lowlevel.h>
+#include <inttypes.h>
+#include "MFSCommunication.h"
+
+void* dcache_new(const struct fuse_ctx *ctx,uint32_t parent,const uint8_t *dbuff,uint32_t dsize,uint8_t attrsize);
 void dcache_release(void *r);
-uint8_t dcache_lookup(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t *inode,uint8_t attr[35]);
-uint8_t dcache_getattr(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35]);
-void dcache_setattr(uint32_t inode,const uint8_t attr[35]);
+uint8_t dcache_lookup(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);
+uint8_t dcache_getattr(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[ATTR_RECORD_SIZE]);
+void dcache_setattr(uint32_t inode,const uint8_t attr[ATTR_RECORD_SIZE]);
 void dcache_invalidate_attr(uint32_t inode);
 void dcache_invalidate_name(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name);
 

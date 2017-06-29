@@ -27,6 +27,7 @@
 #include <string.h>
 #include <pthread.h>
 
+#include "dirattrcache.h"
 #include "massert.h"
 #include "datapack.h"
 
@@ -36,6 +37,7 @@ typedef struct _dircache {
 	const uint8_t *dbuff;
 	uint32_t dsize;
 	uint32_t hashsize;
+	uint8_t attrsize;
 	const uint8_t **namehashtab;
 	const uint8_t **inodehashtab;
 	struct _dircache *next,**prev;
@@ -54,7 +56,7 @@ static inline uint32_t dcache_hash(const uint8_t *name,uint8_t nleng) {
 	return hash;
 }
 
-uint32_t dcache_elemcount(const uint8_t *dbuff,uint32_t dsize) {
+static inline uint32_t dcache_elemcount(const uint8_t *dbuff,uint32_t dsize,uint8_t attrsize) {
 	const uint8_t *ptr,*eptr;
 	uint8_t enleng;
 	uint32_t ret;
@@ -63,16 +65,16 @@ uint32_t dcache_elemcount(const uint8_t *dbuff,uint32_t dsize) {
 	ret=0;
 	while (ptr<eptr) {
 		enleng = *ptr;
-		if (ptr+enleng+40<=eptr) {
+		if (ptr+enleng+5+attrsize<=eptr) {
 			ret++;
 		}
-		ptr+=enleng+40;
+		ptr+=enleng+5+attrsize;
 	}
 	return ret;
 }
 
 static inline void dcache_calchashsize(dircache *d) {
-	uint32_t cnt = dcache_elemcount(d->dbuff,d->dsize);
+	uint32_t cnt = dcache_elemcount(d->dbuff,d->dsize,d->attrsize);
 	d->hashsize = 1;
 	cnt = (cnt*3)/2;
 	while (cnt) {
@@ -127,7 +129,7 @@ void dcache_makeinodehash(dircache *d) {
 	eptr = d->dbuff+d->dsize;
 	while (ptr<eptr) {
 		enleng = *ptr;
-		if (ptr+enleng+40<=eptr) {
+		if (ptr+enleng+5+d->attrsize<=eptr) {
 			iptr = ptr+1+enleng;
 			hash = get32bit(&iptr);
 			disp = ((hash*0x53B23891)&hashmask)|1;
@@ -137,11 +139,11 @@ void dcache_makeinodehash(dircache *d) {
 			}
 			d->inodehashtab[hash&hashmask]=ptr+1+enleng;
 		}
-		ptr+=enleng+40;
+		ptr+=enleng+5+d->attrsize;
 	}
 }
 
-void* dcache_new(const struct fuse_ctx *ctx,uint32_t parent,const uint8_t *dbuff,uint32_t dsize) {
+void* dcache_new(const struct fuse_ctx *ctx,uint32_t parent,const uint8_t *dbuff,uint32_t dsize,uint8_t attrsize) {
 	dircache *d;
 	d = malloc(sizeof(dircache));
 	d->ctx.pid = ctx->pid;
@@ -150,6 +152,7 @@ void* dcache_new(const struct fuse_ctx *ctx,uint32_t parent,const uint8_t *dbuff
 	d->parent = parent;
 	d->dbuff = dbuff;
 	d->dsize = dsize;
+	d->attrsize = attrsize;
 	d->hashsize = 0;
 	d->namehashtab = NULL;
 	d->inodehashtab = NULL;
@@ -243,7 +246,7 @@ static inline void dcache_namehash_invalidate(dircache *d,uint8_t nleng,const ui
 	}
 }
 
-static inline uint8_t dcache_namehash_get(dircache *d,uint8_t nleng,const uint8_t *name,uint32_t *inode,uint8_t attr[35]) {
+static inline uint8_t dcache_namehash_get(dircache *d,uint8_t nleng,const uint8_t *name,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]) {
 	uint32_t hash,disp,hashmask;
 	const uint8_t *ptr;
 
@@ -258,7 +261,12 @@ static inline uint8_t dcache_namehash_get(dircache *d,uint8_t nleng,const uint8_
 			ptr+=1+nleng;
 			*inode = get32bit(&ptr);
 			if (*ptr) { // are attributes valid ?
-				memcpy(attr,ptr,35);
+				if (d->attrsize>=ATTR_RECORD_SIZE) {
+					memcpy(attr,ptr,ATTR_RECORD_SIZE);
+				} else {
+					memcpy(attr,ptr,d->attrsize);
+					memset(attr+d->attrsize,0,ATTR_RECORD_SIZE-d->attrsize);
+				}
 				return 1;
 			} else {
 				return 0;
@@ -269,7 +277,7 @@ static inline uint8_t dcache_namehash_get(dircache *d,uint8_t nleng,const uint8_
 	return 0;
 }
 
-static inline uint8_t dcache_inodehash_get(dircache *d,uint32_t inode,uint8_t attr[35]) {
+static inline uint8_t dcache_inodehash_get(dircache *d,uint32_t inode,uint8_t attr[ATTR_RECORD_SIZE]) {
 	uint32_t hash,disp,hashmask;
 	const uint8_t *ptr;
 
@@ -282,7 +290,12 @@ static inline uint8_t dcache_inodehash_get(dircache *d,uint32_t inode,uint8_t at
 	while ((ptr=d->inodehashtab[hash&hashmask])) {
 		if (inode==get32bit(&ptr)) {
 			if (*ptr) { // are attributes valid ?
-				memcpy(attr,ptr,35);
+				if (d->attrsize>=ATTR_RECORD_SIZE) {
+					memcpy(attr,ptr,ATTR_RECORD_SIZE);
+				} else {
+					memcpy(attr,ptr,d->attrsize);
+					memset(attr+d->attrsize,0,ATTR_RECORD_SIZE-d->attrsize);
+				}
 				return 1;
 			} else {
 				return 0;
@@ -293,7 +306,7 @@ static inline uint8_t dcache_inodehash_get(dircache *d,uint32_t inode,uint8_t at
 	return 0;
 }
 
-static inline uint8_t dcache_inodehash_set(dircache *d,uint32_t inode,const uint8_t attr[35]) {
+static inline uint8_t dcache_inodehash_set(dircache *d,uint32_t inode,const uint8_t attr[ATTR_RECORD_SIZE]) {
 	uint32_t hash,disp,hashmask;
 	const uint8_t *ptr;
 
@@ -305,7 +318,11 @@ static inline uint8_t dcache_inodehash_set(dircache *d,uint32_t inode,const uint
 	disp = ((inode*0x53B23891)&hashmask)|1;
 	while ((ptr=d->inodehashtab[hash&hashmask])) {
 		if (inode==get32bit(&ptr)) {
-			memcpy((uint8_t*)ptr,attr,35);
+			if (d->attrsize<ATTR_RECORD_SIZE) {
+				memcpy((uint8_t*)ptr,attr,d->attrsize);
+			} else {
+				memcpy((uint8_t*)ptr,attr,ATTR_RECORD_SIZE);
+			}
 			return 1;
 		}
 		hash+=disp;
@@ -325,7 +342,7 @@ static inline uint8_t dcache_inodehash_invalidate_attr(dircache *d,uint32_t inod
 	disp = ((inode*0x53B23891)&hashmask)|1;
 	while ((ptr=d->inodehashtab[hash&hashmask])) {
 		if (inode==get32bit(&ptr)) {
-			memset((uint8_t*)ptr,0,35);
+			memset((uint8_t*)ptr,0,d->attrsize);
 			return 1;
 		}
 		hash+=disp;
@@ -333,7 +350,7 @@ static inline uint8_t dcache_inodehash_invalidate_attr(dircache *d,uint32_t inod
 	return 0;
 }
 
-uint8_t dcache_lookup(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t *inode,uint8_t attr[35]) {
+uint8_t dcache_lookup(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]) {
 	dircache *d;
 	zassert(pthread_mutex_lock(&glock));
 	for (d=head ; d ; d=d->next) {
@@ -348,7 +365,7 @@ uint8_t dcache_lookup(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,c
 	return 0;
 }
 
-uint8_t dcache_getattr(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35]) {
+uint8_t dcache_getattr(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[ATTR_RECORD_SIZE]) {
 	dircache *d;
 	zassert(pthread_mutex_lock(&glock));
 	for (d=head ; d ; d=d->next) {
@@ -363,7 +380,7 @@ uint8_t dcache_getattr(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[35
 	return 0;
 }
 
-void dcache_setattr(uint32_t inode,const uint8_t attr[35]) {
+void dcache_setattr(uint32_t inode,const uint8_t attr[ATTR_RECORD_SIZE]) {
 	dircache *d;
 	zassert(pthread_mutex_lock(&glock));
 	for (d=head ; d ; d=d->next) {

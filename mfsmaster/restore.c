@@ -298,7 +298,7 @@ int do_amtime(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 }
 
 int do_attr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t inode,mode,uid,gid,atime,mtime,aclmode;
+	uint32_t inode,mode,uid,gid,atime,mtime,winattr,aclmode;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
@@ -314,12 +314,20 @@ int do_attr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	if (*ptr==',') {
 		EAT(ptr,filename,lv,',');
 		GETU32(aclmode,ptr);
+		if (*ptr==',') {
+			EAT(ptr,filename,lv,',');
+			winattr = aclmode;
+			GETU32(aclmode,ptr);
+		} else {
+			winattr = 0;
+		}
 	} else {
 		aclmode = mode;
+		winattr = 0;
 	}
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_attr(ts,inode,mode,uid,gid,atime,mtime,aclmode);
+	return fs_mr_attr(ts,inode,mode,uid,gid,atime,mtime,winattr,aclmode);
 }
 
 /*

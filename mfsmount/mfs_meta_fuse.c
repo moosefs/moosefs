@@ -96,7 +96,7 @@ typedef struct _pathbuf {
 //#define MASTER_NAME ".master"
 //#define MASTER_INODE 0x7FFFFFFE
 // 0x01b6 = 0666
-//static uint8_t masterattr[35]={'f', 0x01,0xB6, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0};
+//static uint8_t masterattr[ATTR_RECORD_SIZE]={'f', 0x01,0xB6, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0};
 
 #define MASTERINFO_WITH_VERSION 1
 
@@ -104,9 +104,9 @@ typedef struct _pathbuf {
 #define MASTERINFO_INODE 0x7FFFFFFF
 // 0x0124 = 0444
 #ifdef MASTERINFO_WITH_VERSION
-static uint8_t masterinfoattr[35]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,14};
+static uint8_t masterinfoattr[ATTR_RECORD_SIZE]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,14};
 #else
-static uint8_t masterinfoattr[35]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,10};
+static uint8_t masterinfoattr[ATTR_RECORD_SIZE]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,10};
 #endif
 
 #define MIN_SPECIAL_INODE 0x7FFF0000
@@ -281,7 +281,7 @@ static void mfs_inode_to_stat(uint32_t inode, struct stat *stbuf) {
 }
 */
 
-static void mfs_attr_to_stat(uint32_t inode,const uint8_t attr[35], struct stat *stbuf) {
+static void mfs_attr_to_stat(uint32_t inode,const uint8_t attr[ATTR_RECORD_SIZE], struct stat *stbuf) {
 	uint16_t attrmode;
 	uint8_t attrtype;
 	uint32_t attruid,attrgid,attratime,attrmtime,attrctime,attrnlink;
@@ -436,7 +436,7 @@ void mfs_meta_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			inode = mfs_meta_name_to_inode(name);
 			if (inode>0) {
 				int status;
-				uint8_t attr[35];
+				uint8_t attr[ATTR_RECORD_SIZE];
 				status = fs_getdetachedattr(inode,attr);
 				status = mfs_errorconv(status);
 				if (status!=0) {
@@ -468,7 +468,7 @@ void mfs_meta_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			inode = mfs_meta_name_to_inode(name);
 			if (inode>0) {
 				int status;
-				uint8_t attr[35];
+				uint8_t attr[ATTR_RECORD_SIZE];
 				status = fs_getdetachedattr(inode,attr);
 				status = mfs_errorconv(status);
 				if (status!=0) {
@@ -496,7 +496,7 @@ void mfs_meta_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 				inode = mfs_meta_name_to_inode(name);
 				if (inode>0) {
 					int status;
-					uint8_t attr[35];
+					uint8_t attr[ATTR_RECORD_SIZE];
 					status = fs_getdetachedattr(inode,attr);
 					status = mfs_errorconv(status);
 					if (status!=0) {
@@ -542,7 +542,7 @@ void mfs_meta_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 		fuse_reply_attr(req, &o_stbuf, attr_cache_timeout);
 	} else {
 		int status;
-		uint8_t attr[35];
+		uint8_t attr[ATTR_RECORD_SIZE];
 		status = fs_getdetachedattr(ino,attr);
 		status = mfs_errorconv(status);
 		if (status!=0) {
@@ -891,7 +891,7 @@ void mfs_meta_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 }
 
 void mfs_meta_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi) {
-        dirbuf *dirinfo = (dirbuf *)((unsigned long)(fi->fh));
+	dirbuf *dirinfo = (dirbuf *)((unsigned long)(fi->fh));
 	char buffer[READDIR_BUFFSIZE];
 	char *name,c;
 	const uint8_t *ptr,*eptr;

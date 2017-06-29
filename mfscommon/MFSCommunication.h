@@ -512,6 +512,7 @@
 #define ATIME_NEVER 4
 
 
+#define ATTR_RECORD_SIZE                   36
 
 #define CSTOMA_MAXPACKETSIZE 500000000
 #define CLTOMA_MAXPACKETSIZE 1000000
@@ -862,11 +863,18 @@
 //           \       \------- mode
 //            \-------------- flags
 //
-// attr record (1.7.32 and up):
+// attr record (1.7.32 to 3.0.92) - 35B
 //
 //   flags:8 type:4 mode:12 uid:32 gid:32 atime:32 mtime:32 ctime:32 nlink:32 [ length:64 | major:16 minor:16 empty:32 ]
 //
 //   in case of BLOCKDEV and CHARDEV instead of 'length:64' on the end there is 'major:16 minor:16 empty:32'
+//
+// attr record (3.0.93 and up) - 36B:
+//
+//   flags:8 type:4 mode:12 uid:32 gid:32 atime:32 mtime:32 ctime:32 nlink:32 [ length:64 | major:16 minor:16 empty:32 ] winattr:8
+//
+//   in case of BLOCKDEV and CHARDEV instead of 'length:64' on the end there is 'major:16 minor:16 empty:32'
+
 
 
 // NAME type:
@@ -978,8 +986,8 @@
 // 0x0197
 #define MATOCL_FUSE_LOOKUP (PROTO_BASE+407)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:35B - (master version or client version < 3.0.40)
-// msgid:32 inode:32 attr:35B lflags:16 [ protocolid:8 chunkid:64 version:32 N*[ ip:32 port:16 cs_ver:32 labelmask:32 ] ] - (master and client both versions >= 3.0.40 - protocolid==2 ; chunk 0 data only for one-chunk files with unlocked chunk)
+// msgid:32 inode:32 attr:ATTR - (master version or client version < 3.0.40)
+// msgid:32 inode:32 attr:ATTR lflags:16 [ protocolid:8 chunkid:64 version:32 N * [ ip:32 port:16 cs_ver:32 labelmask:32 ] ] - (master and client both versions >= 3.0.40 - protocolid==2 ; chunk 0 data only for one-chunk files with unlocked chunk)
 
 // 0x0198
 #define CLTOMA_FUSE_GETATTR (PROTO_BASE+408)
@@ -990,19 +998,20 @@
 // 0x0199
 #define MATOCL_FUSE_GETATTR (PROTO_BASE+409)
 // msgid:32 status:8
-// msgid:32 attr:35B
+// msgid:32 attr:ATTR
 
 // 0x019A
 #define CLTOMA_FUSE_SETATTR (PROTO_BASE+410)
 // msgid:32 inode:32 uid:32 gid:32 setmask:8 attrmode:16 attruid:32 attrgid:32 attratime:32 attrmtime:32 - versions < 1.6.25
 // msgid:32 inode:32 uid:32 gid:32 setmask:8 attrmode:16 attruid:32 attrgid:32 attratime:32 attrmtime:32 sugidclearmode:8 - version <= 1.6.27
 // msgid:32 inode:32 opened:8 uid:32 gid:32 setmask:8 attrmode:16 attruid:32 attrgid:32 attratime:32 attrmtime:32 sugidclearmode:8 - version < 2.0.0
-// msgid:32 inode:32 opened:8 uid:32 gcnt:32 gcnt * [ gid:32 ] setmask:8 attrmode:16 attruid:32 attrgid:32 attratime:32 attrmtime:32 sugidclearmode:8
+// msgid:32 inode:32 opened:8 uid:32 gcnt:32 gcnt * [ gid:32 ] setmask:8 attrmode:16 attruid:32 attrgid:32 attratime:32 attrmtime:32 sugidclearmode:8 - version < 3.0.93
+// msgid:32 inode:32 opened:8 uid:32 gcnt:32 gcnt * [ gid:32 ] setmask:8 attrmode:16 attruid:32 attrgid:32 attratime:32 attrmtime:32 winattr:8 sugidclearmode:8
 
 // 0x019B
 #define MATOCL_FUSE_SETATTR (PROTO_BASE+411)
 // msgid:32 status:8
-// msgid:32 attr:35B
+// msgid:32 attr:ATTR
 
 // 0x019C
 #define CLTOMA_FUSE_READLINK (PROTO_BASE+412)
@@ -1021,7 +1030,7 @@
 // 0x019F
 #define MATOCL_FUSE_SYMLINK (PROTO_BASE+415)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:35B
+// msgid:32 inode:32 attr:ATTR
 
 // 0x01A0
 #define CLTOMA_FUSE_MKNOD (PROTO_BASE+416)
@@ -1031,7 +1040,7 @@
 // 0x01A1
 #define MATOCL_FUSE_MKNOD (PROTO_BASE+417)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:35B
+// msgid:32 inode:32 attr:ATTR
 
 // 0x01A2
 #define CLTOMA_FUSE_MKDIR (PROTO_BASE+418)
@@ -1042,7 +1051,7 @@
 // 0x01A3
 #define MATOCL_FUSE_MKDIR (PROTO_BASE+419)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:35B
+// msgid:32 inode:32 attr:ATTR
 
 // 0x01A4
 #define CLTOMA_FUSE_UNLINK (PROTO_BASE+420)
@@ -1071,7 +1080,7 @@
 #define MATOCL_FUSE_RENAME (PROTO_BASE+425)
 // msgid:32 status:8
 // since 1.6.21 (after successful rename):
-// msgid:32 inode:32 attr:35B
+// msgid:32 inode:32 attr:ATTR
 
 // 0x01AA
 #define CLTOMA_FUSE_LINK (PROTO_BASE+426)
@@ -1081,7 +1090,7 @@
 // 0x01AB
 #define MATOCL_FUSE_LINK (PROTO_BASE+427)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:35B
+// msgid:32 inode:32 attr:ATTR
 
 // 0x01AC
 #define CLTOMA_FUSE_READDIR (PROTO_BASE+428)
@@ -1092,7 +1101,7 @@
 #define MATOCL_FUSE_READDIR (PROTO_BASE+429)
 // msgid:32 status:8
 // msgid:32 [ nedgeid:64 ] N*[ name:NAME inode:32 type:8 ]	- when GETDIR_FLAG_WITHATTR in flags is not set
-// msgid:32 [ nedgeid:64 ] N*[ name:NAME inode:32 attr:35B ]	- when GETDIR_FLAG_WITHATTR in flags is set
+// msgid:32 [ nedgeid:64 ] N*[ name:NAME inode:32 attr:ATTR ]	- when GETDIR_FLAG_WITHATTR in flags is set
 
 
 // 0x01AE
@@ -1103,7 +1112,7 @@
 // 0x01AF
 #define MATOCL_FUSE_OPEN (PROTO_BASE+431)
 // msgid:32 status:8
-// msgid:32 attr:35B
+// msgid:32 attr:ATTR
 
 // 0x01B0
 #define CLTOMA_FUSE_READ_CHUNK (PROTO_BASE+432)
@@ -1235,7 +1244,7 @@
 // 0x01C5
 #define MATOCL_FUSE_GETDETACHEDATTR (PROTO_BASE+453)
 // msgid:32 status:8
-// msgid:32 attr:35B
+// msgid:32 attr:ATTR
 
 
 // 0x01C6
@@ -1297,7 +1306,7 @@
 // 0x01D1
 #define MATOCL_FUSE_TRUNCATE (PROTO_BASE+465)
 // msgid:32 status:8
-// msgid:32 attr:35B
+// msgid:32 attr:ATTR
 
 
 // 0x01D2
@@ -1402,7 +1411,7 @@
 // 0x01E3
 #define MATOCL_FUSE_CREATE (PROTO_BASE+483)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:35B
+// msgid:32 inode:32 attr:ATTR
 
 // 0x01E4
 #define CLTOMA_FUSE_PARENTS (PROTO_BASE+484)

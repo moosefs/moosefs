@@ -71,7 +71,7 @@
 #define MASKORGROUP 4
 
 #define MFS_NAME_MAX 255
-#define MFS_SYMLINK_MAX 1024
+#define MFS_SYMLINK_MAX 4096
 #define MFS_PATH_MAX 1024
 
 #define MFS_MAX_FILE_SIZE (((uint64_t)(MFSCHUNKSIZE))<<31)

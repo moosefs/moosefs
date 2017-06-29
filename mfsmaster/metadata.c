@@ -44,6 +44,7 @@
 
 #include "bio.h"
 #include "sessions.h"
+#include "dictionary.h"
 #include "xattr.h"
 #include "posixacl.h"
 #include "flocklocks.h"
@@ -821,6 +822,10 @@ void meta_cleanup(void) {
 	fflush(stderr);
 	sclass_cleanup();
 	fprintf(stderr,"done\n");
+	fprintf(stderr,"cleaning dictioanry data ...");
+	fflush(stderr);
+	dict_cleanup();
+	fprintf(stderr,"done\n");
 	metaversion = 0;
 	mfs_syslog(LOG_NOTICE,"metadata have been cleaned");
 }
@@ -1137,7 +1142,7 @@ int meta_loadall(void) {
 			filenames = (char**)malloc(sizeof(char*)*files);
 			rewinddir(dd);
 			pos = 0;
-	                while ((dp = readdir(dd)) != NULL) {
+			while ((dp = readdir(dd)) != NULL) {
 				if (changelog_checkname(dp->d_name)) {
 					uint64_t firstlv,lastlv;
 					uint8_t skip;
@@ -1364,6 +1369,10 @@ uint8_t meta_mr_setmetaid(uint64_t newmetaid) {
 int meta_init(void) {
 	metaversion = 0;
 	metaid = 0;
+	if (dict_init()<0) {
+		mfs_syslog(LOG_ERR,"dictionary init error");
+		return -1;
+	}
 	if (sclass_init()<0) {
 		mfs_syslog(LOG_ERR,"storage class init error");
 		return -1;

@@ -3361,7 +3361,7 @@ static inline void fsnodes_remove_snapshot(uint32_t ts,fsedge *e,uint32_t sesfla
 	}
 }
 
-static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentnode,uint32_t nleng,const uint8_t *name,uint8_t smode,uint8_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t cumask,uint8_t mr) {
+static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentnode,uint32_t nleng,const uint8_t *name,uint8_t smode,uint8_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t cumask,uint8_t mr,uint8_t newflag) {
 	fsedge *e;
 	fsnode *dstnode;
 	uint32_t i;
@@ -3382,12 +3382,12 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 	if (accessstatus==0) {
 		return;
 	}
-	if ((e=fsnodes_lookup(parentnode,nleng,name))) { // element already exists
+	if (newflag==0 && (e=fsnodes_lookup(parentnode,nleng,name))) { // element already exists
 		dstnode = e->child;
 		if (srcnode->type==TYPE_DIRECTORY) {
 			if (rec) {
 				for (e = srcnode->data.ddata.children ; e ; e=e->nextchild) {
-					fsnodes_snapshot(ts,e->child,dstnode,e->nleng,e->name,smode,sesflags,uid,gids,gid,cumask,mr);
+					fsnodes_snapshot(ts,e->child,dstnode,e->nleng,e->name,smode,sesflags,uid,gids,gid,cumask,mr,0);
 				}
 			}
 		} else if (srcnode->type==TYPE_FILE) {
@@ -3539,7 +3539,7 @@ static inline void fsnodes_snapshot(uint32_t ts,fsnode *srcnode,fsnode *parentno
 			if (srcnode->type==TYPE_DIRECTORY) {
 				if (rec) {
 					for (e = srcnode->data.ddata.children ; e ; e=e->nextchild) {
-						fsnodes_snapshot(ts,e->child,dstnode,e->nleng,e->name,smode,sesflags,uid,gids,gid,cumask,mr);
+						fsnodes_snapshot(ts,e->child,dstnode,e->nleng,e->name,smode,sesflags,uid,gids,gid,cumask,mr,1);
 					}
 				}
 			} else if (srcnode->type==TYPE_FILE) {
@@ -5185,7 +5185,7 @@ uint8_t fs_univ_snapshot(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_
 //		if (smode & SNAPSHOT_MODE_PRESERVE_HARDLINKS) {
 //			chash_erase(snapshot_inodehash);
 //		}
-		fsnodes_snapshot(ts,sp,dwd,nleng_dst,name_dst,smode,sesflags,uid,gids,gid,cumask,((sesflags&SESFLAG_METARESTORE)==0)?0:1);
+		fsnodes_snapshot(ts,sp,dwd,nleng_dst,name_dst,smode,sesflags,uid,gids,gid,cumask,((sesflags&SESFLAG_METARESTORE)==0)?0:1,0);
 		if (smode & SNAPSHOT_MODE_PRESERVE_HARDLINKS) {
 			chash_erase(snapshot_inodehash);
 		}

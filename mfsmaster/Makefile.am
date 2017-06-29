@@ -56,11 +56,13 @@ mfsmaster_SOURCES=\
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/pcqueue.c ../mfscommon/pcqueue.h \
 	../mfscommon/cuckoohash.c ../mfscommon/cuckoohash.h \
+	../mfscommon/dictionary.c ../mfscommon/dictionary.h \
+	../mfscommon/hash_begin.h ../mfscommon/hash_end.h \
 	../mfscommon/datapack.h ../mfscommon/massert.h \
 	../mfscommon/slogger.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/hashfn.h ../mfscommon/median.h \
 	../mfscommon/buckets.h ../mfscommon/mfsalloc.h \
-	../mfscommon/MFSCommunication.h
+	../mfscommon/glue.h ../mfscommon/MFSCommunication.h
 
 
 mfsmaster_CPPFLAGS=$(AM_CPPFLAGS) -DMFSMAXFILES=16384 -DAPPNAME=mfsmaster

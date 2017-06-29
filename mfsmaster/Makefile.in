@@ -135,7 +135,8 @@ am_mfsmaster_OBJECTS = mfsmaster-itree.$(OBJEXT) \
 	../mfscommon/mfsmaster-cpuusage.$(OBJEXT) \
 	../mfscommon/mfsmaster-clocks.$(OBJEXT) \
 	../mfscommon/mfsmaster-pcqueue.$(OBJEXT) \
-	../mfscommon/mfsmaster-cuckoohash.$(OBJEXT)
+	../mfscommon/mfsmaster-cuckoohash.$(OBJEXT) \
+	../mfscommon/mfsmaster-dictionary.$(OBJEXT)
 mfsmaster_OBJECTS = $(am_mfsmaster_OBJECTS)
 mfsmaster_LDADD = $(LDADD)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -458,11 +459,13 @@ mfsmaster_SOURCES = \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/pcqueue.c ../mfscommon/pcqueue.h \
 	../mfscommon/cuckoohash.c ../mfscommon/cuckoohash.h \
+	../mfscommon/dictionary.c ../mfscommon/dictionary.h \
+	../mfscommon/hash_begin.h ../mfscommon/hash_end.h \
 	../mfscommon/datapack.h ../mfscommon/massert.h \
 	../mfscommon/slogger.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/hashfn.h ../mfscommon/median.h \
 	../mfscommon/buckets.h ../mfscommon/mfsalloc.h \
-	../mfscommon/MFSCommunication.h
+	../mfscommon/glue.h ../mfscommon/MFSCommunication.h
 
 mfsmaster_CPPFLAGS = $(AM_CPPFLAGS) -DMFSMAXFILES=16384 -DAPPNAME=mfsmaster
 mfsmaster_LDFLAGS = $(ZLIB_LIBS)
@@ -589,6 +592,9 @@ clean-sbinPROGRAMS:
 ../mfscommon/mfsmaster-cuckoohash.$(OBJEXT):  \
 	../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsmaster-dictionary.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 
 mfsmaster$(EXEEXT): $(mfsmaster_OBJECTS) $(mfsmaster_DEPENDENCIES) $(EXTRA_mfsmaster_DEPENDENCIES) 
 	@rm -f mfsmaster$(EXEEXT)
@@ -656,6 +662,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-cpuusage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-crc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-cuckoohash.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-dictionary.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-memusage.Po@am__quote@
@@ -1261,6 +1268,20 @@ mfsmaster-chartsdata.obj: chartsdata.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/cuckoohash.c' object='../mfscommon/mfsmaster-cuckoohash.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmaster-cuckoohash.obj `if test -f '../mfscommon/cuckoohash.c'; then $(CYGPATH_W) '../mfscommon/cuckoohash.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/cuckoohash.c'; fi`
+
+../mfscommon/mfsmaster-dictionary.o: ../mfscommon/dictionary.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmaster-dictionary.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmaster-dictionary.Tpo -c -o ../mfscommon/mfsmaster-dictionary.o `test -f '../mfscommon/dictionary.c' || echo '$(srcdir)/'`../mfscommon/dictionary.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmaster-dictionary.Tpo ../mfscommon/$(DEPDIR)/mfsmaster-dictionary.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/dictionary.c' object='../mfscommon/mfsmaster-dictionary.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmaster-dictionary.o `test -f '../mfscommon/dictionary.c' || echo '$(srcdir)/'`../mfscommon/dictionary.c
+
+../mfscommon/mfsmaster-dictionary.obj: ../mfscommon/dictionary.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmaster-dictionary.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmaster-dictionary.Tpo -c -o ../mfscommon/mfsmaster-dictionary.obj `if test -f '../mfscommon/dictionary.c'; then $(CYGPATH_W) '../mfscommon/dictionary.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/dictionary.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmaster-dictionary.Tpo ../mfscommon/$(DEPDIR)/mfsmaster-dictionary.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/dictionary.c' object='../mfscommon/mfsmaster-dictionary.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmaster-dictionary.obj `if test -f '../mfscommon/dictionary.c'; then $(CYGPATH_W) '../mfscommon/dictionary.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/dictionary.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

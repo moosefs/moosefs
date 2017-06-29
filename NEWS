@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.93-1 (2017-06-01)
+
+  - (master) redesigned xattr storage (much faster and uses less memory)
+  - (master) improved hash map in xattr and acl (static -> dynamic)
+
 * MooseFS 3.0.92-1 (2017-04-27)
 
   - (master+tools) added chunk slices to mfsappendchunks

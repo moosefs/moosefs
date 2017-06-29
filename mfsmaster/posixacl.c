@@ -32,8 +32,7 @@
 #include "massert.h"
 #include "filesystem.h"
 
-#define HASHSIZE 0x100000
-#define HASHFN(inode,acltype) (((inode)*0x56BF7623+(acltype))%(HASHSIZE))
+#include "glue.h"
 
 typedef struct acl_entry {
 	uint32_t id;
@@ -53,32 +52,30 @@ typedef struct acl_node {
 	struct acl_node *next;
 } acl_node;
 
-static acl_node** hashtab;
+#define LOHASH_BITS 20
+#define ENTRY_TYPE acl_node
+#define GLUE_FN_NAME_PREFIX(Y) GLUE(posix_acl_xxx,Y)
+#define HASH_ARGS_TYPE_LIST uint32_t inode,uint8_t acltype
+#define HASH_ARGS_LIST inode,acltype
+#define GLUE_HASH_TAB_PREFIX(Y) GLUE(pacl,Y)
 
-static void posix_acl_delete(uint32_t inode,uint8_t acltype) {
-	uint32_t h;
-	acl_node **acnp,*acn;
-
-	h = HASHFN(inode,acltype);
-	acnp = hashtab+h;
-	while ((acn=*acnp)!=NULL) {
-		if (acn->inode == inode && acn->acltype == acltype) {
-			*acnp = acn->next;
-			if (acn->acltab) {
-				free(acn->acltab);
-			}
-			free(acn);
-		} else {
-			acnp = &(acn->next);
-		}
-	}
+static inline int GLUE_FN_NAME_PREFIX(_cmp)(ENTRY_TYPE *e,HASH_ARGS_TYPE_LIST) {
+	return (e->inode==inode && e->acltype==acltype);
 }
 
+static inline uint32_t GLUE_FN_NAME_PREFIX(_hash)(HASH_ARGS_TYPE_LIST) {
+	return inode*0x56BF7623+acltype;
+}
+
+static inline uint32_t GLUE_FN_NAME_PREFIX(_ehash)(ENTRY_TYPE *e) {
+	return GLUE_FN_NAME_PREFIX(_hash)(e->inode,e->acltype);
+}
+
+#include "hash_begin.h"
+
 static acl_node* posix_acl_create(uint32_t inode,uint8_t acltype) {
-	uint32_t h;
 	acl_node *acn;
 
-	h = HASHFN(inode,acltype);
 	acn = malloc(sizeof(acl_node));
 	passert(acn);
 	acn->inode = inode;
@@ -90,27 +87,14 @@ static acl_node* posix_acl_create(uint32_t inode,uint8_t acltype) {
 	acn->namedusers = 0;
 	acn->namedgroups = 0;
 	acn->acltab = NULL;
-	acn->next = hashtab[h];
-	hashtab[h] = acn;
+	GLUE_FN_NAME_PREFIX(_add)(acn);
 	return acn;
-}
-
-static acl_node* posix_acl_find(uint32_t inode,uint8_t acltype) {
-	uint32_t h;
-	acl_node *acn;
-	h = HASHFN(inode,acltype);
-	for (acn=hashtab[h] ; acn!=NULL ; acn=acn->next) {
-		if (acn->inode == inode && acn->acltype == acltype) {
-			return acn;
-		}
-	}
-	return NULL;
 }
 
 uint16_t posix_acl_getmode(uint32_t inode) {
 	acl_node *acn;
 
-	acn = posix_acl_find(inode,POSIX_ACL_ACCESS);
+	acn = GLUE_FN_NAME_PREFIX(_find)(inode,POSIX_ACL_ACCESS);
 //	(acn->mask==0xFFFF) ???
 	return ((acn->userperm & 7) << 6) | ((acn->mask & 7) << 3) | (acn->otherperm & 7);
 }
@@ -118,7 +102,7 @@ uint16_t posix_acl_getmode(uint32_t inode) {
 void posix_acl_setmode(uint32_t inode,uint16_t mode) {
 	acl_node *acn;
 
-	acn = posix_acl_find(inode,POSIX_ACL_ACCESS);
+	acn = GLUE_FN_NAME_PREFIX(_find)(inode,POSIX_ACL_ACCESS);
 	if (acn!=NULL) {
 		acn->userperm &= 0xFFF8;
 		acn->userperm |= (mode>>6)&7;
@@ -140,7 +124,7 @@ uint8_t posix_acl_accmode(uint32_t inode,uint32_t auid,uint32_t agids,uint32_t *
 	if (auid==0) {
 		return modetoaccmode[7];
 	}
-	acn = posix_acl_find(inode,POSIX_ACL_ACCESS);
+	acn = GLUE_FN_NAME_PREFIX(_find)(inode,POSIX_ACL_ACCESS);
 	if (acn==NULL) {
 		return modetoaccmode[0];
 	}
@@ -182,7 +166,7 @@ uint8_t posix_acl_copydefaults(uint32_t parent,uint32_t inode,uint8_t directory,
 	acl_node *acn;
 
 	ret = 0;
-	pacn = posix_acl_find(parent,POSIX_ACL_DEFAULT);
+	pacn = GLUE_FN_NAME_PREFIX(_find)(parent,POSIX_ACL_DEFAULT);
 	if (pacn==NULL) {
 		return ret;
 	}
@@ -190,7 +174,7 @@ uint8_t posix_acl_copydefaults(uint32_t parent,uint32_t inode,uint8_t directory,
 	if (acls==0 && pacn->userperm<=7 && pacn->groupperm<=7 && pacn->otherperm<=7 && pacn->mask==0xFFFF) { // simple ACL as DEFAULT - just modify mode
 		*mode &= 0xFE00 | (pacn->userperm << 6) | (pacn->groupperm << 3) | pacn->otherperm;
 	} else {
-		acn = posix_acl_find(inode,POSIX_ACL_ACCESS);
+		acn = GLUE_FN_NAME_PREFIX(_find)(inode,POSIX_ACL_ACCESS);
 		if (acn==NULL) {
 			acn = posix_acl_create(inode,POSIX_ACL_ACCESS);
 			ret |= 1;
@@ -225,7 +209,7 @@ uint8_t posix_acl_copydefaults(uint32_t parent,uint32_t inode,uint8_t directory,
 		}
 	}
 	if (directory) {
-		acn = posix_acl_find(inode,POSIX_ACL_DEFAULT);
+		acn = GLUE_FN_NAME_PREFIX(_find)(inode,POSIX_ACL_DEFAULT);
 		if (acn==NULL) {
 			acn = posix_acl_create(inode,POSIX_ACL_DEFAULT);
 			ret |= 2;
@@ -256,7 +240,11 @@ uint8_t posix_acl_copydefaults(uint32_t parent,uint32_t inode,uint8_t directory,
 }
 
 void posix_acl_remove(uint32_t inode,uint8_t acltype) {
-	posix_acl_delete(inode,acltype);
+	acl_node *acn;
+	acn = GLUE_FN_NAME_PREFIX(_find)(inode,acltype);
+	if (acn) {
+		GLUE_FN_NAME_PREFIX(_delete)(acn);
+	}
 }
 
 void posix_acl_set(uint32_t inode,uint8_t acltype,uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t mask,uint16_t namedusers,uint16_t namedgroups,const uint8_t *aclblob) {
@@ -264,12 +252,12 @@ void posix_acl_set(uint32_t inode,uint8_t acltype,uint16_t userperm,uint16_t gro
 	acl_node *acn;
 
 	if (acltype==POSIX_ACL_ACCESS && ((namedusers | namedgroups) == 0) && userperm<=7 && groupperm<=7 && otherperm<=7 && mask==0xFFFF) {
-		posix_acl_delete(inode,acltype);
+		posix_acl_remove(inode,acltype);
 		fs_del_aclflag(inode,acltype);
 		return;
 	}
 
-	acn = posix_acl_find(inode,acltype);
+	acn = GLUE_FN_NAME_PREFIX(_find)(inode,acltype);
 	if (acn==NULL) {
 		acn = posix_acl_create(inode,acltype);
 		fs_set_aclflag(inode,acltype);
@@ -302,7 +290,7 @@ void posix_acl_set(uint32_t inode,uint8_t acltype,uint16_t userperm,uint16_t gro
 
 int32_t posix_acl_get_blobsize(uint32_t inode,uint8_t acltype,void **aclnode) {
 	acl_node *acn;
-	acn = posix_acl_find(inode,acltype);
+	acn = GLUE_FN_NAME_PREFIX(_find)(inode,acltype);
 
 	*aclnode = (void*)acn;
 	if (acn==NULL) {
@@ -332,31 +320,17 @@ void posix_acl_get_data(void *aclnode,uint16_t *userperm,uint16_t *groupperm,uin
 }
 
 uint8_t posix_acl_copy(uint32_t srcinode,uint32_t dstinode,uint8_t acltype) {
-	uint32_t h,acls;
+	uint32_t acls;
 	acl_node *sacn,*dacn;
 
-	h = HASHFN(srcinode,acltype);
-	for (sacn=hashtab[h] ; sacn!=NULL ; sacn=sacn->next) {
-		if (sacn->inode == srcinode && sacn->acltype == acltype) {
-			break;
-		}
-	}
-	if (sacn==NULL) {
-		return 0;
-	}
-	h = HASHFN(dstinode,acltype);
-	for (dacn=hashtab[h] ; dacn!=NULL ; dacn=dacn->next) {
-		if (dacn->inode == dstinode && dacn->acltype == acltype) {
-			break;
-		}
-	}
+	sacn = GLUE_FN_NAME_PREFIX(_find)(srcinode,acltype);
+	dacn = GLUE_FN_NAME_PREFIX(_find)(dstinode,acltype);
 	if (dacn==NULL) {
 		dacn = malloc(sizeof(acl_node));
 		passert(dacn);
 		dacn->inode = dstinode;
 		dacn->acltype = acltype;
-		dacn->next = hashtab[h];
-		hashtab[h] = dacn;
+		GLUE_FN_NAME_PREFIX(_add)(dacn);
 	} else {
 		if (dacn->acltab!=NULL) {
 			free(dacn->acltab);
@@ -380,68 +354,78 @@ uint8_t posix_acl_copy(uint32_t srcinode,uint32_t dstinode,uint8_t acltype) {
 }
 
 void posix_acl_cleanup(void) {
-	uint32_t h;
+	uint32_t i,j;
 	acl_node *acn,*nacn;
 
-	for (h=0 ; h<HASHSIZE ; h++) {
-		for (acn=hashtab[h] ; acn ; acn=nacn) {
-			nacn = acn->next;
-			if (acn->acltab) {
-				free(acn->acltab);
+	for (i=0 ; i<HASHTAB_HISIZE ; i++) {
+		if (GLUE_HASH_TAB_PREFIX(hashtab)[i]!=NULL) {
+			for (j=0 ; j<HASHTAB_LOSIZE ; j++) {
+				for (acn=GLUE_HASH_TAB_PREFIX(hashtab)[i][j] ; acn!=NULL ; acn=nacn) {
+					nacn = acn->next;
+					if (acn->acltab) {
+						free(acn->acltab);
+					}
+					free(acn);
+				}
+				GLUE_HASH_TAB_PREFIX(hashtab)[i][j] = NULL;
 			}
-			free(acn);
 		}
-		hashtab[h] = NULL;
 	}
+	GLUE_FN_NAME_PREFIX(_hash_cleanup)();
 }
 
 uint8_t posix_acl_store(bio *fd) {
 	uint8_t hdrbuff[4+1+2*6];
 	uint8_t aclbuff[6*100];
 	uint8_t *ptr;
-	uint32_t h,accnt,acbcnt;
+	uint32_t i,j,accnt,acbcnt;
 	acl_node *acn;
 
 	if (fd==NULL) {
 		return 0x10;
 	}
-	for (h=0 ; h<HASHSIZE ; h++) {
-		for (acn=hashtab[h] ; acn ; acn=acn->next) {
-			ptr = hdrbuff;
-			put32bit(&ptr,acn->inode);
-			put8bit(&ptr,acn->acltype);
-			put16bit(&ptr,acn->userperm);
-			put16bit(&ptr,acn->groupperm);
-			put16bit(&ptr,acn->otherperm);
-			put16bit(&ptr,acn->mask);
-			put16bit(&ptr,acn->namedusers);
-			put16bit(&ptr,acn->namedgroups);
-			if (bio_write(fd,hdrbuff,4+1+2*6)!=(4+1+2*6)) {
-				syslog(LOG_NOTICE,"write error");
-				return 0xFF;
-			}
-			accnt = 0;
-			acbcnt = 0;
-			ptr = aclbuff;
-			while (accnt<acn->namedusers+acn->namedgroups) {
-				if (acbcnt==100) {
-					if (bio_write(fd,aclbuff,6*100)!=(6*100)) {
+
+	for (i=0 ; i<HASHTAB_HISIZE ; i++) {
+		if (GLUE_HASH_TAB_PREFIX(hashtab)[i]!=NULL) {
+			for (j=0 ; j<HASHTAB_LOSIZE ; j++) {
+				for (acn=GLUE_HASH_TAB_PREFIX(hashtab)[i][j] ; acn!=NULL ; acn=acn->next) {
+					ptr = hdrbuff;
+					put32bit(&ptr,acn->inode);
+					put8bit(&ptr,acn->acltype);
+					put16bit(&ptr,acn->userperm);
+					put16bit(&ptr,acn->groupperm);
+					put16bit(&ptr,acn->otherperm);
+					put16bit(&ptr,acn->mask);
+					put16bit(&ptr,acn->namedusers);
+					put16bit(&ptr,acn->namedgroups);
+					if (bio_write(fd,hdrbuff,4+1+2*6)!=(4+1+2*6)) {
 						syslog(LOG_NOTICE,"write error");
 						return 0xFF;
 					}
+					accnt = 0;
 					acbcnt = 0;
 					ptr = aclbuff;
-				}
-				put32bit(&ptr,acn->acltab[accnt].id);
-				put16bit(&ptr,acn->acltab[accnt].perm);
-				accnt++;
-				acbcnt++;
-			}
-			if (acbcnt>0) {
-					if (bio_write(fd,aclbuff,6*acbcnt)!=(6*acbcnt)) {
-						syslog(LOG_NOTICE,"write error");
-						return 0xFF;
+					while (accnt<acn->namedusers+acn->namedgroups) {
+						if (acbcnt==100) {
+							if (bio_write(fd,aclbuff,6*100)!=(6*100)) {
+								syslog(LOG_NOTICE,"write error");
+								return 0xFF;
+							}
+							acbcnt = 0;
+							ptr = aclbuff;
+						}
+						put32bit(&ptr,acn->acltab[accnt].id);
+						put16bit(&ptr,acn->acltab[accnt].perm);
+						accnt++;
+						acbcnt++;
 					}
+					if (acbcnt>0) {
+						if (bio_write(fd,aclbuff,6*acbcnt)!=(6*acbcnt)) {
+							syslog(LOG_NOTICE,"write error");
+							return 0xFF;
+						}
+					}
+				}
 			}
 		}
 	}
@@ -512,7 +496,7 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 				return -1;
 			}
 		}
-		acn = posix_acl_find(inode,acltype);
+		acn = GLUE_FN_NAME_PREFIX(_find)(inode,acltype);
 		if (acn!=NULL) {
 			if (nl) {
 				fputc('\n',stderr);
@@ -553,7 +537,7 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 						fputc('\n',stderr);
 						// nl=0;
 					}
-					posix_acl_delete(inode,acltype);
+					GLUE_FN_NAME_PREFIX(_delete)(acn);
 					errno = err;
 					mfs_errlog(LOG_ERR,"loading posix_acl: read error");
 					return -1;
@@ -568,11 +552,15 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 }
 
 int posix_acl_init(void) {
-	uint32_t i;
-	hashtab = malloc(sizeof(acl_node*)*HASHSIZE);
-	passert(hashtab);
-	for (i=0 ; i<HASHSIZE ; i++) {
-		hashtab[i] = NULL;
-	}
+	GLUE_FN_NAME_PREFIX(_hash_init)();
 	return 0;
 }
+
+#include "hash_end.h"
+
+#undef LOHASH_BITS
+#undef ENTRY_TYPE
+#undef GLUE_FN_NAME_PREFIX
+#undef HASH_ARGS_TYPE_LIST
+#undef HASH_ARGS_LIST
+#undef GLUE_HASH_TAB_PREFIX

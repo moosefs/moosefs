@@ -19,13 +19,13 @@
  */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+# include "config.h"
 #endif
 
 #ifdef WIN32
-#include "portable.h"
+# include "portable.h"
 #else
-#define MMAP_ALLOC 1
+# define MMAP_ALLOC 1
 #endif
 
 #include <stdio.h>
@@ -33,8 +33,12 @@
 #include <string.h>
 #include <unistd.h>
 #ifndef WIN32
-#include <sys/poll.h>
-#include <syslog.h>
+# ifdef HAVE_POLL_H
+#  include <poll.h>
+# else
+#  include <sys/poll.h>
+# endif
+# include <syslog.h>
 #endif
 #include <sys/time.h>
 #include <time.h>
@@ -42,17 +46,17 @@
 #include <errno.h>
 #include <pthread.h>
 #ifdef MMAP_ALLOC
-#include <sys/types.h>
-#include <sys/mman.h>
+# include <sys/types.h>
+# include <sys/mman.h>
 #endif
 #ifndef WIN32
-#include <pwd.h>
-#include <grp.h>
+# include <pwd.h>
+# include <grp.h>
 #endif
 
 #include "MFSCommunication.h"
 #ifndef WIN32
-#include "stats.h"
+# include "stats.h"
 #endif
 #include "sockets.h"
 #include "strerr.h"

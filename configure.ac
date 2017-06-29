@@ -192,6 +192,9 @@ AC_CHECK_HEADERS([sys/xattr.h])
 # check for bsd-locks (flock) optional header
 AC_CHECK_HEADERS([sys/file.h])
 
+# check if poll is in poll.h instead of sys/poll.h
+AC_CHECK_HEADERS([poll.h], [AC_CHECK_FUNCS([poll])])
+
 # optional I/O functions
 AC_CHECK_FUNCS([pread pwrite readv writev])
 

@@ -29,7 +29,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <syslog.h>
-#include <sys/poll.h>
+#ifdef HAVE_POLL_H
+# include <poll.h>
+#else
+# include <sys/poll.h>
+#endif
 #include <inttypes.h>
 #include <pthread.h>
 

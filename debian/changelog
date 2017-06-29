@@ -1,3 +1,30 @@
+moosefs (3.0.94-1) unstable; urgency=medium
+
+  * (mount) fixed support for CREATE/REPLACE flags in setxattr
+  * (mount) added headers for flock defines
+  * (all) added check for poll.h header file and use it instead of sys/poll.h
+    if possible
+  * (master) added test for WRITE access on directory during moving between
+    different parents
+  * (master) added clearing suig/sgid during write
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 22 Jun 2017 13:00:00 +0200
+
+moosefs (3.0.93-1) unstable; urgency=medium
+
+  * (master) redesigned xattr storage (much faster and uses less memory)
+  * (master) improved hash map in xattr and acl (static -> dynamic)
+  * (cgi+cli) added possibility to define master group as set of IP adresses
+    divided by comma or semicolon
+  * (cs) fixed using fsync on closed descriptors (after change
+    FSYNC_BEFORE_CLOSE option)
+  * (master) fixed removing default acl
+  * (master+mount) added support for basic Windows attributes
+    (hidden,ro,system,archive)
+  * (cgi+cli) fixed working with followers only
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 01 Jun 2017 13:00:00 +0200
+
 moosefs (3.0.92-1) unstable; urgency=medium
 
   * (master+tools) added chunk slices to mfsappendchunks

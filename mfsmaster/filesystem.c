@@ -4479,32 +4479,34 @@ uint8_t fs_setattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,opened)==0) {
 		return MFS_ERROR_ENOENT;
 	}
-	if (uid!=0 && (sesflags&SESFLAG_MAPALL) && (setmask&(SET_UID_FLAG|SET_GID_FLAG))) {
-		return MFS_ERROR_EPERM;
-	}
-	if ((p->eattr&EATTR_NOOWNER)==0) {
-		if (uid!=0 && uid!=p->uid && (setmask&(SET_MODE_FLAG|SET_UID_FLAG|SET_GID_FLAG|SET_ATIME_FLAG|SET_MTIME_FLAG))) {
+	if (!(uid!=0 && setmask==SET_MODE_FLAG && attrmode==(p->mode&01777) && (p->mode&06000)!=0)) { // ignore permission tests for special case - clear suid/sgid during write
+		if (uid!=0 && (sesflags&SESFLAG_MAPALL) && (setmask&(SET_UID_FLAG|SET_GID_FLAG))) {
 			return MFS_ERROR_EPERM;
 		}
-		if (uid!=0 && uid!=p->uid && (setmask&(SET_ATIME_NOW_FLAG|SET_MTIME_NOW_FLAG))) {
-			if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_W,sesflags)) {
-				return MFS_ERROR_EACCES;
+		if ((p->eattr&EATTR_NOOWNER)==0) {
+			if (uid!=0 && uid!=p->uid && (setmask&(SET_MODE_FLAG|SET_UID_FLAG|SET_GID_FLAG|SET_ATIME_FLAG|SET_MTIME_FLAG))) {
+				return MFS_ERROR_EPERM;
 			}
-		}
-	}
-	if (uid!=0 && uid!=attruid && (setmask&SET_UID_FLAG)) {
-		return MFS_ERROR_EPERM;
-	}
-	if ((sesflags&SESFLAG_IGNOREGID)==0) {
-		if (uid!=0 && (setmask&SET_GID_FLAG)) {
-			gf = 0;
-			for (i=0 ; i<gids && gf==0 ; i++) {
-				if (gid[i]==attrgid) {
-					gf = 1;
+			if (uid!=0 && uid!=p->uid && (setmask&(SET_ATIME_NOW_FLAG|SET_MTIME_NOW_FLAG))) {
+				if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_W,sesflags)) {
+					return MFS_ERROR_EACCES;
 				}
 			}
-			if (gf==0) {
-				return MFS_ERROR_EPERM;
+		}
+		if (uid!=0 && uid!=attruid && (setmask&SET_UID_FLAG)) {
+			return MFS_ERROR_EPERM;
+		}
+		if ((sesflags&SESFLAG_IGNOREGID)==0) {
+			if (uid!=0 && (setmask&SET_GID_FLAG)) {
+				gf = 0;
+				for (i=0 ; i<gids && gf==0 ; i++) {
+					if (gid[i]==attrgid) {
+						gf = 1;
+					}
+				}
+				if (gf==0) {
+					return MFS_ERROR_EPERM;
+				}
 			}
 		}
 	}

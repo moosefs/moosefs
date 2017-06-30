@@ -7,6 +7,7 @@ moosefs (3.0.94-1) unstable; urgency=medium
   * (master) added test for WRITE access on directory during moving between
     different parents
   * (master) added clearing suig/sgid during write
+  * (master+mount) increased max symlink path size to 4096 (posix compliance)
 
  -- MooseFS Team <contact@moosefs.com>  Thu, 22 Jun 2017 13:00:00 +0200
 
@@ -22,6 +23,9 @@ moosefs (3.0.93-1) unstable; urgency=medium
   * (master+mount) added support for basic Windows attributes
     (hidden,ro,system,archive)
   * (cgi+cli) fixed working with followers only
+  * (all) added api for reading config parameters from master and chunkserver
+  * (tools) increased timeout from 10 seconds to 20 seconds (needed for huge
+    snapshots)
 
  -- MooseFS Team <contact@moosefs.com>  Thu, 01 Jun 2017 13:00:00 +0200
 

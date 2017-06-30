@@ -67,7 +67,7 @@ static inline uint32_t GLUE_FN_NAME_PREFIX(_hash)(HASH_ARGS_TYPE_LIST) {
 }
 
 static inline uint32_t GLUE_FN_NAME_PREFIX(_ehash)(ENTRY_TYPE *e) {
-	return GLUE_FN_NAME_PREFIX(_hash)(e->value);
+	return e->value;
 }
 #endif
 

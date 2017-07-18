@@ -6930,7 +6930,7 @@ if "MC" in sectionset:
 					else:
 						host = " / "+hostx
 					entrystr.append(namearg)
-					entrydesc[namearg] = "Server: %s%s%s" % (name,host," *" if strip==masterconn.host else "")
+					entrydesc[namearg] = "Server: %s%s%s" % (name,host," *" if (leaderfound and strip==masterconn.host) else "")
 					servers.append((strip,port,"ma_"+name.replace(".","_").replace(":","_"),entrydesc[namearg],nc))
 				if MCdata not in entrystr:
 					out.append("""<option value="" selected="selected"> data type or server</option>""")

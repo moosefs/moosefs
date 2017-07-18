@@ -5,6 +5,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount+master) added update master version during reconnection to master (after updating master server)
   - (master) fixed winattr field size in setattr command
   - (mount) fixed dirattrcache (freezes or inefficiences during listing directories - introduced in 3.0.93)
+  - (cgi) fixed displaying master charts without leader (pro only)
 
 * MooseFS 3.0.94-1 (2017-06-22)
 

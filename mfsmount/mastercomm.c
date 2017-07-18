@@ -1807,7 +1807,7 @@ void fs_reconnect() {
 			return;
 		}
 		i = get32bit(&rptr);
-		if (i!=1 && i!=4) {
+		if (i!=1 && i!=4 && i!=5) {
 			syslog(LOG_WARNING,"master: register error (bad length: %"PRIu32")",i);
 			tcpclose(fd);
 			fd=-1;
@@ -1847,6 +1847,10 @@ void fs_reconnect() {
 			}
 		}
 	} while (i==4);
+	if (i==5) {
+		masterversion = get32bit(&rptr);
+		attrsize = ATTR_RECORD_SIZE;
+	}
 	if (rptr[0]!=0) {
 		sessionlost=(rptr[0]==MFS_ERROR_EPERM)?2:1;
 		syslog(LOG_WARNING,"master: register status: %s",mfs_strerror(rptr[0]));

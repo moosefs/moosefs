@@ -1615,7 +1615,14 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 					}
 				}
 			}
-			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,1);
+			if (rcode==REGISTER_RECONNECT && eptr->version>=VERSION2INT(3,0,95)) {
+				wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,5);
+				put16bit(&wptr,VERSMAJ);
+				put8bit(&wptr,VERSMID);
+				put8bit(&wptr,VERSMIN);
+			} else {
+				wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,1);
+			}
 			put8bit(&wptr,status);
 			if (status!=MFS_STATUS_OK) {
 				eptr->sesdata = NULL;

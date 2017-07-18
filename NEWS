@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.95-1 (WIP)
 
   - (mount+master) added update master version during reconnection to master (after updating master server)
+  - (master) fixed winattr field size in setattr command
 
 * MooseFS 3.0.94-1 (2017-06-22)
 

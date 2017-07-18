@@ -2137,7 +2137,7 @@ void matoclserv_fuse_setattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	attratime = get32bit(&data);
 	attrmtime = get32bit(&data);
 	if (basesize==38) {
-		winattr = get32bit(&data);
+		winattr = get8bit(&data);
 	} else {
 		winattr = 0;
 	}

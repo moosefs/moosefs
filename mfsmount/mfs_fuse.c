@@ -4732,6 +4732,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	groups *gids;
 	void *xattr_value_release;
 	uint8_t aclxattr;
+	uint8_t use_cache;
 
 	if (no_xattrs) {
 		fuse_reply_err(req,ENOSYS);
@@ -4801,12 +4802,17 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	} else {
 		gids = NULL;
 	}
+	use_cache = 0;
 	if (xattr_cache_on) {
 		if (xattr_value_release==NULL) {
 			if (usedircache && dcache_getattr(&ctx,ino,attr) && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
 				status = MFS_ERROR_ENOATTR;
 				buff = NULL;
 				leng = 0;
+				use_cache = 2;
+				if (debug_mode) {
+					fprintf(stderr,"getxattr: sending negative answer using open dir cache\n");
+				}
 			} else {
 				if (aclxattr!=POSIX_ACL_NONE) {
 					status = mfs_getfacl(req,ino,aclxattr,&buff,&leng);
@@ -4820,14 +4826,21 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 				}
 			}
 			xattr_cache_set(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,buff,leng,status);
-		} else if (debug_mode) {
-			fprintf(stderr,"getxattr: sending data from cache\n");
+		} else {
+			use_cache = 1;
+			if (debug_mode) {
+				fprintf(stderr,"getxattr: sending data from cache\n");
+			}
 		}
 	} else {
 		if (usedircache && dcache_getattr(&ctx,ino,attr) && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
 			status = MFS_ERROR_ENOATTR;
 			buff = NULL;
 			leng = 0;
+			use_cache = 2;
+			if (debug_mode) {
+				fprintf(stderr,"getxattr: sending negative answer using open dir cache\n");
+			}
 		} else {
 			if (aclxattr!=POSIX_ACL_NONE) {
 				status = mfs_getfacl(req,ino,aclxattr,&buff,&leng);
@@ -4846,7 +4859,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {
-		oplog_printf(&ctx,"getxattr (%lu,%s,%llu)%s: %s",(unsigned long int)ino,name,(unsigned long long int)size,(xattr_value_release==NULL)?"":" (using cache)",strerr(status));
+		oplog_printf(&ctx,"getxattr (%lu,%s,%llu)%s: %s",(unsigned long int)ino,name,(unsigned long long int)size,(use_cache==0)?"":(use_cache==1)?" (using cache)":" (using open dir cache)",strerr(status));
 		fuse_reply_err(req,status);
 		if (xattr_value_release!=NULL) {
 			xattr_cache_rel(xattr_value_release);
@@ -4854,14 +4867,14 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 		return;
 	}
 	if (size==0) {
-		oplog_printf(&ctx,"getxattr (%lu,%s,%llu)%s: OK (%"PRIu32")",(unsigned long int)ino,name,(unsigned long long int)size,(xattr_value_release==NULL)?"":" (using cache)",leng);
+		oplog_printf(&ctx,"getxattr (%lu,%s,%llu)%s: OK (%"PRIu32")",(unsigned long int)ino,name,(unsigned long long int)size,(use_cache==0)?"":(use_cache==1)?" (using cache)":" (using open dir cache)",leng);
 		fuse_reply_xattr(req,leng);
 	} else {
 		if (leng>size) {
-			oplog_printf(&ctx,"getxattr (%lu,%s,%llu)%s: %s",(unsigned long int)ino,name,(unsigned long long int)size,(xattr_value_release==NULL)?"":" (using cache)",strerr(ERANGE));
+			oplog_printf(&ctx,"getxattr (%lu,%s,%llu)%s: %s",(unsigned long int)ino,name,(unsigned long long int)size,(use_cache==0)?"":(use_cache==1)?" (using cache)":" (using open dir cache)",strerr(ERANGE));
 			fuse_reply_err(req,ERANGE);
 		} else {
-			oplog_printf(&ctx,"getxattr (%lu,%s,%llu)%s: OK (%"PRIu32")",(unsigned long int)ino,name,(unsigned long long int)size,(xattr_value_release==NULL)?"":" (using cache)",leng);
+			oplog_printf(&ctx,"getxattr (%lu,%s,%llu)%s: OK (%"PRIu32")",(unsigned long int)ino,name,(unsigned long long int)size,(use_cache==0)?"":(use_cache==1)?" (using cache)":" (using open dir cache)",leng);
 			fuse_reply_buf(req,(const char*)buff,leng);
 		}
 	}

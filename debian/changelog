@@ -1,3 +1,15 @@
+moosefs (3.0.95-1) unstable; urgency=medium
+
+  * (mount+master) added update master version during reconnection to master
+    (after updating master server)
+  * (master) fixed winattr field size in setattr command
+  * (mount) fixed dirattrcache (freezes or inefficiences during listing
+    directories - introduced in 3.0.93)
+  * (cgi) fixed displaying master charts without leader (pro only)
+  * (mount) added info about using open dir cache in oplog/ophisotry
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 17 Jul 2017 13:00:00 +0200
+
 moosefs (3.0.94-1) unstable; urgency=medium
 
   * (mount) fixed support for CREATE/REPLACE flags in setxattr

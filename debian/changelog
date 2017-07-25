@@ -1,3 +1,9 @@
+moosefs (3.0.96-1) unstable; urgency=medium
+
+  * (tools) fixed segfault in mfsscadmin
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 25 Jul 2017 13:00:00 +0200
+
 moosefs (3.0.95-1) unstable; urgency=medium
 
   * (mount+master) added update master version during reconnection to master

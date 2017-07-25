@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.96-1 (WIP)
+* MooseFS 3.0.96-1 (2017-07-25)
 
   - (tools) fixed segfault in mfsscadmin
 

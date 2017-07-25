@@ -5223,8 +5223,11 @@ int main(int argc,char **argv) {
 				scadmin_mp = *argv;
 				argv++;
 				argc--;
+				if (argc==0) {
+					fprintf(stderr,"missing command after mountpoint\n\n");
+					usage(MFSSCADMIN);
+				}
 			}
-			fprintf(stderr,"%s ; %u\n",argv[0],CHECKNAME("list"));
 			if (CHECKNAME("create")) {
 				f = MFSMKSC;
 			} else if (CHECKNAME("make")) {
@@ -5246,7 +5249,7 @@ int main(int argc,char **argv) {
 			} else if (CHECKNAME("list")) {
 				f = MFSLSSC;
 			} else {
-				fprintf(stderr,"unknown storage class admin command\n");
+				fprintf(stderr,"unknown storage class admin command\n\n");
 				usage(MFSSCADMIN);
 			}
 		}

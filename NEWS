@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.96-1 (WIP)
+
+  - (tools) fixed segfault in mfsscadmin
+
 * MooseFS 3.0.95-1 (2017-07-17)
 
   - (mount+master) added update master version during reconnection to master (after updating master server)

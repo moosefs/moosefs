@@ -815,41 +815,41 @@
 
 // Storage Class
 
-#define CLTOMA_SCLASS_CREATE 350
+#define CLTOMA_SCLASS_CREATE (PROTO_BASE+350)
 // msgid:32 storage_class_name:NAME fver:8 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
-#define MATOCL_SCLASS_CREATE 351
+#define MATOCL_SCLASS_CREATE (PROTO_BASE+351)
 // msgid:32 status:8
 
-#define CLTOMA_SCLASS_CHANGE 352
+#define CLTOMA_SCLASS_CHANGE (PROTO_BASE+352)
 // msgid:32 storage_class_name:NAME fver:8 chgmask:16 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
-#define MATOCL_SCLASS_CHANGE 353
+#define MATOCL_SCLASS_CHANGE (PROTO_BASE+353)
 // msgid:32 status:8
 // msgid:32 fver:8 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
-#define CLTOMA_SCLASS_DELETE 354
+#define CLTOMA_SCLASS_DELETE (PROTO_BASE+354)
 // msgid:32 storage_class_name:NAME
 
-#define MATOCL_SCLASS_DELETE 355
+#define MATOCL_SCLASS_DELETE (PROTO_BASE+355)
 // msgid:32 status:8
 
-#define CLTOMA_SCLASS_DUPLICATE 356
+#define CLTOMA_SCLASS_DUPLICATE (PROTO_BASE+356)
 // msgid:32 storage_class_oldname:NAME storage_class_newname:NAME
 
-#define MATOCL_SCLASS_DUPLICATE 357
+#define MATOCL_SCLASS_DUPLICATE (PROTO_BASE+357)
 // msgid:32 status:8
 
-#define CLTOMA_SCLASS_RENAME 358
+#define CLTOMA_SCLASS_RENAME (PROTO_BASE+358)
 // msgid:32 storage_class_oldname:NAME storage_class_newname:NAME
 
-#define MATOCL_SCLASS_RENAME 359
+#define MATOCL_SCLASS_RENAME (PROTO_BASE+359)
 // msgid:32 status:8
 
-#define CLTOMA_SCLASS_LIST 360
+#define CLTOMA_SCLASS_LIST (PROTO_BASE+360)
 // msgid:32 fver:8
 
-#define MATOCL_SCLASS_LIST 361
+#define MATOCL_SCLASS_LIST (PROTO_BASE+361)
 // msgid:32
 // fver==0:
 //	N * [ storage_class_name:NAME ]

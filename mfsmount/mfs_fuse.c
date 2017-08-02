@@ -4224,7 +4224,7 @@ void mfs_getlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 		type = POSIX_LOCK_WRLCK;
 		ctype = 'W';
 	} else {
-		return;
+		invalid = 1;
 	}
 	if (invalid) {
 		if (debug_mode) {
@@ -4333,7 +4333,7 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 		type = POSIX_LOCK_WRLCK;
 		ctype = 'W';
 	} else {
-		return;
+		invalid = 1;
 	}
 	if (invalid) {
 		if (debug_mode) {

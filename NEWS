@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.97-1 (WIP)
 
   - (tools) fixed trash/sustained size desynchronization after file length changed by chunk creation
+  - (mount) fixed handling invalid arguments in posix lock command
 
 * MooseFS 3.0.96-1 (2017-07-25)
 

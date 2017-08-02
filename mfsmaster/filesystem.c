@@ -5620,7 +5620,16 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t
 		return status;
 	}
 	p->data.fdata.chunktab[indx] = nchunkid;
-	p->data.fdata.length = nlength;
+	if (nlength>p->data.fdata.length) {
+		if (p->type==TYPE_TRASH) {
+			trashspace -= p->data.fdata.length;
+			trashspace += nlength;
+		} else if (p->type==TYPE_SUSTAINED) {
+			sustainedspace -= p->data.fdata.length;
+			sustainedspace += nlength;
+		}
+		p->data.fdata.length = nlength;
+	}
 	fsnodes_get_stats(p,&nsr);
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
@@ -5680,7 +5689,16 @@ uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint
 		return status;
 	}
 	p->data.fdata.chunktab[indx] = nchunkid;
-	p->data.fdata.length = nlength;
+	if (nlength>p->data.fdata.length) {
+		if (p->type==TYPE_TRASH) {
+			trashspace -= p->data.fdata.length;
+			trashspace += nlength;
+		} else if (p->type==TYPE_SUSTAINED) {
+			sustainedspace -= p->data.fdata.length;
+			sustainedspace += nlength;
+		}
+		p->data.fdata.length = nlength;
+	}
 	fsnodes_get_stats(p,&nsr);
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);

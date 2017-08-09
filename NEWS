@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.98-1 (WIP)
+
+  - (mount) changed default cache mode on OS X from 'direct' to 'auto' due to problems with mmap
+
 * MooseFS 3.0.97-1 (2017-08-01)
 
   - (tools) fixed trash/sustained size desynchronization after file length changed by chunk creation

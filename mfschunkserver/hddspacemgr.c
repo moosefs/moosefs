@@ -6643,6 +6643,7 @@ int hdd_init(void) {
 	if (HDDRebalancePerc>100) {
 		HDDRebalancePerc=100;
 	}
+	DoFsyncBeforeClose = cfg_getuint8("HDD_FSYNC_BEFORE_CLOSE",0);
 	Sparsification = cfg_getuint8("HDD_SPARSIFY_ON_WRITE",1);
 
 	main_reload_register(hdd_reload);

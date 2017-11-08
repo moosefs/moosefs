@@ -258,7 +258,10 @@ void sinodes_pid_inodes(pid_t pid) {
 void sinodes_all_pids(void) {
 #if defined(__linux__) || defined(__NetBSD__)
 	DIR *dd;
-	struct dirent *de,*destorage;
+	struct dirent *de;
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
+	struct dirent *destorage;
+#endif
 	const char *np;
 	int pid;
 
@@ -266,12 +269,17 @@ void sinodes_all_pids(void) {
 	if (dd==NULL) {
 		return;
 	}
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
+	/* in new glibc readdir_r is obsoleted, so we should use readdir instead */
 	destorage = (struct dirent*)malloc(sizeof(struct dirent)+pathconf("/proc",_PC_NAME_MAX)+1);
 	if (destorage==NULL) {
 		closedir(dd);
 		return;
 	}
 	while (readdir_r(dd,destorage,&de)==0 && de!=NULL) {
+#else
+	while ((de = readdir(dd))!=NULL) {
+#endif
 		pid = 0;
 		np = de->d_name;
 		while (*np) {
@@ -288,7 +296,9 @@ void sinodes_all_pids(void) {
 			sinodes_pid_inodes(pid);
 		}
 	}
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
 	free(destorage);
+#endif
 	closedir(dd);
 #elif defined(__APPLE__) || defined(__FreeBSD__)
 	struct kinfo_proc *ki, *p;

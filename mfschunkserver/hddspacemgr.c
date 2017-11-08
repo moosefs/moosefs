@@ -5615,7 +5615,10 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen,uin
 void* hdd_folder_scan(void *arg) {
 	folder *f = (folder*)arg;
 	DIR *dd;
-	struct dirent *de,*destorage;
+	struct dirent *de;
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
+	struct dirent *destorage;
+#endif
 	uint16_t subf;
 	char *fullname,*oldfullname;
 	uint16_t plen,oldplen;
@@ -5655,8 +5658,10 @@ void* hdd_folder_scan(void *arg) {
 		fullname[plen]='\0';
 
 		/* size of name added to size of structure because on some os'es d_name has size of 1 byte */
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
 		destorage = (struct dirent*)malloc(sizeof(struct dirent)+pathconf(f->path,_PC_NAME_MAX)+1);
 		passert(destorage);
+#endif
 
 		scanterm = 0;
 
@@ -5691,7 +5696,11 @@ void* hdd_folder_scan(void *arg) {
 				if (dd==NULL) {
 					continue;
 				}
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
 				while (readdir_r(dd,destorage,&de)==0 && de!=NULL) {
+#else
+				while ((de = readdir(dd)) != NULL) {
+#endif
 					if (hdd_check_filename(de->d_name,&namechunkid,&nameversion)<0) {
 						continue;
 					}
@@ -5720,7 +5729,11 @@ void* hdd_folder_scan(void *arg) {
 	//		mkdir(fullname,0755);
 			dd = opendir(fullname);
 			if (dd) {
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
 				while (readdir_r(dd,destorage,&de)==0 && de!=NULL && scanterm==0) {
+#else
+				while ((de = readdir(dd)) != NULL && scanterm==0) {
+#endif
 	//#warning debug
 	//				portable_usleep(100000);
 	//
@@ -5760,7 +5773,9 @@ void* hdd_folder_scan(void *arg) {
 				syslog(LOG_NOTICE,"scanning folder %s: %"PRIu8"%% (%"PRIu32"s)",f->path,lastperc,currenttime-begintime);
 			}
 		}
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
 		free(destorage);
+#endif
 	}
 	free(fullname);
 //	fprintf(stderr,"hdd space manager: %s: %"PRIu32" chunks found\n",f->path,f->chunkcount);

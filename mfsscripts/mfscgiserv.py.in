@@ -6,6 +6,7 @@ import posix
 import time
 import signal
 import os
+import pwd
 import sys
 import getopt
 import traceback
@@ -595,6 +596,13 @@ if __name__=="__main__":
 		else:
 			HTTP.logging = False
 		HTTP.root = rootpath
+		try:
+			os.seteuid(pwd.getpwnam("mfs").pw_uid)
+		except Exception:
+			try:
+				os.seteuid(pwd.getpwnam("nobody").pw_uid)
+			except Exception:
+				pass
 		loop(server,HTTP)
 
 	else:

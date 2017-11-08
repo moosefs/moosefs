@@ -1,8 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.98-1 (WIP)
+* MooseFS 3.0.98-1 (2017-10-12)
 
   - (mount) changed default cache mode on OS X from 'direct' to 'auto' due to problems with mmap
+  - (cgiserv) added seteuid to 'mfs' or 'nobody'
 
 * MooseFS 3.0.97-1 (2017-08-01)
 

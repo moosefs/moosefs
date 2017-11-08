@@ -1,0 +1,3 @@
+dpkg-maintscript-helper rm_conffile /etc/init.d/moosefs-master -- "$@"
+dpkg-maintscript-helper rm_conffile /etc/default/moosefs-master -- "$@"
+

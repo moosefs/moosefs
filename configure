@@ -16750,7 +16750,7 @@ _ACEOF
 
 
 
-ac_config_files="$ac_config_files Makefile mfsmanpages/Makefile mfschunkserver/Makefile mfsscripts/Makefile mfsdata/Makefile mfsmaster/Makefile mfsmetadump/Makefile mfsmetalogger/Makefile mfssupervisor/Makefile mfsmount/Makefile mfsnetdump/Makefile mfstests/Makefile systemd/Makefile mfsscripts/mfscli.py mfsscripts/chart.cgi mfsscripts/index.html mfsscripts/mfscgiserv.py mfsdata/mfschunkserver.cfg mfsdata/mfsmaster.cfg mfsdata/mfsmetalogger.cfg mfsdata/mfsmount.cfg systemd/moosefs-cgiserv.service systemd/moosefs-chunkserver.service systemd/moosefs-master.service systemd/moosefs-metalogger.service"
+ac_config_files="$ac_config_files Makefile mfsmanpages/Makefile mfschunkserver/Makefile mfsscripts/Makefile mfsdata/Makefile mfsmaster/Makefile mfsmetadump/Makefile mfsmetalogger/Makefile mfssupervisor/Makefile mfsmount/Makefile mfsnetdump/Makefile mfstests/Makefile systemd/Makefile mfsscripts/mfscli.py mfsscripts/chart.cgi mfsscripts/index.html mfsscripts/mfscgiserv.py mfsdata/mfschunkserver.cfg mfsdata/mfsmaster.cfg mfsdata/mfsmetalogger.cfg mfsdata/mfsmount.cfg systemd/moosefs-cgiserv.service systemd/moosefs-chunkserver.service systemd/moosefs-chunkserver@.service systemd/moosefs-master.service systemd/moosefs-master@.service systemd/moosefs-metalogger.service systemd/moosefs-metalogger@.service"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -17847,8 +17847,11 @@ do
     "mfsdata/mfsmount.cfg") CONFIG_FILES="$CONFIG_FILES mfsdata/mfsmount.cfg" ;;
     "systemd/moosefs-cgiserv.service") CONFIG_FILES="$CONFIG_FILES systemd/moosefs-cgiserv.service" ;;
     "systemd/moosefs-chunkserver.service") CONFIG_FILES="$CONFIG_FILES systemd/moosefs-chunkserver.service" ;;
+    "systemd/moosefs-chunkserver@.service") CONFIG_FILES="$CONFIG_FILES systemd/moosefs-chunkserver@.service" ;;
     "systemd/moosefs-master.service") CONFIG_FILES="$CONFIG_FILES systemd/moosefs-master.service" ;;
+    "systemd/moosefs-master@.service") CONFIG_FILES="$CONFIG_FILES systemd/moosefs-master@.service" ;;
     "systemd/moosefs-metalogger.service") CONFIG_FILES="$CONFIG_FILES systemd/moosefs-metalogger.service" ;;
+    "systemd/moosefs-metalogger@.service") CONFIG_FILES="$CONFIG_FILES systemd/moosefs-metalogger@.service" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

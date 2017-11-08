@@ -1,0 +1,15 @@
+[Unit]
+Description=MooseFS Chunkserver
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Type=forking
+ExecStart=@SBIN_PATH@/mfschunkserver -c @ETC_PATH@/mfs-%I/mfschunkserver.cfg start
+ExecStop=@SBIN_PATH@/mfschunkserver -c @ETC_PATH@/mfs-%I/mfschunkserver.cfg stop
+ExecReload=@SBIN_PATH@/mfschunkserver -c @ETC_PATH@/mfs-%I/mfschunkserver.cfg reload
+PIDFile=@DATA_PATH@-%I/.mfschunkserver.lock
+Restart=on-abnormal
+
+[Install]
+WantedBy=multi-user.target

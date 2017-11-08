@@ -15,7 +15,29 @@ case "${1}" in
 			if [ -f /etc/mfs/${fname}.cfg.dist ]; then
 				rm -f /etc/mfs/${fname}.cfg.dist
 			fi
+			if [ -f /etc/mfs/${fname}.cfg.sample -a ! -f /etc/mfs/${fname}.cfg ]; then
+				cp /etc/mfs/${fname}.cfg.sample /etc/mfs/${fname}.cfg
+			fi
 		done
+		if [ -f /etc/default/moosefs-metalogger.dpkg-remove -o -f /etc/default/moosefs-metalogger.dpkg-backup ]; then
+			echo "moosefs-metalogger: check 'default' startup status (sysv -> systemd migration)"
+			MFSMETALOGGER_ENABLE=false
+			if [ -s /etc/default/moosefs-metalogger.dpkg-remove ]; then
+				. /etc/default/moosefs-metalogger.dpkg-remove
+			fi
+			if [ -s /etc/default/moosefs-metalogger.dpkg-backup ]; then
+				. /etc/default/moosefs-metalogger.dpkg-backup
+			fi
+			if [ "x$MFSMETALOGGER_ENABLE" = "xtrue" ]; then
+				systemctl enable moosefs-metalogger
+				systemctl start moosefs-metalogger
+			fi
+			if [ "x$MFSMETALOGGER_ENABLE" = "xfalse" ]; then
+				systemctl disable moosefs-metalogger
+			fi
+			dpkg-maintscript-helper rm_conffile /etc/init.d/moosefs-metalogger -- "$@"
+			dpkg-maintscript-helper rm_conffile /etc/default/moosefs-metalogger -- "$@"
+		fi
 		;;
 
 	abort-upgrade|abort-remove|abort-deconfigure)

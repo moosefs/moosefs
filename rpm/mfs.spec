@@ -20,7 +20,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	3.0.97
+Version:	3.0.98
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -293,6 +293,7 @@ exit 0
 %endif
 %if %{_with_systemd}
 %{systemdunitdir}/moosefs-master.service
+%{systemdunitdir}/moosefs-master@.service
 %endif
 
 
@@ -311,6 +312,7 @@ exit 0
 %endif
 %if %{_with_systemd}
 %{systemdunitdir}/moosefs-metalogger.service
+%{systemdunitdir}/moosefs-metalogger@.service
 %endif
 
 
@@ -335,6 +337,7 @@ exit 0
 %endif
 %if %{_with_systemd}
 %{systemdunitdir}/moosefs-chunkserver.service
+%{systemdunitdir}/moosefs-chunkserver@.service
 %endif
 
 

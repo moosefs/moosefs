@@ -1,0 +1,17 @@
+[Unit]
+Description=MooseFS Master server
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Type=forking
+ExecStart=@SBIN_PATH@/mfsmaster -c @ETC_PATH@/mfs-%I/mfsmaster.cfg start
+ExecStop=@SBIN_PATH@/mfsmaster -c @ETC_PATH@/mfs-%I/mfsmaster.cfg stop
+ExecReload=@SBIN_PATH@/mfsmaster -c @ETC_PATH@/mfs-%I/mfsmaster.cfg reload
+PIDFile=@DATA_PATH@-%I/.mfsmaster.lock
+TimeoutStopSec=1800
+TimeoutStartSec=1800
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

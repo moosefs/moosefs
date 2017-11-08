@@ -11,6 +11,25 @@ case "${1}" in
 			adduser --quiet --system --group --no-create-home --home /var/lib/mfs mfs
 			chown -R mfs:mfs /var/lib/mfs
 		fi
+		if [ -f /etc/default/moosefs-cgiserv.dpkg-remove -o -f /etc/default/moosefs-cgiserv.dpkg-backup ]; then
+			echo "moosefs-cgiserv: check 'default' startup status (sysv -> systemd migration)"
+			MFSCGISERV_ENABLE=false
+			if [ -s /etc/default/moosefs-cgiserv.dpkg-remove ]; then
+				. /etc/default/moosefs-cgiserv.dpkg-remove
+			fi
+			if [ -s /etc/default/moosefs-cgiserv.dpkg-backup ]; then
+				. /etc/default/moosefs-cgiserv.dpkg-backup
+			fi
+			if [ "x$MFSCGISERV_ENABLE" = "xtrue" ]; then
+				systemctl enable moosefs-cgiserv
+				systemctl start moosefs-cgiserv
+			fi
+			if [ "x$MFSCGISERV_ENABLE" = "xfalse" ]; then
+				systemctl disable moosefs-cgiserv
+			fi
+			dpkg-maintscript-helper rm_conffile /etc/init.d/moosefs-cgiserv -- "$@"
+			dpkg-maintscript-helper rm_conffile /etc/default/moosefs-cgiserv -- "$@"
+		fi
 		;;
 
 	abort-upgrade|abort-remove|abort-deconfigure)

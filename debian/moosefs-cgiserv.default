@@ -5,8 +5,4 @@
 #   Undefined values default to "false".
 MFSCGISERV_ENABLE=false
 
-# user and group used to run mfscgiserv
-MFSCGISERV_USER=nobody
-MFSCGISERV_GROUP=nogroup
-
 DAEMON_OPTS=""

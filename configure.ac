@@ -580,7 +580,10 @@ AC_CONFIG_FILES([Makefile
 		mfsdata/mfsmount.cfg
 		systemd/moosefs-cgiserv.service
 		systemd/moosefs-chunkserver.service
+		systemd/moosefs-chunkserver@.service
 		systemd/moosefs-master.service
+		systemd/moosefs-master@.service
 		systemd/moosefs-metalogger.service
+		systemd/moosefs-metalogger@.service
 ])
 AC_OUTPUT

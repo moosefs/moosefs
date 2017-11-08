@@ -8,6 +8,9 @@ case "${1}" in
 			if [ -f /etc/mfs/${fname}.cfg.dist ]; then
 				rm -f /etc/mfs/${fname}.cfg.dist
 			fi
+			if [ -f /etc/mfs/${fname}.cfg.sample -a ! -f /etc/mfs/${fname}.cfg ]; then
+				cp /etc/mfs/${fname}.cfg.sample /etc/mfs/${fname}.cfg
+			fi
 		done
 		;;
 

@@ -1,0 +1,3 @@
+dpkg-maintscript-helper rm_conffile /etc/init.d/moosefs-metalogger -- "$@"
+dpkg-maintscript-helper rm_conffile /etc/default/moosefs-metalogger -- "$@"
+

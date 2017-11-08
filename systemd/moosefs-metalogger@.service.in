@@ -1,0 +1,15 @@
+[Unit]
+Description=MooseFS Metalogger server
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Type=forking
+ExecStart=@SBIN_PATH@/mfsmetalogger -c @ETC_PATH@/mfs-%I/mfsmetalogger.cfg start
+ExecStop=@SBIN_PATH@/mfsmetalogger -c @ETC_PATH@/mfs-%I/mfsmetalogger.cfg stop
+ExecReload=@SBIN_PATH@/mfsmetalogger -c @ETC_PATH@/mfs-%I/mfsmetalogger.cfg reload
+PIDFile=@DATA_PATH@-%I/.mfsmetalogger.lock
+Restart=on-abnormal
+
+[Install]
+WantedBy=multi-user.target

@@ -4005,7 +4005,6 @@ void chunk_jobs_main(void) {
 /* ---- */
 
 #define CHUNKFSIZE 17
-#define CHUNKCNT 1000
 /*
 void chunk_text_dump(FILE *fd) {
 	chunk *c;
@@ -4076,10 +4075,10 @@ int chunk_load(bio *fd,uint8_t mver) {
 
 uint8_t chunk_store(bio *fd) {
 	uint8_t hdr[8];
-	uint8_t storebuff[CHUNKFSIZE*CHUNKCNT];
+	uint8_t storebuff[CHUNKFSIZE];
 	uint8_t *ptr;
 	uint8_t archflag;
-	uint32_t i,j;
+	uint32_t i;
 	chunk *c;
 // chunkdata
 	uint64_t chunkid;
@@ -4095,10 +4094,9 @@ uint8_t chunk_store(bio *fd) {
 	if (bio_write(fd,hdr,8)!=8) {
 		return 0xFF;
 	}
-	j=0;
-	ptr = storebuff;
 	for (i=0 ; i<chunkrehashpos ; i++) {
 		for (c=chunkhashtab[i>>HASHTAB_LOBITS][i&HASHTAB_MASK] ; c ; c=c->next) {
+			ptr = storebuff;
 			chunkid = c->chunkid;
 			put64bit(&ptr,chunkid);
 			version = c->version;
@@ -4110,19 +4108,13 @@ uint8_t chunk_store(bio *fd) {
 			put32bit(&ptr,lockedto);
 			archflag = c->archflag;
 			put8bit(&ptr,archflag);
-			j++;
-			if (j==CHUNKCNT) {
-				if (bio_write(fd,storebuff,CHUNKFSIZE*CHUNKCNT)!=(CHUNKFSIZE*CHUNKCNT)) {
-					return 0xFF;
-				}
-				j=0;
-				ptr = storebuff;
+			if (bio_write(fd,storebuff,CHUNKFSIZE)!=CHUNKFSIZE) {
+				return 0xFF;
 			}
 		}
 	}
-	memset(ptr,0,CHUNKFSIZE);
-	j++;
-	if (bio_write(fd,storebuff,CHUNKFSIZE*j)!=(CHUNKFSIZE*j)) {
+	memset(storebuff,0,CHUNKFSIZE);
+	if (bio_write(fd,storebuff,CHUNKFSIZE)!=CHUNKFSIZE) {
 		return 0xFF;
 	}
 	return 0;

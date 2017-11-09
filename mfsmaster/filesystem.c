@@ -8375,9 +8375,9 @@ int fs_loadfree(bio *fd,uint8_t mver) {
 // inode:4 graceperiod:4 exceeded:1 flags:1 ts:4 sinodes:4 hinodes:4 slength:8 hlength:8 ssize:8 hsize:8 srealsize:8 hrealsize:8 = 66B
 
 uint8_t fs_storequota(bio *fd) {
-	uint8_t wbuff[70*100],*ptr;
-	quotanode *qn;
+	uint8_t wbuff[70],*ptr;
 	uint32_t l;
+	quotanode *qn;
 	if (fd==NULL) {
 		return 0x11;
 	}
@@ -8391,17 +8391,8 @@ uint8_t fs_storequota(bio *fd) {
 		syslog(LOG_NOTICE,"write error");
 		return 0xFF;
 	}
-	l=0;
-	ptr=wbuff;
 	for (qn = quotahead ; qn ; qn=qn->next) {
-		if (l==100) {
-				if (bio_write(fd,wbuff,70*100)!=(70*100)) {
-					syslog(LOG_NOTICE,"write error");
-					return 0xFF;
-				}
-				l=0;
-				ptr=wbuff;
-			}
+		ptr=wbuff;
 			put32bit(&ptr,qn->node->inode);
 			put32bit(&ptr,qn->graceperiod);
 			put8bit(&ptr,qn->exceeded);
@@ -8415,23 +8406,20 @@ uint8_t fs_storequota(bio *fd) {
 			put64bit(&ptr,qn->hsize);
 			put64bit(&ptr,qn->srealsize);
 			put64bit(&ptr,qn->hrealsize);
-			l++;
-	}
-	if (l>0) {
-		if (bio_write(fd,wbuff,70*l)!=(70*l)) {
-			syslog(LOG_NOTICE,"write error");
-			return 0xFF;
-		}
+			if (bio_write(fd,wbuff,70)!=70) {
+				syslog(LOG_NOTICE,"write error");
+				return 0xFF;
+			}
 	}
 	return 0;
 }
 
 int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
-	uint8_t rbuff[70*100];
+	uint8_t rbuff[70];
 	const uint8_t *ptr;
 	quotanode *qn;
 	fsnode *fn;
-	uint32_t l,t,inode;
+	uint32_t l,inode;
 	uint8_t nl=1;
 	int32_t rsize;
 
@@ -8446,40 +8434,22 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 		return -1;
 	}
 	ptr=rbuff;
-	t = get32bit(&ptr);
+	l = get32bit(&ptr);
 	quotahead = NULL;
 	rsize = (mver==0x10)?66:70;
 //	freetail = &(freelist);
-	l=0;
-	while (t>0) {
-		if (l==0) {
-			if (t>100) {
-				if (bio_read(fd,rbuff,rsize*100)!=(rsize*100)) {
-					int err = errno;
-					if (nl) {
-						fputc('\n',stderr);
-						// nl=0;
-					}
-					errno = err;
-					mfs_errlog(LOG_ERR,"loading quota: read error");
-					return -1;
-				}
-				l=100;
-			} else {
-				if (bio_read(fd,rbuff,rsize*t)!=(rsize*t)) {
-					int err = errno;
-					if (nl) {
-						fputc('\n',stderr);
-						// nl=0;
-					}
-					errno = err;
-					mfs_errlog(LOG_ERR,"loading free nodes: read error");
-					return -1;
-				}
-				l=t;
+	while (l>0) {
+		if (bio_read(fd,rbuff,rsize)!=rsize) {
+			int err = errno;
+			if (nl) {
+				fputc('\n',stderr);
+				// nl=0;
 			}
-			ptr = rbuff;
+			errno = err;
+			mfs_errlog(LOG_ERR,"loading quota: read error");
+			return -1;
 		}
+		ptr = rbuff;
 		inode = get32bit(&ptr);
 		fn = fsnodes_node_find(inode);
 		if (fn==NULL || fn->type!=TYPE_DIRECTORY) {
@@ -8515,7 +8485,6 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 			qn->hrealsize = get64bit(&ptr);
 		}
 		l--;
-		t--;
 	}
 	return 0;
 }

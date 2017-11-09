@@ -370,7 +370,7 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 
 	if (op!=FLOCK_INTERRUPT && op!=FLOCK_RELEASE) {
 		if (of_checknode(sessionid,inode)==0) {
-			return MFS_ERROR_EINVAL; // EBADF ?
+			return MFS_ERROR_NOTOPENED;
 		}
 	}
 	il = flock_inode_find(inode);
@@ -634,42 +634,34 @@ uint8_t flock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,char cm
 	return MFS_STATUS_OK;
 }
 
-#define FLOCK_STORE_BLOCK_CNT 256
 #define FLOCK_REC_SIZE 17
 
 uint8_t flock_store(bio *fd) {
-	uint8_t storebuff[FLOCK_REC_SIZE*FLOCK_STORE_BLOCK_CNT];
+	uint8_t storebuff[FLOCK_REC_SIZE];
 	uint8_t *ptr;
-	uint32_t h,j;
+	uint32_t h;
 	inodelocks *il;
 	lock *l;
 
 	if (fd==NULL) {
 		return 0x10;
 	}
-	j = 0;
-	ptr = storebuff;
 	for (h=0 ; h<FLOCK_INODE_HASHSIZE ; h++) {
 		for (il = inodehash[h] ; il ; il=il->next) {
 			for (l=il->active ; l ; l=l->next) {
+				ptr = storebuff;
 				put32bit(&ptr,il->inode);
 				put64bit(&ptr,l->owner);
 				put32bit(&ptr,l->sessionid);
 				put8bit(&ptr,l->ltype);
-				j++;
-				if (j==FLOCK_STORE_BLOCK_CNT) {
-					if (bio_write(fd,storebuff,FLOCK_REC_SIZE*FLOCK_STORE_BLOCK_CNT)!=(FLOCK_REC_SIZE*FLOCK_STORE_BLOCK_CNT)) {
-						return 0xFF;
-					}
-					j = 0;
-					ptr = storebuff;
+				if (bio_write(fd,storebuff,FLOCK_REC_SIZE)!=FLOCK_REC_SIZE) {
+					return 0xFF;
 				}
 			}
 		}
 	}
-	memset(ptr,0,FLOCK_REC_SIZE);
-	j++;
-	if (bio_write(fd,storebuff,FLOCK_REC_SIZE*j)!=(FLOCK_REC_SIZE*j)) {
+	memset(storebuff,0,FLOCK_REC_SIZE);
+	if (bio_write(fd,storebuff,FLOCK_REC_SIZE)!=FLOCK_REC_SIZE) {
 		return 0xFF;
 	}
 	return 0;

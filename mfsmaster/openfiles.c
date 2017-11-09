@@ -305,40 +305,29 @@ int of_mr_release(uint32_t sessionid,uint32_t inode) {
 	return MFS_ERROR_MISMATCH;
 }
 
-#define OF_STORE_BLOCK_CNT 256
 #define OF_REC_SIZE 8
 
 uint8_t of_store(bio *fd) {
-	uint8_t storebuff[OF_REC_SIZE*OF_STORE_BLOCK_CNT];
+	uint8_t storebuff[OF_REC_SIZE];
 	uint8_t *ptr;
 	ofrelation *ofr;
-	uint32_t i,j;
-	uint32_t sessionid,inode;
+	uint32_t i;
 
 	if (fd==NULL) {
 		return 0x10;
 	}
-	j=0;
-	ptr = storebuff;
 	for (i=0 ; i<OF_SESSION_HASHSIZE ; i++) {
 		for (ofr = sessionhash[i] ; ofr ; ofr=ofr->snext) {
-			sessionid = ofr->sessionid;
-			inode = ofr->inode;
-			put32bit(&ptr,sessionid);
-			put32bit(&ptr,inode);
-			j++;
-			if (j==OF_STORE_BLOCK_CNT) {
-				if (bio_write(fd,storebuff,OF_REC_SIZE*OF_STORE_BLOCK_CNT)!=(OF_REC_SIZE*OF_STORE_BLOCK_CNT)) {
-					return 0xFF;
-				}
-				j=0;
-				ptr = storebuff;
+			ptr = storebuff;
+			put32bit(&ptr,ofr->sessionid);
+			put32bit(&ptr,ofr->inode);
+			if (bio_write(fd,storebuff,OF_REC_SIZE)!=OF_REC_SIZE) {
+				return 0xFF;
 			}
 		}
 	}
-	memset(ptr,0,OF_REC_SIZE);
-	j++;
-	if (bio_write(fd,storebuff,OF_REC_SIZE*j)!=(OF_REC_SIZE*j)) {
+	memset(storebuff,0,OF_REC_SIZE);
+	if (bio_write(fd,storebuff,OF_REC_SIZE)!=OF_REC_SIZE) {
 		return 0xFF;
 	}
 	return 0;

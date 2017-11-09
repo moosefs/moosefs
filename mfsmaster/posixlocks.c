@@ -462,7 +462,7 @@ uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t
 
 	if ((op==POSIX_LOCK_CMD_SET || op==POSIX_LOCK_CMD_TRY) && i_type!=POSIX_LOCK_UNLCK) {
 		if (of_checknode(sessionid,inode)==0) {
-			return MFS_ERROR_EINVAL; // EBADF ?
+			return MFS_ERROR_NOTOPENED;
 		}
 	}
 
@@ -658,13 +658,12 @@ uint8_t posix_lock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,ch
 	return MFS_STATUS_OK;
 }
 
-#define POSIX_LOCK_STORE_BLOCK_CNT 256
 #define POSIX_LOCK_REC_SIZE 37
 
 uint8_t posix_lock_store(bio *fd) {
-	uint8_t storebuff[POSIX_LOCK_REC_SIZE*POSIX_LOCK_STORE_BLOCK_CNT];
+	uint8_t storebuff[POSIX_LOCK_REC_SIZE];
 	uint8_t *ptr;
-	uint32_t h,j;
+	uint32_t h;
 	inodelocks *il;
 	alock *al;
 	range *r;
@@ -672,12 +671,11 @@ uint8_t posix_lock_store(bio *fd) {
 	if (fd==NULL) {
 		return 0x10;
 	}
-	j = 0;
-	ptr = storebuff;
 	for (h=0 ; h<POSIX_LOCK_INODE_HASHSIZE ; h++) {
 		for (il = inodehash[h] ; il ; il=il->next) {
 			for (al=il->active ; al ; al=al->next) {
 				for (r=al->ranges ; r ; r=r->next) {
+					ptr = storebuff;
 					put32bit(&ptr,il->inode);
 					put64bit(&ptr,al->owner);
 					put32bit(&ptr,al->sessionid);
@@ -685,21 +683,15 @@ uint8_t posix_lock_store(bio *fd) {
 					put64bit(&ptr,r->start);
 					put64bit(&ptr,r->end);
 					put8bit(&ptr,r->type);
-					j++;
-					if (j==POSIX_LOCK_STORE_BLOCK_CNT) {
-						if (bio_write(fd,storebuff,POSIX_LOCK_REC_SIZE*POSIX_LOCK_STORE_BLOCK_CNT)!=(POSIX_LOCK_REC_SIZE*POSIX_LOCK_STORE_BLOCK_CNT)) {
-							return 0xFF;
-						}
-						j = 0;
-						ptr = storebuff;
+					if (bio_write(fd,storebuff,POSIX_LOCK_REC_SIZE)!=POSIX_LOCK_REC_SIZE) {
+						return 0xFF;
 					}
 				}
 			}
 		}
 	}
-	memset(ptr,0,POSIX_LOCK_REC_SIZE);
-	j++;
-	if (bio_write(fd,storebuff,POSIX_LOCK_REC_SIZE*j)!=(POSIX_LOCK_REC_SIZE*j)) {
+	memset(storebuff,0,POSIX_LOCK_REC_SIZE);
+	if (bio_write(fd,storebuff,POSIX_LOCK_REC_SIZE)!=POSIX_LOCK_REC_SIZE) {
 		return 0xFF;
 	}
 	return 0;

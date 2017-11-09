@@ -803,7 +803,7 @@ uint16_t csdb_getnumber(void *v_csptr) {
 
 uint8_t csdb_store(bio *fd) {
 	uint32_t hash;
-	uint8_t wbuff[13*100],*ptr;
+	uint8_t wbuff[13],*ptr;
 	csdbentry *csptr;
 	uint32_t l;
 	l=0;
@@ -822,42 +822,30 @@ uint8_t csdb_store(bio *fd) {
 		syslog(LOG_NOTICE,"write error");
 		return 0xFF;
 	}
-	l=0;
-	ptr=wbuff;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
-			if (l==100) {
-				if (bio_write(fd,wbuff,13*100)!=(13*100)) {
-					syslog(LOG_NOTICE,"write error");
-					return 0xFF;
-				}
-				l=0;
-				ptr=wbuff;
-			}
+			ptr=wbuff;
 			put32bit(&ptr,csptr->ip);
 			put16bit(&ptr,csptr->port);
 			put16bit(&ptr,csptr->csid);
 			put8bit(&ptr,csptr->maintenance);
 			put32bit(&ptr,csptr->maintenance_timeout);
 //			put8bit(&ptr,csptr->fastreplication);
-			l++;
-		}
-	}
-	if (l>0) {
-		if (bio_write(fd,wbuff,13*l)!=(13*l)) {
-			syslog(LOG_NOTICE,"write error");
-			return 0xFF;
+			if (bio_write(fd,wbuff,13)!=13) {
+				syslog(LOG_NOTICE,"write error");
+				return 0xFF;
+			}
 		}
 	}
 	return 0;
 }
 
 int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
-	uint8_t rbuff[13*100];
+	uint8_t rbuff[13];
 	const uint8_t *ptr;
 	csdbentry *csptr;
 	uint32_t hash;
-	uint32_t l,t,ip;
+	uint32_t l,ip;
 	uint16_t port,csid;
 	uint8_t maintenance;
 	uint32_t maintenance_timeout;
@@ -875,7 +863,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		return -1;
 	}
 	ptr=rbuff;
-	t = get32bit(&ptr);
+	l = get32bit(&ptr);
 	if (mver<=0x10) {
 		bsize = 6;
 	} else if (mver<=0x11) {
@@ -885,36 +873,18 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 	} else {
 		bsize = 13;
 	}
-	l=0;
-	while (t>0) {
-		if (l==0) {
-			if (t>100) {
-				if (bio_read(fd,rbuff,bsize*100)!=(bsize*100)) {
-					int err = errno;
-					if (nl) {
-						fputc('\n',stderr);
-						// nl=0;
-					}
-					errno = err;
-					mfs_errlog(LOG_ERR,"loading chunkservers: read error");
-					return -1;
-				}
-				l=100;
-			} else {
-				if (bio_read(fd,rbuff,bsize*t)!=(bsize*t)) {
-					int err = errno;
-					if (nl) {
-						fputc('\n',stderr);
-						// nl=0;
-					}
-					errno = err;
-					mfs_errlog(LOG_ERR,"loading free nodes: read error");
-					return -1;
-				}
-				l=t;
+	while (l>0) {
+		if (bio_read(fd,rbuff,bsize)!=bsize) {
+			int err = errno;
+			if (nl) {
+				fputc('\n',stderr);
+				// nl=0;
 			}
-			ptr = rbuff;
+			errno = err;
+			mfs_errlog(LOG_ERR,"loading chunkservers: read error");
+			return -1;
 		}
+		ptr = rbuff;
 		ip = get32bit(&ptr);
 		port = get16bit(&ptr);
 		if (mver>=0x11) {
@@ -985,7 +955,6 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 			disconnected_servers_in_maintenance++;
 		}
 		l--;
-		t--;
 	}
 	return 0;
 }

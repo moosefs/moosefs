@@ -35,6 +35,7 @@
 #include "massert.h"
 #include "sockets.h"
 #include "strerr.h"
+#include "crc.h"
 
 struct _bio {
 	uint8_t *buff;
@@ -43,6 +44,7 @@ struct _bio {
 	uint32_t pos;
 	uint32_t msecto;
 	uint64_t fileposition;
+	uint32_t crc;
 	uint8_t direction;
 	uint8_t type;
 	uint8_t error;
@@ -72,6 +74,7 @@ bio* bio_file_open(const char *fname,uint8_t direction,uint32_t buffersize) {
 	b->pos = 0;
 	b->msecto = 0;
 	b->fileposition = 0;
+	b->crc = 0;
 	b->direction = direction;
 	b->type = 0;
 	b->error = 0;
@@ -91,6 +94,7 @@ bio* bio_socket_open(int socket,uint8_t direction,uint32_t buffersize,uint32_t m
 	b->pos = 0;
 	b->msecto = msecto;
 	b->fileposition = 0;
+	b->crc = 0;
 	b->direction = direction;
 	b->type = 1;
 	b->error = 0;
@@ -192,6 +196,15 @@ uint64_t bio_file_size(bio *b) {
 	return st.st_size;
 }
 
+uint32_t bio_crc(bio *b) {
+	if (b->direction==BIO_WRITE) {
+		uint32_t ret = b->crc;
+		b->crc = 0;
+		return ret;
+	}
+	return 0;
+}
+
 int64_t bio_read(bio *b,void *vdst,uint64_t len) {
 	int64_t ret,i;
 	uint8_t *dst = (uint8_t*)vdst;
@@ -255,6 +268,7 @@ int64_t bio_write(bio *b,const void *vsrc,uint64_t len) {
 	if (b->direction==BIO_READ || b->error) {
 		return -1;
 	}
+	b->crc ^= mycrc32(0,src,len);
 	if (len>=b->size) {
 		if (bio_flush(b)<0) {
 			return -1;

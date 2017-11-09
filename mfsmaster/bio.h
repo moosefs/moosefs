@@ -31,6 +31,7 @@ bio* bio_file_open(const char *fname,uint8_t direction,uint32_t buffersize);
 bio* bio_socket_open(int socket,uint8_t direction,uint32_t buffersize,uint32_t msecto);
 uint64_t bio_file_position(bio *b);
 uint64_t bio_file_size(bio *b);
+uint32_t bio_crc(bio *b);
 int64_t bio_read(bio *b,void *dst,uint64_t len);
 int64_t bio_write(bio *b,const void *src,uint64_t len);
 int8_t bio_seek(bio *b,int64_t offset,int whence);

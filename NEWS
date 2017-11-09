@@ -10,6 +10,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) fixed race between defered 'open' and 'locks'
   - (master) more chunk debugs and better handling chunk status change
   - (cs) fixed handling mark for removal (after reload sometimes cs could send chunks marked for removal as normal chunks)
+  - (master) added file with metadata checksums (for future use)
 
 * MooseFS 3.0.97-1 (2017-08-01)
 

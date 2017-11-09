@@ -361,13 +361,13 @@ uint8_t matocsserv_check_password(const uint8_t rndcode[32],const uint8_t csdige
 
 void matocsserv_log_extra_info(void) {
 	matocsserventry *eptr;
-	double dur;
+	double dur,usage;
 	const char *hlstatus_name;
 	uint8_t overloaded;
 	uint8_t maintained;
 	uint32_t now = main_time();
 	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+		if (eptr->mode!=KILL && eptr->csptr!=NULL) {
 			dur = monotonic_seconds() - eptr->total_counter_begin;
 			if (dur<1.0) {
 				dur = 1.0;
@@ -393,7 +393,16 @@ void matocsserv_log_extra_info(void) {
 				default:
 					hlstatus_name = "UNKNOWN";
 			}
-			syslog(LOG_NOTICE,"cs %s:%u ; usedspace: %"PRIu64" ; totalspace: %"PRIu64" ; usage: %.2lf%% ; load: %"PRIu32" ; timeout: %"PRIu16" ; chunkscount: %"PRIu32" ; errorcounter: %"PRIu32" ; writecounter: %"PRIu16" ; rrepcounter: %"PRIu16" ; wrepcounter: %"PRIu16" ; delcounter: %"PRIu32" ; create_total: %"PRIu32" ; rrep_total: %"PRIu32" ; wrep_total: %"PRIu32" ; del_total: %"PRIu32" ; create/s: %.4lf ; rrep/s: %.4lf ; wrep/s: %.4lf ; del/s: %.4lf ; csid: %"PRIu16" ; privflag: %"PRIu8" ; dist: %"PRIu32" ; first: %"PRIu8" ; corr: %.4lf ; hlstatus: %"PRIu8" (%s) ; overloaded: %"PRIu8" ; maintained: %"PRIu8,eptr->servstrip,eptr->servport,eptr->usedspace,eptr->totalspace,100.0*(double)(eptr->usedspace)/(double)(eptr->totalspace),eptr->load,eptr->timeout,eptr->chunkscount,eptr->errorcounter,eptr->writecounter,eptr->rrepcounter,eptr->wrepcounter,eptr->delcounter,eptr->create_total_counter,eptr->rrep_total_counter,eptr->wrep_total_counter,eptr->del_total_counter,eptr->create_total_counter/dur,eptr->rrep_total_counter/dur,eptr->wrep_total_counter/dur,eptr->del_total_counter/dur,eptr->csid,eptr->privflag,eptr->dist,eptr->first,eptr->corr,eptr->hlstatus,hlstatus_name,overloaded,maintained);
+			if (eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace) {
+				usage = 100.0*(double)(eptr->usedspace)/(double)(eptr->totalspace);
+			} else {
+				if (eptr->totalspace>0) {
+					usage = 100.0;
+				} else {
+					usage = 0.0;
+				}
+			}
+			syslog(LOG_NOTICE,"cs %s:%u ; usedspace: %"PRIu64" ; totalspace: %"PRIu64" ; usage: %.2lf%% ; load: %"PRIu32" ; timeout: %"PRIu16" ; chunkscount: %"PRIu32" ; errorcounter: %"PRIu32" ; writecounter: %"PRIu16" ; rrepcounter: %"PRIu16" ; wrepcounter: %"PRIu16" ; delcounter: %"PRIu32" ; create_total: %"PRIu32" ; rrep_total: %"PRIu32" ; wrep_total: %"PRIu32" ; del_total: %"PRIu32" ; create/s: %.4lf ; rrep/s: %.4lf ; wrep/s: %.4lf ; del/s: %.4lf ; csid: %"PRIu16" ; privflag: %"PRIu8" ; dist: %"PRIu32" ; first: %"PRIu8" ; corr: %.4lf ; hlstatus: %"PRIu8" (%s) ; overloaded: %"PRIu8" ; maintained: %"PRIu8,eptr->servstrip,eptr->servport,eptr->usedspace,eptr->totalspace,usage,eptr->load,eptr->timeout,eptr->chunkscount,eptr->errorcounter,eptr->writecounter,eptr->rrepcounter,eptr->wrepcounter,eptr->delcounter,eptr->create_total_counter,eptr->rrep_total_counter,eptr->wrep_total_counter,eptr->del_total_counter,eptr->create_total_counter/dur,eptr->rrep_total_counter/dur,eptr->wrep_total_counter/dur,eptr->del_total_counter/dur,eptr->csid,eptr->privflag,eptr->dist,eptr->first,eptr->corr,eptr->hlstatus,hlstatus_name,overloaded,maintained);
 			eptr->create_total_counter = 0;
 			eptr->rrep_total_counter = 0;
 			eptr->wrep_total_counter = 0;

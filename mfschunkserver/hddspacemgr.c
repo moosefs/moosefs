@@ -182,7 +182,6 @@ typedef struct chunk {
 	uint16_t blockno;	// 0xFFFF == invalid
 #endif
 	uint8_t validattr;
-	uint8_t todel;
 //	uint32_t testtime;	// at start use max(atime,mtime) then every operation set it to current time
 	struct chunk *testnext,**testprev;
 	struct chunk *next;
@@ -1110,7 +1109,6 @@ static chunk* hdd_chunk_get(uint64_t chunkid,uint8_t cflag) {
 			c->blockno = 0xFFFF;
 #endif
 			c->validattr = 0;
-			c->todel = 0;
 			c->testnext = NULL;
 			c->testprev = NULL;
 			c->next = hashtab[hashpos];
@@ -1183,7 +1181,6 @@ static chunk* hdd_chunk_get(uint64_t chunkid,uint8_t cflag) {
 				c->blockno = 0xFFFF;
 #endif /* PRESERVE_BLOCK */
 				c->validattr = 0;
-				c->todel = 0;
 				c->state = CH_LOCKED;
 //				syslog(LOG_WARNING,"hdd_chunk_get returns chunk: %016"PRIX64" (c->state:%u)",c->chunkid,c->state);
 				zassert(pthread_mutex_unlock(&hashlock));
@@ -1602,7 +1599,6 @@ uint8_t hdd_senddata(folder *f,int rmflag) {
 		cptr = &(hashtab[i]);
 		while ((c=*cptr)) {
 			if (c->owner==f) {
-				c->todel = todel;
 				if (rmflag) {
 					if (c->state==CH_AVAIL) {
 						hdd_report_lost_chunk(c->chunkid);
@@ -1635,7 +1631,7 @@ uint8_t hdd_senddata(folder *f,int rmflag) {
 						cptr = &(c->next);
 					}
 				} else {
-					hdd_report_new_chunk(c->chunkid,c->version|((c->todel)?0x80000000:0));
+					hdd_report_new_chunk(c->chunkid,c->version|(todel?0x80000000:0));
 					cptr = &(c->next);
 				}
 			} else {
@@ -1882,7 +1878,7 @@ void hdd_get_chunks_next_list_data(uint8_t *buff) {
 		for (c=hashtab[hdd_get_chunks_pos] ; c ; c=c->next) {
 			put64bit(&buff,c->chunkid);
 			v = c->version;
-			if (c->todel) {
+			if (c->owner->todel) {
 				v |= 0x80000000;
 			}
 			put32bit(&buff,v);
@@ -2357,7 +2353,7 @@ static int hdd_io_begin(chunk *c,int mode) {
 			if (mode==MODE_NEW) {
 				c->fd = open(fname,O_RDWR | O_TRUNC | O_CREAT,0666);
 			} else {
-				if (c->todel<2) {
+				if (c->owner->todel<2) {
 					c->fd = open(fname,O_RDWR);
 				} else {
 					c->fd = open(fname,O_RDONLY);
@@ -5376,7 +5372,7 @@ void hdd_create_filename(char fname[PATH_MAX],folder *f,uint16_t pathid,uint64_t
 	}
 }
 
-static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint32_t version,uint16_t blocks,uint16_t hdrsize,uint8_t todel) {
+static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint32_t version,uint16_t blocks,uint16_t hdrsize) {
 	struct stat sb;
 	folder *prevf,*currf;
 	chunk *c;
@@ -5430,14 +5426,14 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	}
 	if (c->pathid!=0xFFFF) { // already have this chunk
 		if (version <= c->version) {	// current chunk is older
-			if (todel<2) { // this is R/W fs?
+			if (f->todel<2) { // this is R/W fs?
 				hdd_create_filename(fname,f,pathid,chunkid,version);
 				unlink(fname); // if yes then remove file
 			}
 			currf = NULL;
 		} else { // current chunk is better, so use it, and clear older one
 			prevf = c->owner;
-			if (c->todel<2) { // current chunk is on R/W fs?
+			if (c->owner->todel<2) { // current chunk is on R/W fs?
 				hdd_generate_filename(fname,c);
 				unlink(fname); // if yes then remove file
 			}
@@ -5445,7 +5441,6 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 			c->blocks = blocks;
 			c->hdrsize = hdrsize;
 			c->validattr = validattr;
-			c->todel = todel;
 //			c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
 			zassert(pthread_mutex_lock(&testlock));
 			hdd_remove_chunk_from_test_chain(c,prevf);
@@ -5459,12 +5454,11 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 		c->blocks = blocks;
 		c->hdrsize = hdrsize;
 		c->validattr = validattr;
-		c->todel = todel;
 //		c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
 		zassert(pthread_mutex_lock(&testlock));
 		hdd_add_chunk_to_test_chain(c,currf);
 		zassert(pthread_mutex_unlock(&testlock));
-		hdd_report_new_chunk(c->chunkid,c->version|(todel?0x80000000:0));
+		hdd_report_new_chunk(c->chunkid,c->version|((f->todel)?0x80000000:0));
 	}
 	zassert(pthread_mutex_lock(&folderlock));
 	if (prevf) {
@@ -5477,7 +5471,7 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	hdd_chunk_release(c);
 }
 
-static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen,uint8_t todel) {
+static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen) {
 	struct stat sb;
 	int fd;
 	uint8_t *chunkbuff;
@@ -5604,7 +5598,7 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen,uin
 		if (chunkid==0 && version==0 && blocks==0 && pathid==0) {
 			break;
 		}
-		hdd_add_chunk(f,pathid,chunkid,version,blocks,hdrsize,todel);
+		hdd_add_chunk(f,pathid,chunkid,version,blocks,hdrsize);
 	}
 
 	syslog(LOG_NOTICE,"scanning folder %s: .chunkdb used - full scan don't needed",f->path);
@@ -5650,7 +5644,7 @@ void* hdd_folder_scan(void *arg) {
 		mkdir(fullname,0755);
 	}
 
-	if (hdd_folder_fastscan(f,fullname,plen,todel)<0) {
+	if (hdd_folder_fastscan(f,fullname,plen)<0) {
 
 		fullname[plen++]='_';
 		fullname[plen++]='_';
@@ -5741,7 +5735,7 @@ void* hdd_folder_scan(void *arg) {
 						continue;
 					}
 //					memcpy(fullname+plen,de->d_name,36);
-					hdd_add_chunk(f,subf,namechunkid,nameversion,0xFFFF,0,todel);
+					hdd_add_chunk(f,subf,namechunkid,nameversion,0xFFFF,0);
 					tcheckcnt++;
 					if (tcheckcnt>=1000) {
 						zassert(pthread_mutex_lock(&folderlock));

@@ -1,9 +1,9 @@
-.TH mfssnapshots "1" "August 2017" "MooseFS 3.0.97-1" "This is part of MooseFS"
+.TH mfssnapshots "1" "November 2017" "MooseFS 3.0.98-1" "This is part of MooseFS"
 .SH NAME
 mfssnapshots \- \fBMooseFS\fP snapshot tools
 .SH SYNOPSIS
 .B mfsappendchunks
-[\fB-s \fIFROM\fP,\fITO\fP] \fISNAPSHOT_FILE\fP \fIOBJECT\fP...
+[\fB-s \fP\fIFROM\fP\fB:\fP\fITO\fP] \fISNAPSHOT_FILE\fP \fIOBJECT\fP...
 .PP
 .B mfsmakesnapshot
 [\fB-o\fP|\fB-c\fP|\fB-p\fP] \fISOURCE\fP... \fIDESTINATION\fP
@@ -38,17 +38,17 @@ can be overridden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
 remove only those files/directories that have \fBsnapshot\fP attribute set and
 will leave everything else untouched.
 .SH "SLICES"
-\fIFROM\fP,\fITO\fP for source file with chunks 0,1,2,...,N-1,N:
+\fIFROM\fP\fB:\fP\fITO\fP for source file with chunks 0,1,2,...,N-1,N:
 .PP
-2,4 = chunks 2 and 3
+2:4 = chunks 2 and 3
 .PP
-3, = chunks 3,4,...,N
+3: = chunks 3,4,...,N
 .PP
-,5 = chunks 0,1,2,3,4
+:5 = chunks 0,1,2,3,4
 .PP
-,-1 = chunks 0,1,2,3,...,N-1
+:-1 = chunks 0,1,2,3,...,N-1
 .PP
--4,-2 = chunks N-3,N-2
+-4:-2 = chunks N-3,N-2
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

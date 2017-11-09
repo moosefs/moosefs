@@ -1,8 +1,29 @@
+moosefs (3.0.98-1) unstable; urgency=medium
+
+  * (mount) changed default cache mode on OS X from 'direct' to 'auto' due to
+    problems with mmap
+  * (cgiserv) added seteuid to 'mfs' or 'nobody'
+  * (cs+tools) use readdir instead of readdir_r on glibc 2.24+
+  * (debian) added support for systemd in debian packages
+  * (all) fixed library dependencies (for libpcap,libz and libm)
+  * (mount) fixed race between defered 'open' and 'locks'
+  * (master) more chunk debugs and better handling chunk status change
+  * (cs) fixed handling mark for removal (after reload sometimes cs could send
+    chunks marked for removal as normal chunks)
+  * (master) added file with metadata checksums (for future use)
+  * (master) fixed way of sending gids to changelog/follower
+  * (master) added inode checksum for some changes sent to changelog/follower
+  * (metadump) added '0x' prefix for fileds dumped as hex numbers
+  * (master) fixed ACL mask synchronization issues (restoring from
+    changelog/leader->follower)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 12 Oct 2017 13:00:00 +0200
+
 moosefs (3.0.97-1) unstable; urgency=medium
 
   * (tools) fixed trash/sustained size desynchronization after file length
     changed by chunk creation
-  * (mount) fixed posix lock unknown type handling
+  * (mount) fixed handling invalid arguments in posix lock command
 
  -- MooseFS Team <contact@moosefs.com>  Tue, 01 Aug 2017 13:00:00 +0200
 

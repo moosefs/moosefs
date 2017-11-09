@@ -122,7 +122,7 @@ int chunk_load(FILE *fd,uint8_t mver) {
 		if (chunkid==0 && version==0 && lockedto==0) {
 			return 0;
 		}
-		printf("CHUNK|i:%016"PRIX64"|v:%08"PRIX32"|t:%10"PRIu32"|a:%"PRIu8"\n",chunkid,version,lockedto,archflag);
+		printf("CHUNK|i:0x%016"PRIX64"|v:0x%08"PRIX32"|t:%10"PRIu32"|a:%"PRIu8"\n",chunkid,version,lockedto,archflag);
 	}
 }
 
@@ -159,9 +159,9 @@ int fs_loadedge(FILE *fd,uint8_t mver) {
 	}
 
 	if (parent_id==0) {
-		printf("EDGE|p:      NULL|c:%10"PRIu32"|i:%016"PRIX64"|n:",child_id,edge_id);
+		printf("EDGE|p:      NULL|c:%10"PRIu32"|i:0x%016"PRIX64"|n:",child_id,edge_id);
 	} else {
-		printf("EDGE|p:%10"PRIu32"|c:%10"PRIu32"|i:%016"PRIX64"|n:",parent_id,child_id,edge_id);
+		printf("EDGE|p:%10"PRIu32"|c:%10"PRIu32"|i:0x%016"PRIX64"|n:",parent_id,child_id,edge_id);
 	}
 	print_name(fd,nleng);
 	printf("\n");
@@ -305,10 +305,10 @@ int fs_loadnode(FILE *fd,uint8_t mver) {
 	ctimestamp = get32bit(&ptr);
 	if (mver>=0x14) {
 		trashtime = get16bit(&ptr);
-		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:%1"PRIX8"|w:%1"PRIX8"|m:%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%5"PRIu32"h",c,nodeid,goal,flags,winattr,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
+		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|w:0x%1"PRIX8"|m:0%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%5"PRIu32"h",c,nodeid,goal,flags,winattr,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
 	} else {
 		trashtime = get32bit(&ptr);
-		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:%1"PRIX8"|m:%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%10"PRIu32"s",c,nodeid,goal,flags,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
+		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|m:%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%10"PRIu32"s",c,nodeid,goal,flags,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
 	}
 
 	if (type==TYPE_BLOCKDEV || type==TYPE_CHARDEV) {
@@ -523,7 +523,7 @@ int fs_loadquota(FILE *fd,uint8_t mver) {
 		hsize = get64bit(&ptr);
 		srealsize = get64bit(&ptr);
 		hrealsize = get64bit(&ptr);
-		printf("QUOTA|i:%10"PRIu32"|g:%"PRIu32"|e:%c|f:%02"PRIX8"|s:%10"PRIu32,nodeid,graceperiod,(exceeded)?'1':'0',flags,stimestamp);
+		printf("QUOTA|i:%10"PRIu32"|g:%"PRIu32"|e:%c|f:0x%02"PRIX8"|s:%10"PRIu32,nodeid,graceperiod,(exceeded)?'1':'0',flags,stimestamp);
 		if (flags&QUOTA_FLAG_SINODES) {
 			printf("|si:%10"PRIu32,sinodes);
 		} else {
@@ -645,7 +645,7 @@ int posix_acl_load(FILE *fd,uint8_t mver) {
 		mask = get16bit(&ptr);
 		namedusers = get16bit(&ptr);
 		namedgroups = get16bit(&ptr);
-		printf("POSIXACL|i:%10"PRIu32"|t:%"PRIu8"|u:%"PRIo16"|g:%"PRIo16"|o:%"PRIo16"|m:%"PRIo16"|n:(",inode,acltype,userperm,groupperm,otherperm,mask);
+		printf("POSIXACL|i:%10"PRIu32"|t:%"PRIu8"|u:0%05"PRIo16"|g:0%05"PRIo16"|o:0%05"PRIo16"|m:0%05"PRIo16"|n:(",inode,acltype,userperm,groupperm,otherperm,mask);
 		acls = namedusers+namedgroups;
 		acbcnt = 0;
 		while (acls>0) {
@@ -666,9 +666,9 @@ int posix_acl_load(FILE *fd,uint8_t mver) {
 			acls--;
 			acbcnt--;
 			if (acls>=namedgroups) {
-				printf("u(%"PRIu32"):%"PRIo16,aclid,aclperm);
+				printf("u(%"PRIu32"):0%05"PRIo16,aclid,aclperm);
 			} else {
-				printf("g(%"PRIu32"):%"PRIo16,aclid,aclperm);
+				printf("g(%"PRIu32"):0%05"PRIo16,aclid,aclperm);
 			}
 			if (acls>0) {
 				printf(",");
@@ -781,7 +781,7 @@ int sessions_load(FILE *fd,uint8_t mver) {
 			disconnected = 0;
 		}
 		if (mver>=0x14) {
-			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|u:%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
+			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:0x%02"PRIX8"|u:0%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
 		} else if (mver>=0x13) {
 			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
 		} else if (mver>=0x11) {
@@ -957,7 +957,7 @@ int posix_lock_load(FILE *fd,uint8_t mver) {
 		if (inode==0 && owner==0 && sessionid==0) {
 			return 0;
 		}
-		printf("POSIXLOCK|i:%10"PRIu32"|s:%10"PRIu32"|o:%016"PRIX64"|p:%10"PRIu32"|r:<%20"PRIu64",%20"PRIu64")|t:%c\n",inode,sessionid,owner,pid,start,end,(type==POSIX_LOCK_RDLCK)?'R':(type==POSIX_LOCK_WRLCK)?'W':'?');
+		printf("POSIXLOCK|i:%10"PRIu32"|s:%10"PRIu32"|o:0x%016"PRIX64"|p:%10"PRIu32"|r:<%20"PRIu64",%20"PRIu64")|t:%c\n",inode,sessionid,owner,pid,start,end,(type==POSIX_LOCK_RDLCK)?'R':(type==POSIX_LOCK_WRLCK)?'W':'?');
 	}
 	return 0;	// unreachable
 }

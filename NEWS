@@ -12,7 +12,8 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed handling mark for removal (after reload sometimes cs could send chunks marked for removal as normal chunks)
   - (master) added file with metadata checksums (for future use)
   - (master) fixed way of sending gids to changelog/follower
-  - (master) added inode checksum for some changes sent to follower
+  - (master) added inode checksum for some changes sent to changelog/follower
+  - (metadump) added '0x' prefix for fileds dumped as hex numbers
 
 * MooseFS 3.0.97-1 (2017-08-01)
 

@@ -220,6 +220,38 @@ void changelog(const char *format,...) {
 	changelog_store_logstring(version,(uint8_t*)printbuff,leng);
 }
 
+char* changelog_generate_gids(uint32_t gids,uint32_t *gid) {
+	static char *gidstr = NULL;
+	static uint32_t gidstr_size = 0;
+	uint32_t i,l;
+
+	i = ((gids/32)+1)*32;
+	i *= 11;
+	i += 10;
+	if (i>gidstr_size || gidstr==NULL) {
+		if (gidstr!=NULL) {
+			free(gidstr);
+		}
+		gidstr = malloc(i);
+		passert(gidstr);
+		gidstr_size = i;
+	}
+	l = 0;
+	gidstr[l++] = '[';
+	for (i=0 ; i<gids ; i++) {
+		if (l<gidstr_size) {
+			l += snprintf(gidstr+l,gidstr_size-l,"%"PRIu32,gid[i]);
+		}
+		if (l<gidstr_size) {
+			gidstr[l++] = (i+1<gids)?',':']';
+		}
+	}
+	if (l<gidstr_size) {
+		gidstr[l++]='\0';
+	}
+	return gidstr;
+}
+
 char* changelog_escape_name(uint32_t nleng,const uint8_t *name) {
 	static char *escname[2]={NULL,NULL};
 	static uint32_t escnamesize[2]={0,0};

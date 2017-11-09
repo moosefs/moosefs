@@ -34,6 +34,8 @@ void changelog(const char *format,...) __printflike(1, 2);
 #else
 void changelog(const char *format,...);
 #endif
+
+char* changelog_generate_gids(uint32_t gids,uint32_t *gid);
 char* changelog_escape_name(uint32_t nleng,const uint8_t *name);
 int changelog_init(void);
 

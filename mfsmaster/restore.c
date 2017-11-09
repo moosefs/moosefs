@@ -44,7 +44,7 @@
 
 #define EAT(clptr,fn,vno,c) { \
 	if (*(clptr)!=(c)) { \
-		mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected\n",(fn),(vno),(c)); \
+		mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
 		return -1; \
 	} \
 	(clptr)++; \
@@ -56,6 +56,10 @@
 	memset((void*)(name),0,256); \
 	_tmp_i = 0; \
 	while ((_tmp_c=*((clptr)++))!=c && _tmp_i<255) { \
+		if (_tmp_c=='\0' || _tmp_c=='\r' || _tmp_c=='\n') { \
+			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
+			return -1; \
+		} \
 		if (_tmp_c=='%') { \
 			_tmp_h1 = *((clptr)++); \
 			_tmp_h2 = *((clptr)++); \
@@ -64,7 +68,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected\n",(fn),(vno)); \
+				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -72,7 +76,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected\n",(fn),(vno)); \
+				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -88,6 +92,10 @@
 	char _tmp_c,_tmp_h1,_tmp_h2; \
 	_tmp_i = 0; \
 	while ((_tmp_c=*((clptr)++))!=c) { \
+		if (_tmp_c=='\0' || _tmp_c=='\r' || _tmp_c=='\n') { \
+			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
+			return -1; \
+		} \
 		if (_tmp_c=='%') { \
 			_tmp_h1 = *((clptr)++); \
 			_tmp_h2 = *((clptr)++); \
@@ -96,7 +104,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected\n",(fn),(vno)); \
+				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -104,7 +112,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected\n",(fn),(vno)); \
+				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -145,6 +153,10 @@
 	char _tmp_c,_tmp_h1,_tmp_h2; \
 	(leng) = 0; \
 	while ((_tmp_c=*((clptr)++))!=c) { \
+		if (_tmp_c=='\0' || _tmp_c=='\r' || _tmp_c=='\n') { \
+			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
+			return -1; \
+		} \
 		if (_tmp_c=='%') { \
 			_tmp_h1 = *((clptr)++); \
 			_tmp_h2 = *((clptr)++); \
@@ -153,7 +165,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected\n",(fn),(vno)); \
+				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -161,7 +173,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected\n",(fn),(vno)); \
+				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -184,12 +196,50 @@
 	(clptr)--; \
 }
 
+#define GETARRAYU32(buff,leng,size,clptr,fn,vno) { \
+	char _tmp_c; \
+	char *eptr; \
+	(leng) = 0; \
+	_tmp_c = *((clptr)++); \
+	if (_tmp_c!='[') { \
+		mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '[' expected",(fn),(vno)); \
+		return -1; \
+	} \
+	while ((_tmp_c=*((clptr)++))!=']') { \
+		if (_tmp_c=='\0' || _tmp_c=='\r' || _tmp_c=='\n') { \
+			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": ']' expected",(fn),(vno)); \
+			return -1; \
+		} \
+		if (_tmp_c>='0' && _tmp_c<='9') { \
+			if ((leng)>=(size)) { \
+				(size) = (leng)+32; \
+				if ((buff)==NULL) { \
+					(buff) = malloc((size)*sizeof(uint32_t)); \
+				} else { \
+					uint32_t *_tmp_buff = (buff); \
+					(buff) = realloc((buff),(size)*sizeof(uint32_t)); \
+					if ((buff)==NULL) { \
+						free(_tmp_buff); \
+					} \
+				} \
+				passert(buff); \
+			} \
+			(buff)[(leng)++] = strtoul(clptr,&eptr,10); \
+			clptr = (const char*)eptr; \
+		} else if (_tmp_c!=',') { \
+			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": number or ',' expected",(fn),(vno)); \
+			return -1; \
+		} \
+	} \
+}
+
 #define GETU8(data,clptr) { \
 	uint32_t tmp; \
 	char *eptr; \
 	tmp=strtoul(clptr,&eptr,10); \
 	clptr = (const char*)eptr; \
 	if (tmp>255) { \
+		mfs_arg_syslog(LOG_WARNING,"value too big (%"PRIu32" - 0-255 expected)",tmp); \
 		return -1; \
 	} \
 	(data)=tmp; \
@@ -201,6 +251,7 @@
 	tmp=strtoul(clptr,&eptr,10); \
 	clptr = (const char*)eptr; \
 	if (tmp>65535) { \
+		mfs_arg_syslog(LOG_WARNING,"value too big (%"PRIu32" - 0-65535 expected)",tmp); \
 		return -1; \
 	} \
 	(data)=tmp; \
@@ -451,7 +502,7 @@ int do_chunkdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 }
 
 int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t sustainedinodes,freeinodes,bid;
+	uint32_t sustainedinodes,freeinodes,inode_chksum,bid;
 	EAT(ptr,filename,lv,'(');
 	if (*ptr!=')') {
 		GETU32(bid,ptr);
@@ -463,12 +514,18 @@ int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	GETU32(freeinodes,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(sustainedinodes,ptr);
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU32(inode_chksum,ptr);
+	} else {
+		inode_chksum = 0;
+	}
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_emptytrash(ts,bid,freeinodes,sustainedinodes);
+	return fs_mr_emptytrash(ts,bid,freeinodes,sustainedinodes,inode_chksum);
 }
 
 int do_emptysustained(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t freeinodes,bid;
+	uint32_t freeinodes,inode_chksum,bid;
 	EAT(ptr,filename,lv,'(');
 	if (*ptr!=')') {
 		GETU32(bid,ptr);
@@ -478,8 +535,14 @@ int do_emptysustained(const char *filename,uint64_t lv,uint32_t ts,const char *p
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(freeinodes,ptr);
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU32(inode_chksum,ptr);
+	} else {
+		inode_chksum = 0;
+	}
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_emptysustained(ts,bid,freeinodes);
+	return fs_mr_emptysustained(ts,bid,freeinodes,inode_chksum);
 }
 
 int do_flock(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -502,7 +565,7 @@ int do_flock(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 }
 
 int do_freeinodes(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t sustainedinodes,freeinodes;
+	uint32_t sustainedinodes,freeinodes,inode_chksum;
 	EAT(ptr,filename,lv,'(');
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
@@ -513,8 +576,14 @@ int do_freeinodes(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	} else {
 		sustainedinodes = 0;
 	}
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU32(inode_chksum,ptr);
+	} else {
+		inode_chksum = 0;
+	}
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_freeinodes(ts,freeinodes,sustainedinodes);
+	return fs_mr_freeinodes(ts,freeinodes,sustainedinodes,inode_chksum);
 }
 
 int do_incversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -756,7 +825,8 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETU32(sesflags,ptr);
 	EAT(ptr,filename,lv,',');
 	if (*ptr=='0') {
-		if (ptr[1]<'0' || ptr[1]>'7' || ptr[1]<'0' || ptr[1]>'7' || ptr[1]<'0' || ptr[1]>'7') {
+		if (ptr[1]<'0' || ptr[1]>'7' || ptr[2]<'0' || ptr[2]>'7' || ptr[3]<'0' || ptr[3]>'7') {
+			mfs_arg_syslog(LOG_WARNING,"wrong session umask ('%c%c%c' - octal number expected)",ptr[1],ptr[2],ptr[3]);
 			return -1;
 		}
 		umaskval = (ptr[1]-'0') * 64 + (ptr[2]-'0') * 8 + (ptr[3]-'0');
@@ -817,7 +887,8 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	GETU32(sesflags,ptr);
 	EAT(ptr,filename,lv,',');
 	if (*ptr=='0') {
-		if (ptr[1]<'0' || ptr[1]>'7' || ptr[1]<'0' || ptr[1]>'7' || ptr[1]<'0' || ptr[1]>'7') {
+		if (ptr[1]<'0' || ptr[1]>'7' || ptr[2]<'0' || ptr[2]>'7' || ptr[3]<'0' || ptr[3]>'7') {
+			mfs_arg_syslog(LOG_WARNING,"wrong session umask ('%c%c%c' - octal number expected)",ptr[1],ptr[2],ptr[3]);
 			return -1;
 		}
 		umaskval = (ptr[1]-'0') * 64 + (ptr[2]-'0') * 8 + (ptr[3]-'0');
@@ -1075,9 +1146,13 @@ int do_setacl(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 
 int do_snapshot(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,parent,smode,sesflags,uid,gids,umask;
-	static uint8_t *gid = NULL;
+	uint32_t inodecheck,removed,same,exisiting,hardlinks,new;
+	static uint8_t *gidstr = NULL;
+	static uint32_t gidstrsize = 0;
+	static uint32_t *gid = NULL;
 	static uint32_t gidsize = 0;
 	uint32_t gidleng;
+	uint32_t *gidtab;
 	uint8_t name[256];
 	uint8_t mode;
 	uint32_t i;
@@ -1094,29 +1169,61 @@ int do_snapshot(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(uid,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(gids,ptr);
-	EAT(ptr,filename,lv,',');
-	mode = 0;
-	for (i=0 ; ptr[i] && ptr[i]!=')' ; i++) {
-		if (ptr[i]<'0' || ptr[i]>'9') {
-			mode=1;
-			break;
+	if (*ptr=='[') {
+		mode=2;
+	} else {
+		GETU32(gids,ptr);
+		EAT(ptr,filename,lv,',');
+		mode = 0;
+		for (i=0 ; ptr[i] && ptr[i]!=')' ; i++) {
+			if (ptr[i]<'0' || ptr[i]>'9') {
+				mode=1;
+				break;
+			}
 		}
 	}
-	if (mode==1) {
-		GETDATA(gid,gidleng,gidsize,ptr,filename,lv,',');
+	if (mode>=1) {
+		if (mode==2) {
+			GETARRAYU32(gid,gids,gidsize,ptr,filename,lv);
+			gidtab = gid;
+		} else {
+			GETDATA(gidstr,gidleng,gidstrsize,ptr,filename,lv,',');
+			if (gids*4!=gidleng) {
+				return MFS_ERROR_MISMATCH;
+			}
+			gidtab = (uint32_t*)gidstr;
+		}
 		EAT(ptr,filename,lv,',');
 		GETU32(umask,ptr);
 		EAT(ptr,filename,lv,')');
-		if (gids*4!=gidleng) {
-			return MFS_ERROR_MISMATCH;
+		if (*ptr==':') {
+			EAT(ptr,filename,lv,':');
+			GETU32(inodecheck,ptr);
+			EAT(ptr,filename,lv,',');
+			GETU32(removed,ptr);
+			EAT(ptr,filename,lv,',');
+			GETU32(same,ptr);
+			EAT(ptr,filename,lv,',');
+			GETU32(exisiting,ptr);
+			EAT(ptr,filename,lv,',');
+			GETU32(hardlinks,ptr);
+			EAT(ptr,filename,lv,',');
+			GETU32(new,ptr);
+		} else {
+			inodecheck=0;
+			removed=0;
+			same=0;
+			exisiting=0;
+			hardlinks=0;
+			new=0;
 		}
-		return fs_mr_snapshot(ts,inode,parent,strlen((char*)name),name,smode,sesflags,uid,gids,(uint32_t*)gid,umask);
+		(void)ptr; // silence cppcheck warnings
+		return fs_mr_snapshot(ts,inode,parent,strlen((char*)name),name,smode,sesflags,uid,gids,gidtab,umask,inodecheck,removed,same,exisiting,hardlinks,new);
 	} else {
 		GETU32(umask,ptr);
 		EAT(ptr,filename,lv,')');
 		(void)ptr; // silence cppcheck warnings
-		return fs_mr_snapshot(ts,inode,parent,strlen((char*)name),name,smode,sesflags,uid,1,&gids,umask);
+		return fs_mr_snapshot(ts,inode,parent,strlen((char*)name),name,smode,sesflags,uid,1,&gids,umask,0,0,0,0,0,0);
 	}
 }
 

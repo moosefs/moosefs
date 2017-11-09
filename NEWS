@@ -8,6 +8,7 @@ This file lists noteworthy changes in MooseFS.
   - (debian) added support for systemd in debian packages
   - (all) fixed library dependencies (for libpcap,libz and libm)
   - (mount) fixed race between defered 'open' and 'locks'
+  - (master) more chunk debugs and better handling chunk status change
 
 * MooseFS 3.0.97-1 (2017-08-01)
 

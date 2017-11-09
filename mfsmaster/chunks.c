@@ -28,6 +28,7 @@
 
 #include <inttypes.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <syslog.h>
@@ -105,6 +106,19 @@ static const char* opstr[] = {
 /* TDVALID - ok, to be deleted */
 /* TDWVER - wrong version, to be deleted */
 enum {INVALID,DEL,BUSY,VALID,WVER,TDBUSY,TDVALID,TDWVER};
+
+#ifdef MFSDEBUG
+static const char* validstr[] = {
+	"INVALID",
+	"DELETE",
+	"BUSY",
+	"VALID",
+	"WVER",
+	"TDBUSY",
+	"TDVALID",
+	"TDWVER"
+};
+#endif
 
 typedef struct _discserv {
 	uint16_t csid;
@@ -300,6 +314,33 @@ static uint32_t **regularchunkcounts;
 
 static uint32_t stats_deletions=0;
 static uint32_t stats_replications=0;
+
+
+#ifdef MFSDEBUG
+static void mfsdebug(const char *format,...) {
+	va_list ap;
+	static FILE *fd = NULL;
+
+	if (format==NULL) {
+		if (fd==NULL) {
+			fd = fopen("mfsdebug.txt","a");
+		} else {
+			fflush(fd);
+		}
+	} else if (fd!=NULL) {
+		fprintf(fd,"%"PRIu32" : ",(uint32_t)(main_time()));
+		va_start(ap,format);
+		vfprintf(fd,format,ap);
+		va_end(ap);
+		fputc('\n',fd);
+	}
+}
+
+void mfsdebug_flush(void) {
+	mfsdebug(NULL);
+}
+#endif
+
 
 /* perfect matching */
 static uint32_t queue[10+MAXCSCOUNT];
@@ -807,6 +848,9 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 	uint32_t labelcnt;
 	int32_t *matching;
 	uint8_t wronglabels;
+#ifdef MFSDEBUG
+	uint8_t debug;
+#endif
 
 	if (c==NULL) {
 		if (servers==NULL && checklabels==0) {
@@ -819,7 +863,15 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 		return;
 	}
 
+#ifdef MFSDEBUG
+	debug = ((c->chunkid&0xFFF)==0)?1:0;
+#endif
 	if (c->ondangerlist || servers==NULL || c->sclassid==0 || c->fcount==0 || c->lockedto+3600>=(uint32_t)main_time()) {
+#ifdef MFSDEBUG
+		if (debug) {
+			mfsdebug("chunk_priority_queue_check ; chunkid=%016"PRIX64" ; ignore: ondangerlist=%u ; servers%c=NULL ; sclassid=%u ; fcount=%u ; lockedto=%"PRIu32,c->chunkid,c->ondangerlist,(servers==NULL)?'=':'!',c->sclassid,c->fcount,c->lockedto);
+		}
+#endif
 		return;
 	}
 	vc = 0;
@@ -868,7 +920,16 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 		} else { // lowest priority - overgoal
 			j = 6;
 		}
+#ifdef MFSDEBUG
+		if (debug) {
+			mfsdebug("chunk_priority_queue_check ; chunkid=%016"PRIX64" ; enqueue: priority=%u ; vc=%u ; tdc=%u ; goal=%u ; wronglabels=%u",c->chunkid,j,vc,tdc,goal,wronglabels);
+		}
+#endif
 		chunk_priority_enqueue(j,c);
+#ifdef MFSDEBUG
+	} else if (debug) {
+		mfsdebug("chunk_priority_queue_check ; chunkid=%016"PRIX64" ; exit: vc=%u ; tdc=%u ; goal=%u ; wronglabels=%u",c->chunkid,vc,tdc,goal,wronglabels);
+#endif
 	}
 }
 
@@ -2131,7 +2192,10 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 	static uint32_t loglastts = 0;
 	static uint32_t ilogcount = 0;
 	static uint32_t clogcount = 0;
+#else
+	uint8_t debug;
 #endif
+
 	cstab[csid].newchunkdelay = NEWCHUNKDELAY;
 	csreceivingchunks |= 2;
 
@@ -2182,8 +2246,61 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 		c->lockedto = (uint32_t)main_time()+UNUSED_DELETE_TIMEOUT;
 		changelog("%"PRIu32"|CHUNKADD(%"PRIu64",%"PRIu32",%"PRIu32")",main_time(),c->chunkid,c->version,c->lockedto);
 	}
+#ifdef MFSDEBUG
+	debug = ((chunkid&0xFFF)==0)?1:0;
+	if (debug) {
+		mfsdebug("chunk_server_has_chunk ; chunkid=%016"PRIX64" new copy: mfrstatus=%u ; csid=%"PRIu16" ; ip=%s",chunkid,(version&0x80000000)?1:0,csid,matocsserv_getstrip(cstab[csid].ptr));
+		for (s=c->slisthead ; s ; s=s->next) {
+			mfsdebug("chunk_server_has_chunk ; chunkid=%016"PRIX64" ; existing copy: mfrstatus=%u ; valid=%s ; csid=%"PRIu16" ; ip=%s",chunkid,(s->valid==TDVALID || s->valid==TDBUSY || s->valid==TDWVER)?1:0,validstr[s->valid],s->csid,matocsserv_getstrip(cstab[s->csid].ptr));
+		}
+	}
+#endif
 	for (s=c->slisthead ; s ; s=s->next) {
 		if (s->csid==csid) {
+			uint8_t nextallvalidcopies = c->allvalidcopies;
+			uint8_t nextregularvalidcopies = c->regularvalidcopies;
+			uint8_t nextvalid;
+			if (s->valid==INVALID || s->valid==DEL || s->valid==WVER || s->valid==TDWVER) { // ignore such copy
+				return;
+			}
+			// in case of other copies just check 'mark for removal' status
+			if (s->valid==BUSY || s->valid==TDBUSY) {
+				if (version&0x80000000) {
+					nextvalid = TDBUSY;
+				} else {
+					nextvalid = BUSY;
+				}
+			} else {
+				if (version&0x80000000) {
+					nextvalid = TDVALID;
+				} else {
+					nextvalid = VALID;
+				}
+			}
+			if (s->valid==nextvalid) {
+				return;
+			}
+			if (s->valid==VALID || s->valid==BUSY) {
+				nextallvalidcopies--;
+				nextregularvalidcopies--;
+			} else if (s->valid==TDVALID || s->valid==TDBUSY) {
+				nextallvalidcopies--;
+			}
+			if (nextvalid==VALID || nextvalid==BUSY) {
+				nextallvalidcopies++;
+				nextregularvalidcopies++;
+			} else if (nextvalid==TDVALID || nextvalid==TDBUSY) {
+				nextallvalidcopies++;
+			}
+			s->valid = nextvalid;
+			if (nextallvalidcopies!=c->allvalidcopies || nextregularvalidcopies!=c->regularvalidcopies) {
+				chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,nextallvalidcopies,c->regularvalidcopies,nextregularvalidcopies);
+				c->allvalidcopies = nextallvalidcopies;
+				c->regularvalidcopies = nextregularvalidcopies;
+				if (version&0x80000000) {
+					chunk_mfr_state_check(c);
+				}
+			}
 			return;
 		}
 	}
@@ -2763,6 +2880,9 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	uint32_t servcnt,extraservcnt;
 	int32_t *matching;
 	uint32_t forcereplication;
+#ifdef MFSDEBUG
+	uint8_t debug;
+#endif
 
 	if (servers==NULL) {
 		servers = malloc(sizeof(uint16_t)*MAXCSCOUNT);
@@ -2883,6 +3003,15 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			break;
 		}
 	}
+#ifdef MFSDEBUG
+	debug = ((c->chunkid&0xFFF)==0)?1:0;
+	if (debug) {
+		mfsdebug("chunk_do_jobs ; chunkid=%016"PRIX64" ; vc=%u ; tdc=%u ; bc=%u ; tdb=%u ; wvc=%u ; tdw=%u ; ivc=%u ; dc=%u",c->chunkid,vc,tdc,bc,tdb,wvc,tdw,ivc,dc);
+		for (s=c->slisthead ; s ; s=s->next) {
+			mfsdebug("chunk_do_jobs ; chunkid=%016"PRIX64" ; existing copy: valid=%s ; csid=%"PRIu16" ; ip=%s",c->chunkid,validstr[s->valid],s->csid,matocsserv_getstrip(cstab[s->csid].ptr));
+		}
+	}
+#endif
 	if (c->allvalidcopies!=vc+tdc+bc+tdb) {
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": wrong all valid copies counter - (counter value: %u, should be: %u) - fixed",c->chunkid,c->version,c->allvalidcopies,vc+tdc+bc+tdb);
 		chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,vc+tdc+bc+tdb,c->regularvalidcopies,c->regularvalidcopies);
@@ -4414,6 +4543,11 @@ int chunk_strinit(void) {
 	}
 	chunk_do_jobs(NULL,JOBS_INIT,0,main_time(),0);	// clear chunk loop internal data, and allocate tabs
 	chunk_priority_queue_check(NULL,0); // allocate 'servers' tab
+
+#ifdef MFSDEBUG
+	mfsdebug(NULL);
+	main_time_register(1,0,mfsdebug_flush);
+#endif
 
 	main_reload_register(chunk_reload);
 	// main_time_register(1,0,chunk_jobs_main);

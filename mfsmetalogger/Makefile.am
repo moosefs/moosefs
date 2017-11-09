@@ -17,8 +17,6 @@ mfsmetalogger_SOURCES= \
 	../mfscommon/slogger.h ../mfscommon/mfsalloc.h \
 	../mfscommon/MFSCommunication.h
 
-mfsmetalogger_LDFLAGS=$(ZLIB_LIBS)
-
 mfsmetalogger_CPPFLAGS=$(AM_CPPFLAGS) -DAPPNAME=mfsmetalogger
 
 distclean:distclean-am

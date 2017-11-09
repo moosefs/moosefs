@@ -101,10 +101,19 @@ AC_SEARCH_LIBS([socket], [socket])
 AC_SEARCH_LIBS([getaddrinfo], [nsl])
 # FreeBSD:
 AC_SEARCH_LIBS([kvm_open], [kvm])
-# All:
-AC_SEARCH_LIBS([round], [m])
 # Linux:
 AC_SEARCH_LIBS([clock_gettime], [rt])
+
+# We do not use AC_SEARCH_LIBS to avoid adding '-lm' to every binary
+mathlib=no
+AC_CHECK_LIB([m],[round],[ AC_CHECK_HEADERS([math.h],[mathlib=yes]) ])
+
+if test "$mathlib" = "no"; then
+	MATH_LIBS=
+else
+	MATH_LIBS=-lm
+fi
+AC_SUBST([MATH_LIBS])
 
 # Checks for header files.
 AC_HEADER_DIRENT
@@ -403,14 +412,20 @@ AM_CONDITIONAL([BUILD_CHUNKSERVER], [test "$enable_mfschunkserver" != "no"])
 
 
 pcap=no
-AC_SEARCH_LIBS([pcap_lib_version],[pcap],[ AC_CHECK_HEADERS([pcap.h],[pcap=yes]) ])
+AC_CHECK_LIB([pcap],[pcap_lib_version],[ AC_CHECK_HEADERS([pcap.h],[pcap=yes]) ])
 
-if test "$pcap" != "yes" -a "enable_mfsnetdump" != "no"; then
-	echo "****** mfsnetdump disabled ******"
-	echo "* mfsnetdump needs pcap library *"
-	echo "*********************************"
-	enable_mfsnetdump=no
+if test "$pcap" = "no"; then
+	PCAP_LIBS=
+	if test "enable_mfsnetdump" != "no"; then
+		echo "****** mfsnetdump disabled ******"
+		echo "* mfsnetdump needs pcap library *"
+		echo "*********************************"
+		enable_mfsnetdump=no
+	fi
+else
+	PCAP_LIBS=-lpcap
 fi
+AC_SUBST([PCAP_LIBS])
 
 AM_CONDITIONAL([BUILD_NETDUMP], [test "$enable_mfsnetdump" != "no"])
 

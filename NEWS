@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgiserv) added seteuid to 'mfs' or 'nobody'
   - (cs+tools) use readdir instead of readdir_r on glibc 2.24+
   - (debian) added support for systemd in debian packages
+  - (all) fixed library dependencies (for libpcap,libz and libm)
 
 * MooseFS 3.0.97-1 (2017-08-01)
 

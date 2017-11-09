@@ -45,7 +45,7 @@ mfschunkserver_SOURCES= \
 
 mfschunkserver_CFLAGS=$(PTHREAD_CFLAGS)
 mfschunkserver_CPPFLAGS=$(AM_CPPFLAGS) -DMFSMAXFILES=16384 -D_USE_PTHREADS $(PTHREAD_CPPFLAGS) -DAPPNAME=mfschunkserver -DUSE_CONNCACHE
-mfschunkserver_LDFLAGS=$(PTHREAD_LIBS) $(ZLIB_LIBS)
+mfschunkserver_LDFLAGS=$(PTHREAD_LIBS) $(ZLIB_LIBS) $(MATH_LIBS)
 
 mfschunktool_SOURCES= \
 	mfschunktool.c \

@@ -2,6 +2,8 @@ sbin_PROGRAMS=mfsnetdump
 
 AM_CPPFLAGS=-I$(top_srcdir)/mfscommon -I.
 
+mfsnetdump_LDADD=$(PCAP_LIBS)
+
 mfsnetdump_SOURCES=\
 	mfsnetdump.c \
 	commands.h \

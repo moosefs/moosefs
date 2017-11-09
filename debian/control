@@ -38,7 +38,7 @@ Description: MooseFS client tools
 
 Package: moosefs-cli
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.5)
+Depends: ${misc:Depends}, python (>= 2.5)
 Description: MooseFS CLI Utility
  This package will install MooseFS component responsible
  for monitoring. This is simple command line utility which
@@ -47,7 +47,7 @@ Description: MooseFS CLI Utility
 
 Package: moosefs-cgi
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.5)
+Depends: ${misc:Depends}, python (>= 2.5)
 Description: MooseFS CGI Monitor
  This package will install MooseFS component responsible
  for monitoring. This is simple CGI utility which
@@ -56,7 +56,7 @@ Description: MooseFS CGI Monitor
 
 Package: moosefs-cgiserv
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, moosefs-cgi, adduser, python (>= 2.5)
+Depends: ${misc:Depends}, moosefs-cgi, adduser, python (>= 2.5)
 Description: Simple CGI-capable HTTP server to run MooseFS CGI Monitor
  This package will install MooseFS component responsible
  for monitoring. This is simple CGI web server that can be
@@ -74,7 +74,7 @@ Package: moosefs-dbg
 Architecture: any
 Section: debug
 Priority: extra
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${misc:Depends}
 Description: MooseFS debug binaries
  This package will install MooseFS debug symbols for
  all MooseFS binaries available in other packages.

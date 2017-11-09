@@ -662,6 +662,7 @@ FUSE_LIBS
 FUSE_CFLAGS
 BUILD_NETDUMP_FALSE
 BUILD_NETDUMP_TRUE
+PCAP_LIBS
 BUILD_CHUNKSERVER_FALSE
 BUILD_CHUNKSERVER_TRUE
 BUILD_SUPERVISOR_FALSE
@@ -703,6 +704,7 @@ PKG_CONFIG_PATH
 PKG_CONFIG
 KILL
 LIBOBJS
+MATH_LIBS
 PTHREAD_CFLAGS
 PTHREAD_LIBS
 PTHREAD_CC
@@ -12908,63 +12910,6 @@ if test "$ac_res" != no; then :
 
 fi
 
-# All:
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing round" >&5
-$as_echo_n "checking for library containing round... " >&6; }
-if ${ac_cv_search_round+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_func_search_save_LIBS=$LIBS
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char round ();
-int
-main ()
-{
-return round ();
-  ;
-  return 0;
-}
-_ACEOF
-for ac_lib in '' m; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_round=$ac_res
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_round+:} false; then :
-  break
-fi
-done
-if ${ac_cv_search_round+:} false; then :
-
-else
-  ac_cv_search_round=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_round" >&5
-$as_echo "$ac_cv_search_round" >&6; }
-ac_res=$ac_cv_search_round
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-
-fi
-
 # Linux:
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing clock_gettime" >&5
 $as_echo_n "checking for library containing clock_gettime... " >&6; }
@@ -13020,6 +12965,67 @@ ac_res=$ac_cv_search_clock_gettime
 if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
+fi
+
+
+# We do not use AC_SEARCH_LIBS to avoid adding '-lm' to every binary
+mathlib=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for round in -lm" >&5
+$as_echo_n "checking for round in -lm... " >&6; }
+if ${ac_cv_lib_m_round+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lm  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char round ();
+int
+main ()
+{
+return round ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_m_round=yes
+else
+  ac_cv_lib_m_round=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_m_round" >&5
+$as_echo "$ac_cv_lib_m_round" >&6; }
+if test "x$ac_cv_lib_m_round" = xyes; then :
+   for ac_header in math.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "math.h" "ac_cv_header_math_h" "$ac_includes_default"
+if test "x$ac_cv_header_math_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_MATH_H 1
+_ACEOF
+ mathlib=yes
+fi
+
+done
+
+fi
+
+
+if test "$mathlib" = "no"; then
+	MATH_LIBS=
+else
+	MATH_LIBS=-lm
 fi
 
 
@@ -15955,7 +15961,7 @@ if ${am_cv_pathless_PYTHON+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-	for am_cv_pathless_PYTHON in python python2 python3 python3.3 python3.2 python3.1 python3.0 python2.7  python2.6 python2.5 python2.4 python2.3 python2.2 python2.1 python2.0 none; do
+	for am_cv_pathless_PYTHON in python python2 python3 python3.5 python3.4 python3.3 python3.2 python3.1 python3.0 python2.7  python2.6 python2.5 python2.4 python2.3 python2.2 python2.1 python2.0 none; do
 	  test "$am_cv_pathless_PYTHON" = none && break
 	  prog="import sys
 # split strings by '.' and convert to numeric.  Append some zeros
@@ -16269,12 +16275,13 @@ fi
 
 
 pcap=no
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing pcap_lib_version" >&5
-$as_echo_n "checking for library containing pcap_lib_version... " >&6; }
-if ${ac_cv_search_pcap_lib_version+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for pcap_lib_version in -lpcap" >&5
+$as_echo_n "checking for pcap_lib_version in -lpcap... " >&6; }
+if ${ac_cv_lib_pcap_pcap_lib_version+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_func_search_save_LIBS=$LIBS
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpcap  $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -16293,35 +16300,18 @@ return pcap_lib_version ();
   return 0;
 }
 _ACEOF
-for ac_lib in '' pcap; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_pcap_lib_version=$ac_res
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_pcap_pcap_lib_version=yes
+else
+  ac_cv_lib_pcap_pcap_lib_version=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_pcap_lib_version+:} false; then :
-  break
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
 fi
-done
-if ${ac_cv_search_pcap_lib_version+:} false; then :
-
-else
-  ac_cv_search_pcap_lib_version=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_pcap_lib_version" >&5
-$as_echo "$ac_cv_search_pcap_lib_version" >&6; }
-ac_res=$ac_cv_search_pcap_lib_version
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pcap_pcap_lib_version" >&5
+$as_echo "$ac_cv_lib_pcap_pcap_lib_version" >&6; }
+if test "x$ac_cv_lib_pcap_pcap_lib_version" = xyes; then :
    for ac_header in pcap.h
 do :
   ac_fn_c_check_header_mongrel "$LINENO" "pcap.h" "ac_cv_header_pcap_h" "$ac_includes_default"
@@ -16337,12 +16327,18 @@ done
 fi
 
 
-if test "$pcap" != "yes" -a "enable_mfsnetdump" != "no"; then
-	echo "****** mfsnetdump disabled ******"
-	echo "* mfsnetdump needs pcap library *"
-	echo "*********************************"
-	enable_mfsnetdump=no
+if test "$pcap" = "no"; then
+	PCAP_LIBS=
+	if test "enable_mfsnetdump" != "no"; then
+		echo "****** mfsnetdump disabled ******"
+		echo "* mfsnetdump needs pcap library *"
+		echo "*********************************"
+		enable_mfsnetdump=no
+	fi
+else
+	PCAP_LIBS=-lpcap
 fi
+
 
  if test "$enable_mfsnetdump" != "no"; then
   BUILD_NETDUMP_TRUE=

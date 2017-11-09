@@ -73,9 +73,9 @@ dist-hook:
 mfsdist: dist
 	if grep -q '(WIP)' NEWS; then \
 		mv $(distdir).tar.gz ../moosefs-dist/$(distdir)-WIP.tar.gz ; \
-		ln -sf $(distdir)-WIP.tar.gz ../moosefs-dist/moosefs-WIP.tar.gz ; \
+		ln -sf $(distdir)-WIP.tar.gz ../moosefs-dist/moosefs-3.x-LATEST.tar.gz ; \
 	else \
 		mv $(distdir).tar.gz ../moosefs-dist/$(distdir)-$(RELEASE).tar.gz ; \
 		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/$(distdir).tar.gz ; \
-		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/moosefs-WIP.tar.gz ; \
+		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/moosefs-3.x-LATEST.tar.gz ; \
 	fi

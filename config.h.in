@@ -156,6 +156,9 @@
 /* Define to 1 if you have the `mallopt' function. */
 #undef HAVE_MALLOPT
 
+/* Define to 1 if you have the <math.h> header file. */
+#undef HAVE_MATH_H
+
 /* Define to 1 if you have the `memmove' function. */
 #undef HAVE_MEMMOVE
 

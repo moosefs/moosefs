@@ -57,6 +57,8 @@ mfstools_SOURCES=\
 	../mfscommon/datapack.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/MFSCommunication.h
 
+mfstools_LDADD=$(MATH_LIBS)
+
 mfstools_links=\
 	mfscheckfile mfsdirinfo mfsfileinfo mfsfilerepair \
 	mfsgetgoal mfsgettrashtime mfsrgetgoal mfsrgettrashtime \

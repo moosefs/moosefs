@@ -382,7 +382,7 @@ uint8_t posix_acl_store(bio *fd) {
 	acl_node *acn;
 
 	if (fd==NULL) {
-		return 0x10;
+		return 0x11;
 	}
 
 	for (i=0 ; i<HASHTAB_HISIZE ; i++) {
@@ -453,8 +453,6 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 	uint8_t nl=1;
 	acl_node *acn;
 
-	(void)mver;
-
 	while (1) {
 		if (bio_read(fd,hdrbuff,4+1+2*6)!=(4+1+2*6)) {
 			int err = errno;
@@ -512,6 +510,16 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 		}
 		acn = posix_acl_create(inode,acltype);
 		fs_set_aclflag(inode,acltype);
+		if (mver==0x10 && mask==0) {
+			uint16_t mode;
+			mode = fs_get_mode(inode);
+			userperm &= 0xFFF8;
+			userperm = (mode>>6)&7;
+			mask = 7;
+			otherperm &= 0xFFF8;
+			otherperm = mode&7;
+			mfs_arg_syslog(LOG_WARNING,"emergency set ACL mask for inode %"PRIu32" to 'rwx'",inode);
+		}
 		acn->userperm = userperm;
 		acn->groupperm = groupperm;
 		acn->otherperm = otherperm;

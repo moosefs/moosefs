@@ -14,6 +14,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed way of sending gids to changelog/follower
   - (master) added inode checksum for some changes sent to changelog/follower
   - (metadump) added '0x' prefix for fileds dumped as hex numbers
+  - (master) fixed ACL mask synchronization issues (restoring from changelog/leader->follower)
 
 * MooseFS 3.0.97-1 (2017-08-01)
 

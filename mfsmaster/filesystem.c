@@ -3977,7 +3977,27 @@ void fs_del_aclflag(uint32_t inode,uint8_t acltype) {
 	}
 }
 
-/* master <-> fuse operations */
+uint16_t fs_get_mode(uint32_t inode) { // for fixing ACL's produced by mfs before 3.0.98
+	fsnode *p;
+	p = fsnodes_node_find(inode);
+	if (p) {
+		return p->mode;
+	}
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/* interface */
 
 uint8_t fs_mr_access(uint32_t ts,uint32_t inode) {
 	fsnode *p;
@@ -4746,14 +4766,14 @@ uint8_t fs_setattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	if (setmask&SET_WINATTR_FLAG) {
 		p->winattr = winattr;
 	}
-	changelog("%"PRIu32"|ATTR(%"PRIu32",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu16")",ts,inode,(uint16_t)(p->mode),p->uid,p->gid,p->atime,p->mtime,p->winattr,attrmode);
+	changelog("%"PRIu32"|ATTR(%"PRIu32",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu8",%"PRIu16")",ts,inode,(uint16_t)(p->mode),p->uid,p->gid,p->atime,p->mtime,p->winattr,(uint16_t)((p->aclpermflag)?((posix_acl_getmode(p->inode)&07777)+(1U<<12)):0));
 	p->ctime = ts;
 	fsnodes_fill_attr(p,NULL,uid,gid[0],auid,agid,sesflags,attr,1);
 	stats_setattr++;
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_t gid,uint32_t atime,uint32_t mtime,uint8_t winattr,uint16_t attrmode) {
+uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_t gid,uint32_t atime,uint32_t mtime,uint8_t winattr,uint16_t aclmode) {
 	fsnode *p;
 	p = fsnodes_node_find(inode);
 	if (!p) {
@@ -4764,7 +4784,12 @@ uint8_t fs_mr_attr(uint32_t ts,uint32_t inode,uint16_t mode,uint32_t uid,uint32_
 	}
 	p->mode = mode;
 	if (p->aclpermflag) {
-		posix_acl_setmode(p->inode,attrmode);
+		if ((aclmode & (1<<12)) == 0) { // wrong aclmode produced by mfs older than 3.0.98
+			aclmode = mode & 0707; // fix user and other bits
+			aclmode |= 0070; // use 'full' mask
+			mfs_arg_syslog(LOG_WARNING,"set attributes for inode %"PRIu32" with posix acl - emergency set mask to 'rwx' - upgrade all masters to newest version and check ACL's for this inode",inode);
+		}
+		posix_acl_setmode(p->inode,aclmode);
 	}
 	p->uid = uid;
 	p->gid = gid;

@@ -34,9 +34,9 @@ uint8_t fs_mr_amtime(uint32_t inode,uint32_t atime,uint32_t mtime,uint32_t ctime
 // int fs_copy(uint32_t ts,inode,parent,strlen(name),name);
 uint8_t fs_mr_create(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *name,uint8_t type,uint16_t mode,uint16_t cumask,uint32_t uid,uint32_t gid,uint32_t rdev,uint32_t inode);
 uint8_t fs_mr_session(uint32_t sessionid);
-uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t bid,uint32_t freeinodes,uint32_t sustainedinodes);
-uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t bid,uint32_t freeinodes);
-uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t freeinodes,uint32_t sustainedinodes);
+uint8_t fs_mr_emptytrash(uint32_t ts,uint32_t bid,uint32_t freeinodes,uint32_t sustainedinodes,uint32_t inode_chksum);
+uint8_t fs_mr_emptysustained(uint32_t ts,uint32_t bid,uint32_t freeinodes,uint32_t inode_chksum);
+uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t freeinodes,uint32_t sustainedinodes,uint32_t inode_chksum);
 uint8_t fs_mr_link(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint32_t nleng_dst,uint8_t *name_dst);
 uint8_t fs_mr_length(uint32_t ts,uint32_t inode,uint64_t length,uint8_t canmodmtime);
 uint8_t fs_mr_move(uint32_t ts,uint32_t parent_src,uint32_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint32_t nleng_dst,const uint8_t *name_dst,uint32_t inode);
@@ -45,7 +45,7 @@ uint8_t fs_mr_repair(uint32_t ts,uint32_t inode,uint32_t indx,uint32_t nversion)
 uint8_t fs_mr_release(uint32_t inode,uint32_t sessionid);
 uint8_t fs_mr_symlink(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *name,const uint8_t *path,uint32_t uid,uint32_t gid,uint32_t inode);
 uint8_t fs_mr_setpath(uint32_t inode,const uint8_t *path);
-uint8_t fs_mr_snapshot(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint16_t nleng_dst,uint8_t *name_dst,uint8_t smode,uint8_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t requmask);
+uint8_t fs_mr_snapshot(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint16_t nleng_dst,uint8_t *name_dst,uint8_t smode,uint8_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t cumask,uint32_t inodecheck,uint32_t removed,uint32_t same,uint32_t exisiting,uint32_t hardlinks,uint32_t new);
 uint8_t fs_mr_unlink(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *name,uint32_t inode);
 uint8_t fs_mr_purge(uint32_t ts,uint32_t inode);
 uint8_t fs_mr_undel(uint32_t ts,uint32_t inode);
@@ -212,5 +212,6 @@ void fs_del_xattrflag(uint32_t inode);
 
 void fs_set_aclflag(uint32_t inode,uint8_t acltype);
 void fs_del_aclflag(uint32_t inode,uint8_t acltype);
+uint16_t fs_get_mode(uint32_t inode);
 
 #endif

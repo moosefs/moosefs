@@ -1667,38 +1667,12 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 
 void matoclserv_reload_sessions(void) {
 	matoclserventry *eptr;
-	uint8_t status;
 
 	exports_reload();
 	for (eptr=matoclservhead ; eptr ; eptr=eptr->next) {
 		if (eptr->mode==DATA && eptr->registered==1 && eptr->sesdata!=NULL) {
 			if (sessions_get_exportscsum(eptr->sesdata)!=exports_checksum()) {
-				uint32_t rootinode;
-				uint8_t sesflags;
-				uint16_t umaskval;
-				uint8_t mingoal,maxgoal;
-				uint32_t mintrashtime,maxtrashtime;
-				uint32_t rootuid,rootgid;
-				uint32_t mapalluid,mapallgid;
-
-				if (eptr->usepassword) {
-					status = exports_check(eptr->peerip,eptr->version,eptr->path,eptr->passwordrnd,eptr->passwordmd5,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime);
-				} else {
-					status = exports_check(eptr->peerip,eptr->version,eptr->path,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime);
-				}
-				if (status==MFS_STATUS_OK) {
-					if (eptr->path) {
-						status = fs_getrootinode(&rootinode,eptr->path);
-					} else {
-						rootinode = 0;
-					}
-				}
-				if (status!=MFS_STATUS_OK) {
-					syslog(LOG_NOTICE,"(client connection from ip:%u.%u.%u.%u): can't find matching line in 'exports' file after reload (error:%s)",(eptr->peerip>>24)&0xFF,(eptr->peerip>>16)&0xFF,(eptr->peerip>>8)&0xFF,eptr->peerip&0xFF,mfsstrerr(status));
-					eptr->mode = KILL;
-				} else {
-					sessions_chg_session(eptr->sesdata,exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,eptr->peerip,eptr->info,eptr->ileng);
-				}
+				eptr->mode = KILL;
 			}
 		}
 	}

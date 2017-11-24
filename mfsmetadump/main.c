@@ -308,7 +308,7 @@ int fs_loadnode(FILE *fd,uint8_t mver) {
 		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|w:0x%1"PRIX8"|m:0%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%5"PRIu32"h",c,nodeid,goal,flags,winattr,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
 	} else {
 		trashtime = get32bit(&ptr);
-		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|m:%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%10"PRIu32"s",c,nodeid,goal,flags,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
+		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|m:0%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%10"PRIu32"s",c,nodeid,goal,flags,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
 	}
 
 	if (type==TYPE_BLOCKDEV || type==TYPE_CHARDEV) {
@@ -896,7 +896,7 @@ int of_load(FILE *fd,uint8_t mver) {
 			return 0;
 		}
 	}
-	return 0;	// unreachable
+	return 0; // unreachable
 }
 
 int flock_load(FILE *fd,uint8_t mver) {

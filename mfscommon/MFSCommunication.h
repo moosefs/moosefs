@@ -699,10 +699,7 @@
 
 // 0x0096
 #define MATOCS_REPLICATE (PROTO_BASE+150)
-// simple copy:
-//  chunkid:64 version:32 ip:32 port:16
-// raid copy (make new chunk as XOR of different parts of couple of chunks - using xormasks)
-//  chunkid:64 version:32 4 * [ xormask:32 ] N * [chunkid:64 version:32 ip:32 port:16]
+// chunkid:64 version:32 ip:32 port:16
 
 // 0x0097
 #define CSTOMA_REPLICATE (PROTO_BASE+151)
@@ -740,7 +737,6 @@
 // 0x00AB
 #define CSTOMA_DUPTRUNC (PROTO_BASE+171)
 // chunkid:64 status:8
-
 
 
 

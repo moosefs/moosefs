@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.99-1 (WIP)
 
   - (master) disconnect all clients when exports has changed
+  - (mount) do not show message about 'negative travel time' when the measured time is zero (happens in virtual machines)
 
 * MooseFS 3.0.98-1 (2017-10-12)
 

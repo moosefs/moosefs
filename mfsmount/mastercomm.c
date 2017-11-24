@@ -2320,7 +2320,7 @@ void* fs_receive_thread(void *arg) {
 					struct timeval tv;
 					usec = monotonic_useconds();
 					pthread_mutex_lock(&fdlock);
-					if (usec>lastsyncsend) {
+					if (usec>=lastsyncsend) {
 						usecping = usec - lastsyncsend;
 						pthread_mutex_unlock(&fdlock);
 						master_stats_set(MASTER_PING,usecping);

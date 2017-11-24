@@ -1,3 +1,12 @@
+moosefs (3.0.99-1) unstable; urgency=medium
+
+  * (master) disconnect all clients when exports has changed
+  * (mount) do not show message about 'negative travel time' when the measured
+    time is zero (happens in virtual machines)
+  * (all) fixed get16bit function on big-endian machines
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 23 Nov 2017 12:00:00 +0100
+
 moosefs (3.0.98-1) unstable; urgency=medium
 
   * (mount) changed default cache mode on OS X from 'direct' to 'auto' due to

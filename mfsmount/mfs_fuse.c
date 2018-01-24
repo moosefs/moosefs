@@ -384,16 +384,10 @@ static void finfo_free_resources(finfo *fileinfo) {
 	fileinfo->rdata = fileinfo->wdata = NULL;
 }
 
-static uint32_t finfo_new(uint32_t inode) {
-	uint32_t i,ni,findex;
+#ifdef FREEBSD_DELAYED_RELEASE
+static void finfo_delayed_release(double now) {
 	finfo *fileinfo;
-#ifdef FREEBSD_DELAYED_RELEASE
-	uint32_t *pi;
-	double now;
-	now = monotonic_seconds();
-#endif
-	zassert(pthread_mutex_lock(&finfo_tab_lock));
-#ifdef FREEBSD_DELAYED_RELEASE
+	uint32_t i,*pi;
 	pi = &finfo_released_head;
 	while ((i=*pi)!=0) {
 		fileinfo = finfo_tab[i];
@@ -413,6 +407,33 @@ static uint32_t finfo_new(uint32_t inode) {
 		}
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 	}
+}
+
+static void* finfo_delayed_release_cleanup_thread(void* arg) {
+	double now;
+
+	while (1) {
+		now = monotonic_seconds();
+		zassert(pthread_mutex_lock(&finfo_tab_lock));
+		finfo_delayed_release(now);
+		zassert(pthread_mutex_unlock(&finfo_tab_lock));
+		sleep(1);
+	}
+	return arg;
+}
+#endif
+
+static uint32_t finfo_new(uint32_t inode) {
+	uint32_t i,ni,findex;
+	finfo *fileinfo;
+#ifdef FREEBSD_DELAYED_RELEASE
+	double now;
+	now = monotonic_seconds();
+#endif
+
+	zassert(pthread_mutex_lock(&finfo_tab_lock));
+#ifdef FREEBSD_DELAYED_RELEASE
+	finfo_delayed_release(now);
 #endif
 	if (finfo_head!=0) {
 		i = finfo_head;
@@ -5182,6 +5203,9 @@ void mfs_term(void) {
 }
 
 void mfs_init(struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
+#ifdef FREEBSD_DELAYED_RELEASE
+	pthread_t th;
+#endif
 	const char* sugid_clear_mode_strings[] = {SUGID_CLEAR_MODE_STRINGS};
 	fuse_ch = ch;
 	debug_mode = debug_mode_in;
@@ -5211,4 +5235,7 @@ void mfs_init(struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double di
 		fprintf(stderr,"mkdir copy sgid=%d\nsugid clear mode=%s\n",mkdir_copy_sgid_in,(sugid_clear_mode_in<SUGID_CLEAR_MODE_OPTIONS)?sugid_clear_mode_strings[sugid_clear_mode_in]:"???");
 	}
 	mfs_statsptr_init();
+#ifdef FREEBSD_DELAYED_RELEASE
+	lwt_minthread_create(&th,1,finfo_delayed_release_cleanup_thread,NULL);
+#endif
 }

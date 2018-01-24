@@ -451,6 +451,7 @@ static void fs_af_add_to_lru(acquired_file *afptr) {
 			}
 		}
 	}
+	massert(af_lru_cnt<=ACQFILES_LRU_LIMIT,"open files lru data mismatch !!!");
 	afptr->lruprev = af_lrutail;
 	*af_lrutail = afptr;
 	afptr->lrunext = NULL;

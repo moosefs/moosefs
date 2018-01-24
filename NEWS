@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.100-1 (WIP)
+
+  - (cs) fixed rare segfault during chunk sending to master after disconection
+
 * MooseFS 3.0.99-1 (2017-11-23)
 
   - (master) disconnect all clients when exports has changed

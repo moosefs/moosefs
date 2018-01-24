@@ -1860,7 +1860,9 @@ uint32_t hdd_get_chunks_next_list_count() {
 	}
 	while (res<CHUNKS_CUT_COUNT && hdd_get_chunks_pos+i<HASHSIZE) {
 		for (c=hashtab[hdd_get_chunks_pos+i] ; c ; c=c->next) {
-			res++;
+			if (c->owner!=NULL) {
+				res++;
+			}
 		}
 		i++;
 	}
@@ -1876,13 +1878,15 @@ void hdd_get_chunks_next_list_data(uint8_t *buff) {
 	chunk *c;
 	while (res<CHUNKS_CUT_COUNT && hdd_get_chunks_pos<HASHSIZE) {
 		for (c=hashtab[hdd_get_chunks_pos] ; c ; c=c->next) {
-			put64bit(&buff,c->chunkid);
-			v = c->version;
-			if (c->owner->todel) {
-				v |= 0x80000000;
+			if (c->owner!=NULL) {
+				put64bit(&buff,c->chunkid);
+				v = c->version;
+				if (c->owner->todel) {
+					v |= 0x80000000;
+				}
+				put32bit(&buff,v);
+				res++;
 			}
-			put32bit(&buff,v);
-			res++;
 		}
 		hdd_get_chunks_pos++;
 	}

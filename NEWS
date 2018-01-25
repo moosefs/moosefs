@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.100-1 (WIP)
+* MooseFS 3.0.100-1 (2018-01-24)
 
   - (cs) fixed rare segfault during chunk sending to master after disconection
   - (mount) added thread for cleaning released files with delay

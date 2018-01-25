@@ -204,7 +204,7 @@ static int rep_read(repsrc *rs) {
 			}
 			if (size>0) {
 				if (size>MAX_RECV_PACKET_SIZE) {
-					syslog(LOG_WARNING,"replicator: packet too long (%"PRIu32"/%u)",size,MAX_RECV_PACKET_SIZE);
+					syslog(LOG_WARNING,"replicator: packet too long (%"PRIu32"/%u) ; command:%"PRIu32,size,MAX_RECV_PACKET_SIZE,type);
 					return -1;
 				}
 				rs->packet = malloc(size);

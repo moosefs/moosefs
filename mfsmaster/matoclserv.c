@@ -5280,7 +5280,7 @@ void matoclserv_read(matoclserventry *eptr,double now) {
 			leng = get32bit(&ptr);
 
 			if (leng>MaxPacketSize) {
-				syslog(LOG_WARNING,"main master server module: packet too long (%"PRIu32"/%u)",leng,MaxPacketSize);
+				syslog(LOG_WARNING,"main master server module: packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,type);
 				eptr->input_end = 1;
 				return;
 			}

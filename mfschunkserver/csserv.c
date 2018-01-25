@@ -584,12 +584,13 @@ void csserv_read(csserventry *eptr) {
 			return;
 		}
 
-		ptr = eptr->hdrbuff+4;
+		ptr = eptr->hdrbuff;
+		type = get32bit(&ptr);
 		size = get32bit(&ptr);
 
 		if (size>0) {
 			if (size>MaxPacketSize) {
-				syslog(LOG_WARNING,"(read) packet too long (%"PRIu32"/%u)",size,MaxPacketSize);
+				syslog(LOG_WARNING,"(read) packet too long (%"PRIu32"/%u) ; command:%"PRIu32,size,MaxPacketSize,type);
 				eptr->state = CLOSE;
 				return;
 			}

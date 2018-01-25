@@ -584,7 +584,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			if (cmd==CLTOCS_WRITE_DATA) {
 				if (leng>0) {
 					if (leng > MaxPacketSize) {
-						syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u)",leng,MaxPacketSize);
+						syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
 						break;
 					}
 #ifdef MMAP_ALLOC
@@ -609,7 +609,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			} else {
 				if (leng>0) {
 					if (leng > SMALL_PACKET_SIZE) {
-						syslog(LOG_WARNING,"packet too long (%"PRIu32"/12)",leng);
+						syslog(LOG_WARNING,"packet too long (%"PRIu32"/12) ; command:%"PRIu32,leng,cmd);
 						break;
 					}
 					if (mainserv_toforward(sock,fwdsock,hdr,leng+8,8,0,SERV_TIMEOUT)!=(int32_t)(leng+8)) {
@@ -748,7 +748,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			leng = get32bit(&rptr);
 			if (leng>0) {
 				if (leng > MaxPacketSize) {
-					syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u)",leng,MaxPacketSize);
+					syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
 					break;
 				}
 				if (pdataleng<leng) {
@@ -957,7 +957,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 		leng = get32bit(&rptr);
 		if (leng>0) {
 			if (leng > MaxPacketSize) {
-				syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u)",leng,MaxPacketSize);
+				syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
 				break;
 			}
 			if (pdataleng<leng+8) {

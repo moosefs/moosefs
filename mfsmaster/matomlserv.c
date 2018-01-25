@@ -735,7 +735,7 @@ void matomlserv_read(matomlserventry *eptr,double now) {
 			leng = get32bit(&ptr);
 
 			if (leng>MaxPacketSize) {
-				syslog(LOG_WARNING,"ML(%s) packet too long (%"PRIu32"/%u)",eptr->servstrip,leng,MaxPacketSize);
+				syslog(LOG_WARNING,"ML(%s) packet too long (%"PRIu32"/%u) ; command:%"PRIu32,eptr->servstrip,leng,MaxPacketSize,type);
 				eptr->input_end = 1;
 				return;
 			}

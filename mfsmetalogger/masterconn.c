@@ -790,7 +790,7 @@ void masterconn_read(masterconn *eptr,double now) {
 			leng = get32bit(&ptr);
 
 			if (leng>MaxPacketSize) {
-				syslog(LOG_WARNING,"Master packet too long (%"PRIu32"/%u)",leng,MaxPacketSize);
+				syslog(LOG_WARNING,"Master packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,type);
 				eptr->input_end = 1;
 				return;
 			}

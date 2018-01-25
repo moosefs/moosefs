@@ -899,8 +899,15 @@ void* read_worker(void *arg) {
 		srcip = fs_getsrcip();
 		fd = conncache_get(ip,port);
 		if (fd<0) {
+			uint32_t connmaxtry;
+			zassert(pthread_mutex_lock(&(ind->lock)));
+			connmaxtry = (ind->trycnt*2)+2;
+			if (connmaxtry>10) {
+				connmaxtry = 10;
+			}
+			zassert(pthread_mutex_unlock(&(ind->lock)));
 			cnt=0;
-			while (cnt<10) {
+			while (cnt<connmaxtry) {
 				fd = tcpsocket();
 				if (fd<0) {
 					syslog(LOG_WARNING,"readworker: can't create tcp socket: %s",strerr(errno));
@@ -916,7 +923,7 @@ void* read_worker(void *arg) {
 				}
 				if (tcpnumtoconnect(fd,ip,port,(cnt%2)?(300*(1<<(cnt>>1))):(200*(1<<(cnt>>1))))<0) {
 					cnt++;
-					if (cnt>=10) {
+					if (cnt>=connmaxtry) {
 						int err = errno;
 						zassert(pthread_mutex_lock(&(ind->lock)));
 						if (ind->trycnt >= minlogretry) {
@@ -928,7 +935,7 @@ void* read_worker(void *arg) {
 					close(fd);
 					fd=-1;
 				} else {
-					cnt=10;
+					cnt=connmaxtry;
 				}
 			}
 		}

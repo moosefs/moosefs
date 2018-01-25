@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) added thread for cleaning released files with delay
   - (mount) added assertion for lru cache (sustained open files)
   - (master+mount) added chunks data cache invalidation after chunksever disconnection and reconnection
+  - (mount) changed (lowered) number of connection retries (depends on I/O retry counter)
 
 * MooseFS 3.0.99-1 (2017-11-23)
 

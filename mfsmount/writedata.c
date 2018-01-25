@@ -922,8 +922,15 @@ void* write_worker(void *arg) {
 		srcip = fs_getsrcip();
 		fd = conncache_get(ip,port);
 		if (fd<0) {
+			uint32_t connmaxtry;
+			zassert(pthread_mutex_lock(&(ind->lock)));
+			connmaxtry = (chd->trycnt*2)+2;
+			if (connmaxtry>10) {
+				connmaxtry = 10;
+			}
+			zassert(pthread_mutex_unlock(&(ind->lock)));
 			cnt=0;
-			while (cnt<10) {
+			while (cnt<connmaxtry) {
 				fd = tcpsocket();
 				if (fd<0) {
 					syslog(LOG_WARNING,"writeworker: can't create tcp socket: %s",strerr(errno));
@@ -939,7 +946,7 @@ void* write_worker(void *arg) {
 				}
 				if (tcpnumtoconnect(fd,ip,port,(cnt%2)?(300*(1<<(cnt>>1))):(200*(1<<(cnt>>1))))<0) {
 					cnt++;
-					if (cnt>=10) {
+					if (cnt>=connmaxtry) {
 						int err = errno;
 						zassert(pthread_mutex_lock(&(ind->lock)));
 						if (chd->trycnt >= minlogretry) {
@@ -958,7 +965,7 @@ void* write_worker(void *arg) {
 #ifdef WDEBUG
 					fprintf(stderr,"connection ok (%"PRIX32":%"PRIu16"->%"PRIX32":%"PRIu16")\n",mip,mport,pip,pport);
 #endif
-					cnt=10;
+					cnt=connmaxtry;
 				}
 			}
 		}

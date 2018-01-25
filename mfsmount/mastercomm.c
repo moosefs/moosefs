@@ -2268,6 +2268,15 @@ void* fs_receive_thread(void *arg) {
 					continue;
 				}
 			}
+			if (cmd==MATOCL_FUSE_INVALIDATE_CHUNK_CACHE) {
+				if (size==0) {
+					internal = 1;
+				} else {
+					syslog(LOG_WARNING,"master: unexpected msg size (msg:MATOCL_FUSE_INVALIDATE_CHUNK_CACHE ; size:%"PRIu32"/4)",size+4);
+					fs_disconnect();
+					continue;
+				}
+			}
 			if (internal) {
 				r = tcptoread(fd,msgbuff,size,RECEIVE_TIMEOUT*1000);
 				if (r==0) {
@@ -2353,6 +2362,10 @@ void* fs_receive_thread(void *arg) {
 #ifdef MFSDEBUG
 					syslog(LOG_NOTICE,"ping time: %u.%06u ; remote time: %u.%06u ; local time: %u.%06u ; monotonic time: %u.%06u",(unsigned int)(usecping/1000000),(unsigned int)(usecping%1000000),(unsigned int)(rusectime/1000000),(unsigned int)(rusectime%1000000),(unsigned int)(lusectime/1000000),(unsigned int)(lusectime%1000000),(unsigned int)(usec/1000000),(unsigned int)(usec%1000000));
 #endif
+					continue;
+				}
+				if (cmd==MATOCL_FUSE_INVALIDATE_CHUNK_CACHE) {
+					chunksdatacache_cleanup();
 					continue;
 				}
 			}

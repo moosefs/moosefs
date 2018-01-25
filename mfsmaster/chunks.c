@@ -2509,6 +2509,9 @@ void chunk_server_register_end(uint16_t csid) {
 		cstab[csid].registered = 1;
 		csregisterinprogress -= 1;
 	}
+	if (csregisterinprogress==0) {
+		matoclserv_fuse_invalidate_chunk_cache();
+	}
 }
 
 void chunk_server_disconnected(uint16_t csid) {
@@ -2541,6 +2544,7 @@ void chunk_server_disconnected(uint16_t csid) {
 	for (csid = csusedhead ; csid < MAXCSCOUNT ; csid = cstab[csid].next) {
 		cstab[csid].mfr_state = UNKNOWN_HARD;
 	}
+	matoclserv_fuse_invalidate_chunk_cache();
 }
 
 void chunk_server_disconnection_loop(void) {

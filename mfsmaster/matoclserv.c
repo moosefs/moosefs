@@ -3040,6 +3040,17 @@ void matoclserv_fuse_fleng_has_changed(matoclserventry *eptr,uint32_t inode,uint
 	}
 }
 
+void matoclserv_fuse_invalidate_chunk_cache(void) {
+	matoclserventry *xeptr;
+	uint8_t *ptr;
+	for (xeptr=matoclservhead ; xeptr ; xeptr=xeptr->next) {
+		if (xeptr->mode==DATA && xeptr->registered==1 && xeptr->sesdata!=NULL && (xeptr->version>=VERSION2INT(4,3,0) || (xeptr->version>=VERSION2INT(3,0,100) && xeptr->version<VERSION2INT(4,0,0)))) {
+			ptr = matoclserv_createpacket(xeptr,MATOCL_FUSE_INVALIDATE_CHUNK_CACHE,4);
+			put32bit(&ptr,0);
+		}
+	}
+}
+
 static inline matoclserventry* matoclserv_find_connection(uint32_t sessionid) {
 	matoclserventry *eptr;
 	for (eptr=matoclservhead ; eptr ; eptr=eptr->next) {

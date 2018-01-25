@@ -44,8 +44,8 @@ There is a separate MooseFS Client for MS Windows available, built on top of [Do
 ## Getting started
 You can install MooseFS using your favorite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download/install.html):
 
-* Ubuntu 10/12/14
-* Debian 5/6/7/8
+* Ubuntu 10/12/14/16
+* Debian 5/6/7/8/9
 * RHEL/CentOS versions 6/7
 * OpenSUSE 12
 * FreeBSD 9.3/10/11 (FreeBSD 11 is supported since MooseFS 3.0.88)

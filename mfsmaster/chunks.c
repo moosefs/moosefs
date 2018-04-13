@@ -3521,28 +3521,33 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						}
 					}
 */
+
 					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
 						if (matching[i+labelcnt]>=0 || allowallservers) {
-							uint32_t r;
-							if (rgvc>0) {	// if there are VALID copies then make copy of one VALID chunk
-								r = 1+rndu32_ranged(rgvc);
-								srccsid = MAXCSCOUNT;
-								for (s=c->slisthead ; s && r>0 ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==VALID) {
-										r--;
-										srccsid = s->csid;
+							uint32_t min_dist = 0xFFFFFFFF;
+							uint32_t dist;
+							uint32_t ip;
+							uint32_t cuip;
+							uint16_t port;
+
+							srccsid = MAXCSCOUNT;
+
+							if (matocsserv_get_csdata(cstab[servers[i]].ptr,&cuip,&port,NULL,NULL)==0) {
+								for (s=c->slisthead ; s ; s=s->next) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass]) {
+										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+											dist=topology_distance(ip,cuip);
+											if (min_dist>dist || (min_dist==dist && s->valid==VALID)) {
+												min_dist=dist;
+												srccsid=s->csid;
+											}
+										}
 									}
 								}
-							} else {	// if not then use TDVALID chunks.
-								r = 1+rndu32_ranged(rgtdc);
-								srccsid = MAXCSCOUNT;
-								for (s=c->slisthead ; s && r>0 ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==TDVALID) {
-										r--;
-										srccsid = s->csid;
-									}
-								}
+							} else {
+								syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32" replicate failed: error get csdata of the dest chunkserver (%s)",c->chunkid,c->version,matocsserv_getstrip(cstab[servers[i]].ptr));
 							}
+
 							if (srccsid!=MAXCSCOUNT) {
 								stats_replications++;
 								// high priority replication
@@ -3580,26 +3585,30 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					for (i=0 ; i<rservcount ; i++) {
 						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
 						if (!s) {
-							uint32_t r;
-							if (rgvc>0) {	// if there are VALID copies then make copy of one VALID chunk
-								r = 1+rndu32_ranged(rgvc);
-								srccsid = MAXCSCOUNT;
-								for (s=c->slisthead ; s && r>0 ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==VALID) {
-										r--;
-										srccsid = s->csid;
+							uint32_t min_dist = 0xFFFFFFFF;
+							uint32_t dist;
+							uint32_t ip;
+							uint32_t cuip;
+							uint16_t port;
+
+							srccsid = MAXCSCOUNT;
+
+							if (matocsserv_get_csdata(cstab[rcsids[i]].ptr,&cuip,&port,NULL,NULL)==0) {
+								for (s=c->slisthead ; s ; s=s->next) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass]) {
+										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+											dist=topology_distance(ip,cuip);
+											if (min_dist>dist || (min_dist==dist && s->valid==VALID)) {
+												min_dist=dist;
+												srccsid=s->csid;
+											}
+										}
 									}
 								}
-							} else {	// if not then use TDVALID chunks.
-								r = 1+rndu32_ranged(rgtdc);
-								srccsid = MAXCSCOUNT;
-								for (s=c->slisthead ; s && r>0 ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==TDVALID) {
-										r--;
-										srccsid = s->csid;
-									}
-								}
+							} else {
+								syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32" replicate failed: error get csdata of the dest chunkserver (%s)",c->chunkid,c->version,matocsserv_getstrip(cstab[rcsids[i]].ptr));
 							}
+
 							if (srccsid!=MAXCSCOUNT) {
 								stats_replications++;
 								// high priority replication

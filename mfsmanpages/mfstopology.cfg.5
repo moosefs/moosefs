@@ -34,9 +34,9 @@ is calculated as: \fB0\fP when IP numbers are the same, \fB1\fP when IP numbers
 are different, but switch numbers are the same and \fB2\fP when switch numbers
 are different
 .PP
-Distances are used only to sort chunkservers during read and write operations.
-New chunks are still created randomly. Also rebalance routines do not take
-distances into account.
+Distances are used to sort chunkservers during read and write operations,
+and under goal chunks replications. New chunks are still created randomly.
+Also rebalance routines do not take distances into account.
 .SH COPYRIGHT
 Copyright (C) 2018 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 

@@ -3529,17 +3529,52 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							uint32_t ip;
 							uint32_t cuip;
 							uint16_t port;
+							uint32_t mdrgvc = 0;
+							uint32_t mdrgtdc = 0;
+							uint32_t r = 0;
 
 							srccsid = MAXCSCOUNT;
 
 							if (matocsserv_get_csdata(cstab[servers[i]].ptr,&cuip,&port,NULL,NULL)==0) {
 								for (s=c->slisthead ; s ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass]) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
 										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
 											dist=topology_distance(ip,cuip);
-											if (min_dist>dist || (min_dist==dist && s->valid==VALID)) {
-												min_dist=dist;
-												srccsid=s->csid;
+											if (min_dist>=dist) {
+												if (min_dist>dist) {
+													min_dist=dist;
+													srccsid=s->csid;
+													mdrgvc = 0;
+													mdrgtdc = 0;
+												} else if (s->valid==VALID) {
+													srccsid=s->csid;
+												}
+												if (s->valid==VALID) {
+													mdrgvc++;
+												} else {
+													mdrgtdc++;
+												}
+											}
+										}
+									}
+								}
+								if (mdrgvc > 1) {
+									r = 1+rndu32_ranged(mdrgvc);
+								} else if (mdrgtdc > 1) {
+									r = 1+rndu32_ranged(mdrgtdc);
+								}
+								for (s=c->slisthead ; s && r>0 ; s=s->next) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+											dist=topology_distance(ip,cuip);
+											if (min_dist==dist) {
+												if (mdrgvc > 1 && s->valid==VALID) {
+													r--;
+													srccsid=s->csid;
+												} else if (mdrgtdc > 1 && s->valid==TDVALID) {
+													r--;
+													srccsid=s->csid;
+												}
 											}
 										}
 									}
@@ -3590,17 +3625,52 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							uint32_t ip;
 							uint32_t cuip;
 							uint16_t port;
+							uint32_t mdrgvc = 0;
+							uint32_t mdrgtdc = 0;
+							uint32_t r = 0;
 
 							srccsid = MAXCSCOUNT;
 
 							if (matocsserv_get_csdata(cstab[rcsids[i]].ptr,&cuip,&port,NULL,NULL)==0) {
 								for (s=c->slisthead ; s ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass]) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
 										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
 											dist=topology_distance(ip,cuip);
-											if (min_dist>dist || (min_dist==dist && s->valid==VALID)) {
-												min_dist=dist;
-												srccsid=s->csid;
+											if (min_dist>=dist) {
+												if (min_dist>dist) {
+													min_dist=dist;
+													srccsid=s->csid;
+													mdrgvc = 0;
+													mdrgtdc = 0;
+												} else if (s->valid==VALID) {
+													srccsid=s->csid;
+												}
+												if (s->valid==VALID) {
+													mdrgvc++;
+												} else {
+													mdrgtdc++;
+												}
+											}
+										}
+									}
+								}
+								if (mdrgvc > 1) {
+									r = 1+rndu32_ranged(mdrgvc);
+								} else if (mdrgtdc > 1) {
+									r = 1+rndu32_ranged(mdrgtdc);
+								}
+								for (s=c->slisthead ; s && r>0 ; s=s->next) {
+									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+											dist=topology_distance(ip,cuip);
+											if (min_dist==dist) {
+												if (mdrgvc > 1 && s->valid==VALID) {
+													r--;
+													srccsid=s->csid;
+												} else if (mdrgtdc > 1 && s->valid==TDVALID) {
+													r--;
+													srccsid=s->csid;
+												}
 											}
 										}
 									}

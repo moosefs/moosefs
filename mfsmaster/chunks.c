@@ -3524,64 +3524,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
 						if (matching[i+labelcnt]>=0 || allowallservers) {
-							uint32_t min_dist = 0xFFFFFFFF;
-							uint32_t dist;
-							uint32_t ip;
-							uint32_t cuip;
-							uint16_t port;
-							uint32_t mdrgvc = 0;
-							uint32_t mdrgtdc = 0;
-							uint32_t r = 0;
-
-							srccsid = MAXCSCOUNT;
-
-							if (matocsserv_get_csdata(cstab[servers[i]].ptr,&cuip,&port,NULL,NULL)==0) {
-								for (s=c->slisthead ; s ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
-											dist=topology_distance(ip,cuip);
-											if (min_dist>=dist) {
-												if (min_dist>dist) {
-													min_dist=dist;
-													srccsid=s->csid;
-													mdrgvc = 0;
-													mdrgtdc = 0;
-												} else if (s->valid==VALID) {
-													srccsid=s->csid;
-												}
-												if (s->valid==VALID) {
-													mdrgvc++;
-												} else {
-													mdrgtdc++;
-												}
-											}
-										}
-									}
-								}
-								if (mdrgvc > 1) {
-									r = 1+rndu32_ranged(mdrgvc);
-								} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
-									r = 1+rndu32_ranged(mdrgtdc);
-								}
-								for (s=c->slisthead ; s && r>0 ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
-											dist=topology_distance(ip,cuip);
-											if (min_dist==dist) {
-												if (mdrgvc > 1 && s->valid==VALID) {
-													r--;
-													srccsid=s->csid;
-												} else if (mdrgtdc > 1 && s->valid==TDVALID) {
-													r--;
-													srccsid=s->csid;
-												}
-											}
-										}
-									}
-								}
-							} else {
-								syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32" replicate failed: error get csdata of the dest chunkserver (%s)",c->chunkid,c->version,matocsserv_getstrip(cstab[servers[i]].ptr));
-							}
+							srccsid = chunk_get_replicate_srccsid(c, servers[i], now, lclass)
 
 							if (srccsid!=MAXCSCOUNT) {
 								stats_replications++;
@@ -3611,6 +3554,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 								}
 								return;
 							}
+
 						}
 					}
 				} else { // classic goal version
@@ -3620,64 +3564,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					for (i=0 ; i<rservcount ; i++) {
 						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
 						if (!s) {
-							uint32_t min_dist = 0xFFFFFFFF;
-							uint32_t dist;
-							uint32_t ip;
-							uint32_t cuip;
-							uint16_t port;
-							uint32_t mdrgvc = 0;
-							uint32_t mdrgtdc = 0;
-							uint32_t r = 0;
-
-							srccsid = MAXCSCOUNT;
-
-							if (matocsserv_get_csdata(cstab[rcsids[i]].ptr,&cuip,&port,NULL,NULL)==0) {
-								for (s=c->slisthead ; s ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
-											dist=topology_distance(ip,cuip);
-											if (min_dist>=dist) {
-												if (min_dist>dist) {
-													min_dist=dist;
-													srccsid=s->csid;
-													mdrgvc = 0;
-													mdrgtdc = 0;
-												} else if (s->valid==VALID) {
-													srccsid=s->csid;
-												}
-												if (s->valid==VALID) {
-													mdrgvc++;
-												} else {
-													mdrgtdc++;
-												}
-											}
-										}
-									}
-								}
-								if (mdrgvc > 1) {
-									r = 1+rndu32_ranged(mdrgvc);
-								} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
-									r = 1+rndu32_ranged(mdrgtdc);
-								}
-								for (s=c->slisthead ; s && r>0 ; s=s->next) {
-									if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-										if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
-											dist=topology_distance(ip,cuip);
-											if (min_dist==dist) {
-												if (mdrgvc > 1 && s->valid==VALID) {
-													r--;
-													srccsid=s->csid;
-												} else if (mdrgtdc > 1 && s->valid==TDVALID) {
-													r--;
-													srccsid=s->csid;
-												}
-											}
-										}
-									}
-								}
-							} else {
-								syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32" replicate failed: error get csdata of the dest chunkserver (%s)",c->chunkid,c->version,matocsserv_getstrip(cstab[rcsids[i]].ptr));
-							}
+							srccsid = chunk_get_replicate_srccsid(c, rcsids[i], now, lclass)
 
 							if (srccsid!=MAXCSCOUNT) {
 								stats_replications++;
@@ -3707,6 +3594,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 								}
 								return;
 							}
+
 						}
 					}
 				}
@@ -3832,6 +3720,66 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 		return;
 	}
+}
+
+uint16_t chunk_get_replicate_srccsid(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass) {
+	uint32_t min_dist = 0xFFFFFFFF;
+	uint32_t dist;
+	uint32_t ip;
+	uint32_t cuip;
+	uint16_t port;
+	uint32_t mdrgvc = 0;
+	uint32_t mdrgtdc = 0;
+	uint32_t r = 0;
+	uint16_t srccsid = MAXCSCOUNT;
+
+	if (matocsserv_get_csdata(cstab[dstcsid].ptr,&cuip,&port,NULL,NULL)==0) {
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+				if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+					dist=topology_distance(ip,cuip);
+					if (min_dist>=dist) {
+						if (min_dist>dist) {
+							min_dist=dist;
+							srccsid=s->csid;
+							mdrgvc = 0;
+							mdrgtdc = 0;
+						} else if (s->valid==VALID) {
+							srccsid=s->csid;
+						}
+						if (s->valid==VALID) {
+							mdrgvc++;
+						} else {
+							mdrgtdc++;
+						}
+					}
+				}
+			}
+		}
+		if (mdrgvc > 1) {
+			r = 1+rndu32_ranged(mdrgvc);
+		} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
+			r = 1+rndu32_ranged(mdrgtdc);
+		}
+		for (s=c->slisthead ; s && r>0 ; s=s->next) {
+			if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+				if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+					dist=topology_distance(ip,cuip);
+					if (min_dist==dist) {
+						if (mdrgvc > 1 && s->valid==VALID) {
+							r--;
+							srccsid=s->csid;
+						} else if (mdrgtdc > 1 && s->valid==TDVALID) {
+							r--;
+							srccsid=s->csid;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return srccsid;
 }
 
 uint8_t chunk_labelset_can_be_fulfilled(uint8_t labelcnt,uint32_t **labelmasks) {

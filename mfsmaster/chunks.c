@@ -3560,7 +3560,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 								}
 								if (mdrgvc > 1) {
 									r = 1+rndu32_ranged(mdrgvc);
-								} else if (mdrgtdc > 1) {
+								} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
 									r = 1+rndu32_ranged(mdrgtdc);
 								}
 								for (s=c->slisthead ; s && r>0 ; s=s->next) {
@@ -3656,7 +3656,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 								}
 								if (mdrgvc > 1) {
 									r = 1+rndu32_ranged(mdrgvc);
-								} else if (mdrgtdc > 1) {
+								} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
 									r = 1+rndu32_ranged(mdrgtdc);
 								}
 								for (s=c->slisthead ; s && r>0 ; s=s->next) {

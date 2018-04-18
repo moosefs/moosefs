@@ -2861,6 +2861,103 @@ void chunk_store_info(uint8_t *buff) {
 
 //jobs state: jobshpos
 
+static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass) {
+	slist *s;
+	uint32_t min_dist = 0xFFFFFFFF;
+	uint32_t dist;
+	uint32_t ip;
+	uint32_t cuip;
+	uint16_t port;
+	uint32_t mdrgvc = 0;
+	uint32_t mdrgtdc = 0;
+	uint32_t r = 0;
+	uint16_t srccsid = MAXCSCOUNT;
+
+	if (matocsserv_get_csdata(cstab[dstcsid].ptr,&cuip,&port,NULL,NULL)==0) {
+		for (s=c->slisthead ; s ; s=s->next) {
+			if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+				if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+					dist=topology_distance(ip,cuip);
+					if (min_dist>=dist) {
+						if (min_dist>dist) {
+							min_dist=dist;
+							srccsid=s->csid;
+							mdrgvc = 0;
+							mdrgtdc = 0;
+						} else if (s->valid==VALID) {
+							srccsid=s->csid;
+						}
+						if (s->valid==VALID) {
+							mdrgvc++;
+						} else {
+							mdrgtdc++;
+						}
+					}
+				}
+			}
+		}
+		if (mdrgvc > 1) {
+			r = 1+rndu32_ranged(mdrgvc);
+		} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
+			r = 1+rndu32_ranged(mdrgtdc);
+		}
+		for (s=c->slisthead ; s && r>0 ; s=s->next) {
+			if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+				if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+					dist=topology_distance(ip,cuip);
+					if (min_dist==dist) {
+						if (mdrgvc > 1 && s->valid==VALID) {
+							r--;
+							srccsid=s->csid;
+						} else if (mdrgtdc > 1 && s->valid==TDVALID) {
+							r--;
+							srccsid=s->csid;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return srccsid;
+}
+
+static inline int chunk_undergoal_replicate(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass, uint8_t extrajob, uint16_t priority, loop_info *inforec) {
+	slist *s;
+	uint16_t srccsid;
+
+	srccsid = chunk_get_undergoal_replicate_srccsid(c, dstcsid, now, lclass);
+	if (srccsid==MAXCSCOUNT) {
+		return -1;
+	}
+	stats_replications++;
+	// high priority replication
+	if (matocsserv_send_replicatechunk(cstab[dstcsid].ptr,c->chunkid,c->version,cstab[srccsid].ptr)<0) {
+		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": error sending replicate command",c->chunkid,c->version);
+		return 1;
+	}
+	chunk_addopchunk(dstcsid,c->chunkid);
+	c->operation = REPLICATE;
+	c->lockedto = now+LOCKTIMEOUT;
+	s = slist_malloc();
+	s->csid = dstcsid;
+	s->valid = BUSY;
+	s->version = c->version;
+	s->next = c->slisthead;
+	c->slisthead = s;
+	chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+	c->allvalidcopies++;
+	c->regularvalidcopies++;
+	if (extrajob==0) {
+		if (priority<5) {
+			inforec->done.copy_undergoal++;
+		} else {
+			inforec->done.copy_wronglabels++;
+		}
+	}
+	return 0;
+}
+
 void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,uint8_t extrajob) {
 	slist *s;
 	static uint16_t *dcsids = NULL;
@@ -3524,37 +3621,9 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
 						if (matching[i+labelcnt]>=0 || allowallservers) {
-							srccsid = chunk_get_replicate_srccsid(c, servers[i], now, lclass)
-
-							if (srccsid!=MAXCSCOUNT) {
-								stats_replications++;
-								// high priority replication
-								if (matocsserv_send_replicatechunk(cstab[servers[i]].ptr,c->chunkid,c->version,cstab[srccsid].ptr)<0) {
-									syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": error sending replicate command",c->chunkid,c->version);
-									return;
-								}
-								chunk_addopchunk(servers[i],c->chunkid);
-								c->operation = REPLICATE;
-								c->lockedto = now+LOCKTIMEOUT;
-								s = slist_malloc();
-								s->csid = servers[i];
-								s->valid = BUSY;
-								s->version = c->version;
-								s->next = c->slisthead;
-								c->slisthead = s;
-								chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
-								c->allvalidcopies++;
-								c->regularvalidcopies++;
-								if (extrajob==0) {
-									if (j<5) {
-										inforec.done.copy_undergoal++;
-									} else {
-										inforec.done.copy_wronglabels++;
-									}
-								}
+							if (chunk_undergoal_replicate(c, servers[i], now, lclass, extrajob, j, &inforec)>=0) {
 								return;
 							}
-
 						}
 					}
 				} else { // classic goal version
@@ -3564,37 +3633,9 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					for (i=0 ; i<rservcount ; i++) {
 						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
 						if (!s) {
-							srccsid = chunk_get_replicate_srccsid(c, rcsids[i], now, lclass)
-
-							if (srccsid!=MAXCSCOUNT) {
-								stats_replications++;
-								// high priority replication
-								if (matocsserv_send_replicatechunk(cstab[rcsids[i]].ptr,c->chunkid,c->version,cstab[srccsid].ptr)<0) {
-									syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": error sending replicate command",c->chunkid,c->version);
-									return;
-								}
-								chunk_addopchunk(rcsids[i],c->chunkid);
-								c->operation = REPLICATE;
-								c->lockedto = now+LOCKTIMEOUT;
-								s = slist_malloc();
-								s->csid = rcsids[i];
-								s->valid = BUSY;
-								s->version = c->version;
-								s->next = c->slisthead;
-								c->slisthead = s;
-								chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
-								c->allvalidcopies++;
-								c->regularvalidcopies++;
-								if (extrajob==0) {
-									if (j<5) { // pro forma = should be always true
-										inforec.done.copy_undergoal++;
-									} else {
-										inforec.done.copy_wronglabels++;
-									}
-								}
+							if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, extrajob, j, &inforec)>=0) {
 								return;
 							}
-
 						}
 					}
 				}
@@ -3720,66 +3761,6 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 		return;
 	}
-}
-
-uint16_t chunk_get_replicate_srccsid(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass) {
-	uint32_t min_dist = 0xFFFFFFFF;
-	uint32_t dist;
-	uint32_t ip;
-	uint32_t cuip;
-	uint16_t port;
-	uint32_t mdrgvc = 0;
-	uint32_t mdrgtdc = 0;
-	uint32_t r = 0;
-	uint16_t srccsid = MAXCSCOUNT;
-
-	if (matocsserv_get_csdata(cstab[dstcsid].ptr,&cuip,&port,NULL,NULL)==0) {
-		for (s=c->slisthead ; s ; s=s->next) {
-			if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-				if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
-					dist=topology_distance(ip,cuip);
-					if (min_dist>=dist) {
-						if (min_dist>dist) {
-							min_dist=dist;
-							srccsid=s->csid;
-							mdrgvc = 0;
-							mdrgtdc = 0;
-						} else if (s->valid==VALID) {
-							srccsid=s->csid;
-						}
-						if (s->valid==VALID) {
-							mdrgvc++;
-						} else {
-							mdrgtdc++;
-						}
-					}
-				}
-			}
-		}
-		if (mdrgvc > 1) {
-			r = 1+rndu32_ranged(mdrgvc);
-		} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
-			r = 1+rndu32_ranged(mdrgtdc);
-		}
-		for (s=c->slisthead ; s && r>0 ; s=s->next) {
-			if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-				if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
-					dist=topology_distance(ip,cuip);
-					if (min_dist==dist) {
-						if (mdrgvc > 1 && s->valid==VALID) {
-							r--;
-							srccsid=s->csid;
-						} else if (mdrgtdc > 1 && s->valid==TDVALID) {
-							r--;
-							srccsid=s->csid;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return srccsid;
 }
 
 uint8_t chunk_labelset_can_be_fulfilled(uint8_t labelcnt,uint32_t **labelmasks) {

@@ -103,7 +103,10 @@ Optional authentication string. When defined - then only chunkservers with the s
 Optional IP class remapping. Remap chunkserver IP addresses with first REMAP_BITS of IP equal to first REMAP_BITS of REMAP_SOURCE_IP_CLASS. During remapping system will set first REMAP_BITS of IP address to first REMAP_BITS of REMAP_DESTINATION_IP_CLASS. (defaults are zeros which means no remap)
 .TP
 .B REPLICATIONS_DELAY_INIT
-initial delay in seconds before starting replications (default is 300)
+initial delay in seconds before starting replications (default is 60)
+.TP
+.B REPLICATIONS_RESPECT_TOPOLOGY
+whether to make undergoal replications respect topology (default is 0, i.e. no)
 .TP
 .B CHUNKS_LOOP_MAX_CPS
 Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)

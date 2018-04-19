@@ -270,6 +270,7 @@ static uint32_t MaxDelSoftLimit;
 static uint32_t MaxDelHardLimit;
 static double TmpMaxDelFrac;
 static uint32_t TmpMaxDel;
+static uint8_t ReplicationsRespectTopology;
 static uint32_t LoopTimeMin;
 //static uint32_t HashSteps;
 static uint32_t HashCPTMax;
@@ -2861,59 +2862,82 @@ void chunk_store_info(uint8_t *buff) {
 
 //jobs state: jobshpos
 
-static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass) {
+static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass, uint32_t rgvc, uint32_t rgtdc) {
 	slist *s;
-	uint32_t min_dist = 0xFFFFFFFF;
-	uint32_t dist;
-	uint32_t ip;
-	uint32_t cuip;
-	uint16_t port;
-	uint32_t mdrgvc = 0;
-	uint32_t mdrgtdc = 0;
 	uint32_t r = 0;
 	uint16_t srccsid = MAXCSCOUNT;
 
-	if (matocsserv_get_csdata(cstab[dstcsid].ptr,&cuip,&port,NULL,NULL)==0) {
-		for (s=c->slisthead ; s ; s=s->next) {
-			if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-				if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
-					dist=topology_distance(ip,cuip);
-					if (min_dist>=dist) {
-						if (min_dist>dist) {
-							min_dist=dist;
-							srccsid=s->csid;
-							mdrgvc = 0;
-							mdrgtdc = 0;
-						} else if (s->valid==VALID) {
-							srccsid=s->csid;
+	if (ReplicationsRespectTopology) {
+		uint32_t min_dist = 0xFFFFFFFF;
+		uint32_t dist;
+		uint32_t ip;
+		uint32_t cuip;
+		uint16_t port;
+		uint32_t mdrgvc = 0;
+		uint32_t mdrgtdc = 0;
+
+		if (matocsserv_get_csdata(cstab[dstcsid].ptr,&cuip,&port,NULL,NULL)==0) {
+			for (s=c->slisthead ; s ; s=s->next) {
+				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+					if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+						dist=topology_distance(ip,cuip);
+						if (min_dist>=dist) {
+							if (min_dist>dist) {
+								min_dist=dist;
+								srccsid=s->csid;
+								mdrgvc = 0;
+								mdrgtdc = 0;
+							} else if (s->valid==VALID) {
+								srccsid=s->csid;
+							}
+							if (s->valid==VALID) {
+								mdrgvc++;
+							} else {
+								mdrgtdc++;
+							}
 						}
-						if (s->valid==VALID) {
-							mdrgvc++;
-						} else {
-							mdrgtdc++;
+					}
+				}
+			}
+			if (mdrgvc > 1) {
+				r = 1+rndu32_ranged(mdrgvc);
+			} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
+				r = 1+rndu32_ranged(mdrgtdc);
+			}
+			for (s=c->slisthead ; s && r>0 ; s=s->next) {
+				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+					if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+						dist=topology_distance(ip,cuip);
+						if (min_dist==dist) {
+							if (mdrgvc > 1 && s->valid==VALID) {
+								r--;
+								srccsid=s->csid;
+							} else if (mdrgtdc > 1 && s->valid==TDVALID) {
+								r--;
+								srccsid=s->csid;
+							}
 						}
 					}
 				}
 			}
 		}
-		if (mdrgvc > 1) {
-			r = 1+rndu32_ranged(mdrgvc);
-		} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
-			r = 1+rndu32_ranged(mdrgtdc);
-		}
-		for (s=c->slisthead ; s && r>0 ; s=s->next) {
-			if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-				if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
-					dist=topology_distance(ip,cuip);
-					if (min_dist==dist) {
-						if (mdrgvc > 1 && s->valid==VALID) {
-							r--;
-							srccsid=s->csid;
-						} else if (mdrgtdc > 1 && s->valid==TDVALID) {
-							r--;
-							srccsid=s->csid;
-						}
-					}
+	} else {
+		if (rgvc>0) {	// if there are VALID copies then make copy of one VALID chunk
+			r = 1+rndu32_ranged(rgvc);
+			srccsid = MAXCSCOUNT;
+			for (s=c->slisthead ; s && r>0 ; s=s->next) {
+				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==VALID) {
+					r--;
+					srccsid = s->csid;
+				}
+			}
+		} else {	// if not then use TDVALID chunks.
+			r = 1+rndu32_ranged(rgtdc);
+			srccsid = MAXCSCOUNT;
+			for (s=c->slisthead ; s && r>0 ; s=s->next) {
+				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==TDVALID) {
+					r--;
+					srccsid = s->csid;
 				}
 			}
 		}
@@ -2922,11 +2946,11 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t 
 	return srccsid;
 }
 
-static inline int chunk_undergoal_replicate(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass, uint8_t extrajob, uint16_t priority, loop_info *inforec) {
+static inline int chunk_undergoal_replicate(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass, uint8_t extrajob, uint16_t priority, loop_info *inforec, uint32_t rgvc, uint32_t rgtdc) {
 	slist *s;
 	uint16_t srccsid;
 
-	srccsid = chunk_get_undergoal_replicate_srccsid(c, dstcsid, now, lclass);
+	srccsid = chunk_get_undergoal_replicate_srccsid(c, dstcsid, now, lclass, rgvc, rgtdc);
 	if (srccsid==MAXCSCOUNT) {
 		return -1;
 	}
@@ -3621,7 +3645,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
 						if (matching[i+labelcnt]>=0 || allowallservers) {
-							if (chunk_undergoal_replicate(c, servers[i], now, lclass, extrajob, j, &inforec)>=0) {
+							if (chunk_undergoal_replicate(c, servers[i], now, lclass, extrajob, j, &inforec, rgvc, rgtdc)>=0) {
 								return;
 							}
 						}
@@ -3633,7 +3657,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					for (i=0 ; i<rservcount ; i++) {
 						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
 						if (!s) {
-							if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, extrajob, j, &inforec)>=0) {
+							if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, extrajob, j, &inforec, rgvc, rgtdc)>=0) {
 								return;
 							}
 						}
@@ -4255,7 +4279,7 @@ void chunk_reload(void) {
 
 	ReplicationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT",60);
 //	ReplicationsDelayDisconnect = cfg_getuint32("REPLICATIONS_DELAY_DISCONNECT",3600);
-
+	ReplicationsRespectTopology = cfg_getuint8("REPLICATIONS_RESPECT_TOPOLOGY",0);
 
 	oldMaxDelSoftLimit = MaxDelSoftLimit;
 	oldMaxDelHardLimit = MaxDelHardLimit;
@@ -4401,6 +4425,7 @@ int chunk_strinit(void) {
 	starttime = main_time();
 	ReplicationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT",60);
 //	ReplicationsDelayDisconnect = cfg_getuint32("REPLICATIONS_DELAY_DISCONNECT",3600);
+	ReplicationsRespectTopology = cfg_getuint8("REPLICATIONS_RESPECT_TOPOLOGY",0);
 	MaxDelSoftLimit = cfg_getuint32("CHUNKS_SOFT_DEL_LIMIT",10);
 	if (cfg_isdefined("CHUNKS_HARD_DEL_LIMIT")) {
 		MaxDelHardLimit = cfg_getuint32("CHUNKS_HARD_DEL_LIMIT",25);

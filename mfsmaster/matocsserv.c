@@ -970,7 +970,9 @@ int matocsserv_get_csdata(void *e,uint32_t *servip,uint16_t *servport,uint32_t *
 	matocsserventry *eptr = (matocsserventry *)e;
 	if (eptr->mode!=KILL) {
 		*servip = eptr->servip;
-		*servport = eptr->servport;
+		if (servport!=NULL) {
+			*servport = eptr->servport;
+		}
 		if (servver!=NULL) {
 			*servver = eptr->version;
 		}

@@ -2872,14 +2872,13 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t 
 		uint32_t dist;
 		uint32_t ip;
 		uint32_t cuip;
-		uint16_t port;
 		uint32_t mdrgvc = 0;
 		uint32_t mdrgtdc = 0;
 
-		if (matocsserv_get_csdata(cstab[dstcsid].ptr,&cuip,&port,NULL,NULL)==0) {
+		if (matocsserv_get_csdata(cstab[dstcsid].ptr,&cuip,NULL,NULL,NULL)==0) {
 			for (s=c->slisthead ; s ; s=s->next) {
 				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-					if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+					if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,NULL,NULL,NULL)==0) {
 						dist=topology_distance(ip,cuip);
 						if (min_dist>=dist) {
 							if (min_dist>dist) {
@@ -2906,7 +2905,7 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t 
 			}
 			for (s=c->slisthead ; s && r>0 ; s=s->next) {
 				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
-					if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,&port,NULL,NULL)==0) {
+					if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,NULL,NULL,NULL)==0) {
 						dist=topology_distance(ip,cuip);
 						if (min_dist==dist) {
 							if (mdrgvc > 1 && s->valid==VALID) {
@@ -2924,7 +2923,6 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t 
 	} else {
 		if (rgvc>0) {	// if there are VALID copies then make copy of one VALID chunk
 			r = 1+rndu32_ranged(rgvc);
-			srccsid = MAXCSCOUNT;
 			for (s=c->slisthead ; s && r>0 ; s=s->next) {
 				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==VALID) {
 					r--;
@@ -2933,7 +2931,6 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t 
 			}
 		} else {	// if not then use TDVALID chunks.
 			r = 1+rndu32_ranged(rgtdc);
-			srccsid = MAXCSCOUNT;
 			for (s=c->slisthead ; s && r>0 ; s=s->next) {
 				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && s->valid==TDVALID) {
 					r--;

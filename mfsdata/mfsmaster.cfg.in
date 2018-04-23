@@ -92,9 +92,11 @@
 # CHUNKSERVER WORKING OPTIONS                 #
 ###############################################
 
-# initial delay in seconds before starting replications (default is 300)
-# REPLICATIONS_DELAY_INIT = 300
+# initial delay in seconds before starting replications (default is 60)
+# REPLICATIONS_DELAY_INIT = 60
 
+# whether to make undergoal replications respect topology (default is 0, i.e. no)
+# REPLICATIONS_RESPECT_TOPOLOGY = 0
 
 # Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)
 # CHUNKS_LOOP_MAX_CPS = 100000

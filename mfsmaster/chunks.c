@@ -2862,7 +2862,7 @@ void chunk_store_info(uint8_t *buff) {
 
 //jobs state: jobshpos
 
-static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass, uint32_t rgvc, uint32_t rgtdc) {
+static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c,uint16_t dstcsid,uint32_t now,uint32_t lclass,uint32_t rgvc,uint32_t rgtdc) {
 	slist *s;
 	uint32_t r = 0;
 	uint16_t srccsid = MAXCSCOUNT;
@@ -2943,11 +2943,11 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c, uint16_t 
 	return srccsid;
 }
 
-static inline int chunk_undergoal_replicate(chunk *c, uint16_t dstcsid, uint32_t now, uint32_t lclass, uint8_t extrajob, uint16_t priority, loop_info *inforec, uint32_t rgvc, uint32_t rgtdc) {
+static inline int chunk_undergoal_replicate(chunk *c,uint16_t dstcsid,uint32_t now,uint32_t lclass,uint8_t extrajob,uint16_t priority,loop_info *inforec,uint32_t rgvc,uint32_t rgtdc) {
 	slist *s;
 	uint16_t srccsid;
 
-	srccsid = chunk_get_undergoal_replicate_srccsid(c, dstcsid, now, lclass, rgvc, rgtdc);
+	srccsid = chunk_get_undergoal_replicate_srccsid(c,dstcsid,now,lclass,rgvc,rgtdc);
 	if (srccsid==MAXCSCOUNT) {
 		return -1;
 	}

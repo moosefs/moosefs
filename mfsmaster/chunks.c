@@ -2943,7 +2943,7 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c,uint16_t d
 	return srccsid;
 }
 
-static inline int chunk_undergoal_replicate(chunk *c,uint16_t dstcsid,uint32_t now,uint32_t lclass,uint8_t extrajob,uint16_t priority,loop_info *inforec,uint32_t rgvc,uint32_t rgtdc) {
+static inline int chunk_undergoal_replicate(chunk *c,uint16_t dstcsid,uint32_t now,uint32_t lclass,uint16_t priority,loop_info *inforec,uint32_t rgvc,uint32_t rgtdc) {
 	slist *s;
 	uint16_t srccsid;
 
@@ -2969,12 +2969,10 @@ static inline int chunk_undergoal_replicate(chunk *c,uint16_t dstcsid,uint32_t n
 	chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
 	c->allvalidcopies++;
 	c->regularvalidcopies++;
-	if (extrajob==0) {
-		if (priority<5) {
-			inforec->done.copy_undergoal++;
-		} else {
-			inforec->done.copy_wronglabels++;
-		}
+	if (priority<5) {
+		inforec->done.copy_undergoal++;
+	} else {
+		inforec->done.copy_wronglabels++;
 	}
 	return 0;
 }
@@ -3642,7 +3640,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
 						if (matching[i+labelcnt]>=0 || allowallservers) {
-							if (chunk_undergoal_replicate(c, servers[i], now, lclass, extrajob, j, &inforec, rgvc, rgtdc)>=0) {
+							if (chunk_undergoal_replicate(c, servers[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
 								return;
 							}
 						}
@@ -3654,7 +3652,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					for (i=0 ; i<rservcount ; i++) {
 						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
 						if (!s) {
-							if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, extrajob, j, &inforec, rgvc, rgtdc)>=0) {
+							if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
 								return;
 							}
 						}
@@ -3665,15 +3663,13 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				chunk_priority_enqueue(j,c);
 			}
 		}
-		if (extrajob==0) {
-			if (vc < goal) {
-				inforec.notdone.copy_undergoal++;
+		if (vc < goal) {
+			inforec.notdone.copy_undergoal++;
+		} else {
+			if (canbefixed==0) {
+				inforec.labels_dont_match++;
 			} else {
-				if (canbefixed==0) {
-					inforec.labels_dont_match++;
-				} else {
-					inforec.notdone.copy_wronglabels++;
-				}
+				inforec.notdone.copy_wronglabels++;
 			}
 		}
 	}

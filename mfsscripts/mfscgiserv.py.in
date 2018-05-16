@@ -72,6 +72,7 @@ class ClientHandler:
 		self.outgoing = emptybuff()
 		self.writable = False
 		self.close_when_done = True
+		self.response = []
  
 	def handle_error(self):
 		self.close()
@@ -82,9 +83,10 @@ class ClientHandler:
 			buff = self.client_socket.recv(1024)
 			if not buff:  # the connection is closed
 				self.close()
-			# buffer the data in self.incoming
-			self.incoming += buff #.write(buff)
-			self.process_incoming()
+			else:
+				# buffer the data in self.incoming
+				self.incoming += buff #.write(buff)
+				self.process_incoming()
 		except socket.error:
 			self.close()
 
@@ -119,6 +121,7 @@ class ClientHandler:
 			else:
 				self.outgoing = self.response[0].read(self.blocksize)
 				if not self.outgoing:
+					self.response[0].close()
 					self.response.pop(0)
 		if self.outgoing:
 			try:
@@ -139,6 +142,10 @@ class ClientHandler:
 				self.incoming = emptybuff()
 
 	def close(self):
+		while self.response:
+			if not isinstance(self.response[0],buff_type):
+				self.response[0].close()
+			self.response.pop(0)
 		del client_handlers[self.client_socket]
 		self.client_socket.close()
 
@@ -603,6 +610,7 @@ if __name__=="__main__":
 				os.seteuid(pwd.getpwnam("nobody").pw_uid)
 			except Exception:
 				pass
+		signal.signal(signal.SIGCHLD, signal.SIG_IGN)
 		loop(server,HTTP)
 
 	else:

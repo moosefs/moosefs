@@ -1,5 +1,11 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.101-1 (WIP)
+
+  - (master) make under goal replications respect topology (patch made by tclh123)
+  - (master) fix inforec undergoal (patch made by tclh123)
+  - (cgiserv) fixed handling connection close during data sending (leaving active pipes which caused leaving mfs.cgi subprocesses)
+
 * MooseFS 3.0.100-1 (2018-01-24)
 
   - (cs) fixed rare segfault during chunk sending to master after disconection

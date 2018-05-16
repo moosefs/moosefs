@@ -77,7 +77,6 @@
 #define CONNECT_TIMEOUT 2000
 
 typedef struct _threc {
-	pthread_t thid;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
 	uint8_t *obuff;
@@ -95,9 +94,16 @@ typedef struct _threc {
 
 	uint32_t rcvd_cmd;
 
-	uint32_t packetid;	// thread number
+	uint32_t packetid;
 	struct _threc *next;
 } threc;
+
+#define THRECHASHSIZE 256
+
+static threc *threchash[THRECHASHSIZE];
+static threc *threcfree = NULL;
+static uint16_t threcnextid = 0;
+
 
 /*
 typedef struct _threc {
@@ -154,8 +160,6 @@ static int64_t timediffusec = 0;
 
 #define RECEIVE_TIMEOUT 10
 
-static threc *threchead=NULL;
-
 
 static int fd;
 static int disconnect;
@@ -169,6 +173,7 @@ static uint32_t maxretries;
 
 static pthread_t rpthid,npthid;
 static pthread_mutex_t fdlock,reclock,aflock,amtimelock;
+static pthread_key_t reckey;
 
 static uint32_t sessionid;
 static uint64_t metaid;
@@ -555,20 +560,70 @@ void fs_dec_acnt(uint32_t inode) {
 	pthread_mutex_unlock(&aflock);
 }
 
-threc* fs_get_my_threc() {
-	pthread_t mythid = pthread_self();
-	threc *rec;
+void fs_free_threc(void *vrec) {
+	threc *drec = (threc*)vrec;
+	threc *rec,**recp;
+	uint32_t rechash;
+
 	pthread_mutex_lock(&reclock);
-	for (rec = threchead ; rec ; rec=rec->next) {
-		if (pthread_equal(rec->thid,mythid)) {
+	rechash = drec->packetid % THRECHASHSIZE;
+	recp = threchash + rechash;
+	while ((rec = *recp)) {
+		if (rec==drec) {
+			*recp = rec->next;
+			rec->next = threcfree;
+			threcfree = rec;
+			pthread_mutex_lock(&(rec->mutex));
+			if (rec->obuff!=NULL) {
+#ifdef MMAP_ALLOC
+				munmap((void*)(rec->obuff),rec->obuffsize);
+#else
+				free(rec->obuff);
+#endif
+				rec->obuff = NULL;
+				rec->obuffsize = 0;
+			}
+			if (rec->ibuff!=NULL) {
+#ifdef MMAP_ALLOC
+				munmap((void*)(rec->ibuff),rec->ibuffsize);
+#else
+				free(rec->ibuff);
+#endif
+				rec->ibuff = NULL;
+				rec->ibuffsize = 0;
+			}
+			pthread_mutex_unlock(&(rec->mutex));
 			pthread_mutex_unlock(&reclock);
-			return rec;
+			return;
+		} else {
+			recp = &(rec->next);
 		}
 	}
-	rec = malloc(sizeof(threc));
-	rec->thid = mythid;
-	pthread_mutex_init(&(rec->mutex),NULL);
-	pthread_cond_init(&(rec->cond),NULL);
+	pthread_mutex_unlock(&reclock);
+	syslog(LOG_WARNING,"threc not found in data structures !!!");
+}
+
+threc* fs_get_my_threc() {
+	threc *rec;
+	uint32_t rechash;
+
+	rec = pthread_getspecific(reckey);
+	if (rec!=NULL) {
+		return rec;
+	}
+	pthread_mutex_lock(&reclock);
+	if (threcfree!=NULL) {
+		rec = threcfree;
+		threcfree = rec->next;
+	} else {
+		rec = malloc(sizeof(threc));
+		rec->packetid = ++threcnextid;
+		pthread_mutex_init(&(rec->mutex),NULL);
+		pthread_cond_init(&(rec->cond),NULL);
+	}
+	rechash = rec->packetid % THRECHASHSIZE;
+	rec->next = threchash[rechash];
+	threchash[rechash] = rec;
 	rec->obuff = NULL;
 	rec->ibuff = NULL;
 	rec->obuffsize = 0;
@@ -578,31 +633,26 @@ threc* fs_get_my_threc() {
 	rec->sent = 0;
 	rec->status = 0;
 	rec->rcvd = 0;
-//	rec->waiting = 0;
 	rec->receiving = 0;
 	rec->rcvd_cmd = 0;
-	if (threchead==NULL) {
-		rec->packetid = 1;
-	} else {
-		rec->packetid = threchead->packetid+1;
-	}
-	rec->next = threchead;
-	//syslog(LOG_NOTICE,"mastercomm: create new threc (%"PRIu32")",rec->packetid);
-	threchead = rec;
 	pthread_mutex_unlock(&reclock);
+	pthread_setspecific(reckey,rec);
 	return rec;
 }
 
 threc* fs_get_threc_by_id(uint32_t packetid) {
 	threc *rec;
+	uint32_t rechash;
+	rechash = packetid % THRECHASHSIZE;
 	pthread_mutex_lock(&reclock);
-	for (rec = threchead ; rec ; rec=rec->next) {
+	for (rec = threchash[rechash] ; rec!=NULL ; rec=rec->next) {
 		if (rec->packetid==packetid) {
 			pthread_mutex_unlock(&reclock);
 			return rec;
 		}
 	}
 	pthread_mutex_unlock(&reclock);
+	syslog(LOG_WARNING,"packet: %"PRIu32" - record not found !!!",packetid);
 	return NULL;
 }
 
@@ -2140,6 +2190,7 @@ void* fs_receive_thread(void *arg) {
 	threc *rec;
 	uint32_t cmd,size,packetid;
 	uint32_t rcvd,toread;
+	uint32_t rechash;
 //	static uint8_t *notify_buff=NULL;
 //	static uint32_t notify_buff_size=0;
 	int32_t r;
@@ -2164,16 +2215,16 @@ void* fs_receive_thread(void *arg) {
 			fd = -1;
 			// send to any threc status error and unlock them
 			pthread_mutex_lock(&reclock);
-			for (rec=threchead ; rec ; rec=rec->next) {
-				pthread_mutex_lock(&(rec->mutex));
-				if (rec->sent) {
-					rec->status = 1;
-					rec->rcvd = 1;
-//					if (rec->waiting) {
-					pthread_cond_signal(&(rec->cond));
-//					}
+			for (rechash=0 ; rechash<THRECHASHSIZE ; rechash++) {
+				for (rec=threchash[rechash] ; rec ; rec=rec->next) {
+					pthread_mutex_lock(&(rec->mutex));
+					if (rec->sent) {
+						rec->status = 1;
+						rec->rcvd = 1;
+						pthread_cond_signal(&(rec->cond));
+					}
+					pthread_mutex_unlock(&(rec->mutex));
 				}
-				pthread_mutex_unlock(&(rec->mutex));
 			}
 			pthread_mutex_unlock(&reclock);
 		}
@@ -2497,51 +2548,77 @@ void fs_init_threads(uint32_t retries,uint32_t timeout) {
 	usectime *= 1000000;
 	usectime += tv.tv_usec;
 	timediffusec = usectime - monotonic_useconds(); // before receiving packets from master start with own wall clock
-	pthread_mutex_init(&reclock,NULL);
-	pthread_mutex_init(&fdlock,NULL);
-	pthread_mutex_init(&aflock,NULL);
-	pthread_mutex_init(&amtimelock,NULL);
-	pthread_attr_init(&thattr);
-	pthread_attr_setstacksize(&thattr,0x100000);
-	pthread_create(&rpthid,&thattr,fs_receive_thread,NULL);
-	pthread_create(&npthid,&thattr,fs_nop_thread,NULL);
-	pthread_attr_destroy(&thattr);
+	zassert(pthread_key_create(&reckey,fs_free_threc));
+	zassert(pthread_mutex_init(&reclock,NULL));
+	zassert(pthread_mutex_init(&fdlock,NULL));
+	zassert(pthread_mutex_init(&aflock,NULL));
+	zassert(pthread_mutex_init(&amtimelock,NULL));
+	zassert(pthread_attr_init(&thattr));
+	zassert(pthread_attr_setstacksize(&thattr,0x100000));
+	zassert(pthread_create(&rpthid,&thattr,fs_receive_thread,NULL));
+	zassert(pthread_create(&npthid,&thattr,fs_nop_thread,NULL));
+	zassert(pthread_attr_destroy(&thattr));
 }
 
 void fs_term(void) {
-	threc *tr,*trn;
+	threc *rec,*recn;
 	uint32_t i;
+	uint32_t rechash;
 	amtime_file *amf,*amfn;
 	acquired_file *af,*afn;
 
-	pthread_mutex_lock(&fdlock);
+	zassert(pthread_mutex_lock(&fdlock));
 	fterm = 1;
-	pthread_mutex_unlock(&fdlock);
-	pthread_join(npthid,NULL);
-	pthread_join(rpthid,NULL);
-	pthread_mutex_destroy(&amtimelock);
-	pthread_mutex_destroy(&aflock);
-	pthread_mutex_destroy(&fdlock);
-	pthread_mutex_destroy(&reclock);
-	for (tr = threchead ; tr ; tr = trn) {
-		trn = tr->next;
-		if (tr->obuff) {
+	zassert(pthread_mutex_unlock(&fdlock));
+	zassert(pthread_join(npthid,NULL));
+	zassert(pthread_join(rpthid,NULL));
+	zassert(pthread_mutex_destroy(&amtimelock));
+	zassert(pthread_mutex_destroy(&aflock));
+	zassert(pthread_mutex_destroy(&fdlock));
+	zassert(pthread_mutex_destroy(&reclock));
+	zassert(pthread_key_delete(reckey));
+	for (rechash=0 ; rechash<THRECHASHSIZE ; rechash++) {
+		for (rec = threchash[rechash] ; rec!=NULL ; rec=recn) {
+			syslog(LOG_WARNING,"thread specific memory (id:%"PRIu32") hasn't been freed",rec->packetid);
+			recn = rec->next;
+			if (rec->obuff) {
 #ifdef MMAP_ALLOC
-			munmap((void*)(tr->obuff),tr->obuffsize);
+				munmap((void*)(rec->obuff),rec->obuffsize);
 #else
-			free(tr->obuff);
+				free(rec->obuff);
+#endif
+			}
+			if (rec->ibuff) {
+#ifdef MMAP_ALLOC
+				munmap((void*)(rec->ibuff),rec->ibuffsize);
+#else
+				free(rec->ibuff);
+#endif
+			}
+			pthread_mutex_destroy(&(rec->mutex));
+			pthread_cond_destroy(&(rec->cond));
+			free(rec);
+		}
+	}
+	for (rec = threcfree ; rec ; rec = recn) {
+		recn = rec->next;
+		if (rec->obuff) {
+#ifdef MMAP_ALLOC
+			munmap((void*)(rec->obuff),rec->obuffsize);
+#else
+			free(rec->obuff);
 #endif
 		}
-		if (tr->ibuff) {
+		if (rec->ibuff) {
 #ifdef MMAP_ALLOC
-			munmap((void*)(tr->ibuff),tr->ibuffsize);
+			munmap((void*)(rec->ibuff),rec->ibuffsize);
 #else
-			free(tr->ibuff);
+			free(rec->ibuff);
 #endif
 		}
-		pthread_mutex_destroy(&(tr->mutex));
-		pthread_cond_destroy(&(tr->cond));
-		free(tr);
+		pthread_mutex_destroy(&(rec->mutex));
+		pthread_cond_destroy(&(rec->cond));
+		free(rec);
 	}
 	for (i=0 ; i<ACQFILES_HASH_SIZE ; i++) {
 		for (af = af_hash[i] ; af ; af = afn) {
@@ -2584,6 +2661,9 @@ uint8_t fs_get_cfg(const char *opt_name,char opt_value[256]) {
 		return MFS_ERROR_EINVAL;
 	}
 	wptr = fs_createpacket(rec,ANTOAN_GET_CONFIG,1+nleng);
+	if (wptr==NULL) {
+		return MFS_ERROR_IO;
+	}
 	put8bit(&wptr,nleng);
 	memcpy(wptr,opt_name,nleng);
 	rptr = fs_sendandreceive(rec,ANTOAN_CONFIG_VALUE,&i);
@@ -2867,17 +2947,18 @@ uint8_t fs_setattr(uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gids,uint
 	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
 	uint8_t asize = master_attrsize();
+	uint32_t mv = master_version();
 
-	if (master_version()<VERSION2INT(1,6,25)) {
+	if (mv<VERSION2INT(1,6,25)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETATTR,31);
 		packetver = 0;
-	} else if (master_version()<VERSION2INT(1,6,28)) {
+	} else if (mv<VERSION2INT(1,6,28)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETATTR,32);
 		packetver = 1;
-	} else if (master_version()<VERSION2INT(2,0,0)) {
+	} else if (mv<VERSION2INT(2,0,0)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETATTR,33);
 		packetver = 2;
-	} else if (master_version()<VERSION2INT(3,0,93)) {
+	} else if (mv<VERSION2INT(3,0,93)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_SETATTR,33+gids*4);
 		packetver = 3;
 	} else {
@@ -3685,6 +3766,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *
 	const uint8_t *rptr;
 	uint32_t i;
 	uint8_t ret;
+	uint8_t packetver;
 	threc *rec = fs_get_my_threc();
 
 	*csdata = NULL;
@@ -3692,15 +3774,17 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *
 
 	if (master_version()>=VERSION2INT(3,0,4)) {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,9);
+		packetver = 1;
 	} else {
 		wptr = fs_createpacket(rec,CLTOMA_FUSE_READ_CHUNK,8);
+		packetver = 0;
 	}
 	if (wptr==NULL) {
 		return MFS_ERROR_IO;
 	}
 	put32bit(&wptr,inode);
 	put32bit(&wptr,indx);
-	if (master_version()>=VERSION2INT(3,0,4)) {
+	if (packetver>=1) {
 		put8bit(&wptr,chunkopflags);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_READ_CHUNK,&i);

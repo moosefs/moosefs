@@ -222,6 +222,9 @@ static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t ms
 		i = read(sock,((uint8_t*)buff)+rcvd,leng-rcvd);
 #endif
 		if (i==0) {
+#ifdef ECONNRESET
+			errno = ECONNRESET;
+#endif
 			return rcvd;
 		}
 		if (i>0) {
@@ -612,6 +615,11 @@ int tcpstrconnect(int sock,const char *hostname,const char *service) {
 	if (connect(sock,(struct sockaddr *)&sa,sizeof(struct sockaddr_in)) >= 0) {
 		return 0;
 	}
+#ifdef WIN32
+	if (WSAGetLastError()==WSAEWOULDBLOCK) {
+		errno = EINPROGRESS;
+	}
+#endif
 	if (errno == EINPROGRESS) {
 		return 1;
 	}
@@ -624,6 +632,11 @@ int tcpnumconnect(int sock,uint32_t ip,uint16_t port) {
 	if (connect(sock,(struct sockaddr *)&sa,sizeof(struct sockaddr_in)) >= 0) {
 		return 0;
 	}
+#ifdef WIN32
+	if (WSAGetLastError()==WSAEWOULDBLOCK) {
+		errno = EINPROGRESS;
+	}
+#endif
 	if (errno == EINPROGRESS) {
 		return 1;
 	}
@@ -641,6 +654,11 @@ int tcpstrtoconnect(int sock,const char *hostname,const char *service,uint32_t m
 	if (connect(sock,(struct sockaddr *)&sa,sizeof(struct sockaddr_in)) >= 0) {
 		return 0;
 	}
+#ifdef WIN32
+	if (WSAGetLastError()==WSAEWOULDBLOCK) {
+		errno = EINPROGRESS;
+	}
+#endif
 	if (errno == EINPROGRESS) {
 		double s,c;
 		uint32_t msecpassed;

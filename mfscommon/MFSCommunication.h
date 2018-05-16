@@ -265,6 +265,7 @@
 #define LOOKUP_ACCESS_MODE_RWX             0x0080
 #define LOOKUP_ACCESS_BITS                 0x00FF
 #define LOOKUP_CHUNK_ZERO_DATA             0x0100
+#define LOOKUP_RO_FILESYSTEM               0x0200
 
 // combinations of MODE_MASK to LOOKUP_ACCESS_MODE
 #define MODE_TO_ACCMODE {0x01,0x03,0x05,0x0F,0x11,0x33,0x55,0xFF}

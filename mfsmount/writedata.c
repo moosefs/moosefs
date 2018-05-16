@@ -763,6 +763,9 @@ void* write_worker(void *arg) {
 				} else if (wrstatus==MFS_ERROR_IO) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,EIO,0);
+				} else if (wrstatus==MFS_ERROR_EROFS) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",inode,chindx,mfsstrerr(wrstatus));
+					write_job_end(chd,EROFS,0);
 				} else {
 					if (chd->trycnt >= minlogretry) {
 						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",inode,chindx,mfsstrerr(wrstatus));

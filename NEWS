@@ -9,6 +9,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) setting correct errno when read returns 0 (in sockets.c)
   - (mount) fixed double free of plock_data structure
   - (master) fixed inconsistency in calculating realsize when storage class definition has changed
+  - (master+mount) fixed handling read-only filesystems (ro flag in exports and lookup-open lflags)
 
 * MooseFS 3.0.100-1 (2018-01-24)
 

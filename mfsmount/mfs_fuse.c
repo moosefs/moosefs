@@ -1353,7 +1353,11 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 	}
 
 	if (fdcache_find(&ctx,ino,NULL,&lflags)) {
-		status = (lflags & (1<<(mmode&0x7)))?MFS_STATUS_OK:MFS_ERROR_EACCES;
+		if ((lflags & LOOKUP_RO_FILESYSTEM) && (mmode & MODE_MASK_W)) {
+			status = MFS_ERROR_EROFS;
+		} else {
+			status = (lflags & (1<<(mmode&0x7)))?MFS_STATUS_OK:MFS_ERROR_EACCES;
+		}
 	} else {
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
@@ -3257,7 +3261,11 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 	fdrec = fdcache_acquire(&ctx,ino,attr,&lflags);
 	if (fdrec) {
-		status = (lflags & (1<<(mmode&0x7)))?MFS_STATUS_OK:MFS_ERROR_EACCES;
+		if ((lflags & LOOKUP_RO_FILESYSTEM) && (mmode & MODE_MASK_W)) {
+			status = MFS_ERROR_EROFS;
+		} else {
+			status = (lflags & (1<<(mmode&0x7)))?MFS_STATUS_OK:MFS_ERROR_EACCES;
+		}
 		if (status==MFS_STATUS_OK) {
 			fdcache_inject_chunkdata(fdrec);
 		} 

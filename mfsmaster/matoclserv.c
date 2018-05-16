@@ -241,7 +241,11 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 	uint8_t cs_data[100*14];
 
 	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
-		status = MFS_ERROR_EROFS;
+		if (eptr->version>=VERSION2INT(3,0,101)) {
+			status = MFS_ERROR_EROFS;
+		} else {
+			status = MFS_ERROR_IO;
+		}
 	} else {
 		status = fs_writechunk(inode,indx,chunkopflags,&prevchunkid,&chunkid,&fleng,&opflag);
 	}
@@ -1977,6 +1981,9 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 					}
 				}
 			}
+			if (sesflags&SESFLAG_READONLY) {
+				lflags |= LOOKUP_RO_FILESYSTEM;
+			}
 			if (lflags & LOOKUP_CHUNK_ZERO_DATA) {
 				ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LOOKUP,eptr->asize+23+count*14);
 				put32bit(&ptr,msgid);
@@ -2990,7 +2997,11 @@ void matoclserv_fuse_write_chunk_end(matoclserventry *eptr,const uint8_t *data,u
 	}
 	flenghaschanged = 0;
 	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
-		status = MFS_ERROR_EROFS;
+		if (eptr->version>=VERSION2INT(3,0,101)) {
+			status = MFS_ERROR_EROFS;
+		} else {
+			status = MFS_ERROR_IO;
+		}
 	} else {
 		status = fs_writeend(inode,fleng,chunkid,chunkopflags,&flenghaschanged);
 	}

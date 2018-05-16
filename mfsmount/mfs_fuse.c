@@ -2667,6 +2667,7 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		} else {
 			dindex = dirbuf_new();
 			dirinfo = dirbuf_get(dindex);
+			passert(dirinfo);
 			pthread_mutex_lock(&(dirinfo->lock));	// make valgrind happy
 			dirinfo->p = NULL;
 			dirinfo->size = 0;
@@ -2687,6 +2688,7 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	} else {
 		dindex = dirbuf_new();
 		dirinfo = dirbuf_get(dindex);
+		passert(dirinfo);
 		pthread_mutex_lock(&(dirinfo->lock));	// make valgrind happy
 		dirinfo->p = NULL;
 		dirinfo->size = 0;
@@ -2734,6 +2736,11 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 		return;
 	}
 	dirinfo = dirbuf_get(fi->fh);
+	if (dirinfo==NULL) {
+		oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
 	if (off<0) {
 		oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EINVAL));
 		fuse_reply_err(req,EINVAL);
@@ -2907,6 +2914,11 @@ void mfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		return;
 	}
 	dirinfo = dirbuf_get(fi->fh);
+	if (dirinfo==NULL) {
+		oplog_printf(&ctx,"releasedir (%lu): %s",(unsigned long int)ino,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
 	zassert(pthread_mutex_lock(&(dirinfo->lock)));
 	if (dirinfo->dcache) {
 		dcache_release(dirinfo->dcache);
@@ -3200,6 +3212,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		uint32_t sindex;
 		sindex = sinfo_new();
 		statsinfo = sinfo_get(sindex);
+		passert(statsinfo);
 //		statsinfo = malloc(sizeof(sinfo));
 //		if (statsinfo==NULL) {
 //			oplog_printf(&ctx,"open (%lu) (internal node: STATS): %s",(unsigned long int)ino,strerr(ENOMEM));

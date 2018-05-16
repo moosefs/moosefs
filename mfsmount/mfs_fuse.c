@@ -4254,7 +4254,6 @@ void* mfs_plock_interrupt (void *data) {
 		fs_posixlock(pld->inode,pld->reqid,pld->owner,POSIX_LOCK_CMD_INT,POSIX_LOCK_UNLCK,0,0,0,NULL,NULL,NULL,NULL);
 		portable_usleep(100000);
 	}
-	free(pld);
 #ifdef HAVE___SYNC_OP_AND_FETCH
 	refs = __sync_sub_and_fetch(&(pld->refs),1);
 #else

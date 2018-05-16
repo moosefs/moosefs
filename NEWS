@@ -7,6 +7,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgiserv) fixed handling connection close during data sending (leaving active pipes which caused leaving mfs.cgi subprocesses)
   - (mount) decreased memory usage (fixed handling buffers allocated per thread)
   - (all) setting correct errno when read returns 0 (in sockets.c)
+  - (mount) fixed double free of plock_data structure
 
 * MooseFS 3.0.100-1 (2018-01-24)
 

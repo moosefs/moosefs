@@ -2,7 +2,7 @@ Source: moosefs
 Section: admin
 Priority: extra
 Maintainer: MooseFS Team <contact@moosefs.com>
-Build-Depends: debhelper (>= 7.0.15), autotools-dev, libc6-dev, libfuse-dev, pkg-config, zlib1g-dev, libpcap0.8-dev, python (>= 2.5)
+Build-Depends: debhelper (>= 7.0.15), autotools-dev, libc6-dev, libfuse-dev, pkg-config, zlib1g-dev, libpcap0.8-dev, python (>= 2.5) | python3
 Standards-Version: 3.7.3
 Homepage: http://moosefs.com/
 
@@ -38,7 +38,7 @@ Description: MooseFS client tools
 
 Package: moosefs-cli
 Architecture: any
-Depends: ${misc:Depends}, python (>= 2.5)
+Depends: ${misc:Depends}, python (>= 2.5) | python3
 Description: MooseFS CLI Utility
  This package will install MooseFS component responsible
  for monitoring. This is simple command line utility which
@@ -47,7 +47,7 @@ Description: MooseFS CLI Utility
 
 Package: moosefs-cgi
 Architecture: any
-Depends: ${misc:Depends}, python (>= 2.5)
+Depends: ${misc:Depends}, python (>= 2.5) | python3
 Description: MooseFS CGI Monitor
  This package will install MooseFS component responsible
  for monitoring. This is simple CGI utility which
@@ -56,7 +56,7 @@ Description: MooseFS CGI Monitor
 
 Package: moosefs-cgiserv
 Architecture: any
-Depends: ${misc:Depends}, moosefs-cgi, adduser, python (>= 2.5)
+Depends: ${misc:Depends}, moosefs-cgi, adduser, python (>= 2.5) | python3
 Description: Simple CGI-capable HTTP server to run MooseFS CGI Monitor
  This package will install MooseFS component responsible
  for monitoring. This is simple CGI web server that can be

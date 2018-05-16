@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-cat debian/control | sed 's/^Build-Depends: /Build-Depends: dh-systemd, /' > debian/control_systemd
+cat debian/control | sed 's/^Build-Depends: /Build-Depends: dh-systemd | debhelper (>= 10.0), /' > debian/control_systemd
 mv debian/control_systemd debian/control
 
 rm -f debian/*.init debian/*.default

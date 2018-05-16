@@ -295,7 +295,7 @@ void changelog_reload(void) {
 		syslog(LOG_WARNING,"BACK_LOGS value too big !!!");
 		BackLogsNumber = MAXLOGLINESIZE;
 	}
-	ChangelogSecondsToRemember = cfg_getuint16("CHANGELOG_PRESERVE_SECONDS",600);
+	ChangelogSecondsToRemember = cfg_getuint16("CHANGELOG_PRESERVE_SECONDS",1800);
 	if (ChangelogSecondsToRemember>3600) {
 		syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
 		ChangelogSecondsToRemember=3600;
@@ -308,7 +308,7 @@ int changelog_init(void) {
 		fprintf(stderr,"BACK_LOGS value too big !!!");
 		return -1;
 	}
-	ChangelogSecondsToRemember = cfg_getuint16("CHANGELOG_PRESERVE_SECONDS",600);
+	ChangelogSecondsToRemember = cfg_getuint16("CHANGELOG_PRESERVE_SECONDS",1800);
 	if (ChangelogSecondsToRemember>3600) {
 		syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
 		ChangelogSecondsToRemember=3600;

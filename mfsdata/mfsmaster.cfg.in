@@ -124,8 +124,8 @@
 # limit groups are the same as in write limit, also relations between numbers should be the same as in write limits ( 1st >= 2nd >= 3rd <= 4th )
 # CHUNKS_READ_REP_LIMIT = 10,5,2,5
 
-# Threshold for chunkserver load (default is 100)
-# CS_HEAVY_LOAD_THRESHOLD = 100
+# Threshold for chunkserver load (default is 150)
+# CS_HEAVY_LOAD_THRESHOLD = 150
 
 # Threshold ratio for chunkserver load (default is 5.0, Whenever chunkserver load is higher than previously specified threshold and this ratio times higher than average load, then chunkserver is switched into 'grace' mode)
 # CS_HEAVY_LOAD_RATIO_THRESHOLD = 5.0

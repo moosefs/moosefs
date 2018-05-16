@@ -8832,7 +8832,7 @@ void fs_reload(void) {
 	if (cfg_isdefined("QUOTA_TIME_LIMIT") && !cfg_isdefined("QUOTA_DEFAULT_GRACE_PERIOD")) {
 		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400); // deprecated option
 	} else {
-		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_DEFAULT_GRACE_PERIOD",7*86400);
+		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_DEFAULT_GRACE_PERIOD",604800);
 	}
 	AtimeMode = cfg_getuint8("ATIME_MODE",0);
 	if (AtimeMode>ATIME_NEVER) {

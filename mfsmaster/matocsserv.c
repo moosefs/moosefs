@@ -2737,7 +2737,7 @@ void matocsserv_reload_common(void) {
 	}
 
 	if (cfg_isdefined("REMAP_BITS") && cfg_isdefined("REMAP_SOURCE_IP_CLASS") && cfg_isdefined("REMAP_DESTINATION_IP_CLASS")) {
-		bits = cfg_getuint8("REMAP_BITS",0);
+		bits = cfg_getuint8("REMAP_BITS",24);
 		srcip = cfg_getstr("REMAP_SOURCE_IP_CLASS","0.0.0.0");
 		dstip = cfg_getstr("REMAP_DESTINATION_IP_CLASS","0.0.0.0");
 		err = 0;

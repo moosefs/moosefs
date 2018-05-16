@@ -65,7 +65,7 @@ enables/disables fsync before chunk closing; default is 0 (off)
 enables/disables sparsification (skip leading and trailing zeroz) during writing new block; default is 1 (on)
 .TP
 .BR WORKERS_MAX ", " WORKERS_MAX_IDLE
-maximum number of active workers and maximum number of idle workers; defaults are 150 and 40
+maximum number of active workers and maximum number of idle workers; defaults are 250 and 40
 .TP
 .B LABELS
 labels string; default is empty - no labels
@@ -83,7 +83,7 @@ MooseFS master command port; default is 9420
 MooseFS master control port; default is 9419
 .TP
 .B MASTER_TIMEOUT
-timeout in seconds for master connections; default is 60
+timeout in seconds for master connections (if not 0); If this value is zero then chunkserver sets it initially to 10 and asks master for this value. default is 0 (ask master).
 .TP
 .B MASTER_RECONNECTION_DELAY
 delay in seconds before trying to reconnect to master after disconnection (default is 5)
@@ -99,9 +99,6 @@ IP address to listen on for client (mount) connections (\fB*\fP means any)
 .TP
 .B CSSERV_LISTEN_PORT
 port to listen on for client (mount) connections (default is 9422)
-.TP
-.B CSSERV_TIMEOUT
-timeout (in seconds) for client (mount) connections (default is 5)
 .SH COPYRIGHT
 Copyright (C) 2018 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 

@@ -74,8 +74,8 @@
 # MASTER_PORT = @DEFAULT_MASTER_CS_PORT@
 
 
-# timeout in seconds for master connections (default is 10)
-# MASTER_TIMEOUT = 10
+# timeout in seconds for master connections. Value >0 forces given timeout, but when value is 0 then CS asks master for timeout (default is 0 - ask master)
+# MASTER_TIMEOUT = 0
 
 # delay in seconds before next try to reconnect to master if not connected (default is 5)
 # MASTER_RECONNECTION_DELAY = 5

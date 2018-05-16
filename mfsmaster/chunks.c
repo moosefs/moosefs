@@ -259,7 +259,6 @@ static uint32_t chunks_priority_leng[DANGER_PRIORITIES];
 static uint32_t chunks_priority_head[DANGER_PRIORITIES];
 static uint32_t chunks_priority_tail[DANGER_PRIORITIES];
 
-// static uint32_t ReplicationsDelayDisconnect=3600;
 static uint32_t ReplicationsDelayInit=60;
 static uint32_t RemoveDelayDisconnect=3600;
 static uint32_t DangerMaxLeng=1000000;
@@ -3637,7 +3636,6 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						}
 					}
 */
-
 					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
 						if (matching[i+labelcnt]>=0 || allowallservers) {
 							if (chunk_undergoal_replicate(c, servers[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
@@ -4271,7 +4269,6 @@ void chunk_reload(void) {
 	char *repstr;
 
 	ReplicationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT",60);
-//	ReplicationsDelayDisconnect = cfg_getuint32("REPLICATIONS_DELAY_DISCONNECT",3600);
 	ReplicationsRespectTopology = cfg_getuint8("REPLICATIONS_RESPECT_TOPOLOGY",0);
 
 	oldMaxDelSoftLimit = MaxDelSoftLimit;
@@ -4417,8 +4414,8 @@ int chunk_strinit(void) {
 
 	starttime = main_time();
 	ReplicationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT",60);
-//	ReplicationsDelayDisconnect = cfg_getuint32("REPLICATIONS_DELAY_DISCONNECT",3600);
 	ReplicationsRespectTopology = cfg_getuint8("REPLICATIONS_RESPECT_TOPOLOGY",0);
+
 	MaxDelSoftLimit = cfg_getuint32("CHUNKS_SOFT_DEL_LIMIT",10);
 	if (cfg_isdefined("CHUNKS_HARD_DEL_LIMIT")) {
 		MaxDelHardLimit = cfg_getuint32("CHUNKS_HARD_DEL_LIMIT",25);

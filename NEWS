@@ -8,6 +8,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) decreased memory usage (fixed handling buffers allocated per thread)
   - (all) setting correct errno when read returns 0 (in sockets.c)
   - (mount) fixed double free of plock_data structure
+  - (master) fixed inconsistency in calculating realsize when storage class definition has changed
 
 * MooseFS 3.0.100-1 (2018-01-24)
 

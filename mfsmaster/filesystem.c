@@ -174,6 +174,7 @@ typedef struct _fsnode {
 			uint64_t length;
 			uint64_t *chunktab;
 			uint32_t chunks;
+			uint8_t realsize_ratio;		// max goal
 			uint8_t end;
 		} fdata;
 	} data;
@@ -1626,7 +1627,57 @@ static inline uint8_t fsnodes_test_quota_for_uncommon_nodes(fsnode *dstnode,fsno
 
 
 // stats
-static inline void fsnodes_get_stats(fsnode *node,statsrecord *sr) {
+static inline void fsnodes_fix_realsize(fsnode *parent,uint64_t realsize_diff) {
+	statsrecord *psr;
+	fsedge *e;
+	if (parent) {
+		psr = &(parent->data.ddata.stats);
+		psr->realsize += realsize_diff;
+		if (parent!=root) {
+			for (e=parent->parents ; e ; e=e->nextparent) {
+				fsnodes_fix_realsize(e->parent,realsize_diff);
+			}
+		}
+	}
+}
+
+static inline void fsnodes_check_realsize(fsnode *node) {
+	uint32_t i,lastchunk,lastchunksize;
+	uint64_t size;
+	fsedge *e;
+	uint64_t new_realsize;
+	uint64_t old_realsize;
+	if (node->type==TYPE_FILE || node->type==TYPE_TRASH || node->type==TYPE_SUSTAINED) {
+		uint8_t realsize_ratio = sclass_get_keepmax_goal(node->sclassid);
+		if (realsize_ratio != node->data.fdata.realsize_ratio) {
+			size = 0;
+			if (node->data.fdata.length>0) {
+				lastchunk = (node->data.fdata.length-1)>>MFSCHUNKBITS;
+				lastchunksize = ((((node->data.fdata.length-1)&MFSCHUNKMASK)+MFSBLOCKSIZE)&MFSBLOCKNEGMASK)+MFSHDRSIZE;
+			} else {
+				lastchunk = 0;
+				lastchunksize = MFSHDRSIZE;
+			}
+			for (i=0 ; i<node->data.fdata.chunks ; i++) {
+				if (node->data.fdata.chunktab[i]>0) {
+					if (i<lastchunk) {
+						size+=MFSCHUNKSIZE+MFSHDRSIZE;
+					} else if (i==lastchunk) {
+						size+=lastchunksize;
+					}
+				}
+			}
+			new_realsize = size * realsize_ratio;
+			old_realsize = size * node->data.fdata.realsize_ratio;
+			for (e=node->parents ; e ; e=e->nextparent) {
+				fsnodes_fix_realsize(e->parent,new_realsize-old_realsize);
+			}
+			node->data.fdata.realsize_ratio = realsize_ratio;
+		}
+	}
+}
+
+static inline void fsnodes_get_stats(fsnode *node,statsrecord *sr,uint8_t fix_realsize_ratio) {
 	uint32_t i,lastchunk,lastchunksize;
 	switch (node->type) {
 	case TYPE_DIRECTORY:
@@ -1660,7 +1711,21 @@ static inline void fsnodes_get_stats(fsnode *node,statsrecord *sr) {
 				sr->chunks++;
 			}
 		}
-		sr->realsize = sr->size * sclass_get_keepmax_goal(node->sclassid);
+		if (fix_realsize_ratio==2) {
+			uint8_t realsize_ratio = sclass_get_keepmax_goal(node->sclassid);
+			if (realsize_ratio != node->data.fdata.realsize_ratio) {
+				fsedge *e;
+				uint64_t new_realsize = sr->size * realsize_ratio;
+				uint64_t old_realsize = sr->size * node->data.fdata.realsize_ratio;
+				for (e=node->parents ; e ; e=e->nextparent) {
+					fsnodes_fix_realsize(e->parent,new_realsize-old_realsize);
+				}
+				node->data.fdata.realsize_ratio = realsize_ratio;
+			}
+		} else if (fix_realsize_ratio) {
+			node->data.fdata.realsize_ratio = sclass_get_keepmax_goal(node->sclassid);
+		}
+		sr->realsize = sr->size * node->data.fdata.realsize_ratio;
 		break;
 	case TYPE_SYMLINK:
 		sr->inodes = 1;
@@ -1745,7 +1810,7 @@ static inline void fsnodes_quota_fixspace(fsnode *node,uint64_t *totalspace,uint
 	statsrecord sr;
 	uint64_t quotasize;
 	if (node && node->type==TYPE_DIRECTORY && (qn=node->data.ddata.quota) && (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE|QUOTA_FLAG_HSIZE|QUOTA_FLAG_SSIZE|QUOTA_FLAG_HLENGTH|QUOTA_FLAG_SLENGTH))) {
-		fsnodes_get_stats(node,&sr);
+		fsnodes_get_stats(node,&sr,2);
 		if (qn->flags&(QUOTA_FLAG_HREALSIZE|QUOTA_FLAG_SREALSIZE)) {
 			quotasize = UINT64_C(0xFFFFFFFFFFFFFFFF);
 			if ((qn->flags&QUOTA_FLAG_HREALSIZE) && quotasize > qn->hrealsize) {
@@ -2154,7 +2219,7 @@ static inline void fsnodes_remove_edge(uint32_t ts,fsedge *e) {
 	statsrecord sr;
 	if (e->parent) {
 		fsnodes_edgeid_remove(e);
-		fsnodes_get_stats(e->child,&sr);
+		fsnodes_get_stats(e->child,&sr,0);
 		fsnodes_sub_stats(e->parent,&sr);
 		e->parent->mtime = e->parent->ctime = ts;
 		e->parent->data.ddata.elements--;
@@ -2213,7 +2278,7 @@ static inline void fsnodes_link(uint32_t ts,fsnode *parent,fsnode *child,uint16_
 	if (child->type==TYPE_DIRECTORY) {
 		parent->data.ddata.nlink++;
 	}
-	fsnodes_get_stats(child,&sr);
+	fsnodes_get_stats(child,&sr,1);
 	fsnodes_add_stats(parent,&sr);
 	if (ts>0) {
 		parent->mtime = parent->ctime = ts;
@@ -2663,7 +2728,7 @@ static inline uint8_t fsnodes_append_slice_of_chunks(uint32_t ts,fsnode *dstobj,
 		return MFS_ERROR_INDEXTOOBIG;
 	}
 
-	fsnodes_get_stats(dstobj,&psr);
+	fsnodes_get_stats(dstobj,&psr,0);
 	if (newchunks>dstobj->data.fdata.chunks) {
 		if (dstobj->data.fdata.chunktab==NULL) {
 			dstobj->data.fdata.chunktab = chunktab_malloc(newchunks);
@@ -2711,7 +2776,7 @@ static inline uint8_t fsnodes_append_slice_of_chunks(uint32_t ts,fsnode *dstobj,
 		sustainedspace += length;
 	}
 	dstobj->data.fdata.length = length;
-	fsnodes_get_stats(dstobj,&nsr);
+	fsnodes_get_stats(dstobj,&nsr,1);
 	for (e=dstobj->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
@@ -2728,12 +2793,7 @@ static inline void fsnodes_changefilesclassid(fsnode *obj,uint8_t sclassid) {
 	statsrecord psr,nsr;
 	fsedge *e;
 
-	fsnodes_get_stats(obj,&psr);
-	nsr = psr;
-	nsr.realsize = sclass_get_keepmax_goal(sclassid) * nsr.size;
-	for (e=obj->parents ; e ; e=e->nextparent) {
-		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
-	}
+	fsnodes_get_stats(obj,&psr,0);
 	for (i=0 ; i<obj->data.fdata.chunks ; i++) {
 		if (obj->data.fdata.chunktab[i]>0) {
 			chunk_change_file(obj->data.fdata.chunktab[i],obj->sclassid,sclassid);
@@ -2742,6 +2802,10 @@ static inline void fsnodes_changefilesclassid(fsnode *obj,uint8_t sclassid) {
 	sclass_decref(obj->sclassid,obj->type);
 	obj->sclassid = sclassid;
 	sclass_incref(sclassid,obj->type);
+	fsnodes_get_stats(obj,&nsr,1);
+	for (e=obj->parents ; e ; e=e->nextparent) {
+		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
+	}
 }
 
 static inline void fsnodes_setlength(fsnode *obj,uint64_t length) {
@@ -2749,7 +2813,7 @@ static inline void fsnodes_setlength(fsnode *obj,uint64_t length) {
 	uint64_t chunkid;
 	fsedge *e;
 	statsrecord psr,nsr;
-	fsnodes_get_stats(obj,&psr);
+	fsnodes_get_stats(obj,&psr,0);
 
 	if (obj->type==TYPE_TRASH) {
 		trashspace -= obj->data.fdata.length;
@@ -2786,7 +2850,7 @@ static inline void fsnodes_setlength(fsnode *obj,uint64_t length) {
 			obj->data.fdata.chunks = 0;
 		}
 	}
-	fsnodes_get_stats(obj,&nsr);
+	fsnodes_get_stats(obj,&nsr,1);
 	for (e=obj->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
@@ -3562,7 +3626,7 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 				}
 				args->existing_object++;
 				args->inode_chksum ^= dstnode->inode;
-				fsnodes_get_stats(dstnode,&psr);
+				fsnodes_get_stats(dstnode,&psr,0);
 				sclass_decref(dstnode->sclassid,dstnode->type);
 				dstnode->sclassid = srcnode->sclassid;
 				sclass_incref(dstnode->sclassid,dstnode->type);
@@ -3588,7 +3652,7 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 					dstnode->data.fdata.chunks = 0;
 				}
 				dstnode->data.fdata.length = srcnode->data.fdata.length;
-				fsnodes_get_stats(dstnode,&nsr);
+				fsnodes_get_stats(dstnode,&nsr,1);
 				fsnodes_add_sub_stats(parentnode,&nsr,&psr);
 			} else {
 				args->same_file++;
@@ -3668,7 +3732,7 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 			if (args->smode&SNAPSHOT_MODE_PRESERVE_HARDLINKS && srcnode->type!=TYPE_DIRECTORY && srcnode->parents->nextparent!=NULL) {
 				chash_add(snapshot_inodehash,srcnode->inode,dstnode);
 			}
-			fsnodes_get_stats(dstnode,&psr);
+			fsnodes_get_stats(dstnode,&psr,0);
 			if ((args->smode&SNAPSHOT_MODE_CPLIKE_ATTR)==0) {
 				sclass_decref(dstnode->sclassid,dstnode->type);
 				dstnode->sclassid = srcnode->sclassid;
@@ -3718,7 +3782,7 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 					dstnode->data.fdata.chunks = 0;
 				}
 				dstnode->data.fdata.length = srcnode->data.fdata.length;
-				fsnodes_get_stats(dstnode,&nsr);
+				fsnodes_get_stats(dstnode,&nsr,1);
 				fsnodes_add_sub_stats(parentnode,&nsr,&psr);
 			} else if (srcnode->type==TYPE_SYMLINK) {
 				if (srcnode->data.sdata.pleng>0) {
@@ -3727,7 +3791,7 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 					memcpy(dstnode->data.sdata.path,srcnode->data.sdata.path,srcnode->data.sdata.pleng);
 					dstnode->data.sdata.pleng = srcnode->data.sdata.pleng;
 				}
-				fsnodes_get_stats(dstnode,&nsr);
+				fsnodes_get_stats(dstnode,&nsr,1);
 				fsnodes_add_sub_stats(parentnode,&nsr,&psr);
 			} else if (srcnode->type==TYPE_BLOCKDEV || srcnode->type==TYPE_CHARDEV) {
 				dstnode->data.devdata.rdev = srcnode->data.devdata.rdev;
@@ -3805,7 +3869,7 @@ static inline uint8_t fsnodes_snapshot_recursive_test_quota(fsnode *srcnode,fsno
 			uint64_t common_length,common_size,common_realsize;
 			statsrecord ssr;
 
-			fsnodes_get_stats(srcnode,&ssr);
+			fsnodes_get_stats(srcnode,&ssr,2);
 			common_inodes = 0;
 			common_length = 0;
 			common_size = 0;
@@ -4370,7 +4434,7 @@ void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t
 	} else {
 		matocsserv_getspace(totalspace,availspace);
 		fsnodes_quota_fixspace(rn,totalspace,availspace);
-		fsnodes_get_stats(rn,&sr);
+		fsnodes_get_stats(rn,&sr,2);
 		*inodes = sr.inodes;
 	}
 	stats_statfs++;
@@ -5142,9 +5206,9 @@ uint8_t fs_univ_move(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t pa
 	}
 	de = fsnodes_lookup(dwd,nleng_dst,name_dst);
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		fsnodes_get_stats(node,&ssr);
+		fsnodes_get_stats(node,&ssr,2);
 		if (de) {
-			fsnodes_get_stats(de->child,&dsr);
+			fsnodes_get_stats(de->child,&dsr,2);
 			if (ssr.inodes>dsr.inodes) {
 				ssr.inodes -= dsr.inodes;
 			} else {
@@ -5246,7 +5310,7 @@ uint8_t fs_univ_link(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t in
 	}
 
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
-		fsnodes_get_stats(sp,&sr);
+		fsnodes_get_stats(sp,&sr,2);
 		if (fsnodes_test_quota(dwd,sr.inodes,sr.length,sr.size,sr.realsize)) {
 			return MFS_ERROR_QUOTA;
 		}
@@ -5370,7 +5434,7 @@ uint8_t fs_univ_snapshot(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_
 		}
 
 		if ((sesflags&SESFLAG_METARESTORE)==0) {
-			fsnodes_get_stats(sp,&ssr);
+			fsnodes_get_stats(sp,&ssr,2);
 			common_inodes = 0;
 			common_length = 0;
 			common_size = 0;
@@ -5785,7 +5849,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t
 	if (fsnodes_test_quota(p,0,lengdiff,sizediff,sclass_get_keepmax_goal(p->sclassid)*sizediff)) {
 		return MFS_ERROR_QUOTA;
 	}
-	fsnodes_get_stats(p,&psr);
+	fsnodes_get_stats(p,&psr,0);
 	/* resize chunks structure */
 	if (indx>=p->data.fdata.chunks) {
 		uint32_t newchunks = indx+1;
@@ -5817,7 +5881,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t
 		}
 		p->data.fdata.length = nlength;
 	}
-	fsnodes_get_stats(p,&nsr);
+	fsnodes_get_stats(p,&nsr,1);
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
@@ -5851,7 +5915,7 @@ uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint
 		return MFS_ERROR_INDEXTOOBIG;
 	}
 	/* resize chunks structure */
-	fsnodes_get_stats(p,&psr);
+	fsnodes_get_stats(p,&psr,0);
 	if (indx>=p->data.fdata.chunks) {
 		uint32_t newchunks = indx+1;
 		if (p->data.fdata.chunktab==NULL) {
@@ -5886,7 +5950,7 @@ uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint
 		}
 		p->data.fdata.length = nlength;
 	}
-	fsnodes_get_stats(p,&nsr);
+	fsnodes_get_stats(p,&nsr,1);
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
@@ -5917,13 +5981,13 @@ static inline uint8_t fs_univ_rollback(uint8_t mr,uint32_t inode,uint32_t indx,u
 		return MFS_ERROR_EINVAL;
 	}
 	if (prevchunkid!=chunkid) {
-		fsnodes_get_stats(p,&psr);
+		fsnodes_get_stats(p,&psr,0);
 		if (prevchunkid>0) {
 			chunk_add_file(prevchunkid,p->sclassid);
 		}
 		chunk_delete_file(chunkid,p->sclassid);
 		p->data.fdata.chunktab[indx] = prevchunkid;
-		fsnodes_get_stats(p,&nsr);
+		fsnodes_get_stats(p,&nsr,1);
 		for (e=p->parents ; e ; e=e->nextparent) {
 			fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 		}
@@ -6053,7 +6117,7 @@ uint8_t fs_repair(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t ui
 	if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_W,sesflags)) {
 		return MFS_ERROR_EACCES;
 	}
-	fsnodes_get_stats(p,&psr);
+	fsnodes_get_stats(p,&psr,0);
 	for (indx=0 ; indx<p->data.fdata.chunks ; indx++) {
 		if (chunk_repair(p->sclassid,p->data.fdata.chunktab[indx],&nversion)) {
 			changelog("%"PRIu32"|REPAIR(%"PRIu32",%"PRIu32"):%"PRIu32,ts,inode,indx,nversion);
@@ -6068,7 +6132,7 @@ uint8_t fs_repair(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t ui
 			(*notchanged)++;
 		}
 	}
-	fsnodes_get_stats(p,&nsr);
+	fsnodes_get_stats(p,&nsr,1);
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
@@ -6096,14 +6160,14 @@ uint8_t fs_mr_repair(uint32_t ts,uint32_t inode,uint32_t indx,uint32_t nversion)
 	if (p->data.fdata.chunktab[indx]==0) {
 		return MFS_ERROR_NOCHUNK;
 	}
-	fsnodes_get_stats(p,&psr);
+	fsnodes_get_stats(p,&psr,0);
 	if (nversion==0) {
 		status = chunk_delete_file(p->data.fdata.chunktab[indx],p->sclassid);
 		p->data.fdata.chunktab[indx]=0;
 	} else {
 		status = chunk_mr_set_version(p->data.fdata.chunktab[indx],nversion);
 	}
-	fsnodes_get_stats(p,&nsr);
+	fsnodes_get_stats(p,&nsr,1);
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
@@ -6935,7 +6999,7 @@ uint8_t fs_get_dir_stats(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 	if (p->type!=TYPE_DIRECTORY && p->type!=TYPE_FILE && p->type!=TYPE_TRASH && p->type!=TYPE_SUSTAINED) {
 		return MFS_ERROR_EPERM;
 	}
-	fsnodes_get_stats(p,&sr);
+	fsnodes_get_stats(p,&sr,2);
 	*inodes = sr.inodes;
 	*dirs = sr.dirs;
 	*files = sr.files;
@@ -7311,6 +7375,7 @@ void fs_test_files() {
 				}
 				files++;
 				chunks += allchunks;
+				fsnodes_check_realsize(f);
 			}
 			for (e=f->parents ; e ; e=e->nextparent) {
 				if (e->child != f) {
@@ -7906,7 +7971,7 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 	e->child->parents = e;
 	e->prevparent = &(e->child->parents);
 	if (e->parent) {
-		fsnodes_get_stats(e->child,&sr);
+		fsnodes_get_stats(e->child,&sr,1);
 		fsnodes_add_stats(e->parent,&sr);
 	}
 	e->edgeid = edgeid;

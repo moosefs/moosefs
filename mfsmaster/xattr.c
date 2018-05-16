@@ -163,6 +163,7 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 				case MFS_XATTR_CREATE_OR_REPLACE:
 					dict_dec_ref(dictname);
 					// no break on purpose
+					nobreak;
 				case MFS_XATTR_REPLACE_ONLY:
 					if (avleng>MFS_XATTR_SIZE_MAX) {
 						return MFS_ERROR_ERANGE;

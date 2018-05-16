@@ -7345,6 +7345,7 @@ void fs_test_files() {
 							case CHUNK_FLOOP_UNDERGOAL_AFLAG_CHANGED:
 								aflagchanged++;
 								// no break - intentionally
+								nobreak;
 							case CHUNK_FLOOP_UNDERGOAL_AFLAG_NOT_CHANGED:
 								ugflag = 1;
 								ugchunks++;
@@ -7352,6 +7353,7 @@ void fs_test_files() {
 							case CHUNK_FLOOP_OK_AFLAG_CHANGED:
 								aflagchanged++;
 								// no break - intentionally
+								nobreak;
 							case CHUNK_FLOOP_OK_AFLAG_NOT_CHANGED:
 								break;
 						}

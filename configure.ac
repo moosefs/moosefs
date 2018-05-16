@@ -332,6 +332,29 @@ if test "$ac_have___sync_fetch_and_op" = "yes" ; then
 fi
 AC_MSG_RESULT($ac_have___sync_fetch_and_op)
 
+saved_cflags="$CFLAGS"
+CFLAGS="-Werror"
+AC_MSG_CHECKING([for __attribute__((fallthrough))])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[]],[[
+int main(void) {
+	int a=0;
+	switch (a) {
+	case 1:
+		a=2;
+		__attribute__((fallthrough));
+	case 2:
+		a=1;
+	}
+	return a;
+}
+]])],[ac_have_working_attribute_fallthrough=yes],[ac_have_working_attribute_fallthrough=no])
+if test "$ac_have_working_attribute_fallthrough" = "yes" ; then
+	AC_DEFINE_UNQUOTED(nobreak,__attribute__((fallthrough)),[have __attribute__((fallthrough))])
+else
+	AC_DEFINE_UNQUOTED(nobreak,,[do not have __attribute__((fallthrough))])
+fi
+AC_MSG_RESULT($ac_have_working_attribute_fallthrough)
+CFLAGS="$saved_cflags"
 
 AC_CHECK_PROGS([KILL], [kill])
 PKG_PROG_PKG_CONFIG

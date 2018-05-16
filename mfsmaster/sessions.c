@@ -891,14 +891,17 @@ uint8_t sessions_check_goal(void *vsesdata,uint8_t smode,uint8_t goal) {
 			if (goal<sesdata->mingoal || goal>sesdata->maxgoal) {
 				return MFS_ERROR_EPERM;
 			}
+			break;
 		case SMODE_INCREASE:
 			if (goal>sesdata->maxgoal) {
 				return MFS_ERROR_EPERM;
 			}
+			break;
 		case SMODE_DECREASE:
 			if (goal<sesdata->mingoal) {
 				return MFS_ERROR_EPERM;
 			}
+			break;
 	}
 	return MFS_STATUS_OK;
 }
@@ -911,14 +914,17 @@ uint8_t sessions_check_trashtime(void *vsesdata,uint8_t smode,uint32_t trashtime
 			if (trashtime<sesdata->mintrashtime || trashtime>sesdata->maxtrashtime) {
 				return MFS_ERROR_EPERM;
 			}
+			break;
 		case SMODE_INCREASE:
 			if (trashtime>sesdata->maxtrashtime) {
 				return MFS_ERROR_EPERM;
 			}
+			break;
 		case SMODE_DECREASE:
 			if (trashtime<sesdata->mintrashtime) {
 				return MFS_ERROR_EPERM;
 			}
+			break;
 	}
 	return MFS_STATUS_OK;
 }

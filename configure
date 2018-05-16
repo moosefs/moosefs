@@ -15586,6 +15586,56 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_have___sync_fetch_and_op" >&5
 $as_echo "$ac_have___sync_fetch_and_op" >&6; }
 
+saved_cflags="$CFLAGS"
+CFLAGS="-Werror"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for __attribute__((fallthrough))" >&5
+$as_echo_n "checking for __attribute__((fallthrough))... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+int main(void) {
+	int a=0;
+	switch (a) {
+	case 1:
+		a=2;
+		__attribute__((fallthrough));
+	case 2:
+		a=1;
+	}
+	return a;
+}
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_have_working_attribute_fallthrough=yes
+else
+  ac_have_working_attribute_fallthrough=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+if test "$ac_have_working_attribute_fallthrough" = "yes" ; then
+
+cat >>confdefs.h <<_ACEOF
+#define nobreak __attribute__((fallthrough))
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define nobreak /**/
+_ACEOF
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_have_working_attribute_fallthrough" >&5
+$as_echo "$ac_have_working_attribute_fallthrough" >&6; }
+CFLAGS="$saved_cflags"
 
 for ac_prog in kill
 do

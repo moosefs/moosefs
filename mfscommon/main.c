@@ -1192,6 +1192,7 @@ int main(int argc,char **argv) {
 			case 'd':
 				printf("option '-d' is deprecated - use '-f' instead\n");
 				// no break on purpose
+				nobreak;
 			case 'f':
 				rundaemon=0;
 				break;

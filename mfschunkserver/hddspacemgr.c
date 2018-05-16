@@ -1678,10 +1678,12 @@ void hdd_check_folders(void) {
 			case SCST_SCANFINISHED:
 				zassert(pthread_join(f->scanthread,NULL));
 				// no break - it's ok !!!
+				nobreak;
 			case SCST_SENDNEEDED:
 			case SCST_SCANNEEDED:
 				f->scanstate = SCST_WORKING;
 				// no break - it's ok !!!
+				nobreak;
 			case SCST_WORKING:
 				if (f->toremove==2) {
 					hdd_folder_dump_chunkdb_begin(f);

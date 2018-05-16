@@ -11,6 +11,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed inconsistency in calculating realsize when storage class definition has changed
   - (master+mount) fixed handling read-only filesystems (ro flag in exports and lookup-open lflags)
   - (all) fixed differences in defaults between source,config and manpages
+  - (all) added 'nobreak' macro to explicitly inform compiler that intentionally there is no 'break' before following 'case'
 
 * MooseFS 3.0.100-1 (2018-01-24)
 

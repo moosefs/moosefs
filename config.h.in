@@ -538,6 +538,9 @@
 /* Define to `int' if <sys/types.h> does not define. */
 #undef mode_t
 
+/* do not have __attribute__((fallthrough)) */
+#undef nobreak
+
 /* Define to `long int' if <sys/types.h> does not define. */
 #undef off_t
 

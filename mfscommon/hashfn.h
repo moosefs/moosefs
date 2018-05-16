@@ -23,6 +23,7 @@
 
 #include <inttypes.h>
 #include "datapack.h"
+#include "config.h"
 
 static uint32_t hash_primes_tab[]={0,
 	         5U,         7U,        13U,        19U,        31U,        43U,        61U,        73U,
@@ -175,8 +176,10 @@ static inline uint32_t murmur3_32(const uint8_t *buf, uint32_t len, uint32_t has
 	switch (len & 3) {
 		case 3:
 			k ^= buf[2] << 16;
+			nobreak;
 		case 2:
 			k ^= buf[1] << 8;
+			nobreak;
 		case 1:
 			k ^= buf[0];
 

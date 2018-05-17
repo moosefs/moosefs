@@ -168,6 +168,8 @@ struct mfsopts {
 	char *preferedlabels;
 	unsigned nofile;
 	signed nice;
+	int mfssuid;
+	int mfsdev;
 #ifdef MFS_USE_MEMLOCK
 	int memlock;
 #endif
@@ -249,6 +251,8 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfspreflabels=%s", preferedlabels, 0),
 	MFS_OPT("mfsrlimitnofile=%u", nofile, 0),
 	MFS_OPT("mfsnice=%d", nice, 0),
+	MFS_OPT("mfssuid", mfssuid, 1),
+	MFS_OPT("mfsdev", mfsdev, 1),
 #ifdef MFS_USE_MEMLOCK
 	MFS_OPT("mfsmemlock", memlock, 1),
 #endif
@@ -1175,6 +1179,7 @@ int main(int argc, char *argv[]) {
 
 	setenv("FUSE_THREAD_STACK","524288",0); // works good with 262144 but not 131072, so for safety we will use 524288
 
+	memset(&mfsopts,0,sizeof(mfsopts));
 	mfsopts.masterhost = NULL;
 	mfsopts.masterport = NULL;
 	mfsopts.bindhost = NULL;
@@ -1185,6 +1190,8 @@ int main(int argc, char *argv[]) {
 	mfsopts.preferedlabels = NULL;
 	mfsopts.nofile = 0;
 	mfsopts.nice = -19;
+	mfsopts.mfssuid = 0;
+	mfsopts.mfsdev = 0;
 #ifdef MFS_USE_MEMLOCK
 	mfsopts.memlock = 0;
 #endif
@@ -1455,6 +1462,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	make_fsname(&args);
+	if (mfsopts.mfssuid) {
+		fuse_opt_insert_arg(&args, 1, "-osuid");
+	}
+	if (mfsopts.mfsdev) {
+		fuse_opt_insert_arg(&args, 1, "-odev");
+	}
 	remove_mfsmount_magic(&args);
 
 //	dump_args("combined_args_before_fuse_parse_cmdline",&args);

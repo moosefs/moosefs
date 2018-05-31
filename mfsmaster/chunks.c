@@ -80,6 +80,11 @@
 
 //#define DISCLOOPELEMENTS (HASHSIZE/0x400)
 
+// replications topology mode
+#define REPLICATIONS_TOPLOGY_NOT_RESPECT 0
+#define REPLICATIONS_TOPLOGY_RESPECT 1
+#define REPLICATIONS_TOPLOGY_SAME_RACK 2
+#define REPLICATIONS_TOPLOGY_FORCE_SAME_RACK 3
 
 enum {JOBS_INIT,JOBS_EVERYLOOP,JOBS_EVERYTICK,JOBS_TERM};
 
@@ -2866,37 +2871,54 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c,uint16_t d
 	uint32_t r = 0;
 	uint16_t srccsid = MAXCSCOUNT;
 
-	if (ReplicationsRespectTopology) {
+	if (ReplicationsRespectTopology>=REPLICATIONS_TOPLOGY_RESPECT) {
 		uint32_t min_dist = 0xFFFFFFFF;
 		uint32_t dist;
 		uint32_t ip;
 		uint32_t cuip;
 		uint32_t mdrgvc = 0;
 		uint32_t mdrgtdc = 0;
+		uint8_t has_valid_chunk_in_same_rack = 0;
 
 		if (matocsserv_get_csdata(cstab[dstcsid].ptr,&cuip,NULL,NULL,NULL)==0) {
 			for (s=c->slisthead ; s ; s=s->next) {
-				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass] && (s->valid==VALID || s->valid==TDVALID)) {
+				if (s->valid==VALID || s->valid==TDVALID) {
 					if (matocsserv_get_csdata(cstab[s->csid].ptr,&ip,NULL,NULL,NULL)==0) {
 						dist=topology_distance(ip,cuip);
-						if (min_dist>=dist) {
-							if (min_dist>dist) {
-								min_dist=dist;
-								srccsid=s->csid;
-								mdrgvc = 0;
-								mdrgtdc = 0;
-							} else if (s->valid==VALID) {
-								srccsid=s->csid;
-							}
-							if (s->valid==VALID) {
-								mdrgvc++;
-							} else {
-								mdrgtdc++;
+						if (dist==TOPOLOGY_SAME_RACK_DISTANCE && !has_valid_chunk_in_same_rack) {
+							has_valid_chunk_in_same_rack = 1;
+						}
+						if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass]) {
+							if (min_dist>=dist) {
+								if (min_dist>dist) {
+									min_dist=dist;
+									srccsid=s->csid;
+									mdrgvc = 0;
+									mdrgtdc = 0;
+								} else if (s->valid==VALID) {
+									srccsid=s->csid;
+								}
+								if (s->valid==VALID) {
+									mdrgvc++;
+								} else {
+									mdrgtdc++;
+								}
 							}
 						}
 					}
 				}
 			}
+
+			if (min_dist>TOPOLOGY_SAME_RACK_DISTANCE) {
+				// if there's valid chunk in same rack, then we don't replicate it this time from a farther chunkserver,
+				// because it can be replicate from the chunkserver in the same rack until its read limit being not reached.
+				if (ReplicationsRespectTopology==REPLICATIONS_TOPLOGY_SAME_RACK && has_valid_chunk_in_same_rack) {
+					return MAXCSCOUNT;
+				} else if (ReplicationsRespectTopology==REPLICATIONS_TOPLOGY_FORCE_SAME_RACK) {
+					return MAXCSCOUNT;
+				}
+			}
+
 			if (mdrgvc > 1) {
 				r = 1+rndu32_ranged(mdrgvc);
 			} else if (mdrgvc == 0 && mdrgtdc > 1) {  // we have to choose TDVALID chunks
@@ -2919,6 +2941,7 @@ static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c,uint16_t d
 				}
 			}
 		}
+
 	} else {
 		if (rgvc>0) {	// if there are VALID copies then make copy of one VALID chunk
 			r = 1+rndu32_ranged(rgvc);

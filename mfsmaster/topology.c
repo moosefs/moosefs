@@ -37,6 +37,7 @@
 #include "cfg.h"
 #include "slogger.h"
 #include "massert.h"
+#include "topology.h"
 
 static void *racktree;
 static char *TopologyFileName;
@@ -198,7 +199,7 @@ int topology_parsenet(char *net,uint32_t *fromip,uint32_t *toip) {
 // as for now:
 //
 // 0 - same machine
-// 1 - same rack, different machines
+// 1 - same rack, different machines, also defined as TOPOLOGY_SAME_RACK_DISTANCE
 // 2 - different racks
 
 uint8_t topology_distance(uint32_t ip1,uint32_t ip2) {
@@ -219,7 +220,7 @@ uint8_t topology_distance(uint32_t ip1,uint32_t ip2) {
 //		rid1>>=1;
 //	}
 //	return rid2;
-	return (rid1==rid2)?1:2;
+	return (rid1==rid2)?TOPOLOGY_SAME_RACK_DISTANCE:2;
 }
 
 // format:

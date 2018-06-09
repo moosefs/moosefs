@@ -95,7 +95,12 @@
 # initial delay in seconds before starting replications (default is 60)
 # REPLICATIONS_DELAY_INIT = 60
 
-# whether to make undergoal replications respect topology (default is 0, i.e. no)
+# whether to make replications respect topology (default is 0, i.e. no)
+# All modes:
+#  0 - feature not enable, replications do not respect topology.
+#  1 - undergoal replications respect topology
+#  2 - undergoal replications respect topology, and only happens in same rack, if there're valid chunks in same rack, otherwise, undergoal replications across racks will happen.
+#  3 - undergoal replications respect topology, and force in same rack, which should be a temporary settings.
 # REPLICATIONS_RESPECT_TOPOLOGY = 0
 
 # Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)

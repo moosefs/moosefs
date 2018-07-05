@@ -106,7 +106,13 @@ Optional IP class remapping. Remap chunkserver IP addresses with first REMAP_BIT
 initial delay in seconds before starting replications (default is 60)
 .TP
 .B REPLICATIONS_RESPECT_TOPOLOGY
-whether to make undergoal replications respect topology (default is 0, i.e. no)
+whether to make undergoal replications respect topology (default is 0)
+.br
+0 - do not respect topology
+.br
+1 - pick destination server at random, but then choose best source server
+.br
+2 - try to find destination server in the same rack as one of the existing copies and then replicate chunk locally (in the same rack)
 .TP
 .B CHUNKS_LOOP_MAX_CPS
 Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)

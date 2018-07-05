@@ -47,6 +47,13 @@ alternate location/name of \fBmfshdd.cfg\fP file
 .B HDD_TEST_FREQ
 chunk test period in seconds; default is 10
 .TP
+.B HDD_MIN_TEST_INTERVAL
+prevents from testing chunk integrity when last I/O (including test) was performed less than HDD_MIN_TEST_INTERVAL seconds ago; default is 86400
+.TP
+.B HDD_FADVISE_MIN_TIME
+If possible use posix_fadvise(POSIX_DONTNEED) after each chunk test (but only if last I/O operation was performed more than HDD_FADVISE_MIN_TIME seconds ago). Using zero will always perform posix_fadvise (flush cache) and using negative value will never flush cache after tests. This setting is valid only for system
+s that support posix_fadivise; default value is 86400
+.TP
 .B HDD_LEAVE_SPACE_DEFAULT
 how much space should be left unused on each hard drive; 
 number format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B? ; default is 256MiB; 

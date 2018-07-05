@@ -182,7 +182,7 @@ typedef struct chunk {
 	uint16_t blockno;	// 0xFFFF == invalid
 #endif
 	uint8_t validattr;
-//	uint32_t testtime;	// at start use max(atime,mtime) then every operation set it to current time
+	uint32_t testtime;	// at start use max(atime,mtime) if possible then every operation set it to current time
 	struct chunk *testnext,**testprev;
 	struct chunk *next;
 } chunk;
@@ -284,6 +284,10 @@ static uint32_t HDDErrorCount = 2;
 static uint32_t HDDErrorTime = 600;
 static uint64_t LeaveFree;
 static uint8_t DoFsyncBeforeClose = 0;
+static uint32_t MinTimeBetweenTests = 86400;
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
+static int32_t MinFlushCacheTime = 86400;
+#endif
 
 /* folders data */
 static folder *folderhead = NULL;
@@ -1050,7 +1054,7 @@ static int hdd_chunk_getattr(chunk *c) {
 		return -1;
 	}
 	c->blocks = (sb.st_size - CHUNKCRCSIZE - c->hdrsize) / MFSBLOCKSIZE;
-//	c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
+	c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
 	c->validattr = 1;
 	return 0;
 }
@@ -1275,7 +1279,7 @@ static void hdd_chunk_testmove(chunk *c) {
 		*(c->testprev) = c;
 		c->owner->testtail = &(c->testnext);
 	}
-//	c->testtime = time(NULL);
+	c->testtime = main_time();
 	zassert(pthread_mutex_unlock(&testlock));
 }
 
@@ -3262,6 +3266,7 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version) {
 	uint16_t block;
 	uint32_t bcrc;
 	int32_t retsize;
+	uint32_t lasttesttime,now;
 	int status;
 	chunk *c;
 	char fname[PATH_MAX];
@@ -3286,48 +3291,57 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version) {
 		hdd_chunk_release(c);
 		return MFS_ERROR_WRONGVERSION;
 	}
+	lasttesttime = c->testtime;
 	status = hdd_io_begin(c,MODE_EXISTING);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_chunk_release(c);
 		return status;
 	}
-	lseek(c->fd,c->hdrsize+CHUNKCRCSIZE,SEEK_SET);
-	ptr = c->crc;
-	for (block=0 ; block<c->blocks ; block++) {
+	now = main_time();
+	if (lasttesttime+MinTimeBetweenTests<=now) {
+		lseek(c->fd,c->hdrsize+CHUNKCRCSIZE,SEEK_SET);
+		ptr = c->crc;
+		for (block=0 ; block<c->blocks ; block++) {
 #ifdef PRESERVE_BLOCK
-		retsize = read(c->fd,c->block,MFSBLOCKSIZE);
+			retsize = read(c->fd,c->block,MFSBLOCKSIZE);
 #else /* PRESERVE_BLOCK */
-		retsize = read(c->fd,blockbuffer,MFSBLOCKSIZE);
+			retsize = read(c->fd,blockbuffer,MFSBLOCKSIZE);
 #endif /* PRESERVE_BLOCK */
-		if (retsize!=MFSBLOCKSIZE) {
-			hdd_error_occured(c);	// uses and preserves errno !!!
-			hdd_generate_filename(fname,c); // preserves errno !!!
-			mfs_arg_errlog_silent(LOG_WARNING,"test_chunk: file:%s - data read error",fname);
-			hdd_io_end(c);
-			hdd_report_damaged_chunk(chunkid);
-			hdd_chunk_release(c);
-			return MFS_ERROR_IO;
-		}
-		hdd_stats_read(MFSBLOCKSIZE);
+			if (retsize!=MFSBLOCKSIZE) {
+				hdd_error_occured(c);	// uses and preserves errno !!!
+				hdd_generate_filename(fname,c); // preserves errno !!!
+				mfs_arg_errlog_silent(LOG_WARNING,"test_chunk: file:%s - data read error",fname);
+				hdd_io_end(c);
+				hdd_report_damaged_chunk(chunkid);
+				hdd_chunk_release(c);
+				return MFS_ERROR_IO;
+			}
+			hdd_stats_read(MFSBLOCKSIZE);
 #ifdef PRESERVE_BLOCK
-		c->blockno = block;
+			c->blockno = block;
 #endif
-		bcrc = get32bit(&ptr);
+			bcrc = get32bit(&ptr);
 #ifdef PRESERVE_BLOCK
-		if (bcrc!=mycrc32(0,c->block,MFSBLOCKSIZE)) {
+			if (bcrc!=mycrc32(0,c->block,MFSBLOCKSIZE)) {
 #else /* PRESERVE_BLOCK */
-		if (bcrc!=mycrc32(0,blockbuffer,MFSBLOCKSIZE)) {
+			if (bcrc!=mycrc32(0,blockbuffer,MFSBLOCKSIZE)) {
 #endif /* PRESERVE_BLOCK */
-			errno = 0;	// set anything to errno
-			hdd_error_occured(c);	// uses and preserves errno !!!
-			hdd_generate_filename(fname,c); // preserves errno !!!
-			syslog(LOG_WARNING,"test_chunk: file:%s - crc error",fname);
-			hdd_io_end(c);
-			hdd_report_damaged_chunk(chunkid);
-			hdd_chunk_release(c);
-			return MFS_ERROR_CRC;
+				errno = 0;	// set anything to errno
+				hdd_error_occured(c);	// uses and preserves errno !!!
+				hdd_generate_filename(fname,c); // preserves errno !!!
+				syslog(LOG_WARNING,"test_chunk: file:%s - crc error",fname);
+				hdd_io_end(c);
+				hdd_report_damaged_chunk(chunkid);
+				hdd_chunk_release(c);
+				return MFS_ERROR_CRC;
+			}
 		}
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
+		if (MinFlushCacheTime>=0 && lasttesttime+MinFlushCacheTime<=now) {
+			posix_fadvise(c->fd,0,0,POSIX_FADV_DONTNEED);
+		}
+#endif
 	}
 	status = hdd_io_end(c);
 	if (status!=MFS_STATUS_OK) {
@@ -5383,9 +5397,11 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	folder *prevf,*currf;
 	chunk *c;
 	uint8_t validattr;
+	uint32_t testtime;
 	char fname[PATH_MAX];
 
 	if (blocks<1024) {
+		testtime = 0;
 		validattr = 1;
 	} else if (f->sizelimit) {
 		hdd_create_filename(fname,f,pathid,chunkid,version);
@@ -5413,10 +5429,12 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 			return;
 		}
 		blocks = (sb.st_size - hdrsize - CHUNKCRCSIZE) / MFSBLOCKSIZE;
+		testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
 		validattr = 1;
 	} else {
 		hdrsize = 0;
 		blocks = 0;
+		testtime = 0;
 		validattr = 0;
 	}
 	prevf = NULL;
@@ -5447,7 +5465,7 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 			c->blocks = blocks;
 			c->hdrsize = hdrsize;
 			c->validattr = validattr;
-//			c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
+			c->testtime = testtime;
 			zassert(pthread_mutex_lock(&testlock));
 			hdd_remove_chunk_from_test_chain(c,prevf);
 			c->pathid = pathid;
@@ -5460,7 +5478,7 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 		c->blocks = blocks;
 		c->hdrsize = hdrsize;
 		c->validattr = validattr;
-//		c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
+		c->testtime = testtime;
 		zassert(pthread_mutex_lock(&testlock));
 		hdd_add_chunk_to_test_chain(c,currf);
 		zassert(pthread_mutex_unlock(&testlock));
@@ -6498,25 +6516,25 @@ void hdd_info(void) {
 	hdd_open_files_handle(OF_INFO);
 }
 
-void hdd_reload(void) {
+static inline void hdd_options_common(uint8_t initflag) {
 	char *LeaveFreeStr;
 	uint8_t sp;
 
 	zassert(pthread_mutex_lock(&folderlock));
 	HDDErrorCount = cfg_getuint32("HDD_ERROR_TOLERANCE_COUNT",2);
 	if (HDDErrorCount<1) {
-		syslog(LOG_NOTICE,"hdd space manager: error tolerance count too small - changed to 1");
+		mfs_syslog(LOG_NOTICE,"hdd space manager: error tolerance count too small - changed to 1");
 		HDDErrorCount = 1;
 	} else if (HDDErrorCount>10) {
-		syslog(LOG_NOTICE,"hdd space manager: error tolerance count too big - changed to 10");
+		mfs_syslog(LOG_NOTICE,"hdd space manager: error tolerance count too big - changed to 10");
 		HDDErrorCount = 10;
 	}
 	HDDErrorTime = cfg_getuint32("HDD_ERROR_TOLERANCE_PERIOD",600);
 	if (HDDErrorTime<10) {
-		syslog(LOG_NOTICE,"hdd space manager: error tolerance period too small - changed to 10 seconds");
+		mfs_syslog(LOG_NOTICE,"hdd space manager: error tolerance period too small - changed to 10 seconds");
 		HDDErrorTime = 10;
 	} else if (HDDErrorTime>86400) {
-		syslog(LOG_NOTICE,"hdd space manager: error tolerance period too big - changed to 86400 seconds (1 day)");
+		mfs_syslog(LOG_NOTICE,"hdd space manager: error tolerance period too big - changed to 86400 seconds (1 day)");
 		HDDErrorTime = 86400;
 	}
 	zassert(pthread_mutex_unlock(&folderlock));
@@ -6526,6 +6544,10 @@ void hdd_reload(void) {
 	if (HDDRebalancePerc>100) {
 		HDDRebalancePerc=100;
 	}
+	MinTimeBetweenTests = cfg_getuint32("HDD_MIN_TEST_INTERVAL",86400);
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
+	MinFlushCacheTime = cfg_getint32("HDD_FADVISE_MIN_TIME",86400);
+#endif
 	zassert(pthread_mutex_unlock(&testlock));
 	zassert(pthread_mutex_lock(&doplock));
 	DoFsyncBeforeClose = cfg_getuint8("HDD_FSYNC_BEFORE_CLOSE",0);
@@ -6533,11 +6555,16 @@ void hdd_reload(void) {
 
 	LeaveFreeStr = cfg_getstr("HDD_LEAVE_SPACE_DEFAULT","256MiB");
 	if (hdd_size_parse(LeaveFreeStr,&LeaveFree)<0) {
-		syslog(LOG_NOTICE,"hdd space manager: HDD_LEAVE_SPACE_DEFAULT parse error - left unchanged");
+		if (initflag) {
+			mfs_syslog(LOG_NOTICE,"hdd space manager: HDD_LEAVE_SPACE_DEFAULT parse error - using default (256MiB)");
+			LeaveFree = 0x10000000;
+		} else {
+			mfs_syslog(LOG_NOTICE,"hdd space manager: HDD_LEAVE_SPACE_DEFAULT parse error - left unchanged");
+		}
 	}
 	free(LeaveFreeStr);
 	if (LeaveFree<0x4000000) {
-		syslog(LOG_NOTICE,"hdd space manager: HDD_LEAVE_SPACE_DEFAULT < chunk size - leaving so small space on hdd is not recommended");
+		mfs_syslog(LOG_NOTICE,"hdd space manager: HDD_LEAVE_SPACE_DEFAULT < chunk size - leaving so small space on hdd is not recommended");
 	}
 
 	sp = cfg_getuint8("HDD_SPARSIFY_ON_WRITE",1);
@@ -6552,7 +6579,10 @@ void hdd_reload(void) {
 	Sparsification = sp?1:0;
 	pthread_mutex_unlock(&cfglock);
 #endif
+}
 
+void hdd_reload(void) {
+	hdd_options_common(0);
 	syslog(LOG_NOTICE,"reloading hdd data ...");
 	hdd_folders_reinit();
 }
@@ -6572,7 +6602,6 @@ int hdd_late_init(void) {
 int hdd_init(void) {
 	uint32_t hp;
 	folder *f;
-	char *LeaveFreeStr;
 
 	// this routine is called at the beginning from the main thread so no locks are necessary here
 	for (hp=0 ; hp<HASHSIZE ; hp++) {
@@ -6614,15 +6643,7 @@ int hdd_init(void) {
 
 	emptyblockcrc = mycrc32_zeroblock(0,MFSBLOCKSIZE);
 
-	LeaveFreeStr = cfg_getstr("HDD_LEAVE_SPACE_DEFAULT","256MiB");
-	if (hdd_size_parse(LeaveFreeStr,&LeaveFree)<0) {
-		fprintf(stderr,"hdd space manager: HDD_LEAVE_SPACE_DEFAULT parse error - using default (256MiB)\n");
-		LeaveFree = 0x10000000;
-	}
-	free(LeaveFreeStr);
-	if (LeaveFree<0x4000000) {
-		fprintf(stderr,"hdd space manager: HDD_LEAVE_SPACE_DEFAULT < chunk size - leaving so small space on hdd is not recommended\n");
-	}
+	hdd_options_common(1);
 
 	if (hdd_folders_reinit()<0) {
 		return -1;
@@ -6636,30 +6657,6 @@ int hdd_init(void) {
 	}
 	zassert(pthread_mutex_unlock(&folderlock));
 	fprintf(stderr,"hdd space manager: start background hdd scanning (searching for available chunks)\n");
-
-	HDDErrorCount = cfg_getuint32("HDD_ERROR_TOLERANCE_COUNT",2);
-	if (HDDErrorCount<1) {
-		fprintf(stderr,"hdd space manager: error tolerance count too small - changed to 1\n");
-		HDDErrorCount = 2;
-	} else if (HDDErrorCount>10) {
-		fprintf(stderr,"hdd space manager: error tolerance count too big - changed to 10\n");
-		HDDErrorCount = 10;
-	}
-	HDDErrorTime = cfg_getuint32("HDD_ERROR_TOLERANCE_PERIOD",600);
-	if (HDDErrorTime<10) {
-		fprintf(stderr,"hdd space manager: error tolerance period too small - changed to 10 seconds\n");
-		HDDErrorTime = 10;
-	} else if (HDDErrorTime>86400) {
-		fprintf(stderr,"hdd space manager: error tolerance period too big - changed to 86400 seconds (1 day)\n");
-		HDDErrorTime = 86400;
-	}
-	HDDTestFreq = cfg_getuint32("HDD_TEST_FREQ",10);
-	HDDRebalancePerc = cfg_getuint32("HDD_REBALANCE_UTILIZATION",20);
-	if (HDDRebalancePerc>100) {
-		HDDRebalancePerc=100;
-	}
-	DoFsyncBeforeClose = cfg_getuint8("HDD_FSYNC_BEFORE_CLOSE",0);
-	Sparsification = cfg_getuint8("HDD_SPARSIFY_ON_WRITE",1);
 
 	main_reload_register(hdd_reload);
 	main_time_register(60,0,hdd_diskinfo_movestats);

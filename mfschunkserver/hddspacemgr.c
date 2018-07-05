@@ -5812,6 +5812,37 @@ void* hdd_folder_scan(void *arg) {
 	return NULL;
 }
 
+void hdd_setmetaid(uint64_t metaid) { // metaid has been verified with master - write .metaid files
+	folder *f;
+	char *metaidfname;
+	int mfd;
+	uint32_t l;
+
+	zassert(pthread_mutex_lock(&folderlock));
+	for (f=folderhead ; f ; f=f->next) {
+		l = strlen(f->path);
+		metaidfname = (char*)malloc(l+8);
+		passert(metaidfname);
+		memcpy(metaidfname,f->path,l);
+		memcpy(metaidfname+l,".metaid",8);
+		mfd = open(metaidfname,O_RDWR|O_CREAT|O_TRUNC,0640);
+		if (mfd>=0) {
+			uint8_t buff[8];
+			uint8_t *wptr;
+			wptr = buff;
+			put64bit(&wptr,metaid);
+			if (write(mfd,buff,8)!=8) {
+				mfs_errlog(LOG_WARNING,"hdd space manager: error writing meta id file");
+			}
+			close(mfd);
+		} else {
+			mfs_errlog(LOG_WARNING,"hdd space manager: error writing meta id file");
+		}
+		free(metaidfname);
+	}
+	zassert(pthread_mutex_unlock(&folderlock));
+}
+
 void* hdd_folders_thread(void *arg) {
 	for (;;) {
 		hdd_check_folders();
@@ -6083,7 +6114,7 @@ int hdd_parseline(char *hddcfgline) {
 	uint8_t lockneeded;
 	uint8_t cannotbeused;
 	uint64_t limit;
-	uint64_t metaid;
+	uint64_t mainmetaid,metaid;
 	uint8_t lmode;
 
 	if (hddcfgline[0]=='#') {
@@ -6207,7 +6238,12 @@ int hdd_parseline(char *hddcfgline) {
 		}
 	}
 
-	metaid = masterconn_getmetaid();
+	mainmetaid = masterconn_getmetaid();
+	if (mainmetaid>0) {
+		metaid = mainmetaid;
+	} else {
+		metaid = masterconn_gethddmetaid(); // metaid not verified with mater? - use metaid from previous hard disks
+	}
 	metaidfname = (char*)malloc(l+8);
 	passert(metaidfname);
 	memcpy(metaidfname,pptr,l);
@@ -6227,9 +6263,9 @@ int hdd_parseline(char *hddcfgline) {
 				return -1;
 			}
 			if (metaid==0 && filemetaid>0) {
-				masterconn_setmetaid(filemetaid);
+				masterconn_sethddmetaid(filemetaid); // metaid not known - set metaid read from hard disks for future verification with master
 			}
-			metaid = 0; // file exists and is correct (or forced do be ignored), so do not re create it
+			mainmetaid = 0; // file exists and is correct (or forced do be ignored), so do not re create it
 		}
 		close(mfd);
 	}
@@ -6283,7 +6319,7 @@ int hdd_parseline(char *hddcfgline) {
 			zassert(pthread_mutex_unlock(&folderlock));
 		}
 	}
-	if (metaid>0) {
+	if (mainmetaid>0) { // metaid already verified with master? - create file '.metaid'
 		metaidfname = (char*)malloc(l+8);
 		passert(metaidfname);
 		memcpy(metaidfname,pptr,l);

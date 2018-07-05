@@ -149,6 +149,8 @@ static uint16_t ChunkServerID = 0;
 static uint64_t MetaID = 0;
 static char *AuthCode = NULL;
 
+static uint64_t hddmetaid;
+
 // static FILE *logfd;
 
 void masterconn_stats(uint64_t *bin,uint64_t *bout) {
@@ -166,6 +168,7 @@ static inline void masterconn_initcsid(void) {
 	if (csidvalid) {
 		return;
 	}
+	hddmetaid = 0;
 	ChunkServerID = 0;
 	MetaID = 0;
 	csidvalid = 1;
@@ -193,8 +196,12 @@ uint64_t masterconn_getmetaid(void) {
 	return MetaID;
 }
 
-void masterconn_setmetaid(uint64_t metaid) {
-	MetaID = metaid;
+uint64_t masterconn_gethddmetaid() {
+	return hddmetaid;
+}
+
+void masterconn_sethddmetaid(uint64_t metaid) {
+	hddmetaid = metaid;
 }
 
 static inline void masterconn_setcsid(uint16_t csid,uint64_t metaid) {
@@ -219,6 +226,7 @@ static inline void masterconn_setcsid(uint16_t csid,uint64_t metaid) {
 		} else {
 			syslog(LOG_WARNING,"can't store chunkserver id (open error)");
 		}
+		hdd_setmetaid(MetaID);
 	}
 }
 
@@ -467,9 +475,17 @@ void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length)
 		if (length>=17) {
 			metaid = get64bit(&data);
 			if (metaid>0 && MetaID>0 && metaid!=MetaID) { // wrong MFS instance - abort
-				syslog(LOG_WARNING,"MATOCS_MASTER_ACK - wrong meta data id. Can't connect to master");
+				syslog(LOG_WARNING,"MATOCS_MASTER_ACK - wrong meta data id (file chunkserverid.mfs:%016"PRIX64" ; received from master:%016"PRIX64"). Can't connect to master",MetaID,metaid);
 				eptr->registerstate = REGISTERED; // do not switch to register ver. 5
 				eptr->mode = KILL;
+				main_exit(); // this can't be fixed, so we should quit
+				return;
+			}
+			if (metaid>0 && MetaID==0 && hddmetaid>0 && metaid!=hddmetaid) { // metaid from hard drives doesn't match master's metaid
+				syslog(LOG_WARNING,"MATOCS_MASTER_ACK - wrong meta data id (files .metaid:%016"PRIX64" ; received from master:%016"PRIX64"). Can't connect to master",hddmetaid,metaid);
+				eptr->registerstate = REGISTERED; // do not switch to register ver. 5
+				eptr->mode = KILL;
+				main_exit(); // this can't be fixed, so we should quit
 				return;
 			}
 		}

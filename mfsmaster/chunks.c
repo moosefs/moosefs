@@ -2859,7 +2859,54 @@ void chunk_store_info(uint8_t *buff) {
 	put32bit(&buff,chunksinfo.locked_used);
 }
 
-//jobs state: jobshpos
+static inline uint8_t chunk_mindist(uint16_t csid,uint32_t ip[255],uint8_t ipcnt) {
+	uint8_t mindist,dist,k;
+	uint32_t sip;
+	mindist = TOPOLOGY_DIST_MAX;
+	if (matocsserv_get_csdata(cstab[csid].ptr,&sip,NULL,NULL,NULL)==0) {
+		for (k=0 ; k<ipcnt && mindist>0 ; k++) {
+			dist=topology_distance(sip,ip[k]);
+			if (dist<mindist) {
+				mindist = dist;
+			}
+		}
+	}
+	return mindist;
+}
+
+// first servers in the same rack (server id), then other (yes, same rack is better than same physical server, so order is 1 and then 0 or 2)
+static inline void chunk_rack_sort(uint16_t servers[MAXCSCOUNT],uint16_t servcount,uint32_t ip[255],uint8_t ipcnt) {
+	uint16_t i,j;
+	uint16_t csid;
+	uint8_t mindist;
+
+	if (servcount==0 || ipcnt==0) {
+		return;
+	}
+	i = 0;
+	j = servcount-1;
+	while (i<j) {
+		while (i<j) {
+			mindist = chunk_mindist(servers[i],ip,ipcnt);
+			if (mindist!=TOPOLOGY_DIST_SAME_RACKID) {
+				break;
+			}
+			i++;
+		}
+		while (i<j) {
+			mindist = chunk_mindist(servers[j],ip,ipcnt);
+			if (mindist==TOPOLOGY_DIST_SAME_RACKID) {
+				break;
+			}
+			j--;
+		}
+		if (i<j) {
+			csid = servers[i];
+			servers[i] = servers[j];
+			servers[j] = csid;
+		}
+	}
+}
 
 static inline uint16_t chunk_get_undergoal_replicate_srccsid(chunk *c,uint16_t dstcsid,uint32_t now,uint32_t lclass,uint32_t rgvc,uint32_t rgtdc) {
 	slist *s;
@@ -2999,6 +3046,8 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	uint32_t servcnt,extraservcnt;
 	int32_t *matching;
 	uint32_t forcereplication;
+	uint32_t vrip[255];
+	uint8_t vripcnt;
 #ifdef MFSDEBUG
 	uint8_t debug;
 #endif
@@ -3578,24 +3627,39 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			rservcount = matocsserv_getservers_lessrepl(rcsids,MaxWriteRepl[lclass],(j<2)?1:0,&allservflag);
 			rgvc=0;
 			rgtdc=0;
+			vripcnt=0;
 			for (s=c->slisthead ; s ; s=s->next) {
 				if (matocsserv_replication_read_counter(cstab[s->csid].ptr,now)<MaxReadRepl[lclass]) {
 					if (s->valid==VALID) {
 						rgvc++;
+						if (vripcnt<255 && ReplicationsRespectTopology>1) {
+							if (matocsserv_get_csdata(cstab[s->csid].ptr,vrip+vripcnt,NULL,NULL,NULL)==0) {
+								vripcnt++;
+							}
+						}
 					} else if (s->valid==TDVALID) {
 						rgtdc++;
+						if (vripcnt<255 && ReplicationsRespectTopology>1) {
+							if (matocsserv_get_csdata(cstab[s->csid].ptr,vrip+vripcnt,NULL,NULL,NULL)==0) {
+								vripcnt++;
+							}
+						}
 					}
 				}
+			}
+			if (ReplicationsRespectTopology>1) {
+				chunk_rack_sort(rcsids,rservcount,vrip,vripcnt);
 			}
 			if (rgvc+rgtdc>0 && rservcount>0) { // have at least one server to read from and at least one to write to
 				if (sclass_has_keeparch_labels(c->sclassid,c->archflag)) { // labels version
 					uint32_t dstservcnt;
 					uint8_t allowallservers;
+					// reverse order - do_perfect_match matches servers 'from right' - this is important when ReplicationsRespectTopology>1
 					servcnt = 0;
 					for (i=0 ; i<rservcount ; i++) {
-						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
+						for (s=c->slisthead ; s && s->csid!=rcsids[rservcount-1-i] ; s=s->next) {}
 						if (s==NULL) {
-							servers[servcnt++] = rcsids[i];
+							servers[servcnt++] = rcsids[rservcount-1-i];
 						}
 					}
 					dstservcnt = servcnt;

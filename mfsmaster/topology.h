@@ -23,6 +23,10 @@
 
 #include <inttypes.h>
 
+#define TOPOLOGY_DIST_SAME_IP 0
+#define TOPOLOGY_DIST_SAME_RACKID 1
+#define TOPOLOGY_DIST_MAX 2
+
 uint8_t topology_distance(uint32_t ip1,uint32_t ip2);
 int topology_init(void);
 

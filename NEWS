@@ -17,6 +17,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed HA bug (uninitialized variable might cause everlasting ELECT - PRO only)
   - (cs) fixed metaid handling
   - (master) added clearing SNAPHSOT eattr on file/directory modifications
+  - (master) added optional same rack preference for destination server during undergoal replications
 
 * MooseFS 3.0.100-1 (2018-01-24)
 

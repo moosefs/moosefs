@@ -2226,6 +2226,7 @@ static inline void fsnodes_remove_edge(uint32_t ts,fsedge *e) {
 		if (e->child->type==TYPE_DIRECTORY) {
 			e->parent->data.ddata.nlink--;
 		}
+		e->parent->eattr &= ~(EATTR_SNAPSHOT);
 	}
 	if (ts>0 && e->child) {
 		e->child->ctime = ts;
@@ -2278,6 +2279,7 @@ static inline void fsnodes_link(uint32_t ts,fsnode *parent,fsnode *child,uint16_
 	if (child->type==TYPE_DIRECTORY) {
 		parent->data.ddata.nlink++;
 	}
+	parent->eattr &= ~(EATTR_SNAPSHOT);
 	fsnodes_get_stats(child,&sr,1);
 	fsnodes_add_stats(parent,&sr);
 	if (ts>0) {
@@ -2854,6 +2856,7 @@ static inline void fsnodes_setlength(fsnode *obj,uint64_t length) {
 	for (e=obj->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
+	obj->eattr &= ~(EATTR_SNAPSHOT);
 }
 
 
@@ -5885,6 +5888,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
+	p->eattr &= ~(EATTR_SNAPSHOT);
 	*chunkid = nchunkid;
 	*length = p->data.fdata.length;
 	changelog("%"PRIu32"|WRITE(%"PRIu32",%"PRIu32",%"PRIu8",%u):%"PRIu64,ts,inode,indx,*opflag,(chunkopflags&CHUNKOPFLAG_CANMODTIME)?1:0,nchunkid);
@@ -5954,6 +5958,7 @@ uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
+	p->eattr &= ~(EATTR_SNAPSHOT);
 	meta_version_inc();
 	if (canmodmtime) {
 		p->mtime = p->ctime = ts;

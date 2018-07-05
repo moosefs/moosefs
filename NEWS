@@ -16,6 +16,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) added using posix_fadvise(...DONTNEED) for tested chunks
   - (master) fixed HA bug (uninitialized variable might cause everlasting ELECT - PRO only)
   - (cs) fixed metaid handling
+  - (master) added clearing SNAPHSOT eattr on file/directory modifications
 
 * MooseFS 3.0.100-1 (2018-01-24)
 

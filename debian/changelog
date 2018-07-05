@@ -1,3 +1,33 @@
+moosefs (3.0.101-1) unstable; urgency=medium
+
+  * (master) make under goal replications respect topology (patch made by
+    tclh123)
+  * (master) fix inforec undergoal (patch made by tclh123)
+  * (cgiserv) fixed handling connection close during data sending (leaving
+    active pipes which caused leaving mfs.cgi subprocesses)
+  * (mount) decreased memory usage (fixed handling buffers allocated per
+    thread)
+  * (all) setting correct errno when read returns 0 (in sockets.c)
+  * (mount) fixed double free of plock_data structure
+  * (master) fixed inconsistency in calculating realsize when storage class
+    definition has changed
+  * (master+mount) fixed handling read-only filesystems (ro flag in exports and
+    lookup-open lflags)
+  * (all) fixed differences in defaults between source,config and manpages
+  * (all) added 'nobreak' macro to explicitly inform compiler that
+    intentionally there is no 'break' before following 'case'
+  * (mount) added 'mfssuid' and 'mfsdev' options to mount (allows mounting with
+    suid/dev options using system mount on Linux)
+  * (cs) added using posix_fadvise(...DONTNEED) for tested chunks
+  * (master) fixed HA bug (uninitialized variable might cause everlasting ELECT
+    - PRO only)
+  * (cs) fixed metaid handling
+  * (master) added clearing SNAPHSOT eattr on file/directory modifications
+  * (master) added optional same rack preference for destination server during
+    undergoal replications
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 28 Jun 2018 13:00:00 +0200
+
 moosefs (3.0.100-1) unstable; urgency=medium
 
   * (cs) fixed rare segfault during chunk sending to master after disconection

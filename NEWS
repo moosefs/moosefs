@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.101-1 (WIP)
+* MooseFS 3.0.101-1 (2018-06-28)
 
   - (master) make under goal replications respect topology (patch made by tclh123)
   - (master) fix inforec undergoal (patch made by tclh123)

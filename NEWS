@@ -14,6 +14,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) added 'nobreak' macro to explicitly inform compiler that intentionally there is no 'break' before following 'case'
   - (mount) added 'mfssuid' and 'mfsdev' options to mount (allows mounting with suid/dev options using system mount on Linux)
   - (cs) added using posix_fadvise(...DONTNEED) for tested chunks
+  - (master) fixed HA bug (uninitialized variable might cause everlasting ELECT - PRO only)
 
 * MooseFS 3.0.100-1 (2018-01-24)
 

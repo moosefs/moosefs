@@ -101,10 +101,10 @@ void csdb_self_check(void) {
 	csdbentry *csptr;
 	uint32_t ds,dsm,s,trs;
 	ds = 0;
-		dsm = 0;
-		s = 0;
-		trs = 0;
-		for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
+	dsm = 0;
+	s = 0;
+	trs = 0;
+	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if ((csptr->maintenance==2 && csptr->eptr!=NULL) || (csptr->maintenance!=0 && csptr->maintenance_timeout>0 && now>csptr->maintenance_timeout)) {
 					if (csptr->eptr==NULL) {
@@ -126,22 +126,22 @@ void csdb_self_check(void) {
 				}
 			}
 		}
-		if (s!=servers) {
-			syslog(LOG_WARNING,"csdb: servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",servers,s);
-			servers = s;
-		}
-		if (ds!=disconnected_servers) {
-			syslog(LOG_WARNING,"csdb: disconnected servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",disconnected_servers,ds);
-			disconnected_servers = ds;
-		}
-		if (dsm!=disconnected_servers_in_maintenance) {
-			syslog(LOG_WARNING,"csdb: disconnected and being maintained servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",disconnected_servers_in_maintenance,dsm);
-			disconnected_servers_in_maintenance = dsm;
-		}
-		if (trs!=tmpremoved_servers) {
-			syslog(LOG_WARNING,"csdb: temporary removed servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",tmpremoved_servers,trs);
-			tmpremoved_servers = trs;
-		}
+	if (s!=servers) {
+		syslog(LOG_WARNING,"csdb: servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",servers,s);
+		servers = s;
+	}
+	if (ds!=disconnected_servers) {
+		syslog(LOG_WARNING,"csdb: disconnected servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",disconnected_servers,ds);
+		disconnected_servers = ds;
+	}
+	if (dsm!=disconnected_servers_in_maintenance) {
+		syslog(LOG_WARNING,"csdb: disconnected and being maintained servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",disconnected_servers_in_maintenance,dsm);
+		disconnected_servers_in_maintenance = dsm;
+	}
+	if (trs!=tmpremoved_servers) {
+		syslog(LOG_WARNING,"csdb: temporary removed servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",tmpremoved_servers,trs);
+		tmpremoved_servers = trs;
+	}
 	csdb_disconnect_check();
 }
 
@@ -946,6 +946,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		csptr->eptr = NULL;
 		csptr->maintenance = maintenance;
 		csptr->maintenance_timeout = maintenance_timeout;
+		csptr->tmpremoved = 0;
 //		csptr->fastreplication = fastreplication;
 		csptr->next = csdbhash[hash];
 		csdbhash[hash] = csptr;

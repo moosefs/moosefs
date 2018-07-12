@@ -25,8 +25,9 @@ moosefs (3.0.101-1) unstable; urgency=medium
   * (master) added clearing SNAPHSOT eattr on file/directory modifications
   * (master) added optional same rack preference for destination server during
     undergoal replications
+  * (mount+tools) increased masterproxy timeout from 1s to 20s
 
- -- MooseFS Team <contact@moosefs.com>  Thu, 28 Jun 2018 13:00:00 +0200
+ -- MooseFS Team <contact@moosefs.com>  Thu, 12 Jul 2018 13:00:00 +0200
 
 moosefs (3.0.100-1) unstable; urgency=medium
 

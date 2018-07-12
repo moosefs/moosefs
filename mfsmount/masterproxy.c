@@ -34,6 +34,7 @@
 #include "MFSCommunication.h"
 #include "negentrycache.h"
 
+#define TOOLTIMEOUTMS 20000
 #define QUERYSIZE 50000
 #define ANSSIZE 4000000
 
@@ -71,7 +72,7 @@ static void* masterproxy_server(void *args) {
 	ansbuffer = malloc(ANSSIZE);
 
 	for (;;) {
-		if (tcptoread(sock,header,8,1000)!=8) {
+		if (tcptoread(sock,header,8,TOOLTIMEOUTMS)!=8) {
 			break;
 		}
 
@@ -84,7 +85,7 @@ static void* masterproxy_server(void *args) {
 				break;
 			}
 
-			if (tcptoread(sock,querybuffer,psize,1000)!=(int32_t)(psize)) {
+			if (tcptoread(sock,querybuffer,psize,TOOLTIMEOUTMS)!=(int32_t)(psize)) {
 				break;
 			}
 
@@ -101,7 +102,7 @@ static void* masterproxy_server(void *args) {
 			put32bit(&wptr,1);
 			put8bit(&wptr,MFS_STATUS_OK);
 
-			if (tcptowrite(sock,ansbuffer,9,1000)!=9) {
+			if (tcptowrite(sock,ansbuffer,9,TOOLTIMEOUTMS)!=9) {
 				break;
 			}
 		} else {
@@ -109,7 +110,7 @@ static void* masterproxy_server(void *args) {
 				break;
 			}
 
-			if (tcptoread(sock,querybuffer,psize,1000)!=(int32_t)(psize)) {
+			if (tcptoread(sock,querybuffer,psize,TOOLTIMEOUTMS)!=(int32_t)(psize)) {
 				break;
 			}
 
@@ -130,7 +131,7 @@ static void* masterproxy_server(void *args) {
 			put32bit(&wptr,asize+4);
 			put32bit(&wptr,msgid);
 
-			if (tcptowrite(sock,ansbuffer,asize+12,1000)!=(int32_t)(asize+12)) {
+			if (tcptowrite(sock,ansbuffer,asize+12,TOOLTIMEOUTMS)!=(int32_t)(asize+12)) {
 				break;
 			}
 		}

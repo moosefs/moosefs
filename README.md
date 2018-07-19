@@ -14,13 +14,13 @@ MooseFS spreads data over several physical commodity servers, which are visible 
 
 Distinctive MooseFS features:
 
-* High reliability - configurable number of files copies are stored on separate servers
+* High reliability - configurable number of files' copies are stored on separate servers
 * No Single Point of Failure - all hardware and software components may be redundant
 * Parallel data operations - many clients can access many files concurrently
 * Capacity can be dynamically expanded by simply adding new computers/disks on the fly
 * Retired hardware may be removed on the fly
 * Deleted files are retained for a configurable period of time (a file system level "trash bin")
-* Coherent, "atomic" snapshots of files, even while the file is being written/accessed
+* Coherent, "atomic" snapshots of files, even while the files are being written/accessed
 * Access to the file system can be limited based on IP address and/or password (similarly as in NFS)
 * Data tiering - supports different storage policies for different files/directories
 * Efficient, pure C implementation
@@ -35,22 +35,21 @@ MooseFS can be installed on any POSIX compliant operating system including diffe
 * OpenSUSE
 * FreeBSD
 * MacOS X
-* Raspberry Pi 3
+* Raspbian - Raspberry Pi 3
 
 MooseFS Client uses [FUSE](https://github.com/libfuse/libfuse).
 
 There is a separate MooseFS Client for MS Windows available, built on top of [Dokany](https://github.com/dokan-dev/dokany).
 
 ## Getting started
-You can install MooseFS using your favorite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download/install.html):
+You can install MooseFS using your favourite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download):
 
-* Ubuntu 10/12/14/16
-* Debian 5/6/7/8/9
-* RHEL/CentOS versions 6/7
-* OpenSUSE 12
-* FreeBSD 9.3/10/11 (FreeBSD 11 is supported since MooseFS 3.0.88)
-* MacOS X 10.9/10.10/10.11
-* Raspberry Pi 3
+* Ubuntu 14/16/18
+* Debian 8/9
+* RHEL/CentOS 6/7
+* FreeBSD 9.3/10/11
+* MacOS X 10.9-10.13
+* Raspbian 8 (Jessie) - Raspberry Pi 3
 
 Minimal set of packages, which are needed to run MooseFS:
 * `moosefs-master` MooseFS Master Server for metadata servers,
@@ -58,9 +57,17 @@ Minimal set of packages, which are needed to run MooseFS:
 * `moosefs-client` MooseFS Client - client side package to mount the filesystem.
 
 ### Source code
-Feel free to download source code either from GitHub code repository or from [our website archives](https://moosefs.com/download/sources.html).
+Feel free to download source code either from GitHub code repository or from [our website archives](https://moosefs.com/download/#source-code).
 
-Building MooseFS on Linux can be easily done by running `./linux_build.sh`.
+Install the following dependencies before building MooseFS from sources:
+* Debian/Ubuntu: `sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config`
+* CentOS/RHEL: `sudo yum install gcc make libpcap-devel zlib-devel fuse-devel pkgconfig`
+
+Recommended packages:
+* Debian/Ubuntu: `sudo apt install fuse`
+* CentOS/RHEL: `sudo yum install fuse`
+
+Building MooseFS on Linux can be easily done by running `./linux_build.sh`. Similarly, use `./freebsd_build.sh` in order to build MooseFS on FreeBSD and respectively `./macosx_build.sh` on MacOS X. Remember, that those scripts do not install (i.e. do not run `make install` at the end). Run this command manually.
 
 ### Minimal setup
 Just three steps to have MooseFS up and running:
@@ -122,9 +129,9 @@ or: `mfsmount -H mfsmaster /mnt/mfs`
 mfsmaster:    /mnt/mfs    moosefs    defaults,mfsdelayedinit    0 0
 ```
 
-There is bit more configuration parameters available but most of them may stay with defaults. We do our best to keep MooseFS easy to deploy and maintain.
+There are more configuration parameters available but most of them may stay with defaults. We do our best to keep MooseFS easy to deploy and maintain.
 
-MooseFS, for testing purposes, can be installed even on one machine!
+MooseFS, for testing purposes, can even be installed on a single machine!
 
 #### Additional tools
 Setting up `moosefs-cli` or `moosefs-cgi` both with `moosefs-cgiserv` is also recommended - it gives you a possibility to monitor the cluster online:
@@ -143,12 +150,12 @@ cp mfsmetalogger.cfg.sample mfsmetalogger.cfg
 
 
 
-Refer to [installation guides](https://moosefs.com/documentation/moosefs-3-0.html) for more details.
+Refer to [installation guides](https://moosefs.com/support/#documentation) for more details.
 
 ## Some facts
 * Date of the first public release: 2008-05-30
 * The project web site: https://moosefs.com
-* Installation and using MooseFS: https://moosefs.com/documentation.html
+* Installation and using MooseFS: https://moosefs.com/support
 * (Old) Sourceforge project site: http://sourceforge.net/projects/moosefs
 
 ## Contact us
@@ -157,7 +164,7 @@ Refer to [installation guides](https://moosefs.com/documentation/moosefs-3-0.htm
 
 
 ## Copyright
-Copyright (c) 2017 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (c) 2018 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

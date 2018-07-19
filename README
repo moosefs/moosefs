@@ -22,7 +22,7 @@ ordinary Unix-like file system:
 Distinctive MooseFS features:
 =============================
 
-  * High reliability - configurable number of files copies are stored
+  * High reliability - configurable number of files' copies are stored
     on separate servers
   * No Single Point of Failure - all hardware and software components may be
     redundant
@@ -32,7 +32,7 @@ Distinctive MooseFS features:
   * Retired hardware may be removed on the fly
   * Deleted files are retained for a configurable period of time (a file system
     level "trash bin")
-  * Coherent, "atomic" snapshots of files, even while the file is being
+  * Coherent, "atomic" snapshots of files, even while the files are being
     written/accessed
   * Access to the file system can be limited based on IP address and/or password
     (similarly as in NFS)
@@ -54,7 +54,7 @@ different Linux distributions, FreeBSD, OS X:
   * OpenSUSE
   * FreeBSD
   * MacOS X
-  * Raspberry Pi 3
+  * Raspbian - Raspberry Pi 3
 
 MooseFS Client uses FUSE (https://github.com/libfuse/libfuse).
 There is a separate MooseFS Client for MS Windows available, built on top
@@ -66,15 +66,14 @@ Getting started
 
 You can install MooseFS using your favorite package manager on one
 of the following platforms using officially supported repositories
-(https://moosefs.com/download/install.html):
+(https://moosefs.com/download):
 
-  * Ubuntu 10/12/14/16
-  * Debian 5/6/7/8/9
-  * RHEL/CentOS versions 6/7
-  * OpenSUSE 12
-  * FreeBSD 9.3/10/11 (FreeBSD 11 is supported since MooseFS 3.0.88)
-  * MacOS X 10.9/10.10/10.11
-  * Raspberry Pi 3
+  * Ubuntu 14/16/18
+  * Debian 8/9
+  * RHEL/CentOS 6/7
+  * FreeBSD 9.3/10/11
+  * MacOS X 10.9-10.13
+  * Raspbian 8 (Jessie) - Raspberry Pi 3
 
 Minimal set of packages, which are needed to run MooseFS:
   * moosefs-master - MooseFS Master Server for metadata servers,
@@ -87,10 +86,20 @@ Source code
 -----------
 
 Feel free to download source code either from GitHub code repository
-or from our website archives (https://moosefs.com/download/sources.html).
+or from our website archives (https://moosefs.com/download/#source-code).
+
+Install the following dependencies before building MooseFS from sources:
+  * Ubuntu: sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config
+  * CentOS: sudo yum install gcc gcc-c++ make libpcap-devel zlib-devel fuse-devel pkgconfig
+
+Recommended packages:
+  * Ubuntu: sudo apt install fuse
+  * CentOS: sudo yum install fuse
 
 Building MooseFS on Linux can be easily done by running ./linux_build.sh.
-
+Similarly, use ./freebsd_build.sh in order to build MooseFS on FreeBSD
+and respectively ./macosx_build.sh on MacOS X. Remember, that those scripts
+do not install (i.e. do not run make install at the end). Run this command manually
 
 Minimal setup
 -------------
@@ -149,11 +158,11 @@ Just three steps to have MooseFS up and running:
       the system boot:
         mfsmaster: /mnt/mfs moosefs defaults,mfsdelayedinit 0 0
 
-   There is bit more configuration parameters available but most
+   There are more configuration parameters available but most
    of them may stay with defaults. We do our best to keep MooseFS easy
    to deploy and maintain.
 
-   MooseFS, for testing purposes, can be installed even on one machine!
+   MooseFS, for testing purposes, can even be installed on a single machine!
 
 
 Additional tools
@@ -176,7 +185,7 @@ synchronizes and backups the metadata:
        mfsmetalogger.cfg
   3. Run Metalogger (as root): mfsmetalogger start
 
-Refer to installation guides (https://moosefs.com/documentation.html)
+Refer to installation guides (https://moosefs.com/support/#documentation)
 for more details.
 
 
@@ -185,7 +194,7 @@ Some facts
 
   * Date of the first public release: 2008-05-30
   * The project web site: https://moosefs.com
-  * Installation and using MooseFS: https://moosefs.com/documentation.html
+  * Installation and using MooseFS: https://moosefs.com/support
   * (Old) Sourceforge project site: http://sourceforge.net/projects/moosefs
 
 
@@ -200,7 +209,7 @@ Contact us
 Copyright
 =========
 
-Copyright (c) 2017 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (c) 2018 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

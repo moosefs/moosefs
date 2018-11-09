@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.103-1 (WIP)
+* MooseFS 3.0.103-1 (2018-11-09)
 
   - (master+client) added space reservation for superuser
   - (bdev) new module for Linux - dedicated block device

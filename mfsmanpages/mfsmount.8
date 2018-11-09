@@ -1,4 +1,4 @@
-.TH mfsmount "8" "July 2018" "MooseFS 3.0.101-1" "This is part of MooseFS"
+.TH mfsmount "8" "November 2018" "MooseFS 3.0.103-1" "This is part of MooseFS"
 .SH NAME
 mfsmount \- mount Moose File System
 .SH SYNOPSIS
@@ -73,6 +73,9 @@ mount specified MooseFS directory (default is /, i.e. whole filesystem)
 .TP
 \fB\-o mfspassword=\fP\fIPASSWORD\fP
 authenticate to MooseFS master with \fIPASSWORD\fP
+.TP
+\fB\-o mfspassfile=\fP\fIFILENAME\fP
+authenticate to MooseFS master with password stored in first line of file pointed by \fIFILENAME\fP
 .TP
 \fB\-o mfsmd5pass=\fP\fIMD5\fP
 authenticate to MooseFS master using directly given \fIMD5\fP (only if

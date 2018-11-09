@@ -35,7 +35,7 @@ CONFLICTS=		moosefs2-${MFS_COMPONENT}-*
 
 .if ${MFS_COMPONENT} == cgi
 MFS_CGIDIR=		${PREFIX}/share/mfscgi
-USES=			python:2.5+
+USES=			python
 CONFIGURE_ARGS+=	--enable-mfscgi \
 			--with-mfscgi-dir=${MFS_CGIDIR}
 .else
@@ -44,7 +44,7 @@ CONFIGURE_ARGS+=	--disable-mfscgi
 
 .if ${MFS_COMPONENT} == cgiserv
 MFS_CGISERVDIR=		${PREFIX}/sbin
-USES=			python:2.5+
+USES=			python
 USE_RC_SUBR=		mfscgiserv
 SUB_FILES+=		pkg-message-cgiserv
 PKGMESSAGE=		${WRKDIR}/pkg-message-cgiserv
@@ -67,7 +67,7 @@ CONFIGURE_ARGS+=	--disable-mfschunkserver
 .endif
 
 .if ${MFS_COMPONENT} == cli
-USES=			python:2.5+
+USES=			python
 CONFIGURE_ARGS+=	--enable-mfscli
 .else
 CONFIGURE_ARGS+=	--disable-mfscli

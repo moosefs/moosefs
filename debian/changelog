@@ -1,3 +1,31 @@
+moosefs (3.0.103-1) unstable; urgency=medium
+
+  * (master+client) added space reservation for superuser
+  * (bdev) new module for Linux - dedicated block device
+  * (daemons) added optional 'processname_set' function
+  * (daemons) fixed waitpid condition
+  * (cs) added data precaching (posix_fadcvise(WILLNEED)) before reading chunk
+    data
+  * (master) remove chunk copy from structures (instead of leaving as INVALID)
+    when replication returned error
+  * (master) close listen sockets after fork (metadata save in background)
+  * (master) added subprocess for saving downloaded metadata in background (pro
+    only)
+  * (master) fixed mfsrmsnapshot issue (SNAPSHOT flag not set in directories -
+    intr. in 3.0.101)
+  * (mount) added option to load master password from given file
+  * (mount) added extremely fast (>1GB/s) pseudo-random generator visible as a
+    virtual file '.random' in root directory (not listed by ls)
+
+ -- MooseFS Team <contact@moosefs.com>  Fri, 09 Nov 2018 12:00:00 +0100
+
+moosefs (3.0.102-1) unstable; urgency=medium
+
+  * (cs) changed chunk testing routine (new definition is in MB/s per disk)
+  * (cs) added optional high speed internal rebalancing
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 25 Jul 2018 13:00:00 +0200
+
 moosefs (3.0.101-1) unstable; urgency=medium
 
   * (master) make under goal replications respect topology (patch made by

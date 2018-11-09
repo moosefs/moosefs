@@ -26,11 +26,17 @@
 #include <time.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#ifdef _USE_PTHREADS
+#include <pthread.h>
+#endif
 
 #include "clocks.h"
 
 static uint8_t i,j;
 static uint8_t p[256];
+#ifdef _USE_PTHREADS
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 int rnd_init(void) {
 	uint8_t key[64],vkey[64];
@@ -42,6 +48,9 @@ int rnd_init(void) {
 		key[l] = random();
 		vkey[l] = random();
 	}
+#ifdef _USE_PTHREADS
+	pthread_mutex_lock(&lock);
+#endif
 	for (l=0 ; l<256 ; l++) {
 		p[l]=l;
 	}
@@ -62,6 +71,9 @@ int rnd_init(void) {
 		p[j] = x;
 	}
 	i = 0;
+#ifdef _USE_PTHREADS
+	pthread_mutex_unlock(&lock);
+#endif
 	return 0;
 }
 
@@ -80,23 +92,38 @@ int rnd_init(void) {
 
 uint8_t rndu8() {
 	uint8_t r;
+#ifdef _USE_PTHREADS
+	pthread_mutex_lock(&lock);
+#endif
 	RND_RC4_STEP(r);
+#ifdef _USE_PTHREADS
+	pthread_mutex_unlock(&lock);
+#endif
 	return r;
 }
 
 uint32_t rndu32() {
 	uint32_t res;
 	uint8_t *r = (uint8_t*)&res;
+#ifdef _USE_PTHREADS
+	pthread_mutex_lock(&lock);
+#endif
 	RND_RC4_STEP(r[0]);
 	RND_RC4_STEP(r[1]);
 	RND_RC4_STEP(r[2]);
 	RND_RC4_STEP(r[3]);
+#ifdef _USE_PTHREADS
+	pthread_mutex_unlock(&lock);
+#endif
 	return res;
 }
 
 uint64_t rndu64() {
 	uint64_t res;
 	uint8_t *r = (uint8_t*)&res;
+#ifdef _USE_PTHREADS
+	pthread_mutex_lock(&lock);
+#endif
 	RND_RC4_STEP(r[0]);
 	RND_RC4_STEP(r[1]);
 	RND_RC4_STEP(r[2]);
@@ -105,7 +132,23 @@ uint64_t rndu64() {
 	RND_RC4_STEP(r[5]);
 	RND_RC4_STEP(r[6]);
 	RND_RC4_STEP(r[7]);
+#ifdef _USE_PTHREADS
+	pthread_mutex_unlock(&lock);
+#endif
 	return res;
+}
+
+void rndbuff(uint8_t *buff,uint32_t size) {
+	uint32_t k;
+#ifdef _USE_PTHREADS
+	pthread_mutex_lock(&lock);
+#endif
+	for (k=0 ; k<size ; k++) {
+		RND_RC4_STEP(buff[k]);
+	}
+#ifdef _USE_PTHREADS
+	pthread_mutex_unlock(&lock);
+#endif
 }
 
 uint64_t rndu64_ranged(uint64_t range) {

@@ -24,9 +24,12 @@
 #include <inttypes.h>
 
 int rnd_init(void);
+
 uint8_t rndu8();
 uint32_t rndu32();
 uint64_t rndu64();
+
+void rndbuff(uint8_t *buff,uint32_t size);
 
 uint64_t rndu64_ranged(uint64_t range);
 uint32_t rndu32_ranged(uint32_t range);

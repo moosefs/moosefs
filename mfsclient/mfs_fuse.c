@@ -104,6 +104,8 @@
 #  define FREEBSD_RELEASE_DELAY 10.0
 #endif
 
+#define RANDOM_BUFFSIZE 0x100000
+
 #define READDIR_BUFFSIZE 50000
 
 #define MAX_FILE_SIZE (int64_t)(MFS_MAX_FILE_SIZE)
@@ -138,10 +140,31 @@ static uint8_t oplogattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x00, 0,0
 // 0x01A4 == 0b110100100 == 0644
 static uint8_t mooseattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0xA4, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0, 0};
 
+#define RANDOM_NAME ".random"
+#define RANDOM_INODE 0x7FFFFFF4
+// 0x0124 == 0b100100100 == 0444
+static uint8_t randomattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0, 0};
+
 #define MIN_SPECIAL_INODE 0x7FFFFFF0
 #define IS_SPECIAL_INODE(ino) ((ino)>=MIN_SPECIAL_INODE)
-#define IS_SPECIAL_NAME(name) ((name)[0]=='.' && (strcmp(STATS_NAME,(name))==0 || strcmp(MASTERINFO_NAME,(name))==0 || strcmp(OPLOG_NAME,(name))==0 || strcmp(OPHISTORY_NAME,(name))==0 || strcmp(MOOSE_NAME,(name))==0/* || strcmp(ATTRCACHE_NAME,(name))==0*/))
+#define IS_SPECIAL_NAME(name) ((name)[0]=='.' && (strcmp(STATS_NAME,(name))==0 || strcmp(MASTERINFO_NAME,(name))==0 || strcmp(OPLOG_NAME,(name))==0 || strcmp(OPHISTORY_NAME,(name))==0 || strcmp(MOOSE_NAME,(name))==0 || strcmp(RANDOM_NAME,(name))==0))
 
+// generators from: http://school.anhb.uwa.edu.au/personalpages/kwessen/shared/Marsaglia99.html (by George Marsaglia)
+
+/* random state */
+static uint32_t rndz=362436069;
+static uint32_t rndw=521288629;
+static uint32_t rndjsr=123456789;
+static uint32_t rndjcong=380116160;
+
+#define znew (rndz=36969*(rndz&65535)+(rndz>>16))
+#define wnew (rndw=18000*(rndw&65535)+(rndw>>16))
+#define MWC ((znew<<16)+wnew)
+#define SHR3 (rndjsr^=(rndjsr<<17), rndjsr^=(rndjsr>>13), rndjsr^=(rndjsr<<5))
+#define CONG (rndjcong=69069*rndjcong+1234567)
+#define KISS ((MWC^CONG)+SHR3)
+
+static pthread_mutex_t randomlock = PTHREAD_MUTEX_INITIALIZER;
 
 /* STATS INODE BUFFER */
 
@@ -1474,6 +1497,19 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			fuse_reply_entry(req, &e);
 			return ;
 		}
+		if (strcmp(name,RANDOM_NAME)==0) {
+			memset(&e, 0, sizeof(e));
+			e.ino = RANDOM_INODE;
+			e.generation = 1;
+			e.attr_timeout = 3600.0;
+			e.entry_timeout = 3600.0;
+			mfs_attr_to_stat(RANDOM_INODE,randomattr,&e.attr);
+			mfs_stats_inc(OP_LOOKUP_INTERNAL);
+			mfs_makeattrstr(attrstr,256,&e.attr);
+			oplog_printf(&ctx,"lookup (%lu,%s) (internal node: RANDOM): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
+			fuse_reply_entry(req, &e);
+			return ;
+		}
 		if (strcmp(name,MOOSE_NAME)==0) {
 			memset(&e, 0, sizeof(e));
 			e.ino = MOOSE_INODE;
@@ -1748,6 +1784,15 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_attr(req, &o_stbuf, 3600.0);
 		return;
 	}
+	if (ino==RANDOM_INODE) {
+		memset(&o_stbuf, 0, sizeof(struct stat));
+		mfs_attr_to_stat(ino,randomattr,&o_stbuf);
+		mfs_stats_inc(OP_GETATTR);
+		mfs_makeattrstr(attrstr,256,&o_stbuf);
+		oplog_printf(&ctx,"getattr (%lu) (internal node: RANDOM): OK (3600,%s)",(unsigned long int)ino,attrstr);
+		fuse_reply_attr(req, &o_stbuf, 3600.0);
+		return;
+	}
 	if (ino==MOOSE_INODE) {
 		memset(&o_stbuf, 0, sizeof(struct stat));
 		mfs_attr_to_stat(ino,mooseattr,&o_stbuf);
@@ -1902,6 +1947,14 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		mfs_attr_to_stat(ino,statsattr,&o_stbuf);
 		mfs_makeattrstr(attrstr,256,&o_stbuf);
 		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) (internal node: STATS): OK (3600,%s)",(unsigned long int)ino,to_set,setattr_str,attrstr);
+		fuse_reply_attr(req, &o_stbuf, 3600.0);
+		return;
+	}
+	if (ino==RANDOM_INODE) {
+		memset(&o_stbuf, 0, sizeof(struct stat));
+		mfs_attr_to_stat(ino,randomattr,&o_stbuf);
+		mfs_makeattrstr(attrstr,256,&o_stbuf);
+		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) (internal node: RANDOM): OK (3600,%s)",(unsigned long int)ino,to_set,setattr_str,attrstr);
 		fuse_reply_attr(req, &o_stbuf, 3600.0);
 		return;
 	}
@@ -3233,11 +3286,11 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_open(req, fi);
 		return;
 	}
-	if (ino==MOOSE_INODE) {
+	if (ino==MOOSE_INODE || ino==RANDOM_INODE) {
 		fi->fh = 0;
 		fi->direct_io = 1;
 		fi->keep_cache = 0;
-		oplog_printf(&ctx,"open (%lu) (internal node: MOOSE): OK (1,0)",(unsigned long int)ino);
+		oplog_printf(&ctx,"open (%lu) (internal node: %s): OK (1,0)",(unsigned long int)ino,(ino==MOOSE_INODE)?"MOOSE":"RANDOM");
 		fuse_reply_open(req, fi);
 		return;
 	}
@@ -3401,8 +3454,8 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_err(req,0);
 		return;
 	}
-	if (ino==MOOSE_INODE) {
-		oplog_printf(&ctx,"release (%lu) (internal node: MOOSE): OK",(unsigned long int)ino);
+	if (ino==MOOSE_INODE || ino==RANDOM_INODE) {
+		oplog_printf(&ctx,"release (%lu) (internal node: %s): OK",(unsigned long int)ino,(ino==MOOSE_INODE)?"MOOSE":"RANDOM");
 		fuse_reply_err(req,0);
 		return;
 	}
@@ -3518,6 +3571,37 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
 			fuse_reply_buf(req,NULL,0);
 		}
+		return;
+	}
+	if (ino==RANDOM_INODE) {
+		uint8_t *rbptr;
+		uint32_t nextr;
+//		if (size>RANDOM_BUFFSIZE) {
+//			size = RANDOM_BUFFSIZE;
+//		}
+		buff = malloc(size);
+		ssize = size;
+		rbptr = buff;
+		pthread_mutex_lock(&randomlock);
+		while (ssize>=4) {
+			nextr = KISS;
+			*rbptr++ = nextr>>24;
+			*rbptr++ = nextr>>16;
+			*rbptr++ = nextr>>8;
+			*rbptr++ = nextr;
+			ssize-=4;
+		}
+		if (ssize>0) {
+			nextr = KISS;
+			while (ssize>0) {
+				*rbptr++ = nextr>>24;
+				nextr <<= 8;
+				ssize--;
+			}
+		}
+		pthread_mutex_unlock(&randomlock);
+		fuse_reply_buf(req,(char*)buff,size);
+		free(buff);
 		return;
 	}
 	if (ino==MOOSE_INODE) {
@@ -3704,7 +3788,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		}
 		fprintf(stderr,"write to inode %lu %llu bytes at position %llu\n",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
 	}
-	if (ino==MASTERINFO_INODE || ino==OPLOG_INODE || ino==OPHISTORY_INODE || ino==MOOSE_INODE) {
+	if (ino==MASTERINFO_INODE || ino==OPLOG_INODE || ino==OPHISTORY_INODE || ino==MOOSE_INODE || ino==RANDOM_INODE) {
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EACCES));
 		fuse_reply_err(req,EACCES);
 		return;

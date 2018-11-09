@@ -89,6 +89,7 @@
 #include "massert.h"
 #include "slogger.h"
 #include "portable.h"
+#include "processname.h"
 
 #define RM_RESTART 0
 #define RM_START 1
@@ -549,7 +550,7 @@ void mainloop() {
 			pid_t pid;
 			int status;
 
-			while ( (pid = waitpid(-1,&status,WNOHANG)) >= 0) {
+			while ( (pid = waitpid(-1,&status,WNOHANG)) > 0) {
 				chldptr = &chldhead;
 				while ((chldit = *chldptr)) {
 					if (chldit->pid == pid) {
@@ -1156,6 +1157,11 @@ int main(int argc,char **argv) {
 #if defined(USE_PTHREADS) && defined(M_ARENA_MAX) && defined(M_ARENA_TEST) && defined(HAVE_MALLOPT)
 	uint32_t limit_glibc_arenas;
 #endif
+	int argc_back;
+	char **argv_back;
+
+	argc_back = argc;
+	argv_back = argv;
 
 	strerr_init();
 	mycrc32_init();
@@ -1269,6 +1275,8 @@ int main(int argc,char **argv) {
 		fprintf(stderr,"can't load config file: %s - using defaults\n",cfgfile);
 	}
 	free(cfgfile);
+
+	processname_init(argc_back,argv_back); // prepare everything for 'processname_set'
 
 	logappname = cfg_getstr("SYSLOG_IDENT",STR(APPNAME));
 

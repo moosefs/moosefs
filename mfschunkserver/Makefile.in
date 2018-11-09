@@ -115,6 +115,7 @@ am_mfschunkserver_OBJECTS = mfschunkserver-bgjobs.$(OBJEXT) \
 	mfschunkserver-replicator.$(OBJEXT) \
 	mfschunkserver-chartsdata.$(OBJEXT) \
 	../mfscommon/mfschunkserver-main.$(OBJEXT) \
+	../mfscommon/mfschunkserver-processname.$(OBJEXT) \
 	../mfscommon/mfschunkserver-cfg.$(OBJEXT) \
 	../mfscommon/mfschunkserver-md5.$(OBJEXT) \
 	../mfscommon/mfschunkserver-random.$(OBJEXT) \
@@ -401,6 +402,7 @@ mfschunkserver_SOURCES = \
 	chartsdefs.h \
 	init.h \
 	../mfscommon/main.c ../mfscommon/main.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
 	../mfscommon/cfg.c ../mfscommon/cfg.h \
 	../mfscommon/md5.c ../mfscommon/md5.h \
 	../mfscommon/random.c ../mfscommon/random.h \
@@ -520,6 +522,9 @@ clean-sbinPROGRAMS:
 ../mfscommon/mfschunkserver-main.$(OBJEXT):  \
 	../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfschunkserver-processname.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfschunkserver-cfg.$(OBJEXT):  \
 	../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
@@ -600,6 +605,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-memusage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-pcqueue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-processname.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-random.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-strerr.Po@am__quote@
@@ -749,6 +755,20 @@ mfschunkserver-chartsdata.obj: chartsdata.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/main.c' object='../mfscommon/mfschunkserver-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
+
+../mfscommon/mfschunkserver-processname.o: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-processname.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-processname.Tpo -c -o ../mfscommon/mfschunkserver-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-processname.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfschunkserver-processname.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+
+../mfscommon/mfschunkserver-processname.obj: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-processname.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-processname.Tpo -c -o ../mfscommon/mfschunkserver-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfschunkserver-processname.Tpo ../mfscommon/$(DEPDIR)/mfschunkserver-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfschunkserver-processname.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfschunkserver-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
 
 ../mfscommon/mfschunkserver-cfg.o: ../mfscommon/cfg.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfschunkserver_CPPFLAGS) $(CPPFLAGS) $(mfschunkserver_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfschunkserver-cfg.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Tpo -c -o ../mfscommon/mfschunkserver-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c

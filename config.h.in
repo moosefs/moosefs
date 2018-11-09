@@ -128,6 +128,12 @@
 /* Define to 1 if you have the <limits.h> header file. */
 #undef HAVE_LIMITS_H
 
+/* Define to 1 if you have the <linux/fs.h> header file. */
+#undef HAVE_LINUX_FS_H
+
+/* Define to 1 if you have the <linux/nbd.h> header file. */
+#undef HAVE_LINUX_NBD_H
+
 /* Define to 1 if you have the <linux/oom.h> header file. */
 #undef HAVE_LINUX_OOM_H
 
@@ -239,6 +245,9 @@
 
 /* Define to 1 if you have the `setitimer' function. */
 #undef HAVE_SETITIMER
+
+/* Define to 1 if you have the `setproctitle' function. */
+#undef HAVE_SETPROCTITLE
 
 /* Do we have sockaddr.sin_len? */
 #undef HAVE_SOCKADDR_SIN_LEN

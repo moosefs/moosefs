@@ -656,10 +656,14 @@ CREATE_DATA_DIR_FALSE
 CREATE_DATA_DIR_TRUE
 CREATE_ETC_MFS_FALSE
 CREATE_ETC_MFS_TRUE
-BUILD_MOUNT_FALSE
-BUILD_MOUNT_TRUE
+BUILD_CLIENT_FALSE
+BUILD_CLIENT_TRUE
+WITH_MOUNT_FALSE
+WITH_MOUNT_TRUE
 FUSE_LIBS
 FUSE_CFLAGS
+WITH_BDEV_FALSE
+WITH_BDEV_TRUE
 BUILD_NETDUMP_FALSE
 BUILD_NETDUMP_TRUE
 PCAP_LIBS
@@ -850,6 +854,7 @@ enable_mfsmetalogger
 enable_mfssupervisor
 enable_mfschunkserver
 enable_mfsmount
+enable_mfsbdev
 enable_mfscgi
 enable_mfscli
 enable_mfscgiserv
@@ -1522,6 +1527,7 @@ Optional Features:
   --disable-mfschunkserver
                           Do not build mfschunkserver
   --disable-mfsmount      Do not build mfsmount
+  --disable-mfsbdev       Do not build mfsbdev
   --disable-mfscgi        Do not install CGI scripts
   --disable-mfscli        Do not install CLI script
   --disable-mfscgiserv    Do not install CGI server
@@ -12340,6 +12346,7 @@ root_sbindir="xxx";
 case $target_os in
   *linux*)
 	fuse=maybe
+	bdev=maybe
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -DDEFAULT_SUGID_CLEAR_MODE_EXT"
 	# Check whether exec_prefix=/usr:
 	root_sbindir="${sbindir}"
@@ -12351,10 +12358,12 @@ case $target_os in
   *solaris*)
 	# OpenSolaris has fuse available and is still identified as "solaris"
 	fuse=maybe
+	bdev=no
 	CPPFLAGS="$CPPFLAGS -D__EXTENSIONS__ -D_POSIX_PTHREAD_SEMANTICS -DDEFAULT_SUGID_CLEAR_MODE_OSX"
 	;;
   *darwin*)
 	fuse=maybe
+	bdev=no
 	# MacFUSE installs to different prefix than pkgconfig
 	if test -f /usr/local/lib/pkgconfig/fuse.pc ; then
 		PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
@@ -12364,10 +12373,12 @@ case $target_os in
 	;;
   *bsd*)
 	fuse=maybe
+	bdev=no
 	CPPFLAGS="$CPPFLAGS -DDEFAULT_SUGID_CLEAR_MODE_BSD"
 	;;
   *)
 	fuse=no
+	bdev=no
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 	;;
 esac
@@ -15032,7 +15043,7 @@ done
 
 
 # optional system functions
-for ac_func in dup2 mlockall getcwd
+for ac_func in dup2 mlockall getcwd setproctitle
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -15909,6 +15920,11 @@ if test "${enable_mfsmount+set}" = set; then :
   enableval=$enable_mfsmount;
 fi
 
+# Check whether --enable-mfsbdev was given.
+if test "${enable_mfsbdev+set}" = set; then :
+  enableval=$enable_mfsbdev;
+fi
+
 # Check whether --enable-mfscgi was given.
 if test "${enable_mfscgi+set}" = set; then :
   enableval=$enable_mfscgi;
@@ -16399,6 +16415,33 @@ else
 fi
 
 
+if test "$bdev" != "no" -a "enable_mfsbdev" != "no"; then
+	for ac_header in linux/nbd.h linux/fs.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+else
+  bdev=no
+fi
+
+done
+
+fi
+
+ if test "$bdev" != "no" -a "$enable_mfsbdev" != "no"; then
+  WITH_BDEV_TRUE=
+  WITH_BDEV_FALSE='#'
+else
+  WITH_BDEV_TRUE='#'
+  WITH_BDEV_FALSE=
+fi
+
+
 if test "$fuse" != "no" -a "enable_mfsmount" != "no"; then
 	if test -n "$PKG_CONFIG"; then
 
@@ -16556,11 +16599,20 @@ fi
 
 
  if test "$fuse" != "no" -a "$enable_mfsmount" != "no"; then
-  BUILD_MOUNT_TRUE=
-  BUILD_MOUNT_FALSE='#'
+  WITH_MOUNT_TRUE=
+  WITH_MOUNT_FALSE='#'
 else
-  BUILD_MOUNT_TRUE='#'
-  BUILD_MOUNT_FALSE=
+  WITH_MOUNT_TRUE='#'
+  WITH_MOUNT_FALSE=
+fi
+
+
+ if test \( "$fuse" != "no" -a "$enable_mfsmount" != "no" \) -o \( "$bdev" != "no" -a "$enable_mfsbdev" != "no" \); then
+  BUILD_CLIENT_TRUE=
+  BUILD_CLIENT_FALSE='#'
+else
+  BUILD_CLIENT_TRUE='#'
+  BUILD_CLIENT_FALSE=
 fi
 
 
@@ -16978,6 +17030,14 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${BUILD_NETDUMP_TRUE}" && test -z "${BUILD_NETDUMP_FALSE}"; then
   as_fn_error $? "conditional \"BUILD_NETDUMP\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${WITH_BDEV_TRUE}" && test -z "${WITH_BDEV_FALSE}"; then
+  as_fn_error $? "conditional \"WITH_BDEV\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${WITH_MOUNT_TRUE}" && test -z "${WITH_MOUNT_FALSE}"; then
+  as_fn_error $? "conditional \"WITH_MOUNT\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${BUILD_CLIENT_TRUE}" && test -z "${BUILD_CLIENT_FALSE}"; then

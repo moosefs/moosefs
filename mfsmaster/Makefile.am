@@ -44,6 +44,7 @@ mfsmaster_SOURCES=\
 	chartsdefs.h \
 	init.h \
 	../mfscommon/main.c ../mfscommon/main.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
 	../mfscommon/cfg.c ../mfscommon/cfg.h \
 	../mfscommon/random.c ../mfscommon/random.h \
 	../mfscommon/md5.c ../mfscommon/md5.h \

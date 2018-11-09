@@ -63,6 +63,7 @@
 #include "merger.h"
 #include "changelog.h"
 #include "clocks.h"
+#include "processname.h"
 
 #include "cfg.h"
 #include "main.h"
@@ -698,6 +699,8 @@ int meta_storeall(int bg) {
 		i = fork();
 		if (i<0) {
 			mfs_errlog(LOG_WARNING,"fork error (store data in foreground - it will block master for a while)");
+		} else if (i==0) { // child
+			processname_set("mfsmaster (metadata saver)");
 		}
 	} else {
 		i = -1;

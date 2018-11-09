@@ -124,6 +124,7 @@ am_mfsmaster_OBJECTS = mfsmaster-itree.$(OBJEXT) \
 	mfsmaster-datacachemgr.$(OBJEXT) \
 	mfsmaster-chartsdata.$(OBJEXT) \
 	../mfscommon/mfsmaster-main.$(OBJEXT) \
+	../mfscommon/mfsmaster-processname.$(OBJEXT) \
 	../mfscommon/mfsmaster-cfg.$(OBJEXT) \
 	../mfscommon/mfsmaster-random.$(OBJEXT) \
 	../mfscommon/mfsmaster-md5.$(OBJEXT) \
@@ -449,6 +450,7 @@ mfsmaster_SOURCES = \
 	chartsdefs.h \
 	init.h \
 	../mfscommon/main.c ../mfscommon/main.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
 	../mfscommon/cfg.c ../mfscommon/cfg.h \
 	../mfscommon/random.c ../mfscommon/random.h \
 	../mfscommon/md5.c ../mfscommon/md5.h \
@@ -566,6 +568,9 @@ clean-sbinPROGRAMS:
 	@: > ../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmaster-main.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsmaster-processname.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmaster-cfg.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmaster-random.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
@@ -670,6 +675,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-memusage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-pcqueue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-processname.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-random.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-strerr.Po@am__quote@
@@ -1103,6 +1109,20 @@ mfsmaster-chartsdata.obj: chartsdata.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/main.c' object='../mfscommon/mfsmaster-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmaster-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
+
+../mfscommon/mfsmaster-processname.o: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmaster-processname.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmaster-processname.Tpo -c -o ../mfscommon/mfsmaster-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmaster-processname.Tpo ../mfscommon/$(DEPDIR)/mfsmaster-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfsmaster-processname.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmaster-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+
+../mfscommon/mfsmaster-processname.obj: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmaster-processname.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmaster-processname.Tpo -c -o ../mfscommon/mfsmaster-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmaster-processname.Tpo ../mfscommon/$(DEPDIR)/mfsmaster-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfsmaster-processname.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmaster-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
 
 ../mfscommon/mfsmaster-cfg.o: ../mfscommon/cfg.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmaster-cfg.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmaster-cfg.Tpo -c -o ../mfscommon/mfsmaster-cfg.o `test -f '../mfscommon/cfg.c' || echo '$(srcdir)/'`../mfscommon/cfg.c

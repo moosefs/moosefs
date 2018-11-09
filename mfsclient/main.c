@@ -87,6 +87,7 @@
 #include "stats.h"
 #include "strerr.h"
 #include "crc.h"
+#include "processname.h"
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
@@ -649,7 +650,7 @@ int main_minthread_create(pthread_t *th,uint8_t detached,void *(*fn)(void *),voi
 	return main_thread_create(th,thattr,fn,arg);
 }
 
-int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
+int mainloop(struct fuse_args *args,const char* mp,int mt,int fg,int argc_back,char **argv_back) {
 	struct fuse_session *se;
 	struct fuse_chan *ch;
 	struct rlimit rls;
@@ -962,6 +963,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		return 1;
 	}
 
+	processname_init(argc_back,argv_back);
+
 	if (mfsopts.debug==0 && fg==0) {
 		setsid();
 		setpgid(0,getpid());
@@ -975,6 +978,13 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 
 	sinodes_init(mp);
 	sstats_init();
+
+	{
+		char pname[256];
+		snprintf(pname,256,"mfsmount (mounted on: %s)",mp);
+		pname[255] = 0;
+		processname_set(pname);
+	}
 
 	if (mt) {
 		err = fuse_session_loop_mt(se);
@@ -1170,6 +1180,8 @@ int main(int argc, char *argv[]) {
 	char *mountpoint;
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	struct fuse_args defaultargs = FUSE_ARGS_INIT(0, NULL);
+	int argc_back = argc;
+	char **argv_back = argv;
 
 #if defined(SIGPIPE) && defined(SIG_IGN)
 	signal(SIGPIPE,SIG_IGN);
@@ -1486,7 +1498,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	res = mainloop(&args,mountpoint,mt,fg);
+	res = mainloop(&args,mountpoint,mt,fg,argc_back,argv_back);
 	fuse_opt_free_args(&defaultargs);
 	fuse_opt_free_args(&args);
 	free(mfsopts.masterhost);

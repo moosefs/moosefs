@@ -4,8 +4,11 @@ cli_mans=mfscli.1
 cgiserv_mans=mfscgiserv.8
 metalogger_mans=mfsmetalogger.8 mfsmetalogger.cfg.5
 netdump_mans=mfsnetdump.8
-mount_mans=\
-	mfsmount.8 mfstools.1 mfsgoal.1 mfssclass.1 mfstrashtime.1 mfsarchive.1 \
+mount_mans=mfsmount.8
+mount_extra_man=mount.moosefs.8
+bdev_mans=mfsbdev.8
+tools_mans=\
+	mfstools.1 mfsgoal.1 mfssclass.1 mfstrashtime.1 mfsarchive.1 \
 	mfseattr.1 mfsquota.1 mfssnapshots.1 mfsdiagtools.1 mfsscadmin.1 \
 	mfscheckfile.1 mfsdirinfo.1 mfsfileinfo.1 mfsfilerepair.1 \
 	mfsgetgoal.1 mfsgettrashtime.1 mfsrgetgoal.1 mfsrgettrashtime.1 \
@@ -16,9 +19,8 @@ mount_mans=\
 	mfsgetquota.1 mfssetquota.1 mfsdelquota.1 mfscopyquota.1 \
 	mfschkarchive.1 mfsclrarchive.1 mfssetarchive.1 \
 	mfsappendchunks.1 mfsmakesnapshot.1 mfsrmsnapshot.1 mfsfilepaths.1
-mount_extra_man=mount.moosefs.8
 
-all_mans=$(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) $(mount_extra_man) 
+all_mans=$(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(tools_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) $(mount_extra_man) $(bdev_mans) 
 
 EXTRA_DIST=$(all_mans)
 
@@ -33,9 +35,15 @@ man_MANS+=$(chunkserver_mans)
 endif
 
 if BUILD_CLIENT
+man_MANS+=$(tools_mans)
+if WITH_MOUNT
 man_MANS+=$(mount_mans)
+endif
 if INSTALL_MOOSEFS_MOUNT
 man_MANS+=$(mount_extra_man)
+endif
+if WITH_BDEV
+man_MANS+=$(bdev_mans)
 endif
 endif
 

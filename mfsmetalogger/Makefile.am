@@ -8,6 +8,7 @@ mfsmetalogger_SOURCES= \
 	masterconn.c masterconn.h \
 	init.h \
 	../mfscommon/main.c ../mfscommon/main.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/cfg.c ../mfscommon/cfg.h \
 	../mfscommon/crc.c ../mfscommon/crc.h \

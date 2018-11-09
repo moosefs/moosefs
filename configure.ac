@@ -57,6 +57,7 @@ root_sbindir="xxx";
 case $target_os in
   *linux*)
 	fuse=maybe
+	bdev=maybe
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -DDEFAULT_SUGID_CLEAR_MODE_EXT"
 	# Check whether exec_prefix=/usr:
 	root_sbindir="${sbindir}"
@@ -68,10 +69,12 @@ case $target_os in
   *solaris*)
 	# OpenSolaris has fuse available and is still identified as "solaris"
 	fuse=maybe
+	bdev=no
 	CPPFLAGS="$CPPFLAGS -D__EXTENSIONS__ -D_POSIX_PTHREAD_SEMANTICS -DDEFAULT_SUGID_CLEAR_MODE_OSX"
 	;;
   *darwin*)
 	fuse=maybe
+	bdev=no
 	# MacFUSE installs to different prefix than pkgconfig
 	if test -f /usr/local/lib/pkgconfig/fuse.pc ; then
 		PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
@@ -81,10 +84,12 @@ case $target_os in
 	;;
   *bsd*)
 	fuse=maybe
+	bdev=no
 	CPPFLAGS="$CPPFLAGS -DDEFAULT_SUGID_CLEAR_MODE_BSD"
 	;;
   *)
 	fuse=no
+	bdev=no
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 	;;
 esac
@@ -188,7 +193,7 @@ AC_CHECK_FUNCS([mkstemp mktemp])
 AC_CHECK_FUNCS([strerror perror])
 
 # optional system functions
-AC_CHECK_FUNCS([dup2 mlockall getcwd])
+AC_CHECK_FUNCS([dup2 mlockall getcwd setproctitle])
 
 # check for mmap support
 AC_CHECK_HEADERS([sys/mman.h], [AC_CHECK_FUNCS([mmap])])
@@ -380,6 +385,8 @@ AC_ARG_ENABLE([mfschunkserver],
 	[AS_HELP_STRING([--disable-mfschunkserver], [Do not build mfschunkserver])])
 AC_ARG_ENABLE([mfsmount],
 	[AS_HELP_STRING([--disable-mfsmount], [Do not build mfsmount])])
+AC_ARG_ENABLE([mfsbdev],
+	[AS_HELP_STRING([--disable-mfsbdev], [Do not build mfsbdev])])
 AC_ARG_ENABLE([mfscgi],
 	[AS_HELP_STRING([--disable-mfscgi], [Do not install CGI scripts])])
 AC_ARG_ENABLE([mfscli],
@@ -452,6 +459,12 @@ AC_SUBST([PCAP_LIBS])
 
 AM_CONDITIONAL([BUILD_NETDUMP], [test "$enable_mfsnetdump" != "no"])
 
+if test "$bdev" != "no" -a "enable_mfsbdev" != "no"; then
+	AC_CHECK_HEADERS([linux/nbd.h linux/fs.h],,[bdev=no])
+fi
+
+AM_CONDITIONAL([WITH_BDEV], [test "$bdev" != "no" -a "$enable_mfsbdev" != "no"])
+
 if test "$fuse" != "no" -a "enable_mfsmount" != "no"; then
 	if test -n "$PKG_CONFIG"; then
 		PKG_CHECK_MODULES([FUSE], [fuse >= 2.6], , [fuse=no])
@@ -497,7 +510,9 @@ fi
 
 AC_CHECK_LIB(fuse, fuse_version, [AC_DEFINE([HAVE_FUSE_VERSION],[1],[libfuse has function fuse_version])])
 
-AM_CONDITIONAL([BUILD_CLIENT], [test "$fuse" != "no" -a "$enable_mfsmount" != "no"])
+AM_CONDITIONAL([WITH_MOUNT], [test "$fuse" != "no" -a "$enable_mfsmount" != "no"])
+
+AM_CONDITIONAL([BUILD_CLIENT], [test \( "$fuse" != "no" -a "$enable_mfsmount" != "no" \) -o \( "$bdev" != "no" -a "$enable_mfsbdev" != "no" \)])
 
 AM_CONDITIONAL([CREATE_ETC_MFS], [test "$enable_mfsmaster" != "no" -o "$enable_mfsmetalogger" != "no" -o "$enable_mfschunkserver" != "no" -o "$enable_mfsmount" != "no"])
 AM_CONDITIONAL([CREATE_DATA_DIR], [test "$enable_mfsmaster" != "no" -o "$enable_mfsmetalogger" != "no" -o "$enable_mfschunkserver" != "no" -o "$enable_mfscgiserv" != "no"])

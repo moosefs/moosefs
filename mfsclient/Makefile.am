@@ -1,4 +1,12 @@
-bin_PROGRAMS=mfsmount mfstools
+bin_PROGRAMS=mfstools
+if WITH_MOUNT
+bin_PROGRAMS += mfsmount
+endif
+if WITH_BDEV
+bin_PROGRAMS += mfsbdev
+endif
+lib_LTLIBRARIES=libmfsio.la
+include_HEADERS=mfsio.h
 
 AM_CPPFLAGS=-I$(top_srcdir)/mfscommon
 AM_CFLAGS=
@@ -42,10 +50,56 @@ mfsmount_SOURCES=\
 	../mfscommon/conncache.c ../mfscommon/conncache.h \
 	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
 	../mfscommon/datapack.h ../mfscommon/massert.h \
 	../mfscommon/mfsstrerr.h ../mfscommon/portable.h \
 	../mfscommon/buckets_mt.h ../mfscommon/mfsalloc.h \
 	../mfscommon/MFSCommunication.h
+
+libmfsio_la_LIBADD=$(PTHREAD_LIBS)
+libmfsio_la_CFLAGS=$(PTHREAD_CFLAGS) -D_USE_PTHREADS -DLIBMFSIO=1
+libmfsio_la_CPPFLAGS=$(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
+libmfsio_la_LDFLAGS=-version-info 1:0:0
+
+libmfsio_la_SOURCES=\
+	labelparser.c labelparser.h \
+	mastercomm.c mastercomm.h \
+	extrapackets.c extrapackets.h \
+	heapsorter.c heapsorter.h \
+	csorder.c csorder.h \
+	chunksdatacache.c chunksdatacache.h \
+	chunkrwlock.c chunkrwlock.h \
+	readdata.c readdata.h \
+	writedata.c writedata.h \
+	csdb.c csdb.h \
+	stats.c stats.h \
+	mfsio.c mfsio.h \
+	../mfscommon/clocks.c ../mfscommon/clocks.h \
+	../mfscommon/delayrun.c ../mfscommon/delayrun.h \
+	../mfscommon/pcqueue.c ../mfscommon/pcqueue.h \
+	../mfscommon/crc.c ../mfscommon/crc.h \
+	../mfscommon/md5.c ../mfscommon/md5.h \
+	../mfscommon/sockets.c ../mfscommon/sockets.h \
+	../mfscommon/conncache.c ../mfscommon/conncache.h \
+	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
+	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/datapack.h ../mfscommon/massert.h \
+	../mfscommon/mfsstrerr.h ../mfscommon/portable.h \
+	../mfscommon/mfsalloc.h \
+	../mfscommon/MFSCommunication.h
+
+mfsbdev_LDADD=$(PTHREAD_LIBS) libmfsio.la
+mfsbdev_CFLAGS=$(PTHREAD_CFLAGS) -D_USE_PTHREADS -DMFSNBD=1
+mfsbdev_CPPFLAGS=$(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
+mfsbdev_SOURCES=\
+	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
+	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/squeue.c ../mfscommon/squeue.h \
+	../mfscommon/workers.c ../mfscommon/workers.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
+	../mfscommon/datapack.h ../mfscommon/massert.h \
+	../mfscommon/sizestr.h ../mfscommon/portable.h \
+	nbdmain.c
 
 mfstools_SOURCES=\
 	mfstools.c \

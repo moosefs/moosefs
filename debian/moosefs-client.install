@@ -36,7 +36,14 @@ usr/bin/mfssetarchive
 usr/bin/mfsfilepaths
 usr/bin/mfsscadmin
 usr/bin/mfstools
+usr/bin/mfsbdev
 sbin/mount.moosefs
+usr/include/mfsio.h
+usr/lib/libmfsio.a
+usr/lib/libmfsio.la
+usr/lib/libmfsio.so
+usr/lib/libmfsio.so.1
+usr/lib/libmfsio.so.1.0.0
 usr/share/man/man1/mfsappendchunks.1
 usr/share/man/man1/mfscheckfile.1
 usr/share/man/man1/mfsdirinfo.1
@@ -82,4 +89,5 @@ usr/share/man/man1/mfssclass.1
 usr/share/man/man1/mfsscadmin.1
 usr/share/man/man1/mfstools.1
 usr/share/man/man8/mfsmount.8
+usr/share/man/man8/mfsbdev.8
 usr/share/man/man8/mount.moosefs.8

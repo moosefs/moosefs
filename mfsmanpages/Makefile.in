@@ -90,13 +90,15 @@ host_triplet = @host@
 target_triplet = @target@
 @BUILD_MASTER_TRUE@am__append_1 = $(master_mans)
 @BUILD_CHUNKSERVER_TRUE@am__append_2 = $(chunkserver_mans)
-@BUILD_MOUNT_TRUE@am__append_3 = $(mount_mans)
-@BUILD_MOUNT_TRUE@@INSTALL_MOOSEFS_MOUNT_TRUE@am__append_4 = $(mount_extra_man)
-@BUILD_METALOGGER_TRUE@am__append_5 = $(metalogger_mans)
-@BUILD_NETDUMP_TRUE@am__append_6 = $(netdump_mans)
-@BUILD_SUPERVISOR_TRUE@am__append_7 = $(supervisor_mans)
-@INSTALL_CGISERV_TRUE@am__append_8 = $(cgiserv_mans)
-@INSTALL_CLI_TRUE@am__append_9 = $(cli_mans)
+@BUILD_CLIENT_TRUE@am__append_3 = $(tools_mans)
+@BUILD_CLIENT_TRUE@@WITH_MOUNT_TRUE@am__append_4 = $(mount_mans)
+@BUILD_CLIENT_TRUE@@INSTALL_MOOSEFS_MOUNT_TRUE@am__append_5 = $(mount_extra_man)
+@BUILD_CLIENT_TRUE@@WITH_BDEV_TRUE@am__append_6 = $(bdev_mans)
+@BUILD_METALOGGER_TRUE@am__append_7 = $(metalogger_mans)
+@BUILD_NETDUMP_TRUE@am__append_8 = $(netdump_mans)
+@BUILD_SUPERVISOR_TRUE@am__append_9 = $(supervisor_mans)
+@INSTALL_CGISERV_TRUE@am__append_10 = $(cgiserv_mans)
+@INSTALL_CLI_TRUE@am__append_11 = $(cli_mans)
 subdir = mfsmanpages
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_pthread.m4 \
@@ -336,8 +338,11 @@ cli_mans = mfscli.1
 cgiserv_mans = mfscgiserv.8
 metalogger_mans = mfsmetalogger.8 mfsmetalogger.cfg.5
 netdump_mans = mfsnetdump.8
-mount_mans = \
-	mfsmount.8 mfstools.1 mfsgoal.1 mfssclass.1 mfstrashtime.1 mfsarchive.1 \
+mount_mans = mfsmount.8
+mount_extra_man = mount.moosefs.8
+bdev_mans = mfsbdev.8
+tools_mans = \
+	mfstools.1 mfsgoal.1 mfssclass.1 mfstrashtime.1 mfsarchive.1 \
 	mfseattr.1 mfsquota.1 mfssnapshots.1 mfsdiagtools.1 mfsscadmin.1 \
 	mfscheckfile.1 mfsdirinfo.1 mfsfileinfo.1 mfsfilerepair.1 \
 	mfsgetgoal.1 mfsgettrashtime.1 mfsrgetgoal.1 mfsrgettrashtime.1 \
@@ -349,12 +354,12 @@ mount_mans = \
 	mfschkarchive.1 mfsclrarchive.1 mfssetarchive.1 \
 	mfsappendchunks.1 mfsmakesnapshot.1 mfsrmsnapshot.1 mfsfilepaths.1
 
-mount_extra_man = mount.moosefs.8
-all_mans = $(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) $(mount_extra_man) 
+all_mans = $(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(tools_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) $(mount_extra_man) $(bdev_mans) 
 EXTRA_DIST = $(all_mans)
 man_MANS = $(am__append_1) $(am__append_2) $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6) \
-	$(am__append_7) $(am__append_8) $(am__append_9)
+	$(am__append_7) $(am__append_8) $(am__append_9) \
+	$(am__append_10) $(am__append_11)
 all: all-am
 
 .SUFFIXES:

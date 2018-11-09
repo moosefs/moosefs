@@ -108,6 +108,7 @@ PROGRAMS = $(sbin_PROGRAMS)
 am__dirstamp = $(am__leading_dot)dirstamp
 am_mfsmetalogger_OBJECTS = mfsmetalogger-masterconn.$(OBJEXT) \
 	../mfscommon/mfsmetalogger-main.$(OBJEXT) \
+	../mfscommon/mfsmetalogger-processname.$(OBJEXT) \
 	../mfscommon/mfsmetalogger-clocks.$(OBJEXT) \
 	../mfscommon/mfsmetalogger-cfg.$(OBJEXT) \
 	../mfscommon/mfsmetalogger-crc.$(OBJEXT) \
@@ -352,6 +353,7 @@ mfsmetalogger_SOURCES = \
 	masterconn.c masterconn.h \
 	init.h \
 	../mfscommon/main.c ../mfscommon/main.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/cfg.c ../mfscommon/cfg.h \
 	../mfscommon/crc.c ../mfscommon/crc.h \
@@ -453,6 +455,9 @@ clean-sbinPROGRAMS:
 ../mfscommon/mfsmetalogger-main.$(OBJEXT):  \
 	../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsmetalogger-processname.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmetalogger-clocks.$(OBJEXT):  \
 	../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
@@ -484,6 +489,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmetalogger-crc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmetalogger-main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmetalogger-processname.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmetalogger-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmetalogger-strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmetalogger-masterconn.Po@am__quote@
@@ -539,6 +545,20 @@ mfsmetalogger-masterconn.obj: masterconn.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/main.c' object='../mfscommon/mfsmetalogger-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-main.obj `if test -f '../mfscommon/main.c'; then $(CYGPATH_W) '../mfscommon/main.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/main.c'; fi`
+
+../mfscommon/mfsmetalogger-processname.o: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-processname.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-processname.Tpo -c -o ../mfscommon/mfsmetalogger-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-processname.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfsmetalogger-processname.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+
+../mfscommon/mfsmetalogger-processname.obj: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-processname.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-processname.Tpo -c -o ../mfscommon/mfsmetalogger-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmetalogger-processname.Tpo ../mfscommon/$(DEPDIR)/mfsmetalogger-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfsmetalogger-processname.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmetalogger-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
 
 ../mfscommon/mfsmetalogger-clocks.o: ../mfscommon/clocks.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmetalogger_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmetalogger-clocks.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmetalogger-clocks.Tpo -c -o ../mfscommon/mfsmetalogger-clocks.o `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c

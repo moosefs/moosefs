@@ -1,0 +1,139 @@
+.TH mfsbdev "1" "November 2018" "MooseFS 3.0.103-1" "This is part of MooseFS"
+.SH NAME
+mfsbdev \- \fBMooseFS\fP block device daemon/management tool
+.SH SYNOPSIS
+.B mfsbdev start
+[\fB-H\fP \fImasterhost\fP]
+[\fB-P\fP \fImasterport\fP]
+[\fB-p\fP \fImasterpassword\fP | \fB-x\fP \fIpasswordfile\fP]
+[\fB-l\fP \fIlinksocket\fP]
+[\fB-F\fP]
+.PP
+.B mfsbdev stop
+[\fB-l\fP \fIlinksocket\fP]
+.PP
+.B mfsbdev map
+[\fB-l\fP \fIlinksocket\fP]
+\fB-f\fP \fImfsfile\fP
+[\fB-d\fP \fInbddevice\fP]
+[\fB-n\fP \fIlinkname\fP]
+[\fB-s\fP \fIbdevsize\fP]
+.PP
+.B mfsbdev unmap
+[\fB-l\fP \fIlinksocket\fP]
+( \fB-f\fP \fImfsfile\fP | \fB-d\fP \fInbddevice\fP | \fB-n\fP \fIlinkname\fP )
+.PP
+.B mfsbdev list
+[\fB-l\fP \fIlinksocket\fP]
+[\fB-t\fP \fBm\fP|\fBu\fP]
+.PP
+.B mfsbdev resize
+[\fB-l\fP \fIlinksocket\fP]
+( \fB-f\fP \fImfsfile\fP | \fB-d\fP \fInbddevice\fP | \fB-n\fP \fIlinkname\fP )
+[\fB-s\fP \fIbdevsize\fP]
+.SH DESCRIPTION
+This tool is used to manage block devices. This tool works in Linux ONLY. Kernel
+module nbd must be loaded for this tool to work properly.
+.SH COMMANDS
+.PP
+.B start
+- starts the daemon; the daemon only listens on a socket at this point;
+all the other commands use the socket to communicate with the daemon; if no
+socket is specified via -l option, the default is used: /dev/mfs/nbdsock
+.PP
+.B stop
+- stops the daemon
+.PP
+.B map
+- maps a file on mfs to be used as a block device
+.PP
+.B unmap
+- removes a mapping
+.PP
+.B list
+- lists current mappings
+.PP
+.B resize
+- changes the size of a block device (requires kernel version 4.18 or higher)
+
+.SH OPTIONS
+.PP
+.B -H
+- master host; default is 'mfsmaster'
+.PP
+.B -P
+- master port; default is '9421'
+.PP
+.B -p
+- master password; mutually exclusive with -x option; if neither -p nor -x are supplied, the tool tries
+to connect without a password
+.PP
+.B -x
+- path to a file containing master password; mutually exclusive with -p option; if neither -p nor -x are supplied, the tool tries
+to connect without a password
+.PP
+.B -l
+- path to communication socket; default is /dev/mfs/nbdsock
+.PP
+.B -F
+- do not daemonize the tool (run in foreground)
+.PP
+.B -f
+- path to mfs file used to map block device;
+.PP
+.B -d
+- path to network block device ('/dev/nbdX'); by default (if this parameter is not supplied)
+first available device is used with the map command
+.PP
+.B -n
+- name of symbolic link created in '/dev/mfs', pointing at the network
+block device created by the map command;
+default is a combination of master hostname, port and mfs file name
+.PP
+.B -s
+- size of the block device, both SI and IEC suffixes can be used; default is the size
+of the file the block device is mapped to
+.PP
+.B
+-t
+- forces the list command to display information in a format ready to use with
+map (m parameter) or unmap (u parameter) command
+
+.SH EXAMPLES
+.PP
+.B mfsbdev start
+- start nbd daemon with default options (masterhost = \fBmfsmaster\fP, masterport = \fB9421\fP, linksocket = \fB/dev/mfs/nbdsock\fP, authentication without password)
+.PP
+.B mfsbdev start -H mfsmaster.my.domain -P 9521 -x /etc/mfs/mastersecret
+- start nbd daemon that will connect to master \fBmfsmaster.my.domain\fP on port \fB9521\fP using password read from file \fB/etc/mfs/mastersecret\fP
+.PP
+.B mfsbdev stop -l /tmp/mynbdinstance
+- stop nbd daemon using for communication unix socket \fB/tmp/mynbdinstance\fP
+.PP
+.B mfsbdev map -f devices/mybdev1.bin -s 2Ti -n mytestvm
+- add mapping to daemon using for communication default socket (\fB/dev/mfs/nbdsock\fP). Device will be assigned automatically, file \fBdevices/mybdev1.bin\fP will be mapped to this device, link '/dev/mfs/mytestvm' to this device will be created and block device will have size of 2TiB.
+.PP
+.B mfsbdev unmap -n mytestvm
+- remove mapping that has link named \fBmytestvm\fP (uses link \fB/dev/mfs/mytestvm\fP).
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2018 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8)

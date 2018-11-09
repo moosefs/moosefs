@@ -36,7 +36,9 @@ if BUILD_MASTER
 	fi
 endif
 if BUILD_CLIENT
+if WITH_MOUNT
 	$(INSTALL_DATA) $(builddir)/mfsmount.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmount.cfg.sample
+endif
 endif
 if BUILD_METALOGGER
 	$(INSTALL_DATA) $(builddir)/mfsmetalogger.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmetalogger.cfg.sample

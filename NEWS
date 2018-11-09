@@ -11,6 +11,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) close listen sockets after fork (metadata save in background)
   - (master) added subprocess for saving downloaded metadata in background (pro only)
   - (master) fixed mfsrmsnapshot issue (SNAPSHOT flag not set in directories - intr. in 3.0.101)
+  - (mount) added option to load master password from given file
 
 * MooseFS 3.0.102-1 (2018-07-25)
 

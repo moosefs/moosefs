@@ -165,6 +165,7 @@ struct mfsopts {
 	char *proxyhost;
 	char *subfolder;
 	char *password;
+	char *passfile;
 	char *md5pass;
 	char *preferedlabels;
 	unsigned nofile;
@@ -248,6 +249,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfsproxy=%s", proxyhost, 0),
 	MFS_OPT("mfssubfolder=%s", subfolder, 0),
 	MFS_OPT("mfspassword=%s", password, 0),
+	MFS_OPT("mfspassfile=%s", passfile, 0),
 	MFS_OPT("mfsmd5pass=%s", md5pass, 0),
 	MFS_OPT("mfspreflabels=%s", preferedlabels, 0),
 	MFS_OPT("mfsrlimitnofile=%u", nofile, 0),
@@ -386,7 +388,8 @@ static void usage(const char *progname) {
 	fprintf(stderr,"    -o mfsbind=IP               define source ip address for connections (default: NOT DEFINED - chosen automatically by OS)\n");
 	fprintf(stderr,"    -o mfsproxy=IP              define listen ip address of local master proxy for communication with tools (default: 127.0.0.1)\n");
 	fprintf(stderr,"    -o mfssubfolder=PATH        define subfolder to mount as root (default: /)\n");
-	fprintf(stderr,"    -o mfspassword=PASSWORD     authenticate to mfsmaster with password\n");
+	fprintf(stderr,"    -o mfspassword=PASSWORD     authenticate to mfsmaster with given password\n");
+	fprintf(stderr,"    -o mfspassfile=FILENAME     authenticate to mfsmaster with password from given file\n");
 	fprintf(stderr,"    -o mfsmd5pass=MD5           authenticate to mfsmaster using directly given md5 (only if mfspassword is not defined)\n");
 	fprintf(stderr,"    -o mfsdonotrememberpassword do not remember password in memory - more secure, but when session is lost then new session is created without password\n");
 	fprintf(stderr,"    -o mfspreflabels=LABELEXPR  specify preferred labels for choosing chunkservers during I/O\n");
@@ -1173,6 +1176,45 @@ void dump_args(const char *prfx,struct fuse_args *args) {
 }
 */
 
+char* password_read(const char *filename) {
+	FILE *fd;
+	char passwordbuff[1024];
+	char *ret;
+	int i;
+
+	fd = fopen(filename,"r");
+	if (fd==NULL) {
+		fprintf(stderr,"error opening password file: %s\n",filename);
+		return NULL;
+	}
+	if (fgets(passwordbuff,1024,fd)==NULL) {
+		fprintf(stderr,"password file (%s) is empty\n",filename);
+		fclose(fd);
+		return NULL;
+	}
+	fclose(fd);
+	passwordbuff[1023]=0;
+	i = strlen(passwordbuff);
+	while (i>0) {
+		i--;
+		if (passwordbuff[i]=='\n' || passwordbuff[i]=='\r') {
+			passwordbuff[i]=0;
+		} else {
+			break;
+		}
+	}
+	if (i==0) {
+		fprintf(stderr,"first line in password file (%s) is empty\n",filename);
+		return NULL;
+	}
+	ret = malloc(i+1);
+	passert(ret);
+	memcpy(ret,passwordbuff,i);
+	memset(passwordbuff,0,1024);
+	ret[i] = 0;
+	return ret;
+}
+
 int main(int argc, char *argv[]) {
 	int res;
 	int mt,fg;
@@ -1198,6 +1240,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.proxyhost = NULL;
 	mfsopts.subfolder = NULL;
 	mfsopts.password = NULL;
+	mfsopts.passfile = NULL;
 	mfsopts.md5pass = NULL;
 	mfsopts.preferedlabels = NULL;
 	mfsopts.nofile = 0;
@@ -1419,6 +1462,16 @@ int main(int argc, char *argv[]) {
 	}
 	if (mfsopts.subfolder==NULL) {
 		mfsopts.subfolder = strdup("/");
+	}
+	if (mfsopts.passfile!=NULL) {
+		if (mfsopts.password!=NULL||mfsopts.md5pass!=NULL) {
+			fprintf(stderr,"mfspassfile option is mutually exclusive with mfspassword and mfsmd5pass\nsee: %s -h for help\n",argv[0]);
+			return 1;
+		}
+		mfsopts.password = password_read(mfsopts.passfile);
+		if (mfsopts.password==NULL) {
+			return 1;
+		}
 	}
 	if (mfsopts.nofile==0) {
 		mfsopts.nofile=100000;

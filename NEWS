@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.102-1 (WIP)
+
+  - (cs) changed chunk testing routine (new definition is in MB/s per disk)
+
 * MooseFS 3.0.101-1 (2018-07-12)
 
   - (master) make under goal replications respect topology (patch made by tclh123)

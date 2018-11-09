@@ -45,7 +45,11 @@ where to store daemon lock file
 alternate location/name of \fBmfshdd.cfg\fP file
 .TP
 .B HDD_TEST_FREQ
-chunk test period in seconds; default is 10
+This option is deprecated. Please define \fBHDD_TEST_SPEED\fP instead. If \fBHDD_TEST_SPEED\fP is not defined then system will try to use \fBHDD_TEST_FREQ\fP but will convert it to \fBHDD_TEST_SPEED\fP using formula:
+\fBHDD_TEST_SPEED = 10 / HDD_TEST_FREQ\fP
+.TP
+.B HDD_TEST_SPEED
+Speed of background chunk tests in MB/s per disk (formally entry defined in \fBmfshdd.cfg\fP). Value can be given as a decimal number; default is 1.0
 .TP
 .B HDD_MIN_TEST_INTERVAL
 prevents from testing chunk integrity when last I/O (including test) was performed less than HDD_MIN_TEST_INTERVAL seconds ago; default is 86400

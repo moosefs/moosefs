@@ -64,6 +64,8 @@
 
 #define PRESERVE_BLOCK 1
 
+// #define HDD_TESTER_DEBUG 1
+
 #if defined(HAVE_PREAD) && defined(HAVE_PWRITE)
 #define USE_PIO 1
 #endif
@@ -255,6 +257,7 @@ typedef struct folder {
 //	double carry;
 	pthread_t scanthread;
 	struct chunk *testhead,**testtail;
+	uint64_t nexttest;
 	uint32_t min_count;
 	uint16_t min_pathid;
 	uint16_t current_pathid;
@@ -278,7 +281,7 @@ typedef struct damaged {
 static pthread_mutex_t cfglock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 static uint8_t Sparsification;
-static uint32_t HDDTestFreq = 10;
+static double HDDTestMBPS = 1.0;
 static uint32_t HDDRebalancePerc = 20;
 static uint32_t HDDErrorCount = 2;
 static uint32_t HDDErrorTime = 600;
@@ -311,7 +314,6 @@ static uint8_t global_rebalance_is_on = 0;
 static pthread_t rebalancethread,foldersthread,delayedthread,testerthread;
 static uint8_t term = 0;
 static uint8_t folderactions = 0;
-static uint8_t testerreset = 0;
 static pthread_mutex_t termlock = PTHREAD_MUTEX_INITIALIZER;
 
 // stats_X
@@ -1054,7 +1056,7 @@ static int hdd_chunk_getattr(chunk *c) {
 		return -1;
 	}
 	c->blocks = (sb.st_size - CHUNKCRCSIZE - c->hdrsize) / MFSBLOCKSIZE;
-	c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
+//	c->testtime = (sb.st_atime>sb.st_mtime)?sb.st_atime:sb.st_mtime;
 	c->validattr = 1;
 	return 0;
 }
@@ -1719,7 +1721,6 @@ void hdd_check_folders(void) {
 					}
 					free(f->path);
 					free(f);
-					testerreset = 1;
 				}
 			} else {
 				fptr = &(f->next);
@@ -3261,7 +3262,7 @@ static int hdd_int_create(uint64_t chunkid,uint32_t version) {
 	return MFS_STATUS_OK;
 }
 
-static int hdd_int_test(uint64_t chunkid,uint32_t version) {
+static int hdd_int_test(uint64_t chunkid,uint32_t version,uint16_t *blocks) {
 	const uint8_t *ptr;
 	uint16_t block;
 	uint32_t bcrc;
@@ -3283,6 +3284,9 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version) {
 		zassert(pthread_setspecific(blockbufferkey,blockbuffer));
 	}
 #endif /* PRESERVE_BLOCK */
+	if (blocks!=NULL) {
+		*blocks = 0;
+	}
 	c = hdd_chunk_find(chunkid);
 	if (c==NULL) {
 		return MFS_ERROR_NOCHUNK;
@@ -3349,6 +3353,9 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version) {
 		hdd_report_damaged_chunk(chunkid);
 		hdd_chunk_release(c);
 		return status;
+	}
+	if (blocks) {
+		*blocks = c->blocks;
 	}
 	hdd_chunk_release(c);
 	return MFS_STATUS_OK;
@@ -4572,7 +4579,7 @@ int hdd_chunkop(uint64_t chunkid,uint32_t version,uint32_t newversion,uint64_t c
 		} else if (length==1) {
 			return hdd_int_create(chunkid,version);
 		} else if (length==2) {
-			return hdd_int_test(chunkid,version);
+			return hdd_int_test(chunkid,version,NULL);
 		} else {
 			return MFS_ERROR_EINVAL;
 		}
@@ -5181,73 +5188,180 @@ void* hdd_rebalance_thread(void *arg) {
 }
 
 void* hdd_tester_thread(void* arg) {
-	folder *f,*of;
+	folder *f,*tf;
 	chunk *c;
 	uint64_t chunkid;
 	uint32_t version;
-	uint32_t freq;
-	uint32_t cnt;
-	uint64_t st,en;
-//	char *path;
+	uint64_t testbps;
+	uint16_t blocks;
+	uint8_t idlemode;
+	uint64_t st,en,nextdelay,nextevent;
+#ifdef HDD_TESTER_DEBUG
+	FILE *fd;
+	uint64_t global_st,global_bytes;
 
-	f = folderhead;
-	freq = HDDTestFreq;
-	cnt = 0;
+	fd = fopen("looplog.txt","a");
+	global_st = monotonic_useconds();
+	global_bytes = 0;
+#endif
 	for (;;) {
 		st = monotonic_useconds();
+#ifdef HDD_TESTER_DEBUG
+		if (fd) {
+			fprintf(fd,"%"PRIu64".%06u: loop begin\n",st/1000000,(unsigned int)(st%1000000));
+		}
+#endif
 		chunkid = 0;
 		version = 0;
+		idlemode = 1;
 		zassert(pthread_mutex_lock(&folderlock));
 		zassert(pthread_mutex_lock(&hashlock));
 		zassert(pthread_mutex_lock(&testlock));
-		if (testerreset) {
-			testerreset = 0;
-			f = folderhead;
-			freq = HDDTestFreq;
-			cnt = 0;
+		testbps = HDDTestMBPS*1024*1024;
+
+#ifdef HDD_TESTER_DEBUG
+		if (fd) {
+			fprintf(fd,"folderactions:%u ; folderhead:%p ; HDDTestMBPS: %.3lf ; testbps:%"PRIu64"\n",folderactions,(void*)folderhead,HDDTestMBPS,testbps);
 		}
-		cnt++;
-		if ( ! (cnt<freq || freq==0 || folderactions==0 || folderhead==NULL)) {
-			cnt = 0;
-			of = f;
-			do {
-				f = f->next;
-				if (f==NULL) {
-					f = folderhead;
+#endif
+		tf = NULL;
+		if (folderactions!=0 && folderhead!=NULL && testbps>0) {
+			idlemode = 0;
+#ifdef HDD_TESTER_DEBUG
+			if (fd) {
+				for (f=folderhead ; f!=NULL ; f=f->next) {
+					fprintf(fd,"%s: next event: %"PRIu64".%06u\n",f->path,(f->nexttest)/1000000,(unsigned int)(f->nexttest%1000000));
 				}
-			} while ((f->damaged || f->todel || f->toremove || f->scanstate!=SCST_WORKING) && of!=f);
-			if ( ! (of==f && (f->damaged || f->todel || f->toremove || f->scanstate!=SCST_WORKING))) {
-				c = f->testhead;
+			}
+#endif
+			for (f=folderhead ; f!=NULL && tf==NULL ; f=f->next) {
+				if (f->damaged==0 && f->todel==0 && f->toremove==0 && f->scanstate==SCST_WORKING) {
+					if (f->nexttest<=st) {
+						tf = f;
+					}
+				}
+			}
+			if (tf!=NULL) {
+#ifdef HDD_TESTER_DEBUG
+				if (fd) {
+					fprintf(fd,"chosen path: %s\n",tf->path);
+				}
+#endif
+				c = tf->testhead;
 				if (c && c->state==CH_AVAIL) {
 					chunkid = c->chunkid;
 					version = c->version;
-//					path = strdup(c->filename);
-//					passert(path);
 				}
+#ifdef HDD_TESTER_DEBUG
+			} else if (fd) {
+				fprintf(fd,"path not found\n");
+#endif
 			}
 		}
+
 		zassert(pthread_mutex_unlock(&testlock));
 		zassert(pthread_mutex_unlock(&hashlock));
 		zassert(pthread_mutex_unlock(&folderlock));
+
+		blocks = 0;
 		if (chunkid>0) {
 //			syslog(LOG_NOTICE,"testing chunk: %s",path);
-			(void)hdd_int_test(chunkid,version); // ignore status here - hdd_int_test on error does everything itself
+			(void)hdd_int_test(chunkid,version,&blocks); // ignore status here - hdd_int_test on error does everything itself
 //			free(path);
 		}
+
 		zassert(pthread_mutex_lock(&termlock));
 		if (term) {
 			zassert(pthread_mutex_unlock(&termlock));
+#ifdef HDD_TESTER_DEBUG
+			if (fd) {
+				fclose(fd);
+			}
+#endif
 			return arg;
 		}
 		zassert(pthread_mutex_unlock(&termlock));
-		en = monotonic_useconds();
-		if (en>=st) {
-			en-=st;
-			if (en<1000000) {
-				portable_usleep(1000000-en);
+
+#ifdef HDD_TESTER_DEBUG
+		global_bytes += blocks*65536;
+#endif
+		if (idlemode==0) {
+			zassert(pthread_mutex_lock(&folderlock));
+			if (testbps>0) {
+				nextdelay = blocks;
+				nextdelay *= UINT64_C(65536000000);
+				nextdelay /= testbps;
+			} else {
+				nextdelay = 10000;
 			}
+#ifdef HDD_TESTER_DEBUG
+			if (fd) {
+				fprintf(fd,"blocks: %u ; nextdelay: %"PRIu64".%06u\n",blocks,nextdelay/1000000,(unsigned int)(nextdelay%1000000));
+			}
+#endif
+			nextevent = 0;
+			for (f=folderhead ; f!=NULL ; f=f->next) {
+				if (f==tf) {
+					f->nexttest = st+nextdelay;
+#ifdef HDD_TESTER_DEBUG
+					if (fd) {
+						fprintf(fd,"%s: set next event to: %"PRIu64".%06u\n",f->path,f->nexttest/1000000,(unsigned int)(f->nexttest%1000000));
+					}
+#endif
+				}
+				if (nextevent==0 || f->nexttest < nextevent) {
+					nextevent = f->nexttest;
+				}
+			}
+#ifdef HDD_TESTER_DEBUG
+			if (fd) {
+				fprintf(fd,"next event: %"PRIu64".%06u\n",nextevent/1000000,(unsigned int)(nextevent%1000000));
+			}
+#endif
+			zassert(pthread_mutex_unlock(&folderlock));
+			en = monotonic_useconds();
+#ifdef HDD_TESTER_DEBUG
+			if (fd) {
+				fprintf(fd,"%"PRIu64".%06u: loop end\n",en/1000000,(unsigned int)(en%1000000));
+			}
+#endif
+			if (en+10000 < nextevent) {
+				nextevent -= en;
+#ifdef HDD_TESTER_DEBUG
+				if (fd) {
+					fprintf(fd,"next event after: %"PRIu64".%06u\n",nextevent/1000000,(unsigned int)(nextevent%1000000));
+				}
+#endif
+				if (nextevent>500000) {
+					nextevent = 500000;
+				}
+			} else {
+				nextevent = 10000;
+			}
+#ifdef HDD_TESTER_DEBUG
+			if (fd) {
+				fprintf(fd,"average speed: %.3lf MB/s\n",global_bytes*1000000.0/((en-global_st)*1024.0*1024.0));
+				fprintf(fd,"normal mode, sleep for: %"PRIu64".%06us\n",nextevent/1000000,(unsigned int)(nextevent%1000000));
+				fflush(fd);
+			}
+#endif
+			portable_usleep(nextevent);
+		} else {
+#ifdef HDD_TESTER_DEBUG
+			if (fd) {
+				fprintf(fd,"average speed: %.3lf MB/s\n",global_bytes*1000000.0/((st-global_st)*1024.0*1024.0));
+				fprintf(fd,"idle mode, sleep for: 0.5s\n");
+				fflush(fd);
+			}
+#endif
+			portable_usleep(500000);
 		}
 	}
+#ifdef HDD_TESTER_DEBUG
+	if (fd) {
+		fclose(fd);
+	}
+#endif
 	return arg;
 }
 
@@ -5322,6 +5436,7 @@ void hdd_testsort(folder *f) {
 	}
 	f->testhead = NULL;
 	f->testtail = &(f->testhead);
+	f->nexttest = 0;
 	for (i=0 ; i<chunksno ; i++) {
 		c = csorttab[i];
 		c->testnext = NULL;
@@ -5400,8 +5515,8 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	uint32_t testtime;
 	char fname[PATH_MAX];
 
+	testtime = 0;
 	if (blocks<1024) {
-		testtime = 0;
 		validattr = 1;
 	} else if (f->sizelimit) {
 		hdd_create_filename(fname,f,pathid,chunkid,version);
@@ -6449,6 +6564,7 @@ int hdd_parseline(char *hddcfgline) {
 	f->dumpfd = -1;
 	f->testhead = NULL;
 	f->testtail = &(f->testhead);
+	f->nexttest = 0;
 	f->min_count = 0;
 	f->min_pathid = 0;
 	f->current_pathid = 0;
@@ -6464,7 +6580,6 @@ int hdd_parseline(char *hddcfgline) {
 	f->rebalance_last_usec = 0;
 	f->next = folderhead;
 	folderhead = f;
-	testerreset = 1;
 	zassert(pthread_mutex_unlock(&folderlock));
 	return 2;
 }
@@ -6575,7 +6690,25 @@ static inline void hdd_options_common(uint8_t initflag) {
 	}
 	zassert(pthread_mutex_unlock(&folderlock));
 	zassert(pthread_mutex_lock(&testlock));
-	HDDTestFreq = cfg_getuint32("HDD_TEST_FREQ",10);
+	if (cfg_isdefined("HDD_TEST_SPEED")) {
+		HDDTestMBPS = cfg_getdouble("HDD_TEST_SPEED",1.0);
+		if (HDDTestMBPS<0.0) {
+			mfs_syslog(LOG_NOTICE,"hdd space manager: setting HDD_TEST_SPEED to negative value doesn't make sense - changed to 0.0");
+			HDDTestMBPS=0.0;
+		}
+	} else {
+		double testfreq;
+		testfreq = cfg_getuint32("HDD_TEST_FREQ",10); // deprecated option
+		if (testfreq>0) {
+			HDDTestMBPS = 10.0 / testfreq;
+		} else {
+			mfs_syslog(LOG_NOTICE,"hdd space manager: regular chunk tests are disabled - this is not recommended setting");
+			HDDTestMBPS = 0.0;
+		}
+	}
+	if (HDDTestMBPS==0.0) {
+		mfs_syslog(LOG_NOTICE,"hdd space manager: regular chunk tests are disabled - this is not recommended setting");
+	}
 	HDDRebalancePerc = cfg_getuint32("HDD_REBALANCE_UTILIZATION",20);
 	if (HDDRebalancePerc>100) {
 		HDDRebalancePerc=100;

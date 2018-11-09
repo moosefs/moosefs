@@ -32,8 +32,9 @@
 # alternate location/name of mfshdd.cfg file (default is @ETC_PATH@/mfs/mfshdd.cfg)
 # HDD_CONF_FILENAME = @ETC_PATH@/mfs/mfshdd.cfg
 
-# chunk test period in seconds (default is 10)
-# HDD_TEST_FREQ = 10
+# Speed of background chunk tests in MB/s per disk (formally entry defined in mfshdd.cfg). Value can be given as a decimal number (default is 1.0)
+# Deprecates: HDD_TEST_FREQ (if HDD_TEST_SPEED is not defined, but there is redefined HDD_TEST_FREQ, then HDD_TEST_SPEED = 10 / HDD_TEST_FREQ)
+# HDD_TEST_SPEED = 1.0
 
 # Do not test chunk integrity when last I/O (including test) was performed less than HDD_MIN_TEST_INTERVAL seconds ago.
 # HDD_MIN_TEST_INTERVAL = 86400

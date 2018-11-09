@@ -822,7 +822,7 @@ uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint
 	snt = &sn;
 	while (n && n->ftime+MFS_INODE_REUSE_DELAY<ts) {
 		ics ^= n->inode;
-		if (((sesflags&SESFLAG_METARESTORE)==0 || sustainedinodes>0) && of_isfileopened(n->inode)) {
+		if (((sesflags&SESFLAG_METARESTORE)==0 || sustainedinodes>0) && of_isfileopen(n->inode)) {
 			si++;
 			an = n->next;
 			n->ftime = ts;
@@ -2334,9 +2334,9 @@ static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nlen
 		p->trashtime = DEFAULT_TRASHTIME;
 	}
 	if (type==TYPE_DIRECTORY) {
-		p->eattr = node->eattr;
+		p->eattr = node->eattr & ~(EATTR_SNAPSHOT);
 	} else {
-		p->eattr = node->eattr & ~(EATTR_NOECACHE);
+		p->eattr = node->eattr & ~(EATTR_NOECACHE|EATTR_SNAPSHOT);
 	}
 	p->winattr = 0;
 	if (node->acldefflag) {
@@ -2930,10 +2930,12 @@ static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 	uint32_t bid;
 	uint16_t pleng=0;
 	uint8_t *path=NULL;
+	uint8_t isopen;
 
 	child = e->child;
+	isopen = of_isfileopen(child->inode);
 	if (child->parents->nextparent==NULL) { // last link
-		if (child->type==TYPE_FILE && (child->trashtime>0 || of_isfileopened(child->inode))) {	// go to trash or sustained ? - get path
+		if (child->type==TYPE_FILE && (child->trashtime>0 || isopen)) {	// go to trash or sustained ? - get path
 			fsnodes_getpath(e,&pleng,&path);
 		}
 	}
@@ -2966,7 +2968,7 @@ static inline void fsnodes_unlink(uint32_t ts,fsedge *e) {
 				child->parents = e;
 				trashspace += child->data.fdata.length;
 				trashnodes++;
-			} else if (of_isfileopened(child->inode)) {
+			} else if (isopen) {
 				bid = child->inode % SUSTAINED_BUCKETS;
 				child->type = TYPE_SUSTAINED;
 				e = fsedge_malloc(pleng);
@@ -3011,7 +3013,7 @@ static inline int fsnodes_purge(uint32_t ts,fsnode *p) {
 	if (p->type==TYPE_TRASH) {
 		trashspace -= p->data.fdata.length;
 		trashnodes--;
-		if (of_isfileopened(p->inode)) {
+		if (of_isfileopen(p->inode)) {
 			bid = p->inode % SUSTAINED_BUCKETS;
 			p->type = TYPE_SUSTAINED;
 			sustainedspace += p->data.fdata.length;
@@ -3549,11 +3551,13 @@ static inline uint8_t fsnodes_remove_snapshot_test(fsedge *e,fsnodes_snapshot_pa
 }
 
 static inline void fsnodes_remove_snapshot(fsedge *e,fsnodes_snapshot_params *args) {
+	uint8_t eattr_back;
 	fsnode *n;
 	fsedge *ie,*ien;
 	n = e->child;
 	fsnodes_keep_alive_check();
 	if (n->type == TYPE_DIRECTORY) {
+		eattr_back = n->eattr;
 		if (fsnodes_access_ext(n,args->uid,args->gids,args->gid,MODE_MASK_W|MODE_MASK_X,args->sesflags)) {
 			for (ie = n->data.ddata.children ; ie ; ie=ien) {
 				ien = ie->nextchild;
@@ -3563,6 +3567,7 @@ static inline void fsnodes_remove_snapshot(fsedge *e,fsnodes_snapshot_params *ar
 		if (n->data.ddata.children!=NULL) {
 			return;
 		}
+		n->eattr = eattr_back;
 	}
 	if (n->eattr & EATTR_SNAPSHOT) {
 		n->trashtime = 0;
@@ -3759,7 +3764,6 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 					dstnode->acldefflag = posix_acl_copy(srcnode->inode,dstnode->inode,POSIX_ACL_DEFAULT);
 				}
 			}
-			dstnode->eattr |= EATTR_SNAPSHOT;
 			if (srcnode->type==TYPE_DIRECTORY) {
 				if (rec) {
 					for (e = srcnode->data.ddata.children ; e ; e=e->nextchild) {
@@ -3799,6 +3803,7 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 			} else if (srcnode->type==TYPE_BLOCKDEV || srcnode->type==TYPE_CHARDEV) {
 				dstnode->data.devdata.rdev = srcnode->data.devdata.rdev;
 			}
+			dstnode->eattr |= EATTR_SNAPSHOT;
 		}
 	}
 }
@@ -7538,7 +7543,7 @@ static inline uint32_t fs_univ_empty_sustained_part(uint32_t ts,uint32_t bid,uin
 	while (e) {
 		p = e->child;
 		e = e->nextchild;
-		if (of_isfileopened(p->inode)==0) {
+		if (of_isfileopen(p->inode)==0) {
 			ics ^= p->inode;
 			fsnodes_purge(ts,p);
 			(*fi)++;

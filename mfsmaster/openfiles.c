@@ -213,7 +213,7 @@ void of_session_removed(uint32_t sessionid) {
 	}
 }
 
-uint8_t of_isfileopened(uint32_t inode) {
+uint8_t of_isfileopen(uint32_t inode) {
 	ofrelation *ofr;
 	uint32_t ihashpos = OF_INODE_HASH(inode);
 

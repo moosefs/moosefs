@@ -73,6 +73,8 @@ int hdd_get_blocks(uint64_t chunkid,uint32_t version,uint8_t *blocks_buff);
 int hdd_get_checksum(uint64_t chunkid, uint32_t version, uint8_t *checksum_buff);
 int hdd_get_checksum_tab(uint64_t chunkid, uint32_t version, uint8_t *checksum_tab);
 
+int hdd_move(void *fsrcv,void *fdstv);
+
 /* chunk operations */
 
 /* all chunk operations in one call */

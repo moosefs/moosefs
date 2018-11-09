@@ -61,6 +61,7 @@
 #include "portable.h"
 #include "lwthread.h"
 #include "sockets.h"
+#include "bgjobs.h"
 
 #define PRESERVE_BLOCK 1
 
@@ -277,12 +278,17 @@ typedef struct damaged {
 } damaged;
 */
 
+typedef struct _rebalance {
+	folder *fsrc,*fdst;
+} rebalance;
+
 #ifndef HAVE___SYNC_OP_AND_FETCH
 static pthread_mutex_t cfglock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 static uint8_t Sparsification;
 static double HDDTestMBPS = 1.0;
 static uint32_t HDDRebalancePerc = 20;
+static uint32_t HSRebalanceLimit = 0;
 static uint32_t HDDErrorCount = 2;
 static uint32_t HDDErrorTime = 600;
 static uint64_t LeaveFree;
@@ -311,7 +317,7 @@ static uint32_t errorcounter = 0;
 static uint8_t hddspacechanged = 0;
 static uint8_t global_rebalance_is_on = 0;
 
-static pthread_t rebalancethread,foldersthread,delayedthread,testerthread;
+static pthread_t hsrebalancethread,rebalancethread,foldersthread,delayedthread,testerthread;
 static uint8_t term = 0;
 static uint8_t folderactions = 0;
 static pthread_mutex_t termlock = PTHREAD_MUTEX_INITIALIZER;
@@ -335,6 +341,8 @@ static pthread_mutex_t folderlock = PTHREAD_MUTEX_INITIALIZER;
 
 // chunk tester
 static pthread_mutex_t testlock = PTHREAD_MUTEX_INITIALIZER;
+
+static pthread_cond_t highspeed_cond = PTHREAD_COND_INITIALIZER;
 
 #ifndef PRESERVE_BLOCK
 static pthread_key_t hdrbufferkey;
@@ -1730,7 +1738,7 @@ void hdd_check_folders(void) {
 		}
 	}
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged || f->toremove || (f->rebalance_in_progress==1 && f->scanstate!=SCST_WORKING)) {
+		if (f->damaged || f->toremove || (f->rebalance_in_progress>0 && f->scanstate!=SCST_WORKING)) {
 			if (f->damaged && f->toremove==0 && f->scanstate==SCST_WORKING && f->lastrefresh+60.0<monotonic_time) {
 				hdd_refresh_usage(f);
 				f->lastrefresh = monotonic_time;
@@ -4624,7 +4632,7 @@ chunk* hdd_random_chunk(folder *f) {
 	return NULL;
 }
 
-int hdd_int_move(folder *fsrc,folder *fdst) {
+static int hdd_int_move(folder *fsrc,folder *fdst) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint16_t block;
@@ -4679,7 +4687,7 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 		return MFS_ERROR_NOCHUNK;
 	}
 	syslog(LOG_NOTICE,"move chunk %s -> %s (chunk: %016"PRIX64"_%08"PRIX32")",fsrc->path,fdst->path,c->chunkid,c->version);
-	status = hdd_io_begin(c,0);
+	status = hdd_io_begin(c,MODE_EXISTING);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);
 		hdd_report_damaged_chunk(c->chunkid);
@@ -4689,10 +4697,11 @@ int hdd_int_move(folder *fsrc,folder *fdst) {
 
 	/* create tmp file name */
 	leng = strlen(fdst->path);
-	tmp_filename = malloc(leng+7);
+	tmp_filename = malloc(leng+13+16+1);
 	passert(tmp_filename);
 	memcpy(tmp_filename,fdst->path,leng);
-	memcpy(tmp_filename+leng,"reptmp",7);
+	snprintf(tmp_filename+leng,13+16+1,"reptmp_chunk_%016"PRIX64,c->chunkid);
+	tmp_filename[leng+13+16] = 0;
 
 	/* create new file */
 	new_fd = open(tmp_filename,O_RDWR | O_TRUNC | O_CREAT,0666);
@@ -4901,8 +4910,14 @@ uint8_t hdd_is_rebalance_on(void) {
 #endif
 }
 
-void* hdd_rebalance_thread(void *arg) {
-	folder *f,*fdst,*fsrc;
+int hdd_move(void *fsrcv,void *fdstv) {
+	folder *fsrc = (folder*)fsrcv;
+	folder *fdst = (folder*)fdstv;
+	return hdd_int_move(fsrc,fdst);
+}
+
+static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t *changed,uint8_t rebalance_is_on,uint8_t hsmode) {
+	folder *f;
 	double aboveminerr,belowminerr,err,expdist;
 	double usage;
 	double avgusage;
@@ -4912,8 +4927,331 @@ void* hdd_rebalance_thread(void *arg) {
 	uint32_t abovecnt;
 	uint64_t belowsum;
 	uint64_t abovesum;
-	uint8_t changed;
 	uint8_t rebalance_servers;
+	uint8_t waitcond;
+	double monotonic_time;
+
+	monotonic_time = 0.0;
+	// check REBALANCE_FORCE_SRC and REBALANCE_FORCE_DST
+	abovecnt = 0;
+	belowcnt = 0;
+	avgcount = 0;
+	*changed = 0;
+	for (f=folderhead ; f ; f=f->next) {
+		if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0) {
+			if (f->needrefresh || rebalance_is_on) {
+				hdd_refresh_usage(f);
+				f->needrefresh = 0;
+				if (monotonic_time==0.0) {
+					monotonic_time = monotonic_seconds();
+				}
+				f->lastrefresh = monotonic_time;
+				*changed = 1;
+			}
+			if (f->balancemode==REBALANCE_FORCE_SRC) {
+				abovecnt++;
+			} else if (f->balancemode==REBALANCE_FORCE_DST) {
+				belowcnt++;
+			} else {
+				avgcount++;
+			}
+		}
+		f->tmpbalancemode = REBALANCE_NONE;
+	}
+	rebalance_servers = 0;
+	if ((abovecnt>0 && (belowcnt+avgcount)>0) || (belowcnt>0 && (abovecnt+avgcount)>0)) { // force data movement
+		for (f=folderhead ; f ; f=f->next) {
+			if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0) {
+				usage = f->total-f->avail;
+				usage /= f->total;
+				if (abovecnt==0) {
+					if (f->balancemode==REBALANCE_FORCE_DST && usage<REBALANCE_DST_MAX_USAGE) {
+						f->tmpbalancemode = REBALANCE_DST;
+						rebalance_servers |= 1;
+					} else if (f->chunkcount>0) {
+						f->tmpbalancemode = REBALANCE_SRC;
+						rebalance_servers |= 2;
+					}
+				} else if (belowcnt==0) {
+					if (f->balancemode==REBALANCE_FORCE_SRC && f->chunkcount>0) {
+						f->tmpbalancemode = REBALANCE_SRC;
+						rebalance_servers |= 2;
+					} else if (usage<REBALANCE_DST_MAX_USAGE) {
+						f->tmpbalancemode = REBALANCE_DST;
+						rebalance_servers |= 1;
+					}
+				} else {
+					if (f->balancemode==REBALANCE_FORCE_DST && usage<REBALANCE_DST_MAX_USAGE) {
+						f->tmpbalancemode = REBALANCE_DST;
+						rebalance_servers |= 1;
+					} else if (f->balancemode==REBALANCE_FORCE_SRC && f->chunkcount>0) {
+						f->tmpbalancemode = REBALANCE_SRC;
+						rebalance_servers |= 2;
+					}
+				}
+			}
+		}
+	} else { // usage rebalance
+		rebalancediff = REBALANCE_DIFF_MAX;
+		if (rebalance_is_on) {
+			rebalancediff /= 2.0;
+		}
+		avgusage = 0.0;
+		avgcount = 0;
+		for (f=folderhead ; f ; f=f->next) {
+			if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+				usage = f->total-f->avail;
+				usage /= f->total;
+				avgusage += usage;
+				avgcount++;
+			}
+		}
+		if (avgcount>0) {
+			avgusage /= avgcount;
+			belowcnt = 0;
+			belowsum = 0;
+			abovecnt = 0;
+			abovesum = 0;
+			for (f=folderhead ; f ; f=f->next) {
+				if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+					usage = f->total-f->avail;
+					usage /= f->total;
+					if (usage < avgusage - rebalancediff) {
+						belowcnt++;
+						belowsum+=f->total;
+					} else if (usage > avgusage + rebalancediff) {
+						abovecnt++;
+						abovesum+=f->total;
+					}
+				}
+			}
+			if (abovecnt>0 || belowcnt>0) {
+				for (f=folderhead ; f ; f=f->next) {
+					if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+						usage = f->total-f->avail;
+						usage /= f->total;
+						if ((((usage < avgusage - rebalancediff) && belowcnt>0) || ((usage <= avgusage + rebalancediff) && belowcnt==0)) && usage<REBALANCE_DST_MAX_USAGE) {
+							f->tmpbalancemode = REBALANCE_DST;
+							rebalance_servers |= 1;
+						} else if ((((usage > avgusage + rebalancediff) && abovecnt>0) || ((usage >= avgusage - rebalancediff) && abovecnt==0)) && f->chunkcount>0) {
+							f->tmpbalancemode = REBALANCE_SRC;
+							rebalance_servers |= 2;
+						}
+					}
+				}
+			}
+		}
+	}
+	*fdst = NULL;
+	*fsrc = NULL;
+	if (rebalance_servers==3) {
+		belowcnt = 0;
+		belowsum = 0;
+		abovecnt = 0;
+		abovesum = 0;
+		waitcond = 0;
+		for (f=folderhead ; f ; f=f->next) {
+			if (f->tmpbalancemode == REBALANCE_DST) {
+				if (hsmode) {
+					waitcond = 1;
+					if (*fdst==NULL && f->rebalance_in_progress<HSRebalanceLimit) {
+						*fdst = f;
+					}
+				} else {
+					belowcnt++;
+					belowsum+=f->total;
+				}
+			} else if (f->tmpbalancemode == REBALANCE_SRC) {
+				abovecnt++;
+				abovesum+=f->total;
+			}
+		}
+		if (*fdst==NULL && waitcond && HSRebalanceLimit>0) { // limits reached on all servers - wait
+			return -1;
+		}
+		aboveminerr = 0.0;
+		belowminerr = 0.0;
+		for (f=folderhead ; f ; f=f->next) {
+			if (f->tmpbalancemode == REBALANCE_DST) {
+				if (!hsmode) {
+					f->write_dist++;
+					if (f->write_first) {
+						err = 1.0;
+					} else {
+						expdist = belowsum;
+						expdist /= f->total;
+						err = (expdist + f->write_corr) / f->write_dist;
+					}
+					if (*fdst==NULL || err<belowminerr) {
+						belowminerr = err;
+						*fdst = f;
+					}
+				}
+			} else if (f->tmpbalancemode == REBALANCE_SRC) {
+				f->read_dist++;
+				if (f->read_first) {
+					err = 1.0;
+				} else {
+					expdist = abovesum;
+					expdist /= f->total;
+					err = (expdist + f->read_corr) / f->read_dist;
+				}
+				if (*fsrc==NULL || err<aboveminerr) {
+					aboveminerr = err;
+					*fsrc = f;
+				}
+			}
+		}
+	}
+	if (*fsrc!=NULL && *fdst!=NULL) {
+		f = *fsrc;
+		if (f->read_first) {
+			f->read_first = 0;
+		} else {
+			expdist = abovesum;
+			expdist /= f->total;
+			f->read_corr += expdist - f->read_dist;
+		}
+		f->read_dist = 0;
+		if (!hsmode) {
+			f = *fdst;
+			if (f->write_first) {
+				f->write_first = 0;
+			} else {
+				expdist = belowsum;
+				expdist /= f->total;
+				f->write_corr += expdist - f->write_dist;
+			}
+			f->write_dist = 0;
+		}
+		return 1;
+	}
+	return 0;
+}
+
+
+void hdd_move_finished(uint8_t status,void *arg) {
+	rebalance *r = (rebalance*)(arg);
+	double monotonic_time;
+
+	(void)status; // ignore status
+	monotonic_time = monotonic_seconds();
+	zassert(pthread_mutex_lock(&folderlock));
+	r->fsrc->rebalance_in_progress--;
+	r->fdst->rebalance_in_progress--;
+	r->fdst->rebalance_last_usec = monotonic_time;
+	zassert(pthread_cond_signal(&highspeed_cond));
+	zassert(pthread_mutex_unlock(&folderlock));
+	free(r);
+}
+
+void* hdd_highspeed_rebalance_thread(void *arg) {
+	rebalance *r;
+	folder *fsrc,*fdst,*f;
+	int sstatus;
+	uint8_t changed;
+	uint8_t rebalance_is_on;
+	double rebalance_finished;
+	double monotonic_time;
+
+	rebalance_is_on = 0;
+	rebalance_finished = 0;
+	for (;;) {
+		zassert(pthread_mutex_lock(&termlock));
+		if (term) {
+			zassert(pthread_mutex_unlock(&termlock));
+			return arg;
+		}
+		zassert(pthread_mutex_unlock(&termlock));
+
+		monotonic_time = monotonic_seconds();
+		zassert(pthread_mutex_lock(&folderlock));
+		if (folderactions==0 || (rebalance_finished + 60.0) > monotonic_time || HSRebalanceLimit==0) {
+			zassert(pthread_mutex_unlock(&folderlock));
+			if (HSRebalanceLimit==0) {
+				rebalance_is_on = 0;
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_and(&global_rebalance_is_on,~1);
+#else
+				zassert(pthread_mutex_lock(&dclock));
+				global_rebalance_is_on &= ~1;
+				zassert(pthread_mutex_unlock(&dclock));
+#endif
+			}
+			sleep(1);
+			continue;
+		}
+
+		do {
+			sstatus = hdd_rebalance_find_servers(&fsrc,&fdst,&changed,rebalance_is_on,1);
+			if (sstatus<0) {
+				zassert(pthread_cond_wait(&highspeed_cond,&folderlock));
+			}
+		} while (sstatus<0);
+
+		if (sstatus==1) { // have servers
+			fsrc->rebalance_in_progress++;
+			fdst->rebalance_in_progress++;
+			zassert(pthread_mutex_unlock(&folderlock));
+			if (changed) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_or(&hddspacechanged,1);
+#else
+				zassert(pthread_mutex_lock(&dclock));
+				hddspacechanged = 1;
+				zassert(pthread_mutex_unlock(&dclock));
+#endif
+			}
+			r = malloc(sizeof(rebalance));
+			passert(r);
+			r->fsrc = fsrc;
+			r->fdst = fdst;
+			job_chunk_move(hdd_move_finished,r,r->fsrc,r->fdst);
+			rebalance_is_on = 1;
+#ifdef HAVE___SYNC_FETCH_AND_OP
+			__sync_fetch_and_or(&global_rebalance_is_on,2);
+#else
+			zassert(pthread_mutex_lock(&dclock));
+			global_rebalance_is_on |= 2;
+			zassert(pthread_mutex_unlock(&dclock));
+#endif
+		} else { // finish HS replication
+			zassert(pthread_mutex_unlock(&folderlock));
+			if (changed) {
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_or(&hddspacechanged,1);
+#else
+				zassert(pthread_mutex_lock(&dclock));
+				hddspacechanged = 1;
+				zassert(pthread_mutex_unlock(&dclock));
+#endif
+			}
+			if (rebalance_is_on) {
+				zassert(pthread_mutex_lock(&folderlock));
+				for (f=folderhead ; f ; f=f->next) {
+					f->read_dist = 0;
+					f->read_first = 1;
+					f->read_corr = 0.0;
+				}
+				zassert(pthread_mutex_unlock(&folderlock));
+				rebalance_finished = monotonic_time;
+			}
+			rebalance_is_on = 0;
+#ifdef HAVE___SYNC_FETCH_AND_OP
+			__sync_fetch_and_and(&global_rebalance_is_on,~2);
+#else
+			zassert(pthread_mutex_lock(&dclock));
+			global_rebalance_is_on &= ~2;
+			zassert(pthread_mutex_unlock(&dclock));
+#endif
+			sleep(1);
+		}
+	}
+}
+
+void* hdd_rebalance_thread(void *arg) {
+	folder *f,*fdst,*fsrc;
+	uint8_t changed;
 	uint8_t rebalance_is_on;
 	double rebalance_finished;
 	double monotonic_time;
@@ -4935,187 +5273,26 @@ void* hdd_rebalance_thread(void *arg) {
 
 		monotonic_time = monotonic_seconds();
 		zassert(pthread_mutex_lock(&folderlock));
-		if (folderactions==0 || (rebalance_finished + 60.0) > monotonic_time || perc==0) {
+		if (folderactions==0 || (rebalance_finished + 60.0) > monotonic_time || perc==0 || HSRebalanceLimit>0) {
 			zassert(pthread_mutex_unlock(&folderlock));
+			if (HSRebalanceLimit>0) {
+				rebalance_is_on = 0;
+#ifdef HAVE___SYNC_FETCH_AND_OP
+				__sync_fetch_and_and(&global_rebalance_is_on,~1);
+#else
+				zassert(pthread_mutex_lock(&dclock));
+				global_rebalance_is_on &= ~1;
+				zassert(pthread_mutex_unlock(&dclock));
+#endif
+			}
 			sleep(1);
 			continue;
 		}
-		// check REBALANCE_FORCE_SRC and REBALANCE_FORCE_DST
-		abovecnt = 0;
-		belowcnt = 0;
-		avgcount = 0;
-		changed = 0;
-		for (f=folderhead ; f ; f=f->next) {
-			if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0) {
-//				if (f->needrefresh || (f->lastrefresh<monotonic_time && rebalance_is_on)) {
-				if (f->needrefresh || rebalance_is_on) {
-					hdd_refresh_usage(f);
-					f->needrefresh = 0;
-					f->lastrefresh = monotonic_time;
-					changed = 1;
-				}
-				if (f->balancemode==REBALANCE_FORCE_SRC) {
-					abovecnt++;
-				} else if (f->balancemode==REBALANCE_FORCE_DST) {
-					belowcnt++;
-				} else {
-					avgcount++;
-				}
-			}
-			f->tmpbalancemode = REBALANCE_NONE;
-		}
-		rebalance_servers = 0;
-		if ((abovecnt>0 && (belowcnt+avgcount)>0) || (belowcnt>0 && (abovecnt+avgcount)>0)) { // force data movement
-			for (f=folderhead ; f ; f=f->next) {
-				if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0) {
-					usage = f->total-f->avail;
-					usage /= f->total;
-					if (abovecnt==0) {
-						if (f->balancemode==REBALANCE_FORCE_DST && usage<REBALANCE_DST_MAX_USAGE) {
-							f->tmpbalancemode = REBALANCE_DST;
-							rebalance_servers |= 1;
-						} else if (f->chunkcount>0) {
-							f->tmpbalancemode = REBALANCE_SRC;
-							rebalance_servers |= 2;
-						}
-					} else if (belowcnt==0) {
-						if (f->balancemode==REBALANCE_FORCE_SRC && f->chunkcount>0) {
-							f->tmpbalancemode = REBALANCE_SRC;
-							rebalance_servers |= 2;
-						} else if (usage<REBALANCE_DST_MAX_USAGE) {
-							f->tmpbalancemode = REBALANCE_DST;
-							rebalance_servers |= 1;
-						}
-					} else {
-						if (f->balancemode==REBALANCE_FORCE_DST && usage<REBALANCE_DST_MAX_USAGE) {
-							f->tmpbalancemode = REBALANCE_DST;
-							rebalance_servers |= 1;
-						} else if (f->balancemode==REBALANCE_FORCE_SRC && f->chunkcount>0) {
-							f->tmpbalancemode = REBALANCE_SRC;
-							rebalance_servers |= 2;
-						}
-					}
-				}
-			}
-		} else { // usage rebalance
-			rebalancediff = REBALANCE_DIFF_MAX;
-			if (rebalance_is_on) {
-				rebalancediff /= 2.0;
-			}
-			avgusage = 0.0;
-			avgcount = 0;
-			for (f=folderhead ; f ; f=f->next) {
-				if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
-					usage = f->total-f->avail;
-					usage /= f->total;
-					avgusage += usage;
-					avgcount++;
-				}
-			}
-			if (avgcount>0) {
-				avgusage /= avgcount;
-				belowcnt = 0;
-				belowsum = 0;
-				abovecnt = 0;
-				abovesum = 0;
-				for (f=folderhead ; f ; f=f->next) {
-					if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
-						usage = f->total-f->avail;
-						usage /= f->total;
-						if (usage < avgusage - rebalancediff) {
-							belowcnt++;
-							belowsum+=f->total;
-						} else if (usage > avgusage + rebalancediff) {
-							abovecnt++;
-							abovesum+=f->total;
-						}
-					}
-				}
-				if (abovecnt>0 || belowcnt>0) {
-					for (f=folderhead ; f ; f=f->next) {
-						if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
-							usage = f->total-f->avail;
-							usage /= f->total;
-							if ((((usage < avgusage - rebalancediff) && belowcnt>0) || ((usage <= avgusage + rebalancediff) && belowcnt==0)) && usage<REBALANCE_DST_MAX_USAGE) {
-								f->tmpbalancemode = REBALANCE_DST;
-								rebalance_servers |= 1;
-							} else if ((((usage > avgusage + rebalancediff) && abovecnt>0) || ((usage >= avgusage - rebalancediff) && abovecnt==0)) && f->chunkcount>0) {
-								f->tmpbalancemode = REBALANCE_SRC;
-								rebalance_servers |= 2;
-							}
-						}
-					}
-				}
-			}
-		}
-		fdst = NULL;
-		fsrc = NULL;
-		if (rebalance_servers==3) {
-			belowcnt = 0;
-			belowsum = 0;
-			abovecnt = 0;
-			abovesum = 0;
-			for (f=folderhead ; f ; f=f->next) {
-				if (f->tmpbalancemode == REBALANCE_DST) {
-					belowcnt++;
-					belowsum+=f->total;
-				} else if (f->tmpbalancemode == REBALANCE_SRC) {
-					abovecnt++;
-					abovesum+=f->total;
-				}
-			}
-			aboveminerr = 0.0;
-			belowminerr = 0.0;
-			for (f=folderhead ; f ; f=f->next) {
-				if (f->tmpbalancemode == REBALANCE_DST) {
-					f->write_dist++;
-					if (f->write_first) {
-						err = 1.0;
-					} else {
-						expdist = belowsum;
-						expdist /= f->total;
-						err = (expdist + f->write_corr) / f->write_dist;
-					}
-					if (fdst==NULL || err<belowminerr) {
-						belowminerr = err;
-						fdst = f;
-					}
-				} else if (f->tmpbalancemode == REBALANCE_SRC) {
-					f->read_dist++;
-					if (f->read_first) {
-						err = 1.0;
-					} else {
-						expdist = abovesum;
-						expdist /= f->total;
-						err = (expdist + f->read_corr) / f->read_dist;
-					}
-					if (fsrc==NULL || err<aboveminerr) {
-						aboveminerr = err;
-						fsrc = f;
-					}
-				}
-			}
-		}
-		if (fdst && fsrc) {
+
+		if (hdd_rebalance_find_servers(&fsrc,&fdst,&changed,rebalance_is_on,0)) {
 //			syslog(LOG_NOTICE,"debug: move %s -> %s",fsrc->path,fdst->path);
-			if (fsrc->read_first) {
-				fsrc->read_first = 0;
-			} else {
-				expdist = abovesum;
-				expdist /= fsrc->total;
-				fsrc->read_corr += expdist - fsrc->read_dist;
-			}
-			fsrc->read_dist = 0;
-			if (fdst->write_first) {
-				fdst->write_first = 0;
-			} else {
-				expdist = belowsum;
-				expdist /= fdst->total;
-				fdst->write_corr += expdist - fdst->write_dist;
-			}
-			fdst->write_dist = 0;
-			fsrc->rebalance_in_progress = 1;
-			fdst->rebalance_in_progress = 1;
+			fsrc->rebalance_in_progress++;
+			fdst->rebalance_in_progress++;
 			zassert(pthread_mutex_unlock(&folderlock));
 			if (changed) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
@@ -5130,8 +5307,8 @@ void* hdd_rebalance_thread(void *arg) {
 			(void)hdd_int_move(fsrc,fdst);
 			en = monotonic_useconds();
 			zassert(pthread_mutex_lock(&folderlock));
-			fsrc->rebalance_in_progress = 0;
-			fdst->rebalance_in_progress = 0;
+			fsrc->rebalance_in_progress--;
+			fdst->rebalance_in_progress--;
 			fdst->rebalance_last_usec = en;
 			zassert(pthread_mutex_unlock(&folderlock));
 			rebalance_is_on = 1;
@@ -5139,7 +5316,7 @@ void* hdd_rebalance_thread(void *arg) {
 			__sync_fetch_and_or(&global_rebalance_is_on,1);
 #else
 			zassert(pthread_mutex_lock(&dclock));
-			global_rebalance_is_on = 1;
+			global_rebalance_is_on |= 1;
 			zassert(pthread_mutex_unlock(&dclock));
 #endif
 			if (perc<100 && en>st) {
@@ -5175,10 +5352,10 @@ void* hdd_rebalance_thread(void *arg) {
 			}
 			rebalance_is_on = 0;
 #ifdef HAVE___SYNC_FETCH_AND_OP
-			__sync_fetch_and_and(&global_rebalance_is_on,0);
+			__sync_fetch_and_and(&global_rebalance_is_on,~1);
 #else
 			zassert(pthread_mutex_lock(&dclock));
-			global_rebalance_is_on = 0;
+			global_rebalance_is_on &= ~1;
 			zassert(pthread_mutex_unlock(&dclock));
 #endif
 			sleep(1);
@@ -5395,6 +5572,7 @@ void hdd_testshuffle(folder *f) {
 	}
 	f->testhead = NULL;
 	f->testtail = &(f->testhead);
+	f->nexttest = 0;
 	for (i=0 ; i<chunksno ; i++) {
 		c = csorttab[i];
 		c->testnext = NULL;
@@ -5436,7 +5614,6 @@ void hdd_testsort(folder *f) {
 	}
 	f->testhead = NULL;
 	f->testtail = &(f->testhead);
-	f->nexttest = 0;
 	for (i=0 ; i<chunksno ; i++) {
 		c = csorttab[i];
 		c->testnext = NULL;
@@ -6011,6 +6188,7 @@ void hdd_term(void) {
 	if (i==0) {
 		zassert(pthread_join(testerthread,NULL));
 		zassert(pthread_join(foldersthread,NULL));
+		zassert(pthread_join(hsrebalancethread,NULL));
 		zassert(pthread_join(rebalancethread,NULL));
 		zassert(pthread_join(delayedthread,NULL));
 	}
@@ -6713,6 +6891,10 @@ static inline void hdd_options_common(uint8_t initflag) {
 	if (HDDRebalancePerc>100) {
 		HDDRebalancePerc=100;
 	}
+	HSRebalanceLimit = cfg_getuint32("HDD_HIGH_SPEED_REBALANCE_LIMIT",0);
+	if (HSRebalanceLimit>10) {
+		HSRebalanceLimit=10;
+	}
 	MinTimeBetweenTests = cfg_getuint32("HDD_MIN_TEST_INTERVAL",86400);
 #if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
 	MinFlushCacheTime = cfg_getint32("HDD_FADVISE_MIN_TIME",86400);
@@ -6764,6 +6946,7 @@ int hdd_late_init(void) {
 	zassert(lwt_minthread_create(&testerthread,0,hdd_tester_thread,NULL));
 	zassert(lwt_minthread_create(&foldersthread,0,hdd_folders_thread,NULL));
 	zassert(lwt_minthread_create(&rebalancethread,0,hdd_rebalance_thread,NULL));
+	zassert(lwt_minthread_create(&hsrebalancethread,0,hdd_highspeed_rebalance_thread,NULL));
 	zassert(lwt_minthread_create(&delayedthread,0,hdd_delayed_thread,NULL));
 	return 0;
 }

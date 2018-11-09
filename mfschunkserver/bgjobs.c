@@ -69,7 +69,8 @@ enum {
 	OP_REPLICATE,
 	OP_GETBLOCKS,
 	OP_GETCHECKSUM,
-	OP_GETCHECKSUMTAB
+	OP_GETCHECKSUMTAB,
+	OP_CHUNKMOVE,
 };
 
 // for OP_CHUNKOP
@@ -127,6 +128,12 @@ typedef struct _chunk_ij_args {
 	uint32_t version;
 	void *pointer;
 } chunk_ij_args;
+
+// for OP_CHUNKMOVE
+typedef struct _chunk_mv_args {
+	void *fsrc;
+	void *fdst;
+} chunk_mv_args;
 
 typedef struct _job {
 	uint32_t jobid;
@@ -247,6 +254,7 @@ static inline void job_close_worker(worker *w) {
 #define rwargs ((chunk_rw_args*)(jptr->args))
 #define rpargs ((chunk_rp_args*)(jptr->args))
 #define ijargs ((chunk_ij_args*)(jptr->args))
+#define mvargs ((chunk_mv_args*)(jptr->args))
 void* job_worker(void *arg) {
 	worker *w = (worker*)arg;
 	jobpool *jp = w->jp;
@@ -371,6 +379,13 @@ void* job_worker(void *arg) {
 					status = MFS_ERROR_NOTDONE;
 				} else {
 					status = hdd_get_checksum_tab(ijargs->chunkid,ijargs->version,ijargs->pointer);
+				}
+				break;
+			case OP_CHUNKMOVE:
+				if (jstate==JSTATE_DISABLED) {
+					status = MFS_ERROR_NOTDONE;
+				} else {
+					status = hdd_move(mvargs->fsrc,mvargs->fdst);
 				}
 				break;
 			default: // OP_EXIT
@@ -740,6 +755,16 @@ uint32_t job_get_chunk_checksum_tab(void (*callback)(uint8_t status,void *extra)
 	return job_new(jp,OP_GETCHECKSUMTAB,args,callback,extra);
 }
 
+uint32_t job_chunk_move(void (*callback)(uint8_t status,void *extra),void *extra,void *fsrc,void *fdst) {
+	jobpool* jp = globalpool;
+	chunk_mv_args *args;
+	args = malloc(sizeof(chunk_mv_args));
+	passert(args);
+	args->fsrc = fsrc;
+	args->fdst = fdst;
+	return job_new(jp,OP_CHUNKMOVE,args,callback,extra);
+}
+
 void job_desc(struct pollfd *pdesc,uint32_t *ndesc) {
 	uint32_t pos = *ndesc;
 	jobpool* jp = globalpool;
@@ -818,6 +843,9 @@ int job_init(void) {
 	exiting = 0;
 	globalpool = job_pool_new(cfg_getuint32("WORKERS_QUEUE_LENGTH",250)); // deprecated option
 
+	if (globalpool==NULL) {
+		return -1;
+	}
 	job_reload();
 
 	main_destruct_register(job_term);

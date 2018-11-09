@@ -62,7 +62,7 @@
 // has to be less than MaxPacketSize on master side divided by 12
 #define NEWCHUNKLIMIT 25000
 
-#define REPORT_LOAD_FREQ 60
+#define REPORT_LOAD_FREQ 5
 #define REPORT_SPACE_FREQ 1
 
 // force disconnection X seconds after term signal
@@ -673,14 +673,19 @@ void masterconn_heavyload(uint32_t load,uint8_t hlstatus) {
 	masterconn *eptr = masterconnsingleton;
 	uint8_t *buff;
 	uint8_t hltosend;
+	uint8_t rebalance;
 
 	if (eptr->registerstate==REGISTERED && eptr->mode==DATA && eptr->masterversion>=VERSION2INT(3,0,7)) {
 		if (hlstatus != eptr->hlstatus) {
 			hltosend = hlstatus;
-			if (hlstatus!=2 && hdd_is_rebalance_on()) {
+			rebalance = hdd_is_rebalance_on();
+			if (rebalance&2) { // in high speed rebalance force 'overloaded' status
+				hltosend = 2;
+			}
+			if (hlstatus!=2 && (rebalance&1)) { // not overloaded and in low speed rebalance - send 'rebalance' status
 				hltosend = 3;
 			}
-			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==3) {
+			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==3) { // does master know about 'rebalance' status? if not then send 'overloaded'
 				hltosend = 2;
 			}
 			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);
@@ -749,15 +754,20 @@ void masterconn_reportload(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t load;
 	uint8_t hltosend;
+	uint8_t rebalance;
 	uint8_t *buff;
 	if (eptr->mode==DATA && eptr->masterversion>=VERSION2INT(1,6,28) && eptr->registerstate==REGISTERED) {
 		load = job_getload();
 		if (eptr->masterversion>=VERSION2INT(3,0,7)) {
 			hltosend = eptr->hlstatus;
-			if (hltosend!=2 && hdd_is_rebalance_on()) {
+			rebalance = hdd_is_rebalance_on();
+			if (rebalance&2) { // in high speed rebalance force 'overloaded' status
+				hltosend = 2;
+			}
+			if (hltosend!=2 && (rebalance&1)) { // not overloaded and in low speed rebalance - send 'rebalance' status
 				hltosend = 3;
 			}
-			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==3) {
+			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==3) { // does master know about 'rebalance' status? if not then send 'overloaded'
 				hltosend = 2;
 			}
 			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);

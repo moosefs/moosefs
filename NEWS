@@ -1,8 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.102-1 (WIP)
+* MooseFS 3.0.102-1 (2018-07-25)
 
   - (cs) changed chunk testing routine (new definition is in MB/s per disk)
+  - (cs) added optional high speed internal rebalancing
 
 * MooseFS 3.0.101-1 (2018-07-12)
 

@@ -57,6 +57,7 @@ uint32_t job_get_chunk_blocks(void (*callback)(uint8_t status,void *extra),void 
 uint32_t job_get_chunk_checksum(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint8_t *checksum);
 uint32_t job_get_chunk_checksum_tab(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint8_t *checksum_tab);
 
+uint32_t job_chunk_move(void (*callback)(uint8_t status,void *extra),void *extra,void *fsrc,void *fdst);
 // uint32_t job_mainserv(int sock);
 
 int job_init(void);

@@ -2627,40 +2627,65 @@ void chunk_got_delete_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
 
 void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,uint8_t status) {
 	chunk *c;
-	slist *s;
+	slist *s,**st;
+	uint8_t fix;
+
 	c = chunk_find(chunkid);
 	if (c==NULL) {
 		return ;
 	}
 	if (c->operation==REPLICATE) { // high priority replication
-		for (s=c->slisthead ; s ; s=s->next) {
-			if (s->csid == csid) {
-				if (s->valid!=BUSY) {
-					syslog(LOG_WARNING,"got replication status from server not set as busy !!!");
-				}
-				if (status!=0 || version!=c->version) {
-					if (s->valid==TDBUSY || s->valid==TDVALID) {
-						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
-						c->allvalidcopies--;
-					}
-					if (s->valid==BUSY || s->valid==VALID) {
-						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
-						c->allvalidcopies--;
-						c->regularvalidcopies--;
-					}
-					if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
+		fix = 0;
+		if (status!=0) { // chunk hasn't been replicated (error occured) - simply remove it from copies
+			st = &(c->slisthead);
+			while (*st) {
+				s = *st;
+				if (s->csid==csid && s->valid==BUSY) {
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+					c->allvalidcopies--;
+					c->regularvalidcopies--;
+					if (c->writeinprogress) {
 						matocsserv_write_counters(cstab[s->csid].ptr,0);
 					}
-					s->valid = INVALID;
-					s->version = 0;	// after unfinished operation can't be shure what version chunk has
+					fix = 1;
+					*st = s->next;
+					chunk_delopchunk(s->csid,c->chunkid);
+					slist_free(s);
 				} else {
-					if (s->valid == BUSY || s->valid == VALID) {
-						s->valid = VALID;
-					}
+					st = &(s->next);
 				}
-				chunk_delopchunk(s->csid,c->chunkid);
-			} else if (s->valid==BUSY) {
-				syslog(LOG_WARNING,"got replication status from one server, but another is set as busy !!!");
+			}
+		}
+		if (fix==0) {
+			for (s=c->slisthead ; s ; s=s->next) {
+				if (s->csid == csid) {
+					if (s->valid!=BUSY) {
+						syslog(LOG_WARNING,"got replication status from server not set as busy !!!");
+					}
+					if (status!=0 || version!=c->version) {
+						if (s->valid==TDBUSY || s->valid==TDVALID) {
+							chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies);
+							c->allvalidcopies--;
+						}
+						if (s->valid==BUSY || s->valid==VALID) {
+							chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies-1,c->regularvalidcopies,c->regularvalidcopies-1);
+							c->allvalidcopies--;
+							c->regularvalidcopies--;
+						}
+						if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
+							matocsserv_write_counters(cstab[s->csid].ptr,0);
+						}
+						s->valid = INVALID;
+						s->version = 0;	// after unfinished operation can't be shure what version chunk has
+					} else {
+						if (s->valid == BUSY || s->valid == VALID) {
+							s->valid = VALID;
+						}
+					}
+					chunk_delopchunk(s->csid,c->chunkid);
+				} else if (s->valid==BUSY) {
+					syslog(LOG_WARNING,"got replication status from one server, but another is set as busy !!!");
+				}
 			}
 		}
 		c->operation = NONE;

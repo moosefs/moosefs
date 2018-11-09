@@ -363,6 +363,7 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 		put8bit(&wptr,status);
 		return mainserv_send_and_free(sock,packet,8+1);
 	}
+	hdd_precache_data(chunkid,offset,size);
 	rcvd = 0;
 	while (size>0) {
 		blocknum = (offset)>>MFSBLOCKBITS;

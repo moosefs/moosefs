@@ -295,9 +295,7 @@ static uint32_t HDDErrorTime = 600;
 static uint64_t LeaveFree;
 static uint8_t DoFsyncBeforeClose = 0;
 static uint32_t MinTimeBetweenTests = 86400;
-#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
 static int32_t MinFlushCacheTime = 86400;
-#endif
 
 /* folders data */
 static folder *folderhead = NULL;
@@ -2579,6 +2577,43 @@ int hdd_close(uint64_t chunkid) {
 	return status;
 }
 
+static void hdd_sequential_mode_int(chunk *c) {
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_SEQUENTIAL)
+	posix_fadvise(c->fd,c->hdrsize+CHUNKCRCSIZE,0,POSIX_FADV_SEQUENTIAL);
+#else
+	(void)c;
+#endif
+}
+
+static void hdd_drop_caches_int(chunk *c) {
+#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
+	posix_fadvise(c->fd,0,0,POSIX_FADV_DONTNEED);
+#else
+	(void)c;
+#endif
+}
+
+void hdd_precache_data(uint64_t chunkid,uint32_t offset,uint32_t size) {
+#if defined(HAVE_POSIX_FADVISE)	&& (defined(POSIX_FADV_WILLNEED) || defined(POSIX_FADV_SEQUENTIAL))
+	chunk *c;
+	c = hdd_chunk_find(chunkid);
+	if (c==NULL) {
+		return;
+	}
+#  ifdef POSIX_FADV_SEQUENTIAL
+	posix_fadvise(c->fd,c->hdrsize+CHUNKCRCSIZE+offset,size,POSIX_FADV_SEQUENTIAL);
+#  endif
+#  ifdef POSIX_FADV_WILLNEED
+	posix_fadvise(c->fd,c->hdrsize+CHUNKCRCSIZE+offset,size,POSIX_FADV_WILLNEED);
+#  endif
+	hdd_chunk_release(c);
+#else
+	(void)chunkid;
+	(void)offset;
+	(void)size;
+#endif
+}
+
 int hdd_read(uint64_t chunkid,uint32_t version,uint16_t blocknum,uint8_t *buffer,uint32_t offset,uint32_t size,uint8_t *crcbuff) {
 	chunk *c;
 	int ret;
@@ -3311,6 +3346,7 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version,uint16_t *blocks) {
 		hdd_chunk_release(c);
 		return status;
 	}
+	hdd_sequential_mode_int(c);
 	now = main_time();
 	if (lasttesttime+MinTimeBetweenTests<=now) {
 		lseek(c->fd,c->hdrsize+CHUNKCRCSIZE,SEEK_SET);
@@ -3350,11 +3386,9 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version,uint16_t *blocks) {
 				return MFS_ERROR_CRC;
 			}
 		}
-#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
 		if (MinFlushCacheTime>=0 && lasttesttime+MinFlushCacheTime<=now) {
-			posix_fadvise(c->fd,0,0,POSIX_FADV_DONTNEED);
+			hdd_drop_caches_int(c);
 		}
-#endif
 	}
 	status = hdd_io_end(c);
 	if (status!=MFS_STATUS_OK) {
@@ -3489,6 +3523,7 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 			return status;
 		}
 	}
+	hdd_sequential_mode_int(oc);
 	status = hdd_io_begin(c,MODE_NEW);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
@@ -4001,6 +4036,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 			return status;
 		}
 	}
+	hdd_sequential_mode_int(oc);
 	status = hdd_io_begin(c,MODE_NEW);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
@@ -4695,6 +4731,7 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 		hdd_chunk_release(c);
 		return status;
 	}
+	hdd_sequential_mode_int(c);
 
 	/* create tmp file name */
 	leng = strlen(fdst->path);
@@ -4848,6 +4885,7 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 			return MFS_ERROR_IO;	//write error
 		}
 	}
+	hdd_drop_caches_int(c);
 	status = hdd_io_end(c);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
@@ -6825,9 +6863,7 @@ static inline void hdd_options_common(uint8_t initflag) {
 		HSRebalanceLimit=10;
 	}
 	MinTimeBetweenTests = cfg_getuint32("HDD_MIN_TEST_INTERVAL",86400);
-#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
 	MinFlushCacheTime = cfg_getint32("HDD_FADVISE_MIN_TIME",86400);
-#endif
 	zassert(pthread_mutex_unlock(&testlock));
 	zassert(pthread_mutex_lock(&doplock));
 	DoFsyncBeforeClose = cfg_getuint8("HDD_FSYNC_BEFORE_CLOSE",0);

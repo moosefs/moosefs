@@ -61,6 +61,9 @@ uint8_t hdd_is_rebalance_on(void);
 /* emergency chunk read - ignore errors, do retries */
 int hdd_emergency_read(uint64_t chunkid,uint32_t *version,uint16_t blocknum,uint8_t buffer[MFSBLOCKSIZE],uint8_t retries,uint8_t *errorflags);
 
+/* precache data */
+void hdd_precache_data(uint64_t chunkid,uint32_t offset,uint32_t size);
+
 /* I/O operations */
 int hdd_open(uint64_t chunkid,uint32_t version);
 int hdd_close(uint64_t chunkid);

@@ -1,11 +1,12 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.103-1 (WIP)
+* MooseFS 3.0.103-1 (2018-09-10)
 
   - (master+client) added space reservation for superuser
   - (bdev) new module for Linux - dedicated block device
   - (daemons) added optional 'processname_set' function
   - (daemons) fixed waitpid condition
+  - (cs) added data precaching (posix_fadcvise(WILLNEED)) before reading chunk data
 
 * MooseFS 3.0.102-1 (2018-07-25)
 

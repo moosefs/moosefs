@@ -2682,6 +2682,12 @@ void matocsserv_keep_alive(void) {
 	}
 }
 
+void matocsserv_close_lsock(void) { // after fork
+	if (lsock>=0) {
+		close(lsock);
+	}
+}
+
 void matocsserv_term(void) {
 	matocsserventry *eptr,*eaptr;
 	in_packetstruct *ipptr,*ipaptr;

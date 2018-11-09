@@ -1061,6 +1061,12 @@ void matomlserv_keep_alive(void) {
 	}
 }
 
+void matomlserv_close_lsock(void) { // after fork
+	if (lsock>=0) {
+		close(lsock);
+	}
+}
+
 void matomlserv_term(void) {
 	matomlserventry *eptr,*eaptr;
 	in_packetstruct *ipptr,*ipaptr;

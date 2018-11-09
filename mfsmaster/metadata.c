@@ -63,6 +63,9 @@
 #include "merger.h"
 #include "changelog.h"
 #include "clocks.h"
+#include "matoclserv.h"
+#include "matocsserv.h"
+#include "matomlserv.h"
 #include "processname.h"
 
 #include "cfg.h"
@@ -700,6 +703,9 @@ int meta_storeall(int bg) {
 		if (i<0) {
 			mfs_errlog(LOG_WARNING,"fork error (store data in foreground - it will block master for a while)");
 		} else if (i==0) { // child
+			matocsserv_close_lsock();
+			matoclserv_close_lsock();
+			matomlserv_close_lsock();
 			processname_set("mfsmaster (metadata saver)");
 		}
 	} else {

@@ -74,6 +74,7 @@ uint8_t matocsserv_isvalid(void *e);
 void matocsserv_disconnection_finished(void *e);
 int matocsserv_no_more_pending_jobs(void);
 void matocsserv_disconnect_all(void);
+void matocsserv_close_lsock(void);
 int matocsserv_init(void);
 
 #endif

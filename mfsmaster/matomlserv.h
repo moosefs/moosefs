@@ -33,6 +33,7 @@ void matomlserv_broadcast_logrotate();
 int matomlserv_no_more_pending_jobs(void);
 void matomlserv_disconnect_all(void);
 uint16_t matomlserv_getport(void);
+void matomlserv_close_lsock(void);
 int matomlserv_init(void);
 
 #endif

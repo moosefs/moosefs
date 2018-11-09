@@ -58,6 +58,9 @@ how often (in hours) master will store metadata (default is 1)
 .B METADATA_DOWNLOAD_FREQ
 how often (in hours) leader will download metadata from followers (pro version only ; default is 24)
 .TP
+.B METADATA_DOWNLOAD_LIMIT
+metadata downloading limit in mebibytes per second (pro version only ; 0 means no limit, default is 50 - 50MiB/s = ~52.4MB/s)
+.TP
 .B BACK_META_KEEP_PREVIOUS
 number of previous metadata files to be kept (default is 1)
 .TP

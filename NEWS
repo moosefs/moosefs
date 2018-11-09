@@ -9,6 +9,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) added data precaching (posix_fadcvise(WILLNEED)) before reading chunk data
   - (master) remove chunk copy from structures (instead of leaving as INVALID) when replication returned error
   - (master) close listen sockets after fork (metadata save in background)
+  - (master) added subprocess for saving downloaded metadata in background (pro only)
 
 * MooseFS 3.0.102-1 (2018-07-25)
 

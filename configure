@@ -16796,7 +16796,7 @@ _ACEOF
 
 
 
-ac_config_files="$ac_config_files Makefile mfsmanpages/Makefile mfschunkserver/Makefile mfsscripts/Makefile mfsdata/Makefile mfsmaster/Makefile mfsmetadump/Makefile mfsmetalogger/Makefile mfssupervisor/Makefile mfsmount/Makefile mfsnetdump/Makefile mfstests/Makefile systemd/Makefile mfsscripts/mfscli.py mfsscripts/chart.cgi mfsscripts/index.html mfsscripts/mfscgiserv.py mfsdata/mfschunkserver.cfg mfsdata/mfsmaster.cfg mfsdata/mfsmetalogger.cfg mfsdata/mfsmount.cfg systemd/moosefs-cgiserv.service systemd/moosefs-chunkserver.service systemd/moosefs-chunkserver@.service systemd/moosefs-master.service systemd/moosefs-master@.service systemd/moosefs-metalogger.service systemd/moosefs-metalogger@.service"
+ac_config_files="$ac_config_files Makefile mfsmanpages/Makefile mfschunkserver/Makefile mfsscripts/Makefile mfsdata/Makefile mfsmaster/Makefile mfsmetadump/Makefile mfsmetalogger/Makefile mfssupervisor/Makefile mfsclient/Makefile mfsnetdump/Makefile mfstests/Makefile systemd/Makefile mfsscripts/mfscli.py mfsscripts/chart.cgi mfsscripts/index.html mfsscripts/mfscgiserv.py mfsdata/mfschunkserver.cfg mfsdata/mfsmaster.cfg mfsdata/mfsmetalogger.cfg mfsdata/mfsmount.cfg systemd/moosefs-cgiserv.service systemd/moosefs-chunkserver.service systemd/moosefs-chunkserver@.service systemd/moosefs-master.service systemd/moosefs-master@.service systemd/moosefs-metalogger.service systemd/moosefs-metalogger@.service"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -16980,8 +16980,8 @@ if test -z "${BUILD_NETDUMP_TRUE}" && test -z "${BUILD_NETDUMP_FALSE}"; then
   as_fn_error $? "conditional \"BUILD_NETDUMP\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
-if test -z "${BUILD_MOUNT_TRUE}" && test -z "${BUILD_MOUNT_FALSE}"; then
-  as_fn_error $? "conditional \"BUILD_MOUNT\" was never defined.
+if test -z "${BUILD_CLIENT_TRUE}" && test -z "${BUILD_CLIENT_FALSE}"; then
+  as_fn_error $? "conditional \"BUILD_CLIENT\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${CREATE_ETC_MFS_TRUE}" && test -z "${CREATE_ETC_MFS_FALSE}"; then
@@ -17879,7 +17879,7 @@ do
     "mfsmetadump/Makefile") CONFIG_FILES="$CONFIG_FILES mfsmetadump/Makefile" ;;
     "mfsmetalogger/Makefile") CONFIG_FILES="$CONFIG_FILES mfsmetalogger/Makefile" ;;
     "mfssupervisor/Makefile") CONFIG_FILES="$CONFIG_FILES mfssupervisor/Makefile" ;;
-    "mfsmount/Makefile") CONFIG_FILES="$CONFIG_FILES mfsmount/Makefile" ;;
+    "mfsclient/Makefile") CONFIG_FILES="$CONFIG_FILES mfsclient/Makefile" ;;
     "mfsnetdump/Makefile") CONFIG_FILES="$CONFIG_FILES mfsnetdump/Makefile" ;;
     "mfstests/Makefile") CONFIG_FILES="$CONFIG_FILES mfstests/Makefile" ;;
     "systemd/Makefile") CONFIG_FILES="$CONFIG_FILES systemd/Makefile" ;;

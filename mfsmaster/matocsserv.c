@@ -50,6 +50,7 @@
 #include "sockets.h"
 #include "chunks.h"
 #include "random.h"
+#include "sizestr.h"
 #include "slogger.h"
 #include "massert.h"
 #include "mfsstrerr.h"
@@ -62,6 +63,9 @@
 #define MaxPacketSize CSTOMA_MAXPACKETSIZE
 
 #define MANAGER_SWITCH_CONST 5
+
+// ReserveSpaceMode
+enum{RESERVE_BYTES,RESERVE_PERCENT,RESERVE_CHUNKSERVER_USED,RESERVE_CHUNKSERVER_TOTAL};
 
 // matocsserventry.mode
 enum{KILL,DATA,FINISH};
@@ -143,6 +147,10 @@ static matocsserventry *matocsservhead=NULL;
 static int lsock;
 static int32_t lsockpdescpos;
 
+static uint64_t gtotalspace = 0;
+static uint64_t gavailspace = 0;
+static uint64_t gfreespace = 0;
+
 // from config
 static char *ListenHost;
 static char *ListenPort;
@@ -151,6 +159,8 @@ static char *AuthCode = NULL;
 static uint32_t RemapMask = 0;
 static uint32_t RemapSrc = 0;
 static uint32_t RemapDst = 0;
+static double ReserveSpaceValue = 0.0;
+static uint8_t ReserveSpaceMode = RESERVE_BYTES;
 
 /* replications DB */
 
@@ -941,20 +951,66 @@ uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replim
 	return j;
 }
 
-
-void matocsserv_getspace(uint64_t *totalspace,uint64_t *availspace) {
+void matocsserv_calculate_space(void) {
 	matocsserventry *eptr;
-	uint64_t tspace,uspace;
+	uint64_t tspace,uspace,rspace;
+	uint64_t muspace,mtspace;
 	tspace = 0;
 	uspace = 0;
+	muspace = 0;
+	mtspace = 0;
 	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
 		if (eptr->mode!=KILL && eptr->totalspace>0) {
 			tspace += eptr->totalspace;
 			uspace += eptr->usedspace;
+			if (eptr->usedspace > muspace) {
+				muspace = eptr->usedspace;
+			}
+			if (eptr->totalspace > mtspace) {
+				mtspace = eptr->totalspace;
+			}
 		}
 	}
-	*totalspace = tspace;
-	*availspace = tspace-uspace;
+	switch (ReserveSpaceMode) {
+		case RESERVE_PERCENT:
+			rspace = ReserveSpaceValue * (tspace / 100.0);
+			break;
+		case RESERVE_CHUNKSERVER_USED:
+			rspace = ReserveSpaceValue * muspace;
+			break;
+		case RESERVE_CHUNKSERVER_TOTAL:
+			rspace = ReserveSpaceValue * mtspace;
+			break;
+		case RESERVE_BYTES:
+		default:
+			rspace = ReserveSpaceValue;
+			break;
+	}
+
+	gtotalspace = tspace;
+	gfreespace = tspace-uspace;
+	if (rspace > gfreespace) {
+		gavailspace = 0;
+	} else {
+		gavailspace = gfreespace - rspace;
+	}
+}
+
+
+int matocsserv_have_availspace(void) {
+	return (gavailspace>0)?1:0;
+}
+
+void matocsserv_getspace(uint64_t *totalspace,uint64_t *availspace,uint64_t *freespace) {
+	if (totalspace!=NULL) {
+		*totalspace = gtotalspace;
+	}
+	if (availspace!=NULL) {
+		*availspace = gavailspace;
+	}
+	if (freespace!=NULL) {
+		*freespace = gfreespace;
+	}
 }
 
 char* matocsserv_getstrip(void *e) {
@@ -2720,6 +2776,9 @@ void matocsserv_reload_common(void) {
 	uint8_t bits,err;
 	char *srcip,*dstip;
 	uint32_t srcclass,dstclass,mask;
+	char *reservespace;
+	const char *endptr;
+	double reservespacevalue;
 
 	DefaultTimeout = cfg_getuint32("MATOCS_TIMEOUT",10);
 	if (DefaultTimeout>65535) {
@@ -2735,6 +2794,25 @@ void matocsserv_reload_common(void) {
 	if (cfg_isdefined("AUTH_CODE")) {
 		AuthCode = cfg_getstr("AUTH_CODE","");
 	}
+
+	reservespace = cfg_getstr("RESERVE_SPACE","0");
+	reservespacevalue = sizestrtod(reservespace,&endptr);
+	if (endptr[0]=='\0' || (endptr[0]=='B' && endptr[1]=='\0')) {
+		ReserveSpaceValue = reservespacevalue;
+		ReserveSpaceMode = RESERVE_BYTES;
+	} else if (endptr[0]=='%' && endptr[1]=='\0') {
+		ReserveSpaceValue = reservespacevalue;
+		ReserveSpaceMode = RESERVE_PERCENT;
+	} else if (endptr[0]=='U' && endptr[1]=='\0') {
+		ReserveSpaceValue = reservespacevalue;
+		ReserveSpaceMode = RESERVE_CHUNKSERVER_USED;
+	} else if (endptr[0]=='C' && endptr[1]=='\0') {
+		ReserveSpaceValue = reservespacevalue;
+		ReserveSpaceMode = RESERVE_CHUNKSERVER_TOTAL;
+	} else {
+		mfs_arg_syslog(LOG_WARNING,"error parsing RESERVE_SPACE (\"%s\") ; error on '%c'",reservespace,endptr[0]);
+	}
+	free(reservespace);
 
 	if (cfg_isdefined("REMAP_BITS") && cfg_isdefined("REMAP_SOURCE_IP_CLASS") && cfg_isdefined("REMAP_DESTINATION_IP_CLASS")) {
 		bits = cfg_getuint8("REMAP_BITS",24);
@@ -2864,6 +2942,7 @@ int matocsserv_init(void) {
 	main_info_register(matocsserv_log_extra_info);
 	main_time_register(1,0,matocsserv_privileged_cleanup);
 	main_time_register(1,0,matocsserv_hlstatus_fix);
+	main_time_register(1,0,matocsserv_calculate_space);
 //	main_time_register(TIMEMODE_SKIP_LATE,60,0,matocsserv_status);
 	return 0;
 }

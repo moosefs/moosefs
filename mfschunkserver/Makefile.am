@@ -40,6 +40,7 @@ mfschunkserver_SOURCES= \
 	../mfscommon/datapack.h ../mfscommon/massert.h \
 	../mfscommon/slogger.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/portable.h ../mfscommon/mfsalloc.h \
+	../mfscommon/sizestr.h \
 	../mfscommon/MFSCommunication.h
 
 

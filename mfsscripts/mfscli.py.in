@@ -1826,18 +1826,19 @@ for mhost,mport in masterlist:
 				else:
 					statestr = "UPGRADE THIS UNIT !!!"
 					statecolor = 2
-			elif length==121 or length==129:
+			elif length==121 or length==129 or length==137:
+				offset = 8 if length==137 else 0
 				version = struct.unpack(">HBB",data[:4])
 				conn.set_version(version)
 				memusage,syscpu,usercpu = struct.unpack(">QQQ",data[4:28])
 				syscpu/=10000000.0
 				usercpu/=10000000.0
-				lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">LLB",data[92:101])
+				lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">LLB",data[offset+92:offset+101])
 				if conn.version_at_least(2,0,14):
 					lastsaveseconds = lastsaveseconds / 1000.0
-				workingstate,nextstate,stablestate,sync,leaderip,changetime,metaversion = struct.unpack(">BBBBLLQ",data[101:121])
-				if length==129:
-					exports_checksum = struct.unpack(">Q",data[121:129])[0]
+				workingstate,nextstate,stablestate,sync,leaderip,changetime,metaversion = struct.unpack(">BBBBLLQ",data[offset+101:offset+121])
+				if length>=129:
+					exports_checksum = struct.unpack(">Q",data[offset+121:offset+129])[0]
 				if workingstate==0xFF and nextstate==0xFF and stablestate==0xFF and sync==0xFF:
 					if leaderfound==0:
 						leaderconn = conn
@@ -2901,8 +2902,12 @@ if "IN" in sectionset:
 					tab.append("all chunk copies",allcopies)
 					tab.append("regular chunk copies",tdcopies)
 					print(tab)
-			elif length==101 or length==121 or length==129:
-				v1,v2,v3,memusage,syscpu,usercpu,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies,lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">HBBQQQQQQLQLLLLLLLLLB",masterinfo[:101])
+			elif length==101 or length==121 or length==129 or length==137:
+				if length>=137:
+					v1,v2,v3,memusage,syscpu,usercpu,totalspace,availspace,freespace,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies,lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">HBBQQQQQQQLQLLLLLLLLLB",masterinfo[:109])
+				else:
+					v1,v2,v3,memusage,syscpu,usercpu,totalspace,availspace,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies,lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">HBBQQQQQQLQLLLLLLLLLB",masterinfo[:101])
+					freespace = None
 				strver,sortver = version_str_and_sort((v1,v2,v3))
 				syscpu/=10000000.0
 				usercpu/=10000000.0
@@ -2944,10 +2949,12 @@ if "IN" in sectionset:
 						out.append("""</table>""")
 						out.append("""<br/>""")
 					out.append("""<table class="FR" cellspacing="0">""")
-					out.append("""	<tr><th colspan="12">Metadata Info</th></tr>""")
+					out.append("""	<tr><th colspan="%u">Metadata Info</th></tr>""" % (12 if freespace==None else 13))
 					out.append("""	<tr>""")
 					out.append("""		<th>total space</th>""")
 					out.append("""		<th>avail space</th>""")
+					if freespace!=None:
+						out.append("""		<th>free space</th>""")
 					out.append("""		<th>trash space</th>""")
 					out.append("""		<th>trash files</th>""")
 					out.append("""		<th>sustained space</th>""")
@@ -2960,8 +2967,10 @@ if "IN" in sectionset:
 					out.append("""		<th><a style="cursor:default" title="only chunks from 'regular' hdd space">regular chunk copies</a></th>""")
 					out.append("""	</tr>""")
 					out.append("""	<tr>""")
-					out.append("""		<td align="center"><a style="cursor:default" title="%s B">%s</a></td>""" % (decimal_number(total),humanize_number(total,"&nbsp;")))
-					out.append("""		<td align="center"><a style="cursor:default" title="%s B">%s</a></td>""" % (decimal_number(avail),humanize_number(avail,"&nbsp;")))
+					out.append("""		<td align="center"><a style="cursor:default" title="%s B">%s</a></td>""" % (decimal_number(totalspace),humanize_number(totalspace,"&nbsp;")))
+					out.append("""		<td align="center"><a style="cursor:default" title="%s B">%s</a></td>""" % (decimal_number(availspace),humanize_number(availspace,"&nbsp;")))
+					if freespace!=None:
+						out.append("""		<td align="center"><a style="cursor:default" title="%s B">%s</a></td>""" % (decimal_number(freespace),humanize_number(freespace,"&nbsp;")))
 					out.append("""		<td align="center"><a style="cursor:default" title="%s B">%s</a></td>""" % (decimal_number(trspace),humanize_number(trspace,"&nbsp;")))
 					out.append("""		<td align="center">%u</td>""" % trfiles)
 					out.append("""		<td align="center"><a style="cursor:default" title="%s B">%s</a></td>""" % (decimal_number(respace),humanize_number(respace,"&nbsp;")))
@@ -3000,12 +3009,16 @@ if "IN" in sectionset:
 					else:
 						tab.append("CPU used","not available")
 					if ttymode:
-						tab.append("total space",humanize_number(total," "))
-						tab.append("avail space",humanize_number(avail," "))
+						tab.append("total space",humanize_number(totalspace," "))
+						tab.append("avail space",humanize_number(availspace," "))
+						if freespace!=None:
+							tab.append("avail space",humanize_number(freespace," "))
 						tab.append("trash space",humanize_number(trspace," "))
 					else:
-						tab.append("total space",total)
-						tab.append("avail space",avail)
+						tab.append("total space",totalspace)
+						tab.append("avail space",availspace)
+						if freespace!=None:
+							tab.append("avail space",freespace)
 						tab.append("trash space",trspace)
 					tab.append("trash files",trfiles)
 					if ttymode:
@@ -3907,9 +3920,9 @@ if "CS" in sectionset:
 				out = []
 				out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfscs" cellspacing="0">""")
 				if masterconn.version_at_least(3,0,38):
-					out.append("""  <tr><th colspan="19">Chunk Servers</th></tr>""")
+					out.append("""	<tr><th colspan="19">Chunk Servers</th></tr>""")
 				elif masterconn.version_at_least(2,1,0):
-					out.append("""  <tr><th colspan="18">Chunk Servers</th></tr>""")
+					out.append("""	<tr><th colspan="18">Chunk Servers</th></tr>""")
 				elif masterconn.version_at_least(2,0,11):
 					out.append("""	<tr><th colspan="17">Chunk Servers</th></tr>""")
 				elif masterconn.version_at_least(1,7,25):
@@ -4118,7 +4131,7 @@ if "CS" in sectionset:
 						if leaderfound:
 							out.append("""		<td align="center">%s : <a href="%s">%s</a></td>""" % (mmstr,mmurl,mm))
 						else:
-							out.append("""          <td align="center">not available</td>""")
+							out.append("""		<td align="center">not available</td>""")
 					out.append("""		<td align="right">%u</td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td>""" % (chunks,used,decimal_number(used),humanize_number(used,"&nbsp;"),total,decimal_number(total),humanize_number(total,"&nbsp;")))
 					if (total>0):
 						usedpercent = (used*100.0)/total
@@ -4169,7 +4182,15 @@ if "CS" in sectionset:
 						data.append(labelstr)
 					data.append(strver)
 					if masterconn.version_at_least(1,6,28):
-						data.append(load)
+						if gracetime>=0x80000000:
+							if gracetime>=0xC0000000:
+								data.append("<%u>" % load)
+							else:
+								data.append("(%u)" % load)
+						elif gracetime>0:
+							data.append("[%u]" % load)
+						else:
+							data.append(load)
 					if masterconn.version_at_least(2,0,11):
 						if leaderfound==0:
 							data.append("not available")
@@ -4207,7 +4228,15 @@ if "CS" in sectionset:
 						data.append(labelstr)
 					data.append(strver)
 					if masterconn.version_at_least(1,6,28):
-						data.append(load)
+						if gracetime>=0x80000000:
+							if gracetime>=0xC0000000:
+								data.append("<%u>" % load)
+							else:
+								data.append("(%u)" % load)
+						elif gracetime>0:
+							data.append("[%u]" % load)
+						else:
+							data.append(load)
 					if masterconn.version_at_least(2,0,11):
 						if leaderfound==0:
 							data.append("-")

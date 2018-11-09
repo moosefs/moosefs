@@ -182,3 +182,10 @@
 #  3 - Same as above but only in case of files. In case of folders and symlinks do not modify atime.
 #  4 - Never modify atime during access (like "noatime" option).
 # ATIME_MODE = 0
+
+# Define amount of space reserved for superuser only (default is 0)
+#  #B or #    - amount defined in bytes (you can use metric prefixes - SI and IEC binary prefixes)
+#  #% or #.#% - amount defined as a percent of total space
+#  #U or #.#U - amount in multiplies of 'max bytes currently used by one of chunkservers'
+#  #C or #.#C - amount in multiplies of 'max total bytes of chunkserver - the highest capacity of one chunkserver'
+# RESERVE_SPACE = 0

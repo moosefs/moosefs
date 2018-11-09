@@ -1173,7 +1173,7 @@ void mfs_statfs(fuse_req_t req,fuse_ino_t ino) {
 #else
 void mfs_statfs(fuse_req_t req) {
 #endif
-	uint64_t totalspace,availspace,trashspace,sustainedspace;
+	uint64_t totalspace,availspace,freespace,trashspace,sustainedspace;
 	uint32_t inodes;
 	uint32_t bsize;
 	struct statvfs stfsbuf;
@@ -1192,7 +1192,7 @@ void mfs_statfs(fuse_req_t req) {
 #if FUSE_USE_VERSION >= 26
 	(void)ino;
 #endif
-	fs_statfs(&totalspace,&availspace,&trashspace,&sustainedspace,&inodes);
+	fs_statfs(&totalspace,&availspace,&freespace,&trashspace,&sustainedspace,&inodes);
 
 #if defined(__APPLE__)
 	if (totalspace>0x0001000000000000ULL) {
@@ -1217,15 +1217,18 @@ void mfs_statfs(fuse_req_t req) {
 		stfsbuf.f_blocks = totalspace/bsize;
 	}
 	if (availspace/bsize>0xFFFFFFFFU) {
-		stfsbuf.f_bfree = 0xFFFFFFFFU;
 		stfsbuf.f_bavail = 0xFFFFFFFFU;
 	} else {
-		stfsbuf.f_bfree = availspace/bsize;
 		stfsbuf.f_bavail = availspace/bsize;
+	}
+	if (freespace/bsize>0xFFFFFFFFU) {
+		stfsbuf.f_bfree = 0xFFFFFFFFU;
+	} else {
+		stfsbuf.f_bfree = freespace/bsize;
 	}
 #else
 	stfsbuf.f_blocks = totalspace/bsize;
-	stfsbuf.f_bfree = availspace/bsize;
+	stfsbuf.f_bfree = freespace/bsize;
 	stfsbuf.f_bavail = availspace/bsize;
 #endif
 	stfsbuf.f_files = 1000000000+PKGVERSION+inodes;
@@ -1233,9 +1236,9 @@ void mfs_statfs(fuse_req_t req) {
 	stfsbuf.f_favail = 1000000000+PKGVERSION;
 	//stfsbuf.f_flag = ST_RDONLY;
 #if FUSE_USE_VERSION >= 26
-	oplog_printf(&ctx,"statfs (%lu): OK (%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu32")",(unsigned long int)ino,totalspace,availspace,trashspace,sustainedspace,inodes);
+	oplog_printf(&ctx,"statfs (%lu): OK (%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu32")",(unsigned long int)ino,totalspace,availspace,freespace,trashspace,sustainedspace,inodes);
 #else
-	oplog_printf(&ctx,"statfs (): OK (%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu32")",totalspace,availspace,trashspace,sustainedspace,inodes);
+	oplog_printf(&ctx,"statfs (): OK (%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu64",%"PRIu32")",totalspace,availspace,freespace,trashspace,sustainedspace,inodes);
 #endif
 	fuse_reply_statfs(req,&stfsbuf);
 }
@@ -3781,7 +3784,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 
 	fs_mtime(ino);
-	err = write_data(fileinfo->wdata,off,size,(const uint8_t*)buf);
+	err = write_data(fileinfo->wdata,off,size,(const uint8_t*)buf,(ctx.uid==0)?1:0);
 	fs_mtime(ino);
 
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));

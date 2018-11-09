@@ -161,8 +161,8 @@ ETAGS = etags
 CTAGS = ctags
 CSCOPE = cscope
 DIST_SUBDIRS = mfstests mfsdata mfsmanpages mfsmaster mfsmetadump \
-	mfsmetalogger mfssupervisor mfschunkserver mfsmount mfsscripts \
-	mfsnetdump systemd
+	mfsmetalogger mfssupervisor mfschunkserver mfsclient \
+	mfsscripts mfsnetdump systemd
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in COPYING \
 	INSTALL NEWS README compile config.guess config.sub install-sh \
 	ltmain.sh missing
@@ -380,8 +380,8 @@ top_srcdir = @top_srcdir@
 @BUILD_SUPERVISOR_TRUE@SUPERVISORDIR = mfssupervisor
 @BUILD_CHUNKSERVER_FALSE@CHUNKSERVERDIR = 
 @BUILD_CHUNKSERVER_TRUE@CHUNKSERVERDIR = mfschunkserver
-@BUILD_MOUNT_FALSE@MOUNTDIR = 
-@BUILD_MOUNT_TRUE@MOUNTDIR = mfsmount
+@BUILD_CLIENT_FALSE@CLIENTDIR = 
+@BUILD_CLIENT_TRUE@CLIENTDIR = mfsclient
 @BUILD_SCRIPTS_FALSE@SCRIPTSDIR = 
 @BUILD_SCRIPTS_TRUE@SCRIPTSDIR = mfsscripts
 @BUILD_NETDUMP_FALSE@NETDUMPDIR = 
@@ -390,7 +390,7 @@ top_srcdir = @top_srcdir@
 @WITH_SYSTEMD_TRUE@SYSTEMDDIR = systemd
 RELEASE = @release@
 ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = mfstests mfsdata mfsmanpages $(MASTERDIR) $(METALOGGERDIR) $(SUPERVISORDIR) $(CHUNKSERVERDIR) $(MOUNTDIR) $(SCRIPTSDIR) $(NETDUMPDIR) $(SYSTEMDDIR)
+SUBDIRS = mfstests mfsdata mfsmanpages $(MASTERDIR) $(METALOGGERDIR) $(SUPERVISORDIR) $(CHUNKSERVERDIR) $(CLIENTDIR) $(SCRIPTSDIR) $(NETDUMPDIR) $(SYSTEMDDIR)
 EXTRA_DIST = m4/ax_pthread.m4 debian rpm macosx freebsd debian_sysv_to_systemd.sh linux_build.sh macosx_build.sh freebsd_build.sh sanitize_build.sh README.md
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive

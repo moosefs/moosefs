@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.103-1 (WIP)
+
+  - (master+client) added space reservation for superuser
+
 * MooseFS 3.0.102-1 (2018-07-25)
 
   - (cs) changed chunk testing routine (new definition is in MB/s per disk)

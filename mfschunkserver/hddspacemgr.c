@@ -56,6 +56,7 @@
 #include "slogger.h"
 #include "massert.h"
 #include "random.h"
+#include "sizestr.h"
 #include "clocks.h"
 #include "strerr.h"
 #include "portable.h"
@@ -6308,91 +6309,19 @@ void hdd_term(void) {
 }
 
 int hdd_size_parse(const char *str,uint64_t *ret) {
-	uint64_t val,frac,fracdiv;
-	double drval,mult;
-	int f;
-	val=0;
-	frac=0;
-	fracdiv=1;
-	f=0;
-	while (*str>='0' && *str<='9') {
-		f=1;
-		val*=10;
-		val+=(*str-'0');
-		str++;
-	}
-	if (*str=='.') {	// accept format ".####" (without 0)
-		str++;
-		while (*str>='0' && *str<='9') {
-			fracdiv*=10;
-			frac*=10;
-			frac+=(*str-'0');
-			str++;
+	double val;
+	const char *endptr;
+
+	val = sizestrtod(str,&endptr);
+
+	if (endptr[0]=='\0' || (endptr[0]=='B' && endptr[1]=='\0')) {
+		if (val>18446744073709551615.0) {
+			return -2;
 		}
-		if (fracdiv==1) {	// if there was '.' expect number afterwards
-			return -1;
-		}
-	} else if (f==0) {	// but not empty string
-		return -1;
+		*ret = round(val);
+		return 1;
 	}
-	if (str[0]=='\0' || (str[0]=='B' && str[1]=='\0')) {
-		mult=1.0;
-	} else if (str[0]!='\0' && (str[1]=='\0' || (str[1]=='B' && str[2]=='\0'))) {
-		switch(str[0]) {
-		case 'k':
-			mult=1e3;
-			break;
-		case 'M':
-			mult=1e6;
-			break;
-		case 'G':
-			mult=1e9;
-			break;
-		case 'T':
-			mult=1e12;
-			break;
-		case 'P':
-			mult=1e15;
-			break;
-		case 'E':
-			mult=1e18;
-			break;
-		default:
-			return -1;
-		}
-	} else if (str[0]!='\0' && str[1]=='i' && (str[2]=='\0' || (str[2]=='B' && str[3]=='\0'))) {
-		switch(str[0]) {
-		case 'K':
-			mult=1024.0;
-			break;
-		case 'M':
-			mult=1048576.0;
-			break;
-		case 'G':
-			mult=1073741824.0;
-			break;
-		case 'T':
-			mult=1099511627776.0;
-			break;
-		case 'P':
-			mult=1125899906842624.0;
-			break;
-		case 'E':
-			mult=1152921504606846976.0;
-			break;
-		default:
-			return -1;
-		}
-	} else {
-		return -1;
-	}
-	drval = round(((double)frac/(double)fracdiv+(double)val)*mult);
-	if (drval>18446744073709551615.0) {
-		return -2;
-	} else {
-		*ret = drval;
-	}
-	return 1;
+	return -1;
 }
 
 int hdd_parseline(char *hddcfgline) {

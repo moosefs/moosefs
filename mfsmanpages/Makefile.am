@@ -32,7 +32,7 @@ if BUILD_CHUNKSERVER
 man_MANS+=$(chunkserver_mans)
 endif
 
-if BUILD_MOUNT
+if BUILD_CLIENT
 man_MANS+=$(mount_mans)
 if INSTALL_MOOSEFS_MOUNT
 man_MANS+=$(mount_extra_man)

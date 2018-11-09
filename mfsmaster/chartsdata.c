@@ -136,7 +136,7 @@ void chartsdata_refresh(void) {
 	uint64_t data[CHARTS];
 	uint32_t fsdata[16];
 	uint32_t i,del,repl; //,bin,bout,opr,opw,dbr,dbw,dopr,dopw,repl;
-	uint64_t total, avail;
+	uint64_t total,avail;
 
 	for (i=0 ; i<CHARTS ; i++) {
 		data[i]=CHARTS_NODATA;
@@ -162,7 +162,7 @@ void chartsdata_refresh(void) {
 	}
 	matoclserv_stats(data+CHARTS_PACKETSRCVD);
 
-	matocsserv_getspace(&total,&avail);
+	matocsserv_getspace(&total,&avail,NULL);
 	data[CHARTS_USED_SPACE]=total-avail;
 	data[CHARTS_TOTAL_SPACE]=total;
 

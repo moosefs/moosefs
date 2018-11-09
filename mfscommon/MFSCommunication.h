@@ -497,6 +497,7 @@
 // CLTOMA_FUSE_READ_CHUNK,CLTOMA_FUSE_WRITE_CHUNK,CLTOMA_FUSE_WRITE_CHUNK_END - chunkopflags
 #define CHUNKOPFLAG_CANMODTIME             1
 #define CHUNKOPFLAG_CONTINUEOP             2
+#define CHUNKOPFLAG_CANUSERESERVESPACE     4
 
 #define MODULE_TYPE_UNKNOWN                0
 #define MODULE_TYPE_MASTER                 1
@@ -966,10 +967,8 @@
 
 // 0x0193
 #define MATOCL_FUSE_STATFS (PROTO_BASE+403)
-// deprecated:
-//	msgid:32 totalspace:64 availspace:64 trashspace:64 inodes:32
-// current:
-//	msgid:32 totalspace:64 availspace:64 trashspace:64 sustainedspace:64 inodes:32
+// msgid:32 totalspace:64 availspace:64 trashspace:64 sustainedspace:64 inodes:32 - version < 3.0.102 (and < 4.9.0 in 4.x)
+// msgid:32 totalspace:64 availspace:64 freespace:64 trashspace:64 sustainedspace:64 inodes:32
 
 // 0x0194
 #define CLTOMA_FUSE_ACCESS (PROTO_BASE+404)

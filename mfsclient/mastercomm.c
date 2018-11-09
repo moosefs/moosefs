@@ -2575,8 +2575,7 @@ void fs_term(void) {
 	zassert(pthread_mutex_destroy(&amtimelock));
 	zassert(pthread_mutex_destroy(&aflock));
 	zassert(pthread_mutex_destroy(&fdlock));
-	zassert(pthread_mutex_destroy(&reclock));
-	zassert(pthread_key_delete(reckey));
+	zassert(pthread_mutex_lock(&reclock));
 	for (rechash=0 ; rechash<THRECHASHSIZE ; rechash++) {
 		for (rec = threchash[rechash] ; rec!=NULL ; rec=recn) {
 			syslog(LOG_WARNING,"thread specific memory (id:%"PRIu32") hasn't been freed",rec->packetid);
@@ -2620,6 +2619,9 @@ void fs_term(void) {
 		pthread_cond_destroy(&(rec->cond));
 		free(rec);
 	}
+	zassert(pthread_mutex_unlock(&reclock));
+	zassert(pthread_mutex_destroy(&reclock));
+	zassert(pthread_key_delete(reckey));
 	for (i=0 ; i<ACQFILES_HASH_SIZE ; i++) {
 		for (af = af_hash[i] ; af ; af = afn) {
 			afn = af->next;
@@ -2684,7 +2686,7 @@ uint8_t fs_get_cfg(const char *opt_name,char opt_value[256]) {
 	}
 }
 
-void fs_statfs(uint64_t *totalspace,uint64_t *availspace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes) {
+void fs_statfs(uint64_t *totalspace,uint64_t *availspace,uint64_t *freespace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -2693,21 +2695,28 @@ void fs_statfs(uint64_t *totalspace,uint64_t *availspace,uint64_t *trashspace,ui
 	if (wptr==NULL) {
 		*totalspace = 0;
 		*availspace = 0;
+		*freespace = 0;
 		*trashspace = 0;
 		*sustainedspace = 0;
 		*inodes = 0;
 		return;
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_STATFS,&i);
-	if (rptr==NULL || i!=36) {
+	if (rptr==NULL || (i!=36 && i!=44)) {
 		*totalspace = 0;
 		*availspace = 0;
+		*freespace = 0;
 		*trashspace = 0;
 		*sustainedspace = 0;
 		*inodes = 0;
 	} else {
 		*totalspace = get64bit(&rptr);
 		*availspace = get64bit(&rptr);
+		if (i==44) {
+			*freespace = get64bit(&rptr);
+		} else {
+			*freespace = *availspace;
+		}
 		*trashspace = get64bit(&rptr);
 		*sustainedspace = get64bit(&rptr);
 		*inodes = get32bit(&rptr);
@@ -2755,7 +2764,6 @@ uint8_t fs_access(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint16
 	return ret;
 }
 
-#ifdef WIN32
 uint8_t fs_simple_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
@@ -2811,7 +2819,6 @@ uint8_t fs_simple_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint3
 	}
 	return ret;
 }
-#endif
 
 uint8_t fs_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE],uint16_t *lflags,uint8_t *csdataver,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize) {
 	uint8_t *wptr;

@@ -62,7 +62,8 @@ mfsmaster_SOURCES=\
 	../mfscommon/slogger.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/hashfn.h ../mfscommon/median.h \
 	../mfscommon/buckets.h ../mfscommon/mfsalloc.h \
-	../mfscommon/glue.h ../mfscommon/MFSCommunication.h
+	../mfscommon/glue.h ../mfscommon/sizestr.h \
+	../mfscommon/MFSCommunication.h
 
 
 mfsmaster_CPPFLAGS=$(AM_CPPFLAGS) -DMFSMAXFILES=16384 -DAPPNAME=mfsmaster

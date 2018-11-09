@@ -334,7 +334,7 @@ void mfs_meta_statfs(fuse_req_t req, fuse_ino_t ino) {
 #else
 void mfs_meta_statfs(fuse_req_t req) {
 #endif
-	uint64_t totalspace,availspace,trashspace,sustainedspace;
+	uint64_t totalspace,availspace,freespace,trashspace,sustainedspace;
 	uint32_t inodes;
 	struct statvfs stfsbuf;
 	memset(&stfsbuf,0,sizeof(stfsbuf));
@@ -342,7 +342,7 @@ void mfs_meta_statfs(fuse_req_t req) {
 #if FUSE_USE_VERSION >= 26
 	(void)ino;
 #endif
-	fs_statfs(&totalspace,&availspace,&trashspace,&sustainedspace,&inodes);
+	fs_statfs(&totalspace,&availspace,&freespace,&trashspace,&sustainedspace,&inodes);
 
 	stfsbuf.f_namemax = NAME_MAX;
 	stfsbuf.f_frsize = MFSBLOCKSIZE;

@@ -520,7 +520,7 @@ install-data-hook:
 @BUILD_MASTER_TRUE@			fi ; \
 @BUILD_MASTER_TRUE@		fi ; \
 @BUILD_MASTER_TRUE@	fi
-@BUILD_MOUNT_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmount.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmount.cfg.sample
+@BUILD_CLIENT_TRUE@@WITH_MOUNT_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmount.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmount.cfg.sample
 @BUILD_METALOGGER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmetalogger.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmetalogger.cfg.sample
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

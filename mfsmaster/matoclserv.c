@@ -1096,7 +1096,7 @@ void matoclserv_node_info(matoclserventry *eptr,const uint8_t *data,uint32_t len
 }
 
 void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint64_t totalspace,availspace,trspace,respace;
+	uint64_t totalspace,availspace,freespace,trspace,respace;
 	uint64_t memusage,syscpu,usercpu;
 	uint32_t trnodes,renodes,inodes,dnodes,fnodes;
 	uint32_t chunks,chunkcopies,tdcopies;
@@ -1110,10 +1110,10 @@ void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) 
 		return;
 	}
 	meta_info(&lsstore,&lstime,&lsstat);
-	fs_info(&totalspace,&availspace,&trspace,&trnodes,&respace,&renodes,&inodes,&dnodes,&fnodes);
+	fs_info(&totalspace,&availspace,&freespace,&trspace,&trnodes,&respace,&renodes,&inodes,&dnodes,&fnodes);
 	chunk_info(&chunks,&chunkcopies,&tdcopies);
 	chartsdata_resusage(&memusage,&syscpu,&usercpu);
-	ptr = matoclserv_createpacket(eptr,MATOCL_INFO,129);
+	ptr = matoclserv_createpacket(eptr,MATOCL_INFO,137);
 	/* put32bit(&buff,VERSION): */
 	put16bit(&ptr,VERSMAJ);
 	put8bit(&ptr,VERSMID);
@@ -1123,6 +1123,7 @@ void matoclserv_info(matoclserventry *eptr,const uint8_t *data,uint32_t length) 
 	put64bit(&ptr,usercpu);
 	put64bit(&ptr,totalspace);
 	put64bit(&ptr,availspace);
+	put64bit(&ptr,freespace);
 	put64bit(&ptr,trspace);
 	put32bit(&ptr,trnodes);
 	put64bit(&ptr,respace);
@@ -1828,20 +1829,25 @@ uint32_t* matoclserv_gid_storage(uint32_t gids) {
 }
 
 void matoclserv_fuse_statfs(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint64_t totalspace,availspace,trashspace,sustainedspace;
+	uint64_t totalspace,availspace,freespace,trashspace,sustainedspace;
 	uint32_t msgid,inodes;
+	uint8_t addfreespace;
 	uint8_t *ptr;
 	if (length!=4) {
 		syslog(LOG_NOTICE,"CLTOMA_FUSE_STATFS - wrong size (%"PRIu32"/4)",length);
 		eptr->mode = KILL;
 		return;
 	}
+	addfreespace = ((eptr->version>=VERSION2INT(3,0,102) && eptr->version<VERSION2INT(4,0,0)) || eptr->version>=VERSION2INT(4,9,0))?1:0;
 	msgid = get32bit(&data);
-	fs_statfs(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),&totalspace,&availspace,&trashspace,&sustainedspace,&inodes);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_STATFS,40);
+	fs_statfs(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),&totalspace,&availspace,&freespace,&trashspace,&sustainedspace,&inodes);
+	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_STATFS,addfreespace?48:40);
 	put32bit(&ptr,msgid);
 	put64bit(&ptr,totalspace);
 	put64bit(&ptr,availspace);
+	if (addfreespace) {
+		put64bit(&ptr,freespace);
+	}
 	put64bit(&ptr,trashspace);
 	put64bit(&ptr,sustainedspace);
 	put32bit(&ptr,inodes);

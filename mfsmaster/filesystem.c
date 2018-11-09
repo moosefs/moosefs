@@ -4371,8 +4371,8 @@ void fs_get_paths_data(uint32_t rootinode,uint32_t inode,uint8_t *buff) {
 	}
 }
 
-void fs_info(uint64_t *totalspace,uint64_t *availspace,uint64_t *trspace,uint32_t *trnodes,uint64_t *respace,uint32_t *renodes,uint32_t *inodes,uint32_t *dnodes,uint32_t *fnodes) {
-	matocsserv_getspace(totalspace,availspace);
+void fs_info(uint64_t *totalspace,uint64_t *availspace,uint64_t *freespace,uint64_t *trspace,uint32_t *trnodes,uint64_t *respace,uint32_t *renodes,uint32_t *inodes,uint32_t *dnodes,uint32_t *fnodes) {
+	matocsserv_getspace(totalspace,availspace,freespace);
 	*trspace = trashspace;
 	*trnodes = trashnodes;
 	*respace = sustainedspace;
@@ -4417,7 +4417,7 @@ uint8_t fs_getrootinode(uint32_t *rootinode,const uint8_t *path) {
 	}
 }
 
-void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t *availspace,uint64_t *trspace,uint64_t *respace,uint32_t *inodes) {
+void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t *availspace,uint64_t *freespace,uint64_t *trspace,uint64_t *respace,uint32_t *inodes) {
 	fsnode *rn;
 	statsrecord sr;
 	(void)sesflags;
@@ -4433,10 +4433,12 @@ void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t
 	if (!rn || rn->type!=TYPE_DIRECTORY) {
 		*totalspace = 0;
 		*availspace = 0;
+		*freespace = 0;
 		*inodes = 0;
 	} else {
-		matocsserv_getspace(totalspace,availspace);
+		matocsserv_getspace(totalspace,availspace,freespace);
 		fsnodes_quota_fixspace(rn,totalspace,availspace);
+		fsnodes_quota_fixspace(rn,totalspace,freespace);
 		fsnodes_get_stats(rn,&sr,2);
 		*inodes = sr.inodes;
 	}
@@ -5802,6 +5804,9 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t
 	uint32_t ts = main_time();
 	uint32_t lastchunk,lastchunksize,sizediff;
 
+	if (matocsserv_have_availspace()==0 && (chunkopflags&CHUNKOPFLAG_CANUSERESERVESPACE)==0) {
+		return MFS_ERROR_NOSPACE;
+	}
 	*chunkid = 0;
 	*length = 0;
 	p = fsnodes_node_find(inode);

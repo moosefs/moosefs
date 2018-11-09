@@ -23,10 +23,10 @@ else
 CHUNKSERVERDIR=
 endif
 
-if BUILD_MOUNT
-MOUNTDIR=mfsmount
+if BUILD_CLIENT
+CLIENTDIR=mfsclient
 else
-MOUNTDIR=
+CLIENTDIR=
 endif
 
 if BUILD_SCRIPTS
@@ -51,7 +51,7 @@ RELEASE = @release@
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS=mfstests mfsdata mfsmanpages $(MASTERDIR) $(METALOGGERDIR) $(SUPERVISORDIR) $(CHUNKSERVERDIR) $(MOUNTDIR) $(SCRIPTSDIR) $(NETDUMPDIR) $(SYSTEMDDIR)
+SUBDIRS=mfstests mfsdata mfsmanpages $(MASTERDIR) $(METALOGGERDIR) $(SUPERVISORDIR) $(CHUNKSERVERDIR) $(CLIENTDIR) $(SCRIPTSDIR) $(NETDUMPDIR) $(SYSTEMDDIR)
 
 EXTRA_DIST=m4/ax_pthread.m4 debian rpm macosx freebsd debian_sysv_to_systemd.sh linux_build.sh macosx_build.sh freebsd_build.sh sanitize_build.sh README.md
 

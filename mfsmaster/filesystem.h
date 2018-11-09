@@ -67,7 +67,7 @@ uint8_t fs_mr_set_file_chunk(uint32_t inode,uint32_t indx,uint64_t chunkdid);
 void fs_text_dump(FILE *fd);
 
 void fs_stats(uint32_t stats[16]);
-void fs_info(uint64_t *totalspace,uint64_t *availspace,uint64_t *trspace,uint32_t *trnodes,uint64_t *respace,uint32_t *renodes,uint32_t *inodes,uint32_t *dnodes,uint32_t *fnodes);
+void fs_info(uint64_t *totalspace,uint64_t *availspace,uint64_t *freespace,uint64_t *trspace,uint32_t *trnodes,uint64_t *respace,uint32_t *renodes,uint32_t *inodes,uint32_t *dnodes,uint32_t *fnodes);
 void fs_test_getdata(uint32_t *loopstart,uint32_t *loopend,uint32_t *files,uint32_t *ugfiles,uint32_t *mfiles,uint32_t *mtfiles,uint32_t *msfiles,uint32_t *chunks,uint32_t *ugchunks,uint32_t *mchunks,char **msgbuff,uint32_t *msgbuffleng);
 
 // void fs_attrtoblob(uint8_t attr[32],uint8_t attrblob[32]);
@@ -76,7 +76,7 @@ uint32_t fs_getdirpath_size(uint32_t inode);
 void fs_getdirpath_data(uint32_t inode,uint8_t *buff,uint32_t size);
 uint8_t fs_getrootinode(uint32_t *rootinode,const uint8_t *path);
 
-void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t *availspace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes);
+void fs_statfs(uint32_t rootinode,uint8_t sesflags,uint64_t *totalspace,uint64_t *availspace,uint64_t *freespace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes);
 uint8_t fs_access(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,int modemask);
 uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE],uint8_t *accmode,uint8_t *filenode,uint8_t *validchunk,uint64_t *chunkid);
 uint8_t fs_getattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t opened,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint8_t attr[ATTR_RECORD_SIZE]);

@@ -497,7 +497,7 @@ fi
 
 AC_CHECK_LIB(fuse, fuse_version, [AC_DEFINE([HAVE_FUSE_VERSION],[1],[libfuse has function fuse_version])])
 
-AM_CONDITIONAL([BUILD_MOUNT], [test "$fuse" != "no" -a "$enable_mfsmount" != "no"])
+AM_CONDITIONAL([BUILD_CLIENT], [test "$fuse" != "no" -a "$enable_mfsmount" != "no"])
 
 AM_CONDITIONAL([CREATE_ETC_MFS], [test "$enable_mfsmaster" != "no" -o "$enable_mfsmetalogger" != "no" -o "$enable_mfschunkserver" != "no" -o "$enable_mfsmount" != "no"])
 AM_CONDITIONAL([CREATE_DATA_DIR], [test "$enable_mfsmaster" != "no" -o "$enable_mfsmetalogger" != "no" -o "$enable_mfschunkserver" != "no" -o "$enable_mfscgiserv" != "no"])
@@ -604,7 +604,7 @@ AC_CONFIG_FILES([Makefile
 		mfsmetadump/Makefile
 		mfsmetalogger/Makefile
 		mfssupervisor/Makefile
-		mfsmount/Makefile
+		mfsclient/Makefile
 		mfsnetdump/Makefile
 		mfstests/Makefile
 		systemd/Makefile

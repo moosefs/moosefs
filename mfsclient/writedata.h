@@ -34,7 +34,7 @@ void write_data_inode_setmaxfleng(uint32_t inode,uint64_t maxfleng);
 uint64_t write_data_inode_getmaxfleng(uint32_t inode);
 uint64_t write_data_getmaxfleng(void *vid);
 int write_data_flush_inode(uint32_t inode);
-int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *buff);
+int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *buff,uint8_t superuser);
 uint8_t write_cache_almost_full(void);
 // uint64_t write_data_get_maxfleng(uint32_t inode);
 

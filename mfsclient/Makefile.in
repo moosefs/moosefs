@@ -14,6 +14,8 @@
 
 @SET_MAKE@
 
+
+
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -89,8 +91,10 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-bin_PROGRAMS = mfsmount$(EXEEXT) mfstools$(EXEEXT)
-subdir = mfsmount
+bin_PROGRAMS = mfstools$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2)
+@WITH_MOUNT_TRUE@am__append_1 = mfsmount
+@WITH_BDEV_TRUE@am__append_2 = mfsbdev
+subdir = mfsclient
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_pthread.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
@@ -98,14 +102,82 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_pthread.m4 \
 	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
+DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
+	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__installdirs = "$(DESTDIR)$(bindir)"
-PROGRAMS = $(bin_PROGRAMS)
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__uninstall_files_from_dir = { \
+  test -z "$$files" \
+    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
+    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
+         $(am__cd) "$$dir" && rm -f $$files; }; \
+  }
+am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
+	"$(DESTDIR)$(includedir)"
+LTLIBRARIES = $(lib_LTLIBRARIES)
+am__DEPENDENCIES_1 =
+libmfsio_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am__dirstamp = $(am__leading_dot)dirstamp
+am_libmfsio_la_OBJECTS = libmfsio_la-labelparser.lo \
+	libmfsio_la-mastercomm.lo libmfsio_la-extrapackets.lo \
+	libmfsio_la-heapsorter.lo libmfsio_la-csorder.lo \
+	libmfsio_la-chunksdatacache.lo libmfsio_la-chunkrwlock.lo \
+	libmfsio_la-readdata.lo libmfsio_la-writedata.lo \
+	libmfsio_la-csdb.lo libmfsio_la-stats.lo libmfsio_la-mfsio.lo \
+	../mfscommon/libmfsio_la-clocks.lo \
+	../mfscommon/libmfsio_la-delayrun.lo \
+	../mfscommon/libmfsio_la-pcqueue.lo \
+	../mfscommon/libmfsio_la-crc.lo \
+	../mfscommon/libmfsio_la-md5.lo \
+	../mfscommon/libmfsio_la-sockets.lo \
+	../mfscommon/libmfsio_la-conncache.lo \
+	../mfscommon/libmfsio_la-lwthread.lo \
+	../mfscommon/libmfsio_la-strerr.lo
+libmfsio_la_OBJECTS = $(am_libmfsio_la_OBJECTS)
+AM_V_lt = $(am__v_lt_@AM_V@)
+am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+am__v_lt_0 = --silent
+am__v_lt_1 = 
+libmfsio_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libmfsio_la_CFLAGS) \
+	$(CFLAGS) $(libmfsio_la_LDFLAGS) $(LDFLAGS) -o $@
+@WITH_MOUNT_TRUE@am__EXEEXT_1 = mfsmount$(EXEEXT)
+@WITH_BDEV_TRUE@am__EXEEXT_2 = mfsbdev$(EXEEXT)
+PROGRAMS = $(bin_PROGRAMS)
+am_mfsbdev_OBJECTS = ../mfscommon/mfsbdev-lwthread.$(OBJEXT) \
+	../mfscommon/mfsbdev-strerr.$(OBJEXT) \
+	../mfscommon/mfsbdev-squeue.$(OBJEXT) \
+	../mfscommon/mfsbdev-workers.$(OBJEXT) \
+	../mfscommon/mfsbdev-processname.$(OBJEXT) \
+	mfsbdev-nbdmain.$(OBJEXT)
+mfsbdev_OBJECTS = $(am_mfsbdev_OBJECTS)
+mfsbdev_DEPENDENCIES = $(am__DEPENDENCIES_1) libmfsio.la
+mfsbdev_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(mfsbdev_CFLAGS) \
+	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	mfsmount-dirattrcache.$(OBJEXT) \
 	mfsmount-symlinkcache.$(OBJEXT) \
@@ -128,14 +200,10 @@ am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	../mfscommon/mfsmount-sockets.$(OBJEXT) \
 	../mfscommon/mfsmount-conncache.$(OBJEXT) \
 	../mfscommon/mfsmount-lwthread.$(OBJEXT) \
-	../mfscommon/mfsmount-strerr.$(OBJEXT)
+	../mfscommon/mfsmount-strerr.$(OBJEXT) \
+	../mfscommon/mfsmount-processname.$(OBJEXT)
 mfsmount_OBJECTS = $(am_mfsmount_OBJECTS)
-am__DEPENDENCIES_1 =
 mfsmount_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
-AM_V_lt = $(am__v_lt_@AM_V@)
-am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
-am__v_lt_0 = --silent
-am__v_lt_1 = 
 mfsmount_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(mfsmount_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
@@ -178,13 +246,16 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(mfsmount_SOURCES) $(mfstools_SOURCES)
-DIST_SOURCES = $(mfsmount_SOURCES) $(mfstools_SOURCES)
+SOURCES = $(libmfsio_la_SOURCES) $(mfsbdev_SOURCES) \
+	$(mfsmount_SOURCES) $(mfstools_SOURCES)
+DIST_SOURCES = $(libmfsio_la_SOURCES) $(mfsbdev_SOURCES) \
+	$(mfsmount_SOURCES) $(mfstools_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+HEADERS = $(include_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
 # and print each of them once, without duplicates.  Input order is
@@ -370,11 +441,13 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+lib_LTLIBRARIES = libmfsio.la
+include_HEADERS = mfsio.h
 AM_CPPFLAGS = -I$(top_srcdir)/mfscommon
 AM_CFLAGS = 
 AM_LDFLAGS = 
 mfsmount_LDADD = $(PTHREAD_LIBS) $(FUSE_LIBS)
-mfsmount_CFLAGS = $(PTHREAD_CFLAGS) -D_USE_PTHREADS $(FUSE_CFLAGS) -DFUSE_USE_VERSION=29 -DAPPNAME=mfsmount
+mfsmount_CFLAGS = $(PTHREAD_CFLAGS) -D_USE_PTHREADS $(FUSE_CFLAGS) -DFUSE_USE_VERSION=29 -DAPPNAME=mfsmount -DMFSMOUNT=1
 mfsmount_CPPFLAGS = $(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
 mfsmount_SOURCES = \
 	labelparser.c labelparser.h \
@@ -410,10 +483,55 @@ mfsmount_SOURCES = \
 	../mfscommon/conncache.c ../mfscommon/conncache.h \
 	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
 	../mfscommon/datapack.h ../mfscommon/massert.h \
 	../mfscommon/mfsstrerr.h ../mfscommon/portable.h \
 	../mfscommon/buckets_mt.h ../mfscommon/mfsalloc.h \
 	../mfscommon/MFSCommunication.h
+
+libmfsio_la_LIBADD = $(PTHREAD_LIBS)
+libmfsio_la_CFLAGS = $(PTHREAD_CFLAGS) -D_USE_PTHREADS -DLIBMFSIO=1
+libmfsio_la_CPPFLAGS = $(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
+libmfsio_la_LDFLAGS = -version-info 1:0:0
+libmfsio_la_SOURCES = \
+	labelparser.c labelparser.h \
+	mastercomm.c mastercomm.h \
+	extrapackets.c extrapackets.h \
+	heapsorter.c heapsorter.h \
+	csorder.c csorder.h \
+	chunksdatacache.c chunksdatacache.h \
+	chunkrwlock.c chunkrwlock.h \
+	readdata.c readdata.h \
+	writedata.c writedata.h \
+	csdb.c csdb.h \
+	stats.c stats.h \
+	mfsio.c mfsio.h \
+	../mfscommon/clocks.c ../mfscommon/clocks.h \
+	../mfscommon/delayrun.c ../mfscommon/delayrun.h \
+	../mfscommon/pcqueue.c ../mfscommon/pcqueue.h \
+	../mfscommon/crc.c ../mfscommon/crc.h \
+	../mfscommon/md5.c ../mfscommon/md5.h \
+	../mfscommon/sockets.c ../mfscommon/sockets.h \
+	../mfscommon/conncache.c ../mfscommon/conncache.h \
+	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
+	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/datapack.h ../mfscommon/massert.h \
+	../mfscommon/mfsstrerr.h ../mfscommon/portable.h \
+	../mfscommon/mfsalloc.h \
+	../mfscommon/MFSCommunication.h
+
+mfsbdev_LDADD = $(PTHREAD_LIBS) libmfsio.la
+mfsbdev_CFLAGS = $(PTHREAD_CFLAGS) -D_USE_PTHREADS -DMFSNBD=1
+mfsbdev_CPPFLAGS = $(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
+mfsbdev_SOURCES = \
+	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
+	../mfscommon/strerr.c ../mfscommon/strerr.h \
+	../mfscommon/squeue.c ../mfscommon/squeue.h \
+	../mfscommon/workers.c ../mfscommon/workers.h \
+	../mfscommon/processname.c ../mfscommon/processname.h \
+	../mfscommon/datapack.h ../mfscommon/massert.h \
+	../mfscommon/sizestr.h ../mfscommon/portable.h \
+	nbdmain.c
 
 mfstools_SOURCES = \
 	mfstools.c \
@@ -450,9 +568,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign mfsmount/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign mfsclient/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign mfsmount/Makefile
+	  $(AUTOMAKE) --foreign mfsclient/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -470,6 +588,68 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
+
+install-libLTLIBRARIES: $(lib_LTLIBRARIES)
+	@$(NORMAL_INSTALL)
+	@list='$(lib_LTLIBRARIES)'; test -n "$(libdir)" || list=; \
+	list2=; for p in $$list; do \
+	  if test -f $$p; then \
+	    list2="$$list2 $$p"; \
+	  else :; fi; \
+	done; \
+	test -z "$$list2" || { \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(libdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(libdir)" || exit 1; \
+	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 '$(DESTDIR)$(libdir)'"; \
+	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=install $(INSTALL) $(INSTALL_STRIP_FLAG) $$list2 "$(DESTDIR)$(libdir)"; \
+	}
+
+uninstall-libLTLIBRARIES:
+	@$(NORMAL_UNINSTALL)
+	@list='$(lib_LTLIBRARIES)'; test -n "$(libdir)" || list=; \
+	for p in $$list; do \
+	  $(am__strip_dir) \
+	  echo " $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f '$(DESTDIR)$(libdir)/$$f'"; \
+	  $(LIBTOOL) $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=uninstall rm -f "$(DESTDIR)$(libdir)/$$f"; \
+	done
+
+clean-libLTLIBRARIES:
+	-test -z "$(lib_LTLIBRARIES)" || rm -f $(lib_LTLIBRARIES)
+	@list='$(lib_LTLIBRARIES)'; \
+	locs=`for p in $$list; do echo $$p; done | \
+	      sed 's|^[^/]*$$|.|; s|/[^/]*$$||; s|$$|/so_locations|' | \
+	      sort -u`; \
+	test -z "$$locs" || { \
+	  echo rm -f $${locs}; \
+	  rm -f $${locs}; \
+	}
+../mfscommon/$(am__dirstamp):
+	@$(MKDIR_P) ../mfscommon
+	@: > ../mfscommon/$(am__dirstamp)
+../mfscommon/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) ../mfscommon/$(DEPDIR)
+	@: > ../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-clocks.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-delayrun.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-pcqueue.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-crc.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-md5.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-sockets.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-conncache.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-lwthread.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/libmfsio_la-strerr.lo: ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+
+libmfsio.la: $(libmfsio_la_OBJECTS) $(libmfsio_la_DEPENDENCIES) $(EXTRA_libmfsio_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(libmfsio_la_LINK) -rpath $(libdir) $(libmfsio_la_OBJECTS) $(libmfsio_la_LIBADD) $(LIBS)
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
@@ -519,12 +699,21 @@ clean-binPROGRAMS:
 	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
 	echo " rm -f" $$list; \
 	rm -f $$list
-../mfscommon/$(am__dirstamp):
-	@$(MKDIR_P) ../mfscommon
-	@: > ../mfscommon/$(am__dirstamp)
-../mfscommon/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) ../mfscommon/$(DEPDIR)
-	@: > ../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsbdev-lwthread.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsbdev-strerr.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsbdev-squeue.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsbdev-workers.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsbdev-processname.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+
+mfsbdev$(EXEEXT): $(mfsbdev_OBJECTS) $(mfsbdev_DEPENDENCIES) $(EXTRA_mfsbdev_DEPENDENCIES) 
+	@rm -f mfsbdev$(EXEEXT)
+	$(AM_V_CCLD)$(mfsbdev_LINK) $(mfsbdev_OBJECTS) $(mfsbdev_LDADD) $(LIBS)
 ../mfscommon/mfsmount-clocks.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmount-delayrun.$(OBJEXT):  \
@@ -546,6 +735,9 @@ clean-binPROGRAMS:
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/mfsmount-strerr.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/mfsmount-processname.$(OBJEXT):  \
+	../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 
 mfsmount$(EXEEXT): $(mfsmount_OBJECTS) $(mfsmount_DEPENDENCIES) $(EXTRA_mfsmount_DEPENDENCIES) 
 	@rm -f mfsmount$(EXEEXT)
@@ -566,12 +758,27 @@ mfstools$(EXEEXT): $(mfstools_OBJECTS) $(mfstools_DEPENDENCIES) $(EXTRA_mfstools
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 	-rm -f ../mfscommon/*.$(OBJEXT)
+	-rm -f ../mfscommon/*.lo
 
 distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/clocks.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-clocks.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-conncache.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-crc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-delayrun.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-lwthread.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-md5.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-pcqueue.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-sockets.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-strerr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/md5.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsbdev-lwthread.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsbdev-processname.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsbdev-squeue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsbdev-strerr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsbdev-workers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-clocks.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-conncache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-crc.Po@am__quote@
@@ -579,11 +786,25 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-lwthread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-pcqueue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-processname.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmount-strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/labelparser.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-chunkrwlock.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-chunksdatacache.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-csdb.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-csorder.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-extrapackets.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-heapsorter.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-labelparser.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-mastercomm.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-mfsio.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-readdata.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-stats.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-writedata.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsbdev-nbdmain.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunkrwlock.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunksdatacache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csdb.Po@am__quote@
@@ -633,6 +854,237 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
+
+libmfsio_la-labelparser.lo: labelparser.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-labelparser.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-labelparser.Tpo -c -o libmfsio_la-labelparser.lo `test -f 'labelparser.c' || echo '$(srcdir)/'`labelparser.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-labelparser.Tpo $(DEPDIR)/libmfsio_la-labelparser.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='labelparser.c' object='libmfsio_la-labelparser.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-labelparser.lo `test -f 'labelparser.c' || echo '$(srcdir)/'`labelparser.c
+
+libmfsio_la-mastercomm.lo: mastercomm.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-mastercomm.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-mastercomm.Tpo -c -o libmfsio_la-mastercomm.lo `test -f 'mastercomm.c' || echo '$(srcdir)/'`mastercomm.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-mastercomm.Tpo $(DEPDIR)/libmfsio_la-mastercomm.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mastercomm.c' object='libmfsio_la-mastercomm.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-mastercomm.lo `test -f 'mastercomm.c' || echo '$(srcdir)/'`mastercomm.c
+
+libmfsio_la-extrapackets.lo: extrapackets.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-extrapackets.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-extrapackets.Tpo -c -o libmfsio_la-extrapackets.lo `test -f 'extrapackets.c' || echo '$(srcdir)/'`extrapackets.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-extrapackets.Tpo $(DEPDIR)/libmfsio_la-extrapackets.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='extrapackets.c' object='libmfsio_la-extrapackets.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-extrapackets.lo `test -f 'extrapackets.c' || echo '$(srcdir)/'`extrapackets.c
+
+libmfsio_la-heapsorter.lo: heapsorter.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-heapsorter.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-heapsorter.Tpo -c -o libmfsio_la-heapsorter.lo `test -f 'heapsorter.c' || echo '$(srcdir)/'`heapsorter.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-heapsorter.Tpo $(DEPDIR)/libmfsio_la-heapsorter.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='heapsorter.c' object='libmfsio_la-heapsorter.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-heapsorter.lo `test -f 'heapsorter.c' || echo '$(srcdir)/'`heapsorter.c
+
+libmfsio_la-csorder.lo: csorder.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-csorder.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-csorder.Tpo -c -o libmfsio_la-csorder.lo `test -f 'csorder.c' || echo '$(srcdir)/'`csorder.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-csorder.Tpo $(DEPDIR)/libmfsio_la-csorder.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='csorder.c' object='libmfsio_la-csorder.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-csorder.lo `test -f 'csorder.c' || echo '$(srcdir)/'`csorder.c
+
+libmfsio_la-chunksdatacache.lo: chunksdatacache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-chunksdatacache.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-chunksdatacache.Tpo -c -o libmfsio_la-chunksdatacache.lo `test -f 'chunksdatacache.c' || echo '$(srcdir)/'`chunksdatacache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-chunksdatacache.Tpo $(DEPDIR)/libmfsio_la-chunksdatacache.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chunksdatacache.c' object='libmfsio_la-chunksdatacache.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-chunksdatacache.lo `test -f 'chunksdatacache.c' || echo '$(srcdir)/'`chunksdatacache.c
+
+libmfsio_la-chunkrwlock.lo: chunkrwlock.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-chunkrwlock.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-chunkrwlock.Tpo -c -o libmfsio_la-chunkrwlock.lo `test -f 'chunkrwlock.c' || echo '$(srcdir)/'`chunkrwlock.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-chunkrwlock.Tpo $(DEPDIR)/libmfsio_la-chunkrwlock.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chunkrwlock.c' object='libmfsio_la-chunkrwlock.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-chunkrwlock.lo `test -f 'chunkrwlock.c' || echo '$(srcdir)/'`chunkrwlock.c
+
+libmfsio_la-readdata.lo: readdata.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-readdata.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-readdata.Tpo -c -o libmfsio_la-readdata.lo `test -f 'readdata.c' || echo '$(srcdir)/'`readdata.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-readdata.Tpo $(DEPDIR)/libmfsio_la-readdata.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='readdata.c' object='libmfsio_la-readdata.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-readdata.lo `test -f 'readdata.c' || echo '$(srcdir)/'`readdata.c
+
+libmfsio_la-writedata.lo: writedata.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-writedata.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-writedata.Tpo -c -o libmfsio_la-writedata.lo `test -f 'writedata.c' || echo '$(srcdir)/'`writedata.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-writedata.Tpo $(DEPDIR)/libmfsio_la-writedata.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='writedata.c' object='libmfsio_la-writedata.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-writedata.lo `test -f 'writedata.c' || echo '$(srcdir)/'`writedata.c
+
+libmfsio_la-csdb.lo: csdb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-csdb.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-csdb.Tpo -c -o libmfsio_la-csdb.lo `test -f 'csdb.c' || echo '$(srcdir)/'`csdb.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-csdb.Tpo $(DEPDIR)/libmfsio_la-csdb.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='csdb.c' object='libmfsio_la-csdb.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-csdb.lo `test -f 'csdb.c' || echo '$(srcdir)/'`csdb.c
+
+libmfsio_la-stats.lo: stats.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-stats.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-stats.Tpo -c -o libmfsio_la-stats.lo `test -f 'stats.c' || echo '$(srcdir)/'`stats.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-stats.Tpo $(DEPDIR)/libmfsio_la-stats.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='stats.c' object='libmfsio_la-stats.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-stats.lo `test -f 'stats.c' || echo '$(srcdir)/'`stats.c
+
+libmfsio_la-mfsio.lo: mfsio.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-mfsio.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-mfsio.Tpo -c -o libmfsio_la-mfsio.lo `test -f 'mfsio.c' || echo '$(srcdir)/'`mfsio.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-mfsio.Tpo $(DEPDIR)/libmfsio_la-mfsio.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfsio.c' object='libmfsio_la-mfsio.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-mfsio.lo `test -f 'mfsio.c' || echo '$(srcdir)/'`mfsio.c
+
+../mfscommon/libmfsio_la-clocks.lo: ../mfscommon/clocks.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-clocks.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-clocks.Tpo -c -o ../mfscommon/libmfsio_la-clocks.lo `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-clocks.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-clocks.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/clocks.c' object='../mfscommon/libmfsio_la-clocks.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-clocks.lo `test -f '../mfscommon/clocks.c' || echo '$(srcdir)/'`../mfscommon/clocks.c
+
+../mfscommon/libmfsio_la-delayrun.lo: ../mfscommon/delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-delayrun.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-delayrun.Tpo -c -o ../mfscommon/libmfsio_la-delayrun.lo `test -f '../mfscommon/delayrun.c' || echo '$(srcdir)/'`../mfscommon/delayrun.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-delayrun.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-delayrun.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/delayrun.c' object='../mfscommon/libmfsio_la-delayrun.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-delayrun.lo `test -f '../mfscommon/delayrun.c' || echo '$(srcdir)/'`../mfscommon/delayrun.c
+
+../mfscommon/libmfsio_la-pcqueue.lo: ../mfscommon/pcqueue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-pcqueue.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-pcqueue.Tpo -c -o ../mfscommon/libmfsio_la-pcqueue.lo `test -f '../mfscommon/pcqueue.c' || echo '$(srcdir)/'`../mfscommon/pcqueue.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-pcqueue.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-pcqueue.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/pcqueue.c' object='../mfscommon/libmfsio_la-pcqueue.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-pcqueue.lo `test -f '../mfscommon/pcqueue.c' || echo '$(srcdir)/'`../mfscommon/pcqueue.c
+
+../mfscommon/libmfsio_la-crc.lo: ../mfscommon/crc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-crc.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-crc.Tpo -c -o ../mfscommon/libmfsio_la-crc.lo `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-crc.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-crc.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/crc.c' object='../mfscommon/libmfsio_la-crc.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-crc.lo `test -f '../mfscommon/crc.c' || echo '$(srcdir)/'`../mfscommon/crc.c
+
+../mfscommon/libmfsio_la-md5.lo: ../mfscommon/md5.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-md5.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-md5.Tpo -c -o ../mfscommon/libmfsio_la-md5.lo `test -f '../mfscommon/md5.c' || echo '$(srcdir)/'`../mfscommon/md5.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-md5.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-md5.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/md5.c' object='../mfscommon/libmfsio_la-md5.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-md5.lo `test -f '../mfscommon/md5.c' || echo '$(srcdir)/'`../mfscommon/md5.c
+
+../mfscommon/libmfsio_la-sockets.lo: ../mfscommon/sockets.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-sockets.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-sockets.Tpo -c -o ../mfscommon/libmfsio_la-sockets.lo `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-sockets.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-sockets.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/sockets.c' object='../mfscommon/libmfsio_la-sockets.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-sockets.lo `test -f '../mfscommon/sockets.c' || echo '$(srcdir)/'`../mfscommon/sockets.c
+
+../mfscommon/libmfsio_la-conncache.lo: ../mfscommon/conncache.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-conncache.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-conncache.Tpo -c -o ../mfscommon/libmfsio_la-conncache.lo `test -f '../mfscommon/conncache.c' || echo '$(srcdir)/'`../mfscommon/conncache.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-conncache.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-conncache.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/conncache.c' object='../mfscommon/libmfsio_la-conncache.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-conncache.lo `test -f '../mfscommon/conncache.c' || echo '$(srcdir)/'`../mfscommon/conncache.c
+
+../mfscommon/libmfsio_la-lwthread.lo: ../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-lwthread.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-lwthread.Tpo -c -o ../mfscommon/libmfsio_la-lwthread.lo `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-lwthread.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-lwthread.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/lwthread.c' object='../mfscommon/libmfsio_la-lwthread.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-lwthread.lo `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
+
+../mfscommon/libmfsio_la-strerr.lo: ../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT ../mfscommon/libmfsio_la-strerr.lo -MD -MP -MF ../mfscommon/$(DEPDIR)/libmfsio_la-strerr.Tpo -c -o ../mfscommon/libmfsio_la-strerr.lo `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/libmfsio_la-strerr.Tpo ../mfscommon/$(DEPDIR)/libmfsio_la-strerr.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/libmfsio_la-strerr.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o ../mfscommon/libmfsio_la-strerr.lo `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+
+../mfscommon/mfsbdev-lwthread.o: ../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-lwthread.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-lwthread.Tpo -c -o ../mfscommon/mfsbdev-lwthread.o `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-lwthread.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-lwthread.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/lwthread.c' object='../mfscommon/mfsbdev-lwthread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-lwthread.o `test -f '../mfscommon/lwthread.c' || echo '$(srcdir)/'`../mfscommon/lwthread.c
+
+../mfscommon/mfsbdev-lwthread.obj: ../mfscommon/lwthread.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-lwthread.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-lwthread.Tpo -c -o ../mfscommon/mfsbdev-lwthread.obj `if test -f '../mfscommon/lwthread.c'; then $(CYGPATH_W) '../mfscommon/lwthread.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/lwthread.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-lwthread.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-lwthread.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/lwthread.c' object='../mfscommon/mfsbdev-lwthread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-lwthread.obj `if test -f '../mfscommon/lwthread.c'; then $(CYGPATH_W) '../mfscommon/lwthread.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/lwthread.c'; fi`
+
+../mfscommon/mfsbdev-strerr.o: ../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-strerr.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-strerr.Tpo -c -o ../mfscommon/mfsbdev-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-strerr.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-strerr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/mfsbdev-strerr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-strerr.o `test -f '../mfscommon/strerr.c' || echo '$(srcdir)/'`../mfscommon/strerr.c
+
+../mfscommon/mfsbdev-strerr.obj: ../mfscommon/strerr.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-strerr.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-strerr.Tpo -c -o ../mfscommon/mfsbdev-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-strerr.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-strerr.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/strerr.c' object='../mfscommon/mfsbdev-strerr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
+
+../mfscommon/mfsbdev-squeue.o: ../mfscommon/squeue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-squeue.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-squeue.Tpo -c -o ../mfscommon/mfsbdev-squeue.o `test -f '../mfscommon/squeue.c' || echo '$(srcdir)/'`../mfscommon/squeue.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-squeue.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-squeue.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/squeue.c' object='../mfscommon/mfsbdev-squeue.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-squeue.o `test -f '../mfscommon/squeue.c' || echo '$(srcdir)/'`../mfscommon/squeue.c
+
+../mfscommon/mfsbdev-squeue.obj: ../mfscommon/squeue.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-squeue.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-squeue.Tpo -c -o ../mfscommon/mfsbdev-squeue.obj `if test -f '../mfscommon/squeue.c'; then $(CYGPATH_W) '../mfscommon/squeue.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/squeue.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-squeue.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-squeue.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/squeue.c' object='../mfscommon/mfsbdev-squeue.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-squeue.obj `if test -f '../mfscommon/squeue.c'; then $(CYGPATH_W) '../mfscommon/squeue.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/squeue.c'; fi`
+
+../mfscommon/mfsbdev-workers.o: ../mfscommon/workers.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-workers.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-workers.Tpo -c -o ../mfscommon/mfsbdev-workers.o `test -f '../mfscommon/workers.c' || echo '$(srcdir)/'`../mfscommon/workers.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-workers.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-workers.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/workers.c' object='../mfscommon/mfsbdev-workers.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-workers.o `test -f '../mfscommon/workers.c' || echo '$(srcdir)/'`../mfscommon/workers.c
+
+../mfscommon/mfsbdev-workers.obj: ../mfscommon/workers.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-workers.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-workers.Tpo -c -o ../mfscommon/mfsbdev-workers.obj `if test -f '../mfscommon/workers.c'; then $(CYGPATH_W) '../mfscommon/workers.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/workers.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-workers.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-workers.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/workers.c' object='../mfscommon/mfsbdev-workers.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-workers.obj `if test -f '../mfscommon/workers.c'; then $(CYGPATH_W) '../mfscommon/workers.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/workers.c'; fi`
+
+../mfscommon/mfsbdev-processname.o: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-processname.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-processname.Tpo -c -o ../mfscommon/mfsbdev-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-processname.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfsbdev-processname.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+
+../mfscommon/mfsbdev-processname.obj: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsbdev-processname.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsbdev-processname.Tpo -c -o ../mfscommon/mfsbdev-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsbdev-processname.Tpo ../mfscommon/$(DEPDIR)/mfsbdev-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfsbdev-processname.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
+
+mfsbdev-nbdmain.o: nbdmain.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT mfsbdev-nbdmain.o -MD -MP -MF $(DEPDIR)/mfsbdev-nbdmain.Tpo -c -o mfsbdev-nbdmain.o `test -f 'nbdmain.c' || echo '$(srcdir)/'`nbdmain.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsbdev-nbdmain.Tpo $(DEPDIR)/mfsbdev-nbdmain.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='nbdmain.c' object='mfsbdev-nbdmain.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o mfsbdev-nbdmain.o `test -f 'nbdmain.c' || echo '$(srcdir)/'`nbdmain.c
+
+mfsbdev-nbdmain.obj: nbdmain.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT mfsbdev-nbdmain.obj -MD -MP -MF $(DEPDIR)/mfsbdev-nbdmain.Tpo -c -o mfsbdev-nbdmain.obj `if test -f 'nbdmain.c'; then $(CYGPATH_W) 'nbdmain.c'; else $(CYGPATH_W) '$(srcdir)/nbdmain.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsbdev-nbdmain.Tpo $(DEPDIR)/mfsbdev-nbdmain.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='nbdmain.c' object='mfsbdev-nbdmain.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o mfsbdev-nbdmain.obj `if test -f 'nbdmain.c'; then $(CYGPATH_W) 'nbdmain.c'; else $(CYGPATH_W) '$(srcdir)/nbdmain.c'; fi`
 
 mfsmount-labelparser.o: labelparser.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-labelparser.o -MD -MP -MF $(DEPDIR)/mfsmount-labelparser.Tpo -c -o mfsmount-labelparser.o `test -f 'labelparser.c' || echo '$(srcdir)/'`labelparser.c
@@ -1096,11 +1548,47 @@ mfsmount-main.obj: main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-strerr.obj `if test -f '../mfscommon/strerr.c'; then $(CYGPATH_W) '../mfscommon/strerr.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/strerr.c'; fi`
 
+../mfscommon/mfsmount-processname.o: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-processname.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-processname.Tpo -c -o ../mfscommon/mfsmount-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-processname.Tpo ../mfscommon/$(DEPDIR)/mfsmount-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfsmount-processname.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-processname.o `test -f '../mfscommon/processname.c' || echo '$(srcdir)/'`../mfscommon/processname.c
+
+../mfscommon/mfsmount-processname.obj: ../mfscommon/processname.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmount-processname.obj -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmount-processname.Tpo -c -o ../mfscommon/mfsmount-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ../mfscommon/$(DEPDIR)/mfsmount-processname.Tpo ../mfscommon/$(DEPDIR)/mfsmount-processname.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='../mfscommon/processname.c' object='../mfscommon/mfsmount-processname.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsmount-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
+
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
+	-rm -rf ../mfscommon/.libs ../mfscommon/_libs
+install-includeHEADERS: $(include_HEADERS)
+	@$(NORMAL_INSTALL)
+	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(includedir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(includedir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
+	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
+	done
+
+uninstall-includeHEADERS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(includedir)'; $(am__uninstall_files_from_dir)
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -1186,9 +1674,11 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS)
+all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(HEADERS)
+install-binPROGRAMS: install-libLTLIBRARIES
+
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -1225,7 +1715,8 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-binPROGRAMS clean-generic clean-libtool mostlyclean-am
+clean-am: clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
+	clean-libtool mostlyclean-am
 
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -1242,13 +1733,13 @@ info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-includeHEADERS
 
 install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS
+install-exec-am: install-binPROGRAMS install-libLTLIBRARIES
 	@$(NORMAL_INSTALL)
 	$(MAKE) $(AM_MAKEFLAGS) install-exec-hook
 install-html: install-html-am
@@ -1289,24 +1780,27 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS
+uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
+	uninstall-libLTLIBRARIES
 
 .MAKE: install-am install-exec-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean \
-	clean-binPROGRAMS clean-generic clean-libtool cscopelist-am \
-	ctags ctags-am distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-binPROGRAMS \
-	install-data install-data-am install-dvi install-dvi-am \
-	install-exec install-exec-am install-exec-hook install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
-	uninstall-binPROGRAMS
+	clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
+	clean-libtool cscopelist-am ctags ctags-am distclean \
+	distclean-compile distclean-generic distclean-libtool \
+	distclean-tags distdir dvi dvi-am html html-am info info-am \
+	install install-am install-binPROGRAMS install-data \
+	install-data-am install-dvi install-dvi-am install-exec \
+	install-exec-am install-exec-hook install-html install-html-am \
+	install-includeHEADERS install-info install-info-am \
+	install-libLTLIBRARIES install-man install-pdf install-pdf-am \
+	install-ps install-ps-am install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-binPROGRAMS \
+	uninstall-includeHEADERS uninstall-libLTLIBRARIES
 
 .PRECIOUS: Makefile
 

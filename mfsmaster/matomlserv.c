@@ -48,6 +48,7 @@
 #include "crc.h"
 #include "cfg.h"
 #include "main.h"
+#include "sizestr.h"
 #include "sockets.h"
 #include "slogger.h"
 #include "massert.h"

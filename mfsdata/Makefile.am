@@ -35,7 +35,7 @@ if BUILD_MASTER
 		fi ; \
 	fi
 endif
-if BUILD_MOUNT
+if BUILD_CLIENT
 	$(INSTALL_DATA) $(builddir)/mfsmount.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmount.cfg.sample
 endif
 if BUILD_METALOGGER

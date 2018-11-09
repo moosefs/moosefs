@@ -25,7 +25,7 @@
 #include "MFSCommunication.h"
 #include "massert.h"
 #include "lwthread.h"
-#ifndef WIN32
+#ifdef MFSMOUNT
 #include "mfs_fuse.h"
 #include "fdcache.h"
 #endif
@@ -108,14 +108,14 @@ void* ep_thread(void *arg) {
 					chunksdatacache_clear_inode(ep->inode,ep->chindx+1);
 					read_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,0);
 					read_inode_set_length_passive(ep->inode,ep->fleng);
-#ifndef WIN32
+#ifdef MFSMOUNT
 					fdcache_invalidate(ep->inode);
 					mfs_inode_change_fleng(ep->inode,ep->fleng);
 					mfs_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,0);
 #endif
 				} else {
 					read_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,MFSCHUNKSIZE);
-#ifndef WIN32
+#ifdef MFSMOUNT
 					fdcache_invalidate(ep->inode);
 					mfs_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,MFSCHUNKSIZE);
 #endif
@@ -123,7 +123,7 @@ void* ep_thread(void *arg) {
 				break;
 			case FLENG_CHANGED:
 				read_inode_set_length_passive(ep->inode,ep->fleng);
-#ifndef WIN32
+#ifdef MFSMOUNT
 				fdcache_invalidate(ep->inode);
 				mfs_inode_clear_cache(ep->inode,ep->fleng,0);
 				mfs_inode_change_fleng(ep->inode,ep->fleng);

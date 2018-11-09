@@ -59,7 +59,7 @@
 #include "chunkrwlock.h"
 #include "chunksdatacache.h"
 #include "MFSCommunication.h"
-#ifndef WIN32
+#ifdef MFSMOUNT
 #include "fdcache.h"
 #endif
 
@@ -114,6 +114,7 @@ typedef struct chunkdata_s {
 	uint8_t chunkready;
 	uint8_t unbreakable;
 	uint8_t continueop;
+	uint8_t superuser;
 	int wakeup_fd;
 	cblock *datachainhead,*datachaintail;
 	struct inodedata_s *parent;
@@ -387,6 +388,7 @@ chunkdata* write_new_chunkdata(inodedata *ind,uint32_t chindx) {
 	chd->chunkready = 0;
 	chd->unbreakable = 0;
 	chd->continueop = 0;
+	chd->superuser = 0;
 	chd->trycnt = 0;
 	chd->parent = ind;
 	chd->next = NULL;
@@ -636,7 +638,7 @@ void* write_worker(void *arg) {
 	uint8_t wrstatus;
 	uint8_t chunkready;
 	uint8_t unbreakable;
-	uint8_t continueop;
+	uint8_t chunkopflags;
 	int status;
 	char csstrip[16];
 	uint8_t waitforstatus;
@@ -717,7 +719,7 @@ void* write_worker(void *arg) {
 			status = EINVAL;	// this should never happen, so status is not important - just anything
 		}
 		chunkready = chd->chunkready;
-		continueop = chd->continueop;
+		chunkopflags = (chd->continueop?CHUNKOPFLAG_CONTINUEOP:0) | (chd->superuser?CHUNKOPFLAG_CANUSERESERVESPACE:0);
 
 		zassert(pthread_mutex_unlock(&(ind->lock)));
 
@@ -741,7 +743,7 @@ void* write_worker(void *arg) {
 		// syslog(LOG_NOTICE,"file: %"PRIu32", index: %"PRIu16" - debug1",inode,chindx);
 		// get chunk data from master
 //		start = monotonic_seconds();
-		wrstatus = fs_writechunk(inode,chindx,(continueop?CHUNKOPFLAG_CONTINUEOP:0),&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
+		wrstatus = fs_writechunk(inode,chindx,chunkopflags,&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
 		if (wrstatus!=MFS_STATUS_OK) {
 			if (wrstatus!=MFS_ERROR_LOCKED && wrstatus!=MFS_ERROR_EAGAIN) {
 				if (wrstatus==MFS_ERROR_ENOENT) {
@@ -799,7 +801,7 @@ void* write_worker(void *arg) {
 		}
 
 		chunksdatacache_insert(inode,chindx,chunkid,version,csdataver,csdata,csdatasize);
-#ifndef WIN32
+#ifdef MFSMOUNT
 		fdcache_invalidate(inode);
 #endif
 
@@ -1633,7 +1635,7 @@ int write_cb_expand(chunkdata *chd,cblock *cb,uint32_t from,uint32_t to,const ui
 	return 0;
 }
 
-int write_block(inodedata *ind,uint32_t chindx,uint16_t pos,uint32_t from,uint32_t to,const uint8_t *data) {
+int write_block(inodedata *ind,uint32_t chindx,uint16_t pos,uint32_t from,uint32_t to,const uint8_t *data,uint8_t superuser) {
 	cblock *cb,*ncb;
 	chunkdata *chd;
 	uint8_t newchunk;
@@ -1642,6 +1644,9 @@ int write_block(inodedata *ind,uint32_t chindx,uint16_t pos,uint32_t from,uint32
 	zassert(pthread_mutex_lock(&(ind->lock)));
 	for (chd=ind->chunks ; chd ; chd=chd->next) {
 		if (chd->chindx == chindx) {
+			if (superuser) {
+				chd->superuser = 1;
+			}
 			for (cb=chd->datachaintail ; cb ; cb=cb->prev) {
 				if (cb->pos==pos) {
 					if (write_cb_expand(chd,cb,from,to,data)==0) {
@@ -1661,6 +1666,9 @@ int write_block(inodedata *ind,uint32_t chindx,uint16_t pos,uint32_t from,uint32
 	memcpy(ncb->data+from,data,to-from);
 	if (chd==NULL) {
 		chd = write_new_chunkdata(ind,chindx);
+		if (superuser) {
+			chd->superuser = 1;
+		}
 		newchunk = 1;
 	} else {
 		newchunk = 0;
@@ -1688,7 +1696,7 @@ int write_block(inodedata *ind,uint32_t chindx,uint16_t pos,uint32_t from,uint32
 	return 0;
 }
 
-int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *data) {
+int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *data,uint8_t superuser) {
 	uint32_t chindx;
 	uint16_t pos;
 	uint32_t from;
@@ -1724,7 +1732,7 @@ int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *data) {
 	from = offset&MFSBLOCKMASK;
 	while (size>0) {
 		if (size>MFSBLOCKSIZE-from) {
-			if (write_block(ind,chindx,pos,from,MFSBLOCKSIZE,data)<0) {
+			if (write_block(ind,chindx,pos,from,MFSBLOCKSIZE,data,superuser)<0) {
 				return EIO;
 			}
 			size -= (MFSBLOCKSIZE-from);
@@ -1736,7 +1744,7 @@ int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *data) {
 				chindx++;
 			}
 		} else {
-			if (write_block(ind,chindx,pos,from,from+size,data)<0) {
+			if (write_block(ind,chindx,pos,from,from+size,data,superuser)<0) {
 				return EIO;
 			}
 			size = 0;

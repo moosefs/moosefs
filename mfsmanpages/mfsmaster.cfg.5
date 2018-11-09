@@ -173,6 +173,9 @@ Default grace period in seconds for soft quota (default is 604800 = 7 days)
 .TP
 .B ATIME_MODE
 Set atime modification mode (default is 0 = always modify atime - see NOTES)
+.TP
+.B RESERVE_SPACE
+Set amount of space reserved for superuser (default is 0 = do not reserve space for superuser - see NOTES)
 .SH NOTES
 .PP
 Chunks in master are tested in a loop. Speed (or frequency) is regulated by two
@@ -209,15 +212,25 @@ Whenever chunkserver load is higher than \fBCS_HEAVY_LOAD_THRESHOLD\fP  and \fBC
 .PP
 There are five values for \fBATIME_MODE\fP (all other values are treated as 0):
 .IP \[bu] 2
-0 = Always modify atime for files, folders and symlinks.
+\fB0\fP = Always modify atime for files, folders and symlinks.
 .IP \[bu] 2
-1 = Always modify atime but only in case of files (do not modify atime in case of folders and symlinks).
+\fB1\fP = Always modify atime but only in case of files (do not modify atime in case of folders and symlinks).
 .IP \[bu] 2
-2 = Modify atime only when it is lower than ctime or mtime and when current time is higher than ctime or mtime respectively, also modify atime when current atime is older than 24h. Do it for all objects during access (like "relatime" option in Linux).
+\fB2\fP = Modify atime only when it is lower than ctime or mtime and when current time is higher than ctime or mtime respectively, also modify atime when current atime is older than 24h. Do it for all objects during access (like "relatime" option in Linux).
 .IP \[bu] 2
-3 = Same as above but only in case of files. In case of folders and symlinks do not modify atime.
+\fB3\fP = Same as above but only in case of files. In case of folders and symlinks do not modify atime.
 .IP \[bu] 2
-4 = Never modify atime during access (like "noatime" option).
+\fB4\fP = Never modify atime during access (like "noatime" option).
+.PP
+You can reserve space for superuser using \fBRESERVE_SPACE\fP option. You can define it as number of bytes, percent of total space, capacity of biggest chunkserver, etc.
+.IP \[bu] 2
+\fI#\fP or \fI#\fP\fBB\fP = number of bytes reserved for superuser. Standard metric prefixes can be used - SI and IEC (k,K,M,Mi,G,Gi etc.)
+.IP \[bu] 2
+\fI#\fP\fB%\fP or \fI#\fP\fB.\fP\fI#\fP\fB%\fP = percent of total capacity of MooseFS instance
+.IP \[bu] 2
+\fI#\fP\fBU\fP or \fI#\fP\fB.\fP\fI#\fP\fBU\fP = multiplies of "U" value; U is defined as maximum number of bytes currently used by a single chunkserver
+.IP \[bu] 2
+\fI#\fP\fBC\fP or \fI#\fP\fB.\fP\fI#\fP\fBC\fP = multiplies of "C" value; C is defined as maximum total capacity of a single chunkserver
 .PP
 When your network has two (or more) IP classes you may want to use one network for standard communication between MFS modules and separate network only for I/O. It can be done by setting REMAP_BITS, REMAP_SOURCE_IP_CLASS and REMAP_DESTINATION_IP_CLASS.
 When you set these options then master will change internally IP addresses of chunkservers and will send them as chunk locations, so clients will make connections with chunkservers using new (destination) IP for all I/O, but still communicate with master using original (source) IP.

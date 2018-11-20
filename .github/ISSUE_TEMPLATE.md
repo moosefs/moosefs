@@ -38,7 +38,7 @@ Invalid
 
 #### Operating system (distribution) and kernel version.
 <!-- https://moosefs.com/blog/what-are-the-operating-systems-and-networking-requirements/ -->
-<!-- If servers and clients run on different platforms include outputs from "uname -vsrom; mfsmount -V" -->
+<!-- If servers and clients run on different platforms include outputs from "uname -vsrm; mfsmount -V; lsb_release -a" -->
 
 #### Hardware / network configuration, and underlying filesystems on master, chunkservers, and clients.
 <!--

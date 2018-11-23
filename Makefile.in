@@ -160,7 +160,7 @@ am__define_uniq_tagged_files = \
 ETAGS = etags
 CTAGS = ctags
 CSCOPE = cscope
-DIST_SUBDIRS = mfstests mfsdata mfsmanpages mfsmaster mfsmetadump \
+DIST_SUBDIRS = mfstests mfsdata mfsmanpages mfsmaster mfsmetatools \
 	mfsmetalogger mfssupervisor mfschunkserver mfsclient \
 	mfsscripts mfsnetdump systemd
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in COPYING \
@@ -373,7 +373,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 @BUILD_MASTER_FALSE@MASTERDIR = 
-@BUILD_MASTER_TRUE@MASTERDIR = mfsmaster mfsmetadump
+@BUILD_MASTER_TRUE@MASTERDIR = mfsmaster mfsmetatools
 @BUILD_METALOGGER_FALSE@METALOGGERDIR = 
 @BUILD_METALOGGER_TRUE@METALOGGERDIR = mfsmetalogger
 @BUILD_SUPERVISOR_FALSE@SUPERVISORDIR = 

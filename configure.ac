@@ -616,7 +616,7 @@ AC_CONFIG_FILES([Makefile
 		mfsscripts/Makefile
 		mfsdata/Makefile
 		mfsmaster/Makefile
-		mfsmetadump/Makefile
+		mfsmetatools/Makefile
 		mfsmetalogger/Makefile
 		mfssupervisor/Makefile
 		mfsclient/Makefile

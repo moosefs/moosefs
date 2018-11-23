@@ -41,7 +41,7 @@ master counters (very fast, but not precise). All repeated nodes (hard links) an
 chunks (snapshots) are counted multiple times. To count stats more preciselly
 you can use \fB-p\fP switch which turns on slow, recursive procedure. In this mode
 nodes and chunks are counted only once and the system uses current number of chunk
-copies instead of goal/labels.
+copies instead of goal/labels. System administrators might consider using \fBmfsmetadirinfo\fP (see \fBmfsmetadirinfo\fP(8)).
 .PP
 \fBmfsfilepaths\fP tool can be used to find all occurrences (hard links) of given file 
 in filesystem. It can also be used to find a file with given i-node number. 
@@ -104,4 +104,5 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmount (8),
-.BR mfstools (1)
+.BR mfstools (1),
+.BR mfsmetadirinfo (8)

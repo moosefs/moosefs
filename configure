@@ -16848,7 +16848,7 @@ _ACEOF
 
 
 
-ac_config_files="$ac_config_files Makefile mfsmanpages/Makefile mfschunkserver/Makefile mfsscripts/Makefile mfsdata/Makefile mfsmaster/Makefile mfsmetadump/Makefile mfsmetalogger/Makefile mfssupervisor/Makefile mfsclient/Makefile mfsnetdump/Makefile mfstests/Makefile systemd/Makefile mfsscripts/mfscli.py mfsscripts/chart.cgi mfsscripts/index.html mfsscripts/mfscgiserv.py mfsdata/mfschunkserver.cfg mfsdata/mfsmaster.cfg mfsdata/mfsmetalogger.cfg mfsdata/mfsmount.cfg systemd/moosefs-cgiserv.service systemd/moosefs-chunkserver.service systemd/moosefs-chunkserver@.service systemd/moosefs-master.service systemd/moosefs-master@.service systemd/moosefs-metalogger.service systemd/moosefs-metalogger@.service"
+ac_config_files="$ac_config_files Makefile mfsmanpages/Makefile mfschunkserver/Makefile mfsscripts/Makefile mfsdata/Makefile mfsmaster/Makefile mfsmetatools/Makefile mfsmetalogger/Makefile mfssupervisor/Makefile mfsclient/Makefile mfsnetdump/Makefile mfstests/Makefile systemd/Makefile mfsscripts/mfscli.py mfsscripts/chart.cgi mfsscripts/index.html mfsscripts/mfscgiserv.py mfsdata/mfschunkserver.cfg mfsdata/mfsmaster.cfg mfsdata/mfsmetalogger.cfg mfsdata/mfsmount.cfg systemd/moosefs-cgiserv.service systemd/moosefs-chunkserver.service systemd/moosefs-chunkserver@.service systemd/moosefs-master.service systemd/moosefs-master@.service systemd/moosefs-metalogger.service systemd/moosefs-metalogger@.service"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -17936,7 +17936,7 @@ do
     "mfsscripts/Makefile") CONFIG_FILES="$CONFIG_FILES mfsscripts/Makefile" ;;
     "mfsdata/Makefile") CONFIG_FILES="$CONFIG_FILES mfsdata/Makefile" ;;
     "mfsmaster/Makefile") CONFIG_FILES="$CONFIG_FILES mfsmaster/Makefile" ;;
-    "mfsmetadump/Makefile") CONFIG_FILES="$CONFIG_FILES mfsmetadump/Makefile" ;;
+    "mfsmetatools/Makefile") CONFIG_FILES="$CONFIG_FILES mfsmetatools/Makefile" ;;
     "mfsmetalogger/Makefile") CONFIG_FILES="$CONFIG_FILES mfsmetalogger/Makefile" ;;
     "mfssupervisor/Makefile") CONFIG_FILES="$CONFIG_FILES mfssupervisor/Makefile" ;;
     "mfsclient/Makefile") CONFIG_FILES="$CONFIG_FILES mfsclient/Makefile" ;;

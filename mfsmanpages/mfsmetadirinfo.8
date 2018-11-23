@@ -1,0 +1,83 @@
+.TH mfsmetadirinfo "8" "November 2018" "MooseFS 3.0.103-1" "This is part of MooseFS"
+.SH NAME
+mfsmetadirinfo - uses MooseFS metadata to calculate precise directory information (similar to mfsdirinfo)
+.SH SYNOPSIS
+\fBmfsmetadirinfo\fP [\fB\-f\fP \fBJ\fP|\fBC\fP|\fBC\fP \fIx\fP] [\fB\-o\fP \fIoutputfile\fP] [\fB\-a\fP \fIsum_name\fP] \fImetadata.mfs\fP \fIPATH\fP [\fIPATH...\fP]
+.SH DESCRIPTION
+\fBmfsmetadirinfo\fP is a tool that can be used to calculate precise directory information such as number of inodes, number of chunks, total length of all files, size, real size etc. Output can be generated as plain text, CSV or JSON.
+Data for calculations is read from indicated \fImetadata.mfs\fP mfs master metadata file and is
+calculated for directory(ies) specified by \fIPATH\fP parameter(s) \- relative in mfs instance.
+Default output is human-readable plain text, JSON or CSV can be selected using options.
+.PP
+Options:
+.TP
+\fB\-f\fP
+switch output format to JSON (\fBJ\fP) or CSV (\fBC\fP); for CSV, if only \fBC\fP is specified, default
+separator will be used (comma), if second character is specified, this character will be used as 
+the separator in CSV data
+.TP
+\fB\-o\fP
+write output to \fIoutputfile\fP instead of stdout
+.TP
+\fB\-a\fP
+optional parameter that indicates the tool should calculate the information for all
+supplied paths together (a sum), this calculation is indicated by \fIsum_name\fP in output data
+.SH OUTPUT FIELDS
+For each \fIPATH\fP and, if defined, for \fIsum_name\fP, following information will be indicated:
+.TP 10
+inodes
+number of all unique inodes (file system objects)
+.TP
+files
+number of all unique files
+.TP
+dirs
+number of all unique directories
+.TP
+chunks
+number of all unique chunks
+.TP
+kchunks
+number of all unique chunks using KEEP policy
+.TP
+achunks
+number of all unique chunks using ARCH policy
+.TP
+length
+total length of all unique files
+.TP
+size
+total size of all unique chunks
+.TP
+rsize
+total real size of all unique chunks (number of copies taken into account)
+.TP
+ksize
+hypothetical real size of all unique chunks if all were using KEEP policy
+.TP
+asize
+hypothetical real size of all unique chunks if all were using ARCH policy
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2018 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfsmetadump (8),
+.BR mfsdirinfo (1)

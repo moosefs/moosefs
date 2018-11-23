@@ -282,6 +282,7 @@ exit 0
 %doc NEWS README
 %attr(755,root,root) %{_sbindir}/mfsmaster
 %attr(755,root,root) %{_sbindir}/mfsmetadump
+%attr(755,root,root) %{_sbindir}/mfsmetadirinfo
 %attr(755,root,root) %{_sbindir}/mfsmetarestore
 %attr(755,root,root) %{_sbindir}/mfsstatsdump
 %{_mandir}/man5/mfsexports.cfg.5*
@@ -290,6 +291,7 @@ exit 0
 %{_mandir}/man8/mfsmaster.8*
 %{_mandir}/man8/mfsmetarestore.8*
 %{_mandir}/man8/mfsmetadump.8*
+%{_mandir}/man8/mfsmetadirinfo.8*
 %{_mandir}/man8/mfsstatsdump.8*
 %{mfsconfdir}/mfsexports.cfg.sample
 %{mfsconfdir}/mfstopology.cfg.sample

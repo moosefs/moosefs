@@ -666,6 +666,9 @@ void masterconn_send_disconnect_command(void) {
 		syslog(LOG_NOTICE,"sending unregister command ...");
 		buff = masterconn_create_attached_packet(eptr,CSTOMA_REGISTER,1);
 		put8bit(&buff,63);
+		eptr->mode = CLOSE;
+	} else if (eptr->mode!=FREE) {
+		eptr->mode = KILL;
 	}
 }
 
@@ -1526,7 +1529,7 @@ void masterconn_desc(struct pollfd *pdesc,uint32_t *ndesc) {
 	if (eptr->mode==DATA && eptr->input_end==0) {
 		pdesc[pos].events |= POLLIN;
 	}
-	if ((eptr->mode==DATA && eptr->outputhead!=NULL) || eptr->mode==CONNECTING) {
+	if (((eptr->mode==DATA || eptr->mode==CLOSE) && eptr->outputhead!=NULL) || eptr->mode==CONNECTING) {
 		pdesc[pos].events |= POLLOUT;
 	}
 	if (pdesc[pos].events!=0) {
@@ -1543,7 +1546,7 @@ void masterconn_disconnection_check(void) {
 	out_packetstruct *opptr,*opaptr;
 	idlejob *ij,*nij;
 
-	if (eptr->mode == KILL || eptr->mode == CLOSE) {
+	if (eptr->mode==KILL || (eptr->mode==CLOSE && eptr->outputhead==NULL)) {
 		// masterconn_beforeclose(eptr);
 		tcpclose(eptr->sock);
 		if (eptr->input_packet) {
@@ -1611,11 +1614,11 @@ void masterconn_serve(struct pollfd *pdesc) {
 			}
 			masterconn_parse(eptr);
 		}
-		if (eptr->mode==DATA && eptr->lastwrite+(eptr->timeout/3.0)<now && eptr->outputhead==NULL) {
+		if ((eptr->mode==DATA || eptr->mode==CLOSE) && eptr->lastwrite+(eptr->timeout/3.0)<now && eptr->outputhead==NULL) {
 			masterconn_create_attached_packet(eptr,ANTOAN_NOP,0);
 		}
 		if (eptr->pdescpos>=0) {
-			if ((((pdesc[eptr->pdescpos].events & POLLOUT)==0 && (eptr->outputhead)) || (pdesc[eptr->pdescpos].revents & POLLOUT)) && eptr->mode==DATA) {
+			if ((((pdesc[eptr->pdescpos].events & POLLOUT)==0 && (eptr->outputhead)) || (pdesc[eptr->pdescpos].revents & POLLOUT)) && (eptr->mode==DATA || eptr->mode==CLOSE)) {
 				masterconn_write(eptr,now);
 			}
 		}
@@ -1693,10 +1696,8 @@ void masterconn_reload(void) {
 	MasterPort = cfg_getstr("MASTER_PORT",DEFAULT_MASTER_CS_PORT);
 	BindHost = cfg_getstr("BIND_HOST","*");
 
+	masterconn_send_disconnect_command(); // closes connection
 	eptr->masteraddrvalid = 0;
-	if (eptr->mode!=FREE) {
-		eptr->mode = KILL;
-	}
 	Timeout = cfg_getuint32("MASTER_TIMEOUT",0);
 
 	ReconnectionDelay = cfg_getuint32("MASTER_RECONNECTION_DELAY",5);
@@ -1713,7 +1714,7 @@ void masterconn_reload(void) {
 }
 
 void masterconn_wantexit(void) {
-	masterconn_send_disconnect_command();
+	masterconn_send_disconnect_command(); // closes connection
 	wantexittime = monotonic_seconds();
 }
 

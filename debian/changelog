@@ -16,6 +16,14 @@ moosefs (3.0.103-1) unstable; urgency=medium
   * (mount) added option to load master password from given file
   * (mount) added extremely fast (>1GB/s) pseudo-random generator visible as a
     virtual file '.random' in root directory (not listed by ls)
+  * (metatools) added new metatool 'mfsmetadirinfo' - offline version of
+    'mfsdirinfo -p'
+  * (tools) changed data structure used by 'mfsdirinfo -p' (faster, less memory
+    usage)
+  * (tools) network code refactoring (less code, reconnection to master on
+    error)
+  * (cs) proper disconnection from master during reload (maintenance mode
+    during reload)
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 09 Nov 2018 12:00:00 +0100
 

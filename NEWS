@@ -16,6 +16,7 @@ This file lists noteworthy changes in MooseFS.
   - (metatools) added new metatool 'mfsmetadirinfo' - offline version of 'mfsdirinfo -p'
   - (tools) changed data structure used by 'mfsdirinfo -p' (faster, less memory usage)
   - (tools) network code refactoring (less code, reconnection to master on error)
+  - (cs) proper disconnection from master during reload (maintenance mode during reload)
 
 * MooseFS 3.0.102-1 (2018-07-25)
 

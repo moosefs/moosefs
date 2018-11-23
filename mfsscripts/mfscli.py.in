@@ -6108,7 +6108,7 @@ if "RS" in sectionset and leaderfound:
 				out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Show open files for: <select name="server" size="1" onchange="document.location.href='%s&amp;OFsessionid='+this.options[this.selectedIndex].value">""" % createlink({"OFsessionid":""}))
 				if OFsessionid==0:
 					out.append("""<option value="0" selected="selected"> select session</option>""")
-				sessions = sessionsdata.keys()
+				sessions = list(sessionsdata.keys())
 				sessions.sort()
 				for sessionid in sessions:
 					host,sortipnum,ipnum,info,openfiles = sessionsdata[sessionid]

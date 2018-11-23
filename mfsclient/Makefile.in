@@ -207,9 +207,10 @@ mfsmount_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 mfsmount_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(mfsmount_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_mfstools_OBJECTS = mfstools.$(OBJEXT) labelparser.$(OBJEXT) \
-	../mfscommon/clocks.$(OBJEXT) ../mfscommon/sockets.$(OBJEXT) \
-	../mfscommon/strerr.$(OBJEXT) ../mfscommon/md5.$(OBJEXT)
+am_mfstools_OBJECTS = mfstools.$(OBJEXT) mfstools_master.$(OBJEXT) \
+	labelparser.$(OBJEXT) ../mfscommon/clocks.$(OBJEXT) \
+	../mfscommon/sockets.$(OBJEXT) ../mfscommon/strerr.$(OBJEXT) \
+	../mfscommon/md5.$(OBJEXT) ../mfscommon/liset64.$(OBJEXT)
 mfstools_OBJECTS = $(am_mfstools_OBJECTS)
 mfstools_DEPENDENCIES = $(am__DEPENDENCIES_1)
 AM_V_P = $(am__v_P_@AM_V@)
@@ -535,11 +536,13 @@ mfsbdev_SOURCES = \
 
 mfstools_SOURCES = \
 	mfstools.c \
+	mfstools_master.c mfstools_master.h \
 	labelparser.c labelparser.h \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/sockets.c ../mfscommon/sockets.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/md5.c ../mfscommon/md5.h \
+	../mfscommon/liset64.c ../mfscommon/liset64.h \
 	../mfscommon/datapack.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/MFSCommunication.h
 
@@ -750,6 +753,8 @@ mfsmount$(EXEEXT): $(mfsmount_OBJECTS) $(mfsmount_DEPENDENCIES) $(EXTRA_mfsmount
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 ../mfscommon/md5.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/liset64.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 
 mfstools$(EXEEXT): $(mfstools_OBJECTS) $(mfstools_DEPENDENCIES) $(EXTRA_mfstools_DEPENDENCIES) 
 	@rm -f mfstools$(EXEEXT)
@@ -773,6 +778,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-pcqueue.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-sockets.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/libmfsio_la-strerr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/liset64.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/md5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsbdev-lwthread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsbdev-processname.Po@am__quote@
@@ -830,6 +836,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-writedata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-xattrcache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfstools.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfstools_master.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\

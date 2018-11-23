@@ -45,9 +45,12 @@
 #include "mfsstrerr.h"
 #include "sockets.h"
 #include "hashfn.h"
+#include "liset64.h"
 #include "clocks.h"
 #include "md5.h"
 #include "MFSCommunication.h"
+
+#include "mfstools_master.h"
 
 #define tcpread(s,b,l) tcptoread(s,b,l,20000)
 #define tcpwrite(s,b,l) tcptowrite(s,b,l,20000)
@@ -473,125 +476,8 @@ void dirname_inplace(char *path) {
 	}
 }
 
-
-
-/* ---- CHUNK/INODE SET ROUTINES ---- */
-
-uint64_t sc_upper_power_of_two(uint64_t v) {
-	v--;
-	v |= v >> 1;
-	v |= v >> 2;
-	v |= v >> 4;
-	v |= v >> 8;
-	v |= v >> 16;
-	v |= v >> 32;
-	v++;
-	return v;
-}
-
-/* ---- CHUNK SET ---- */
-
-uint64_t *chunkhash;
-uint64_t chunkhashsize;
-uint64_t chunkhashelems;
-
-void sc_chunkset_init(uint64_t chunks) {
-	if (chunks<100000) {
-		chunks = 100000;
-	}
-	chunkhashsize = chunks;
-	chunkhashsize *= 3;
-	chunkhashsize /= 2;
-	chunkhashsize = sc_upper_power_of_two(chunkhashsize);
-	chunkhashelems = 0;
-	chunkhash = malloc(sizeof(uint64_t)*chunkhashsize);
-	memset(chunkhash,0,sizeof(uint64_t)*chunkhashsize);
-}
-
-void sc_chunkset_cleanup(void) {
-	free(chunkhash);
-	chunkhash = NULL;
-	chunkhashsize = 0;
-	chunkhashelems = 0;
-}
-
-uint8_t sc_chunkset_add(uint64_t chunkid) {
-	uint64_t hash = hash64(chunkid);
-	uint64_t disp = (hash>>32)|1;
-	hash &= (chunkhashsize-1);
-	disp &= (chunkhashsize-1);
-	while (chunkhash[hash]!=0) {
-		if (chunkhash[hash]==chunkid) {
-			return 0;
-		}
-		hash += disp;
-		hash &= (chunkhashsize-1);
-	}
-	chunkhash[hash] = chunkid;
-	chunkhashelems++;
-	massert(chunkhashelems*10 <= chunkhashsize*8,"chunk hash overloaded !!!");
-	return 1;
-}
-
-/* ---- INODE SET ---- */
-
-uint32_t *inohash;
-uint64_t inohashsize;
-uint64_t inohashelems;
-
-void sc_inoset_init(uint32_t inodes) {
-	if (inodes<100000) {
-		inodes = 100000;
-	}
-	inohashsize = inodes;
-	inohashsize *= 3;
-	inohashsize /= 2;
-	inohashsize = sc_upper_power_of_two(inohashsize);
-	inohashelems = 0;
-	inohash = malloc(sizeof(uint32_t)*inohashsize);
-	memset(inohash,0,sizeof(uint32_t)*inohashsize);
-}
-
-void sc_inoset_cleanup(void) {
-	free(inohash);
-	inohash = NULL;
-	inohashsize = 0;
-	inohashelems = 0;
-}
-
-/*
-uint8_t sc_inoset_inset(uint32_t inode) {
-	uint64_t hash = hash32mult(inode);
-	uint64_t disp = (hash32(inode))|1;
-	hash &= (inohashsize-1);
-	disp &= (inohashsize-1);
-	while (inohash[hash]!=0) {
-		if (inohash[hash]==inode) {
-			return 1;
-		}
-		hash += disp;
-		hash &= (inohashsize-1);
-	}
-	return 0;
-}
-*/
-uint8_t sc_inoset_add(uint32_t inode) {
-	uint64_t hash = hash32mult(inode);
-	uint64_t disp = (hash32(inode))|1;
-	hash &= (inohashsize-1);
-	disp &= (inohashsize-1);
-	while (inohash[hash]!=0) {
-		if (inohash[hash]==inode) {
-			return 0;
-		}
-		hash += disp;
-		hash &= (inohashsize-1);
-	}
-	inohash[hash] = inode;
-	inohashelems++;
-	massert(inohashelems*10 <= inohashsize*8,"inode hash overloaded !!!");
-	return 1;
-}
+int inode_liset;
+int chunk_liset;
 
 /* ---- INODE QUEUE ---- */
 
@@ -620,7 +506,7 @@ uint8_t sc_dequeue(uint32_t *inode) {
 
 uint8_t sc_enqueue(uint32_t inode) {
 	inoqueue *iq;
-	if (sc_inoset_add(inode)) {
+	if (liset_addval(inode_liset,inode)==0) { // new element
 		iq = malloc(sizeof(inoqueue));
 		iq->inode = inode;
 		iq->next = NULL;
@@ -631,814 +517,6 @@ uint8_t sc_enqueue(uint32_t inode) {
 		return 0;
 	}
 }
-
-
-/*
-int32_t socket_read(int sock,void *buff,uint32_t leng) {
-	uint32_t rcvd=0;
-	int i;
-	while (rcvd<leng) {
-		i = read(sock,((uint8_t*)buff)+rcvd,leng-rcvd);
-		if (i<=0) return i;
-		rcvd+=i;
-	}
-	return rcvd;
-}
-
-int32_t socket_write(int sock,void *buff,uint32_t leng) {
-	uint32_t sent=0;
-	int i;
-	while (sent<leng) {
-		i = write(sock,((uint8_t*)buff)+sent,leng-sent);
-		if (i<=0) return i;
-		sent+=i;
-	}
-	return sent;
-}
-*/
-
-int master_register_old(int rfd) {
-	uint32_t i;
-	const uint8_t *rptr;
-	uint8_t *wptr,regbuff[8+72];
-
-	wptr = regbuff;
-	put32bit(&wptr,CLTOMA_FUSE_REGISTER);
-	put32bit(&wptr,68);
-	memcpy(wptr,FUSE_REGISTER_BLOB_TOOLS_NOACL,64);
-	wptr+=64;
-	put16bit(&wptr,VERSMAJ);
-	put8bit(&wptr,VERSMID);
-	put8bit(&wptr,VERSMIN);
-	if (tcpwrite(rfd,regbuff,8+68)!=8+68) {
-		printf("register to master: send error\n");
-		return -1;
-	}
-	if (tcpread(rfd,regbuff,9)!=9) {
-		printf("register to master: receive error\n");
-		return -1;
-	}
-	rptr = regbuff;
-	i = get32bit(&rptr);
-	if (i!=MATOCL_FUSE_REGISTER) {
-		printf("register to master: wrong answer (type)\n");
-		return -1;
-	}
-	i = get32bit(&rptr);
-	if (i!=1) {
-		printf("register to master: wrong answer (length)\n");
-		return -1;
-	}
-	if (*rptr) {
-		printf("register to master: %s\n",mfsstrerr(*rptr));
-		return -1;
-	}
-	return 0;
-}
-
-int master_register(int rfd,uint32_t cuid) {
-	uint32_t i;
-	const uint8_t *rptr;
-	uint8_t *wptr,regbuff[8+73];
-
-	wptr = regbuff;
-	put32bit(&wptr,CLTOMA_FUSE_REGISTER);
-	put32bit(&wptr,73);
-	memcpy(wptr,FUSE_REGISTER_BLOB_ACL,64);
-	wptr+=64;
-	put8bit(&wptr,REGISTER_TOOLS);
-	put32bit(&wptr,cuid);
-	put16bit(&wptr,VERSMAJ);
-	put8bit(&wptr,VERSMID);
-	put8bit(&wptr,VERSMIN);
-	if (tcpwrite(rfd,regbuff,8+73)!=8+73) {
-		printf("register to master: send error\n");
-		return -1;
-	}
-	if (tcpread(rfd,regbuff,9)!=9) {
-		printf("register to master: receive error\n");
-		return -1;
-	}
-	rptr = regbuff;
-	i = get32bit(&rptr);
-	if (i!=MATOCL_FUSE_REGISTER) {
-		printf("register to master: wrong answer (type)\n");
-		return -1;
-	}
-	i = get32bit(&rptr);
-	if (i!=1) {
-		printf("register to master: wrong answer (length)\n");
-		return -1;
-	}
-	if (*rptr) {
-		printf("register to master: %s\n",mfsstrerr(*rptr));
-		return -1;
-	}
-	return 0;
-}
-
-static dev_t current_device = 0;
-static int current_master = -1;
-static uint32_t masterversion = 0;
-
-int open_master_conn(const char *name,uint32_t *inode,mode_t *mode,uint64_t *leng,uint8_t needsamedev,uint8_t needrwfs) {
-	char rpath[PATH_MAX+1];
-	struct stat stb;
-	struct statvfs stvfsb;
-	int sd;
-	uint8_t masterinfo[14];
-	const uint8_t *miptr;
-	uint8_t cnt;
-	uint32_t masterip;
-	uint16_t masterport;
-	uint32_t mastercuid;
-	uint32_t pinode;
-	int rpathlen;
-
-	rpath[0]=0;
-	if (realpath(name,rpath)==NULL) {
-		printf("%s: realpath error on (%s): %s\n",name,rpath,strerr(errno));
-		return -1;
-	}
-//	p = rpath;
-	if (needrwfs) {
-		if (statvfs(rpath,&stvfsb)!=0) {
-			printf("%s: (%s) statvfs error: %s\n",name,rpath,strerr(errno));
-			return -1;
-		}
-		if (stvfsb.f_flag&ST_RDONLY) {
-			printf("%s: (%s) Read-only file system\n",name,rpath);
-			return -1;
-		}
-	}
-	if (lstat(rpath,&stb)!=0) {
-		printf("%s: (%s) lstat error: %s\n",name,rpath,strerr(errno));
-		return -1;
-	}
-	pinode = stb.st_ino;
-	if (inode!=NULL) {
-		*inode = pinode;
-	}
-	if (mode!=NULL) {
-		*mode = stb.st_mode;
-	}
-	if (leng!=NULL) {
-		*leng = stb.st_size;
-	}
-	if (current_master>=0) {
-		if (current_device==stb.st_dev) {
-			return current_master;
-		}
-		if (needsamedev) {
-			printf("%s: different device\n",name);
-			return -1;
-		}
-	}
-	if (current_master>=0) {
-		close(current_master);
-		current_master=-1;
-	}
-	current_device = stb.st_dev;
-	for(;;) {
-		rpathlen = strlen(rpath);
-		if (rpathlen+strlen("/.masterinfo")<PATH_MAX) {
-			strcpy(rpath+rpathlen,"/.masterinfo");
-			if (lstat(rpath,&stb)==0) {
-				if ((stb.st_ino==0x7FFFFFFF || stb.st_ino==0x7FFFFFFE) && stb.st_nlink==1 && stb.st_uid==0 && stb.st_gid==0 && (stb.st_size==10 || stb.st_size==14)) {
-					if (stb.st_ino==0x7FFFFFFE && inode!=NULL) {	// meta master
-						if (((*inode)&INODE_TYPE_MASK)!=INODE_TYPE_TRASH && ((*inode)&INODE_TYPE_MASK)!=INODE_TYPE_SUSTAINED) {
-							printf("%s: only files in 'trash' and 'sustained' are usable in mfsmeta\n",name);
-							return -1;
-						}
-						(*inode)&=INODE_VALUE_MASK;
-					}
-					sd = open(rpath,O_RDONLY);
-					if (stb.st_size==10) {
-						if (read(sd,masterinfo,10)!=10) {
-							printf("%s: can't read '.masterinfo'\n",name);
-							close(sd);
-							return -1;
-						}
-					} else if (stb.st_size==14) {
-						if (read(sd,masterinfo,14)!=14) {
-							printf("%s: can't read '.masterinfo'\n",name);
-							close(sd);
-							return -1;
-						}
-					}
-					close(sd);
-					miptr = masterinfo;
-					masterip = get32bit(&miptr);
-					masterport = get16bit(&miptr);
-					mastercuid = get32bit(&miptr);
-					if (stb.st_size==14) {
-						masterversion = get32bit(&miptr);
-					} else {
-						masterversion = 0;
-					}
-					if (masterip==0 || masterport==0 || mastercuid==0) {
-						printf("%s: incorrect '.masterinfo'\n",name);
-						return -1;
-					}
-					cnt=0;
-					while (cnt<10) {
-						sd = tcpsocket();
-						if (sd<0) {
-							printf("%s: can't create connection socket: %s\n",name,strerr(errno));
-							return -1;
-						}
-						tcpreuseaddr(sd);
-						tcpnumbind(sd,0,0);
-						if (tcpnumtoconnect(sd,masterip,masterport,(cnt%2)?(300*(1<<(cnt>>1))):(200*(1<<(cnt>>1))))<0) {
-							cnt++;
-							if (cnt==10) {
-								printf("%s: can't connect to master (.masterinfo): %s\n",name,strerr(errno));
-								return -1;
-							}
-							tcpclose(sd);
-						} else {
-							cnt=10;
-						}
-					}
-					tcpnodelay(sd);
-					if (master_register(sd,mastercuid)<0) {
-						printf("%s: can't register to master (.masterinfo)\n",name);
-						return -1;
-					}
-					current_master = sd;
-					return sd;
-				}
-			} else if (pinode==1) { // this is root inode - if there is no .masterinfo here then it is not MFS.
-				printf("%s: not MFS object\n",name);
-				return -1;
-			}
-		} else if (pinode==1) { // found root inode, but path is still to long - give up
-			printf("%s: path too long\n",name);
-			return -1;
-		}
-		rpath[rpathlen]='\0';
-		if (rpath[0]!='/' || rpath[1]=='\0') { // went to '/' without success - this is not MFS
-			printf("%s: not MFS object\n",name);
-			return -1;
-		}
-		dirname_inplace(rpath);
-		if (lstat(rpath,&stb)!=0) {
-			printf("%s: (%s) lstat error: %s\n",name,rpath,strerr(errno));
-			return -1;
-		}
-		pinode = stb.st_ino;
-	}
-	return -1;
-}
-
-void close_master_conn(int err) {
-	if (current_master<0) {
-		return;
-	}
-	if (err) {
-		close(current_master);
-		current_master = -1;
-		current_device = 0;
-	}
-}
-
-/*
-int open_master_conn(const char *name,uint32_t *inode) {
-	char rpath[PATH_MAX],*p;
-	struct stat stb;
-	int sd;
-	if (realpath(name,rpath)==NULL) {
-		printf("%s: realpath error\n",name);
-		return -1;
-	}
-	p = rpath;
-	if (lstat(p,&stb)!=0) {
-		printf("%s: (%s) lstat error\n",name,p);
-		return -1;
-	}
-	*inode = stb.st_ino;
-	for(;;) {
-		if (stb.st_ino==1) {	// found fuse root
-			p = strcat(p,"/.master");
-			if (lstat(p,&stb)==0) {
-				if ((stb.st_ino==0x7FFFFFFF || stb.st_ino==0x7FFFFFFE) && stb.st_nlink==1 && stb.st_uid==0 && stb.st_gid==0) {
-					if (stb.st_ino==0x7FFFFFFE) {	// meta master
-						if (((*inode)&INODE_TYPE_MASK)!=INODE_TYPE_TRASH && ((*inode)&INODE_TYPE_MASK)!=INODE_TYPE_SUSTAINED) {
-							printf("%s: only files in 'trash' and 'sustained' are usable in mfsmeta\n",name);
-							return -1;
-						}
-						(*inode)&=INODE_VALUE_MASK;
-					}
-					sd = open(p,O_RDWR);
-					if (master_register(sd)<0) {
-						printf("%s: can't register to master\n",name);
-						return -1;
-					}
-					return sd;
-				}
-			}
-			printf("%s: not MFS object\n",name);
-			return -1;
-		}
-		if (p[0]!='/' || p[1]=='\0') {
-			printf("%s: not MFS object\n",name);
-			return -1;
-		}
-		p = dirname(p);
-		if (lstat(p,&stb)!=0) {
-			printf("%s: (%s) lstat error\n",name,p);
-			return -1;
-		}
-	}
-	return -1;
-}
-
-int open_two_files_master_conn(const char *fname,const char *sname,uint32_t *finode,uint32_t *sinode) {
-	char frpath[PATH_MAX];
-	char srpath[PATH_MAX];
-	int i;
-	char *p;
-	struct stat stb;
-	int sd;
-	if (realpath(fname,frpath)==NULL) {
-		printf("%s: realpath error\n",fname);
-		return -1;
-	}
-	if (realpath(sname,srpath)==NULL) {
-		printf("%s: realpath error\n",sname);
-		return -1;
-	}
-	if (lstat(frpath,&stb)!=0) {
-		printf("%s: (%s) lstat error\n",fname,frpath);
-		return -1;
-	}
-	*finode = stb.st_ino;
-	if (lstat(srpath,&stb)!=0) {
-		printf("%s: (%s) lstat error\n",sname,srpath);
-		return -1;
-	}
-	*sinode = stb.st_ino;
-
-	for (i=0 ; i<PATH_MAX && frpath[i]==srpath[i] ; i++) {}
-	frpath[i]='\0';
-	p = dirname(frpath);
-	if (lstat(p,&stb)!=0) {
-		printf("%s: lstat error\n",p);
-		return -1;
-	}
-	for(;;) {
-		if (stb.st_ino==1) {	// found fuse root
-			p = strcat(p,"/.master");
-			if (lstat(p,&stb)==0) {
-				if ((stb.st_ino==0x7FFFFFFF || stb.st_ino==0x7FFFFFFE) && stb.st_nlink==1 && stb.st_uid==0 && stb.st_gid==0) {
-					if (stb.st_ino==0x7FFFFFFE) {	// meta master
-						if ((((*finode)&INODE_TYPE_MASK)!=INODE_TYPE_TRASH && ((*finode)&INODE_TYPE_MASK)!=INODE_TYPE_SUSTAINED) \
-						 || (((*sinode)&INODE_TYPE_MASK)!=INODE_TYPE_TRASH && ((*sinode)&INODE_TYPE_MASK)!=INODE_TYPE_SUSTAINED)) {
-							printf("%s,%s: only files in 'trash' and 'sustained' are usable in mfsmeta\n",fname,sname);
-							return -1;
-						}
-						(*finode)&=INODE_VALUE_MASK;
-						(*sinode)&=INODE_VALUE_MASK;
-					}
-					sd = open(p,O_RDWR);
-					if (master_register(sd)<0) {
-						printf("%s,%s: can't register to master\n",fname,sname);
-						return -1;
-					}
-					return sd;
-				}
-			}
-			printf("%s,%s: not same MFS objects\n",fname,sname);
-			return -1;
-		}
-		if (p[0]!='/' || p[1]=='\0') {
-			printf("%s,%s: not same MFS objects\n",fname,sname);
-			return -1;
-		}
-		p = dirname(p);
-		if (lstat(p,&stb)!=0) {
-			printf("%s: lstat error\n",p);
-			return -1;
-		}
-	}
-	return -1;
-}
-*/
-
-#if 0
-
-#define LABELS_BUFF_SIZE ((((26+1)*MASKORGROUP)+5)*9)
-
-static inline char* make_label_expr(char *strbuff,uint8_t labelscnt,uint32_t labelmasks[9][MASKORGROUP]) {
-	uint8_t i,j;
-	char *p,c;
-
-	p = strbuff;
-	for (i=0 ; i<labelscnt ; i++) {
-		if (i>0) {
-			*p = ' ';
-			p++;
-			*p = ',';
-			p++;
-			*p = ' ';
-			p++;
-		}
-		*p = '[';
-		p++;
-		for (j=0 ; j<MASKORGROUP ; j++) {
-			if (labelmasks[i][j]==0) {
-				break;
-			}
-			if (j>0) {
-				*p = '+';
-				p++;
-			}
-			for (c='A' ; c<='Z' ; c++) {
-				if (labelmasks[i][j] & (1 << (c-'A'))) {
-					*p = c;
-					p++;
-				}
-			}
-		}
-		if (j==0) {
-			*p = '*';
-			p++;
-		}
-		*p = ']';
-		p++;
-	}
-	*p = '\0';
-	return strbuff;
-}
-
-/* grammar productions:
- *	A -> [1-9] E ',' A | [1-9] E ';' A
- *	E -> '*' | S
- *	S -> S '+' M | S '|' M | S '||' M | M
- *	M -> M '*' L | M '&' L | M '&&' L | M L | L
- *	L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']'
- */
-
-enum {
-	OR,
-	AND,
-	REF,
-	ANY,
-	SYM
-};
-
-typedef struct _node {
-	uint8_t op;
-	uint8_t val;
-	struct _node *arg1;
-	struct _node *arg2;
-} node;
-
-typedef struct _expr {
-	const char *str;
-	node *terms[9];
-	uint8_t erroroccured;
-} expr;
-
-
-static inline void expr_rfree(node *actnode) {
-	if (actnode!=NULL) {
-		if (actnode->op!=REF) {
-			expr_rfree(actnode->arg1);
-			expr_rfree(actnode->arg2);
-		}
-		free(actnode);
-	}
-}
-
-static inline node* newnode(uint8_t op,int8_t val,node *arg1,node *arg2) {
-	node *aux;
-	aux = (node*)malloc(sizeof(node));
-	aux->op = op;
-	aux->val = val;
-	aux->arg1 = arg1;
-	aux->arg2 = arg2;
-	return aux;
-}
-
-static inline node* expr_or(expr *e);
-
-static inline void expr_eat_white(expr *e) {
-	while (e->str[0]==' ' || e->str[0]=='\t') {
-		e->str++;
-	}
-}
-
-/* L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']' */
-static inline node* expr_sym(expr *e) {
-	node *a;
-	uint8_t v;
-	expr_eat_white(e);
-	if (e->str[0]=='(') {
-		e->str++;
-		expr_eat_white(e);
-		a=expr_or(e);
-		expr_eat_white(e);
-		if (e->str[0]==')') {
-			e->str++;
-			return a;
-		} else {
-			if ((int8_t)(e->str[0])>=32) {
-				printf("parse error, closing round bracket expected, next char: '%c'\n",e->str[0]);
-			} else {
-				printf("parse error, closing round bracket expected, next code: 0x%02"PRIX8"\n",(uint8_t)(e->str[0]));
-			}
-			expr_rfree(a);
-			e->erroroccured = 1;
-			return NULL;
-		}
-	}
-	if (e->str[0]=='[') {
-		e->str++;
-		expr_eat_white(e);
-		a=expr_or(e);
-		expr_eat_white(e);
-		if (e->str[0]==']') {
-			e->str++;
-			return a;
-		} else {
-			if ((int8_t)(e->str[0])>=32) {
-				printf("parse error, closing round bracket expected, next char: '%c'\n",e->str[0]);
-			} else {
-				printf("parse error, closing round bracket expected, next code: 0x%02"PRIX8"\n",(uint8_t)(e->str[0]));
-			}
-			expr_rfree(a);
-			e->erroroccured = 1;
-			return NULL;
-		}
-	}
-	if (e->str[0]>='A' && e->str[0]<='Z') {
-		v = e->str[0]-'A';
-		e->str++;
-		return newnode(SYM,v,NULL,NULL);
-	}
-	if (e->str[0]>='a' && e->str[0]<='z') {
-		v = e->str[0]-'a';
-		e->str++;
-		return newnode(SYM,v,NULL,NULL);
-	}
-	if ((int8_t)(e->str[0])>=32) {
-		printf("parse error, next char: '%c'\n",e->str[0]);
-	} else {
-		printf("parse error, next code: 0x%02"PRIX8"\n",(uint8_t)(e->str[0]));
-	}
-	e->erroroccured = 1;
-	return NULL;
-}
-
-/* M -> M '*' L | M '&' L | M '&&' L | M L | L */
-static inline node* expr_and(expr *e) {
-	node *a;
-	node *b;
-	expr_eat_white(e);
-	a = expr_sym(e);
-	expr_eat_white(e);
-	if (e->str[0]=='&' && e->str[1]=='&') {
-		e->str += 2;
-		b = expr_and(e);
-		return newnode(AND,0,a,b);
-	} else if (e->str[0]=='&' || e->str[0]=='*') {
-		e->str ++;
-		b = expr_and(e);
-		return newnode(AND,0,a,b);	
-	} else if ((e->str[0]>='A' && e->str[0]<='Z') || (e->str[0]>='a' && e->str[0]<='z') || e->str[0]=='(' || e->str[0]=='[') {
-		b = expr_and(e);
-		return newnode(AND,0,a,b);
-	} else {
-		return a;
-	}
-}
-
-/* S -> S '+' M | S '|' M | S '||' M | M */
-static inline node* expr_or(expr *e) {
-	node *a;
-	node *b;
-	expr_eat_white(e);
-	a = expr_and(e);
-	expr_eat_white(e);
-	if (e->str[0]=='|' && e->str[1]=='|') {
-		e->str += 2;
-		b = expr_or(e);
-		return newnode(OR,0,a,b);
-	} else if (e->str[0]=='|' || e->str[0]=='+') {
-		e->str ++;
-		b = expr_or(e);
-		return newnode(OR,0,a,b);
-	} else {
-		return a;
-	}
-}
-
-/* E -> '*' | S */
-static inline node* expr_first(expr *e) {
-	expr_eat_white(e);
-	if (e->str[0]=='*') {
-		e->str++;
-		return newnode(ANY,0,NULL,NULL);
-	}
-	return expr_or(e);
-}
-
-/* A -> [1-9] E ',' A | [1-9] E ';' A */
-static inline void expr_top(expr *e) {
-	uint32_t i;
-	uint32_t g;
-	uint8_t f;
-	node *a;
-
-	i = 0;
-	while (i<9) {
-		expr_eat_white(e);
-		f = 0;
-		if (e->str[0]>='1' && e->str[0]<='9') {
-			g = e->str[0]-'0';
-			e->str++;
-			f = 1;
-		} else {
-			g = 1;
-		}
-		expr_eat_white(e);
-		if (i==0 && f==1 && e->str[0]==0) { // number only
-			a = newnode(ANY,0,NULL,NULL);
-		} else {
-			a = expr_first(e);
-		}
-		expr_eat_white(e);
-		if (e->erroroccured) {
-			expr_rfree(a);
-			return;
-		}
-		if (i+g>9) {
-			break;
-		}
-		f = 0;
-		while (g>0) {
-			if (f==1) {
-				e->terms[i] = newnode(REF,0,a,NULL);
-			} else {
-				e->terms[i] = a;
-				f = 1;
-			}
-			i++;
-			g--;
-		}
-		if (e->str[0]==',' || e->str[0]==';') {
-			e->str++;
-		} else if (e->str[0]) {
-			if ((int8_t)(e->str[0])>=32) {
-				printf("parse error, next char: '%c'\n",e->str[0]);
-			} else {
-				printf("parse error, next code: 0x%02"PRIX8"\n",(uint8_t)(e->str[0]));
-			}
-			e->erroroccured = 1;
-			return;
-		} else {
-			return;
-		}
-	}
-	printf("parse error, too many copies\n");
-	e->erroroccured = 1;
-	return;
-}
-
-typedef struct _termval {
-	uint8_t cnt;
-	uint32_t *labelmasks;
-} termval;
-
-static int label_cmp(const void *a,const void *b) {
-	uint32_t aa = *((const uint32_t*)a);
-	uint32_t bb = *((const uint32_t*)b);
-	return (aa>bb)?1:(aa<bb)?-1:0;
-}
-
-static inline termval* expr_eval(node *a) {
-	termval *t1,*t2,*t;
-	uint32_t i,j;
-	t1 = NULL;
-	t2 = NULL;
-	t = NULL;
-	if (a->op==REF) {
-		return expr_eval(a->arg1);
-	}
-	if (a->op==ANY) {
-		t1 = malloc(sizeof(termval));
-		t1->cnt = 0;
-		t1->labelmasks = NULL;
-		return t1;
-	}
-	if (a->op==SYM) {
-		t1 = malloc(sizeof(termval));
-		t1->cnt = 1;
-		t1->labelmasks = malloc(sizeof(uint32_t));
-		t1->labelmasks[0] = 1 << a->val;
-		return t1;
-	}
-	if (a->op==OR || a->op==AND) {
-		t1 = expr_eval(a->arg1);
-		t2 = expr_eval(a->arg2);
-		if (t1==NULL || t2==NULL || t1->cnt==0 || t2->cnt==0) {
-			if (t1) {
-				free(t1->labelmasks);
-				free(t1);
-			}
-			if (t2) {
-				free(t2->labelmasks);
-				free(t2);
-			}
-			return NULL;
-		}
-		t = malloc(sizeof(termval));
-	}
-	if (a->op==AND) {
-		t->cnt = t1->cnt*t2->cnt;
-		t->labelmasks = malloc(sizeof(uint32_t)*t->cnt);
-		for (i=0 ; i<t1->cnt ; i++) {
-			for (j=0 ; j<t2->cnt ; j++) {
-				t->labelmasks[i*t2->cnt+j] = (t1->labelmasks[i] | t2->labelmasks[j]);
-			}
-		}
-	} else if (a->op==OR) {
-		t->cnt = t1->cnt+t2->cnt;
-		t->labelmasks = malloc(sizeof(uint32_t)*t->cnt);
-		memcpy(t->labelmasks,t1->labelmasks,sizeof(uint32_t)*t1->cnt);
-		memcpy(t->labelmasks+t1->cnt,t2->labelmasks,sizeof(uint32_t)*t2->cnt);
-	} else {
-		if (t) { /* satisify cppcheck */
-			free(t);
-		}
-		return NULL;
-	}
-	free(t1->labelmasks);
-	free(t2->labelmasks);
-	free(t1);
-	free(t2);
-	if (t->cnt>1) {
-		qsort(t->labelmasks,t->cnt,sizeof(uint32_t),label_cmp);
-		for (i=0 ; i+1<t->cnt ; i++) {
-			while (t->labelmasks[i]==t->labelmasks[i+1] && i+1<t->cnt) {
-				if (i+2<t->cnt) {
-					memmove(t->labelmasks+i+1,t->labelmasks+i+2,sizeof(uint32_t)*(t->cnt-i-2));
-				}
-				t->cnt--;
-			}
-		}
-	}
-	if (t->cnt > MASKORGROUP) {
-		printf("Too many 'or' groups (max: %u)\n",MASKORGROUP);
-		free(t->labelmasks);
-		free(t);
-		return NULL;
-	}
-	return t;
-}
-
-static inline int parse_label_expr(char *exprstr,uint8_t *labelscnt,uint32_t labelmasks[9][MASKORGROUP]) {
-	expr e;
-	termval *t;
-	uint32_t i,j;
-	int res;
-
-	res = 0;
-	e.str = exprstr;
-	e.erroroccured = 0;
-	for (i=0 ; i<9 ; i++) {
-		e.terms[i] = NULL;
-	}
-	expr_top(&e);
-	if (e.erroroccured) {
-		res = -1;
-	}
-	for (i=0 ; i<9 && res==0 && e.terms[i]!=NULL ; i++) {
-		t = expr_eval(e.terms[i]);
-		if (t==NULL) {
-			res = -1;
-		} else {
-			for (j=0 ; j<MASKORGROUP ; j++) {
-				if (j<t->cnt) {
-					labelmasks[i][j] = t->labelmasks[j];
-				} else {
-					labelmasks[i][j] = 0;
-				}
-			}
-			free(t->labelmasks);
-			free(t);
-		}
-	}
-	if (res==0) {
-		*labelscnt = i;
-	}
-	for (i=0 ; i<9 ; i++) {
-		expr_rfree(e.terms[i]);
-	}
-	return res;
-}
-#endif
 
 static inline int parse_slice_expr(char *p,int64_t *slice_from,int64_t *slice_to) {
 	if (*p==':') {
@@ -1516,15 +594,12 @@ static inline uint32_t parse_period(char *str,char **endpos) {
 }
 
 int file_paths(const char* fname) {
-	uint8_t reqbuff[16],*wptr,*buff;
-	const uint8_t *rptr;
 	const char *p;
 	struct stat st;
 	char cwdbuff[MAXPATHLEN];
 	uint32_t arginode;
-	uint32_t cmd,leng,inode;
-	uint32_t pleng;
-	int fd;
+	uint32_t inode;
+	uint32_t leng,pleng;
 
 	p = fname;
 	while (*p>='0' && *p<='9') {
@@ -1534,65 +609,32 @@ int file_paths(const char* fname) {
 	if (*p=='\0' && stat(fname,&st)<0 && errno==ENOENT) {
 		arginode = strtoul(fname,NULL,10);
 		p = getcwd(cwdbuff,MAXPATHLEN);
-		fd = open_master_conn(p,&inode,NULL,NULL,0,0);
+		if (master_prepare_conn(p,&inode,NULL,NULL,0,0)<0) {
+			return -1;
+		}
 		inode = arginode;
 	} else {
-		fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
+		if (master_prepare_conn(fname,&inode,NULL,NULL,0,0)<0) {
+			return -1;
+		}
 	}
-	if (fd<0) {
+	master_new_packet();
+	master_put32bit(inode);
+	if (master_send_and_receive(CLTOMA_FUSE_PATHS,MATOCL_FUSE_PATHS)<0) {
 		return -1;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_PATHS);
-	put32bit(&wptr,8);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	if (tcpwrite(fd,reqbuff,16)!=16) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_PATHS) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
+	leng = master_get_leng();
 	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
 	}
 	printf("%s:\n",fname);
 	while (leng>=4) {
-		pleng = get32bit(&rptr);
+		pleng = master_get32bit();
 		leng-=4;
 		if (leng>=pleng) {
 			while (pleng) {
-				putchar(get8bit(&rptr));
+				putchar(master_get8bit());
 				pleng--;
 				leng--;
 			}
@@ -1601,194 +643,12 @@ int file_paths(const char* fname) {
 			leng=0;
 		}
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
-
-/* - code moved to file_info
-int check_file(const char* fname) {
-	uint8_t reqbuff[16],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode;
-	uint8_t copies;
-	uint32_t chunks;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
-	if (fd<0) {
-		return -1;
-	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_CHECK);
-	put32bit(&wptr,8);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	if (tcpwrite(fd,reqbuff,16)!=16) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_CHECK) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if (leng%3!=0 && leng!=44) {
-		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
-		return -1;
-	}
-	printf("%s:\n",fname);
-	if (leng%3==0) {
-		for (cmd=0 ; cmd<leng ; cmd+=3) {
-			copies = get8bit(&rptr);
-			chunks = get16bit(&rptr);
-			if (copies==1) {
-				printf("1 copy:");
-			} else {
-				printf("%"PRIu8" copies:",copies);
-			}
-			print_number(" ","\n",chunks,1,0,1);
-		}
-	} else {
-		for (cmd=0 ; cmd<11 ; cmd++) {
-			chunks = get32bit(&rptr);
-			if (chunks>0) {
-				if (cmd==1) {
-					printf(" chunks with 1 copy:    ");
-				} else if (cmd>=10) {
-					printf(" chunks with 10+ copies:");
-				} else {
-					printf(" chunks with %u copies:  ",cmd);
-				}
-				print_number(" ","\n",chunks,1,0,1);
-			}
-		}
-	}
-	free(buff);
-	return 0;
-}
-*/
-
-/*
-int copy_goal_src(const char *fname,void **params) {
-	int fd;
-	open_master_conn(fname,&inode,NULL,NULL,0,0);
-	if (fd<0) {
-		return -1;
-	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_GETGOAL);
-	put32bit(&wptr,9);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put8bit(&wptr,GMODE_NORMAL);
-	if (tcpwrite(fd,reqbuff,17)!=17) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_GETGOAL) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if (leng<2) {
-		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
-		return -1;
-	}
-	fn = get8bit(&rptr);
-	dn = get8bit(&rptr);
-	if ((fn!=0 || dn!=1) && (fn!=1 || dn!=0)) {
-		printf("%s: master query: wrong answer (fn,dn)\n",fname);
-		free(buff);
-		return -1;
-	}
-	goal = get8bit(&rptr);
-	if (goal>0) {
-		*params = malloc(1);
-		wptr = *params;
-		put8bit(&wptr,goal);
-	} else {
-		labelscnt = get8bit(&rptr);
-		if (labelscnt>9 || labelscnt<1) {
-			printf("%s: master query: wrong answer (labelscnt)\n",fname);
-			free(buff);
-			return -1;
-		}
-		*params = malloc(2+labelscnt*MASKORGROUP*sizeof(uint32_t));
-		wptr = *params;
-		put8bit(&wptr,0);
-		put8bit(&wptr,labelscnt);
-		memcpy(wptr,rptr,labelscnt*MASKORGROUP*sizeof(uint32_t));
-	}
-	cnt = get32bit(&rptr);
-	if (cnt!=1) {
-		printf("%s: master query: wrong answer (cnt)\n",fname);
-		free(buff);
-		free(*params);
-		return -1;
-	}
-	free(buff);
-	return 0;
-}
-*/
 
 typedef struct _storage_class {
 	uint8_t admin_only;
@@ -1800,67 +660,58 @@ typedef struct _storage_class {
 	uint32_t arch_labelmasks[9][MASKORGROUP];
 } storage_class;
 
-static inline int deserialize_sc(const uint8_t **rptr,uint32_t leng,storage_class *sc) {
+static inline int deserialize_sc(storage_class *sc) {
 	uint8_t i,og;
-	if (leng<7) {
-		return -1;
-	}
-	sc->admin_only = get8bit(rptr);
-	sc->create_mode = get8bit(rptr);
-	sc->arch_delay = get16bit(rptr);
-	sc->create_labelscnt = get8bit(rptr);
-	sc->keep_labelscnt = get8bit(rptr);
-	sc->arch_labelscnt = get8bit(rptr);
-	if (leng<(uint32_t)(7+(sc->create_labelscnt+sc->keep_labelscnt+sc->arch_labelscnt)*4*MASKORGROUP)) {
-		return -1;
-	}
+	sc->admin_only = master_get8bit();
+	sc->create_mode = master_get8bit();
+	sc->arch_delay = master_get16bit();
+	sc->create_labelscnt = master_get8bit();
+	sc->keep_labelscnt = master_get8bit();
+	sc->arch_labelscnt = master_get8bit();
 	if (sc->create_labelscnt>9 || sc->create_labelscnt<1 || sc->keep_labelscnt>9 || sc->keep_labelscnt<1 || sc->arch_labelscnt>9 || sc->arch_labelscnt<1) {
 		return -1;
 	}
 	for (i=0 ; i<sc->create_labelscnt ; i++) {
 		for (og=0 ; og<MASKORGROUP ; og++) {
-			sc->create_labelmasks[i][og] = get32bit(rptr);
+			sc->create_labelmasks[i][og] = master_get32bit();
 		}
 	}
 	for (i=0 ; i<sc->keep_labelscnt ; i++) {
 		for (og=0 ; og<MASKORGROUP ; og++) {
-			sc->keep_labelmasks[i][og] = get32bit(rptr);
+			sc->keep_labelmasks[i][og] = master_get32bit();
 		}
 	}
 	for (i=0 ; i<sc->arch_labelscnt ; i++) {
 		for (og=0 ; og<MASKORGROUP ; og++) {
-			sc->arch_labelmasks[i][og] = get32bit(rptr);
+			sc->arch_labelmasks[i][og] = master_get32bit();
 		}
 	}
-	return 7+(sc->create_labelscnt+sc->keep_labelscnt+sc->arch_labelscnt)*4*MASKORGROUP;
+	return 0;
 }
 
-static inline uint32_t serialize_sc(uint8_t **wptr,const storage_class *sc) {
+static inline void serialize_sc(const storage_class *sc) {
 	uint8_t i,og;
-	if (wptr!=NULL) {
-		put8bit(wptr,sc->admin_only);
-		put8bit(wptr,sc->create_mode);
-		put16bit(wptr,sc->arch_delay);
-		put8bit(wptr,sc->create_labelscnt);
-		put8bit(wptr,sc->keep_labelscnt);
-		put8bit(wptr,sc->arch_labelscnt);
-		for (i=0 ; i<sc->create_labelscnt ; i++) {
-			for (og=0 ; og<MASKORGROUP ; og++) {
-				put32bit(wptr,sc->create_labelmasks[i][og]);
-			}
-		}
-		for (i=0 ; i<sc->keep_labelscnt ; i++) {
-			for (og=0 ; og<MASKORGROUP ; og++) {
-				put32bit(wptr,sc->keep_labelmasks[i][og]);
-			}
-		}
-		for (i=0 ; i<sc->arch_labelscnt ; i++) {
-			for (og=0 ; og<MASKORGROUP ; og++) {
-				put32bit(wptr,sc->arch_labelmasks[i][og]);
-			}
+	master_put8bit(sc->admin_only);
+	master_put8bit(sc->create_mode);
+	master_put16bit(sc->arch_delay);
+	master_put8bit(sc->create_labelscnt);
+	master_put8bit(sc->keep_labelscnt);
+	master_put8bit(sc->arch_labelscnt);
+	for (i=0 ; i<sc->create_labelscnt ; i++) {
+		for (og=0 ; og<MASKORGROUP ; og++) {
+			master_put32bit(sc->create_labelmasks[i][og]);
 		}
 	}
-	return 7+(sc->create_labelscnt+sc->keep_labelscnt+sc->arch_labelscnt)*4*MASKORGROUP;
+	for (i=0 ; i<sc->keep_labelscnt ; i++) {
+		for (og=0 ; og<MASKORGROUP ; og++) {
+			master_put32bit(sc->keep_labelmasks[i][og]);
+		}
+	}
+	for (i=0 ; i<sc->arch_labelscnt ; i++) {
+		for (og=0 ; og<MASKORGROUP ; og++) {
+			master_put32bit(sc->arch_labelmasks[i][og]);
+		}
+	}
 }
 
 static inline void printf_sc(const storage_class *sc,char *endstr) {
@@ -1891,155 +742,47 @@ static inline void printf_sc(const storage_class *sc,char *endstr) {
 	printf("%s",endstr);
 }
 
-#if 0
-static inline int labels_deserialize(const uint8_t **rptr,uint8_t *create_mode,uint8_t *create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t *keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t *arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t *arch_delay) {
-	uint8_t lc,og;
-	if (masterversion>=VERSION2INT(3,0,9)) {
-		*create_mode = get8bit(rptr);
-		*arch_delay = get16bit(rptr);
-		*create_labelscnt = get8bit(rptr);
-		*keep_labelscnt = get8bit(rptr);
-		*arch_labelscnt = get8bit(rptr);
-		if (*create_labelscnt>9 || *create_labelscnt<1 || *keep_labelscnt>9 || *keep_labelscnt<1 || *arch_labelscnt>9 || *arch_labelscnt<1) {
-			return -1;
-		}
-		for (lc=0 ; lc<*create_labelscnt ; lc++) {
-			for (og=0 ; og<MASKORGROUP ; og++) {
-				create_labelmasks[lc][og] = get32bit(rptr);
-			}
-		}
-		for (lc=0 ; lc<*keep_labelscnt ; lc++) {
-			for (og=0 ; og<MASKORGROUP ; og++) {
-				keep_labelmasks[lc][og] = get32bit(rptr);
-			}
-		}
-		for (lc=0 ; lc<*arch_labelscnt ; lc++) {
-			for (og=0 ; og<MASKORGROUP ; og++) {
-				arch_labelmasks[lc][og] = get32bit(rptr);
-			}
-		}
-	} else {
-		*create_mode = CREATE_MODE_STD;
-		*arch_delay = 0;
-		*create_labelscnt = get8bit(rptr);
-		if (*create_labelscnt>9 || *create_labelscnt<1) {
-			return -1;
-		}
-		*keep_labelscnt = *create_labelscnt;
-		*arch_labelscnt = *create_labelscnt;
-		for (lc=0 ; lc<*create_labelscnt ; lc++) {
-			for (og=0 ; og<MASKORGROUP ; og++) {
-				create_labelmasks[lc][og] = keep_labelmasks[lc][og] = arch_labelmasks[lc][og] = get32bit(rptr);
-			}
-		}
-	}
-	return 0;
-}
-
-void printf_goal(uint8_t create_mode,uint8_t create_labelscnt,uint32_t create_labelmasks[9][MASKORGROUP],uint8_t keep_labelscnt,uint32_t keep_labelmasks[9][MASKORGROUP],uint8_t arch_labelscnt,uint32_t arch_labelmasks[9][MASKORGROUP],uint16_t arch_delay,char *endstr) {
-	char create_labelsbuff[LABELS_BUFF_SIZE];
-	char keep_labelsbuff[LABELS_BUFF_SIZE];
-	char arch_labelsbuff[LABELS_BUFF_SIZE];
-	if (arch_delay==0) {
-		if (create_labelscnt==keep_labelscnt) {
-			printf("%"PRIu8" ; create_mode: %s ; create_labels: %s ; keep_labels: %s%s",create_labelscnt,(create_mode==CREATE_MODE_LOOSE)?"LOOSE":(create_mode==CREATE_MODE_STRICT)?"STRICT":"STD",make_label_expr(create_labelsbuff,create_labelscnt,create_labelmasks),make_label_expr(keep_labelsbuff,keep_labelscnt,keep_labelmasks),endstr);
-		} else {
-			printf("%"PRIu8"->%"PRIu8" ; create_mode: %s ; create_labels: %s ; keep_labels: %s%s",create_labelscnt,keep_labelscnt,(create_mode==CREATE_MODE_LOOSE)?"LOOSE":(create_mode==CREATE_MODE_STRICT)?"STRICT":"STD",make_label_expr(create_labelsbuff,create_labelscnt,create_labelmasks),make_label_expr(keep_labelsbuff,keep_labelscnt,keep_labelmasks),endstr);
-		}
-	} else {
-		if (create_labelscnt==keep_labelscnt && keep_labelscnt==arch_labelscnt) {
-			printf("%"PRIu8" ; create_mode: %s ; create_labels: %s ; keep_labels: %s ; arch_labels: %s ; arch_delay: %"PRIu16"d%s",create_labelscnt,(create_mode==CREATE_MODE_LOOSE)?"LOOSE":(create_mode==CREATE_MODE_STRICT)?"STRICT":"STD",make_label_expr(create_labelsbuff,create_labelscnt,create_labelmasks),make_label_expr(keep_labelsbuff,keep_labelscnt,keep_labelmasks),make_label_expr(arch_labelsbuff,arch_labelscnt,arch_labelmasks),arch_delay,endstr);
-		} else {
-			printf("%"PRIu8"->%"PRIu8"->%"PRIu8" ; create_mode: %s ; create_labels: %s ; keep_labels: %s ; arch_labels: %s ; arch_delay: %"PRIu16"d%s",create_labelscnt,keep_labelscnt,arch_labelscnt,(create_mode==CREATE_MODE_LOOSE)?"LOOSE":(create_mode==CREATE_MODE_STRICT)?"STRICT":"STD",make_label_expr(create_labelsbuff,create_labelscnt,create_labelmasks),make_label_expr(keep_labelsbuff,keep_labelscnt,keep_labelmasks),make_label_expr(arch_labelsbuff,arch_labelscnt,arch_labelmasks),arch_delay,endstr);
-		}
-	}
-}
-#endif
-
 int get_sclass(const char *fname,uint8_t *goal,char storage_class_name[256],uint8_t mode) {
-	uint8_t reqbuff[17],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode;
+	uint32_t inode;
 	uint8_t fn,dn,i;
-	uint8_t scnleng;
 	uint32_t cnt;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
-	if (fd<0) {
+
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,0)<0) {
 		return -1;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_GETSCLASS);
-	put32bit(&wptr,9);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put8bit(&wptr,mode);
-	if (tcpwrite(fd,reqbuff,17)!=17) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	master_new_packet();
+	master_put32bit(inode);
+	master_put8bit(mode);
+	if (master_send_and_receive(CLTOMA_FUSE_GETSCLASS,MATOCL_FUSE_GETSCLASS)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_GETSCLASS) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if (leng<2) {
+	} else if (master_get_leng()<2) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
 	}
 	if (mode==GMODE_NORMAL) {
-		fn = get8bit(&rptr);
-		dn = get8bit(&rptr);
+		fn = master_get8bit();
+		dn = master_get8bit();
 		if ((fn!=0 || dn!=1) && (fn!=1 || dn!=0)) {
 			printf("%s: master query: wrong answer (fn,dn)\n",fname);
-			free(buff);
+			master_error();
 			return -1;
 		}
-		*goal = get8bit(&rptr);
+		*goal = master_get8bit();
 		if (*goal==0) {
 			printf("%s: unsupported data format (upgrade master)\n",fname);
-			free(buff);
 			return -1;
 		} else if (*goal==0xFF) {
-			scnleng = get8bit(&rptr);
-			memcpy(storage_class_name,rptr,scnleng);
-			storage_class_name[scnleng]=0;
-			rptr+=scnleng;
+			master_getname(storage_class_name);
 		}
-		cnt = get32bit(&rptr);
+		cnt = master_get32bit();
 		if (cnt!=1) {
 			printf("%s: master query: wrong answer (cnt)\n",fname);
-			free(buff);
+			master_error();
 			return -1;
 		}
 		if (*goal==0xFF) {
@@ -2048,22 +791,18 @@ int get_sclass(const char *fname,uint8_t *goal,char storage_class_name[256],uint
 			printf("%s: %"PRIu8"\n",fname,*goal);
 		}
 	} else {
-		fn = get8bit(&rptr);
-		dn = get8bit(&rptr);
+		fn = master_get8bit();
+		dn = master_get8bit();
 		printf("%s:\n",fname);
 		for (i=0 ; i<fn ; i++) {
-			*goal = get8bit(&rptr);
+			*goal = master_get8bit();
 			if (*goal==0) {
 				printf("%s: unsupported data format (upgrade master)\n",fname);
-				free(buff);
 				return -1;
 			} else if (*goal==0xFF) {
-				scnleng = get8bit(&rptr);
-				memcpy(storage_class_name,rptr,scnleng);
-				storage_class_name[scnleng]=0;
-				rptr+=scnleng;
+				master_getname(storage_class_name);
 			}
-			cnt = get32bit(&rptr);
+			cnt = master_get32bit();
 			if (*goal==0xFF) {
 				printf(" files with storage class       '%s' :",storage_class_name);
 			} else {
@@ -2072,18 +811,14 @@ int get_sclass(const char *fname,uint8_t *goal,char storage_class_name[256],uint
 			print_number(" ","\n",cnt,1,0,1);
 		}
 		for (i=0 ; i<dn ; i++) {
-			*goal = get8bit(&rptr);
+			*goal = master_get8bit();
 			if (*goal==0) {
 				printf("%s: unsupported data format (upgrade master)\n",fname);
-				free(buff);
 				return -1;
 			} else if (*goal==0xFF) {
-				scnleng = get8bit(&rptr);
-				memcpy(storage_class_name,rptr,scnleng);
-				storage_class_name[scnleng]=0;
-				rptr+=scnleng;
+				master_getname(storage_class_name);
 			}
-			cnt = get32bit(&rptr);
+			cnt = master_get32bit();
 			if (*goal==0xFF) {
 				printf(" directories with storage class '%s' :",storage_class_name);
 			} else {
@@ -2092,192 +827,122 @@ int get_sclass(const char *fname,uint8_t *goal,char storage_class_name[256],uint
 			print_number(" ","\n",cnt,1,0,1);
 		}
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
 int get_trashtime(const char *fname,uint32_t *trashtime,uint8_t mode) {
-	uint8_t reqbuff[17],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode;
+	uint32_t inode;
 	uint32_t fn,dn,i;
 //	uint32_t trashtime;
 	uint32_t cnt;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
-	if (fd<0) {
+
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,0)<0) {
 		return -1;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_GETTRASHTIME);
-	put32bit(&wptr,9);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put8bit(&wptr,mode);
-	if (tcpwrite(fd,reqbuff,17)!=17) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	master_new_packet();
+	master_put32bit(inode);
+	master_put8bit(mode);
+	if (master_send_and_receive(CLTOMA_FUSE_GETTRASHTIME,MATOCL_FUSE_GETTRASHTIME)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_GETTRASHTIME) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if (leng<8 || leng%8!=0) {
+	} else if (master_get_leng()<8 || master_get_leng()%8!=0) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
-	} else if (mode==GMODE_NORMAL && leng!=16) {
+	} else if (mode==GMODE_NORMAL && master_get_leng()!=16) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
 	}
 	if (mode==GMODE_NORMAL) {
-		fn = get32bit(&rptr);
-		dn = get32bit(&rptr);
-		*trashtime = get32bit(&rptr);
-		cnt = get32bit(&rptr);
+		fn = master_get32bit();
+		dn = master_get32bit();
+		*trashtime = master_get32bit();
+		cnt = master_get32bit();
 		if ((fn!=0 || dn!=1) && (fn!=1 || dn!=0)) {
 			printf("%s: master query: wrong answer (fn,dn)\n",fname);
-			free(buff);
+			master_error();
 			return -1;
 		}
 		if (cnt!=1) {
 			printf("%s: master query: wrong answer (cnt)\n",fname);
-			free(buff);
+			master_error();
 			return -1;
 		}
 		printf("%s: %"PRIu32"\n",fname,*trashtime);
 	} else {
-		fn = get32bit(&rptr);
-		dn = get32bit(&rptr);
+		fn = master_get32bit();
+		dn = master_get32bit();
 		printf("%s:\n",fname);
 		for (i=0 ; i<fn ; i++) {
-			*trashtime = get32bit(&rptr);
-			cnt = get32bit(&rptr);
+			*trashtime = master_get32bit();
+			cnt = master_get32bit();
 			printf(" files with trashtime        %10"PRIu32" :",*trashtime);
 			print_number(" ","\n",cnt,1,0,1);
 		}
 		for (i=0 ; i<dn ; i++) {
-			*trashtime = get32bit(&rptr);
-			cnt = get32bit(&rptr);
+			*trashtime = master_get32bit();
+			cnt = master_get32bit();
 			printf(" directories with trashtime  %10"PRIu32" :",*trashtime);
 			print_number(" ","\n",cnt,1,0,1);
 		}
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
 int get_eattr(const char *fname,uint8_t *eattr,uint8_t mode) {
-	uint8_t reqbuff[17],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode;
+	uint32_t inode;
 	uint8_t fn,dn,i,j;
 	uint32_t fcnt[EATTR_BITS];
 	uint32_t dcnt[EATTR_BITS];
 //	uint8_t eattr;
 	uint32_t cnt;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
-	if (fd<0) {
+
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,0)<0) {
 		return -1;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_GETEATTR);
-	put32bit(&wptr,9);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put8bit(&wptr,mode);
-	if (tcpwrite(fd,reqbuff,17)!=17) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	master_new_packet();
+	master_put32bit(inode);
+	master_put8bit(mode);
+	if (master_send_and_receive(CLTOMA_FUSE_GETEATTR,MATOCL_FUSE_GETEATTR)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_GETEATTR) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if (leng%5!=2) {
+	} else if (master_get_leng()%5!=2) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
-	} else if (mode==GMODE_NORMAL && leng!=7) {
+	} else if (mode==GMODE_NORMAL && master_get_leng()!=7) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
 	}
 	if (mode==GMODE_NORMAL) {
-		fn = get8bit(&rptr);
-		dn = get8bit(&rptr);
-		*eattr = get8bit(&rptr);
-		cnt = get32bit(&rptr);
+		fn = master_get8bit();
+		dn = master_get8bit();
+		*eattr = master_get8bit();
+		cnt = master_get32bit();
 		if ((fn!=0 || dn!=1) && (fn!=1 || dn!=0)) {
 			printf("%s: master query: wrong answer (fn,dn)\n",fname);
-			free(buff);
+			master_error();
 			return -1;
 		}
 		if (cnt!=1) {
 			printf("%s: master query: wrong answer (cnt)\n",fname);
-			free(buff);
+			master_error();
 			return -1;
 		}
 		printf("%s: ",fname);
@@ -2298,11 +963,11 @@ int get_eattr(const char *fname,uint8_t *eattr,uint8_t mode) {
 			fcnt[j]=0;
 			dcnt[j]=0;
 		}
-		fn = get8bit(&rptr);
-		dn = get8bit(&rptr);
+		fn = master_get8bit();
+		dn = master_get8bit();
 		for (i=0 ; i<fn ; i++) {
-			*eattr = get8bit(&rptr);
-			cnt = get32bit(&rptr);
+			*eattr = master_get8bit();
+			cnt = master_get32bit();
 			for (j=0 ; j<EATTR_BITS ; j++) {
 				if ((*eattr) & (1<<j)) {
 					fcnt[j]+=cnt;
@@ -2310,8 +975,8 @@ int get_eattr(const char *fname,uint8_t *eattr,uint8_t mode) {
 			}
 		}
 		for (i=0 ; i<dn ; i++) {
-			*eattr = get8bit(&rptr);
-			cnt = get32bit(&rptr);
+			*eattr = master_get8bit();
+			cnt = master_get32bit();
 			for (j=0 ; j<EATTR_BITS ; j++) {
 				if ((*eattr) & (1<<j)) {
 					dcnt[j]+=cnt;
@@ -2337,18 +1002,17 @@ int get_eattr(const char *fname,uint8_t *eattr,uint8_t mode) {
 			}
 		}
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
 int set_sclass(const char *fname,uint8_t goal,const char src_storage_class_name[256],const char storage_class_name[256],uint8_t mode) {
-	uint8_t reqbuff[22+512],*wptr,*buff;
-	const uint8_t *rptr;
-	int32_t rleng;
 	uint8_t nleng,snleng;
-	uint32_t cmd,leng,inode,uid;
+	uint32_t inode,uid;
 	uint32_t changed,notchanged,notpermitted,quotaexceeded;
-	int fd;
 
 	nleng = strlen(storage_class_name);
 	if ((mode&SMODE_TMASK)==SMODE_EXCHANGE) {
@@ -2356,96 +1020,45 @@ int set_sclass(const char *fname,uint8_t goal,const char src_storage_class_name[
 	} else {
 		snleng = 0;
 	}
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
-	if (fd<0) {
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,1)<0) {
+		return -1;
+	}
+	if (goal==0xFF && master_get_version()<VERSION2INT(3,0,75)) {
+		printf("%s: storage classes not supported (master too old)\n",fname);
+		return -1;
+	}
+	if (goal==0 || (goal>9 && goal!=0xFF)) {
+		printf("%s: set storage class unsupported mode (internal error)\n",fname);
 		return -1;
 	}
 	uid = getuid();
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_SETSCLASS);
-	if (goal>=1 && goal<=9) {
-		rleng = 14;
-	} else if (goal==0xFF) {
-		if (masterversion<VERSION2INT(3,0,75)) {
-			printf("%s: storage classes not supported (master too old)\n",fname);
-			close_master_conn(0);
-			return -1;
-		}
-		if ((mode&SMODE_TMASK)==SMODE_EXCHANGE) {
-			rleng = 14+2+snleng+nleng;
-		} else {
-			rleng = 14+1+nleng;
-		}
-	} else {
-		printf("%s: set storage class unsupported mode (internal error)\n",fname);
-		close_master_conn(0);
-		return -1;
-	}
-	put32bit(&wptr,rleng);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put32bit(&wptr,uid);
-	put8bit(&wptr,goal);
-	put8bit(&wptr,mode);
+	master_new_packet();
+	master_put32bit(inode);
+	master_put32bit(uid);
+	master_put8bit(goal);
+	master_put8bit(mode);
 	if (goal==0xFF) {
 		if ((mode&SMODE_TMASK)==SMODE_EXCHANGE) {
-			put8bit(&wptr,snleng);
-			memcpy(wptr,src_storage_class_name,snleng);
-			wptr+=snleng;
+			master_putname(snleng,src_storage_class_name);
 		}
-		put8bit(&wptr,nleng);
-		memcpy(wptr,storage_class_name,nleng);
-		wptr+=nleng;
+		master_putname(nleng,storage_class_name);
 	}
-	rleng += 8;
-	if (tcpwrite(fd,reqbuff,rleng)!=rleng) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	if (master_send_and_receive(CLTOMA_FUSE_SETSCLASS,MATOCL_FUSE_SETSCLASS)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_SETSCLASS) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if (leng!=12 && leng!=16) {
+	} else if (master_get_leng()!=12 && master_get_leng()!=16) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
 	}
-	changed = get32bit(&rptr);
-	notchanged = get32bit(&rptr);
-	notpermitted = get32bit(&rptr);
-	if (leng==16) {
-		quotaexceeded = get32bit(&rptr);
+	changed = master_get32bit();
+	notchanged = master_get32bit();
+	notpermitted = master_get32bit();
+	if (master_get_leng()==16) {
+		quotaexceeded = master_get32bit();
 	} else {
 		quotaexceeded = 0;
 	}
@@ -2473,79 +1086,44 @@ int set_sclass(const char *fname,uint8_t goal,const char src_storage_class_name[
 			print_number(" inodes with goal not changed:          ","\n",notchanged,1,0,1);
 		}
 		print_number(" inodes with permission denied:         ","\n",notpermitted,1,0,1);
-		if (leng==16) {
+		if (master_get_leng()==16) {
 			print_number(" inodes with quota exceeded:            ","\n",quotaexceeded,1,0,1);
 		}
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
 int set_trashtime(const char *fname,uint32_t trashtime,uint8_t mode) {
-	uint8_t reqbuff[25],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode,uid;
+	uint32_t inode,uid;
 	uint32_t changed,notchanged,notpermitted;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
-	if (fd<0) {
+
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,1)<0) {
 		return -1;
 	}
 	uid = getuid();
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_SETTRASHTIME);
-	put32bit(&wptr,17);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put32bit(&wptr,uid);
-	put32bit(&wptr,trashtime);
-	put8bit(&wptr,mode);
-	if (tcpwrite(fd,reqbuff,25)!=25) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	master_new_packet();
+	master_put32bit(inode);
+	master_put32bit(uid);
+	master_put32bit(trashtime);
+	master_put8bit(mode);
+	if (master_send_and_receive(CLTOMA_FUSE_SETTRASHTIME,MATOCL_FUSE_SETTRASHTIME)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_SETTRASHTIME) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if (leng!=12) {
+	} else if (master_get_leng()!=12) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
 	}
-	changed = get32bit(&rptr);
-	notchanged = get32bit(&rptr);
-	notpermitted = get32bit(&rptr);
+	changed = master_get32bit();
+	notchanged = master_get32bit();
+	notpermitted = master_get32bit();
 	if ((mode&SMODE_RMASK)==0) {
 		if (changed || mode==SMODE_SET) {
 			printf("%s: %"PRIu32"\n",fname,trashtime);
@@ -2558,75 +1136,39 @@ int set_trashtime(const char *fname,uint32_t trashtime,uint8_t mode) {
 		print_number(" inodes with trashtime not changed: ","\n",notchanged,1,0,1);
 		print_number(" inodes with permission denied:     ","\n",notpermitted,1,0,1);
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
 int set_eattr(const char *fname,uint8_t eattr,uint8_t mode) {
-	uint8_t reqbuff[22],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode,uid;
+	uint32_t inode,uid;
 	uint32_t changed,notchanged,notpermitted;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
-	if (fd<0) {
+
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,1)<0) {
 		return -1;
 	}
 	uid = getuid();
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_SETEATTR);
-	put32bit(&wptr,14);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put32bit(&wptr,uid);
-	put8bit(&wptr,eattr);
-	put8bit(&wptr,mode);
-	if (tcpwrite(fd,reqbuff,22)!=22) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	master_put32bit(inode);
+	master_put32bit(uid);
+	master_put8bit(eattr);
+	master_put8bit(mode);
+	if (master_send_and_receive(CLTOMA_FUSE_SETEATTR,MATOCL_FUSE_SETEATTR)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_SETEATTR) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if (leng!=12) {
+	} else if (master_get_leng()!=12) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
 	}
-	changed = get32bit(&rptr);
-	notchanged = get32bit(&rptr);
-	notpermitted = get32bit(&rptr);
+	changed = master_get32bit();
+	notchanged = master_get32bit();
+	notpermitted = master_get32bit();
 	if ((mode&SMODE_RMASK)==0) {
 		if (changed) {
 			printf("%s: attribute(s) changed\n",fname);
@@ -2639,87 +1181,45 @@ int set_eattr(const char *fname,uint8_t eattr,uint8_t mode) {
 		print_number(" inodes with attributes not changed: ","\n",notchanged,1,0,1);
 		print_number(" inodes with permission denied:      ","\n",notpermitted,1,0,1);
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
 int archive_control(const char *fname,uint8_t archcmd) {
-	uint8_t reqbuff[21],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode,uid;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
-	if (fd<0) {
+	uint32_t inode,uid;
+
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,1)<0) {
 		return -1;
 	}
 	uid = getuid();
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_ARCHCTL);
-	put32bit(&wptr,archcmd==ARCHCTL_GET?9:13);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put8bit(&wptr,archcmd);
-	if (archcmd==ARCHCTL_GET) {
-		if (tcpwrite(fd,reqbuff,17)!=17) {
-			printf("%s: master query: send error\n",fname);
-			close_master_conn(1);
-			return -1;
-		}
-	} else {
-		put32bit(&wptr,uid);
-		if (tcpwrite(fd,reqbuff,21)!=21) {
-			printf("%s: master query: send error\n",fname);
-			close_master_conn(1);
-			return -1;
-		}
+	master_put32bit(inode);
+	master_put8bit(archcmd);
+	if (archcmd!=ARCHCTL_GET) {
+		master_put32bit(uid);
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_send_and_receive(CLTOMA_FUSE_ARCHCTL,MATOCL_FUSE_ARCHCTL)<0) {
 		return -1;
 	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_ARCHCTL) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
 	}
 	if (archcmd==ARCHCTL_GET) {
 		uint32_t archinodes,partinodes,notarchinodes;
 		uint64_t archchunks,notarchchunks;
-		if (leng!=28) {
+		if (master_get_leng()!=28) {
 			printf("%s: master query: wrong answer (leng)\n",fname);
-			free(buff);
+			master_error();
 			return -1;
 		}
-		archchunks = get64bit(&rptr);
-		notarchchunks = get64bit(&rptr);
-		archinodes = get32bit(&rptr);
-		partinodes = get32bit(&rptr);
-		notarchinodes = get32bit(&rptr);
+		archchunks = master_get64bit();
+		notarchchunks = master_get64bit();
+		archinodes = master_get32bit();
+		partinodes = master_get32bit();
+		notarchinodes = master_get32bit();
 		if (archinodes+partinodes+notarchinodes==1) {
 			if (archinodes==1) {
 				printf("%s: all chunks are archived\n",fname);
@@ -2739,31 +1239,30 @@ int archive_control(const char *fname,uint8_t archcmd) {
 	} else {
 		uint64_t changed,notchanged;
 		uint32_t notpermitted;
-		if (leng!=20) {
+		if (master_get_leng()!=20) {
 			printf("%s: master query: wrong answer (leng)\n",fname);
-			free(buff);
+			master_error();
 			return -1;
 		}
-		changed = get64bit(&rptr);
-		notchanged = get64bit(&rptr);
-		notpermitted = get32bit(&rptr);
+		changed = master_get64bit();
+		notchanged = master_get64bit();
+		notpermitted = master_get32bit();
 		printf("%s:\n",fname);
 		print_number(" chunks changed:               ","\n",changed,1,0,1);
 		print_number(" chunks not changed:           ","\n",notchanged,1,0,1);
 		print_number(" files with permission denied: ","\n",notpermitted,1,0,1);
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
 int make_sc(const char *mfsmp,const char *scname,storage_class *sc) {
-	uint8_t reqbuff[12+256+8+3*9*4*MASKORGROUP],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng;
-	int32_t pleng;
 	uint32_t nleng;
 	char cwdbuff[MAXPATHLEN];
-	int fd;
+	uint8_t status;
 
 	nleng = strlen(scname);
 	if (nleng>=256) {
@@ -2773,77 +1272,37 @@ int make_sc(const char *mfsmp,const char *scname,storage_class *sc) {
 	if (mfsmp==NULL) {
 		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
 	}
-	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
-	if (fd<0) {
+	if (master_prepare_conn(mfsmp,NULL,NULL,NULL,0,0)<0) {
 		return -1;
 	}
-	pleng = 4+1+nleng+1+serialize_sc(NULL,sc);
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_SCLASS_CREATE);
-	put32bit(&wptr,pleng);
-	put32bit(&wptr,0);
-	put8bit(&wptr,nleng);
-	memcpy(wptr,scname,nleng);
-	wptr+=nleng;
-	put8bit(&wptr,0); // packet version
-	serialize_sc(&wptr,sc);
-	pleng+=8;
-	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
-		printf("master query: send error\n");
-		close_master_conn(1);
+	master_new_packet();
+	master_putname(nleng,scname);
+	master_put8bit(0); // packet version
+	serialize_sc(sc);
+	if (master_send_and_receive(CLTOMA_SCLASS_CREATE,MATOCL_SCLASS_CREATE)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("master query: receive error\n");
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_SCLASS_CREATE) {
-		printf("master query: wrong answer (type)\n");
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("master query: receive error\n");
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("master query: wrong answer (queryid)\n");
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng!=1) {
+	if (master_get_leng()!=1) {
 		printf("master query: wrong answer (leng)\n");
-		free(buff);
+		master_error();
 		return -1;
 	}
-	if (rptr[0]!=MFS_STATUS_OK) {
-		printf("storage class make %s: error: %s\n",scname,mfsstrerr(*rptr));
-		free(buff);
+	status = master_get8bit();
+	if (status!=MFS_STATUS_OK) {
+		printf("storage class make %s: error: %s\n",scname,mfsstrerr(status));
 		return -1;
 	}
 	printf("storage class make %s: ok\n",scname);
+	if (master_end_packet()==0) { // pro forma
+		printf("master query: packet size error\n");
+		return -1;
+	}
 	return 0;
 }
 
 int change_sc(const char *mfsmp,const char *scname,uint16_t chgmask,storage_class *sc) {
-	uint8_t reqbuff[12+256+10+3*9*4*MASKORGROUP],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng;
-	int32_t pleng;
 	uint32_t nleng;
 	char cwdbuff[MAXPATHLEN];
-	int fd;
 
 	nleng = strlen(scname);
 	if (nleng>=256) {
@@ -2853,82 +1312,46 @@ int change_sc(const char *mfsmp,const char *scname,uint16_t chgmask,storage_clas
 	if (mfsmp==NULL) {
 		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
 	}
-	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
-	if (fd<0) {
+	if (master_prepare_conn(mfsmp,NULL,NULL,NULL,0,0)<0) {
 		return -1;
 	}
-	pleng = 4+1+nleng+3+serialize_sc(NULL,sc);
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_SCLASS_CHANGE);
-	put32bit(&wptr,pleng);
-	put32bit(&wptr,0);
-	put8bit(&wptr,nleng);
-	memcpy(wptr,scname,nleng);
-	wptr+=nleng;
-	put8bit(&wptr,0); // packet version
-	put16bit(&wptr,chgmask);
-	serialize_sc(&wptr,sc);
-	pleng+=8;
-	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
-		printf("master query: send error\n");
-		close_master_conn(1);
+	master_new_packet();
+	master_putname(nleng,scname);
+	master_put8bit(0); // packet version
+	master_put16bit(chgmask);
+	serialize_sc(sc);
+	if (master_send_and_receive(CLTOMA_SCLASS_CHANGE,MATOCL_SCLASS_CHANGE)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("master query: receive error\n");
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_SCLASS_CHANGE) {
-		printf("master query: wrong answer (type)\n");
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("master query: receive error\n");
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("master query: wrong answer (queryid)\n");
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==0) {
+	if (master_get_leng()==0) {
 		printf("master query: wrong answer (leng)\n");
-		free(buff);
+		master_error();
 		return -1;
 	}
-	if (leng==1) {
+	if (master_get_leng()==1) {
 		if (chgmask==0) {
-			printf("storage class show %s: error: %s\n",scname,mfsstrerr(*rptr));
+			printf("storage class show %s: error: %s\n",scname,mfsstrerr(master_get8bit()));
 		} else {
-			printf("storage class change %s: error: %s\n",scname,mfsstrerr(*rptr));
+			printf("storage class change %s: error: %s\n",scname,mfsstrerr(master_get8bit()));
 		}
-		free(buff);
 		return -1;
 	}
-	if (get8bit(&rptr)!=0) {
+	if (master_get8bit()!=0) {
 		printf("master query: wrong answer (wrong data format)\n");
-		free(buff);
+		master_error();
 		return -1;
 	}
-	if (deserialize_sc(&rptr,leng-1,sc)<0) {
-		printf("master query: wrong answer (deserialize stoage class)\n");
-		free(buff);
+	if (deserialize_sc(sc)<0) {
+		printf("master query: wrong answer (deserialize storage class)\n");
+		master_error();
 		return -1;
 	}
 	printf("storage class change %s: ",scname);
 	printf_sc(sc,"\n");
+	if (master_end_packet()==0) {
+		printf("master query: packet size error\n");
+		return -1;
+	}
 	return 0;
 }
 
@@ -2939,13 +1362,9 @@ int show_sc(const char *mfsmp,const char *scname) {
 }
 
 int remove_sc(const char *mfsmp,const char *scname) {
-	uint8_t reqbuff[12+256],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng;
-	int32_t pleng;
 	uint32_t nleng;
 	char cwdbuff[MAXPATHLEN];
-	int fd;
+	uint8_t status;
 
 	nleng = strlen(scname);
 	if (nleng>=256) {
@@ -2955,77 +1374,36 @@ int remove_sc(const char *mfsmp,const char *scname) {
 	if (mfsmp==NULL) {
 		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
 	}
-	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
-	if (fd<0) {
+	if (master_prepare_conn(mfsmp,NULL,NULL,NULL,0,0)<0) {
 		return -1;
 	}
-	pleng = 4+1+nleng;
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_SCLASS_DELETE);
-	put32bit(&wptr,pleng);
-	put32bit(&wptr,0);
-	put8bit(&wptr,nleng);
-	memcpy(wptr,scname,nleng);
-	wptr+=nleng;
-	pleng+=8;
-	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
-		printf("master query: send error\n");
-		close_master_conn(1);
+	master_new_packet();
+	master_putname(nleng,scname);
+	if (master_send_and_receive(CLTOMA_SCLASS_DELETE,MATOCL_SCLASS_DELETE)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("master query: receive error\n");
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_SCLASS_DELETE) {
-		printf("master query: wrong answer (type)\n");
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("master query: receive error\n");
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("master query: wrong answer (queryid)\n");
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng!=1) {
+	if (master_get_leng()!=1) {
 		printf("master query: wrong answer (leng)\n");
-		free(buff);
+		master_error();
 		return -1;
 	}
-	if (rptr[0]!=MFS_STATUS_OK) {
-		printf("storage class remove %s: error: %s\n",scname,mfsstrerr(*rptr));
-		free(buff);
+	status = master_get8bit();
+	if (status!=MFS_STATUS_OK) {
+		printf("storage class remove %s: error: %s\n",scname,mfsstrerr(status));
 		return -1;
 	}
 	printf("storage class remove %s: ok\n",scname);
-	return 0;
-
+	if (master_end_packet()==0) { // pro forma
+		printf("master query: packet size error\n");
+		return -1;
+	}
 	return 0;
 }
 
 int copy_sc(const char *mfsmp,const char *oldscname,const char *newscname) {
-	uint8_t reqbuff[12+512],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng;
-	int32_t pleng;
 	uint32_t onleng,nnleng;
 	char cwdbuff[MAXPATHLEN];
-	int fd;
+	uint8_t status;
 
 	onleng = strlen(oldscname);
 	nnleng = strlen(newscname);
@@ -3040,79 +1418,38 @@ int copy_sc(const char *mfsmp,const char *oldscname,const char *newscname) {
 	if (mfsmp==NULL) {
 		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
 	}
-	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
-	if (fd<0) {
+	if (master_prepare_conn(mfsmp,NULL,NULL,NULL,0,0)<0) {
 		return -1;
 	}
 	
-	pleng = 4+2+onleng+nnleng;
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_SCLASS_DUPLICATE);
-	put32bit(&wptr,pleng);
-	put32bit(&wptr,0);
-	put8bit(&wptr,onleng);
-	memcpy(wptr,oldscname,onleng);
-	wptr+=onleng;
-	put8bit(&wptr,nnleng);
-	memcpy(wptr,newscname,nnleng);
-	wptr+=nnleng;
-	pleng+=8;
-	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
-		printf("master query: send error\n");
-		close_master_conn(1);
+	master_new_packet();
+	master_putname(onleng,oldscname);
+	master_putname(nnleng,newscname);
+	if (master_send_and_receive(CLTOMA_SCLASS_DUPLICATE,MATOCL_SCLASS_DUPLICATE)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("master query: receive error\n");
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_SCLASS_DUPLICATE) {
-		printf("master query: wrong answer (type)\n");
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("master query: receive error\n");
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("master query: wrong answer (queryid)\n");
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng!=1) {
+	if (master_get_leng()!=1) {
 		printf("master query: wrong answer (leng)\n");
-		free(buff);
+		master_error();
 		return -1;
 	}
-	if (rptr[0]!=MFS_STATUS_OK) {
-		printf("storage class copy %s->%s: error: %s\n",oldscname,newscname,mfsstrerr(*rptr));
-		free(buff);
+	status = master_get8bit();
+	if (status!=MFS_STATUS_OK) {
+		printf("storage class copy %s->%s: error: %s\n",oldscname,newscname,mfsstrerr(status));
 		return -1;
 	}
 	printf("storage class copy %s->%s: ok\n",oldscname,newscname);
+	if (master_end_packet()==0) { // pro forma
+		printf("master query: packet size error\n");
+		return -1;
+	}
 	return 0;
 }
 
 int move_sc(const char *mfsmp,const char *oldscname,const char *newscname) {
-	uint8_t reqbuff[12+512],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng;
-	int32_t pleng;
 	uint32_t onleng,nnleng;
 	char cwdbuff[MAXPATHLEN];
-	int fd;
+	uint8_t status;
 
 	onleng = strlen(oldscname);
 	nnleng = strlen(newscname);
@@ -3127,162 +1464,96 @@ int move_sc(const char *mfsmp,const char *oldscname,const char *newscname) {
 	if (mfsmp==NULL) {
 		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
 	}
-	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
-	if (fd<0) {
+	if (master_prepare_conn(mfsmp,NULL,NULL,NULL,0,0)<0) {
 		return -1;
 	}
 
-	pleng = 4+2+onleng+nnleng;
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_SCLASS_RENAME);
-	put32bit(&wptr,pleng);
-	put32bit(&wptr,0);
-	put8bit(&wptr,onleng);
-	memcpy(wptr,oldscname,onleng);
-	wptr+=onleng;
-	put8bit(&wptr,nnleng);
-	memcpy(wptr,newscname,nnleng);
-	wptr+=nnleng;
-	pleng+=8;
-	if (tcpwrite(fd,reqbuff,pleng)!=pleng) {
-		printf("master query: send error\n");
-		close_master_conn(1);
+	master_new_packet();
+	master_putname(onleng,oldscname);
+	master_putname(nnleng,newscname);
+	if (master_send_and_receive(CLTOMA_SCLASS_RENAME,MATOCL_SCLASS_RENAME)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("master query: receive error\n");
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_SCLASS_RENAME) {
-		printf("master query: wrong answer (type)\n");
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("master query: receive error\n");
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("master query: wrong answer (queryid)\n");
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng!=1) {
+	if (master_get_leng()!=1) {
 		printf("master query: wrong answer (leng)\n");
-		free(buff);
+		master_error();
 		return -1;
 	}
-	if (rptr[0]!=MFS_STATUS_OK) {
-		printf("storage class move %s->%s: error: %s\n",oldscname,newscname,mfsstrerr(*rptr));
-		free(buff);
+	status = master_get8bit();
+	if (status!=MFS_STATUS_OK) {
+		printf("storage class move %s->%s: error: %s\n",oldscname,newscname,mfsstrerr(status));
 		return -1;
 	}
 	printf("storage class move %s->%s: ok\n",oldscname,newscname);
+	if (master_end_packet()==0) { // pro forma
+		printf("master query: packet size error\n");
+		return -1;
+	}
 	return 0;
 }
 
 int list_sc(const char *mfsmp,uint8_t longmode) {
-	uint8_t reqbuff[12+512],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng;
-	uint8_t nleng;
-	int dret;
 	char scname[256];
 	storage_class sc;
 	char cwdbuff[MAXPATHLEN];
-	int fd;
 
 	if (mfsmp==NULL) {
 		mfsmp = getcwd(cwdbuff,MAXPATHLEN);
 	}
-	fd = open_master_conn(mfsmp,NULL,NULL,NULL,0,0);
-	if (fd<0) {
+	if (master_prepare_conn(mfsmp,NULL,NULL,NULL,0,0)<0) {
 		return -1;
 	}
 
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_SCLASS_LIST);
-	put32bit(&wptr,5);
-	put32bit(&wptr,0);
-	put8bit(&wptr,longmode);
-	if (tcpwrite(fd,reqbuff,13)!=13) {
-		printf("master query: send error\n");
-		close_master_conn(1);
+	master_new_packet();
+	master_put8bit(longmode);
+	if (master_send_and_receive(CLTOMA_SCLASS_LIST,MATOCL_SCLASS_LIST)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("master query: receive error\n");
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("storage class list: error: %s\n",mfsstrerr(master_get8bit()));
 		return -1;
 	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_SCLASS_LIST) {
-		printf("master query: wrong answer (type)\n");
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("master query: receive error\n");
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("master query: wrong answer (queryid)\n");
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("storage class list: error: %s\n",mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	}
-	while (leng>0) {
-		nleng = get8bit(&rptr);
-		leng--;
-		if (nleng<=leng) {
-			memcpy(scname,rptr,nleng);
-			rptr+=nleng;
-			leng-=nleng;
-			scname[nleng]=0;
-		}
+	while (master_bytes_left()>0) {
+		master_getname(scname);
 		if (longmode&1) {
-			dret = deserialize_sc(&rptr,leng,&sc);
-			if (dret<0) {
+			if (deserialize_sc(&sc)<0) {
 				printf("master query: wrong answer (deserialize storage class)\n");
-				free(buff);
+				master_error();
 				return -1;
 			}
-			leng -= dret;
 			printf("%s : ",scname);
 			printf_sc(&sc,"\n");
 		} else {
 			printf("%s\n",scname);
 		}
 	}
+	if (master_end_packet()==0) {
+		printf("master query: packet size error\n");
+		return -1;
+	}
 	return 0;
 }
 
-int ip_port_cmp(const void*a,const void*b) {
-	return memcmp(a,b,6);
+typedef struct _chunk_data {
+	uint32_t ip;
+	uint16_t port;
+	uint8_t status;
+} chunk_data;
+
+int chunk_data_cmp(const void*a,const void*b) {
+	chunk_data *aa = (chunk_data*)a;
+	chunk_data *bb = (chunk_data*)b;
+
+	if (aa->ip < bb->ip) {
+		return -1;
+	} else if (aa->ip > bb->ip) {
+		return 1;
+	} else if (aa->port < bb->port) {
+		return -1;
+	} else if (aa->port > bb->port) {
+		return 1;
+	}
+	return 0;
 }
 
 int get_checksum_block(const char *csstrip,uint32_t csip,uint16_t csport,uint64_t chunkid,uint32_t version,uint8_t crcblock[4096]) {
@@ -3377,17 +1648,13 @@ void digest_to_str(char strdigest[33],uint8_t digest[16]) {
 }
 
 int file_info(uint8_t fileinfomode,const char *fname) {
-	uint8_t reqbuff[21],*wptr,*buff;
-	const uint8_t *rptr;
-	int32_t rleng;
 	uint32_t fchunks;
 	uint8_t fchunksvalid;
-	uint32_t indx,cmd,leng,inode,version;
+	uint32_t indx,inode,version;
 	uint32_t chunks,copies,vcopies,copy;
 	char *strtype;
 	char csstrip[16];
-	uint32_t csip;
-	uint16_t csport;
+	chunk_data *cdtab;
 	uint8_t protover;
 	uint64_t chunkid;
 	uint64_t fleng;
@@ -3397,57 +1664,21 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	uint8_t firstdigest;
 	uint8_t checksumerror;
 	char strdigest[33];
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,&fleng,0,0);
-	if (fd<0) {
+
+	if (master_prepare_conn(fname,&inode,NULL,&fleng,0,0)<0) {
 		return -1;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_CHECK);
-	put32bit(&wptr,8);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	if (tcpwrite(fd,reqbuff,16)!=16) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	master_new_packet();
+	master_put32bit(inode);
+	if (master_send_and_receive(CLTOMA_FUSE_CHECK,MATOCL_FUSE_CHECK)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_CHECK) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
-	} else if ((leng%3!=0 || leng>33) && leng!=44 && leng!=48) {
+	} else if ((master_get_leng()%3!=0 || master_get_leng()>33) && master_get_leng()!=44 && master_get_leng()!=48) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
+		master_error();
 		return -1;
 	}
 	if (fileinfomode&FILEINFO_QUICK) {
@@ -3455,10 +1686,10 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	}
 	fchunks = 0;
 	fchunksvalid = 0;
-	if (leng%3==0 && leng<=33) {
-		for (cmd=0 ; cmd<leng ; cmd+=3) {
-			copies = get8bit(&rptr);
-			chunks = get16bit(&rptr);
+	if (master_get_leng()%3==0 && master_get_leng()<=33) {
+		while (master_bytes_left()>0) {
+			copies = master_get8bit();
+			chunks = master_get16bit();
 			if (fileinfomode&FILEINFO_QUICK) {
 				if (copies==1) {
 					printf("1 copy:");
@@ -3470,22 +1701,22 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 			fchunks += chunks;
 		}
 	} else {
-		for (cmd=0 ; cmd<11 ; cmd++) {
-			chunks = get32bit(&rptr);
+		for (copies=0 ; copies<11 ; copies++) {
+			chunks = master_get32bit();
 			if (chunks>0 && (fileinfomode&FILEINFO_QUICK)) {
-				if (cmd==1) {
+				if (copies==1) {
 					printf(" chunks with 1 copy:    ");
-				} else if (cmd>=10) {
+				} else if (copies>=10) {
 					printf(" chunks with 10+ copies:");
 				} else {
-					printf(" chunks with %u copies:  ",cmd);
+					printf(" chunks with %u copies:  ",copies);
 				}
 				print_number(" ","\n",chunks,1,0,1);
 			}
 			fchunks += chunks;
 		}
-		if (leng==48) {
-			chunks = get32bit(&rptr);
+		if (master_get_leng()==48) {
+			chunks = master_get32bit();
 			if (chunks>0 && (fileinfomode&FILEINFO_QUICK)) {
 				printf(" empty (zero) chunks:   ");
 				print_number(" ","\n",chunks,1,0,1);
@@ -3494,7 +1725,10 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 			fchunksvalid = 1;
 		}
 	}
-	free(buff);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	if ((fileinfomode&FILEINFO_QUICK)==0) {
 		if (fchunksvalid==0) { // in this case fchunks doesn't include 'empty' chunks, so use file size to fix 'fchunks' if necessary
 			if (fchunks < ((fleng+MFSCHUNKMASK)>>MFSCHUNKBITS)) {
@@ -3510,85 +1744,42 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 			printf("\tno chunks - empty file\n");
 		}
 		for (indx=0 ; indx<fchunks ; indx++) {
-			wptr = reqbuff;
-			if (masterversion<VERSION2INT(3,0,26)) {
-				put32bit(&wptr,CLTOMA_FUSE_READ_CHUNK);
-				if (masterversion>VERSION2INT(3,0,3)) {
-					rleng = 21;
-					put32bit(&wptr,13);
-				} else {
-					rleng = 20;
-					put32bit(&wptr,12);
+			master_new_packet();
+			if (master_get_version()<VERSION2INT(3,0,26)) {
+				uint32_t leng;
+				master_put32bit(inode);
+				master_put32bit(indx);
+				if (master_get_version()>=VERSION2INT(3,0,3)) {
+					master_put8bit(0); // canmodatime
 				}
-				put32bit(&wptr,0);
-				put32bit(&wptr,inode);
-				put32bit(&wptr,indx);
-				if (masterversion>VERSION2INT(3,0,3)) {
-					put8bit(&wptr,0); // canmodatime
-				}
-				if (tcpwrite(fd,reqbuff,rleng)!=rleng) {
-					printf("%s [%"PRIu32"]: master query: send error\n",fname,indx);
-					close_master_conn(1);
+				if (master_send_and_receive(CLTOMA_FUSE_READ_CHUNK,MATOCL_FUSE_READ_CHUNK)<0) {
 					return -1;
 				}
-				if (tcpread(fd,reqbuff,8)!=8) {
-					printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
-					close_master_conn(1);
-					return -1;
-				}
-				rptr = reqbuff;
-				cmd = get32bit(&rptr);
-				leng = get32bit(&rptr);
-				if (cmd!=MATOCL_FUSE_READ_CHUNK) {
-					printf("%s [%"PRIu32"]: master query: wrong answer (type)\n",fname,indx);
-					close_master_conn(1);
-					return -1;
-				}
-				buff = malloc(leng);
-				if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-					printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
-					free(buff);
-					close_master_conn(1);
-					return -1;
-				}
-				rptr = buff;
-				cmd = get32bit(&rptr);	// queryid
-				if (cmd!=0) {
-					printf("%s [%"PRIu32"]: master query: wrong answer (queryid)\n",fname,indx);
-					free(buff);
-					close_master_conn(1);
-					return -1;
-				}
-				leng-=4;
+				leng = master_get_leng();
 				if (leng==1) {
-					printf("%s [%"PRIu32"]: %s\n",fname,indx,mfsstrerr(*rptr));
-					free(buff);
-					close_master_conn(1);
+					printf("%s [%"PRIu32"]: %s\n",fname,indx,mfsstrerr(master_get8bit()));
 					return -1;
 				} else if (leng&1) {
-					protover = get8bit(&rptr);
+					protover = master_get8bit();
 					if (protover!=1 && protover!=2) {
 						printf("%s [%"PRIu32"]: master query: unknown protocol id (%"PRIu8")\n",fname,indx,protover);
-						free(buff);
-						close_master_conn(1);
+						master_error();
 						return -1;
 					}
 					if (leng<21 || (protover==1 && ((leng-21)%10)!=0) || (protover==2 && ((leng-21)%14)!=0)) {
 						printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
-						free(buff);
-						close_master_conn(1);
+						master_error();
 						return -1;
 					}
 				} else {
 					if (leng<20 || ((leng-20)%6)!=0) {
 						printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
-						free(buff);
-						close_master_conn(1);
+						master_error();
 						return -1;
 					}
 					protover = 0;
 				}
-				rptr += 8; // fleng
+				(void)master_get64bit(); // fleng
 				if (protover==2) {
 					copies = (leng-21)/14;
 				} else if (protover==1) {
@@ -3597,81 +1788,61 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 					copies = (leng-20)/6;
 				}
 			} else {
-				put32bit(&wptr,CLTOMA_FUSE_CHECK);
-				put32bit(&wptr,12);
-				put32bit(&wptr,0);
-				put32bit(&wptr,inode);
-				put32bit(&wptr,indx);
-				if (tcpwrite(fd,reqbuff,20)!=20) {
-					printf("%s [%"PRIu32"]: master query: send error\n",fname,indx);
-					close_master_conn(1);
+				master_put32bit(inode);
+				master_put32bit(indx);
+				if (master_send_and_receive(CLTOMA_FUSE_CHECK,MATOCL_FUSE_CHECK)<0) {
 					return -1;
 				}
-				if (tcpread(fd,reqbuff,8)!=8) {
-					printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
-					close_master_conn(1);
-					return -1;
-				}
-				rptr = reqbuff;
-				cmd = get32bit(&rptr);
-				leng = get32bit(&rptr);
-				if (cmd!=MATOCL_FUSE_CHECK) {
-					printf("%s [%"PRIu32"]: master query: wrong answer (type)\n",fname,indx);
-					close_master_conn(1);
-					return -1;
-				}
-				buff = malloc(leng);
-				if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-					printf("%s [%"PRIu32"]: master query: receive error\n",fname,indx);
-					free(buff);
-					close_master_conn(1);
-					return -1;
-				}
-				rptr = buff;
-				cmd = get32bit(&rptr);	// queryid
-				if (cmd!=0) {
-					printf("%s [%"PRIu32"]: master query: wrong answer (queryid)\n",fname,indx);
-					free(buff);
-					close_master_conn(1);
-					return -1;
-				}
-				leng-=4;
-				if (leng==1) {
-					printf("%s [%"PRIu32"]: %s\n",fname,indx,mfsstrerr(*rptr));
-					free(buff);
-					close_master_conn(1);
+				if (master_get_leng()==1) {
+					printf("%s [%"PRIu32"]: %s\n",fname,indx,mfsstrerr(master_get8bit()));
 					return -1;
 				} else {
-					if (leng<12 || ((leng-12)%7)!=0) {
+					if (master_get_leng()<12 || ((master_get_leng()-12)%7)!=0) {
 						printf("%s [%"PRIu32"]: master query: wrong answer (leng)\n",fname,indx);
-						free(buff);
-						close_master_conn(1);
+						master_error();
 						return -1;
 					}
 					protover = 255;
-					copies = (leng-12)/7;
+					copies = (master_get_leng()-12)/7;
 				}
 			}
-			chunkid = get64bit(&rptr);
-			version = get32bit(&rptr);
+			chunkid = master_get64bit();
+			version = master_get32bit();
 			if (chunkid==0 && version==0) {
 				printf("\tchunk %"PRIu32": empty\n",indx);
 			} else {
 				printf("\tchunk %"PRIu32": %016"PRIX64"_%08"PRIX32" / (id:%"PRIu64" ver:%"PRIu32")\n",indx,chunkid,version,chunkid,version);
 				vcopies = 0;
-				wptr = (uint8_t*)rptr;
 				if (copies>0) {
-					qsort(wptr,copies,(protover==255)?7:(protover==2)?14:(protover==1)?10:6,ip_port_cmp);
+					cdtab = malloc(copies*sizeof(chunk_data));
+				} else {
+					cdtab = NULL;
+				}
+				for (copy=0 ; copy<copies ; copy++) {
+					cdtab[copy].ip = master_get32bit();
+					cdtab[copy].port = master_get16bit();
+					if (protover==255) {
+						cdtab[copy].status = master_get8bit();
+					} else {
+						cdtab[copy].status = CHECK_VALID;
+						if (protover>=1) {
+							(void)master_get32bit();
+						}
+						if (protover>=2) {
+							(void)master_get32bit();
+						}
+					}
+				}
+				if (copies>0) {
+					qsort(cdtab,copies,sizeof(chunk_data),chunk_data_cmp);
 				}
 				firstdigest = 1;
 				checksumerror = 0;
 				for (copy=0 ; copy<copies ; copy++) {
-					snprintf(csstrip,16,"%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8,rptr[0],rptr[1],rptr[2],rptr[3]);
+					snprintf(csstrip,16,"%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8,(uint8_t)((cdtab[copy].ip>>24)&0xFF),(uint8_t)((cdtab[copy].ip>>16)&0xFF),(uint8_t)((cdtab[copy].ip>>8)&0xFF),(uint8_t)(cdtab[copy].ip&0xFF));
 					csstrip[15]=0;
-					csip = get32bit(&rptr);
-					csport = get16bit(&rptr);
 					if (protover==255) {
-						switch (get8bit(&rptr)) {
+						switch (cdtab[copy].status) {
 							case CHECK_VALID:
 								strtype = "VALID";
 								vcopies++;
@@ -3694,17 +1865,15 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 					} else if (protover==2) {
 						strtype = "VALID";
 						vcopies++;
-						rptr+=8;
 					} else if (protover==1) {
 						strtype = "VALID";
 						vcopies++;
-						rptr+=4;
 					} else {
 						strtype = "VALID";
 						vcopies++;
 					}
 					if (fileinfomode&(FILEINFO_CRC|FILEINFO_SIGNATURE)) {
-						if (get_checksum_block(csstrip,csip,csport,chunkid,version,crcblock)==0) {
+						if (get_checksum_block(csstrip,cdtab[copy].ip,cdtab[copy].port,chunkid,version,crcblock)==0) {
 							md5_init(&chunkctx);
 							md5_update(&chunkctx,crcblock,4096);
 							if ((fileinfomode&FILEINFO_SIGNATURE) && firstdigest) {
@@ -3721,19 +1890,19 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 							firstdigest = 0;
 							if (fileinfomode&FILEINFO_CRC) {
 								digest_to_str(strdigest,currentdigest);
-								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s ; checksum digest: %s)\n",copy+1,csstrip,csport,strtype,strdigest);
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s ; checksum digest: %s)\n",copy+1,csstrip,cdtab[copy].port,strtype,strdigest);
 							} else {
-								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,csport,strtype);
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,cdtab[copy].port,strtype);
 							}
 						} else {
 							if (fileinfomode&FILEINFO_CRC) {
-								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s) - can't get checksum\n",copy+1,csstrip,csport,strtype);
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s) - can't get checksum\n",copy+1,csstrip,cdtab[copy].port,strtype);
 							} else {
-								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,csport,strtype);
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,cdtab[copy].port,strtype);
 							}
 						}
 					} else {
-						printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,csport,strtype);
+						printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,cdtab[copy].port,strtype);
 					}
 				}
 				if (checksumerror) {
@@ -3745,10 +1914,15 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 				if (vcopies==0) {
 					printf("\t\tno valid copies !!!\n");
 				}
+				if (cdtab!=NULL) {
+					free(cdtab);
+				}
 			}
-			free(buff);
+			if (master_end_packet()==0) {
+				printf("%s: master query: packet size error\n",fname);
+				return -1;
+			}
 		}
-		close_master_conn(0);
 		if (fileinfomode&FILEINFO_SIGNATURE) {
 			md5_final(currentdigest,&filectx);
 			digest_to_str(strdigest,currentdigest);
@@ -3759,17 +1933,14 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 }
 
 int append_file(const char *fname,const char *afname,int64_t slice_from,int64_t slice_to) {
-	uint8_t reqbuff[37+NGROUPS_MAX*4+4],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode,ainode,uid,gid;
+	uint32_t inode,ainode,uid,gid;
 	uint32_t slice_from_abs,slice_to_abs;
-	int32_t psize;
 	uint8_t flags;
 	gid_t grouplist[NGROUPS_MAX];
 	uint32_t i,gids;
 	uint8_t addmaingroup;
 	mode_t dmode,smode;
-	int fd;
+	uint8_t status;
 
 	if (slice_from < INT64_C(-0xFFFFFFFF) || slice_to > INT64_C(0xFFFFFFFF) || slice_to < INT64_C(-0xFFFFFFFF) || slice_to > INT64_C(0xFFFFFFFF)) {
 		printf("bad slice indexes\n");
@@ -3789,32 +1960,28 @@ int append_file(const char *fname,const char *afname,int64_t slice_from,int64_t 
 		slice_to_abs = slice_to;
 	}
 
-	fd = open_master_conn(fname,&inode,&dmode,NULL,0,1);
-	if (fd<0) {
+	if (master_prepare_conn(fname,&inode,&dmode,NULL,0,1)<0) {
 		return -1;
 	}
-	if (open_master_conn(afname,&ainode,&smode,NULL,1,1)<0) {
+	if (master_prepare_conn(afname,&ainode,&smode,NULL,1,1)<0) {
 		return -1;
 	}
 
-	if ((slice_from!=0 || slice_to!=0x80000000) && masterversion<VERSION2INT(3,0,92)) {
-		close_master_conn(0);
+	if ((slice_from!=0 || slice_to!=0x80000000) && master_get_version()<VERSION2INT(3,0,92)) {
 		printf("slices not supported in your master - please upgrade it\n");
 		return -1;
 	}
 	if ((smode&S_IFMT)!=S_IFREG) {
-		close_master_conn(0);
 		printf("%s: not a file\n",afname);
 		return -1;
 	}
 	if ((dmode&S_IFMT)!=S_IFREG) {
-		close_master_conn(0);
 		printf("%s: not a file\n",fname);
 		return -1;
 	}
 	uid = getuid();
 	gid = getgid();
-	if (masterversion>=VERSION2INT(2,0,0)) {
+	if (master_get_version()>=VERSION2INT(2,0,0)) {
 		gids = getgroups(NGROUPS_MAX,grouplist);
 		addmaingroup = 1;
 		for (i=0 ; i<gids ; i++) {
@@ -3826,80 +1993,46 @@ int append_file(const char *fname,const char *afname,int64_t slice_from,int64_t 
 		gids = 0;
 		addmaingroup = 0;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_APPEND_SLICE);
-	if (masterversion>=VERSION2INT(3,0,92)) {
-		put32bit(&wptr,29+(addmaingroup+gids)*4);
-		put32bit(&wptr,0);
-		put8bit(&wptr,flags);
-		put32bit(&wptr,inode);
-		put32bit(&wptr,ainode);
-		put32bit(&wptr,slice_from_abs);
-		put32bit(&wptr,slice_to_abs);
-		psize = 37;
+	master_new_packet();
+	if (master_get_version()>=VERSION2INT(3,0,92)) {
+		master_put8bit(flags);
+		master_put32bit(inode);
+		master_put32bit(ainode);
+		master_put32bit(slice_from_abs);
+		master_put32bit(slice_to_abs);
 	} else {
-		put32bit(&wptr,20+(addmaingroup+gids)*4);
-		put32bit(&wptr,0);
-		put32bit(&wptr,inode);
-		put32bit(&wptr,ainode);
-		psize = 28;
+		master_put32bit(inode);
+		master_put32bit(ainode);
 	}
-	put32bit(&wptr,uid);
-	if (masterversion<VERSION2INT(2,0,0)) {
-		put32bit(&wptr,gid);
+	master_put32bit(uid);
+	if (master_get_version()<VERSION2INT(2,0,0)) {
+		master_put32bit(gid);
 	} else {
-		put32bit(&wptr,addmaingroup+gids);
+		master_put32bit(addmaingroup+gids);
 		if (addmaingroup) {
-			put32bit(&wptr,gid);
+			master_put32bit(gid);
 		}
 		for (i=0 ; i<gids ; i++) {
-			put32bit(&wptr,grouplist[i]);
+			master_put32bit(grouplist[i]);
 		}
 	}
-	if (tcpwrite(fd,reqbuff,psize+(addmaingroup+gids)*4)!=(int32_t)(psize+(addmaingroup+gids)*4)) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	if (master_send_and_receive(CLTOMA_FUSE_APPEND_SLICE,MATOCL_FUSE_APPEND_SLICE)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_APPEND_SLICE) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		return -1;
-	}
-	leng-=4;
-	if (leng!=1) {
+	if (master_get_leng()!=1) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
-		return -1;
-	} else if (*rptr!=MFS_STATUS_OK) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
+		master_error();
 		return -1;
 	}
-	free(buff);
+	status = master_get8bit();
+	if (status!=MFS_STATUS_OK) {
+		printf("%s: %s\n",fname,mfsstrerr(status));
+		return -1;
+	}
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
@@ -3910,12 +2043,7 @@ static uint64_t sumlength;
 static uint64_t chunk_size_cnt;
 static uint64_t chunk_rsize_cnt;
 
-int sc_node_info(int fd,uint32_t inode) {
-	uint8_t *wptr;
-	const uint8_t *rptr;
-	uint8_t *buff;
-	uint8_t reqbuff[28];
-	uint32_t cmd,leng;
+int sc_node_info(uint32_t inode) {
 	uint16_t anstype;
 	uint64_t fleng;
 	uint64_t chunkid;
@@ -3928,88 +2056,52 @@ int sc_node_info(int fd,uint32_t inode) {
 	continueid = 0;
 	touched_inodes++;
 	do {
-		wptr = reqbuff;
-		put32bit(&wptr,CLTOMA_NODE_INFO);
-		put32bit(&wptr,20);
-		put32bit(&wptr,0);
-		put32bit(&wptr,inode);
-		put32bit(&wptr,500); // 500 !!!
-		put64bit(&wptr,continueid);
-		if (tcpwrite(fd,reqbuff,28)!=28) {
-			printf("inode: %"PRIu32" ; master query: send error\n",inode);
+		master_new_packet();
+		master_put32bit(inode);
+		master_put32bit(500); // 500 !!!
+		master_put64bit(continueid);
+		if (master_send_and_receive(CLTOMA_NODE_INFO,MATOCL_NODE_INFO)<0) {
 			return -1;
 		}
-		if (tcpread(fd,reqbuff,8)!=8) {
-			printf("inode: %"PRIu32" ; master query: receive error\n",inode);
-			return -1;
-		}
-		rptr = reqbuff;
-		cmd = get32bit(&rptr);
-		leng = get32bit(&rptr);
-		if (cmd!=MATOCL_NODE_INFO) {
-			printf("inode: %"PRIu32" ; master query: wrong answer (type)\n",inode);
-			return -1;
-		}
-		buff = malloc(leng);
-		if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-			printf("inode: %"PRIu32" ; master query: receive error\n",inode);
-			free(buff);
-			return -1;
-		}
-		rptr = buff;
-		cmd = get32bit(&rptr); // queryid
-		if (cmd!=0) {
-			printf("inode: %"PRIu32" ; master query: wrong answer (queryid)\n",inode);
-			free(buff);
-			return -1;
-		}
-		leng-=4;
-		if (leng==1) {
+		if (master_get_leng()==1) {
 			// error - ignore
-			free(buff);
 			return 0;
 		}
-		if (leng<2) {
+		if (master_get_leng()<2) {
 			printf("inode: %"PRIu32" ; master query: wrong answer (size)\n",inode);
-			free(buff);
+			master_error();
 			return -1;
 		}
-		anstype = get16bit(&rptr);
-		leng-=2;
-		if (anstype==1 && (leng%4)==0) { // directory
+		anstype = master_get16bit();
+		if (anstype==1 && ((master_get_leng()-2)%4)==0) { // directory
 //			printf("directory\n");
 			if (continueid==0) {
 				dirnode_cnt++;
 			}
-			continueid = get64bit(&rptr);
+			continueid = master_get64bit();
 //			printf("continueid: %"PRIX64"\n",continueid);
-			leng-=8;
-			while (leng>0) {
-				childinode = get32bit(&rptr);
-				leng-=4;
+			while (master_bytes_left()>0) {
+				childinode = master_get32bit();
 //				printf("inode: %"PRIu32"\n",childinode);
 				if (sc_enqueue(childinode)==0) {
 					touched_inodes++; // repeated nodes - increment here
 				}
 			}
-		} else if (anstype==2 && (leng-16)%13==0) { // file
+		} else if (anstype==2 && (master_get_leng()-2-16)%13==0) { // file
 //			printf("file\n");
 			if (continueid==0) {
 				filenode_cnt++;
 			}
-			continueid = get64bit(&rptr);
-			leng-=8;
-			fleng = get64bit(&rptr);
-			leng-=8;
+			continueid = master_get64bit();
+			fleng = master_get64bit();
 //			printf("continueid: %"PRIu64" ; fleng: %"PRIu64"\n",continueid,fleng);
 			sumlength += fleng;
-			while (leng>0) {
-				chunkid = get64bit(&rptr);
-				chunksize = get32bit(&rptr);
-				copies = get8bit(&rptr);
-				leng-=13;
+			while (master_bytes_left()>0) {
+				chunkid = master_get64bit();
+				chunksize = master_get32bit();
+				copies = master_get8bit();
 //				printf("chunk: %016"PRIX64" ; chunksize: %"PRIu32" ; copies:%"PRIu8"\n",chunkid,chunksize,copies);
-				if (sc_chunkset_add(chunkid)) {
+				if (liset_addval(chunk_liset,chunkid)==0) { // new chunk ?
 					chunk_size_cnt += chunksize;
 					chunk_rsize_cnt += copies * chunksize;
 				}
@@ -4017,87 +2109,49 @@ int sc_node_info(int fd,uint32_t inode) {
 		} else {
 			continueid = 0;
 		}
-		free(buff);
+		if (master_end_packet()==0) { // pro forma
+			printf("master query: packet size error\n");
+			return -1;
+		}
 	} while (continueid!=0);
 	return 0;
 }
 
 
 int dir_info(uint8_t dirinfomode,const char *fname) {
-	uint8_t reqbuff[16],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode;
+	uint32_t inode;
 	uint32_t inodes,dirs,files,chunks;
 	uint64_t length,size,realsize;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,0);
-	if (fd<0) {
+
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,0)<0) {
 		return -1;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_GETDIRSTATS);
-	put32bit(&wptr,8);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	if (tcpwrite(fd,reqbuff,16)!=16) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	master_new_packet();
+	master_put32bit(inode);
+	if (master_send_and_receive(CLTOMA_FUSE_GETDIRSTATS,MATOCL_FUSE_GETDIRSTATS)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_GETDIRSTATS) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	} else if (leng!=56 && leng!=40) {
+	} else if (master_get_leng()!=56 && master_get_leng()!=40) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
-		close_master_conn(1);
+		master_error();
 		return -1;
 	}
-	inodes = get32bit(&rptr);
-	dirs = get32bit(&rptr);
-	files = get32bit(&rptr);
-	if (leng==56) {
-		rptr+=8;
+	inodes = master_get32bit();
+	dirs = master_get32bit();
+	files = master_get32bit();
+	if (master_get_leng()==56) {
+		(void)master_get64bit();
 	}
-	chunks = get32bit(&rptr);
-	if (leng==56) {
-		rptr+=8;
+	chunks = master_get32bit();
+	if (master_get_leng()==56) {
+		(void)master_get64bit();
 	}
-	length = get64bit(&rptr);
-	size = get64bit(&rptr);
-	realsize = get64bit(&rptr);
-	free(buff);
+	length = master_get64bit();
+	size = master_get64bit();
+	realsize = master_get64bit();
 	if (dirinfomode==0 || dirinfomode==DIRINFO_PRECISE) {
 		printf("%s:\n",fname);
 		print_number(" inodes:       ","\n",inodes,0,0,1);
@@ -4138,12 +2192,16 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 		}
 		printf("%s\n",fname);
 	}
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	if (dirinfomode&DIRINFO_PRECISE) {
 		uint16_t progress;
 		double seconds,lseconds;
 		uint8_t err;
 	
-		if (masterversion<VERSION2INT(3,0,73)) {
+		if (master_get_version()<VERSION2INT(3,0,73)) {
 			printf("precise data calculation needs master at least in version 3.0.73 - upgrade your unit\n");
 		} else {
 			err = 0;
@@ -4159,12 +2217,12 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 			chunk_rsize_cnt = 0;
 			lseconds = monotonic_seconds();
 
-			sc_inoset_init(inodes);
-			sc_chunkset_init(chunks);
+			inode_liset = liset_new();
+			chunk_liset = liset_new();
 			sc_enqueue(inode);
 			while (sc_dequeue(&inode)) {
 				if (err==0) {
-					if (sc_node_info(fd,inode)<0) {
+					if (sc_node_info(inode)<0) {
 						err = 1;
 					}
 					progress = ((uint64_t)touched_inodes * 10000ULL) / (uint64_t)inodes;
@@ -4182,16 +2240,16 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 			if (err==0) {
 				if (dirinfomode==DIRINFO_PRECISE) {
 					printf("%s (precise data):\n",fname);
-					print_number(" inodes:       ","\n",inohashelems,0,0,1);
+					print_number(" inodes:       ","\n",liset_card(inode_liset),0,0,1);
 					print_number("  directories: ","\n",dirnode_cnt,0,0,1);
 					print_number("  files:       ","\n",filenode_cnt,0,0,1);
-					print_number(" chunks:       ","\n",chunkhashelems,0,0,1);
+					print_number(" chunks:       ","\n",liset_card(chunk_liset),0,0,1);
 					print_number(" length:       ","\n",sumlength,0,1,1);
 					print_number(" size:         ","\n",chunk_size_cnt,0,1,1);
 					print_number(" realsize:     ","\n",chunk_rsize_cnt,0,1,1);
 				} else {
 					if (dirinfomode&DIRINFO_INODES) {
-						print_number_only(inohashelems,0);
+						print_number_only(liset_card(inode_liset),0);
 						printf("\t");
 					}
 					if (dirinfomode&DIRINFO_DIRS) {
@@ -4203,7 +2261,7 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 						printf("\t");
 					}
 					if (dirinfomode&DIRINFO_CHUNKS) {
-						print_number_only(chunkhashelems,0);
+						print_number_only(liset_card(chunk_liset),0);
 						printf("\t");
 					}
 					if (dirinfomode&DIRINFO_LENGTH) {
@@ -4221,30 +2279,26 @@ int dir_info(uint8_t dirinfomode,const char *fname) {
 					printf("%s (precise data)\n",fname);
 				}
 			}
-			sc_inoset_cleanup();
-			sc_chunkset_cleanup();
+			liset_remove(chunk_liset);
+			liset_remove(inode_liset);
 		}
 	}
-	close_master_conn(0);
 	return 0;
 }
 
 int file_repair(const char *fname) {
-	uint8_t reqbuff[24+NGROUPS_MAX*4+4],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode,uid,gid;
+	uint32_t inode,uid,gid;
 	gid_t grouplist[NGROUPS_MAX];
 	uint32_t i,gids;
 	uint8_t addmaingroup;
 	uint32_t notchanged,erased,repaired;
-	int fd;
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,1);
-	if (fd<0) {
+
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,1)<0) {
 		return -1;
 	}
 	uid = getuid();
 	gid = getgid();
-	if (masterversion>=VERSION2INT(2,0,0)) {
+	if (master_get_version()>=VERSION2INT(2,0,0)) {
 		gids = getgroups(NGROUPS_MAX,grouplist);
 		addmaingroup = 1;
 		for (i=0 ; i<gids ; i++) {
@@ -4256,77 +2310,42 @@ int file_repair(const char *fname) {
 		gids = 0;
 		addmaingroup = 0;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_REPAIR);
-	put32bit(&wptr,16+(addmaingroup+gids)*4);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put32bit(&wptr,uid);
-	if (masterversion<VERSION2INT(2,0,0)) {
-		put32bit(&wptr,gid);
+	master_new_packet();
+	master_put32bit(inode);
+	master_put32bit(uid);
+	if (master_get_version()<VERSION2INT(2,0,0)) {
+		master_put32bit(gid);
 	} else {
-		put32bit(&wptr,addmaingroup+gids);
+		master_put32bit(addmaingroup+gids);
 		if (addmaingroup) {
-			put32bit(&wptr,gid);
+			master_put32bit(gid);
 		}
 		for (i=0 ; i<gids ; i++) {
-			put32bit(&wptr,grouplist[i]);
+			master_put32bit(grouplist[i]);
 		}
 	}
-	if (tcpwrite(fd,reqbuff,24+(addmaingroup+gids)*4)!=(int32_t)(24+(addmaingroup+gids)*4)) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	if (master_send_and_receive(CLTOMA_FUSE_REPAIR,MATOCL_FUSE_REPAIR)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_REPAIR) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	} else if (leng!=12) {
+	} else if (master_get_leng()!=12) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
-		close_master_conn(1);
+		master_error();
 		return -1;
 	}
-	close_master_conn(0);
-	notchanged = get32bit(&rptr);
-	erased = get32bit(&rptr);
-	repaired = get32bit(&rptr);
-	free(buff);
+	notchanged = master_get32bit();
+	erased = master_get32bit();
+	repaired = master_get32bit();
 	printf("%s:\n",fname);
 	print_number(" chunks not changed: ","\n",notchanged,1,0,1);
 	print_number(" chunks erased:      ","\n",erased,1,0,1);
 	print_number(" chunks repaired:    ","\n",repaired,1,0,1);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
@@ -4429,106 +2448,62 @@ int eattr_control(const char *fname,uint8_t mode,uint8_t eattr) {
 */
 
 int quota_control(const char *fname,uint8_t mode,uint8_t *qflags,uint32_t *graceperiod,uint32_t *sinodes,uint64_t *slength,uint64_t *ssize,uint64_t *srealsize,uint32_t *hinodes,uint64_t *hlength,uint64_t *hsize,uint64_t *hrealsize) {
-	uint8_t reqbuff[73],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,inode;
+	uint32_t inode;
 	uint32_t curinodes;
 	uint64_t curlength,cursize,currealsize;
-	int32_t psize;
-	int fd;
+
 //	printf("set quota: %s (soft:%1X,i:%"PRIu32",l:%"PRIu64",w:%"PRIu64",r:%"PRIu64"),(hard:%1X,i:%"PRIu32",l:%"PRIu64",w:%"PRIu64",r:%"PRIu64")\n",fname,sflags,sinodes,slength,ssize,srealsize,hflags,hinodes,hlength,hsize,hrealsize);
 	if (mode==2) {
 		*qflags = 0;
 	}
-	fd = open_master_conn(fname,&inode,NULL,NULL,0,(*qflags)?1:0);
-	if (fd<0) {
+	if (master_prepare_conn(fname,&inode,NULL,NULL,0,(*qflags)?1:0)<0) {
 		return -1;
 	}
-	psize = (mode)?9:(masterversion<VERSION2INT(3,0,9))?65:69;
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_QUOTACONTROL);
-	put32bit(&wptr,psize);
-	put32bit(&wptr,0);
-	put32bit(&wptr,inode);
-	put8bit(&wptr,*qflags);
+	master_new_packet();
+	master_put32bit(inode);
+	master_put8bit(*qflags);
 	if (mode==0) {
-		if (masterversion>=VERSION2INT(3,0,9)) {
-			put32bit(&wptr,*graceperiod);
+		if (master_get_version()>=VERSION2INT(3,0,9)) {
+			master_put32bit(*graceperiod);
 		}
-		put32bit(&wptr,*sinodes);
-		put64bit(&wptr,*slength);
-		put64bit(&wptr,*ssize);
-		put64bit(&wptr,*srealsize);
-		put32bit(&wptr,*hinodes);
-		put64bit(&wptr,*hlength);
-		put64bit(&wptr,*hsize);
-		put64bit(&wptr,*hrealsize);
+		master_put32bit(*sinodes);
+		master_put64bit(*slength);
+		master_put64bit(*ssize);
+		master_put64bit(*srealsize);
+		master_put32bit(*hinodes);
+		master_put64bit(*hlength);
+		master_put64bit(*hsize);
+		master_put64bit(*hrealsize);
 	}
-	if (tcpwrite(fd,reqbuff,psize+8)!=(psize+8)) {
-		printf("%s: master query: send error\n",fname);
-		close_master_conn(1);
+	if (master_send_and_receive(CLTOMA_FUSE_QUOTACONTROL,MATOCL_FUSE_QUOTACONTROL)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s: master query: receive error\n",fname);
-		close_master_conn(1);
+	if (master_get_leng()==1) {
+		printf("%s: %s\n",fname,mfsstrerr(master_get8bit()));
 		return -1;
-	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_QUOTACONTROL) {
-		printf("%s: master query: wrong answer (type)\n",fname);
-		close_master_conn(1);
-		return -1;
-	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s: master query: receive error\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s: master query: wrong answer (queryid)\n",fname);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	leng-=4;
-	if (leng==1) {
-		printf("%s: %s\n",fname,mfsstrerr(*rptr));
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	} else if (leng!=85 && leng!=89) {
+	} else if (master_get_leng()!=85 && master_get_leng()!=89) {
 		printf("%s: master query: wrong answer (leng)\n",fname);
-		free(buff);
-		close_master_conn(1);
+		master_error();
 		return -1;
 	}
-	close_master_conn(0);
-	*qflags = get8bit(&rptr);
-	if (leng==89) {
-		*graceperiod = get32bit(&rptr);
+	*qflags = master_get8bit();
+	if (master_get_leng()==89) {
+		*graceperiod = master_get32bit();
 	} else {
 		*graceperiod = 0;
 	}
-	*sinodes = get32bit(&rptr);
-	*slength = get64bit(&rptr);
-	*ssize = get64bit(&rptr);
-	*srealsize = get64bit(&rptr);
-	*hinodes = get32bit(&rptr);
-	*hlength = get64bit(&rptr);
-	*hsize = get64bit(&rptr);
-	*hrealsize = get64bit(&rptr);
-	curinodes = get32bit(&rptr);
-	curlength = get64bit(&rptr);
-	cursize = get64bit(&rptr);
-	currealsize = get64bit(&rptr);
-	free(buff);
+	*sinodes = master_get32bit();
+	*slength = master_get64bit();
+	*ssize = master_get64bit();
+	*srealsize = master_get64bit();
+	*hinodes = master_get32bit();
+	*hlength = master_get64bit();
+	*hsize = master_get64bit();
+	*hrealsize = master_get64bit();
+	curinodes = master_get32bit();
+	curlength = master_get64bit();
+	cursize = master_get64bit();
+	currealsize = master_get64bit();
 	if ((*graceperiod)>0) {
 		printf("%s: (current values | soft quota | hard quota) ; soft quota grace period: %u seconds\n",fname,*graceperiod);
 	} else {
@@ -4546,6 +2521,10 @@ int quota_control(const char *fname,uint8_t mode,uint8_t *qflags,uint32_t *grace
 	print_number(" realsize | ",NULL,currealsize,0,1,1);
 	print_number(" | ",NULL,*srealsize,0,1,(*qflags)&QUOTA_FLAG_SREALSIZE);
 	print_number(" | "," |\n",*hrealsize,0,1,(*qflags)&QUOTA_FLAG_HREALSIZE);
+	if (master_end_packet()==0) {
+		printf("%s: master query: packet size error\n",fname);
+		return -1;
+	}
 	return 0;
 }
 
@@ -4562,15 +2541,14 @@ int delete_quota(const char *fname,uint8_t sflags,uint8_t hflags) {
 */
 
 int snapshot_ctl(const char *dstdir,const char *dstbase,const char *srcname,uint32_t srcinode,uint8_t smode) {
-	uint8_t reqbuff[8+24+255+NGROUPS_MAX*4+4],*wptr,*buff;
-	const uint8_t *rptr;
-	uint32_t cmd,leng,dstinode,uid,gid;
+	uint32_t dstinode,uid,gid;
 	gid_t grouplist[NGROUPS_MAX];
 	uint32_t i,gids;
 	uint8_t addmaingroup;
 	uint32_t nleng;
 	uint16_t umsk;
-	int fd;
+	uint8_t status;
+
 	umsk = umask(0);
 	umask(umsk);
 	nleng = strlen(dstbase);
@@ -4578,13 +2556,12 @@ int snapshot_ctl(const char *dstdir,const char *dstbase,const char *srcname,uint
 		printf("%s: name too long\n",dstbase);
 		return -1;
 	}
-	fd = open_master_conn(dstdir,&dstinode,NULL,NULL,0,1);
-	if (fd<0) {
+	if (master_prepare_conn(dstdir,&dstinode,NULL,NULL,0,1)<0) {
 		return -1;
 	}
 	uid = getuid();
 	gid = getgid();
-	if (masterversion>=VERSION2INT(2,0,0)) {
+	if (master_get_version()>=VERSION2INT(2,0,0)) {
 		gids = getgroups(NGROUPS_MAX,grouplist);
 		addmaingroup = 1;
 		for (i=0 ; i<gids ; i++) {
@@ -4596,79 +2573,52 @@ int snapshot_ctl(const char *dstdir,const char *dstbase,const char *srcname,uint
 		gids = 0;
 		addmaingroup = 0;
 	}
-	wptr = reqbuff;
-	put32bit(&wptr,CLTOMA_FUSE_SNAPSHOT);
-	if (masterversion<VERSION2INT(1,7,0)) {
-		put32bit(&wptr,22+nleng);
+	master_new_packet();
+	master_put32bit(srcinode);
+	master_put32bit(dstinode);
+	master_putname(nleng,dstbase);
+	master_put32bit(uid);
+	if (master_get_version()<VERSION2INT(2,0,0)) {
+		master_put32bit(gid);
 	} else {
-		put32bit(&wptr,24+nleng+(addmaingroup+gids)*4);
-	}
-	put32bit(&wptr,0);
-	put32bit(&wptr,srcinode);
-	put32bit(&wptr,dstinode);
-	put8bit(&wptr,nleng);
-	memcpy(wptr,dstbase,nleng);
-	wptr+=nleng;
-	put32bit(&wptr,uid);
-	if (masterversion<VERSION2INT(2,0,0)) {
-		put32bit(&wptr,gid);
-	} else {
-		put32bit(&wptr,addmaingroup+gids);
+		master_put32bit(addmaingroup+gids);
 		if (addmaingroup) {
-			put32bit(&wptr,gid);
+			master_put32bit(gid);
 		}
 		for (i=0 ; i<gids ; i++) {
-			put32bit(&wptr,grouplist[i]);
+			master_put32bit(grouplist[i]);
 		}
 	}
-	put8bit(&wptr,smode);
-	if (masterversion>=VERSION2INT(1,7,0)) {
-		put16bit(&wptr,umsk);
+	master_put8bit(smode);
+	if (master_get_version()>=VERSION2INT(1,7,0)) {
+		master_put16bit(umsk);
 	}
-	if (tcpwrite(fd,reqbuff,((masterversion>=VERSION2INT(1,7,0))?32:30)+nleng+(addmaingroup+gids)*4)!=(int32_t)(((masterversion>=VERSION2INT(1,7,0))?32:30)+nleng+(addmaingroup+gids)*4)) {
-		printf("%s->%s/%s: master query: send error\n",srcname,dstdir,dstbase);
-		close_master_conn(1);
+	if (master_send_and_receive(CLTOMA_FUSE_SNAPSHOT,MATOCL_FUSE_SNAPSHOT)<0) {
 		return -1;
 	}
-	if (tcpread(fd,reqbuff,8)!=8) {
-		printf("%s->%s/%s: master query: receive error\n",srcname,dstdir,dstbase);
-		close_master_conn(1);
+	if (master_get_leng()!=1) {
+		if (srcname==NULL) {
+			printf("%s/%s: master query: wrong answer (leng)\n",dstdir,dstbase);
+		} else {
+			printf("%s->%s/%s: master query: wrong answer (leng)\n",srcname,dstdir,dstbase);
+		}
 		return -1;
 	}
-	rptr = reqbuff;
-	cmd = get32bit(&rptr);
-	leng = get32bit(&rptr);
-	if (cmd!=MATOCL_FUSE_SNAPSHOT) {
-		printf("%s->%s/%s: master query: wrong answer (type)\n",srcname,dstdir,dstbase);
-		close_master_conn(1);
+	status = master_get8bit();
+	if (status!=0) {
+		if (srcname==NULL) {
+			printf("%s/%s: %s\n",dstdir,dstbase,mfsstrerr(status));
+		} else {
+			printf("%s->%s/%s: %s\n",srcname,dstdir,dstbase,mfsstrerr(status));
+		}
 		return -1;
 	}
-	buff = malloc(leng);
-	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
-		printf("%s->%s/%s: master query: receive error\n",srcname,dstdir,dstbase);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	rptr = buff;
-	cmd = get32bit(&rptr);	// queryid
-	if (cmd!=0) {
-		printf("%s->%s/%s: master query: wrong answer (queryid)\n",srcname,dstdir,dstbase);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	leng-=4;
-	if (leng!=1) {
-		printf("%s->%s/%s: master query: wrong answer (leng)\n",srcname,dstdir,dstbase);
-		free(buff);
-		close_master_conn(1);
-		return -1;
-	}
-	close_master_conn(0);
-	if (*rptr!=0) {
-		printf("%s->%s/%s: %s\n",srcname,dstdir,dstbase,mfsstrerr(*rptr));
-		free(buff);
+	if (master_end_packet()==0) {
+		if (srcname==NULL) {
+			printf("%s/%s: master query: packet size error\n",dstdir,dstbase);
+		} else {
+			printf("%s->%s/%s: master query: packet size error\n",srcname,dstdir,dstbase);
+		}
 		return -1;
 	}
 	return 0;
@@ -5145,6 +3095,7 @@ int main(int argc,char **argv) {
 	memset(&sc,0,sizeof(sc));
 	sc.create_mode = CREATE_MODE_STD;
 	strerr_init();
+	master_init();
 
 	l = strlen(argv[0]);
 #define CHECKNAME(name) ((strcmp(argv[0],name)==0) || (l>(int)(sizeof(name)-1) && strcmp((argv[0])+(l-sizeof(name)),"/" name)==0))

@@ -14,6 +14,8 @@ This file lists noteworthy changes in MooseFS.
   - (mount) added option to load master password from given file
   - (mount) added extremely fast (>1GB/s) pseudo-random generator visible as a virtual file '.random' in root directory (not listed by ls)
   - (metatools) added new metatool 'mfsmetadirinfo' - offline version of 'mfsdirinfo -p'
+  - (tools) changed data structure used by 'mfsdirinfo -p' (faster, less memory usage)
+  - (tools) network code refactoring (less code, reconnection to master on error)
 
 * MooseFS 3.0.102-1 (2018-07-25)
 

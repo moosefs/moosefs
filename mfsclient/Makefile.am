@@ -103,11 +103,13 @@ mfsbdev_SOURCES=\
 
 mfstools_SOURCES=\
 	mfstools.c \
+	mfstools_master.c mfstools_master.h \
 	labelparser.c labelparser.h \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/sockets.c ../mfscommon/sockets.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/md5.c ../mfscommon/md5.h \
+	../mfscommon/liset64.c ../mfscommon/liset64.h \
 	../mfscommon/datapack.h ../mfscommon/mfsstrerr.h \
 	../mfscommon/MFSCommunication.h
 

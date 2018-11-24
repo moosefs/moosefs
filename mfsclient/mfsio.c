@@ -31,6 +31,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
+#ifdef HAVE_SYS_FILE_H
+#include <sys/file.h>
+#endif
 
 #include "MFSCommunication.h"
 #include "mastercomm.h"

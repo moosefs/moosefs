@@ -5986,7 +5986,7 @@ if "RS" in sectionset and leaderfound:
 							color = "#0080E0"
 						else:
 							msperc = (1.0 * mscount) / scount
-							color = "#%02X0000" % (255-255*msperc)
+							color = "#%02X0000" % int(255-255*msperc)
 						labelsarr.append("""<span style="color:%s"><a style="cursor:default" title="%u/%u servers">%s</a></span>""" % (color,mscount,scount,labelstr))
 					out.append("""		<td align="center">%u</td>""" % (len(labelsarr)))
 					out.append("""		<td align="center">%s</td>""" % ("&nbsp;,&nbsp;".join(labelsarr)))
@@ -6004,7 +6004,7 @@ if "RS" in sectionset and leaderfound:
 							color = "#0080E0"
 						else:
 							msperc = (1.0 * mscount) / scount
-							color = "#%02X0000" % (255-255*msperc)
+							color = "#%02X0000" % int(255-255*msperc)
 						labelsarr.append("""<span style="color:%s"><a style="cursor:default" title="%u/%u servers">%s</a></span>""" % (color,mscount,scount,labelstr))
 					out.append("""		<td align="center">%u</td>""" % (len(labelsarr)))
 					out.append("""		<td align="center">%s</td>""" % ("&nbsp;,&nbsp;".join(labelsarr)))
@@ -6022,7 +6022,7 @@ if "RS" in sectionset and leaderfound:
 							color = "#0080E0"
 						else:
 							msperc = (1.0 * mscount) / scount
-							color = "#%02X0000" % (255-255*msperc)
+							color = "#%02X0000" % int(255-255*msperc)
 						labelsarr.append("""<span style="color:%s"><a style="cursor:default" title="%u/%u servers">%s</a></span>""" % (color,mscount,scount,labelstr))
 					out.append("""		<td align="center">%u</td>""" % (len(labelsarr)))
 					out.append("""		<td align="center">%s</td>""" % ("&nbsp;,&nbsp;".join(labelsarr)))

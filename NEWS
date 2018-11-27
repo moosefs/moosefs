@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.104-1 (WIP)
 
   - (master) fixed taking into account labels in classes 1-9
+  - (master) fixed recovering userperm and otherperm in ACL (in practice it doesn't matter - mainly cosmetics)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

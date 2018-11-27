@@ -514,10 +514,10 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 			uint16_t mode;
 			mode = fs_get_mode(inode);
 			userperm &= 0xFFF8;
-			userperm = (mode>>6)&7;
+			userperm |= (mode>>6)&7;
 			mask = 7;
 			otherperm &= 0xFFF8;
-			otherperm = mode&7;
+			otherperm |= mode&7;
 			mfs_arg_syslog(LOG_WARNING,"emergency set ACL mask for inode %"PRIu32" to 'rwx'",inode);
 		}
 		acn->userperm = userperm;

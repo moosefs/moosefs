@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.104-1 (WIP)
+
+  - (master) fixed taking into account labels in classes 1-9
+
 * MooseFS 3.0.103-1 (2018-11-09)
 
   - (master+client) added space reservation for superuser

@@ -630,22 +630,14 @@ uint8_t sclass_is_admin_only(uint16_t sclassid) {
 }
 
 uint8_t sclass_has_create_labels(uint16_t sclassid) {
-	if (sclassid>=FIRSTSCLASSID) {
-		return sclasstab[sclassid].has_create_labels;
-	} else {
-		return 0;
-	}
+	return sclasstab[sclassid].has_create_labels;
 }
 
 uint8_t sclass_has_keeparch_labels(uint16_t sclassid,uint8_t archflag) {
-	if (sclassid>=FIRSTSCLASSID) {
-		if (archflag) {
-			return sclasstab[sclassid].has_arch_labels;
-		} else {
-			return sclasstab[sclassid].has_keep_labels;
-		}
+	if (archflag) {
+		return sclasstab[sclassid].has_arch_labels;
 	} else {
-		return 0;
+		return sclasstab[sclassid].has_keep_labels;
 	}
 }
 

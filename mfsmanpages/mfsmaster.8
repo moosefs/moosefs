@@ -40,7 +40,7 @@ run in foreground, don't daemonize
 how long to wait for lockfile (in seconds; default is 1800 seconds)
 .TP
 \fB\-i\fP
-ignore some metadata structure errors
+ignore some metadata structure errors (attach orphans to root, ignore names without inode, etc.). DO NOT use unless you are ready to pick up the pieces. See https://github.com/moosefs/moosefs/issues/151 for discussion.
 .TP
 \fB\-a\fP
 automatically restore metadata from change logs

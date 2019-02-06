@@ -47,10 +47,10 @@ on which chunkservers the files in this class should be written and later kept.
 same definition will be created then
 .PP
 \fBchange\fP|\fBmodify\fP changes the given options in a class or classes indicated by 
-\fISCLASS_NAME\fP paremeter(s)
+\fISCLASS_NAME\fP parameter(s)
 .PP
 \fBdelete\fP|\fBremove\fP removes the class or classes indicated by 
-\fISCLASS_NAME\fP paremeter(s); if any of the classes is not empty (i.e. it is still 
+\fISCLASS_NAME\fP parameter(s); if any of the classes is not empty (i.e. it is still 
 used by some MooseFS objects), it will not be removed and the tool will return an error 
 and an error message will be printed; empty classes will be removed in any case
 .PP
@@ -92,7 +92,7 @@ or admin only (1)
 .SH LABELS EXPRESSIONS
 
 Labels are letters (A-Z - 26 letters) that can be assigned to chunkservers. Each chunkserver can
-have multiple (up to 26) labels. Labels are defined in mfschunkserver.cfg file, for more infomation
+have multiple (up to 26) labels. Labels are defined in mfschunkserver.cfg file, for more information
 refer to the appropriate manpage.
 .PP
 Labels expression is a set of subexpressions separated by commas, each subexpression specifies the storage schema
@@ -102,7 +102,7 @@ sum (logical or). Multiplication means a file can be stored only on a chunkserve
 Asterisk means any chunkserver. Identical subexpressions can be shortened by adding a number in front of one instead
 of repeating it a number of times.
 .PP
-Examples of lables expressions:
+Examples of labels expressions:
 .PP
 \fBA,B\fP - files will have two copies, one copy will be stored on chunkserver(s) 
 with label \fBA\fP, the other on chunkserver(s) with label \fBB\fP

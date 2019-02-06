@@ -45,7 +45,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) added using posix_fadvise(...DONTNEED) for tested chunks
   - (master) fixed HA bug (uninitialized variable might cause everlasting ELECT - PRO only)
   - (cs) fixed metaid handling
-  - (master) added clearing SNAPHSOT eattr on file/directory modifications
+  - (master) added clearing SNAPSHOT eattr on file/directory modifications
   - (master) added optional same rack preference for destination server during undergoal replications
   - (mount+tools) increased masterproxy timeout from 1s to 20s
 
@@ -70,13 +70,13 @@ This file lists noteworthy changes in MooseFS.
   - (cs+tools) use readdir instead of readdir_r on glibc 2.24+
   - (debian) added support for systemd in debian packages
   - (all) fixed library dependencies (for libpcap,libz and libm)
-  - (mount) fixed race between defered 'open' and 'locks'
+  - (mount) fixed race between deferred 'open' and 'locks'
   - (master) more chunk debugs and better handling chunk status change
   - (cs) fixed handling mark for removal (after reload sometimes cs could send chunks marked for removal as normal chunks)
   - (master) added file with metadata checksums (for future use)
   - (master) fixed way of sending gids to changelog/follower
   - (master) added inode checksum for some changes sent to changelog/follower
-  - (metadump) added '0x' prefix for fileds dumped as hex numbers
+  - (metadump) added '0x' prefix for fields dumped as hex numbers
   - (master) fixed ACL mask synchronization issues (restoring from changelog/leader->follower)
 
 * MooseFS 3.0.97-1 (2017-08-01)
@@ -109,7 +109,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (master) redesigned xattr storage (much faster and uses less memory)
   - (master) improved hash map in xattr and acl (static -> dynamic)
-  - (cgi+cli) added possibility to define master group as set of IP adresses divided by comma or semicolon
+  - (cgi+cli) added possibility to define master group as set of IP addresses divided by comma or semicolon
   - (cs) fixed using fsync on closed descriptors (after change FSYNC_BEFORE_CLOSE option)
   - (master) fixed removing default acl
   - (master+mount) added support for basic Windows attributes (hidden,ro,system,archive)
@@ -712,7 +712,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed serious incompatibility with mounts 2.1+
   - (master) added chunk preallocation
   - (master) added deleting wrong versioned chunks that do not belong to any file
-  - (mount) fixed printed informations about mapall (thanks to Tom Ivar Helbekkmo)
+  - (mount) fixed printed information about mapall (thanks to Tom Ivar Helbekkmo)
   - (master) fixed rmdir mapall/maproot rights check (thanks to Tom Ivar Helbekkmo)
 
 * MooseFS 2.1.6-1 (2014-12-22)
@@ -915,7 +915,7 @@ This file lists noteworthy changes in MooseFS.
   - (master+cgi+cli) changed store status (background,download and foreground)
   - (master+cgi+cli) changed option "canchangequota" to "admin"
   - (master) added rename/unlink "metadata.mfs" in case of using '-a' option
-  - (master+cgi+cli) last save duration changed from seconds to miliseconds
+  - (master+cgi+cli) last save duration changed from seconds to milliseconds
 
 * MooseFS 2.0.13-1 (2014-06-09)
 
@@ -1209,7 +1209,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgi+cli+master) turn off 'grace' state
   - (master) in 'noowner' i-nodes mode copy 'owner' bits to 'group' and 'other' bits
   - (common) increase time events frequency
-  - (master) increase freqency of chunk-loop task (1 per second to 50 per seconds)
+  - (master) increase frequency of chunk-loop task (1 per second to 50 per seconds)
   - (mount) fixed invalidate open-dir dentry cache
   - (master) fixed sustaining old sessions by clients who can't properly register
   - (cs) improved efficiency (removed lock in network thread)
@@ -1361,7 +1361,7 @@ This file lists noteworthy changes in MooseFS.
   - (metarestore) fixed bugs in "REPAIR" and "SNAPSHOT" entries
   - (master) fixed bug in "snapshot" command ("mfsmakesnapshot dir dir/" caused master to hung-up)
   - (master) preserving atime and mtime during "snapshot" operation (makes "snapshot" to work more like "cp -Rp" than "cp -R")
-  - (cs) ommit "marked for removal" disks during chunk test loop
+  - (cs) omit "marked for removal" disks during chunk test loop
 
 * MooseFS 1.6.14 (2010-03-19)
 

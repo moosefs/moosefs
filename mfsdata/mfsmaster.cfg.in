@@ -82,7 +82,7 @@
 # After reload currently connected chunkservers are NOT disconnected. New AUTH_CODE will be used when chunkservers will make new connection.
 # AUTH_CODE = mfspassword
 
-# Optional IP class remapping. If you want to use class A for communication with master and class B for I/O (communcation with chunkservers) then define class A as REMAP_SOURCE_IP_CLASS and class B as REMAP_DESTINATION_IP_CLASS.
+# Optional IP class remapping. If you want to use class A for communication with master and class B for I/O (communication with chunkservers) then define class A as REMAP_SOURCE_IP_CLASS and class B as REMAP_DESTINATION_IP_CLASS.
 # You must also define REMAP_BITS which means how many of first bits of class A should be changed to bits from class B. All chunkserver IP numbers that are not in class A will stay unchanged.
 # REMAP_BITS = 24
 # REMAP_SOURCE_IP_CLASS = 192.168.1.0

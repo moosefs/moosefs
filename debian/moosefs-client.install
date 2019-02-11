@@ -36,7 +36,7 @@ usr/bin/mfssetarchive
 usr/bin/mfsfilepaths
 usr/bin/mfsscadmin
 usr/bin/mfstools
-usr/bin/mfsbdev
+usr/sbin/mfsbdev
 sbin/mount.moosefs
 usr/include/mfsio.h
 usr/lib/libmfsio.a

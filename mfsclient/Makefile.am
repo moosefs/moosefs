@@ -1,9 +1,10 @@
 bin_PROGRAMS=mfstools
+sbin_PROGRAMS=
 if WITH_MOUNT
 bin_PROGRAMS += mfsmount
 endif
 if WITH_BDEV
-bin_PROGRAMS += mfsbdev
+sbin_PROGRAMS += mfsbdev
 endif
 lib_LTLIBRARIES=libmfsio.la
 include_HEADERS=mfsio.h

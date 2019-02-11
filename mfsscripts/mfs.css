@@ -332,6 +332,10 @@ table.CR tr.C4 td {background-color: #D8D8D8;}
 table.CR tr:first-child th {background-color: #A0A0A0;}
 table.CR th {background-color: #C0C0C0;}
 
+table#mfsmatrix > thead > tr:hover > td,
+table.acid_tab  > tbody > tr:hover > td,
+table.FR        > tbody > tr:hover > td { background-color: #FFF; }
+
 table.BOTMENU {width: 100%; margin-left:auto; margin-right:auto; border:0px;}
 
 div.PROGBOX {

@@ -129,10 +129,11 @@ void symlink_cache_insert(uint32_t inode,const uint8_t *path) {
 	zassert(pthread_mutex_unlock(&slcachelock));
 }
 
-int symlink_cache_search(uint32_t inode,const uint8_t **path) {
+uint8_t* symlink_cache_search(uint32_t inode) {
 	hashbucket *hb;
 	uint8_t h,i;
 	double t;
+	uint8_t *path;
 
 	t = monotonic_seconds();
 
@@ -151,18 +152,18 @@ int symlink_cache_search(uint32_t inode,const uint8_t **path) {
 					zassert(pthread_mutex_unlock(&slcachelock));
 					symlink_cache_stats_dec(LINKS);
 					symlink_cache_stats_inc(SEARCH_MISSES);
-					return 0;
+					return NULL;
 				}
-				*path = hb->path[i];
+				path = (uint8_t*)strdup((const char *)(hb->path[i]));
 				zassert(pthread_mutex_unlock(&slcachelock));
 				symlink_cache_stats_inc(SEARCH_HITS);
-				return 1;
+				return path;
 			}
 		}
 	}
 	zassert(pthread_mutex_unlock(&slcachelock));
 	symlink_cache_stats_inc(SEARCH_MISSES);
-	return 0;
+	return NULL;
 }
 
 void symlink_cache_init(void) {

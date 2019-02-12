@@ -2511,7 +2511,8 @@ void mfs_symlink(fuse_req_t req, const char *path, fuse_ino_t parent, const char
 
 void mfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 	int status;
-	const uint8_t *path;
+	uint8_t *path;
+	const uint8_t *cpath;
 	struct fuse_ctx ctx;
 
 	ctx = *(fuse_req_ctx(req));
@@ -2519,23 +2520,25 @@ void mfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 		oplog_printf(&ctx,"readlink (%lu) ...",(unsigned long int)ino);
 		fprintf(stderr,"readlink (%lu)\n",(unsigned long int)ino);
 	}
-	if (symlink_cache_search(ino,&path)) {
+	path = symlink_cache_search(ino);
+	if (path!=NULL) {
 		mfs_stats_inc(OP_READLINK_CACHED);
 		oplog_printf(&ctx,"readlink (%lu) (using cache): OK (%s)",(unsigned long int)ino,(char*)path);
 		fuse_reply_readlink(req, (char*)path);
+		free(path);
 		return;
 	}
 	mfs_stats_inc(OP_READLINK_MASTER);
-	status = fs_readlink(ino,&path);
+	status = fs_readlink(ino,&cpath);
 	status = mfs_errorconv(status);
 	if (status!=0) {
 		oplog_printf(&ctx,"readlink (%lu): %s",(unsigned long int)ino,strerr(status));
 		fuse_reply_err(req, status);
 	} else {
 		dcache_invalidate_attr(ino);
-		symlink_cache_insert(ino,path);
-		oplog_printf(&ctx,"readlink (%lu): OK (%s)",(unsigned long int)ino,(char*)path);
-		fuse_reply_readlink(req, (char*)path);
+		symlink_cache_insert(ino,cpath);
+		oplog_printf(&ctx,"readlink (%lu): OK (%s)",(unsigned long int)ino,(char*)cpath);
+		fuse_reply_readlink(req, (char*)cpath);
 	}
 }
 

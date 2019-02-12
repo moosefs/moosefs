@@ -7,6 +7,7 @@ This file lists noteworthy changes in MooseFS.
   - (cli+cgi) fixed python3 compatibility issue (casting to int for "%X" format)
   - (master) increased mmap allocation block size (Linux kernel issue - too many mmaps leads to memory not being properly released by the kernel)
   - (client) fixed handling internal packets with size zero (client disconnection during chunkserver registration)
+  - (client) fixed symlink cache handling (potential race condition)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

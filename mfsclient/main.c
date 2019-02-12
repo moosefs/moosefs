@@ -22,8 +22,16 @@
 #include "config.h"
 #endif
 
-#if defined(HAVE_MLOCKALL) && defined(RLIMIT_MEMLOCK) && defined(MCL_CURRENT) && defined(MCL_FUTURE)
-#  define MFS_USE_MEMLOCK 1
+#if defined(HAVE_MLOCKALL)
+#  if defined(HAVE_SYS_MMAN_H)
+#    include <sys/mman.h>
+#  endif
+#  if defined(HAVE_SYS_RESOURCE_H)
+#    include <sys/resource.h>
+#  endif
+#  if defined(RLIMIT_MEMLOCK) && defined(MCL_CURRENT) && defined(MCL_FUTURE)
+#    define MFS_USE_MEMLOCK 1
+#  endif
 #endif
 
 #if defined(HAVE_MALLOC_H)
@@ -45,9 +53,6 @@
 #include <fuse_lowlevel.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#ifdef MFS_USE_MEMLOCK
-#  include <sys/mman.h>
-#endif
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>

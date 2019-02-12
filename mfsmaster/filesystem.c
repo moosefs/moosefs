@@ -300,9 +300,9 @@ void fs_stats(uint32_t stats[16]) {
 
 
 
-CREATE_BUCKET_ALLOCATOR(freenode,freenode,5000)
+CREATE_BUCKET_ALLOCATOR(freenode,freenode,10000000/sizeof(freenode))
 
-CREATE_BUCKET_ALLOCATOR(quotanode,quotanode,500)
+CREATE_BUCKET_ALLOCATOR(quotanode,quotanode,10000000/sizeof(quotanode))
 
 #define fsnode_dir_malloc() fsnode_malloc(0)
 #define fsnode_file_malloc() fsnode_malloc(1)
@@ -316,7 +316,7 @@ CREATE_BUCKET_ALLOCATOR(quotanode,quotanode,500)
 #define fsnode_dev_free(n) fsnode_free(n,3)
 #define fsnode_other_free(n) fsnode_free(n,4)
 
-#define NODE_BUCKET_SIZE 65500
+#define NODE_BUCKET_SIZE 10000000
 #define NODE_MAX_INDX 5
 
 typedef struct _fsnode_bucket {
@@ -412,7 +412,7 @@ static inline void fsnode_getusage(uint64_t *allocated,uint64_t *used) {
 
 
 
-#define EDGE_BUCKET_SIZE 65500
+#define EDGE_BUCKET_SIZE 10000000
 #define EDGE_MAX_INDX (MFS_PATH_MAX/8)
 #define EDGE_REC_INDX(nleng) (((nleng)-1)/8)
 #define EDGE_REC_SIZE(indx) (((indx)+1)*8 + ((offsetof(fsedge,name)+7)&UINT32_C(0xFFFFFFF8)))
@@ -509,7 +509,7 @@ static inline void fsedge_getusage(uint64_t *allocated,uint64_t *used) {
 
 
 
-#define SYMLINK_BUCKET_SIZE 65500
+#define SYMLINK_BUCKET_SIZE 10000000
 #define SYMLINK_MAX_INDX (MFS_SYMLINK_MAX/8)
 #define SYMLINK_REC_INDX(pathleng) (((pathleng)-1)/8)
 #define SYMLINK_REC_SIZE(indx) (((indx)+1)*8)
@@ -605,7 +605,7 @@ static inline void symlink_getusage(uint64_t *allocated,uint64_t *used) {
 
 
 
-#define CHUNKTAB_BUCKET_SIZE 100000
+#define CHUNKTAB_BUCKET_SIZE 10000000
 #define CHUNKTAB_MAX_INDX 121
 #define CHUNKTAB_ELEMENT_SIZE(chunks) ((chunks)*sizeof(uint64_t))
 #define CHUNKTAB_REC_INDX(chunks) (((chunks)<=0x10)?(chunks)-1:((chunks)<=0x100)?(((chunks)+0xF)/0x10)+0xE:((chunks)<=0x1000)?(((chunks)+0xFF)/0x100)+0x1D:((chunks)<=0x10000)?(((chunks)+0xFFF)/0x1000)+0x2C:((chunks)<=0x100000)?(((chunks)+0xFFFF)/0x10000)+0x3B:((chunks)<=0x1000000)?(((chunks)+0xFFFFF)/0x100000)+0x4A:((chunks)<=0x10000000)?(((chunks)+0xFFFFFF)/0x1000000)+0x59:(((chunks)+UINT64_C(0xFFFFFFF))/0x10000000)+0x68)

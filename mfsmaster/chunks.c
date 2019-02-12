@@ -447,9 +447,9 @@ void chunk_stats(uint32_t *del,uint32_t *repl) {
 	stats_replications = 0;
 }
 
-CREATE_BUCKET_ALLOCATOR(slist,slist,5000)
+CREATE_BUCKET_ALLOCATOR(slist,slist,10000000/sizeof(slist))
 
-CREATE_BUCKET_ALLOCATOR(chunk,chunk,20000)
+CREATE_BUCKET_ALLOCATOR(chunk,chunk,10000000/sizeof(chunk))
 
 void chunk_get_memusage(uint64_t allocated[3],uint64_t used[3]) {
 	allocated[0] = sizeof(chunk*)*chunkrehashpos;

@@ -2329,18 +2329,20 @@ void* fs_receive_thread(void *arg) {
 				}
 			}
 			if (internal) {
-				r = tcptoread(fd,msgbuff,size,RECEIVE_TIMEOUT*1000);
-				if (r==0) {
-					syslog(LOG_WARNING,"master: connection lost (data)");
-					fs_disconnect();
-					continue;
+				if (size>0) {
+					r = tcptoread(fd,msgbuff,size,RECEIVE_TIMEOUT*1000);
+					if (r==0) {
+						syslog(LOG_WARNING,"master: connection lost (data)");
+						fs_disconnect();
+						continue;
+					}
+					if (r!=(int32_t)size) {
+						syslog(LOG_WARNING,"master: tcp recv error: %s (data)",strerr(errno));
+						fs_disconnect();
+						continue;
+					}
+					master_stats_add(MASTER_BYTESRCVD,size);
 				}
-				if (r!=(int32_t)size) {
-					syslog(LOG_WARNING,"master: tcp recv error: %s (data)",strerr(errno));
-					fs_disconnect();
-					continue;
-				}
-				master_stats_add(MASTER_BYTESRCVD,size);
 				ptr = msgbuff;
 //				if (cmd==MATOCL_FUSE_INVALIDATE_DATA_CACHE) {
 //#ifndef WIN32

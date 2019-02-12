@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed recovering userperm and otherperm in ACL (in practice it doesn't matter - mainly cosmetics)
   - (cli+cgi) fixed python3 compatibility issue (casting to int for "%X" format)
   - (master) increased mmap allocation block size (Linux kernel issue - too many mmaps leads to memory not being properly released by the kernel)
+  - (client) fixed handling internal packets with size zero (client disconnection during chunkserver registration)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

@@ -218,6 +218,7 @@ struct mfsopts {
 	double groupscacheto;
 	double fsyncmintime;
 	int fsyncbeforeclose;
+	int netdev; // only for ignoring '_netdev' option
 };
 
 static struct mfsopts mfsopts;
@@ -301,6 +302,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 //	MFS_OPT("mfsaclsupport", xattraclsupport, 1),
 	MFS_OPT("mfsfsyncmintime=%lf", fsyncmintime, 0),
 	MFS_OPT("mfsfsyncbeforeclose", fsyncbeforeclose, 1),
+	MFS_OPT("_netdev", netdev, 1),
 
 	FUSE_OPT_KEY("-m",             KEY_META),
 	FUSE_OPT_KEY("--meta",         KEY_META),

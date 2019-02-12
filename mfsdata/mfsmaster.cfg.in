@@ -101,6 +101,12 @@
 # 2 - try to find destination server in the same rack as one of the existing copies and then replicate chunk locally (in the same rack)
 # REPLICATIONS_RESPECT_TOPOLOGY = 0
 
+# avoid using same ip/rack for different chunk copies
+# 0 - ignore ip and rackid (standard behaviour)
+# 1 - avoid storing more than one copy on chunkservers using same IP number
+# 2 - avoid storing more than one copy on chunkservers using IP number from the same rack id
+# CHUNKS_UNIQUE_MODE = 0
+
 # Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)
 # CHUNKS_LOOP_MAX_CPS = 100000
 

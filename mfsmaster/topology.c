@@ -195,6 +195,10 @@ int topology_parsenet(char *net,uint32_t *fromip,uint32_t *toip) {
 	return -1;
 }
 
+uint32_t topology_get_rackid(uint32_t ip) {
+	return itree_find(racktree,ip);
+}
+
 // as for now:
 //
 // 0 - same machine

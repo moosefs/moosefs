@@ -275,6 +275,10 @@ static uint32_t LoopTimeMin;
 static uint32_t HashCPTMax;
 static double AcceptableDifference;
 
+static uint8_t DoNotUseSameIP;
+static uint8_t DoNotUseSameRack;
+static uint32_t LabelUniqueMask;
+
 static uint32_t jobshpos;
 static uint32_t jobshstep;
 static uint32_t jobshcnt;
@@ -341,36 +345,26 @@ void mfsdebug_flush(void) {
 }
 #endif
 
-
-/* perfect matching */
-static uint32_t queue[10+MAXCSCOUNT];
-static uint32_t qtop=0;
-
-static inline void queue_push(uint32_t data) {
-	queue[qtop++] = data;
-}
-
-static inline uint32_t queue_pop(void) {
-	return queue[--qtop];
-}
-
-static inline int queue_notempty(void) {
-	return (qtop>0);
-}
-
-static inline void queue_empty(void) {
-	qtop = 0;
-}
-
 int32_t* do_perfect_match(uint32_t labelcnt,uint32_t servcnt,uint32_t **labelmasks,uint16_t *servers) {
-	uint32_t i,l,x,v;
+	uint32_t s,i,l,x,v,vi,sp,rsp,sid,sids,gr;
+	int32_t t;
+	static int32_t *imatching = NULL;
 	static int32_t *matching = NULL;
 	static int32_t *augment = NULL;
 	static uint8_t *visited = NULL;
+	static int32_t *stack = NULL;
+	static int32_t *group = NULL;
+	static int32_t *grnode = NULL;
+	static uint32_t *sidval = NULL;
+	static int32_t *sidpos = NULL;
 	static uint32_t tablength = 0;
+	static uint32_t stablength = 0;
 
-	if (labelcnt + servcnt > tablength || matching==NULL || augment==NULL || visited==NULL) {
+	if (labelcnt + servcnt > tablength || imatching==NULL || matching==NULL || augment==NULL || visited==NULL || stack==NULL) {
 		tablength = 100 + 2 * (labelcnt + servcnt);
+		if (imatching) {
+			free(imatching);
+		}
 		if (matching) {
 			free(matching);
 		}
@@ -380,18 +374,51 @@ int32_t* do_perfect_match(uint32_t labelcnt,uint32_t servcnt,uint32_t **labelmas
 		if (visited) {
 			free(visited);
 		}
+		if (stack) {
+			free(stack);
+		}
+		imatching = malloc(sizeof(int32_t)*tablength);
+		passert(imatching);
 		matching = malloc(sizeof(int32_t)*tablength);
 		passert(matching);
-		memset(matching,0xff,sizeof(int32_t)*tablength);
 		augment = malloc(sizeof(int32_t)*tablength);
 		passert(augment);
-		memset(augment,0xff,sizeof(int32_t)*tablength);
 		visited = malloc(sizeof(uint8_t)*tablength);
 		passert(visited);
-		memset(visited,0,sizeof(uint8_t)*tablength);
+		stack = malloc(sizeof(int32_t)*tablength);
+		passert(stack);
+	}
+	if (servcnt > stablength || sidval==NULL || sidpos==NULL || grnode==NULL || group==NULL) {
+		stablength = 100 + 2 * servcnt;
+		if (sidval) {
+			free(sidval);
+		}
+		if (sidpos) {
+			free(sidpos);
+		}
+		if (grnode) {
+			free(grnode);
+		}
+		if (group) {
+			free(group);
+		}
+		sidval = malloc(sizeof(uint32_t)*stablength);
+		passert(sidval);
+		sidpos = malloc(sizeof(int32_t)*stablength);
+		passert(sidpos);
+		grnode = malloc(sizeof(int32_t)*stablength);
+		passert(grnode);
+		group = malloc(sizeof(int32_t)*stablength);
+		passert(group);
 	}
 
-	for (i=0 ; i<servcnt+labelcnt ; i++) {
+	s = servcnt + labelcnt;
+	if (s==0) {
+		return matching;
+	}
+
+	for (i=0 ; i<s ; i++) {
+		imatching[i] = -1;
 		matching[i] = -1;
 		augment[i] = -1;
 	}
@@ -400,41 +427,90 @@ int32_t* do_perfect_match(uint32_t labelcnt,uint32_t servcnt,uint32_t **labelmas
 		return matching;
 	}
 
+	sp = 0;
+
+	// calc groups
+	sids = 0;
+	for (i=0 ; i<servcnt ; i++) {
+		if (DoNotUseSameIP) {
+			sid = matocsserv_server_get_ip(cstab[servers[i]].ptr);
+		} else if (DoNotUseSameRack) {
+			sid = topology_get_rackid(matocsserv_server_get_ip(cstab[servers[i]].ptr));
+		} else {
+			sid = matocsserv_server_get_labelmask(cstab[servers[i]].ptr) & LabelUniqueMask;
+		}
+		if (sid==0) {
+			group[i] = i;
+		} else {
+			for (l=0 ; l<sids && sid!=sidval[l] ; l++) { }
+			if (l==sids) {
+				sidval[l] = sid;
+				sidpos[l] = i;
+				sids++;
+			}
+			group[i] = sidpos[l];
+		}
+	}
+
 	for (l=0 ; l<labelcnt ; l++) {
-		if (matching[l]==-1) {
+		if (imatching[l]==-1) {
 			for (i=0 ; i<servcnt+labelcnt ; i++) {
 				visited[i] = 0;
 			}
 			visited[l] = 1;
 			augment[l] = -1;
-			queue_push(l);
-			while (queue_notempty()) {
-				x = queue_pop();
+			stack[sp++] = l; // push
+			while (sp!=0) { // stack not empty
+				x = stack[--sp]; // pop
 				if (x<labelcnt) {
+					rsp = sp;
 					for (v=0 ; v<servcnt ; v++) {
-						if (matocsserv_server_has_labels(cstab[servers[v]].ptr,labelmasks[x])) {
-							if (visited[labelcnt+v]==0) {
-								visited[labelcnt+v]=1;
-								augment[labelcnt+v]=x;
-								queue_push(labelcnt+v);
+#ifdef MATCH_LEFT
+						vi = v;
+#else
+						vi = servcnt-1-v;
+#endif
+						gr = group[vi];
+						if (visited[labelcnt+gr]==0) {
+							if (matocsserv_server_has_labels(cstab[servers[vi]].ptr,labelmasks[x])) {
+								visited[labelcnt+gr] = 1;
+								augment[labelcnt+gr] = x;
+								grnode[gr] = vi;
+								stack[sp++] = labelcnt + gr; // push
 							}
 						}
 					}
-				} else if (matching[x] >= 0) {
-					augment[matching[x]] = x;
-					visited[matching[x]] = 1;
-					queue_push(matching[x]);
+					// reverse stack from rsp to sp
+					for (v=0 ; v<(sp-rsp)/2 ; v++) {
+						// swap stack[rsp+v] , stack[sp-1-v]
+						t = stack[sp-1-v];
+						stack[sp-1-v] = stack[rsp+v];
+						stack[rsp+v] = t;
+					}
+				} else if (imatching[x] >= 0) {
+					augment[imatching[x]] = x;
+					visited[imatching[x]] = 1;
+					stack[sp++] = imatching[x];
 				} else {
 					while (augment[x]>=0) {
 						if (x>=labelcnt) {
-							matching[x] = augment[x];
-							matching[augment[x]] = x;
+							imatching[x] = augment[x];
+							imatching[augment[x]] = x;
+							matching[augment[x]] = grnode[x-labelcnt] + labelcnt;
 						}
 						x = augment[x];
 					}
-					queue_empty();
+					sp = 0; // clear stack;
 				}
 			}
+		}
+	}
+
+	// add reverse matching
+	for (i=0 ; i<labelcnt ; i++) {
+		t = matching[i];
+		if (t>=0) {
+			matching[t] = i;
 		}
 	}
 	return matching;
@@ -888,7 +964,7 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 	}
 	wronglabels = 0;
 	goal = sclass_get_keeparch_goal(c->sclassid,c->archflag);
-	if (sclass_has_keeparch_labels(c->sclassid,c->archflag) && vc >= goal && checklabels) {
+	if (((DoNotUseSameIP | DoNotUseSameRack | LabelUniqueMask) || sclass_has_keeparch_labels(c->sclassid,c->archflag)) && vc >= goal && checklabels) {
 		servcnt = 0;
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid==VALID) {
@@ -3488,7 +3564,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 		delnotdone+=(vc-goal);
 		prevdone = 1;
 
-		if (sclass_has_keeparch_labels(c->sclassid,c->archflag)) { // labels version
+		if ((DoNotUseSameIP | DoNotUseSameRack | LabelUniqueMask) || sclass_has_keeparch_labels(c->sclassid,c->archflag)) { // labels version
 			servcnt = 0;
 			for (i=0 ; i<dservcount ; i++) {
 				for (s=c->slisthead ; s && s->csid!=dcsids[dservcount-1-i] ; s=s->next) {}
@@ -3591,7 +3667,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 // step 8. check matching for labeled chunks
 	forcereplication = 0;
-	if (sclass_has_keeparch_labels(c->sclassid,c->archflag)) {
+	if ((DoNotUseSameIP | DoNotUseSameRack | LabelUniqueMask) || sclass_has_keeparch_labels(c->sclassid,c->archflag)) {
 		servcnt = 0;
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid==VALID) {
@@ -3676,7 +3752,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				chunk_rack_sort(rcsids,rservcount,vrip,vripcnt);
 			}
 			if (rgvc+rgtdc>0 && rservcount>0) { // have at least one server to read from and at least one to write to
-				if (sclass_has_keeparch_labels(c->sclassid,c->archflag)) { // labels version
+				if ((DoNotUseSameIP | DoNotUseSameRack | LabelUniqueMask) || sclass_has_keeparch_labels(c->sclassid,c->archflag)) { // labels version
 					uint32_t dstservcnt;
 					uint8_t allowallservers;
 					// reverse order - do_perfect_match matches servers 'from right' - this is important when ReplicationsRespectTopology>1
@@ -4352,16 +4428,53 @@ void chunk_term(void) {
 	free(regularchunkcounts);
 }
 
+void chunk_load_cfg_common(void) {
+	uint32_t uniqmode;
+
+	uniqmode = cfg_getuint32("CHUNKS_UNIQUE_MODE",0);
+
+	DoNotUseSameIP=0;
+	DoNotUseSameRack=0;
+	LabelUniqueMask=0;
+
+	if (uniqmode==1) {
+		DoNotUseSameIP=1;
+	} else if (uniqmode==2) {
+		DoNotUseSameRack=1;
+	}
+
+	ReplicationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT",60);
+	ReplicationsRespectTopology = cfg_getuint8("REPLICATIONS_RESPECT_TOPOLOGY",0);
+
+	if (cfg_isdefined("ACCEPTABLE_PERCENTAGE_DIFFERENCE")) {
+		AcceptableDifference = cfg_getdouble("ACCEPTABLE_PERCENTAGE_DIFFERENCE",1.0)/100.0; // 1%
+	} else {
+		AcceptableDifference = cfg_getdouble("ACCEPTABLE_DIFFERENCE",0.01); // 1% - deprecated option
+	}
+	if (AcceptableDifference<0.001) { // 0.1%
+		AcceptableDifference = 0.001;
+	}
+	if (AcceptableDifference>0.1) { // 10%
+		AcceptableDifference = 0.1;
+	}
+
+	DangerMaxLeng = cfg_getuint32("PRIORITY_QUEUES_LENGTH",1000000);
+	if (DangerMaxLeng<10000) {
+		DangerMaxLeng = 10000;
+	}
+}
+
 void chunk_reload(void) {
 	uint32_t oldMaxDelSoftLimit,oldMaxDelHardLimit,oldDangerMaxLeng;
 	uint32_t cps,i,j;
 	char *repstr;
 
-	ReplicationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT",60);
-	ReplicationsRespectTopology = cfg_getuint8("REPLICATIONS_RESPECT_TOPOLOGY",0);
+	oldDangerMaxLeng = DangerMaxLeng;
 
 	oldMaxDelSoftLimit = MaxDelSoftLimit;
 	oldMaxDelHardLimit = MaxDelHardLimit;
+
+	chunk_load_cfg_common();
 
 	MaxDelSoftLimit = cfg_getuint32("CHUNKS_SOFT_DEL_LIMIT",10);
 	if (cfg_isdefined("CHUNKS_HARD_DEL_LIMIT")) {
@@ -4456,23 +4569,6 @@ void chunk_reload(void) {
 		HashCPTMax = ((cps+(TICKSPERSECOND-1))/TICKSPERSECOND);
 	}
 
-	if (cfg_isdefined("ACCEPTABLE_PERCENTAGE_DIFFERENCE")) {
-		AcceptableDifference = cfg_getdouble("ACCEPTABLE_PERCENTAGE_DIFFERENCE",1.0)/100.0; // 1%
-	} else {
-		AcceptableDifference = cfg_getdouble("ACCEPTABLE_DIFFERENCE",0.01); // 1% - deprecated option
-	}
-	if (AcceptableDifference<0.001) { // 1%
-		AcceptableDifference = 0.001;
-	}
-	if (AcceptableDifference>0.1) { // 10%
-		AcceptableDifference = 0.1;
-	}
-
-	oldDangerMaxLeng = DangerMaxLeng;
-	DangerMaxLeng = cfg_getuint32("PRIORITY_QUEUES_LENGTH",1000000);
-	if (DangerMaxLeng<10000) {
-		DangerMaxLeng = 10000;
-	}
 	if (DangerMaxLeng != oldDangerMaxLeng) {
 		for (j=0 ; j<DANGER_PRIORITIES ; j++) {
 			if (chunks_priority_leng[j]>0) {
@@ -4502,8 +4598,8 @@ int chunk_strinit(void) {
 	char *repstr;
 
 	starttime = main_time();
-	ReplicationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT",60);
-	ReplicationsRespectTopology = cfg_getuint8("REPLICATIONS_RESPECT_TOPOLOGY",0);
+
+	chunk_load_cfg_common();
 
 	MaxDelSoftLimit = cfg_getuint32("CHUNKS_SOFT_DEL_LIMIT",10);
 	if (cfg_isdefined("CHUNKS_HARD_DEL_LIMIT")) {
@@ -4587,21 +4683,7 @@ int chunk_strinit(void) {
 		}
 		HashCPTMax = ((cps+(TICKSPERSECOND-1))/TICKSPERSECOND);
 	}
-	if (cfg_isdefined("ACCEPTABLE_PERCENTAGE_DIFFERENCE")) {
-		AcceptableDifference = cfg_getdouble("ACCEPTABLE_PERCENTAGE_DIFFERENCE",1.0)/100.0; // 1%
-	} else {
-		AcceptableDifference = cfg_getdouble("ACCEPTABLE_DIFFERENCE",0.01); // 1% - deprecated option
-	}
-	if (AcceptableDifference<0.001) { // 0.1%
-		AcceptableDifference = 0.001;
-	}
-	if (AcceptableDifference>0.1) { // 10%
-		AcceptableDifference = 0.1;
-	}
-	DangerMaxLeng = cfg_getuint32("PRIORITY_QUEUES_LENGTH",1000000);
-	if (DangerMaxLeng<10000) {
-		DangerMaxLeng = 10000;
-	}
+
 	chunk_hash_init();
 //	for (i=0 ; i<HASHSIZE ; i++) {
 //		chunkhash[i]=NULL;

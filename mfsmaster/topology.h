@@ -27,6 +27,7 @@
 #define TOPOLOGY_DIST_SAME_RACKID 1
 #define TOPOLOGY_DIST_MAX 2
 
+uint32_t topology_get_rackid(uint32_t ip);
 uint8_t topology_distance(uint32_t ip1,uint32_t ip2);
 int topology_init(void);
 

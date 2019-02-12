@@ -732,6 +732,16 @@ uint16_t matocsserv_servers_with_label(uint8_t label) {
 	return cnt;
 }
 
+uint32_t matocsserv_server_get_labelmask(void *e) {
+	matocsserventry *eptr = (matocsserventry *)e;
+	return eptr->labelmask;
+}
+
+uint32_t matocsserv_server_get_ip(void *e) {
+	matocsserventry *eptr = (matocsserventry *)e;
+	return eptr->servip;
+}
+
 uint16_t matocsserv_servers_count(void) {
 	uint16_t cnt;
 	matocsserventry *eptr;

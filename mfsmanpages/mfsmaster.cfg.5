@@ -117,6 +117,15 @@ whether to make undergoal replications respect topology (default is 0)
 .br
 2 - try to find destination server in the same rack as one of the existing copies and then replicate chunk locally (in the same rack)
 .TP
+.B CHUNKS_UNIQUE_MODE
+avoid using same ip/rack for different chunk copies (default is 0)
+.br
+0 - ignore ip and rackid (standard behaviour)
+.br
+1 - avoid storing more than one copy on chunkservers using same IP number
+.br
+2 - avoid storing more than one copy on chunkservers using IP number from the same rack id
+.TP
 .B CHUNKS_LOOP_MAX_CPS
 Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)
 .TP

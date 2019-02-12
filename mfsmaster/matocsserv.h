@@ -25,6 +25,8 @@
 #include "chunks.h" // MAXCSCOUNT
 
 uint8_t matocsserv_server_has_labels(void *e,uint32_t *labelmask);
+uint32_t matocsserv_server_get_labelmask(void *e);
+uint32_t matocsserv_server_get_ip(void *e);
 uint16_t matocsserv_servers_with_labelsets(uint32_t *labelmask);
 uint16_t matocsserv_servers_with_label(uint8_t label);
 uint16_t matocsserv_servers_count(void);

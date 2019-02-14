@@ -10,6 +10,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) fixed symlink cache handling (potential race condition)
   - (master) added global option for preventing using same ip or same rack for more than one chunk copy
   - (clinet) added ignoring '_netdev' option - sometimes needed in case of mounting from fstab
+  - (master) added defining rackid as string paths in mfstopology.cfg (introdiced optional higher distances between servers)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

@@ -37,50 +37,165 @@
 #include "cfg.h"
 #include "slogger.h"
 #include "massert.h"
+#include "mfsalloc.h"
 
 static void *racktree;
 static char *TopologyFileName;
 
-/* hash is much faster than itree, but it is hard to define ip classes in hash tab
 
-#define HASHSIZE 199
 
-static uint32_t hashtab_ip[HASHSIZE];
-static uint32_t hashtab_rid[HASHSIZE];
+// ************* NAME <-> ID MAP ** BEGIN ***************
 
-void hash_clear(void) {
-	memset(hashtab_ip,0,sizeof(uint32_t)*HASHSIZE);
-	memset(hashtab_rid,0,sizeof(uint32_t)*HASHSIZE);
-}
+#define HASHTABSIZE 4096
 
-void hash_insert(uint32_t ip,uint32_t rid) {
-	uint32_t hash = ip%HASHSIZE;
-	uint32_t disp = (ip%(HASHSIZE-2))+1;
-	while (hashtab_ip[hash]!=0) {
-		if (hashtab_ip[hash]==ip) {
-			hashtab_rid[hash]=rid;
-			return;
-		}
-		hash += disp;
-		hash %= HASHSIZE;
+typedef struct _rackhashentry {
+	char* rackname;
+	uint32_t rackid;
+	uint32_t hash;
+	struct _rackhashentry *next;
+} rackhashentry;
+
+static rackhashentry* rackhashtab[HASHTABSIZE];
+static rackhashentry** rackidtab = NULL;
+static uint32_t rackidtabsize = 0;
+static uint32_t rackidnext = 0;
+
+static inline uint32_t topology_rackname_hash(char *rackname) {
+	uint8_t p;
+	uint32_t result = 55821;
+	while ((p=*rackname)!=0) {
+		rackname++;
+		result = result*33+p;
 	}
-	hashtab_ip[hash] = ip;
-	hashtab_rid[hash] = rid;
+	return result;
 }
 
-uint32_t hash_find(uint32_t ip) {
-	uint32_t hash = ip%HASHSIZE;
-	uint32_t disp = (ip%(HASHSIZE-2))+1;
-	while (hashtab_ip[hash]!=0) {
-		if (hashtab_ip[hash]==ip) {
-			return hashtab_rid[hash];
-		}
-		hash += disp;
-		hash %= HASHSIZE;
+static inline uint32_t topology_get_next_free_rackid(void) {
+	uint32_t i;
+	i = rackidtabsize;
+	if (rackidtabsize==0) {
+		rackidtabsize = 1024;
+		rackidtab = malloc(sizeof(rackhashentry*)*rackidtabsize);
+		passert(rackidtab);
+		rackidnext = 1; // skip rackid=0
+	} else if (rackidnext>=rackidtabsize) {
+		rackidtabsize = rackidtabsize*3/2;
+		rackidtab = mfsrealloc(rackidtab,sizeof(rackhashentry*)*rackidtabsize);
+		passert(rackidtab);
 	}
-	return 0;
+	while (i<rackidtabsize) {
+		rackidtab[i] = NULL;
+		i++;
+	}
+	return rackidnext++;
 }
-*/
+
+static uint32_t topology_rackname_to_rackid(char *rackname) {
+	uint32_t hash,hashpos;
+	rackhashentry *rhe;
+
+	hash = topology_rackname_hash(rackname);
+	hashpos = hash % HASHTABSIZE;
+	for (rhe = rackhashtab[hashpos] ; rhe != NULL ; rhe = rhe->next) {
+		if (rhe->hash==hash && strcmp(rhe->rackname,rackname)==0) {
+			return rhe->rackid;
+		}
+	}
+
+	rhe = malloc(sizeof(rackhashentry));
+	rhe->rackname = strdup(rackname);
+	rhe->rackid = topology_get_next_free_rackid();
+	rhe->hash = hash;
+	rhe->next = rackhashtab[hashpos];
+	rackhashtab[hashpos] = rhe;
+	rackidtab[rhe->rackid] = rhe;
+	return rhe->rackid;
+}
+
+static char* topology_rackid_to_rackname(uint32_t rackid) {
+	if (rackid==0) {
+		return "";
+	}
+	if (rackid<rackidnext) {
+		return rackidtab[rackid]->rackname;
+	}
+	return NULL;
+}
+
+static void topology_rackname_init(void) {
+	uint32_t i;
+	rackidtab = NULL;
+	rackidtabsize = 0;
+	rackidnext = 0;
+	for (i=0 ; i<HASHTABSIZE ; i++) {
+		rackhashtab[i] = NULL;
+	}
+}
+
+static void topology_rackname_cleanup(void) {
+	uint32_t i;
+	for (i=1 ; i<rackidnext ; i++) {
+		free(rackidtab[i]->rackname);
+		free(rackidtab[i]);
+	}
+	free(rackidtab);
+	topology_rackname_init();
+}
+
+static rackhashentry* rackhashtab_stash[HASHTABSIZE];
+static rackhashentry** rackidtab_stash = NULL;
+static uint32_t rackidtabsize_stash = 0;
+static uint32_t rackidnext_stash = 0;
+
+
+static void topology_rackname_stash(void) {
+	uint32_t i;
+	for (i=0 ; i<HASHTABSIZE ; i++) {
+		rackhashtab_stash[i] = rackhashtab[i];
+		rackhashtab[i] = NULL;
+	}
+	rackidtab_stash = rackidtab;
+	rackidtab = NULL;
+	rackidtabsize_stash = rackidtabsize;
+	rackidtabsize = 0;
+	rackidnext_stash = rackidnext;
+	rackidnext = 0;
+}
+
+static void topology_rackname_restore(void) {
+	topology_rackname_cleanup();
+	uint32_t i;
+	for (i=0 ; i<HASHTABSIZE ; i++) {
+		rackhashtab[i] = rackhashtab_stash[i];
+		rackhashtab_stash[i] = NULL;
+	}
+	rackidtab = rackidtab_stash;
+	rackidtab_stash = NULL;
+	rackidtabsize = rackidtabsize_stash;
+	rackidtabsize_stash = 0;
+	rackidnext = rackidnext_stash;
+	rackidnext_stash = 0;
+}
+
+static void topology_rackname_cleanupstash(void) {
+	uint32_t i;
+	for (i=1 ; i<rackidnext_stash ; i++) {
+		free(rackidtab_stash[i]->rackname);
+		free(rackidtab_stash[i]);
+	}
+	free(rackidtab_stash);
+	rackidtab_stash = NULL;
+	rackidtabsize_stash = 0;
+	rackidnext_stash = 0;
+	for (i=0 ; i<HASHTABSIZE ; i++) {
+		rackhashtab_stash[i] = NULL;
+	}
+}
+
+// ************* NAME <-> ID MAP ** END *****************
+
+
+
 
 int topology_parsenet(char *net,uint32_t *fromip,uint32_t *toip) {
 	uint32_t ip,i,octet;
@@ -207,166 +322,87 @@ uint32_t topology_get_rackid(uint32_t ip) {
 
 uint8_t topology_distance(uint32_t ip1,uint32_t ip2) {
 	uint32_t rid1,rid2;
+	char *rname1,*rname2;
+	int pos,lastbar;
+	uint8_t l1,l2;
+
 	if (ip1==ip2) {
 		return 0;
 	}
-//	rid1 = hash_find(ip1);
-//	rid2 = hash_find(ip2);
 	rid1 = itree_find(racktree,ip1);
 	rid2 = itree_find(racktree,ip2);
-//	rid1^=rid2;
-//	rid2=0;
-//	while(rid1) {
-//		if (rid1&1) {
-//			rid2++;
-//		}
-//		rid1>>=1;
-//	}
-//	return rid2;
-	return (rid1==rid2)?1:2;
+	if (rid1==rid2) {
+		return 1;
+	}
+	rname1 = topology_rackid_to_rackname(rid1);
+	rname2 = topology_rackid_to_rackname(rid2);
+
+	if (rname1==NULL && rname2==NULL) { // safety guard - this may only happen when both rid1 and rid2 are 0 - it shouldn't pass rid1==rid2 condition
+		return 1;
+	}
+
+	lastbar = 0;
+	if (rname1!=NULL && rname2!=NULL) {
+		pos = 0;
+		while (1) {
+			if ((rname1[pos]==0 && rname2[pos]=='|') || (rname1[pos]=='|' && rname2[pos]==0)) {
+				lastbar = pos;
+				break;
+			}
+			if (rname1[pos] != rname2[pos]) {
+				break;
+			}
+			if (rname1[pos]=='|') {
+				lastbar = pos;
+			}
+			if (rname1[pos] == 0) { // safety guard - this means that strings are identical - if that then they should have the same rackid
+				return 1;
+			}
+			pos++;
+		}
+	}
+	l1 = 0;
+	l2 = 0;
+	if (rname1!=NULL) {
+		if (rname1[lastbar]=='|') {
+			pos = lastbar+1;
+		} else {
+			pos = lastbar;
+		}
+		for ( ; rname1[pos] ; pos++) {
+			if (rname1[pos]=='|') {
+				l1++;
+			}
+		}
+	}
+	if (rname2!=NULL) {
+		if (rname2[lastbar]=='|') {
+			pos = lastbar+1;
+		} else {
+			pos = lastbar;
+		}
+		for ( ; rname2[pos] ; pos++) {
+			if (rname2[pos]=='|') {
+				l2++;
+			}
+		}
+	}
+	if (l1>l2) {
+		return 2+l1;
+	} else {
+		return 2+l2;
+	}
 }
 
 // format:
 // network	rackid
 
-/*
-idea for the future:
 
-distance(id1,id2) = number of one bits in id1^id2
-
-network topology examples with rack ids
-
-1. chain
-
-A--B--C--D--E
-
-A: 1111
-B: 1110
-C: 1100
-D: 1000
-E: 0000
-
-2. star
-
-      A
-    B | C
-     \|/
-   D--*--E
-
-A: 00001
-B: 00010
-C: 00100
-D: 01000
-E: 10000
-
-3. two chains
-
-  A--B--C--D--E--F
-        |
-  G--H--I--J--K--L--M--N
-
-A: 1111111111001
-B: 1111011111001
-C: 1110011111001
-D: 1100011111001
-E: 1000011111001
-F: 0000011111001
-G: 1110011111110
-H: 1110011111100
-I: 1110011111000
-J: 1110011110000
-K: 1110011100000
-L: 1110011000000
-M: 1110010000000
-N: 1110000000000
-
-4. star and chain
-
-         A
-       B | C
-        \|/
-      D--*--E
-        /|
-       F |
-         |
-   G--H--I--J--K--L--M--N
-
-A: 00000111111001
-B: 00001011111001
-C: 00010011111001
-D: 00100011111001
-E: 01000011111001
-F: 10000011111001
-G: 00000011111110
-H: 00000011111100
-I: 00000011111000
-J: 00000011110000
-K: 00000011100000
-L: 00000011000000
-M: 00000010000000
-N: 00000000000000
-
-5. two stars
-
-         A
-       B | C
-        \|/
-      D--*--E
-        /|
-       F |
-         |
-       G | H
-        \|/
-      I--*--J
-        /|\
-       K L M
-
-A: 00000100000001
-B: 00001000000001
-C: 00010000000001
-D: 00100000000001
-E: 01000000000001
-F: 10000000000001
-G: 00000000000010
-H: 00000000000100
-I: 00000000001000
-J: 00000000010000
-K: 00000000100000
-L: 00000001000000
-M: 00000010000000
-
-6. two stars with poor link
-
-         A
-       B | C
-        \|/
-      D--*--E
-        /.
-       F .
-         .
-       G . H
-        \./
-      I--*--J
-        /|\
-       K L M
-
-A: 00000100000001111111
-B: 00001000000001111111
-C: 00010000000001111111
-D: 00100000000001111111
-E: 01000000000001111111
-F: 10000000000001111111
-G: 00000000000010000000
-H: 00000000000100000000
-I: 00000000001000000000
-J: 00000000010000000000
-K: 00000000100000000000
-L: 00000001000000000000
-M: 00000010000000000000
-*/
+// format (3.0.104+)
+// network	rack_path_sparated_by_vertical_bar
 
 int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,uint32_t *rid) {
-	char *net;
+	char c,*net,*rackname;
 	char *p;
 
 	p = line;
@@ -397,13 +433,22 @@ int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,ui
 		p++;
 	}
 
-	if (*p<'0' || *p>'9') {
+	if (*p==0 || *p=='#') {
 		mfs_arg_syslog(LOG_WARNING,"mfstopology: incorrect rack id in line: %"PRIu32,lineno);
 		fprintf(stderr,"mfstopology: incorrect rack id in line: %"PRIu32"\n",lineno);
 		return -1;
 	}
 
-	*rid = strtoul(p,&p,10);
+	rackname = p;
+
+	while (*p && *p!=' ' && *p!='\t') {
+		p++;
+	}
+
+	c = *p;
+	*p = 0;
+	*rid = topology_rackname_to_rackid(rackname);
+	*p = c;
 
 	while (*p==' ' || *p=='\t') {
 		p++;
@@ -443,7 +488,7 @@ void topology_load(void) {
 		return;
 	}
 
-//	hash_clear();
+	topology_rackname_stash();
 	newtree = NULL;
 	lineno = 1;
 	while (fgets(linebuff,10000,fd)) {
@@ -472,10 +517,12 @@ void topology_load(void) {
 			syslog(LOG_WARNING,"error reading mfstopology file - network topology not defined");
 		}
 		itree_freeall(newtree);
+		topology_rackname_restore();
 		fprintf(stderr,"error reading mfstopology file - network topology not defined (using defaults)\n");
 		return;
 	}
 	fclose(fd);
+	topology_rackname_cleanupstash();
 	itree_freeall(racktree);
 	racktree = newtree;
 	if (racktree) {
@@ -521,11 +568,13 @@ void topology_term(void) {
 	if (TopologyFileName) {
 		free(TopologyFileName);
 	}
+	topology_rackname_cleanup();
 }
 
 int topology_init(void) {
 	TopologyFileName = NULL;
 	racktree = NULL;
+	topology_rackname_init();
 	topology_reload();
 	main_reload_register(topology_reload);
 	main_destruct_register(topology_term);

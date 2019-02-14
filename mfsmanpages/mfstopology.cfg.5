@@ -2,19 +2,20 @@
 .SH NAME
 mfstopology.cfg \- MooseFS network topology definitions
 .SH DESCRIPTION
-The file \fBmfstopology.cfg\fP contains assignments of IP addresses into 
-network locations (usually switch numbers). This file is optional. If your
-network has one switch or decreasing traffic between switches is not necessary
+The file \fBmfstopology.cfg\fP assigns IP addresses to
+network locations. This file is optional. If your
+network is very small (i.e. has just one switch) or
+network topology is not necessary
 then leave this file empty.
 .SH SYNTAX
 .PP
 Syntax is:
 .TP
-\fIADDRESS\fP \fISWITCH-NUMBER\fP
+\fIIP_ADDRESSES\fP \fILOCATION_PATH\fP
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
 .PP
-\fIADDRESS\fP can be specified in several forms:
+\fIIP_ADDRESS\fP can be specified in several forms:
 .PP
 .nf
 .ta +2i
@@ -25,20 +26,45 @@ Lines starting with \fB#\fP character are ignored as comments.
 \fBf.f.f.f-t.t.t.t\fP	IP range specified by from-to addresses (inclusive)
 .fi
 .PP
-\fISWITCH-NUMBER\fP can be specified as any positive 32-bit number.
+\fILOCATION_PATH\fP can be specified as a sequence of words separated by vertical bars.
 .SH NOTES
-If one IP belongs to more than one definition then last definition is used.
+If one IP belongs to more than one definition then the last definition is used.
 .PP
-As for now distance between switches is constant. So distance between machines
-is calculated as: \fB0\fP when IP numbers are the same, \fB1\fP when IP numbers
-are different, but switch numbers are the same and \fB2\fP when switch numbers
-are different
+Distance between IP numbers is defined as follows: \fB0\fP when IP numbers are the same,
+\fB1\fP when IP numbers are different, but paths specified by these numbers are the same. In case of different
+paths distance is defined as one plus maximum number of elements from both paths after 
+common starting part.
 .PP
 Distances are used to sort chunkservers during read and write operations.
-And also under goal chunks replications if you enable \fBREPLICATIONS_RESPECT_TOPOLOGY\fP.
-New chunks are still created randomly. Also rebalance routines do not take distances into account.
+They are also used by goal chunks replications if you enable \fBREPLICATIONS_RESPECT_TOPOLOGY\fP (see \fBmfsmaster.cfg\fP\|(5)).
+New chunks are created randomly (without using topology information).
+Rebalance routines may take distances into account (see \fBCHUNKS_UNIQUE_MODE\fP in \fBmfsmaster.cfg\fP\|(5)).
+.SH EXAMPLES
+192.168.1.0/24                US|CHICAGO|WTOWER|R1A
+.PP
+192.168.2.0-192.168.2.255     PL|WARSAW|GROCHOWSKA|R154
+.PP
+192.168.3.0/255.255.255.0     123
+.PP
+192.168.1.1                   A|B|C
+.SH DISTANCE EXAMPLES
+Distances calculated for two different IP numbers mapped to given location paths:
+.PP
+d('US','DE') = 2
+.PP
+d('US','') = 2
+.PP
+d('US|PHOENIX|AT&T|RACK1','US|PHOENIX|AT&T|RACK2') = 2
+.PP
+d('US|PHOENIX|AT&T|RACK1','US|PHOENIX|ATM|RACK7') = 3
+.PP
+d('US|PHOENIX|AT&T|RACK1','US|CHICAGO|AT&T|RACK2') = 4
+.PP
+d('US|PHOENIX|AT&T|RACK1','US|ATM') = 4
+.PP
+d('US|PHOENIX|AT&T|RACK1','DE|BERLIN|ATM|RACK175') = 5
 .SH COPYRIGHT
-Copyright (C) 2018 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (C) 2019 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

@@ -14,6 +14,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed desync on adding damaged chunk
   - (master) added changelog save mode (background,async and sync)
   - (all) fixed issues reported by cppcheck (fixes #179)
+  - (cli+cgi) fixed issues reported by pylint (fixes #180)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

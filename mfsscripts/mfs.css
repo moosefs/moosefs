@@ -25,7 +25,7 @@ body {
 	right:0; 
 	overflow:auto;
 	background:#5B6884;
-	padding:15px 10px;
+	padding:0px 10px 10px;
 	color:#000;
 	text-align:center;
 }
@@ -148,7 +148,7 @@ table.MENU td.LSU {border-bottom: 1px solid #FFF; border-right: 1px solid #000; 
 table.MENU td.LUS {border-bottom: 1px solid #5B6884; border-right: 1px solid #FFF; border-top: 1px solid #FFF; border-left: 1px solid #FFF; background-color: #5B6884;}
 table.MENU td.LSS {border-bottom: 1px solid #5B6884; border-right: 1px solid #FFF; border-top: 1px solid #FFF; border-left: 1px solid #AAA; background-color: #5B6884;}
 
-table.acid_tab {width: 100%; margin-left:auto; margin-right:auto;}
+table.acid_tab {width: 100%; margin-left:auto; margin-right:auto; margin-top:10px;}
 table.acid_tab tr:first-child th {background-color: #A0A0A0;}
 table.acid_tab th {background-color: #C0C0C0;}
 table.acid_tab td {background-color: #E8E8E8;}
@@ -179,7 +179,7 @@ table.acid_tab tr:nth-child(2n+1) td {background-color: #E8E8E8;}
 table.acid_tab tr:nth-child(2n+2) td {background-color: #D6D6D6;}
 */
 
-table.FR {width: 100%; margin-left:auto; margin-right:auto;}
+table.FR {width: 100%; margin-left:auto; margin-right:auto; margin-top:10px;}
 table.FR td, table.FR tr.C1 td {background-color: #E8E8E8;}
 table.FR tr.C2 td {background-color: #D6D6D6;}
 table.FR tr:first-child th {background-color: #A0A0A0;}
@@ -192,6 +192,8 @@ table.FR th.PERC8 {width: 8%;}
 table.FR th.RANGEBAR {padding: 2px 0;}
 table.FR td.REL {background-color: #D0D0F0; border:0px; padding: 3px 0;}
 table.FR td.PR {background-color: #7878B8; border:0px; padding: 3px 0;}
+
+table.SMALLMARGIN {margin-top:4px;}
 
 .MEMDIST0 {
 	background: #f9f9bb; /* Old browsers */
@@ -324,7 +326,7 @@ td.NOPADDING {
 	padding: 0px;
 }
 
-table.CR {width: 100%; margin-left:auto; margin-right:auto;}
+table.CR {width: 100%; margin-left:auto; margin-right:auto; margin-top:10px;}
 table.CR td, table.CR tr.C1 td {background-color: #E8E8E8;}
 table.CR tr.C2 td {background-color: #E0E0E0;}
 table.CR tr.C3 td {background-color: #D0D0D0;}

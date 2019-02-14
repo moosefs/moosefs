@@ -27,19 +27,19 @@ MFSMASTER_ENABLE=false
 MFSMASTER_DEFAULTS_FILE=/etc/default/moosefs-master
 MFSMASTER_CONFIG_FILE=
 if [ -s "$MFSMASTER_DEFAULTS_FILE" ]; then
-    . "$MFSMASTER_DEFAULTS_FILE"
-    case "x$MFSMASTER_ENABLE" in
-        xtrue) ;;
-        xfalse)
-	    log_warning_msg "$NAME not enabled in \"$MFSMASTER_DEFAULTS_FILE\", exiting..."
-	    exit 0
-	    ;;
-        *)
-            log_failure_msg "value of MFSMASTER_ENABLE must be either 'true' or 'false';"
-            log_failure_msg "not starting ${NAME}."
-            exit 1
-            ;;
-    esac
+	. "$MFSMASTER_DEFAULTS_FILE"
+	case "x$MFSMASTER_ENABLE" in
+		xtrue) ;;
+		xfalse)
+			log_warning_msg "$NAME not enabled in \"$MFSMASTER_DEFAULTS_FILE\", exiting..."
+			exit 0
+			;;
+		*)
+			log_failure_msg "value of MFSMASTER_ENABLE must be either 'true' or 'false';"
+			log_failure_msg "not starting ${NAME}."
+			exit 1
+			;;
+	esac
 fi
 
 set -e
@@ -64,24 +64,8 @@ fi
 : ${MFSUSER:=$DEFAULT_USER}
 : ${MFSGROUP:=$DEFAULT_GROUP}
 
-check_dirs()
-{
-	# check that the metadata dir exists
-	if [ ! -d "$DATADIR" ]; then
-		mkdir "$DATADIR"
-	fi
-	chmod 0755 "$DATADIR"
-	chown -R $MFSUSER:$MFSGROUP "$DATADIR"
-	if [ ! -e "$DATADIR"/metadata.mfs ]; then
-		if [ ! -e "$DATADIR"/metadata.mfs.back ]; then
-			echo "MFSM NEW" > "$DATADIR"/metadata.mfs
-		fi
-	fi
-}
-
 case "$1" in
 	start)
-		check_dirs
 		echo "Starting ${NAME}:"
 		$DAEMON ${MFSMASTER_CONFIG_FILE:+-c $MFSMASTER_CONFIG_FILE} start
 		;;
@@ -97,7 +81,6 @@ case "$1" in
 		;;
 
 	restart)
-		check_dirs
 		echo "Restarting ${NAME}:"
 		$DAEMON ${MFSMASTER_CONFIG_FILE:+-c $MFSMASTER_CONFIG_FILE} restart
 		;;

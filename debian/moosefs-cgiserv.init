@@ -21,19 +21,19 @@ test -e $DAEMON || exit 0
 MFSCGISERV_ENABLE=false
 MFSCGISERV_DEFAULTS_FILE=/etc/default/moosefs-cgiserv
 if [ -s "$MFSCGISERV_DEFAULTS_FILE" ]; then
-    . "$MFSCGISERV_DEFAULTS_FILE"
-    case "x$MFSCGISERV_ENABLE" in
-        xtrue) ;;
-        xfalse)
-	    log_warning_msg "$NAME not enabled in \"$MFSCGISERV_DEFAULTS_FILE\", exiting..."
-	    exit 0
-	    ;;
-        *)
-            log_failure_msg "value of MFSCGISERV_ENABLE must be either 'true' or 'false';"
-            log_failure_msg "not starting ${NAME}."
-            exit 1
-            ;;
-    esac
+	. "$MFSCGISERV_DEFAULTS_FILE"
+	case "x$MFSCGISERV_ENABLE" in
+		xtrue) ;;
+		xfalse)
+			log_warning_msg "$NAME not enabled in \"$MFSCGISERV_DEFAULTS_FILE\", exiting..."
+			exit 0
+			;;
+		*)
+			log_failure_msg "value of MFSCGISERV_ENABLE must be either 'true' or 'false';"
+			log_failure_msg "not starting ${NAME}."
+			exit 1
+			;;
+	esac
 fi
 
 set -e

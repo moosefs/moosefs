@@ -42,7 +42,7 @@ enum {
 
 #define PHN_USESI       0x01
 #define PHN_USEIEC      0x00
-char* humanize_number(uint64_t number,uint8_t flags) {
+char* mfs_humanize_number(uint64_t number,uint8_t flags) {
 	static char numbuf[6];	// [ "xxx" , "xx" , "x" , "x.x" ] + ["" , "X" , "Xi"]
 	uint64_t divisor;
 	uint16_t b;
@@ -663,11 +663,11 @@ void print_result_plain(FILE *ofd) {
 			fprintf(ofd,"chunks: %"PRIu64"\n",liset_card(dis->chunk_liset));
 			fprintf(ofd," keep chunks: %"PRIu64"\n",dis->s.kchunks);
 			fprintf(ofd," arch chunks: %"PRIu64"\n",dis->s.achunks);
-			fprintf(ofd,"length: %"PRIu64" = %5sB\n",dis->s.length,humanize_number(dis->s.length,PHN_USEIEC));
-			fprintf(ofd,"size: %"PRIu64" = %5sB\n",dis->s.size,humanize_number(dis->s.size,PHN_USEIEC));
-			fprintf(ofd,"keep size: %"PRIu64" = %5sB\n",dis->s.keeprsize,humanize_number(dis->s.keeprsize,PHN_USEIEC));
-			fprintf(ofd,"arch size: %"PRIu64" = %5sB\n",dis->s.archrsize,humanize_number(dis->s.archrsize,PHN_USEIEC));
-			fprintf(ofd,"real size: %"PRIu64" = %5sB\n",dis->s.rsize,humanize_number(dis->s.rsize,PHN_USEIEC));
+			fprintf(ofd,"length: %"PRIu64" = %5sB\n",dis->s.length,mfs_humanize_number(dis->s.length,PHN_USEIEC));
+			fprintf(ofd,"size: %"PRIu64" = %5sB\n",dis->s.size,mfs_humanize_number(dis->s.size,PHN_USEIEC));
+			fprintf(ofd,"keep size: %"PRIu64" = %5sB\n",dis->s.keeprsize,mfs_humanize_number(dis->s.keeprsize,PHN_USEIEC));
+			fprintf(ofd,"arch size: %"PRIu64" = %5sB\n",dis->s.archrsize,mfs_humanize_number(dis->s.archrsize,PHN_USEIEC));
+			fprintf(ofd,"real size: %"PRIu64" = %5sB\n",dis->s.rsize,mfs_humanize_number(dis->s.rsize,PHN_USEIEC));
 		} else {
 			fprintf(ofd,"path not found !!!\n");
 		}

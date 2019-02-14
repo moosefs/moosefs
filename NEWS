@@ -16,6 +16,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) fixed issues reported by cppcheck (fixes #179)
   - (cli+cgi) fixed issues reported by pylint (fixes #180)
   - (cs) added 'damaged' flag to chunk (prevents syslog flooding - issue #192)
+  - (metatools) fixed conflict with builtin function 'humanize_number' (NetBSD)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

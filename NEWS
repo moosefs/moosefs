@@ -18,6 +18,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) added 'damaged' flag to chunk (prevents syslog flooding - issue #192)
   - (metatools) fixed conflict with builtin function 'humanize_number' (NetBSD)
   - (master) better handling chunks with pending high-priority jobs
+  - (master) long loop detection (log info whenever time between polls is longer than 1 second)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

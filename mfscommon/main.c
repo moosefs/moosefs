@@ -422,13 +422,25 @@ static inline void destruct(void) {
 }
 
 void main_keep_alive(void) {
+	uint64_t useclast;
 	struct timeval tv;
+	kaentry *kait;
+
 	gettimeofday(&tv,NULL);
+	useclast = usecnow;
 	usecnow = tv.tv_sec;
 	usecnow *= 1000000;
 	usecnow += tv.tv_usec;
 	now = tv.tv_sec;
-	kaentry *kait;
+	if (usecnow>useclast && useclast>0) {
+		useclast = usecnow - useclast;
+	} else {
+		useclast = 0;
+	}
+	if (useclast > 1000000) {
+		syslog(LOG_WARNING,"long loop detected (%"PRIu64".%06"PRIu32"s)",useclast/1000000,(uint32_t)(useclast%1000000));
+	}
+
 	for (kait = kahead ; kait!=NULL ; kait=kait->next ) {
 		kait->fun();
 	}
@@ -436,6 +448,7 @@ void main_keep_alive(void) {
 
 void mainloop() {
 	uint64_t prevtime = 0;
+	uint64_t useclast;
 	struct timeval tv;
 	pollentry *pollit;
 	eloopentry *eloopit;
@@ -461,10 +474,19 @@ void mainloop() {
 		}
 		i = poll(pdesc,ndesc,10);
 		gettimeofday(&tv,NULL);
+		useclast = usecnow;
 		usecnow = tv.tv_sec;
 		usecnow *= 1000000;
 		usecnow += tv.tv_usec;
 		now = tv.tv_sec;
+		if (usecnow>useclast && useclast>0) {
+			useclast = usecnow - useclast;
+		} else {
+			useclast = 0;
+		}
+		if (useclast > 1000000) {
+			syslog(LOG_WARNING,"long loop detected (%"PRIu64".%06"PRIu32"s)",useclast/1000000,(uint32_t)(useclast%1000000));
+		}
 		if (i<0) {
 			if (!ERRNO_ERROR) {
 				syslog(LOG_WARNING,"poll returned EAGAIN");
@@ -1512,9 +1534,9 @@ int main(int argc,char **argv) {
 	signal_cleanup();
 	cfg_term();
 	strerr_term();
-	closelog();
-	free(logappname);
 	wdunlock();
 	mfs_arg_syslog(LOG_NOTICE,"process exited successfully (status:%d)",ch);
+	closelog();
+	free(logappname);
 	return ch;
 }

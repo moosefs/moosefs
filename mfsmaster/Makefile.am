@@ -41,6 +41,7 @@ mfsmaster_SOURCES=\
 	matomlserv.c matomlserv.h \
 	datacachemgr.c datacachemgr.h \
 	chartsdata.c chartsdata.h \
+	bgsaver.c bgsaver.h \
 	chartsdefs.h \
 	init.h \
 	../mfscommon/main.c ../mfscommon/main.h \

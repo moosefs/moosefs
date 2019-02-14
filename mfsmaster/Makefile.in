@@ -122,7 +122,7 @@ am_mfsmaster_OBJECTS = mfsmaster-itree.$(OBJEXT) \
 	mfsmaster-matocsserv.$(OBJEXT) mfsmaster-matoclserv.$(OBJEXT) \
 	mfsmaster-matomlserv.$(OBJEXT) \
 	mfsmaster-datacachemgr.$(OBJEXT) \
-	mfsmaster-chartsdata.$(OBJEXT) \
+	mfsmaster-chartsdata.$(OBJEXT) mfsmaster-bgsaver.$(OBJEXT) \
 	../mfscommon/mfsmaster-main.$(OBJEXT) \
 	../mfscommon/mfsmaster-processname.$(OBJEXT) \
 	../mfscommon/mfsmaster-cfg.$(OBJEXT) \
@@ -447,6 +447,7 @@ mfsmaster_SOURCES = \
 	matomlserv.c matomlserv.h \
 	datacachemgr.c datacachemgr.h \
 	chartsdata.c chartsdata.h \
+	bgsaver.c bgsaver.h \
 	chartsdefs.h \
 	init.h \
 	../mfscommon/main.c ../mfscommon/main.h \
@@ -681,6 +682,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-strerr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/statsdump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/strerr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-bgsaver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-bio.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-changelog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-chartsdata.Po@am__quote@
@@ -1095,6 +1097,20 @@ mfsmaster-chartsdata.obj: chartsdata.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='chartsdata.c' object='mfsmaster-chartsdata.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mfsmaster-chartsdata.obj `if test -f 'chartsdata.c'; then $(CYGPATH_W) 'chartsdata.c'; else $(CYGPATH_W) '$(srcdir)/chartsdata.c'; fi`
+
+mfsmaster-bgsaver.o: bgsaver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mfsmaster-bgsaver.o -MD -MP -MF $(DEPDIR)/mfsmaster-bgsaver.Tpo -c -o mfsmaster-bgsaver.o `test -f 'bgsaver.c' || echo '$(srcdir)/'`bgsaver.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-bgsaver.Tpo $(DEPDIR)/mfsmaster-bgsaver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bgsaver.c' object='mfsmaster-bgsaver.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mfsmaster-bgsaver.o `test -f 'bgsaver.c' || echo '$(srcdir)/'`bgsaver.c
+
+mfsmaster-bgsaver.obj: bgsaver.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mfsmaster-bgsaver.obj -MD -MP -MF $(DEPDIR)/mfsmaster-bgsaver.Tpo -c -o mfsmaster-bgsaver.obj `if test -f 'bgsaver.c'; then $(CYGPATH_W) 'bgsaver.c'; else $(CYGPATH_W) '$(srcdir)/bgsaver.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-bgsaver.Tpo $(DEPDIR)/mfsmaster-bgsaver.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bgsaver.c' object='mfsmaster-bgsaver.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mfsmaster-bgsaver.obj `if test -f 'bgsaver.c'; then $(CYGPATH_W) 'bgsaver.c'; else $(CYGPATH_W) '$(srcdir)/bgsaver.c'; fi`
 
 ../mfscommon/mfsmaster-main.o: ../mfscommon/main.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ../mfscommon/mfsmaster-main.o -MD -MP -MF ../mfscommon/$(DEPDIR)/mfsmaster-main.Tpo -c -o ../mfscommon/mfsmaster-main.o `test -f '../mfscommon/main.c' || echo '$(srcdir)/'`../mfscommon/main.c

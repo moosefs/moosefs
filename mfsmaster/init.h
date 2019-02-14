@@ -35,6 +35,7 @@
 #include "changelog.h"
 #include "chartsdata.h"
 #include "missinglog.h"
+#include "bgsaver.h"
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
@@ -52,7 +53,7 @@ const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 		meta_incverboselevel(); \
 		break;
 #define MODULE_OPTIONS_SYNOPIS "[-i] [-a] [-x [-x]] "
-#define MODULE_OPTIONS_DESC "-i : ignore some metadata structure errors (attach orphans to root, ignore names without inode, etc.)\n-a : automatically restore metadata from change logs\n-x : produce more verbose output\n-xx : even more verbose output\n"
+#define MODULE_OPTIONS_DESC "-i : ignore some metadata structure errors (attach orphans to root, ignore names without inode, etc.). DO NOT USE unless you are absoluttely sure that there are no other options to restore your metadata.\n-a : automatically restore metadata from change logs\n-x : produce more verbose output\n-xx : even more verbose output\n"
 
 /* Run Tab */
 typedef int (*runfn)(void);
@@ -60,6 +61,7 @@ struct {
 	runfn fn;
 	char *name;
 } RunTab[]={
+	{bgsaver_init,"bgsaver"},
 	{changelog_init,"change log"},
 	{rnd_init,"random generator"},
 	{missing_log_init,"missing chunks/files log"}, // has to be before 'fs_init'

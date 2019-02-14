@@ -69,6 +69,15 @@ how many seconds of change logs have to be preserved in memory (default is 1800;
 this sets the minimum, actual number may be a bit bigger due to logs being kept 
 in 5k blocks; zero disables extra logs storage)
 .TP
+.B CHANGELOG_SAVE_MODE
+Changelog save mode (default is 0)
+.br
+0 - write in background by different process (less safe, but doesn't make master stop in case of heavy hdd load)
+.br
+1 - write in foreground without syncing data (master waits for every changelog to be saved to hdd, but without syncing - a little more safe than the background option, but may cause master to stop and wait for flushing hdd buffers)
+.br
+2 - write in foreground with fsync after each write (very safe, but may make your master very slow unless you have very sophisticated hardware)
+.TP
 .B MISSING_LOG_CAPACITY
 how many missing chunks will be stored in master (up to 100*MISSING_LOG_CAPACITY bytes of memory will be allocated ; default value is 100000)
 .TP

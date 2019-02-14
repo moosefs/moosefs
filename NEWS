@@ -12,6 +12,7 @@ This file lists noteworthy changes in MooseFS.
   - (clinet) added ignoring '_netdev' option - sometimes needed in case of mounting from fstab
   - (master) added defining rackid as string paths in mfstopology.cfg (introdiced optional higher distances between servers)
   - (master) fixed desync on adding damaged chunk
+  - (master) added changelog save mode (background,async and sync)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

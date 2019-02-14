@@ -2206,7 +2206,7 @@ int chunk_mr_chunkadd(uint32_t ts,uint64_t chunkid,uint32_t version,uint32_t loc
 	if (chunkid>=nextchunkid) {
 		nextchunkid=chunkid+1;
 	}
-	if (lockedto<ts) {
+	if (lockedto>0 && lockedto<ts) {
 		return MFS_ERROR_MISMATCH;
 	}
 	c = chunk_new(chunkid);

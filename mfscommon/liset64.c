@@ -22,6 +22,7 @@
 #include <inttypes.h>
 
 #include "liset64.h"
+#include "mfsalloc.h"
 
 typedef struct liset {
 	int valid;
@@ -48,7 +49,7 @@ int liset_new() {
 			settab = (liset*)malloc(sizeof(liset)*settabsize);
 		} else {
 			settabsize *= 2;
-			settab = (liset*)realloc((char*)settab,sizeof(liset)*settabsize);
+			settab = (liset*)mfsrealloc((char*)settab,sizeof(liset)*settabsize);
 		}
 	}
 	settab[settabffree].valid = 1;

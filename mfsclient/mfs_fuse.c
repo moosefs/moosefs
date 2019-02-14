@@ -1317,7 +1317,8 @@ int mfs_access_test(const uint8_t attr[ATTR_RECORD_SIZE],int mmode,uint32_t uid,
 	attrmode = get16bit(&ptr);
 	attruid = get32bit(&ptr);
 	attrgid = get32bit(&ptr);
-	
+
+	modebits = 0; // makes cppcheck happy
 	if (uid == attruid) {
 		modebits = (attrmode >> 6) & 7;
 	} else {

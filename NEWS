@@ -13,6 +13,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added defining rackid as string paths in mfstopology.cfg (introdiced optional higher distances between servers)
   - (master) fixed desync on adding damaged chunk
   - (master) added changelog save mode (background,async and sync)
+  - (all) fixed issues reported by cppcheck (fixes #179)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

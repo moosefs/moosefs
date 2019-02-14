@@ -74,7 +74,8 @@ CONFIGURE_ARGS+=	--disable-mfscli
 .endif
 
 .if ${MFS_COMPONENT} == client
-USES=			fuse pkgconfig
+USES=			fuse pkgconfig libtool
+USE_LDCONFIG=		yes
 CONFIGURE_ARGS+=	--enable-mfsmount
 .else
 CONFIGURE_ARGS+=	--disable-mfsmount

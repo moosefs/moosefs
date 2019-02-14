@@ -36,6 +36,11 @@ bin/mfssetarchive
 bin/mfsfilepaths
 bin/mfsscadmin
 bin/mfstools
+include/mfsio.h
+lib/libmfsio.a
+lib/libmfsio.so
+lib/libmfsio.so.1
+lib/libmfsio.so.1.0.0
 man/man1/mfsappendchunks.1.gz
 man/man1/mfscheckfile.1.gz
 man/man1/mfsdirinfo.1.gz

@@ -254,10 +254,20 @@ static uint8_t csreceivingchunks = 0;
 #define DANGER_PRIORITIES 7
 #define REPLICATION_DANGER_PRIORITIES 6
 
+#define DPRIORITY_ENDANGERED_HIGHGOAL 0
+#define DPRIORITY_ENDANGERED 1
+#define DPRIORITY_UNDERGOAL_MFR 2
+#define DPRIORITY_MFR 3
+#define DPRIORITY_UNDERGOAL 4
+#define DPRIORITY_WRONGLABEL 5
+#define DPRIORITY_OVERGOAL 6
+
 static chunk** chunks_priority_queue[DANGER_PRIORITIES];
 static uint32_t chunks_priority_leng[DANGER_PRIORITIES];
 static uint32_t chunks_priority_head[DANGER_PRIORITIES];
 static uint32_t chunks_priority_tail[DANGER_PRIORITIES];
+
+static double chunks_priority_mincpsperc[DANGER_PRIORITIES] = {1.0,0.1,0.1,0.01,0.05,0.01,0.3};
 
 static uint32_t ReplicationsDelayInit=60;
 static uint32_t RemoveDelayDisconnect=3600;
@@ -982,19 +992,19 @@ static inline void chunk_priority_queue_check(chunk *c,uint8_t checklabels) {
 	}
 	if (vc+tdc > 0 && (vc != goal || wronglabels)) { // wrong-goal chunk
 		if (vc+tdc==1 && goal>2) { // highest priority - chunks with one copy and high goal
-			j = 0;
+			j = DPRIORITY_ENDANGERED_HIGHGOAL;
 		} else if (vc+tdc==1 && goal==2) { // next priority - chunks with one copy
-			j = 1;
+			j = DPRIORITY_ENDANGERED;
 		} else if (vc==1 && tdc>0) { // next priority - chunks on one regular disk and some "marked for removal" disks
-			j = 2;
+			j = DPRIORITY_UNDERGOAL_MFR;
 		} else if (tdc>0) { // next priority - chunks on "marked for removal" disks
-			j = 3;
+			j = DPRIORITY_MFR;
 		} else if (vc < goal) { // next priority - standard undergoal chunks
-			j = 4;
+			j = DPRIORITY_UNDERGOAL;
 		} else if (wronglabels) { // next priority - changed labels
-			j = 5;
+			j = DPRIORITY_WRONGLABEL;
 		} else { // lowest priority - overgoal
-			j = 6;
+			j = DPRIORITY_OVERGOAL;
 		}
 #ifdef MFSDEBUG
 		if (debug) {
@@ -3594,7 +3604,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							dc++;
 						} else {
 							prevdone=0;
-							chunk_priority_enqueue(6,c); // in such case only enqueue this chunk for future processing
+							chunk_priority_enqueue(DPRIORITY_OVERGOAL,c); // in such case only enqueue this chunk for future processing
 						}
 					}
 				}
@@ -3619,7 +3629,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						dc++;
 					} else {
 						prevdone=0;
-						chunk_priority_enqueue(6,c); // in such case only enqueue this chunk for future processing
+						chunk_priority_enqueue(DPRIORITY_OVERGOAL,c); // in such case only enqueue this chunk for future processing
 					}
 				}
 			}
@@ -3628,7 +3638,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	}
 
 // step 7.2. if chunk has one copy on each server and some of them have status TDVALID then delete them
-	if (extrajob==0 && vc+tdc>=scount && vc<goal && tdc>0 && vc+tdc>1 && chunks_priority_leng[0]==0 && chunks_priority_leng[1]==0 && chunks_priority_leng[2]==0) {
+	if (extrajob==0 && vc+tdc>=scount && vc<goal && tdc>0 && vc+tdc>1 && chunks_priority_leng[DPRIORITY_ENDANGERED_HIGHGOAL]==0 && chunks_priority_leng[DPRIORITY_ENDANGERED]==0 && chunks_priority_leng[DPRIORITY_UNDERGOAL_MFR]==0) {
 		uint8_t tdcr = 0;
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid==TDVALID) {
@@ -3694,22 +3704,22 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			uint8_t allservflag;
 
 			if (vc+tdc==1 && goal>2) { // highest priority - chunks with only one copy and high goal
-				j = 0;
+				j = DPRIORITY_ENDANGERED_HIGHGOAL;
 				lclass = 0;
 			} else if (vc+tdc==1 && goal==2) { // next priority - chunks with only one copy
-				j = 1;
+				j = DPRIORITY_ENDANGERED;
 				lclass = 0;
 			} else if (vc==1 && tdc>0) { // next priority - chunks on one regular disk and some "marked for removal" disks
-				j = 2;
+				j = DPRIORITY_UNDERGOAL_MFR;
 				lclass = 1;
 			} else if (tdc>0) { // next priority - chunks on "marked for removal" disks
-				j = 3;
+				j = DPRIORITY_MFR;
 				lclass = 1;
 			} else if (vc < goal) { // next priority - standard undergoal chunks
-				j = 4;
+				j = DPRIORITY_UNDERGOAL;
 				lclass = 1;
 			} else { // lowest priority - wrong labeled chunks
-				j = 5;
+				j = DPRIORITY_WRONGLABEL;
 				lclass = 1;
 			}
 			if (extrajob==0) {
@@ -4111,6 +4121,9 @@ void chunk_jobs_main(void) {
 #ifdef MFSDEBUG
 		l = chunks_priority_leng[j];
 #endif
+		if (lc > (1.0 - chunks_priority_mincpsperc[j])*HashCPTMax) { // prevent starvation of lowest priority chunks by highest priority chunks
+			lc = HashCPTMax * (1.0 - chunks_priority_mincpsperc[j]);
+		}
 		if (chunks_priority_leng[j]>0 && lc<HashCPTMax) {
 			h = chunks_priority_head[j];
 			t = chunks_priority_tail[j];

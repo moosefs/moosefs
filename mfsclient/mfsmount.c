@@ -614,50 +614,80 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	}
 }
 
-int main_thread_create(pthread_t *th,const pthread_attr_t *attr,void *(*fn)(void *),void *arg) {
-	sigset_t oldset;
-	sigset_t newset;
-	int res;
+uint32_t main_snprint_parameters(char *buff,uint32_t size) {
+	uint32_t leng = 0;
 
-	sigemptyset(&newset);
-	sigaddset(&newset, SIGTERM);
-	sigaddset(&newset, SIGINT);
-	sigaddset(&newset, SIGHUP);
-	sigaddset(&newset, SIGQUIT);
-	pthread_sigmask(SIG_BLOCK, &newset, &oldset);
-	res = pthread_create(th,attr,fn,arg);
-	pthread_sigmask(SIG_SETMASK, &oldset, NULL);
-	return res;
-}
-
-int main_minthread_create(pthread_t *th,uint8_t detached,void *(*fn)(void *),void *arg) {
-	static pthread_attr_t *thattr = NULL;
-	static uint8_t thattr_detached;
-	if (thattr == NULL) {
-		size_t mystacksize;
-		thattr = malloc(sizeof(pthread_attr_t));
-		passert(thattr);
-		zassert(pthread_attr_init(thattr));
-#ifdef PTHREAD_STACK_MIN
-		mystacksize = PTHREAD_STACK_MIN;
-		if (mystacksize < 0x20000) {
-			mystacksize = 0x20000;
-		}
-#else
-		mystacksize = 0x20000;
+#define bprintf(...) { if (leng<size) leng+=snprintf(buff+leng,size-leng,__VA_ARGS__); }
+#define NOTNULL(a) (((a)==NULL)?"(not defined)":(a))
+#define DIRECTOPT(name,string) bprintf(name ": %s\n",string);
+#define BOOLOPT(name,opt) bprintf(name ": %s\n",(mfsopts.opt)?"(defined)":"(not defined)");
+#define STROPT(name,opt) bprintf(name ": %s\n",NOTNULL(mfsopts.opt));
+#define NUMOPT(name,format,opt) bprintf(name ": %" format "\n",(mfsopts.opt));
+	STROPT("mfsmaster",masterhost);
+	STROPT("mfsport",masterport);
+	STROPT("mfsbind",bindhost);
+	STROPT("mfsproxy",proxyhost);
+	STROPT("mfssubfolder",subfolder);
+	STROPT("mfspassword",password);
+	STROPT("mfspassfile",passfile);
+	STROPT("mfsmd5pass",md5pass);
+	STROPT("mfspreflabels",preferedlabels);
+	NUMOPT("mfsrlimitnofile","u",nofile);
+	NUMOPT("mfsnice","d",nice);
+	BOOLOPT("mfssuid",mfssuid);
+	BOOLOPT("mfsdev",mfsdev);
+#ifdef MFS_USE_MEMLOCK
+	BOOLOPT("mfsmemlock",memlock);
 #endif
-		zassert(pthread_attr_setstacksize(thattr,mystacksize));
-		thattr_detached = detached + 1; // make it different
-	}
-	if (detached != thattr_detached) {
-		if (detached) {
-			zassert(pthread_attr_setdetachstate(thattr,PTHREAD_CREATE_DETACHED));
-		} else {
-			zassert(pthread_attr_setdetachstate(thattr,PTHREAD_CREATE_JOINABLE));
-		}
-		thattr_detached = detached;
-	}
-	return main_thread_create(th,thattr,fn,arg);
+#ifdef MFS_USE_MALLOPT
+	NUMOPT("mfslimitarenas","u",limitarenas);
+#endif
+#if defined(__linux__) && defined(OOM_ADJUSTABLE)
+	BOOLOPT("mfsallowoomkiller",allowoomkiller);
+#endif
+	NUMOPT("mfswritecachesize","u",writecachesize);
+	NUMOPT("mfsreadaheadsize","u",readaheadsize);
+	NUMOPT("mfsreadaheadleng","u",readaheadleng);
+	NUMOPT("mfsreadaheadtrigger","u",readaheadtrigger);
+	NUMOPT("mfsioretries","u",ioretries);
+	NUMOPT("mfstimeout","u",timeout);
+	NUMOPT("mfslogretry","u",logretry);
+	BOOLOPT("mfsdebug",debug);
+	BOOLOPT("mfsmeta",meta);
+	BOOLOPT("mfsflattrash",flattrash);
+	BOOLOPT("mfsdelayedinit",delayedinit);
+	BOOLOPT("mfsdonotrememberpassword",donotrememberpassword);
+	BOOLOPT("mfscachefiles",cachefiles);
+	BOOLOPT("mfsnoxattrs",noxattrs);
+	BOOLOPT("mfsnoposixlocks",noposixlocks);
+	BOOLOPT("mfsnobsdlocks",nobsdlocks);
+	STROPT("mfscachemode",cachemode);
+	NUMOPT("mfsmkdircopysgid","u",mkdircopysgid);
+	STROPT("mfssugidclearmode",sugidclearmodestr);
+	NUMOPT("mfsattrcacheto",".3lf",attrcacheto);
+	NUMOPT("mfsxattrcacheto",".3lf",xattrcacheto);
+	NUMOPT("mfsentrycacheto",".3lf",entrycacheto);
+	NUMOPT("mfsdirentrycacheto",".3lf",direntrycacheto);
+	NUMOPT("mfsnegentrycacheto",".3lf",negentrycacheto);
+	NUMOPT("mfsgroupscacheto",".3lf",groupscacheto);
+	NUMOPT("mfsfsyncmintime",".3lf",fsyncmintime);
+	BOOLOPT("mfsfsyncbeforeclose",fsyncbeforeclose);
+	DIRECTOPT("working_keep_cache_mode",
+			(mfsopts.keepcache==0)?"AUTO":
+			(mfsopts.keepcache==1)?"YES":
+			(mfsopts.keepcache==2)?"NO":
+			(mfsopts.keepcache==3)?"DIRECT":
+			"(unknown value)");
+	DIRECTOPT("working_sugid_clear_mode",
+			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_NEVER)?"NEVER":
+			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_ALWAYS)?"ALWAYS":
+			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_OSX)?"OSX":
+			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_BSD)?"BSD":
+			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_EXT)?"EXT":
+			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_XFS)?"XFS":
+			"(unknown value)");
+	DIRECTOPT("no_std_mount_options",(mfsopts.nostdmountoptions)?"(defined)":"(not defined)");
+	return leng;
 }
 
 int mainloop(struct fuse_args *args,const char* mp,int mt,int fg,int argc_back,char **argv_back) {

@@ -40,7 +40,7 @@ mfsmount_SOURCES=\
 	csdb.c csdb.h \
 	stats.c stats.h \
 	oplog.c oplog.h \
-	main.c \
+	mfsmount.c mfsmount.h \
 	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/delayrun.c ../mfscommon/delayrun.h \
 	../mfscommon/pcqueue.c ../mfscommon/pcqueue.h \

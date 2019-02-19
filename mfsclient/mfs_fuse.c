@@ -65,6 +65,7 @@
 #include "lwthread.h"
 #include "MFSCommunication.h"
 
+#include "mfsmount.h"
 #include "sustained_stats.h"
 #include "chunksdatacache.h"
 #include "dirattrcache.h"
@@ -145,9 +146,14 @@ static uint8_t mooseattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0xA4, 0,0
 // 0x0124 == 0b100100100 == 0444
 static uint8_t randomattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0, 0};
 
+#define PARAMS_NAME ".params"
+#define PARAMS_INODE 0x7FFFFFF5
+// 0x0124 == 0b100100100 == 0400
+static uint8_t paramsattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x00, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0, 0};
+
 #define MIN_SPECIAL_INODE 0x7FFFFFF0
 #define IS_SPECIAL_INODE(ino) ((ino)>=MIN_SPECIAL_INODE)
-#define IS_SPECIAL_NAME(name) ((name)[0]=='.' && (strcmp(STATS_NAME,(name))==0 || strcmp(MASTERINFO_NAME,(name))==0 || strcmp(OPLOG_NAME,(name))==0 || strcmp(OPHISTORY_NAME,(name))==0 || strcmp(MOOSE_NAME,(name))==0 || strcmp(RANDOM_NAME,(name))==0))
+#define IS_SPECIAL_NAME(name) ((name)[0]=='.' && (strcmp(STATS_NAME,(name))==0 || strcmp(MASTERINFO_NAME,(name))==0 || strcmp(OPLOG_NAME,(name))==0 || strcmp(OPHISTORY_NAME,(name))==0 || strcmp(MOOSE_NAME,(name))==0 || strcmp(RANDOM_NAME,(name))==0 || strcmp(PARAMS_NAME,(name))==0))
 
 // generators from: http://school.anhb.uwa.edu.au/personalpages/kwessen/shared/Marsaglia99.html (by George Marsaglia)
 
@@ -165,6 +171,9 @@ static uint32_t rndjcong=380116160;
 #define KISS ((MWC^CONG)+SHR3)
 
 static pthread_mutex_t randomlock = PTHREAD_MUTEX_INITIALIZER;
+
+static char *params_buff;
+static uint32_t params_leng;
 
 /* STATS INODE BUFFER */
 
@@ -1498,6 +1507,19 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			fuse_reply_entry(req, &e);
 			return ;
 		}
+		if (strcmp(name,PARAMS_NAME)==0) {
+			memset(&e, 0, sizeof(e));
+			e.ino = PARAMS_INODE;
+			e.generation = 1;
+			e.attr_timeout = 3600.0;
+			e.entry_timeout = 3600.0;
+			mfs_attr_to_stat(PARAMS_INODE,paramsattr,&e.attr);
+			mfs_stats_inc(OP_LOOKUP_INTERNAL);
+			mfs_makeattrstr(attrstr,256,&e.attr);
+			oplog_printf(&ctx,"lookup (%lu,%s) (internal node: PARAMS): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
+			fuse_reply_entry(req, &e);
+			return ;
+		}
 		if (strcmp(name,RANDOM_NAME)==0) {
 			memset(&e, 0, sizeof(e));
 			e.ino = RANDOM_INODE;
@@ -1785,6 +1807,15 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_attr(req, &o_stbuf, 3600.0);
 		return;
 	}
+	if (ino==PARAMS_INODE) {
+		memset(&o_stbuf, 0, sizeof(struct stat));
+		mfs_attr_to_stat(ino,paramsattr,&o_stbuf);
+		mfs_stats_inc(OP_GETATTR);
+		mfs_makeattrstr(attrstr,256,&o_stbuf);
+		oplog_printf(&ctx,"getattr (%lu) (internal node: PARAMS): OK (3600,%s)",(unsigned long int)ino,attrstr);
+		fuse_reply_attr(req, &o_stbuf, 3600.0);
+		return;
+	}
 	if (ino==RANDOM_INODE) {
 		memset(&o_stbuf, 0, sizeof(struct stat));
 		mfs_attr_to_stat(ino,randomattr,&o_stbuf);
@@ -1948,6 +1979,14 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		mfs_attr_to_stat(ino,statsattr,&o_stbuf);
 		mfs_makeattrstr(attrstr,256,&o_stbuf);
 		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) (internal node: STATS): OK (3600,%s)",(unsigned long int)ino,to_set,setattr_str,attrstr);
+		fuse_reply_attr(req, &o_stbuf, 3600.0);
+		return;
+	}
+	if (ino==PARAMS_INODE) {
+		memset(&o_stbuf, 0, sizeof(struct stat));
+		mfs_attr_to_stat(ino,paramsattr,&o_stbuf);
+		mfs_makeattrstr(attrstr,256,&o_stbuf);
+		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) (internal node: PARAMS): OK (3600,%s)",(unsigned long int)ino,to_set,setattr_str,attrstr);
 		fuse_reply_attr(req, &o_stbuf, 3600.0);
 		return;
 	}
@@ -3298,10 +3337,33 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_open(req, fi);
 		return;
 	}
+	if (ino==PARAMS_INODE) {
+		if ((fi->flags & O_ACCMODE) != O_RDONLY) {
+			oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): %s",(unsigned long int)ino,strerr(EACCES));
+			fuse_reply_err(req,EACCES);
+			return;
+		}
+		if (ctx.uid != 0) {
+			oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): %s",(unsigned long int)ino,strerr(EPERM));
+			fuse_reply_err(req,EPERM);
+			return;
+		}
+		fi->fh = 0;
+		fi->direct_io = 0;
+		fi->keep_cache = 1;
+		oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): OK (1,0)",(unsigned long int)ino);
+		fuse_reply_open(req, fi);
+		return;
+	}
 	if (ino==OPLOG_INODE || ino==OPHISTORY_INODE) {
 		if ((fi->flags & O_ACCMODE) != O_RDONLY) {
 			oplog_printf(&ctx,"open (%lu) (internal node: %s): %s",(unsigned long int)ino,(ino==OPLOG_INODE)?"OPLOG":"OPHISTORY",strerr(EACCES));
 			fuse_reply_err(req,EACCES);
+			return;
+		}
+		if (ctx.uid != 0) {
+			oplog_printf(&ctx,"open (%lu) (internal node: %s): %s",(unsigned long int)ino,(ino==OPLOG_INODE)?"OPLOG":"OPHISTORY",strerr(EPERM));
+			fuse_reply_err(req,EPERM);
 			return;
 		}
 		fi->fh = oplog_newhandle((ino==OPHISTORY_INODE)?1:0);
@@ -3440,7 +3502,7 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_err(req,0);
 		return;
 	}
-	if (ino==STATS_INODE) {
+	if (ino==STATS_INODE || ino==PARAMS_INODE) {
 		sinfo *statsinfo = sinfo_get(fi->fh);
 		if (statsinfo!=NULL) {
 			pthread_mutex_lock(&(statsinfo->lock));		// make helgrind happy
@@ -3576,6 +3638,18 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 			fuse_reply_buf(req,NULL,0);
 		}
 		return;
+	}
+	if (ino==PARAMS_INODE) {
+		if (off>=params_leng) {
+			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+			fuse_reply_buf(req,NULL,0);
+		} else if ((uint64_t)(off+size)>(uint64_t)(params_leng)) {
+			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)(params_leng-off));
+			fuse_reply_buf(req,params_buff+off,params_leng-off);
+		} else {
+			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)size);
+			fuse_reply_buf(req,params_buff+off,size);
+		}
 	}
 	if (ino==RANDOM_INODE) {
 		uint8_t *rbptr;
@@ -3792,7 +3866,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		}
 		fprintf(stderr,"write to inode %lu %llu bytes at position %llu\n",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
 	}
-	if (ino==MASTERINFO_INODE || ino==OPLOG_INODE || ino==OPHISTORY_INODE || ino==MOOSE_INODE || ino==RANDOM_INODE) {
+	if (ino==MASTERINFO_INODE || ino==OPLOG_INODE || ino==OPHISTORY_INODE || ino==MOOSE_INODE || ino==RANDOM_INODE || ino==PARAMS_INODE) {
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EACCES));
 		fuse_reply_err(req,EACCES);
 		return;
@@ -5313,6 +5387,16 @@ void mfs_term(void) {
 	}
 }
 
+#define AUXBUFFSIZE 10000
+void mfs_prepare_params(void) {
+	params_buff = malloc(AUXBUFFSIZE);
+	params_leng = main_snprint_parameters(params_buff,AUXBUFFSIZE);
+	if (params_leng<AUXBUFFSIZE) {
+		params_buff = mfsrealloc(params_buff,params_leng);
+	}
+	mfs_attr_set_fleng(paramsattr,params_leng);
+}
+
 void mfs_init(struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
 #ifdef FREEBSD_DELAYED_RELEASE
 	pthread_t th;
@@ -5346,6 +5430,7 @@ void mfs_init(struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double di
 		fprintf(stderr,"mkdir copy sgid=%d\nsugid clear mode=%s\n",mkdir_copy_sgid_in,(sugid_clear_mode_in<SUGID_CLEAR_MODE_OPTIONS)?sugid_clear_mode_strings[sugid_clear_mode_in]:"???");
 	}
 	mfs_statsptr_init();
+	mfs_prepare_params();
 #ifdef FREEBSD_DELAYED_RELEASE
 	lwt_minthread_create(&th,1,finfo_delayed_release_cleanup_thread,NULL);
 #endif

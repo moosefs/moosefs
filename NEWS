@@ -19,6 +19,7 @@ This file lists noteworthy changes in MooseFS.
   - (metatools) fixed conflict with builtin function 'humanize_number' (NetBSD)
   - (master) better handling chunks with pending high-priority jobs
   - (master) long loop detection (log info whenever time between polls is longer than 1 second)
+  - (master) fixed condition that checks if thare are all chunkservers and all chunks available (and using it for detecting ENOSPC condition - issue #201)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

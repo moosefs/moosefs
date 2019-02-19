@@ -1584,7 +1584,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 		csstable = 0;
 	}
 
-	if (chunk_counters_in_progress() && csdb_have_all_servers()) {
+	if (chunk_counters_in_progress()==0 && csdb_have_all_servers()) {
 		csalldata = 1;
 	} else {
 		csalldata = 0;
@@ -1594,15 +1594,15 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 		if (mr==0) {
 			servcount = chunk_creation_servers(csids,sclassid,&overloaded);
 			if (servcount==0) {
-				if (overloaded) {
-					return MFS_ERROR_EAGAIN;
+				if (overloaded || csalldata==0) {
+					return MFS_ERROR_EAGAIN; // try again for ever
 				} else {
 					uint16_t scount;
 					scount = matocsserv_servers_count();
 					if (scount>0 && csstable) {
-						return MFS_ERROR_NOSPACE;
+						return MFS_ERROR_NOSPACE; // return error
 					} else {
-						return MFS_ERROR_NOCHUNKSERVERS;
+						return MFS_ERROR_NOCHUNKSERVERS; // try again
 					}
 				}
 			}
@@ -1700,9 +1700,9 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 						*opflag = 1;
 					} else {
 						if (csalldata) {
-							return MFS_ERROR_CHUNKLOST;
+							return MFS_ERROR_CHUNKLOST; // return error
 						} else {
-							return MFS_ERROR_CSNOTPRESENT;
+							return MFS_ERROR_CSNOTPRESENT; // try again
 						}
 					}
 				} else {
@@ -1772,9 +1772,9 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 					*opflag=1;
 				} else {
 					if (csalldata) {
-						return MFS_ERROR_CHUNKLOST;
+						return MFS_ERROR_CHUNKLOST; // return error
 					} else {
-						return MFS_ERROR_CSNOTPRESENT;
+						return MFS_ERROR_CSNOTPRESENT; // try again
 					}
 				}
 			} else {
@@ -1816,7 +1816,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 		csstable = 0;
 	}
 
-	if (chunk_counters_in_progress() && csdb_have_all_servers()) {
+	if (chunk_counters_in_progress()==0 && csdb_have_all_servers()) {
 		csalldata = 1;
 	} else {
 		csalldata = 0;
@@ -1874,9 +1874,9 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 				c->version++;
 			} else {
 				if (csalldata) {
-					return MFS_ERROR_CHUNKLOST;
+					return MFS_ERROR_CHUNKLOST; // return error
 				} else {
-					return MFS_ERROR_CSNOTPRESENT;
+					return MFS_ERROR_CSNOTPRESENT; // try again
 				}
 			}
 		} else {
@@ -1940,9 +1940,9 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 				*nchunkid = c->chunkid;
 			} else {
 				if (csalldata) {
-					return MFS_ERROR_CHUNKLOST;
+					return MFS_ERROR_CHUNKLOST; // return error
 				} else {
-					return MFS_ERROR_CSNOTPRESENT;
+					return MFS_ERROR_CSNOTPRESENT; // try again
 				}
 			}
 		} else {

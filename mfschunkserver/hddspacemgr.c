@@ -4639,8 +4639,8 @@ chunk* hdd_random_chunk(folder *f) {
 	if (f->chunkcount>0) {
 		for (try=0 ; try<RANDOM_CHUNK_RETRIES ; try++) {
 			pos = rndu32_ranged(f->chunkcount);
-			if (f->chunktab[pos]->state==CH_AVAIL && c->damaged==0) {
-				c = f->chunktab[pos];
+			c = f->chunktab[pos];
+			if (c->state==CH_AVAIL && c->damaged==0) {
 				c->state = CH_LOCKED;
 				zassert(pthread_mutex_unlock(&hashlock));
 				zassert(pthread_mutex_unlock(&folderlock));

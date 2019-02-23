@@ -3761,7 +3761,7 @@ if "IN" in sectionset:
 					sf = chunkid
 				elif MForder==5:
 					sf = mtype
-				mcdata.append((sf,paths,inode,indx,chunkid,mtype))
+				mcdata.append((str(sf),paths,inode,indx,chunkid,mtype))
 			mcdata.sort()
 			if MFrev:
 				mcdata.reverse()

@@ -1746,7 +1746,7 @@ def resolve_inodes_paths(masterconn,inodes):
 					psize-=pleng
 					if sys.version_info[0]>=3:
 						try:
-							path = path.decode('ascii')
+							path = path.decode('utf-8')
 						except UnicodeDecodeError:
 							pass
 					if inode not in inodepaths:

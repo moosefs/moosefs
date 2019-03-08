@@ -701,7 +701,11 @@ int meta_storeall(int bg) {
 		}
 		i = fork();
 		if (i<0) {
+#if defined(__linux__)
+			mfs_errlog(LOG_WARNING,"fork error (store data in foreground - it will block master for a while - check /proc/sys/vm/overcommit_memory and if necessary set to 1)");
+#else
 			mfs_errlog(LOG_WARNING,"fork error (store data in foreground - it will block master for a while)");
+#endif
 		} else if (i==0) { // child
 			matocsserv_close_lsock();
 			matoclserv_close_lsock();
@@ -901,6 +905,12 @@ void meta_sendall(int socket) {
 		}
 		bio_close(fd);
 		exit(0);
+	} else if (i<0) {
+#if defined(__linux__)
+		mfs_errlog(LOG_WARNING,"fork error - can't send metadata - check /proc/sys/vm/overcommit_memory and if necessary set to 1");
+#else
+		mfs_errlog(LOG_WARNING,"fork error - can't send metadata");
+#endif
 //	} else {
 //		main_chld_register(i,meta_sendended);
 	}

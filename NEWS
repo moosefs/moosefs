@@ -25,6 +25,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed handling 'damaged' disks with chunks on reload (issue #207)
   - (cs) unlink duplicates week after detection (instead of removing them instantly - related to issue #207)
   - (tools) added displaying number of blocks in 'mfsfileinfo'
+  - (master) added error messages for 'fork' errors
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

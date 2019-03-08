@@ -27,6 +27,7 @@ This file lists noteworthy changes in MooseFS.
   - (tools) added displaying number of blocks in 'mfsfileinfo'
   - (master) added error messages for 'fork' errors
   - (cgi) added timestamp (issue #197)
+  - (cgi) fixed chart.cgi url (issue #200)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

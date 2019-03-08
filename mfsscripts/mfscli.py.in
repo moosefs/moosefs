@@ -2286,7 +2286,7 @@ if cgimode:
 	print("""<div id="header">""")
 	print("""<table class="HDR" cellpadding="0" cellspacing="0" border="0">""")
 	print("""<tr>""")
-	print("""<td class="LOGO"><a href="http://moosefs.com"><img src="/logomini.png" alt="logo" style="border:0;width:123px;height:47px" /></a></td>""")
+	print("""<td class="LOGO"><a href="http://moosefs.com"><img src="logomini.png" alt="logo" style="border:0;width:123px;height:47px" /></a></td>""")
 	print("""<td class="MENU"><table class="MENU" cellspacing="0">""")
 	print("""<tr>""")
 	last="U"
@@ -6861,9 +6861,9 @@ if "MC" in sectionset:
 				if (ma_nc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "/chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
 				} else {
-					url = "/chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;antycache="+minutes;
 				}
 				if (typeof(element.ma_url)=="undefined" || element.ma_url!=url) {
 					element.ma_url = url;
@@ -6881,9 +6881,9 @@ if "MC" in sectionset:
 				if (ma_nc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "/chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
 				} else {
-					url = "/chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;antycache="+minutes;
 				}
 				if (typeof(element.ma_url)=="undefined" || element.ma_url!=url) {
 					element.ma_url = url;
@@ -7038,9 +7038,9 @@ if "MC" in sectionset:
 				if (manc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "/chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
 				} else {
-					url = "/chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;antycache="+minutes;
 				}
 				if (typeof(element.ma_url)=="undefined" || element.ma_url!=url) {
 					element.ma_url = url;
@@ -7350,9 +7350,9 @@ if "CC" in sectionset:
 				if (cs_nc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "/chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
 				} else {
-					url = "/chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;antycache="+minutes;
 				}
 				if (typeof(element.cs_url)=="undefined" || element.cs_url!=url) {
 					element.cs_url = url;
@@ -7370,9 +7370,9 @@ if "CC" in sectionset:
 				if (cs_nc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "/chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
 				} else {
-					url = "/chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;antycache="+minutes;
 				}
 				if (typeof(element.cs_url)=="undefined" || element.cs_url!=url) {
 					element.cs_url = url;
@@ -7529,9 +7529,9 @@ if "CC" in sectionset:
 				if (csnc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "/chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
 				} else {
-					url = "/chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;antycache="+minutes;
 				}
 				if (typeof(element.cs_url)=="undefined" || element.cs_url!=url) {
 					element.cs_url = url;

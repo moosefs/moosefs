@@ -26,6 +26,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) unlink duplicates week after detection (instead of removing them instantly - related to issue #207)
   - (tools) added displaying number of blocks in 'mfsfileinfo'
   - (master) added error messages for 'fork' errors
+  - (cgi) fixed handling encodings (issue #206 and #208)
   - (cgi) added timestamp (issue #197)
   - (cgi) fixed chart.cgi url (issue #200)
 

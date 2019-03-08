@@ -94,6 +94,7 @@ import sys
 import traceback
 import os
 import subprocess
+import codecs
 
 cgimode = 1 if 'GATEWAY_INTERFACE' in os.environ else 0
 
@@ -104,6 +105,12 @@ except NameError:
 
 #parse parameters and auxilinary functions
 if cgimode:
+	# in CGI mode set default output encoding to utf-8 (our html page encoding)
+	if sys.version_info[0]<3:
+		sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
+	else:
+		sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+
 	try:
 		import urllib.parse as xurllib
 	except ImportError:
@@ -1552,11 +1559,7 @@ class DataProvider:
 				fip1,fip2,fip3,fip4,tip1,tip2,tip3,tip4,pleng = struct.unpack(">BBBBBBBBL",data[pos:pos+12])
 				pos+=12
 				path = data[pos:pos+pleng]
-				if sys.version_info[0]>=3:
-					try:
-						path = path.decode('ascii')
-					except UnicodeDecodeError:
-						pass
+				path = path.decode('utf-8','replace')
 				pos+=pleng
 				if self.masterconn.version_at_least(3,0,72):
 					v1,v2,v3,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime = struct.unpack(">HBBBBHLLLLBBLL",data[pos:pos+34])
@@ -1629,15 +1632,8 @@ class DataProvider:
 				pos+=4
 				path = data[pos:pos+pleng]
 				pos+=pleng
-				if sys.version_info[0]>=3:
-					try:
-						info = info.decode('ascii')
-					except UnicodeDecodeError:
-						pass
-					try:
-						path = path.decode('ascii')
-					except UnicodeDecodeError:
-						pass
+				info = info.decode('utf-8','replace')
+				path = path.decode('utf-8','replace')
 				if self.masterconn.version_at_least(3,0,72):
 					sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime = struct.unpack(">BHLLLLBBLL",data[pos:pos+29])
 					pos+=29
@@ -1744,11 +1740,7 @@ def resolve_inodes_paths(masterconn,inodes):
 					path = data[pos:pos+pleng]
 					pos+=pleng
 					psize-=pleng
-					if sys.version_info[0]>=3:
-						try:
-							path = path.decode('ascii')
-						except UnicodeDecodeError:
-							pass
+					path = path.decode('utf-8','replace')
 					if inode not in inodepaths:
 						inodepaths[inode] = []
 					inodepaths[inode].append(path)
@@ -2591,7 +2583,7 @@ if "IN" in sectionset:
 		out = []
 		out.append("""<table class="FR" cellspacing="0">""")
 		out.append("""<tr><th>Notice</th></tr>""")
-		out.append("""<tr><td>You are currently using GPL version of MooseFS. If you want to find out what great features are available in MooseFS Pro go to <a href="http://moosefs.com/products.html">http://moosefs.com/products.html</a></td></tr>""")
+		out.append("""<tr><td>You are currently using GPL version of MooseFS. If you want to find out what great features are available in MooseFS Pro go to <a href="https://moosefs.com/products/">https://moosefs.com/products/</a></td></tr>""")
 		out.append("""</table>""")
 		print("\n".join(out))
 
@@ -3619,10 +3611,10 @@ if "IN" in sectionset:
 			if length>=(36 + pver*8):
 				if pver==1:
 					loopstart,loopend,files,ugfiles,mfiles,mtfiles,msfiles,chunks,ugchunks,mchunks,msgbuffleng = struct.unpack(">LLLLLLLLLLL",data[:44])
-					datastr = data[44:].decode('ascii')
+					datastr = data[44:].decode('utf-8','replace')
 				else:
 					loopstart,loopend,files,ugfiles,mfiles,chunks,ugchunks,mchunks,msgbuffleng = struct.unpack(">LLLLLLLLL",data[:36])
-					datastr = data[36:].decode('ascii')
+					datastr = data[36:].decode('utf-8','replace')
 				if cgimode:
 					out = []
 					out.append("""<table class="FR" cellspacing="0">""")
@@ -4468,14 +4460,10 @@ if "HD" in sectionset:
 						length -= 2+entrysize
 						if sys.version_info[0]<3:
 							plen = ord(entry[0])
-							hddpath = entry[1:plen+1]
 						else:
 							plen = entry[0]
-							hddpath = entry[1:plen+1]
-							try:
-								hddpath = hddpath.decode('ascii')
-							except UnicodeDecodeError:
-								pass
+						hddpath = entry[1:plen+1]
+						hddpath = hddpath.decode('utf-8','replace')
 						hostpath = "%s:%u:%s" % (hoststr,port,hddpath)
 						ippath = "%s:%u:%s" % (hostip,port,hddpath)
 						sortippath = "%03u.%03u.%03u.%03u:%05u:%s" % (ip1,ip2,ip3,ip4,port,hddpath)
@@ -5708,10 +5696,7 @@ if "RS" in sectionset and leaderfound:
 					sclassid,sclassnleng = struct.unpack_from(">BB",data,pos)
 					pos += 2
 					sclassname = data[pos:pos+sclassnleng]
-					try:
-						sclassname = sclassname.decode('utf-8')
-					except UnicodeDecodeError:
-						pass
+					sclassname = sclassname.decode('utf-8','replace')
 					pos += sclassnleng
 					files,dirs,stdchunks_under,archchunks_under,stdchunks_exact,archchunks_exact,stdchunks_over,archchunks_over,admin_only,create_mode,arch_delay,create_canbefulfilled,create_labelscnt,keep_canbefulfilled,keep_labelscnt,arch_canbefulfilled,arch_labelscnt = struct.unpack_from(">LLQQQQQQBBHBBBBBB",data,pos)
 					pos += 18 + 3 * 16
@@ -6030,37 +6015,6 @@ if "RS" in sectionset and leaderfound:
 						openfiles.append((OFsessionid,inode))
 						inodes.add(inode)
 				inodepaths = resolve_inodes_paths(masterconn,inodes)
-#				if len(inodes)>0:
-#					data,length = masterconn.command(CLTOMA_MASS_RESOLVE_PATHS,MATOCL_MASS_RESOLVE_PATHS,struct.pack(">"+len(inodes)*"L",*inodes))
-#					pos = 0
-#					while pos+8<=length:
-#						inode,psize = struct.unpack(">LL",data[pos:pos+8])
-#						pos+=8
-#						if psize == 0:
-#							if inode not in inodepaths:
-#								inodepaths[inode] = []
-#							inodepaths[inode].append("./META")
-#						elif pos + psize <= length:
-#							while psize>=4:
-#								pleng = struct.unpack(">L",data[pos:pos+4])[0]
-#								pos+=4
-#								psize-=4
-#								path = data[pos:pos+pleng]
-#								pos+=pleng
-#								psize-=pleng
-#								if sys.version_info[0]>=3:
-#									try:
-#										path = path.decode('ascii')
-#									except UnicodeDecodeError:
-#										pass
-#								if inode not in inodepaths:
-#									inodepaths[inode] = []
-#								inodepaths[inode].append(path)
-#							if psize!=0:
-#								raise RuntimeError("MFS packet malformed")
-#					if pos!=length:
-#						raise RuntimeError("MFS packet malformed")
-#				print(inodepaths)
 				ofdata = []
 				for sessionid,inode in openfiles:
 					if sessionid in sessionsdata:
@@ -6349,11 +6303,7 @@ if "QU" in sectionset:
 				inode,pleng = struct.unpack(">LL",data[pos:pos+8])
 				pos+=8
 				path = data[pos:pos+pleng]
-				if sys.version_info[0]>=3:
-					try:
-						path = path.decode('ascii')
-					except UnicodeDecodeError:
-						pass
+				path = path.decode('utf-8','replace')
 				pos+=pleng
 				if masterconn.version_at_least(3,0,9):
 					graceperiod,exceeded,qflags,timetoblock = struct.unpack(">LBBL",data[pos:pos+10])

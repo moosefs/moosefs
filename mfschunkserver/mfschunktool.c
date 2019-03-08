@@ -30,6 +30,9 @@
 
 #define CHUNKCRCSIZE 4096
 
+#define MODE_FAST 1
+#define MODE_EMPTY 2
+
 static inline int hdd_check_filename(const char *fname,uint64_t *chunkid,uint32_t *version) {
 	uint64_t namechunkid;
 	uint32_t nameversion;
@@ -76,7 +79,7 @@ static inline int hdd_check_filename(const char *fname,uint64_t *chunkid,uint32_
 	return 0;
 }
 
-int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repair) {
+int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t repair) {
 	uint64_t namechunkid;
 	uint32_t nameversion;
 	uint32_t i;
@@ -99,7 +102,7 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 	}
 	if (fd<0) {
 		fprintf(stderr,"%s: error opening file !!!\n",fname);
-		return -1;
+		return ret | 16;
 	}
 	i = strlen(fname);
 	if (i<35) {
@@ -113,9 +116,9 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 			if (read(fd,buff,20)!=20) {
 				fprintf(stderr,"%s: error reading header !!!\n",fname);
 				close(fd);
-				return -1;
+				return ret | 16;
 			}
-			if (memcmp(buff,MFSSIGNATURE "C 1.0",8)!=0) {
+			if (memcmp(buff,MFSSIGNATURE "C 1.",7)!=0 || (buff[7]!='0' && buff[7]!='1')) {
 				fprintf(stderr,"%s: wrong chunk header !!!\n",fname);
 				memcpy(buff,MFSSIGNATURE "C 1.0",8);
 				ret |= 1;
@@ -137,12 +140,12 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 				if (lseek(fd,0,SEEK_SET)!=0) {
 					fprintf(stderr,"%s: error setting file pointer\n",fname);
 					close(fd);
-					return -1;
+					return ret | 16;
 				}
 				if (write(fd,buff,20)!=20) {
 					fprintf(stderr,"%s: error writing header !!!\n",fname);
 					close(fd);
-					return -1;
+					return ret | 16;
 				}
 				ret |= 4;
 			}
@@ -154,18 +157,18 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 	if (hdrsize!=1024 && hdrsize!=4096) {
 		fprintf(stderr,"%s: wrong file size\n",fname);
 		close(fd);
-		return -1;
+		return ret | 16;
 	}
 	// read crc
 	if (lseek(fd,hdrsize,SEEK_SET)!=hdrsize) {
 		fprintf(stderr,"%s: error setting file pointer\n",fname);
 		close(fd);
-		return -1;
+		return ret | 16;
 	}
 	if (read(fd,buff,CHUNKCRCSIZE)!=CHUNKCRCSIZE) {
 		fprintf(stderr,"%s: error reading checksum block\n",fname);
 		close(fd);
-		return -1;
+		return ret | 16;
 	}
 	rp = buff;
 	for (i=0 ; i<1024 ; i++) {
@@ -173,47 +176,57 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 	}
 
 	// check data crc
-	if (fastmode && repair==0) {
+	if ((mode&MODE_FAST) && repair==0) {
 		s = lseek(fd,-MFSBLOCKSIZE,SEEK_END);
 		if (s<(hdrsize + CHUNKCRCSIZE)) {
 			fprintf(stderr,"%s: wrong file size\n",fname);
 			close(fd);
-			return -1;
+			return ret | 16;
 		}
 		s -= (hdrsize + CHUNKCRCSIZE);
 		if ((s%MFSBLOCKSIZE)!=0) {
 			fprintf(stderr,"%s: wrong file size\n",fname);
 			close(fd);
-			return -1;
+			return ret | 16;
 		}
 		s >>= 16;
 		if (read(fd,buff,MFSBLOCKSIZE)!=MFSBLOCKSIZE) {
 			fprintf(stderr,"%s: error reading last data block\n",fname);
 			close(fd);
-			return -1;
+			return ret | 16;
 		}
 		crcblock = mycrc32(0,buff,MFSBLOCKSIZE);
 		if (crc[s]!=crcblock) {
 			fprintf(stderr,"%s: crc error (last block ; header crc: %08"PRIX32" ; block crc: %08"PRIX32")\n",fname,crc[s],crcblock);
 			ret |= 2;
 		}
+		if ((mode&MODE_EMPTY) && s<1023) {
+			if (crc[s+1]!=mycrc32_zeroblock(0,MFSBLOCKSIZE) && crc[s+1]!=0) {
+				fprintf(stderr,"%s: crc error (first empty block (%u) has 'non zero' crc: %08"PRIX32")\n",fname,(unsigned int)(s+1),crc[s+1]);
+				ret |= 2;
+			}
+		}
 	} else {
 		if (lseek(fd,(hdrsize + CHUNKCRCSIZE),SEEK_SET)!=(hdrsize + CHUNKCRCSIZE)) {
 			fprintf(stderr,"%s: error setting file pointer\n",fname);
 			close(fd);
-			return -1;
+			return ret | 16;
 		}
 		for (i=0 ; i<1024 ; i++) {
 			s = read(fd,buff,MFSBLOCKSIZE);
 			if (s==0) {
-				break;
+				crcblock = mycrc32_zeroblock(0,MFSBLOCKSIZE);
+				if ((mode&MODE_EMPTY)==0 || crc[i]==0) {
+					crc[i] = crcblock;
+				}
+			} else {
+				if (s!=MFSBLOCKSIZE) {
+					fprintf(stderr,"%s: error reading data block: %"PRIu32"\n",fname,i);
+					close(fd);
+					return ret | 16;
+				}
+				crcblock = mycrc32(0,buff,MFSBLOCKSIZE);
 			}
-			if (s!=MFSBLOCKSIZE) {
-				fprintf(stderr,"%s: error reading data block: %"PRIu32"\n",fname,i);
-				close(fd);
-				return -1;
-			}
-			crcblock = mycrc32(0,buff,MFSBLOCKSIZE);
 			if (crc[i]!=crcblock) {
 				fprintf(stderr,"%s: crc error (block: %"PRIu32" ; header crc: %08"PRIX32" ; block crc: %08"PRIX32")\n",fname,i,crc[i],crcblock);
 				crc[i] = crcblock;
@@ -229,12 +242,12 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 			if (lseek(fd,hdrsize,SEEK_SET)!=hdrsize) {
 				fprintf(stderr,"%s: error setting file pointer\n",fname);
 				close(fd);
-				return -1;
+				return ret | 16;
 			}
 			if (write(fd,buff,CHUNKCRCSIZE)!=CHUNKCRCSIZE) {
 				fprintf(stderr,"%s: error writing checksum block\n",fname);
 				close(fd);
-				return -1;
+				return ret | 16;
 			}
 			ret |= 8;
 		}
@@ -253,15 +266,17 @@ int chunk_repair(const char *fname,uint8_t fastmode,uint8_t showok,uint8_t repai
 }
 
 void usage(const char *appname) {
-	fprintf(stderr,"usage: %s [-fr] chunk_file ...\n",appname);
+	fprintf(stderr,"usage: %s [-frex] chunk_file ...\n",appname);
 	fprintf(stderr,"\n");
 	fprintf(stderr,"-f: fast check (check only header and crc of last data block)\n");
 	fprintf(stderr,"-r: repair (fix header info from file name and recalculate crc)\n");
+	fprintf(stderr,"-e: check crc values for non existing blocks - may fail in case of chunks 1.0 that were truncated\n");
+	fprintf(stderr,"-x: print 'OK' for good files\n");
 }
 
 int main(int argc,char *argv[]) {
 	int ch;
-	uint8_t fastmode = 0;
+	uint8_t mode = 0;
 	uint8_t repair = 0;
 	uint8_t verbose = 0;
 	uint8_t ret = 0;
@@ -277,7 +292,10 @@ int main(int argc,char *argv[]) {
 				printf("version: %s\n",VERSSTR);
 				return 0;
 			case 'f':
-				fastmode=1;
+				mode |= MODE_FAST;
+				break;
+			case 'e':
+				mode |= MODE_EMPTY;
 				break;
 			case 'r':
 				repair=1;
@@ -307,7 +325,7 @@ int main(int argc,char *argv[]) {
 	mycrc32_init();
 
 	while (argc>0) {
-		ret |= chunk_repair(*argv,fastmode,verbose,repair);
+		ret |= chunk_repair(*argv,mode,verbose,repair);
 		argv++;
 		argc--;
 	}

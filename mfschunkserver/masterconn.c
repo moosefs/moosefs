@@ -1048,14 +1048,14 @@ void masterconn_idlejob_finished(uint8_t status,void *ijp) {
 				if (status!=MFS_STATUS_OK) {
 					ptr = masterconn_create_attached_packet(eptr,CSTOAN_CHUNK_CHECKSUM_TAB,8+4+1);
 				} else {
-					ptr = masterconn_create_attached_packet(eptr,CSTOAN_CHUNK_CHECKSUM_TAB,8+4+4096);
+					ptr = masterconn_create_attached_packet(eptr,CSTOAN_CHUNK_CHECKSUM_TAB,8+4+4*MFSBLOCKSINCHUNK);
 				}
 				put64bit(&ptr,ij->chunkid);
 				put32bit(&ptr,ij->version);
 				if (status!=MFS_STATUS_OK) {
 					put8bit(&ptr,status);
 				} else {
-					memcpy(ptr,ij->buff,4096);
+					memcpy(ptr,ij->buff,4*MFSBLOCKSINCHUNK);
 				}
 				break;
 		}
@@ -1115,7 +1115,7 @@ void masterconn_get_chunk_checksum_tab(masterconn *eptr,const uint8_t *data,uint
 		eptr->mode = KILL;
 		return;
 	}
-	ij = malloc(offsetof(idlejob,buff)+4096);
+	ij = malloc(offsetof(idlejob,buff)+4*MFSBLOCKSINCHUNK);
 	ij->op = IJ_GET_CHUNK_CHECKSUM_TAB;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);

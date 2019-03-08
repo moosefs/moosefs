@@ -371,6 +371,7 @@ static pthread_cond_t scanprogresscond = PTHREAD_COND_INITIALIZER;
 */
 
 static uint32_t emptyblockcrc;
+static uint8_t *emptychunkcrc;
 
 static uint64_t stats_bytesr = 0;
 static uint64_t stats_bytesw = 0;
@@ -2079,7 +2080,7 @@ static inline void chunk_emptycrc(chunk *c) {
 	c->crc = (uint8_t*)malloc(CHUNKCRCSIZE);
 #endif
 	passert(c->crc);
-	memset(c->crc,0,CHUNKCRCSIZE);	// make valgrind happy
+	memcpy(c->crc,emptychunkcrc,CHUNKCRCSIZE);
 }
 
 static inline int chunk_readcrc(chunk *c,int mode) {
@@ -2107,7 +2108,7 @@ static inline int chunk_readcrc(chunk *c,int mode) {
 		return MFS_ERROR_IO;
 	}
 #endif /* USE_PIO */
-	if (memcmp(hdr,MFSSIGNATURE "C 1.0",8)!=0) {
+	if (memcmp(hdr,MFSSIGNATURE "C 1.",7)!=0 || (hdr[7]!='0' && hdr[7]!='1')) { // accept chunks 1.1 (correct CRC for non existing blocks)
 		hdd_generate_filename(fname,c);
 		syslog(LOG_WARNING,"chunk_readcrc: file:%s - wrong header",fname);
 		errno = 0;
@@ -3246,7 +3247,7 @@ int hdd_get_checksum(uint64_t chunkid,uint32_t version,uint8_t *checksum_buff) {
 		return status;
 	}
 	chksum = 1;
-	for (i=0 ; i<1024 ; i++) {
+	for (i=0 ; i<MFSBLOCKSINCHUNK ; i++) {
 		chksum *= 426265243;
 		chksum ^= c->crc[i];
 	}
@@ -3281,7 +3282,7 @@ int hdd_get_checksum_tab(uint64_t chunkid,uint32_t version,uint8_t *checksum_tab
 		hdd_chunk_release(c);
 		return status;
 	}
-	for (i=0 ; i<1024 ; i++) {
+	for (i=0 ; i<MFSBLOCKSINCHUNK ; i++) {
 		put32bit(&checksum_tab,c->crc[i]);
 	}
 	status = hdd_io_end(c);
@@ -3440,13 +3441,28 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version,uint16_t *blocks) {
 				errno = 0;	// set anything to errno
 				hdd_error_occured(c);	// uses and preserves errno !!!
 				hdd_generate_filename(fname,c); // preserves errno !!!
-				syslog(LOG_WARNING,"test_chunk: file:%s - crc error",fname);
+				syslog(LOG_WARNING,"test_chunk: file:%s - crc error (data block %u)",fname,block);
 				hdd_io_end(c);
 				hdd_report_damaged_chunk(c);
 				hdd_chunk_release(c);
 				return MFS_ERROR_CRC;
 			}
 		}
+/*
+		for (block=c->blocks ; block<MFSBLOCKSINCHUNK ; block++) {
+			bcrc = get32bit(&ptr);
+			if (bcrc!=emptyblockcrc && bcrc!=0) { // accept 0 for non existing blocks
+				errno = 0;	// set anything to errno
+				hdd_error_occured(c);	// uses and preserves errno !!!
+				hdd_generate_filename(fname,c); // preserves errno !!!
+				syslog(LOG_WARNING,"test_chunk: file:%s - crc error (empty block %u)",fname,block);
+				hdd_io_end(c);
+				hdd_report_damaged_chunk(c);
+				hdd_chunk_release(c);
+				return MFS_ERROR_CRC;
+			}
+		}
+*/
 		if (MinFlushCacheTime>=0 && lasttesttime+MinFlushCacheTime<=now) {
 			hdd_drop_caches_int(c);
 		}
@@ -3600,6 +3616,9 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 	put32bit(&ptr,copyversion);
 	memcpy(c->crc,oc->crc,CHUNKCRCSIZE);
 	memcpy(hdrbuffer+c->hdrsize,oc->crc,CHUNKCRCSIZE);
+	if (oc->blocks<MFSBLOCKSINCHUNK) {
+		memcpy(hdrbuffer+c->hdrsize+4*oc->blocks,emptychunkcrc,4*(MFSBLOCKSINCHUNK-oc->blocks));
+	}
 	if (write(c->fd,hdrbuffer,c->hdrsize+CHUNKCRCSIZE)!=(ssize_t)(c->hdrsize+CHUNKCRCSIZE)) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_generate_filename(fname,c); // preserves errno !!!
@@ -3956,6 +3975,15 @@ static int hdd_int_truncate(uint64_t chunkid,uint32_t version,uint32_t newversio
 #endif /* PRESERVE_BLOCK */
 			ptr = (c->crc)+(4*blocknum);
 			put32bit(&ptr,i);
+			blocknum++;
+			c->crcchanged = 1;
+		} else {
+			ptr = (c->crc)+(4*blocknum);
+		}
+		if (blocknum < c->blocks) {
+			for (i=blocknum ; i<c->blocks ; i++) {
+				put32bit(&ptr,emptyblockcrc);
+			}
 			c->crcchanged = 1;
 		}
 	}
@@ -4113,7 +4141,18 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 	put64bit(&ptr,copychunkid);
 	put32bit(&ptr,copyversion);
 	memcpy(hdrbuffer+c->hdrsize,oc->crc,CHUNKCRCSIZE);
-// do not write header yet - only seek to apriopriate position
+	if (write(c->fd,hdrbuffer,c->hdrsize)!=(ssize_t)(c->hdrsize)) {
+		hdd_error_occured(c);	// uses and preserves errno !!!
+		hdd_generate_filename(fname,c); // preserves errno !!!
+		mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - hdr write error",fname);
+		hdd_io_end(c);
+		unlink(fname);
+		hdd_chunk_delete(c);
+		hdd_io_end(oc);
+		hdd_chunk_release(oc);
+		return MFS_ERROR_IO;
+	}
+	hdd_stats_write(c->hdrsize);
 	lseek(c->fd,c->hdrsize+CHUNKCRCSIZE,SEEK_SET);
 #ifndef PRESERVE_BLOCK
 	lseek(oc->fd,oc->hdrsize+CHUNKCRCSIZE,SEEK_SET);
@@ -4226,9 +4265,8 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 			hdd_chunk_release(oc);
 			return MFS_ERROR_IO;	//write error
 		}
-		ptr = hdrbuffer+c->hdrsize+4*(oc->blocks);
-		for (block=oc->blocks ; block<blocks ; block++) {
-			put32bit(&ptr,emptyblockcrc);
+		if (oc->blocks < MFSBLOCKSINCHUNK) {
+			memcpy(hdrbuffer+c->hdrsize+4*(oc->blocks),emptychunkcrc,4*(MFSBLOCKSINCHUNK-oc->blocks));
 		}
 	} else { // shrinking
 		uint32_t blocksize = (length&MFSBLOCKMASK);
@@ -4340,6 +4378,9 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 					hdd_chunk_release(oc);
 					return MFS_ERROR_IO;	//write error
 				}
+			}
+			if (blocks < MFSBLOCKSINCHUNK) {
+				memcpy(hdrbuffer+c->hdrsize+4*blocks,emptychunkcrc,4*(MFSBLOCKSINCHUNK-blocks));
 			}
 		} else { // misaligned shrink
 //			truncneeded = 0; - we need to check it only in last block
@@ -4552,12 +4593,15 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 					return MFS_ERROR_IO;	//write error
 				}
 			}
+			if (blocks < MFSBLOCKSINCHUNK) {
+				memcpy(hdrbuffer+c->hdrsize+4*blocks,emptychunkcrc,4*(MFSBLOCKSINCHUNK-blocks));
+			}
 		}
 	}
 // and now write header
 	memcpy(c->crc,hdrbuffer+c->hdrsize,CHUNKCRCSIZE);
-	lseek(c->fd,0,SEEK_SET);
-	if (write(c->fd,hdrbuffer,c->hdrsize+CHUNKCRCSIZE)!=(ssize_t)(c->hdrsize+CHUNKCRCSIZE)) {
+	lseek(c->fd,c->hdrsize,SEEK_SET);
+	if (write(c->fd,hdrbuffer+c->hdrsize,CHUNKCRCSIZE)!=(ssize_t)(CHUNKCRCSIZE)) {
 		hdd_error_occured(c);	// uses and preserves errno !!!
 		hdd_generate_filename(fname,c); // preserves errno !!!
 		mfs_arg_errlog_silent(LOG_WARNING,"duptrunc_chunk: file:%s - hdr write error",fname);
@@ -4568,7 +4612,7 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 		hdd_chunk_release(oc);
 		return MFS_ERROR_IO;
 	}
-	hdd_stats_write(c->hdrsize+CHUNKCRCSIZE);
+	hdd_stats_write(CHUNKCRCSIZE);
 	status = hdd_io_end(oc);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(oc);	// uses and preserves errno !!!
@@ -4819,6 +4863,9 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 	put64bit(&wptr,c->chunkid);
 	put32bit(&wptr,c->version);
 	memcpy(hdrbuffer+new_hdrsize,c->crc,CHUNKCRCSIZE);
+	if (c->blocks<MFSBLOCKSINCHUNK) {
+		memcpy(hdrbuffer+new_hdrsize+4*c->blocks,emptychunkcrc,4*(MFSBLOCKSINCHUNK-c->blocks));
+	}
 	if (write(new_fd,hdrbuffer,new_hdrsize+CHUNKCRCSIZE)!=(ssize_t)(new_hdrsize+CHUNKCRCSIZE)) {
 		mfs_arg_errlog_silent(LOG_WARNING,"move_chunk: file:%s - hdr write error",tmp_filename);
 		close(new_fd);
@@ -5797,7 +5844,7 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	char fname[PATH_MAX];
 
 	testtime = 0;
-	if (blocks<1024) {
+	if (blocks<MFSBLOCKSINCHUNK) {
 		validattr = 1;
 	} else if (f->sizelimit) {
 		hdd_create_filename(fname,f,pathid,chunkid,version);
@@ -6996,6 +7043,8 @@ int hdd_late_init(void) {
 }
 
 int hdd_init(void) {
+	uint8_t *ptr;
+	uint32_t i;
 	uint32_t hp;
 	folder *f;
 
@@ -7038,6 +7087,16 @@ int hdd_init(void) {
 #endif /* PRESERVE_BLOCK */
 
 	emptyblockcrc = mycrc32_zeroblock(0,MFSBLOCKSIZE);
+#ifdef MMAP_ALLOC
+	emptychunkcrc = (uint8_t*)mmap(NULL,CHUNKCRCSIZE,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
+#else
+	emptychunkcrc = (uint8_t*)malloc(CHUNKCRCSIZE);
+#endif
+	passert(emptychunkcrc);
+	ptr = emptychunkcrc;
+	for (i=0 ; i<CHUNKCRCSIZE ; i+=sizeof(uint32_t)) {
+		put32bit(&ptr,emptyblockcrc);
+	}
 
 	hdd_options_common(1);
 

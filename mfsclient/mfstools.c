@@ -1556,31 +1556,38 @@ int chunk_data_cmp(const void*a,const void*b) {
 	return 0;
 }
 
-int get_checksum_block(const char *csstrip,uint32_t csip,uint16_t csport,uint64_t chunkid,uint32_t version,uint8_t crcblock[4096]) {
+int get_checksum_block(const char *csstrip,uint32_t csip,uint16_t csport,uint64_t chunkid,uint32_t version,uint8_t crcblock[4096],uint16_t *blocks) {
 	uint8_t reqbuff[20],*wptr,*buff;
 	const uint8_t *rptr;
 	int fd;
 	uint32_t cmd,leng;
 	uint16_t cnt;
+	uint8_t status;
 
+	buff = NULL;
+	fd = -1;
 	cnt=0;
 	while (cnt<10) {
 		fd = tcpsocket();
 		if (fd<0) {
 			printf("can't create connection socket: %s\n",strerr(errno));
-			return -1;
+			goto error;
 		}
 		if (tcpnumtoconnect(fd,csip,csport,(cnt%2)?(300*(1<<(cnt>>1))):(200*(1<<(cnt>>1))))<0) {
 			cnt++;
 			if (cnt==10) {
 				printf("can't connect to chunkserver %s:%"PRIu16": %s\n",csstrip,csport,strerr(errno));
-				return -1;
+				goto error;
 			}
 			tcpclose(fd);
+			fd = -1;
 		} else {
 			cnt=10;
 		}
 	}
+
+	// 1 - get checksum block
+	buff = NULL;
 	wptr = reqbuff;
 	put32bit(&wptr,ANTOCS_GET_CHUNK_CHECKSUM_TAB);
 	put32bit(&wptr,12);
@@ -1588,55 +1595,104 @@ int get_checksum_block(const char *csstrip,uint32_t csip,uint16_t csport,uint64_
 	put32bit(&wptr,version);
 	if (tcpwrite(fd,reqbuff,20)!=20) {
 		printf("%s:%"PRIu16": cs query: send error\n",csstrip,csport);
-		tcpclose(fd);
-		return -1;
+		goto error;
 	}
 	if (tcpread(fd,reqbuff,8)!=8) {
 		printf("%s:%"PRIu16" cs query: receive error\n",csstrip,csport);
-		tcpclose(fd);
-		return -1;
+		goto error;
 	}
 	rptr = reqbuff;
 	cmd = get32bit(&rptr);
 	leng = get32bit(&rptr);
 	if (cmd!=CSTOAN_CHUNK_CHECKSUM_TAB) {
 		printf("%s:%"PRIu16" cs query: wrong answer (type)\n",csstrip,csport);
-		tcpclose(fd);
-		return -1;
+		goto error;
 	}
 	if (leng!=13 && leng!=(4096+12)) {
 		printf("%s:%"PRIu16" cs query: wrong answer (size)\n",csstrip,csport);
-		tcpclose(fd);
-		return -1;
+		goto error;
 	}
 	buff = malloc(leng);
 	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
 		printf("%s:%"PRIu16" cs query: receive error\n",csstrip,csport);
-		free(buff);
-		tcpclose(fd);
-		return -1;
+		goto error;
 	}
-	tcpclose(fd);
 	rptr = buff;
 	if (chunkid!=get64bit(&rptr)) {
 		printf("%s:%"PRIu16" cs query: wrong answer (chunkid)\n",csstrip,csport);
-		free(buff);
-		return -1;
+		goto error;
 	}
 	if (version!=get32bit(&rptr)) {
 		printf("%s:%"PRIu16" cs query: wrong answer (version)\n",csstrip,csport);
-		free(buff);
-		return -1;
+		goto error;
 	}
 	leng-=12;
 	if (leng==1) {
 		printf("%s:%"PRIu16" cs query error: %s\n",csstrip,csport,mfsstrerr(*rptr));
-		free(buff);
-		return -1;
+		goto error;
 	}
 	memcpy(crcblock,rptr,4096);
 	free(buff);
+
+	// 2 - get number of blocks
+	buff = NULL;
+	wptr = reqbuff;
+	put32bit(&wptr,ANTOCS_GET_CHUNK_BLOCKS);
+	put32bit(&wptr,12);
+	put64bit(&wptr,chunkid);
+	put32bit(&wptr,version);
+	if (tcpwrite(fd,reqbuff,20)!=20) {
+		printf("%s:%"PRIu16": cs query: send error\n",csstrip,csport);
+		goto error;
+	}
+	if (tcpread(fd,reqbuff,8)!=8) {
+		printf("%s:%"PRIu16" cs query: receive error\n",csstrip,csport);
+		goto error;
+	}
+	rptr = reqbuff;
+	cmd = get32bit(&rptr);
+	leng = get32bit(&rptr);
+	if (cmd!=CSTOAN_CHUNK_BLOCKS) {
+		printf("%s:%"PRIu16" cs query: wrong answer (type)\n",csstrip,csport);
+		goto error;
+	}
+	if (leng!=15) {
+		printf("%s:%"PRIu16" cs query: wrong answer (size)\n",csstrip,csport);
+		goto error;
+	}
+	buff = malloc(leng);
+	if (tcpread(fd,buff,leng)!=(int32_t)leng) {
+		printf("%s:%"PRIu16" cs query: receive error\n",csstrip,csport);
+		goto error;
+	}
+	rptr = buff;
+	if (chunkid!=get64bit(&rptr)) {
+		printf("%s:%"PRIu16" cs query: wrong answer (chunkid)\n",csstrip,csport);
+		goto error;
+	}
+	if (version!=get32bit(&rptr)) {
+		printf("%s:%"PRIu16" cs query: wrong answer (version)\n",csstrip,csport);
+		goto error;
+	}
+	*blocks = get16bit(&rptr);
+	status = get8bit(&rptr);
+	if (status!=MFS_STATUS_OK) {
+		printf("%s:%"PRIu16" cs query error: %s\n",csstrip,csport,mfsstrerr(status));
+		goto error;
+	}
+	free(buff);
+
+	tcpclose(fd);
 	return 0;
+
+error:
+	if (buff!=NULL) {
+		free(buff);
+	}
+	if (fd>=0) {
+		tcpclose(fd);
+	}
+	return -1;
 }
 
 void digest_to_str(char strdigest[33],uint8_t digest[16]) {
@@ -1659,6 +1715,7 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 	uint64_t chunkid;
 	uint64_t fleng;
 	uint8_t crcblock[4096];
+	uint16_t blocks;
 	md5ctx filectx,chunkctx;
 	uint8_t chunkdigest[16],currentdigest[16];
 	uint8_t firstdigest;
@@ -1873,11 +1930,11 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 						vcopies++;
 					}
 					if (fileinfomode&(FILEINFO_CRC|FILEINFO_SIGNATURE)) {
-						if (get_checksum_block(csstrip,cdtab[copy].ip,cdtab[copy].port,chunkid,version,crcblock)==0) {
+						if (get_checksum_block(csstrip,cdtab[copy].ip,cdtab[copy].port,chunkid,version,crcblock,&blocks)==0) {
 							md5_init(&chunkctx);
-							md5_update(&chunkctx,crcblock,4096);
+							md5_update(&chunkctx,crcblock,4*blocks);
 							if ((fileinfomode&FILEINFO_SIGNATURE) && firstdigest) {
-								md5_update(&filectx,crcblock,4096);
+								md5_update(&filectx,crcblock,4*blocks);
 							}
 							md5_final(currentdigest,&chunkctx);
 							if (firstdigest) {
@@ -1890,7 +1947,7 @@ int file_info(uint8_t fileinfomode,const char *fname) {
 							firstdigest = 0;
 							if (fileinfomode&FILEINFO_CRC) {
 								digest_to_str(strdigest,currentdigest);
-								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s ; checksum digest: %s)\n",copy+1,csstrip,cdtab[copy].port,strtype,strdigest);
+								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s ; blocks: %u ; checksum digest: %s)\n",copy+1,csstrip,cdtab[copy].port,strtype,blocks,strdigest);
 							} else {
 								printf("\t\tcopy %"PRIu32": %s:%"PRIu16" (status:%s)\n",copy+1,csstrip,cdtab[copy].port,strtype);
 							}

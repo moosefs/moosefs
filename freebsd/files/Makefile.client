@@ -9,8 +9,6 @@ LICENSE=	GPLv2
 
 MFS_COMPONENT=	client
 
-BROKEN_powerpc64=	fails to compile: mfs_fuse.c: internal compiler error: Segmentation fault
-
 MASTERDIR=	${.CURDIR}/../moosefs3-master
 
 .include "${MASTERDIR}/Makefile"

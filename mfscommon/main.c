@@ -437,7 +437,7 @@ void main_keep_alive(void) {
 	} else {
 		useclast = 0;
 	}
-	if (useclast > 1000000) {
+	if (useclast > 5000000) {
 		syslog(LOG_WARNING,"long loop detected (%"PRIu64".%06"PRIu32"s)",useclast/1000000,(uint32_t)(useclast%1000000));
 	}
 
@@ -484,7 +484,7 @@ void mainloop() {
 		} else {
 			useclast = 0;
 		}
-		if (useclast > 1000000) {
+		if (useclast > 5000000) {
 			syslog(LOG_WARNING,"long loop detected (%"PRIu64".%06"PRIu32"s)",useclast/1000000,(uint32_t)(useclast%1000000));
 		}
 		if (i<0) {

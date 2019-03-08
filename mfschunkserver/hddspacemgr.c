@@ -120,6 +120,11 @@
 #define MODE_IGNVERS 1
 #define MODE_NEW 2
 
+typedef struct waitforremoval {
+	char *fname;
+	struct waitforremoval *next;
+} waitforremoval;
+
 typedef struct damagedchunk {
 	uint64_t chunkid;
 	struct damagedchunk *next;
@@ -215,12 +220,19 @@ typedef struct folder {
 #define SCST_WORKING 5
 	unsigned int scanstate:3;
 	unsigned int needrefresh:1;
-	unsigned int todel:2;
+#define MFR_NO 0
+#define MFR_YES 1
+#define MFR_READONLY 2
+	unsigned int markforremoval:2;
 #define REBALANCE_STD 0
 #define REBALANCE_FORCE_SRC 1
 #define REBALANCE_FORCE_DST 2
 	unsigned int balancemode:2;
 	unsigned int damaged:1;
+#define REMOVING_NO 0
+#define REMOVING_INPROGRESS 1
+#define REMOVING_START 2
+#define REMOVING_END 3
 	unsigned int toremove:2;
 #define REBALANCE_NONE 0
 #define REBALANCE_SRC 1
@@ -264,7 +276,10 @@ typedef struct folder {
 	uint16_t min_pathid;
 	uint16_t current_pathid;
 	uint32_t subf_count[256];
-	pthread_t maintenance_thread;
+	uint32_t wfrtime;
+	uint32_t wfrlast;
+	uint32_t wfrcount;
+	waitforremoval *wfrchunks;
 	struct folder *next;
 } folder;
 
@@ -758,7 +773,7 @@ void hdd_diskinfo_data(uint8_t *buff) {
 					buff += sl;
 				}
 			}
-			put8bit(&buff,((f->todel)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANINPROGRESS)?4:0));
+			put8bit(&buff,((f->markforremoval)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANINPROGRESS)?4:0));
 			ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
 			put64bit(&buff,f->lasterrtab[ei].chunkid);
 			put32bit(&buff,f->lasterrtab[ei].timestamp);
@@ -830,7 +845,7 @@ void hdd_diskinfo_monotonic_data(uint8_t *buff) {
 					buff += sl;
 				}
 			}
-			put8bit(&buff,((f->todel)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANINPROGRESS)?4:0));
+			put8bit(&buff,((f->markforremoval)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANINPROGRESS)?4:0));
 			ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
 			put64bit(&buff,f->lasterrtab[ei].chunkid);
 			put32bit(&buff,f->lasterrtab[ei].timestamp);
@@ -1297,6 +1312,7 @@ static inline void hdd_refresh_usage(folder *f) {
 	if (statvfs(f->path,&fsinfo)<0) {
 		syslog(LOG_NOTICE,"disk: %s ; statvfs arror (%s) - mark it as damaged",f->path,strerr(errno));
 		f->damaged = 1;
+		f->toremove = REMOVING_START;
 		return;
 	}
 
@@ -1307,10 +1323,12 @@ static inline void hdd_refresh_usage(folder *f) {
 	} else if (f->ignoresize==0 && (f->lastblocks * 9 > fsinfo.f_blocks * 10 || f->lastblocks * 10 < fsinfo.f_blocks * 9)) {
 		syslog(LOG_NOTICE,"disk: %s ; number of total blocks has been changed significantly (%llu -> %llu) - mark it as damaged",f->path,(unsigned long long int)(f->lastblocks),(unsigned long long int)(fsinfo.f_blocks));
 		f->damaged = 1;
+		f->toremove = REMOVING_START;
 		return;
 	} else if (f->isro != isro) {
 		syslog(LOG_NOTICE,"disk: %s ; unit read-only flag has been changed (%s->%s) - mark it as damaged",f->path,(f->isro)?"RO":"RW",isro?"RO":"RW");
 		f->damaged = 1;
+		f->toremove = REMOVING_START;
 		return;
 	} else if (f->lastblocks != fsinfo.f_blocks) {
 		f->lastblocks = fsinfo.f_blocks;
@@ -1376,7 +1394,7 @@ static inline folder* hdd_getfolder() {
 	onlygood = 0;
 
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
+		if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
 			if (f->avail * UINT64_C(1000) >= f->total) { // space used <= 99.9%
 				notfull_cnt++;
 			}
@@ -1384,7 +1402,7 @@ static inline folder* hdd_getfolder() {
 	}
 
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
+		if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
 			if (notfull_cnt==0 || f->avail * UINT64_C(1000) >= f->total) { // space used <= 99.9%
 				if (f->rebalance_last_usec + REBALANCE_GRACE_PERIOD < usectime) {
 					good_cnt++;
@@ -1403,7 +1421,7 @@ static inline folder* hdd_getfolder() {
 	bf = NULL;
 	minerr = 0.0; // make some old compilers happy
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
+		if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>0 && f->avail>0 && f->balancemode!=REBALANCE_FORCE_SRC) {
 			if (notfull_cnt==0 || f->avail * UINT64_C(1000) >= f->total) { // space used <= 99.9%
 				if (onlygood==0 || (f->rebalance_last_usec + REBALANCE_GRACE_PERIOD < usectime)) {
 					f->write_dist++;
@@ -1451,7 +1469,7 @@ static inline folder* hdd_getfolder() {
 	bf = NULL;
 	ok = 0;
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged || f->todel || f->total==0 || f->avail==0 || f->scanstate!=SCST_WORKING) {
+		if (f->damaged || f->markforremoval!=MFR_NO || f->total==0 || f->avail==0 || f->scanstate!=SCST_WORKING) {
 			continue;
 		}
 		if (f->carry >= maxcarry) {
@@ -1485,7 +1503,7 @@ static inline folder* hdd_getfolder() {
 	d = maxavail-s;
 	maxcarry = 1.0;
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged || f->todel || f->total==0 || f->avail==0 || f->scanstate!=SCST_WORKING) {
+		if (f->damaged || f->markforremoval!=MFR_NO || f->total==0 || f->avail==0 || f->scanstate!=SCST_WORKING) {
 			continue;
 		}
 		pavail = (double)(f->avail)/(double)(f->total);
@@ -1504,11 +1522,53 @@ static inline folder* hdd_getfolder() {
 }
 */
 
+static inline void hdd_wfr_add(folder *f,const char *fname) {
+	waitforremoval *wfr;
+
+	wfr = malloc(sizeof(waitforremoval));
+	passert(wfr);
+	wfr->fname = strdup(fname);
+	passert(wfr->fname);
+	wfr->next = f->wfrchunks;
+	f->wfrchunks = wfr;
+	f->wfrcount++;
+}
+
+static inline void hdd_wfr_check(folder *f) {
+	waitforremoval *wfr;
+	uint32_t now = main_time();
+
+	if (f->wfrcount>0) {
+		if (f->wfrtime+7*86400<now) {
+			// unlink
+			while ((wfr = f->wfrchunks)!=NULL) {
+				unlink(wfr->fname);
+				f->wfrchunks = wfr->next;
+				f->wfrcount--;
+				free(wfr->fname);
+				free(wfr);
+			}
+			massert(f->wfrcount==0,"wait for removal count mismatch after unlink");
+		} else {
+			// report
+			if (f->wfrlast+3600<now) {
+				syslog(LOG_WARNING,"on drive '%s' %"PRIu32" chunk duplicates detected - will remove them in %u hours",f->path,f->wfrcount,(now+3599U-f->wfrtime)/3600U);
+				f->wfrlast = now;
+			}
+		}
+	}
+}
+
 static inline void hdd_folder_dump_chunkdb_begin(folder *f) {
 	uint32_t pleng;
 	char *fname;
 	uint8_t hdr[14];
 	uint8_t *wptr;
+
+	if (f->damaged || f->markforremoval==MFR_READONLY || f->wfrcount>0) { // do not store '.chunkdb'
+		f->dumpfd = -1;
+		return;
+	}
 	pleng = strlen(f->path);
 	fname = malloc(pleng+13);
 	passert(fname);
@@ -1597,11 +1657,11 @@ static inline void hdd_folder_dump_chunkdb_chunk(folder *f,chunk *c) {
 
 uint8_t hdd_senddata(folder *f,int rmflag) {
 	uint32_t i;
-	uint8_t todel;
+	uint8_t markforremoval;
 	uint8_t canberemoved;
 	chunk **cptr,*c;
 
-	todel = f->todel;
+	markforremoval = f->markforremoval!=MFR_NO;
 	canberemoved = 1;
 	zassert(pthread_mutex_lock(&hashlock));
 	zassert(pthread_mutex_lock(&testlock));
@@ -1641,7 +1701,7 @@ uint8_t hdd_senddata(folder *f,int rmflag) {
 						cptr = &(c->next);
 					}
 				} else {
-					hdd_report_new_chunk(c->chunkid,c->version|(todel?0x80000000:0));
+					hdd_report_new_chunk(c->chunkid,c->version|(markforremoval?0x80000000:0));
 					cptr = &(c->next);
 				}
 			} else {
@@ -1676,11 +1736,11 @@ void hdd_check_folders(void) {
 		return;
 	}
 //	for (f=folderhead ; f ; f=f->next) {
-//		syslog(LOG_NOTICE,"folder: %s, toremove:%u, damaged:%u, todel:%u, scanstate:%u",f->path,f->toremove,f->damaged,f->todel,f->scanstate);
+//		syslog(LOG_NOTICE,"folder: %s, toremove:%u, damaged:%u, markforremoval:%u, scanstate:%u",f->path,f->toremove,f->damaged,f->markforremoval,f->scanstate);
 //	}
 	fptr = &folderhead;
 	while ((f=*fptr)) {
-		if (f->toremove && f->rebalance_in_progress==0) {
+		if (f->toremove!=REMOVING_NO && f->rebalance_in_progress==0) {
 			switch (f->scanstate) {
 			case SCST_SCANINPROGRESS:
 				f->scanstate = SCST_SCANTERMINATE;
@@ -1695,19 +1755,20 @@ void hdd_check_folders(void) {
 				// no break - it's ok !!!
 				nobreak;
 			case SCST_WORKING:
-				if (f->toremove==2) {
+				if (f->toremove==REMOVING_START) {
 					hdd_folder_dump_chunkdb_begin(f);
-					f->toremove = 1;
+					f->toremove = REMOVING_INPROGRESS;
 				}
 				if (hdd_senddata(f,1)) {
 					hdd_folder_dump_chunkdb_end(f);
-					f->toremove = 0;
+					f->toremove = REMOVING_END;
 				}
 				changed = 1;
 				break;
 			}
-			if (f->toremove==0) { // 0 here means 'removed', so delete it from data structures
+			if (f->toremove==REMOVING_END) {
 				if (f->damaged) {
+					f->toremove = REMOVING_NO;
 					f->chunkcount = 0;
 					f->chunktabsize = 0;
 					if (f->chunktab) {
@@ -1734,8 +1795,8 @@ void hdd_check_folders(void) {
 		}
 	}
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged || f->toremove || (f->rebalance_in_progress>0 && f->scanstate!=SCST_WORKING)) {
-			if (f->damaged && f->toremove==0 && f->scanstate==SCST_WORKING && f->lastrefresh+60.0<monotonic_time) {
+		if (f->damaged || f->toremove!=REMOVING_NO || (f->rebalance_in_progress>0 && f->scanstate!=SCST_WORKING)) {
+			if (f->damaged && f->toremove==REMOVING_NO && f->scanstate==SCST_WORKING && f->lastrefresh+60.0<monotonic_time) {
 				hdd_refresh_usage(f);
 				f->lastrefresh = monotonic_time;
 				changed = 1;
@@ -1775,12 +1836,12 @@ void hdd_check_folders(void) {
 					}
 				}
 			}
-			if (err>HDDErrorCount && f->todel<2) {
+			if (err>HDDErrorCount && f->markforremoval!=MFR_READONLY) {
 				syslog(LOG_WARNING,"%"PRIu32" errors occurred in %"PRIu32" seconds on folder: %s",err,HDDErrorTime,f->path);
-				f->toremove = 2;
+				f->toremove = REMOVING_START;
 				f->damaged = 1;
 				changed = 1;
-			} else if (enoent && err>HDDErrorCount && f->todel>=2) {
+			} else if (enoent && err>HDDErrorCount && f->markforremoval==MFR_READONLY) {
 				syslog(LOG_WARNING,"%"PRIu32" errors occurred in %"PRIu32" seconds on folder: %s",err,HDDErrorTime,f->path);
 				f->damaged = 1;
 			} else if (f->needrefresh || f->lastrefresh+60.0<monotonic_time) {
@@ -1788,6 +1849,9 @@ void hdd_check_folders(void) {
 				f->needrefresh = 0;
 				f->lastrefresh = monotonic_time;
 				changed = 1;
+			}
+			if (f->damaged==0 && f->toremove==REMOVING_NO) {
+				hdd_wfr_check(f);
 			}
 		}
 	}
@@ -1892,7 +1956,7 @@ void hdd_get_chunks_next_list_data(uint8_t *buff) {
 			if (c->owner!=NULL) {
 				put64bit(&buff,c->chunkid);
 				v = c->version;
-				if (c->owner->todel) {
+				if (c->owner->markforremoval!=MFR_NO) {
 					v |= 0x80000000;
 				}
 				put32bit(&buff,v);
@@ -1929,7 +1993,7 @@ void hdd_get_chunks_data(uint8_t *buff) {
 			for (c=hashtab[i] ; c ; c=c->next) {
 				put64bit(&buff,c->chunkid);
 				v = c->version;
-				if (c->owner->todel) {
+				if (c->owner->markforremoval!=MFR_NO) {
 					v |= 0x80000000;
 				}
 				put32bit(&buff,v);
@@ -1982,10 +2046,10 @@ void hdd_get_space(uint64_t *usedspace,uint64_t *totalspace,uint32_t *chunkcount
 	avail = total = tdavail = tdtotal = 0ULL;
 	chunks = tdchunks = 0;
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged || f->toremove) {
+		if (f->damaged || f->toremove!=REMOVING_NO) {
 			continue;
 		}
-		if (f->todel==0) {
+		if (f->markforremoval==MFR_NO) {
 			if (f->scanstate==SCST_WORKING) {
 				avail += f->avail;
 				total += f->total;
@@ -2366,9 +2430,9 @@ static int hdd_io_begin(chunk *c,int mode) {
 		if (c->fd<0) {
 			hdd_open_files_handle(OF_BEFORE_OPEN);
 			if (mode==MODE_NEW) {
-				c->fd = open(fname,O_RDWR | O_TRUNC | O_CREAT,0666);
+				c->fd = open(fname,O_RDWR | O_CREAT | O_EXCL,0666);
 			} else {
-				if (c->owner->todel<2) {
+				if (c->owner->markforremoval!=MFR_READONLY) {
 					c->fd = open(fname,O_RDWR);
 				} else {
 					c->fd = open(fname,O_RDONLY);
@@ -4974,7 +5038,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 	avgcount = 0;
 	*changed = 0;
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0) {
+		if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>0) {
 			if (f->needrefresh || rebalance_is_on) {
 				hdd_refresh_usage(f);
 				f->needrefresh = 0;
@@ -4997,7 +5061,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 	rebalance_servers = 0;
 	if ((abovecnt>0 && (belowcnt+avgcount)>0) || (belowcnt>0 && (abovecnt+avgcount)>0)) { // force data movement
 		for (f=folderhead ; f ; f=f->next) {
-			if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>0) {
+			if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>0) {
 				usage = f->total-f->avail;
 				usage /= f->total;
 				if (abovecnt==0) {
@@ -5035,7 +5099,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 		avgusage = 0.0;
 		avgcount = 0;
 		for (f=folderhead ; f ; f=f->next) {
-			if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+			if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
 				usage = f->total-f->avail;
 				usage /= f->total;
 				avgusage += usage;
@@ -5049,7 +5113,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 			abovecnt = 0;
 			abovesum = 0;
 			for (f=folderhead ; f ; f=f->next) {
-				if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+				if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
 					usage = f->total-f->avail;
 					usage /= f->total;
 					if (usage < avgusage - rebalancediff) {
@@ -5063,7 +5127,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 			}
 			if (abovecnt>0 || belowcnt>0) {
 				for (f=folderhead ; f ; f=f->next) {
-					if (f->damaged==0 && f->toremove==0 && f->todel==0 && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+					if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
 						usage = f->total-f->avail;
 						usage /= f->total;
 						if ((((usage < avgusage - rebalancediff) && belowcnt>0) || ((usage <= avgusage + rebalancediff) && belowcnt==0)) && usage<REBALANCE_DST_MAX_USAGE) {
@@ -5448,7 +5512,7 @@ void* hdd_tester_thread(void* arg) {
 			}
 #endif
 			for (f=folderhead ; f!=NULL && tf==NULL ; f=f->next) {
-				if (f->damaged==0 && f->todel==0 && f->toremove==0 && f->scanstate==SCST_WORKING) {
+				if (f->damaged==0 && f->markforremoval==MFR_NO && f->toremove==REMOVING_NO && f->scanstate==SCST_WORKING) {
 					if (f->nexttest<=st) {
 						tf = f;
 					}
@@ -5738,8 +5802,8 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	} else if (f->sizelimit) {
 		hdd_create_filename(fname,f,pathid,chunkid,version);
 		if (stat(fname,&sb)<0) {
-			if (f->todel<2) {
-				unlink(fname);
+			if (f->markforremoval!=MFR_READONLY) {
+				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
 			}
 			return;
 		}
@@ -5749,14 +5813,14 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 		}
 		hdrsize = (sb.st_size - CHUNKCRCSIZE) & MFSBLOCKMASK;
 		if (hdrsize!=OLDHDRSIZE && hdrsize!=NEWHDRSIZE) {
-			if (f->todel<2) {
-				unlink(fname);	// remove wrong chunk
+			if (f->markforremoval!=MFR_READONLY) {
+				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
 			}
 			return;
 		}
 		if (sb.st_size<(hdrsize+CHUNKCRCSIZE) || sb.st_size>((uint32_t)hdrsize+CHUNKCRCSIZE+MFSCHUNKSIZE)) {
-			if (f->todel<2) {
-				unlink(fname);	// remove wrong chunk
+			if (f->markforremoval!=MFR_READONLY) {
+				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
 			}
 			return;
 		}
@@ -5782,16 +5846,16 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	}
 	if (c->pathid!=0xFFFF) { // already have this chunk
 		if (version <= c->version) {	// current chunk is older
-			if (f->todel<2) { // this is R/W fs?
+			if (f->markforremoval!=MFR_READONLY) { // this is R/W fs?
 				hdd_create_filename(fname,f,pathid,chunkid,version);
-				unlink(fname); // if yes then remove file
+				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
 			}
 			currf = NULL;
 		} else { // current chunk is better, so use it, and clear older one
 			prevf = c->owner;
-			if (c->owner->todel<2) { // current chunk is on R/W fs?
+			if (c->owner->markforremoval!=MFR_READONLY) { // current chunk is on R/W fs?
 				hdd_generate_filename(fname,c);
-				unlink(fname); // if yes then remove file
+				hdd_wfr_add(c->owner,fname); // add file to 'wait for removal' queue
 			}
 			c->version = version;
 			c->blocks = blocks;
@@ -5814,7 +5878,7 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 		zassert(pthread_mutex_lock(&testlock));
 		hdd_add_chunk_to_test_chain(c,currf);
 		zassert(pthread_mutex_unlock(&testlock));
-		hdd_report_new_chunk(c->chunkid,c->version|((f->todel)?0x80000000:0));
+		hdd_report_new_chunk(c->chunkid,c->version|((f->markforremoval!=MFR_NO)?0x80000000:0));
 	}
 	zassert(pthread_mutex_lock(&folderlock));
 	if (prevf) {
@@ -5980,7 +6044,7 @@ void* hdd_folder_scan(void *arg) {
 	uint64_t namechunkid;
 	uint32_t nameversion;
 	uint32_t tcheckcnt;
-	uint8_t scanterm,todel;
+	uint8_t scanterm,markforremoval;
 //	uint8_t progressreportmode;
 	uint8_t lastperc,currentperc;
 	uint32_t lasttime,currenttime,begintime;
@@ -5988,7 +6052,7 @@ void* hdd_folder_scan(void *arg) {
 	begintime = time(NULL);
 
 	zassert(pthread_mutex_lock(&folderlock));
-	todel = f->todel;
+	markforremoval = f->markforremoval;
 	hdd_refresh_usage(f);
 //	progressreportmode = wait_for_scan;
 	zassert(pthread_mutex_unlock(&folderlock));
@@ -6001,7 +6065,7 @@ void* hdd_folder_scan(void *arg) {
 
 	memcpy(fullname,f->path,plen);
 	fullname[plen] = '\0';
-	if (todel==0) {
+	if (markforremoval==MFR_NO) {
 		mkdir(fullname,0755);
 	}
 
@@ -6028,7 +6092,7 @@ void* hdd_folder_scan(void *arg) {
 		zassert(pthread_mutex_unlock(&dclock));
 #endif
 
-		if (todel==0) {
+		if (markforremoval==MFR_NO) {
 			for (subf=0 ; subf<256 ; subf++) {
 				fullname[plen-3]="0123456789ABCDEF"[(subf>>4)&0xF];
 				fullname[plen-2]="0123456789ABCDEF"[subf&0xF];
@@ -6246,7 +6310,7 @@ void hdd_term(void) {
 		if (f->scanstate==SCST_SCANTERMINATE || f->scanstate==SCST_SCANFINISHED) {
 			i++;
 		}
-		if (f->scanstate==SCST_WORKING && f->toremove==0) {
+		if (f->scanstate==SCST_WORKING && f->toremove==REMOVING_NO) {
 			hdd_folder_dump_chunkdb_begin(f);
 		}
 	}
@@ -6307,7 +6371,7 @@ void hdd_term(void) {
 	}
 	for (f=folderhead ; f ; f=fn) {
 		fn = f->next;
-		if (f->scanstate==SCST_WORKING && f->toremove==0) {
+		if (f->scanstate==SCST_WORKING && f->toremove==REMOVING_NO) {
 			hdd_folder_dump_chunkdb_end(f);
 		}
 		if (f->lfd>=0) {
@@ -6370,7 +6434,7 @@ int hdd_size_parse(const char *str,uint64_t *ret) {
 
 int hdd_parseline(char *hddcfgline) {
 	uint32_t l,p;
-	int lfd,td,bm,is;
+	int lfd,mfr,bm,is;
 	int mfd;
 	char *pptr;
 	char *lockfname;
@@ -6430,13 +6494,13 @@ int hdd_parseline(char *hddcfgline) {
 	} else {
 		hddcfgline[l]='\0';
 	}
-	td = 0;
+	mfr = MFR_NO;
 	bm = REBALANCE_STD;
 	is = 0;
 	pptr = hddcfgline;
 	while (1) {
 		if (*pptr == '*') {
-			td = 1;
+			mfr = MFR_YES;
 		} else if (*pptr == '~') {
 			is = 1;
 		} else if (*pptr == '>') {
@@ -6455,7 +6519,7 @@ int hdd_parseline(char *hddcfgline) {
 	cannotbeused = 0;
 	for (f=folderhead ; f && lockneeded ; f=f->next) {
 		if (strcmp(f->path,pptr)==0) {
-			if (f->toremove==1) {
+			if (f->toremove==REMOVING_INPROGRESS) {
 				cannotbeused = 1;
 			} else {
 				lockneeded = 0;
@@ -6541,10 +6605,10 @@ int hdd_parseline(char *hddcfgline) {
 	memcpy(lockfname,pptr,l);
 	memcpy(lockfname+l,".lock",6);
 	lfd = open(lockfname,O_RDWR|O_CREAT|O_TRUNC,0640);
-	if (lfd<0 && errno==EROFS && td) {
+	if (lfd<0 && errno==EROFS && mfr!=MFR_NO) {
 		lfd = open(lockfname,O_RDONLY); // prevents umounting
 		free(lockfname);
-		td = 2;
+		mfr = MFR_READONLY;
 	} else {
 		if (lfd<0) {
 			mfs_arg_errlog(LOG_ERR,"hdd space manager: can't create lock file '%s'",lockfname);
@@ -6608,8 +6672,8 @@ int hdd_parseline(char *hddcfgline) {
 	zassert(pthread_mutex_lock(&folderlock));
 	for (f=folderhead ; f ; f=f->next) {
 		if (strcmp(f->path,pptr)==0) {
-			if (f->toremove==2) {
-				f->toremove = 0;
+			if (f->toremove==REMOVING_START) {
+				f->toremove = REMOVING_NO;
 			}
 			if (lmode==1) {
 				f->leavefree = limit;
@@ -6651,12 +6715,12 @@ int hdd_parseline(char *hddcfgline) {
 				f->lastrefresh = 0.0;
 				f->needrefresh = 1;
 			} else {
-				if ((f->todel==0 && td>0) || (f->todel>0 && td==0)) {
+				if ((f->markforremoval==MFR_NO && mfr!=MFR_NO) || (f->markforremoval!=MFR_NO && mfr==MFR_NO)) {
 					// the change is important - chunks need to be send to master again
 					f->scanstate = SCST_SENDNEEDED;
 				}
 			}
-			f->todel = td;
+			f->markforremoval = mfr;
 			f->balancemode = bm;
 			f->ignoresize = is;
 			zassert(pthread_mutex_unlock(&folderlock));
@@ -6668,7 +6732,7 @@ int hdd_parseline(char *hddcfgline) {
 	}
 	f = (folder*)malloc(sizeof(folder));
 	passert(f);
-	f->todel = td;
+	f->markforremoval = mfr;
 	f->balancemode = bm;
 	f->ignoresize = is;
 	f->damaged = 0;
@@ -6676,7 +6740,7 @@ int hdd_parseline(char *hddcfgline) {
 	f->scanprogress = 0;
 	f->path = strdup(pptr);
 	passert(f->path);
-	f->toremove = 0;
+	f->toremove = REMOVING_NO;
 	if (lmode==1) {
 		f->leavefree = limit;
 	} else {
@@ -6729,6 +6793,10 @@ int hdd_parseline(char *hddcfgline) {
 	f->write_corr = 0.0;
 	f->rebalance_in_progress = 0;
 	f->rebalance_last_usec = 0;
+	f->wfrtime = main_time();
+	f->wfrlast = 0;
+	f->wfrcount = 0;
+	f->wfrchunks = NULL;
 	f->next = folderhead;
 	folderhead = f;
 	zassert(pthread_mutex_unlock(&folderlock));
@@ -6769,8 +6837,8 @@ int hdd_folders_reinit(void) {
 	zassert(pthread_mutex_lock(&folderlock));
 	folderactions = 0; // stop folder actions
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->toremove==0) {
-			f->toremove = 2;
+		if (f->toremove==REMOVING_NO) {
+			f->toremove = REMOVING_START;
 		}
 	}
 	zassert(pthread_mutex_unlock(&folderlock));
@@ -6787,7 +6855,7 @@ int hdd_folders_reinit(void) {
 	zassert(pthread_mutex_lock(&folderlock));
 	datadef = 0;
 	for (f=folderhead ; f ; f=f->next) {
-		if (f->toremove==0) {
+		if (f->toremove==REMOVING_NO) {
 			datadef = 1;
 			if (f->scanstate==SCST_SCANNEEDED) {
 				syslog(LOG_NOTICE,"hdd space manager: folder %s will be scanned",f->path);

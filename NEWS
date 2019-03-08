@@ -21,6 +21,8 @@ This file lists noteworthy changes in MooseFS.
   - (master) long loop detection (log info whenever time between polls is longer than 1 second)
   - (master) fixed condition that checks if thare are all chunkservers and all chunks available (and using it for detecting ENOSPC condition - issue #201)
   - (mount) added '.params' pseudofile with mfsmount working parameters (such as cache sizes,timeouts etc.)
+  - (cs) fixed removing chunks from data structures when marking disk as 'damaged' (issue #207)
+  - (cs) unlink duplicates week after detection (instead of removing them instantly - related to issue #207)
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

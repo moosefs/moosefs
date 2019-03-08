@@ -154,6 +154,7 @@ table.acid_tab th {background-color: #C0C0C0;}
 table.acid_tab td {background-color: #E8E8E8;}
 table.acid_tab tr.C1 td {background-color: #E8E8E8;}
 table.acid_tab tr.C2 td {background-color: #D6D6D6;}
+table.acid_tab tr.CH td {background-color: #FFFFFF;}
 table.acid_tab th.SMPROGBAR {width: 102px;}
 table.acid_tab th.PROGBAR {width: 202px;}
 table.acid_tab th.PERC4 {width: 4%;}
@@ -335,7 +336,6 @@ table.CR tr:first-child th {background-color: #A0A0A0;}
 table.CR th {background-color: #C0C0C0;}
 
 table#mfsmatrix > thead > tr:hover > td,
-table.acid_tab  > tbody > tr:hover > td,
 table.FR        > tbody > tr:hover > td { background-color: #FFF; }
 
 table.BOTMENU {width: 100%; margin-left:auto; margin-right:auto; border:0px;}

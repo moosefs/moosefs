@@ -104,6 +104,19 @@ if (typeof acid_tab == "undefined") {
 			}
 		},
 
+		add_event: function(obj,type,fn) {
+			if (obj.addEventListener) {
+				obj.addEventListener(type, fn, false);
+			} else if (obj.attachEvent) {
+				obj.attachEvent('on'+type, fn);
+			}
+		},
+
+		add_hover: function(obj,fnin,fnout) {
+			acid_tab.add_event(obj,"mouseenter",fnin);
+			acid_tab.add_event(obj,"mouseleave",fnout);
+		},
+
 		preparetab: function(table) {
 			var i,j,k,x,h,m,s,p,c,z,r;
 			// find thead using 'TH' node names
@@ -293,13 +306,32 @@ if (typeof acid_tab == "undefined") {
 			return ret;
 		},
 
+		calcrowspan: function(tbody,rowid) {
+			var rowspan;
+			var i,cell;
+			var row = tbody.rows[rowid];
+			rowspan = 1;
+			for (i=0 ; i<row.cells.length ; i++) {
+				cell = row.cells[i];
+				if (typeof cell.rowSpan != "undefined") {
+					if (cell.rowSpan>rowspan) {
+						rowspan = cell.rowSpan;
+					}
+				}
+			}
+			if (rowspan > tbody.rows.length - rowid) {
+				rowspan = tbody.rows.length - rowid;
+			}
+			return rowspan;
+		},
+
 		sorter: function(hcell,newbody) {
 			var table = hcell.acid_tab;
 			var tbody = table.tBodies[0];
 			var newrows = new Array();
 			var smode = 0;
 			var level = 0;
-			var i;
+			var i,j,k;
 			if (newbody==0) {
 				if (table.acid_tab_sortedby != null) {
 					if (table.acid_tab_indicator) {
@@ -321,28 +353,39 @@ if (typeof acid_tab == "undefined") {
 			}
 			smode = hcell.acid_tab_smode;
 			level = hcell.acid_tab_level;
-			for (i=0 ; smode==0 && i<tbody.rows.length ; i++) {
+			i = 0;
+			while (smode==0 && i<tbody.rows.length) {
 				var cell = tbody.rows[i].cells[hcell.acid_tab_colid];
 				var text = acid_tab.getcelltext(cell,level);
+				var rowspan = acid_tab.calcrowspan(tbody,i);
 				if (text!='') {
 					if (text.match(/^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))(\s|%|$)/)) { // looks like a number
 						smode = 1;
 					}
 				}
+				i += rowspan;
 			}
 			if (smode==0) { // number not found - switch to alpha
 				smode = 2;
 			}
-			for (i=0 ; i<tbody.rows.length ; i++) {
+			i = 0;
+			while (i<tbody.rows.length) {
 				var cell = tbody.rows[i].cells[hcell.acid_tab_colid];
 				var text = acid_tab.getcelltext(cell,level);
+				var rowspan = acid_tab.calcrowspan(tbody,i);
 				if (smode==1) {
 					text = parseFloat(text);
 					if (isNaN(text)) {
 						text = 0;
 					}
 				}
-				newrows[newrows.length] = [text,tbody.rows[i]];
+				k = newrows.length;
+				newrows[k] = new Array();
+				newrows[k][0] = text;
+				for (j=0 ; j<rowspan ; j++) {
+					newrows[k][j+1] = tbody.rows[i];
+					i++;
+				}
 			}
 			if (smode==1) {
 				newrows.sort(function(a,b){return a[0]-b[0];});
@@ -354,11 +397,15 @@ if (typeof acid_tab == "undefined") {
 			}
 			if (table.acid_tab_reversed) {
 				for (i=newrows.length-1 ; i>=0 ; i--) {
-					tbody.appendChild(newrows[i][1]);
+					for (j=0 ; j<newrows[i].length-1 ; j++) {
+						tbody.appendChild(newrows[i][j+1]);
+					}
 				}
 			} else {
 				for (i=0 ; i<newrows.length ; i++) {
-					tbody.appendChild(newrows[i][1]);
+					for (j=0 ; j<newrows[i].length-1 ; j++) {
+						tbody.appendChild(newrows[i][j+1]);
+					}
 				}
 			}
 			delete newrows;
@@ -389,12 +436,22 @@ if (typeof acid_tab == "undefined") {
 
 		reverse: function(tbody) {
 			var newrows = new Array();
-			var i;
-			for (i=0 ; i<tbody.rows.length ; i++) {
-				newrows[newrows.length] = tbody.rows[i];
+			var rowspan;
+			var i,j,k;
+			i = 0;
+			while (i<tbody.rows.length) {
+				rowspan = acid_tab.calcrowspan(tbody,i);
+				k = newrows.length;
+				newrows[k] = new Array();
+				for (j=0 ; j<rowspan ; j++) {
+					newrows[k][j] = tbody.rows[i];
+					i++;
+				}
 			}
 			for (i=newrows.length-1 ; i>=0 ; i--) {
-				tbody.appendChild(newrows[i]);
+				for (j=0 ; j<newrows[i].length ; j++) {
+					tbody.appendChild(newrows[i][j]);
+				}
 			}
 			delete newrows;
 		},
@@ -406,19 +463,89 @@ if (typeof acid_tab == "undefined") {
 			if (typeof table.acid_tab_zebra != "undefined") {
 				acid_tab.dozebra(tbody,table.acid_tab_zebra);
 			}
+			acid_tab.addhovers(tbody);
 		},
 
 		dozebra: function(tbody,zebratab) {
-			var i;
-			for (i=0 ; i<tbody.rows.length ; i++) {
-				tbody.rows[i].className=zebratab[i%zebratab.length];
+			var rowspan;
+			var cn;
+			var i,j,k;
+			i = 0;
+			k = 0;
+			while (i<tbody.rows.length) {
+				rowspan = acid_tab.calcrowspan(tbody,i);
+				for (j=0 ; j<rowspan ; j++) {
+					cn = zebratab[k];
+					tbody.rows[i].className = cn;
+					tbody.rows[i].acid_tab_cn = cn;
+					i++;
+				}
+				k++;
+				if (k>=zebratab.length) {
+					k=0;
+				}
 			}
 		},
 
 		enumerate: function(tbody,colid) {
+			var rowspan;
+			var i,j;
+			i = 0;
+			j = 1;
+			while (i<tbody.rows.length) {
+				rowspan = acid_tab.calcrowspan(tbody,i);
+				tbody.rows[i].cells[colid].innerHTML=j;
+				j++;
+				i+=rowspan;
+			}
+		},
+
+		rowsetclass: function(tbody,firstrow,classname) {
+			var rowspan;
 			var i;
-			for (i=0 ; i<tbody.rows.length ; i++) {
-				tbody.rows[i].cells[colid].innerHTML=i+1;
+			rowspan = acid_tab.calcrowspan(tbody,firstrow);
+			for (i=0 ; i<rowspan ; i++) {
+				tbody.rows[firstrow+i].className = classname;
+			}
+		},
+
+		trenter: function(ev) {
+			var i,t;
+			var row;
+			var tbody;
+			t = ev.target;
+			tbody = t.parentNode;
+			acid_tab.rowsetclass(tbody,t.acid_tab_firstrow,"CH");
+		},
+
+		trleave: function(ev) {
+			var i,t;
+			var row;
+			var tbody;
+			var cn;
+			t = ev.target;
+			tbody = t.parentNode;
+			if (typeof t.acid_tab_cn != "undefined") {
+				cn = t.acid_tab_cn;
+			} else {
+				cn = "C1";
+			}
+			acid_tab.rowsetclass(tbody,t.acid_tab_firstrow,cn);
+		},
+
+		addhovers: function(tbody) {
+			var rowspan;
+			var cn;
+			var i,j,k;
+			i = 0;
+			k = 0;
+			while (i<tbody.rows.length) {
+				rowspan = acid_tab.calcrowspan(tbody,i);
+				for (j=0 ; j<rowspan ; j++) {
+					tbody.rows[i+j].acid_tab_firstrow = i;
+					acid_tab.add_hover(tbody.rows[i+j],acid_tab.trenter,acid_tab.trleave);
+				}
+				i += rowspan;
 			}
 		},
 

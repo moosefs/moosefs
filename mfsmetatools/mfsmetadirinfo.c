@@ -800,9 +800,9 @@ int main(int argc,char *argv[]) {
 	dirinfostate *dis,**disp;
 	FILE *fd;
 	FILE *ofd;
-	const char *outfname;
+	char *outfname;
+	char *allname;
 	const char *appname;
-	const char *allname;
 	char sep;
 	int ch;
 	uint8_t format;
@@ -856,40 +856,40 @@ int main(int argc,char *argv[]) {
 		return 1;
 	}
 
+	ret = 1;
+	ofd = NULL;
+	fd = NULL;
+
 	if (outfname!=NULL) {
 		ofd = fopen(outfname,"w");
 		if (ofd==NULL) {
 			fprintf(stderr,"error opening output file '%s'\n",outfname);
-			return 1;
+			goto error;
 		}
 	}
 
 	fd = fopen(argv[0],"rb");
 	if (fd==NULL) {
 		fprintf(stderr,"error opening metadata file '%s'\n",argv[0]);
-		return 1;
+		goto error;
 	}
 	if (fread(hdr,1,8,fd)!=8) {
 		fprintf(stderr,"%s: can't read metadata header\n",argv[0]);
-		fclose(fd);
-		return 1;
+		goto error;
 	}
 	if (memcmp(hdr,"MFSM NEW",8)==0) {
 		fprintf(stderr,"%s: empty file\n",argv[0]);
-		fclose(fd);
-		return 1;
+		goto error;
 	}
 	if (memcmp(hdr,MFSSIGNATURE "M ",5)==0 && hdr[5]>='1' && hdr[5]<='9' && hdr[6]=='.' && hdr[7]>='0' && hdr[7]<='9') {
 		fver = ((hdr[5]-'0')<<4)+(hdr[7]-'0');
 	} else {
 		fprintf(stderr,"%s: unrecognized file format\n",argv[0]);
-		fclose(fd);
-		return 1;
+		goto error;
 	}
 	if (fver<0x20) {
-		fprintf(stderr,"%s: metadata file format too old %u.%u\n",argv[0],fver>>4,fver&0xF);
-		fclose(fd);
-		return 1;
+		fprintf(stderr,"%s: metadata file format too old %u.%u\n",argv[0],(unsigned)(fver>>4),(unsigned)(fver&0xF));
+		goto error;
 	}
 	dishead = NULL;
 	disp = &dishead;
@@ -920,6 +920,7 @@ int main(int argc,char *argv[]) {
 		ret = 1;
 	}
 	fclose(fd);
+	fd = NULL;
 	if (ret==0) {
 		if (format==2) {
 			print_result_json(ofd);
@@ -938,8 +939,18 @@ int main(int argc,char *argv[]) {
 		dishead = dis->next;
 		free(dis);
 	}
+error:
+	if (fd!=NULL) {
+		fclose(fd);
+	}
 	if (outfname!=NULL) {
-		fclose(ofd);
+		if (ofd!=NULL) {
+			fclose(ofd);
+		}
+		free(outfname);
+	}
+	if (allname!=NULL) {
+		free(allname);
 	}
 	return ret;
 }

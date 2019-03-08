@@ -191,7 +191,7 @@ struct mfsopts {
 	int debug;
 	int flattrash;
 	int delayedinit;
-	int mkdircopysgid;
+	unsigned int mkdircopysgid;
 	char *sugidclearmodestr;
 	int sugidclearmode;
 	char *cachemode;

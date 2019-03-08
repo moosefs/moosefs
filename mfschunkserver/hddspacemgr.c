@@ -6686,25 +6686,31 @@ int hdd_parseline(char *hddcfgline) {
 				f->sizelimit = 0;
 			}
 			if (f->damaged) {
-				f->scanstate = SCST_SCANNEEDED;
-				f->scanprogress = 0;
-				f->damaged = 0;
-				f->avail = 0ULL;
-				f->total = 0ULL;
-				f->lastblocks = 0;
-				f->isro = 0;
-				if (f->chunktab) {
-					free(f->chunktab);
+				if (f->chunkcount>0) { // disk only flagged as damaged - do not rescan !!!
+					f->damaged = 0;
+					f->lastblocks = 0;
+					f->isro = 0;
+				} else {
+					f->scanstate = SCST_SCANNEEDED;
+					f->scanprogress = 0;
+					f->damaged = 0;
+					f->avail = 0ULL;
+					f->total = 0ULL;
+					f->lastblocks = 0;
+					f->isro = 0;
+					if (f->chunktab) {
+						free(f->chunktab);
+					}
+					f->chunkcount = 0;
+					f->chunktabsize = 0;
+					f->chunktab = NULL;
+					hdd_stats_clear(&(f->cstat));
+					hdd_stats_clear(&(f->monotonic));
+					for (l=0 ; l<STATSHISTORY ; l++) {
+						hdd_stats_clear(&(f->stats[l]));
+					}
+					f->statspos = 0;
 				}
-				f->chunkcount = 0;
-				f->chunktabsize = 0;
-				f->chunktab = NULL;
-				hdd_stats_clear(&(f->cstat));
-				hdd_stats_clear(&(f->monotonic));
-				for (l=0 ; l<STATSHISTORY ; l++) {
-					hdd_stats_clear(&(f->stats[l]));
-				}
-				f->statspos = 0;
 				for (l=0 ; l<LASTERRSIZE ; l++) {
 					f->lasterrtab[l].chunkid = 0ULL;
 					f->lasterrtab[l].timestamp = 0;
@@ -6873,8 +6879,7 @@ int hdd_folders_reinit(void) {
 	zassert(pthread_mutex_unlock(&folderlock));
 
 	if (datadef==0) {
-		mfs_arg_syslog(LOG_ERR,"hdd space manager: no hdd space defined in %s file",hddfname);
-		ret = -1;
+		mfs_arg_syslog(LOG_WARNING,"hdd space manager: no hdd space defined in %s file",hddfname);
 	}
 
 	free(hddfname);

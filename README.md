@@ -34,12 +34,12 @@ MooseFS can be installed on any POSIX compliant operating system including diffe
 * RHEL/CentOS
 * OpenSUSE
 * FreeBSD
-* MacOS X
+* macOS
 * Raspbian - Raspberry Pi 3
 
-MooseFS Client uses [FUSE](https://github.com/libfuse/libfuse).
+MooseFS Linux Client uses [FUSE](https://github.com/libfuse/libfuse). MooseFS macOS Client uses [FUSE for macOS](https://github.com/osxfuse/osxfuse).
 
-There is a separate MooseFS Client for MS Windows available, built on top of [Dokany](https://github.com/dokan-dev/dokany).
+There is a separate MooseFS Client for Microsoft Windows available, built on top of [Dokany](https://github.com/dokan-dev/dokany).
 
 ## Getting started
 You can install MooseFS using your favourite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download):
@@ -48,26 +48,29 @@ You can install MooseFS using your favourite package manager on one of the follo
 * Debian 8/9
 * RHEL/CentOS 6/7
 * FreeBSD 9.3/10/11
-* MacOS X 10.9-10.13
+* macOS 10.9-10.14
 * Raspbian 8 (Jessie) - Raspberry Pi 3
 
 Minimal set of packages, which are needed to run MooseFS:
+
 * `moosefs-master` MooseFS Master Server for metadata servers,
 * `moosefs-chunkserver` MooseFS Chunkserver for data storage servers,
 * `moosefs-client` MooseFS Client - client side package to mount the filesystem.
 
 ### Source code
-Feel free to download source code either from GitHub code repository or from [our website archives](https://moosefs.com/download/#source-code).
+Feel free to download the source code from our GitHub code repository!
 
 Install the following dependencies before building MooseFS from sources:
+
 * Debian/Ubuntu: `sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config`
 * CentOS/RHEL: `sudo yum install gcc make libpcap-devel zlib-devel fuse-devel pkgconfig`
 
 Recommended packages:
+
 * Debian/Ubuntu: `sudo apt install fuse`
 * CentOS/RHEL: `sudo yum install fuse`
 
-Building MooseFS on Linux can be easily done by running `./linux_build.sh`. Similarly, use `./freebsd_build.sh` in order to build MooseFS on FreeBSD and respectively `./macosx_build.sh` on MacOS X. Remember, that those scripts do not install (i.e. do not run `make install` at the end). Run this command manually.
+Building MooseFS on Linux can be easily done by running `./linux_build.sh`. Similarly, use `./freebsd_build.sh` in order to build MooseFS on FreeBSD and respectively `./macosx_build.sh` on macOS. Remember, that these scripts do not install binaries (i.e. do not run `make install`) at the end. Run this command manually.
 
 ### Minimal setup
 Just three steps to have MooseFS up and running:
@@ -164,7 +167,7 @@ Refer to [installation guides](https://moosefs.com/support/#documentation) for m
 
 
 ## Copyright
-Copyright (c) 2018 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (c) 2008-2019 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

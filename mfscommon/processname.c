@@ -76,7 +76,6 @@ void processname_init(int argc,char *argv[]) {
 		}
 	}
 
-	argv[1] = NULL;
 	argv_start = argv[0];
 	argv_leng = (lastpos - argv_start) - 1;
 }

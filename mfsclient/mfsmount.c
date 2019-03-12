@@ -690,7 +690,7 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	return leng;
 }
 
-int mainloop(struct fuse_args *args,const char* mp,int mt,int fg,int argc_back,char **argv_back) {
+int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	struct fuse_session *se;
 	struct fuse_chan *ch;
 	struct rlimit rls;
@@ -1003,7 +1003,6 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg,int argc_back,c
 		return 1;
 	}
 
-	processname_init(argc_back,argv_back);
 
 	if (mfsopts.debug==0 && fg==0) {
 		setsid();
@@ -1259,8 +1258,8 @@ int main(int argc, char *argv[]) {
 	char *mountpoint;
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	struct fuse_args defaultargs = FUSE_ARGS_INIT(0, NULL);
-	int argc_back = argc;
-	char **argv_back = argv;
+
+	processname_init(argc,argv);
 
 #if defined(SIGPIPE) && defined(SIG_IGN)
 	signal(SIGPIPE,SIG_IGN);
@@ -1588,7 +1587,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	res = mainloop(&args,mountpoint,mt,fg,argc_back,argv_back);
+	res = mainloop(&args,mountpoint,mt,fg);
 	fuse_opt_free_args(&defaultargs);
 	fuse_opt_free_args(&args);
 	free(mfsopts.masterhost);

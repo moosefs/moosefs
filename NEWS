@@ -30,6 +30,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgi) added timestamp (issue #197)
   - (cgi) fixed chart.cgi url (issue #200)
   - (cs) fixed crc values for non existing blocks
+  - (mount) fixed changing processname
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

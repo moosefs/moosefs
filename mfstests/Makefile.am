@@ -35,7 +35,7 @@ mfstest_delayrun_LDADD=$(PTHREAD_LIBS)
 mfstest_delayrun_CFLAGS=$(PTHREAD_CFLAGS) -D_USE_PTHREADS
 mfstest_delayrun_CPPFLAGS=$(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
 
-distclean:distclean-am
+distclean-local:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 

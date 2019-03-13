@@ -2,13 +2,13 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.103], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.104], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
 AC_CONFIG_HEADER([config.h])
 AC_CANONICAL_TARGET
-AM_INIT_AUTOMAKE([1.14 foreign subdir-objects])
+AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AM_SILENT_RULES([yes])
 AC_CONFIG_MACRO_DIRS([m4])
 
@@ -26,7 +26,9 @@ AC_DEFINE_UNQUOTED([VERSION2INT(maj,med,min)], [((maj)*0x10000+(med)*0x100+(((ma
 AC_DEFINE_UNQUOTED([VERSSTR], ["${PACKAGE_VERSION}-${release}"], [MFS version - string])
 
 # Checks for programs.
+AM_PROG_AR
 AC_PROG_CC(mycc gcc llvm-gcc clang)
+AM_PROG_CC_C_O
 AC_PROG_LN_S
 AC_PROG_LIBTOOL
 

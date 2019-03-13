@@ -1,3 +1,51 @@
+moosefs (3.0.104-1) unstable; urgency=medium
+
+  * (master) fixed taking into account labels in classes 1-9
+  * (master) fixed recovering userperm and otherperm in ACL (in practice it
+    doesn't matter - mainly cosmetics)
+  * (cli+cgi) fixed python3 compatibility issue (casting to int for "%X"
+    format)
+  * (master) increased mmap allocation block size (Linux kernel issue - too
+    many mmaps leads to memory not being properly released by the kernel)
+  * (client) fixed handling internal packets with size zero (client
+    disconnection during chunkserver registration)
+  * (client) fixed symlink cache handling (potential race condition)
+  * (master) added global option for preventing using same ip or same rack for
+    more than one chunk copy
+  * (clinet) added ignoring '_netdev' option - sometimes needed in case of
+    mounting from fstab
+  * (master) added defining rackid as string paths in mfstopology.cfg
+    (introdiced optional higher distances between servers)
+  * (master) fixed desync on adding damaged chunk
+  * (master) added changelog save mode (background,async and sync)
+  * (all) fixed issues reported by cppcheck (fixes #179)
+  * (cli+cgi) fixed issues reported by pylint (fixes #180)
+  * (cs) added 'damaged' flag to chunk (prevents syslog flooding - issue #192)
+  * (metatools) fixed conflict with builtin function 'humanize_number' (NetBSD)
+  * (master) better handling chunks with pending high-priority jobs
+  * (master) long loop detection (log info whenever time between polls is
+    longer than 1 second)
+  * (master) fixed condition that checks if thare are all chunkservers and all
+    chunks available (and using it for detecting ENOSPC condition - issue #201)
+  * (mount) added '.params' pseudofile with mfsmount working parameters (such
+    as cache sizes,timeouts etc.)
+  * (cs) fixed removing chunks from data structures when marking disk as
+    'damaged' (issue #207)
+  * (cs) fixed handling 'damaged' disks with chunks on reload (issue #207)
+  * (cs) unlink duplicates week after detection (instead of removing them
+    instantly - related to issue #207)
+  * (tools) added displaying number of blocks in 'mfsfileinfo'
+  * (master) added error messages for 'fork' errors
+  * (cgi) fixed handling encodings (issue #206 and #208)
+  * (cgi) added timestamp (issue #197)
+  * (cgi) fixed chart.cgi url (issue #200)
+  * (cs) fixed crc values for non existing blocks
+  * (mount) fixed changing processname
+  * (supervisor) added reloading config parameters on SIGHUP (aka 'reload' -
+    'pro' version only)
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 12 Mar 2018 12:00:00 +0100
+
 moosefs (3.0.103-1) unstable; urgency=medium
 
   * (master+client) added space reservation for superuser
@@ -58,7 +106,7 @@ moosefs (3.0.101-1) unstable; urgency=medium
   * (master) fixed HA bug (uninitialized variable might cause everlasting ELECT
     - PRO only)
   * (cs) fixed metaid handling
-  * (master) added clearing SNAPHSOT eattr on file/directory modifications
+  * (master) added clearing SNAPSHOT eattr on file/directory modifications
   * (master) added optional same rack preference for destination server during
     undergoal replications
   * (mount+tools) increased masterproxy timeout from 1s to 20s
@@ -94,14 +142,14 @@ moosefs (3.0.98-1) unstable; urgency=medium
   * (cs+tools) use readdir instead of readdir_r on glibc 2.24+
   * (debian) added support for systemd in debian packages
   * (all) fixed library dependencies (for libpcap,libz and libm)
-  * (mount) fixed race between defered 'open' and 'locks'
+  * (mount) fixed race between deferred 'open' and 'locks'
   * (master) more chunk debugs and better handling chunk status change
   * (cs) fixed handling mark for removal (after reload sometimes cs could send
     chunks marked for removal as normal chunks)
   * (master) added file with metadata checksums (for future use)
   * (master) fixed way of sending gids to changelog/follower
   * (master) added inode checksum for some changes sent to changelog/follower
-  * (metadump) added '0x' prefix for fileds dumped as hex numbers
+  * (metadump) added '0x' prefix for fields dumped as hex numbers
   * (master) fixed ACL mask synchronization issues (restoring from
     changelog/leader->follower)
 
@@ -150,7 +198,7 @@ moosefs (3.0.93-1) unstable; urgency=medium
 
   * (master) redesigned xattr storage (much faster and uses less memory)
   * (master) improved hash map in xattr and acl (static -> dynamic)
-  * (cgi+cli) added possibility to define master group as set of IP adresses
+  * (cgi+cli) added possibility to define master group as set of IP addresses
     divided by comma or semicolon
   * (cs) fixed using fsync on closed descriptors (after change
     FSYNC_BEFORE_CLOSE option)
@@ -1063,7 +1111,7 @@ moosefs (2.1.7-1) unstable; urgency=medium
   * (master) added chunk preallocation
   * (master) added deleting wrong versioned chunks that do not belong to any
     file
-  * (mount) fixed printed informations about mapall (thanks to Tom Ivar
+  * (mount) fixed printed information about mapall (thanks to Tom Ivar
     Helbekkmo)
   * (master) fixed rmdir mapall/maproot rights check (thanks to Tom Ivar
     Helbekkmo)
@@ -1362,7 +1410,7 @@ moosefs (2.0.14-1) unstable; urgency=medium
   * (master+cgi+cli) changed store status (background,download and foreground)
   * (master+cgi+cli) changed option "canchangequota" to "admin"
   * (master) added rename/unlink "metadata.mfs" in case of using '-a' option
-  * (master+cgi+cli) last save duration changed from seconds to miliseconds
+  * (master+cgi+cli) last save duration changed from seconds to milliseconds
 
  -- MooseFS Team <contact@moosefs.com>  Tue, 10 Jun 2014 13:00:00 +0200
 
@@ -1762,7 +1810,7 @@ moosefs (1.7.0) unstable; urgency=medium
   * (master) in 'noowner' i-nodes mode copy 'owner' bits to 'group' and 'other'
     bits
   * (common) increase time events frequency
-  * (master) increase freqency of chunk-loop task (1 per second to 50 per
+  * (master) increase frequency of chunk-loop task (1 per second to 50 per
     seconds)
   * (mount) fixed invalidate open-dir dentry cache
   * (master) fixed sustaining old sessions by clients who can't properly
@@ -1998,7 +2046,7 @@ moosefs (1.6.15) unstable; urgency=medium
     master to hung-up)
   * (master) preserving atime and mtime during "snapshot" operation (makes
     "snapshot" to work more like "cp -Rp" than "cp -R")
-  * (cs) ommit "marked for removal" disks during chunk test loop
+  * (cs) omit "marked for removal" disks during chunk test loop
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 09 Apr 2010 13:00:00 +0200
 

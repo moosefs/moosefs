@@ -1774,8 +1774,11 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
 	clean-libtool clean-sbinPROGRAMS mostlyclean-am
 
+distclean: distclean-am
+	-rm -rf ../mfscommon/$(DEPDIR) ./$(DEPDIR)
+	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-tags
+	distclean-local distclean-tags
 
 dvi: dvi-am
 
@@ -1846,19 +1849,20 @@ uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
 	clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
 	clean-libtool clean-sbinPROGRAMS cscopelist-am ctags ctags-am \
 	distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-binPROGRAMS \
-	install-data install-data-am install-dvi install-dvi-am \
-	install-exec install-exec-am install-exec-hook install-html \
-	install-html-am install-includeHEADERS install-info \
-	install-info-am install-libLTLIBRARIES install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-sbinPROGRAMS \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
-	uninstall-binPROGRAMS uninstall-includeHEADERS \
-	uninstall-libLTLIBRARIES uninstall-sbinPROGRAMS
+	distclean-libtool distclean-local distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-binPROGRAMS install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-exec-hook \
+	install-html install-html-am install-includeHEADERS \
+	install-info install-info-am install-libLTLIBRARIES \
+	install-man install-pdf install-pdf-am install-ps \
+	install-ps-am install-sbinPROGRAMS install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-binPROGRAMS \
+	uninstall-includeHEADERS uninstall-libLTLIBRARIES \
+	uninstall-sbinPROGRAMS
 
 .PRECIOUS: Makefile
 
@@ -1872,7 +1876,7 @@ install-exec-hook:
 		$(LN_S) -f $(bindir)/mfsmount $(DESTDIR)$(root_sbindir)/mount.moosefs ; \
 	fi
 
-distclean:distclean-am
+distclean-local:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 

@@ -20,7 +20,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	3.0.103
+Version:	3.0.104
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -155,8 +155,8 @@ make install \
 EXTRA_FILES=$RPM_BUILD_ROOT/ExtraFiles.list
 touch %{EXTRA_FILES}
 
-if [ -x %{buildroot}/%{_bindir}/mfsbdev ]; then
-	echo '%attr(755,root,root) %{_bindir}/mfsbdev' > %{EXTRA_FILES}
+if [ -x %{buildroot}/%{_sbindir}/mfsbdev ]; then
+	echo '%attr(755,root,root) %{_sbindir}/mfsbdev' > %{EXTRA_FILES}
 	echo '%{_mandir}/man8/mfsbdev.8*' >> %{EXTRA_FILES}
 fi
 
@@ -393,7 +393,7 @@ exit 0
 %{_bindir}/mfsscadmin
 %attr(755,root,root) %{_bindir}/mfstools
 %attr(755,root,root) %{_bindir}/mfsmount
-# %attr(755,root,root) %{_bindir}/mfsbdev - moved to EXTRA_FILES
+# %attr(755,root,root) %{_sbindir}/mfsbdev - moved to EXTRA_FILES
 /sbin/mount.moosefs
 %{_includedir}/mfsio.h
 %{_libdir}/libmfsio.a

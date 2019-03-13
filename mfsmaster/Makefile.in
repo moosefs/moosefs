@@ -1454,8 +1454,11 @@ clean: clean-am
 clean-am: clean-generic clean-libtool clean-sbinPROGRAMS \
 	mostlyclean-am
 
+distclean: distclean-am
+	-rm -rf ../mfscommon/$(DEPDIR) ./$(DEPDIR)
+	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-tags
+	distclean-local distclean-tags
 
 dvi: dvi-am
 
@@ -1522,12 +1525,12 @@ uninstall-am: uninstall-sbinPROGRAMS uninstall-sbinSCRIPTS
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean clean-generic \
 	clean-libtool clean-sbinPROGRAMS cscopelist-am ctags ctags-am \
 	distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-sbinPROGRAMS \
+	distclean-libtool distclean-local distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-sbinPROGRAMS \
 	install-sbinSCRIPTS install-strip installcheck installcheck-am \
 	installdirs maintainer-clean maintainer-clean-generic \
 	mostlyclean mostlyclean-compile mostlyclean-generic \
@@ -1537,7 +1540,7 @@ uninstall-am: uninstall-sbinPROGRAMS uninstall-sbinSCRIPTS
 .PRECIOUS: Makefile
 
 
-distclean:distclean-am
+distclean-local:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 

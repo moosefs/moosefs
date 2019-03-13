@@ -608,11 +608,16 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-clean-am: clean-generic clean-libtool clean-sbinPROGRAMS \
+clean: clean-am
+
+clean-am: clean-generic clean-libtool clean-local clean-sbinPROGRAMS \
 	mostlyclean-am
 
+distclean: distclean-am
+	-rm -rf ./$(DEPDIR)
+	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-tags
+	distclean-local distclean-tags
 
 dvi: dvi-am
 
@@ -677,18 +682,19 @@ uninstall-am: uninstall-sbinPROGRAMS
 .MAKE: install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean clean-generic \
-	clean-libtool clean-sbinPROGRAMS cscopelist-am ctags ctags-am \
-	distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-sbinPROGRAMS install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am uninstall-sbinPROGRAMS
+	clean-libtool clean-local clean-sbinPROGRAMS cscopelist-am \
+	ctags ctags-am distclean distclean-compile distclean-generic \
+	distclean-libtool distclean-local distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-sbinPROGRAMS \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
+	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
+	uninstall-sbinPROGRAMS
 
 .PRECIOUS: Makefile
 
@@ -699,10 +705,10 @@ commands.h: ../mfscommon/MFSCommunication.h
 	@echo "  CONV     commands"
 	@cat ../mfscommon/MFSCommunication.h | grep '^#define [A-Z][A-Z]TO[A-Z][A-Z]' | grep -v MAXPACKETSIZE | awk '{ printf "{%s,\"%s\"},\n",$$2,$$2; }' > commands.h
 
-clean:clean-am
+clean-local:clean-am
 	-rm -f commands.h
 
-distclean:distclean-am
+distclean-local:distclean-am
 	-rm -f commands.h
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile

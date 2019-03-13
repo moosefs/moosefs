@@ -20,6 +20,6 @@ mfsmetalogger_SOURCES= \
 
 mfsmetalogger_CPPFLAGS=$(AM_CPPFLAGS) -DAPPNAME=mfsmetalogger
 
-distclean:distclean-am
+distclean-local:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile

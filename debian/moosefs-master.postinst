@@ -21,7 +21,7 @@ case "${1}" in
 		done
 		if [ ! -f /var/lib/mfs/metadata.mfs -a ! -f /var/lib/mfs/metadata.mfs.back -a -f /var/lib/mfs/metadata.mfs.empty ]; then
 			cp /var/lib/mfs/metadata.mfs.empty /var/lib/mfs/metadata.mfs
-			chown -R mfs:mfs /var/lib/mfs
+			chown mfs:mfs /var/lib/mfs/metadata.mfs
 		fi
 		if [ -f /etc/default/moosefs-master.dpkg-remove -o -f /etc/default/moosefs-master.dpkg-backup ]; then
 			echo "moosefs-master: check 'default' startup status (sysv -> systemd migration)"

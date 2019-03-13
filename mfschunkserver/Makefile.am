@@ -55,6 +55,6 @@ mfschunktool_SOURCES= \
 	../mfscommon/datapack.h \
 	../mfscommon/MFSCommunication.h
 
-distclean:distclean-am
+distclean-local:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile

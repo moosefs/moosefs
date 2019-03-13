@@ -76,6 +76,6 @@ EXTRA_DIST = $(sbin_SCRIPTS)
 sbin_SCRIPTS=\
 	mfsmetarestore
 
-distclean:distclean-am
+distclean-local:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile

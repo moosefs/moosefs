@@ -135,7 +135,7 @@ install-exec-hook:
 		$(LN_S) -f $(bindir)/mfsmount $(DESTDIR)$(root_sbindir)/mount.moosefs ; \
 	fi
 
-distclean:distclean-am
+distclean-local:distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 

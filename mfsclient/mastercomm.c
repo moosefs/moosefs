@@ -1039,7 +1039,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 					return NULL;
 				}
 				period = usectimeout - period;
-                usecto = gettimeofday_usec(&tv);
+				usecto = gettimeofday_usec(&tv);
 				usecto += period;
 				ts.tv_sec = usecto / 1000000;
 				ts.tv_nsec = (usecto % 1000000) * 1000;

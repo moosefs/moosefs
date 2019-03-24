@@ -1994,10 +1994,7 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 					struct timespec ts;
 					struct timeval tv;
 					uint64_t usecto;
-					gettimeofday(&tv, NULL);
-					usecto = tv.tv_sec;
-					usecto *= 1000000;
-					usecto += tv.tv_usec;
+					usecto = gettimeofday_usec(&tv);
 					usecto += usectimeout;
 					ts.tv_sec = usecto / 1000000;
 					ts.tv_nsec = (usecto % 1000000) * 1000;

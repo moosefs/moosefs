@@ -61,6 +61,7 @@
 
 #include <stdlib.h>
 #include <inttypes.h>
+#include <clocks.h>
 // #include <syslog.h>
 
 #if defined(HAVE_SETITIMER)
@@ -87,10 +88,7 @@ void cpu_init (void) {
 #endif
 
 #if defined(HAVE_GETTIMEOFDAY)
-	gettimeofday(&tod,NULL);
-	lastget = tod.tv_sec;
-	lastget *= UINT64_C(1000000);
-	lastget += tod.tv_usec;
+	lastget = gettimeofday_usec(&tod);
 #else
 	lastget = time(NULL);
 	lastget *= UINT64_C(1000000);
@@ -137,10 +135,7 @@ void cpu_used (uint64_t *scpu,uint64_t *ucpu) {
 	uint64_t systime,usertime;
 
 #if defined(HAVE_GETTIMEOFDAY)
-	gettimeofday(&tod,NULL);
-	now = tod.tv_sec;
-	now *= UINT64_C(1000000);
-	now += tod.tv_usec;
+	now = gettimeofday_usec(&tod);
 #else
 	now = time(NULL);
 	now *= UINT64_C(1000000);

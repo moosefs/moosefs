@@ -1794,10 +1794,7 @@ void matoclserv_fuse_time_sync(matoclserventry *eptr,const uint8_t *data,uint32_
 		msgid = 0;
 	}
 
-	gettimeofday(&tv,NULL);
-	usectime = tv.tv_sec;
-	usectime *= 1000000;
-	usectime += tv.tv_usec;
+	usectime = gettimeofday_usec(&tv);
 
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_TIME_SYNC,8+length);
 	if (length==4) {

@@ -426,11 +426,8 @@ void main_keep_alive(void) {
 	struct timeval tv;
 	kaentry *kait;
 
-	gettimeofday(&tv,NULL);
 	useclast = usecnow;
-	usecnow = tv.tv_sec;
-	usecnow *= 1000000;
-	usecnow += tv.tv_usec;
+	usecnow = gettimeofday_usec(&tv);
 	now = tv.tv_sec;
 	if (usecnow>useclast && useclast>0) {
 		useclast = usecnow - useclast;
@@ -473,11 +470,8 @@ void mainloop() {
 			pollit->desc(pdesc,&ndesc);
 		}
 		i = poll(pdesc,ndesc,10);
-		gettimeofday(&tv,NULL);
 		useclast = usecnow;
-		usecnow = tv.tv_sec;
-		usecnow *= 1000000;
-		usecnow += tv.tv_usec;
+		usecnow = gettimeofday_usec(&tv);
 		now = tv.tv_sec;
 		if (usecnow>useclast && useclast>0) {
 			useclast = usecnow - useclast;

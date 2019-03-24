@@ -1039,10 +1039,7 @@ const uint8_t* fs_sendandreceive(threc *rec,uint32_t expected_cmd,uint32_t *answ
 					return NULL;
 				}
 				period = usectimeout - period;
-				gettimeofday(&tv, NULL);
-				usecto = tv.tv_sec;
-				usecto *= 1000000;
-				usecto += tv.tv_usec;
+                usecto = gettimeofday_usec(&tv);
 				usecto += period;
 				ts.tv_sec = usecto / 1000000;
 				ts.tv_nsec = (usecto % 1000000) * 1000;
@@ -1176,10 +1173,7 @@ const uint8_t* fs_sendandreceive_any(threc *rec,uint32_t *received_cmd,uint32_t 
 					return NULL;
 				}
 				period = usectimeout - period;
-				gettimeofday(&tv, NULL);
-				usecto = tv.tv_sec;
-				usecto *= 1000000;
-				usecto += tv.tv_usec;
+				usecto = gettimeofday_usec(&tv);
 				usecto += period;
 				ts.tv_sec = usecto / 1000000;
 				ts.tv_nsec = (usecto % 1000000) * 1000;
@@ -2400,10 +2394,7 @@ void* fs_receive_thread(void *arg) {
 					rusectime += usecping/2;
 					// usectime here should have master's wall clock
 					fs_amtime_reference_clock(usec,rusectime);
-					gettimeofday(&tv,NULL);
-					lusectime = tv.tv_sec;
-					lusectime *= 1000000;
-					lusectime += tv.tv_usec;
+					lusectime = gettimeofday_usec(&tv);
 					if (rusectime + 1000000 < lusectime || lusectime + 1000000 < rusectime) {
 						syslog(LOG_WARNING,"time desync between client and master is higher than a second - it might lead to strange atime/mtime behaviour - consider time synchronization in your moosefs cluster");
 					}
@@ -2545,10 +2536,7 @@ void fs_init_threads(uint32_t retries,uint32_t timeout) {
 	af_lruhead = NULL;
 	af_lrutail = &(af_lruhead);
 	af_lru_cnt = 0;
-	gettimeofday(&tv,NULL);
-	usectime = tv.tv_sec;
-	usectime *= 1000000;
-	usectime += tv.tv_usec;
+	usectime = gettimeofday_usec(&tv);
 	timediffusec = usectime - monotonic_useconds(); // before receiving packets from master start with own wall clock
 	zassert(pthread_key_create(&reckey,fs_free_threc));
 	zassert(pthread_mutex_init(&reclock,NULL));

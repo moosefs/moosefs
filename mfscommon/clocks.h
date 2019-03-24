@@ -22,6 +22,9 @@
 #define _CLOCKS_H_
 
 #include <inttypes.h>
+#include <sys/time.h>
+
+uint64_t gettimeofday_usec(struct timeval *tv);
 
 double monotonic_seconds();
 uint64_t monotonic_useconds();

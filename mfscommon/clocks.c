@@ -48,6 +48,11 @@
 
 #include <inttypes.h>
 
+uint64_t gettimeofday_usec(struct timeval *tv) {
+	gettimeofday(tv, NULL);
+	return (uint64_t) (tv->tv_sec * UINT64_C(1000000)) + (uint64_t) tv->tv_usec;
+}
+
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
 double monotonic_seconds() {
 	struct timespec ts;

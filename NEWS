@@ -32,6 +32,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed crc values for non existing blocks
   - (mount) fixed changing processname
   - (supervisor) added reloading config parameters on SIGHUP (aka 'reload' - 'pro' version only)
+  - (cs) fixed exiting protocol
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

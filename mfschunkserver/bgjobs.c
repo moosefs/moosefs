@@ -173,7 +173,7 @@ static jobpool* globalpool = NULL;
 static uint32_t stats_maxjobscnt = 0;
 static uint32_t last_maxjobscnt = 0;
 
-static uint8_t exiting;
+// static uint8_t exiting;
 
 void job_stats(uint32_t *maxjobscnt) {
 	*maxjobscnt = last_maxjobscnt = stats_maxjobscnt;
@@ -409,6 +409,7 @@ void* job_worker(void *arg) {
 
 static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callback)(uint8_t status,void *extra),void *extra) {
 //	jobpool* jp = (jobpool*)jpool;
+/*
 	if (exiting) {
 		if (callback) {
 			callback(MFS_ERROR_NOTDONE,extra);
@@ -418,9 +419,19 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 		}
 		return 0;
 	} else {
-		uint32_t jobid = jp->nextjobid;
-		uint32_t jhpos = JHASHPOS(jobid);
+*/
+		uint32_t jobid;
+		uint32_t jhpos;
 		job *jptr;
+
+		zassert(pthread_mutex_lock(&(jp->jobslock)));
+		jobid = jp->nextjobid;
+		jp->nextjobid++;
+		if (jp->nextjobid==0) {
+			jp->nextjobid=1;
+		}
+		jhpos = JHASHPOS(jobid);
+		zassert(pthread_mutex_unlock(&(jp->jobslock)));
 		jptr = malloc(sizeof(job));
 		passert(jptr);
 		jptr->jobid = jobid;
@@ -431,12 +442,8 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 		jptr->next = jp->jobhash[jhpos];
 		jp->jobhash[jhpos] = jptr;
 		queue_put(jp->jobqueue,jobid,op,(uint8_t*)jptr,1);
-		jp->nextjobid++;
-		if (jp->nextjobid==0) {
-			jp->nextjobid=1;
-		}
 		return jobid;
-	}
+//	}
 }
 
 /* interface */
@@ -466,8 +473,8 @@ void* job_pool_new(uint32_t jobs) {
 	for (i=0 ; i<JHASHSIZE ; i++) {
 		jp->jobhash[i]=NULL;
 	}
-	jp->nextjobid = 1;
 	zassert(pthread_mutex_lock(&(jp->jobslock)));
+	jp->nextjobid = 1;
 	job_spawn_worker(jp);
 	zassert(pthread_mutex_unlock(&(jp->jobslock)));
 	return jp;
@@ -565,6 +572,7 @@ void job_pool_delete(jobpool* jp) {
 	}
 	zassert(pthread_mutex_unlock(&(jp->jobslock)));
 	if (!queue_isempty(jp->statusqueue)) {
+		syslog(LOG_WARNING,"not empty job queue !!!");
 		job_pool_check_jobs(0);
 	}
 //	syslog(LOG_NOTICE,"deleting jobqueue: %p",jp->jobqueue);
@@ -813,9 +821,9 @@ void job_heavyload_test(void) {
 	}
 }
 
-void job_wantexit(void) {
-	exiting = 1;
-}
+//void job_wantexit(void) {
+//	exiting = 1;
+//}
 
 int job_canexit(void) {
 	return (job_pool_jobs_count()>0)?0:1;
@@ -840,7 +848,7 @@ void job_reload(void) {
 
 int job_init(void) {
 //	globalpool = (jobpool*)malloc(sizeof(jobpool));
-	exiting = 0;
+//	exiting = 0;
 	globalpool = job_pool_new(cfg_getuint32("WORKERS_QUEUE_LENGTH",250)); // deprecated option
 
 	if (globalpool==NULL) {
@@ -849,7 +857,7 @@ int job_init(void) {
 	job_reload();
 
 	main_destruct_register(job_term);
-	main_wantexit_register(job_wantexit);
+//	main_wantexit_register(job_wantexit);
 	main_canexit_register(job_canexit);
 	main_reload_register(job_reload);
 	main_eachloop_register(job_heavyload_test);

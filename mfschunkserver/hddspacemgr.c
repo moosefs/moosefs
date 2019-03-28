@@ -5332,6 +5332,12 @@ void* hdd_highspeed_rebalance_thread(void *arg) {
 		do {
 			sstatus = hdd_rebalance_find_servers(&fsrc,&fdst,&changed,rebalance_is_on,1);
 			if (sstatus<0) {
+				zassert(pthread_mutex_lock(&termlock));
+				if (term) {
+					zassert(pthread_mutex_unlock(&termlock));
+					return arg;
+				}
+				zassert(pthread_mutex_unlock(&termlock));
 				zassert(pthread_cond_wait(&highspeed_cond,&folderlock));
 			}
 		} while (sstatus<0);
@@ -6328,7 +6334,7 @@ void hdd_blockbuffer_free(void *addr) {
 #endif
 
 void hdd_term(void) {
-	uint32_t i;
+	uint32_t i,m,l;
 	folder *f,*fn;
 	chunk *c,*cn;
 	dopchunk *dc,*dcn;
@@ -6337,6 +6343,7 @@ void hdd_term(void) {
 	newchunk *nc,*ncn;
 	damagedchunk *dmc,*dmcn;
 
+	syslog(LOG_NOTICE,"terminating aux threads");
 	zassert(pthread_mutex_lock(&termlock));
 	i = term; // if term is non zero here then it means that threads have not been started, so do not join with them
 	term = 1;
@@ -6350,6 +6357,7 @@ void hdd_term(void) {
 	}
 	zassert(pthread_mutex_lock(&folderlock));
 	i = 0;
+	m = 0;
 	for (f=folderhead ; f ; f=f->next) {
 		if (f->scanstate==SCST_SCANINPROGRESS) {
 			f->scanstate = SCST_SCANTERMINATE;
@@ -6357,24 +6365,48 @@ void hdd_term(void) {
 		if (f->scanstate==SCST_SCANTERMINATE || f->scanstate==SCST_SCANFINISHED) {
 			i++;
 		}
+		if (f->rebalance_in_progress>0) {
+			m++;
+		}
 		if (f->scanstate==SCST_WORKING && f->toremove==REMOVING_NO) {
 			hdd_folder_dump_chunkdb_begin(f);
 		}
 	}
 	zassert(pthread_mutex_unlock(&folderlock));
 //	syslog(LOG_NOTICE,"waiting for scanning threads (%"PRIu32")",i);
-	while (i>0) {
+	l = 0;
+	while ((i>0 || m>0) && l<1000) {
+		if ((l%100)==0) {
+			if (i>0) {
+				syslog(LOG_NOTICE,"waiting for scanning threads (%"PRIu32")",i);
+			}
+			if (m>0) {
+				syslog(LOG_NOTICE,"waiting for rebalance jobs (%"PRIu32")",m);
+			}
+		}
 		portable_usleep(10000); // not very elegant solution.
 		zassert(pthread_mutex_lock(&folderlock));
+		m = 0;
 		for (f=folderhead ; f ; f=f->next) {
 			if (f->scanstate==SCST_SCANFINISHED) {
 				zassert(pthread_join(f->scanthread,NULL));
 				f->scanstate = SCST_SCANTERMINATE;	// any state - to prevent calling pthread_join again
 				i--;
 			}
+			if (f->rebalance_in_progress>0) {
+				m++;
+			}
 		}
 		zassert(pthread_mutex_unlock(&folderlock));
+		l++;
 	}
+	if (i>0) {
+		syslog(LOG_WARNING,"can't wait longer for scanning threads (%"PRIu32")",i);
+	}
+	if (m>0) {
+		syslog(LOG_WARNING,"can't wait longer for rebalance jobs (%"PRIu32")",m);
+	}
+	syslog(LOG_NOTICE,"closing chunks");
 	for (i=0 ; i<HASHSIZE ; i++) {
 		for (c=hashtab[i] ; c ; c=cn) {
 			cn = c->next;
@@ -6416,6 +6448,7 @@ void hdd_term(void) {
 			}
 		}
 	}
+	syslog(LOG_NOTICE,"freeing data structures");
 	for (f=folderhead ; f ; f=fn) {
 		fn = f->next;
 		if (f->scanstate==SCST_WORKING && f->toremove==REMOVING_NO) {
@@ -6461,6 +6494,7 @@ void hdd_term(void) {
 		dmcn = dmc->next;
 		free(dmc);
 	}
+	syslog(LOG_NOTICE,"hddspacemgr: terminating done");
 }
 
 int hdd_size_parse(const char *str,uint64_t *ret) {
@@ -6934,6 +6968,12 @@ int hdd_folders_reinit(void) {
 	return ret;
 }
 
+void hdd_wantexit(void) {
+	zassert(pthread_mutex_lock(&folderlock));
+	folderactions = 0; // stop folder actions
+	zassert(pthread_mutex_unlock(&folderlock));
+}
+
 void hdd_info(void) {
 	hdd_open_files_handle(OF_INFO);
 }
@@ -7113,6 +7153,7 @@ int hdd_init(void) {
 	zassert(pthread_mutex_unlock(&folderlock));
 	fprintf(stderr,"hdd space manager: start background hdd scanning (searching for available chunks)\n");
 
+	main_wantexit_register(hdd_wantexit);
 	main_reload_register(hdd_reload);
 	main_time_register(60,0,hdd_diskinfo_movestats);
 	main_destruct_register(hdd_term);

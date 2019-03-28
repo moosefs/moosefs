@@ -970,6 +970,8 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 #endif
 				}
 				pdataleng = leng+8;
+				pdataleng += 0xFFF;
+				pdataleng &= ~0xFFF;
 #ifdef MMAP_ALLOC
 				pdata = mmap(NULL,pdataleng,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
 #else

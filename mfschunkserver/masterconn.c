@@ -668,6 +668,7 @@ void masterconn_send_disconnect_command(void) {
 		put8bit(&buff,63);
 		eptr->mode = CLOSE;
 	} else if (eptr->mode!=FREE) {
+		syslog(LOG_NOTICE,"killing master connection");
 		eptr->mode = KILL;
 	}
 }
@@ -699,7 +700,7 @@ void masterconn_heavyload(uint32_t load,uint8_t hlstatus) {
 	}
 }
 
-void masterconn_check_hdd_space() {
+void masterconn_check_hdd_space(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint8_t *buff;
 	if ((eptr->registerstate==REGISTERED || eptr->registerstate==INPROGRESS) && eptr->mode==DATA) {
@@ -718,7 +719,7 @@ void masterconn_check_hdd_space() {
 	}
 }
 
-void masterconn_check_hdd_reports() {
+void masterconn_check_hdd_reports(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t errorcounter;
 	uint32_t chunkcounter;
@@ -1548,7 +1549,9 @@ void masterconn_disconnection_check(void) {
 
 	if (eptr->mode==KILL || (eptr->mode==CLOSE && eptr->outputhead==NULL)) {
 		// masterconn_beforeclose(eptr);
+		syslog(LOG_NOTICE,"closing connection with master");
 		tcpclose(eptr->sock);
+		eptr->sock = -1;
 		if (eptr->input_packet) {
 			free(eptr->input_packet);
 		}
@@ -1627,7 +1630,8 @@ void masterconn_serve(struct pollfd *pdesc) {
 			eptr->mode = KILL;
 		}
 	}
-	if (wantexittime>0.0 && wantexittime+FORCE_DISCONNECTION_TO < now) {
+	if (eptr->mode==CLOSE && wantexittime>0.0 && wantexittime+FORCE_DISCONNECTION_TO < now) {
+		syslog(LOG_NOTICE,"masterconn: unregistering timed out");
 		eptr->mode = KILL;
 	}
 	masterconn_disconnection_check();

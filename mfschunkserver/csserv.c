@@ -526,12 +526,15 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 	}
 }
 
+void csserv_wantexit(void) {
+	syslog(LOG_NOTICE,"closing %s:%s",ListenHost,ListenPort);
+	tcpclose(lsock);
+	lsock = -1;
+}
+
 void csserv_term(void) {
 	csserventry *eptr,*eaptr;
 	packetstruct *pptr,*paptr;
-
-	syslog(LOG_NOTICE,"closing %s:%s",ListenHost,ListenPort);
-	tcpclose(lsock);
 
 	eptr = csservhead;
 	while (eptr) {
@@ -682,10 +685,15 @@ void csserv_write(csserventry *eptr) {
 void csserv_desc(struct pollfd *pdesc,uint32_t *ndesc) {
 	uint32_t pos = *ndesc;
 	csserventry *eptr;
-	pdesc[pos].fd = lsock;
-	pdesc[pos].events = POLLIN;
-	lsockpdescpos = pos;
-	pos++;
+
+	if (lsock>=0) {
+		pdesc[pos].fd = lsock;
+		pdesc[pos].events = POLLIN;
+		lsockpdescpos = pos;
+		pos++;
+	} else {
+		lsockpdescpos = 0;
+	}
 	for (eptr=csservhead ; eptr ; eptr=eptr->next) {
 		eptr->pdescpos = -1;
 		if (eptr->state==IDLE) {
@@ -709,7 +717,7 @@ void csserv_serve(struct pollfd *pdesc) {
 
 	now = monotonic_seconds();
 
-	if (lsockpdescpos>=0 && (pdesc[lsockpdescpos].revents & POLLIN)) {
+	if (lsockpdescpos>=0 && (pdesc[lsockpdescpos].revents & POLLIN) && lsock>=0) {
 		ns=tcpaccept(lsock);
 		if (ns<0) {
 			mfs_errlog_silent(LOG_NOTICE,"accept error");
@@ -801,6 +809,9 @@ void csserv_reload(void) {
 	char *oldListenHost,*oldListenPort;
 	int newlsock;
 
+	if (lsock<0) { // this is exiting stage - ignore reload
+		return ;
+	}
 //	ThreadedServer = 1-ThreadedServer;
 
 	oldListenHost = ListenHost;
@@ -868,6 +879,7 @@ int csserv_init(void) {
 	mfs_arg_syslog(LOG_NOTICE,"main server module: listen on %s:%s",ListenHost,ListenPort);
 
 	csservhead = NULL;
+	main_wantexit_register(csserv_wantexit);
 	main_reload_register(csserv_reload);
 	main_destruct_register(csserv_term);
 	main_poll_register(csserv_desc,csserv_serve);

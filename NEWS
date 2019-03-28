@@ -33,6 +33,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) fixed changing processname
   - (supervisor) added reloading config parameters on SIGHUP (aka 'reload' - 'pro' version only)
   - (cs) fixed exiting protocol
+  - (cs) added internal rebalance chart
 
 * MooseFS 3.0.103-1 (2018-11-09)
 

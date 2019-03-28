@@ -53,7 +53,7 @@ static const estatdef estatdefs[]=ESTATDEFS
 void chartsdata_refresh(void) {
 	uint64_t data[CHARTS];
 	uint64_t bin,bout;
-	uint32_t i,opr,opw,dbr,dbw,dopr,dopw,repl;
+	uint32_t i,opr,opw,dbr,dbw,dopr,dopw,movl,movh,repl;
 	uint32_t op_cr,op_de,op_ve,op_du,op_tr,op_dt,op_te;
 	uint32_t jobs;
 	uint64_t scpu,ucpu;
@@ -84,7 +84,7 @@ void chartsdata_refresh(void) {
 	data[CHARTS_CSSERVOUT]+=bout;
 	data[CHARTS_HLOPR]=opr;
 	data[CHARTS_HLOPW]=opw;
-	hdd_stats(&bin,&bout,&opr,&opw,&dbr,&dbw,&dopr,&dopw,data+CHARTS_RTIME,data+CHARTS_WTIME);
+	hdd_stats(&bin,&bout,&opr,&opw,&dbr,&dbw,&dopr,&dopw,&movl,&movh,data+CHARTS_RTIME,data+CHARTS_WTIME);
 	data[CHARTS_HDRBYTESR]=bin;
 	data[CHARTS_HDRBYTESW]=bout;
 	data[CHARTS_HDRLLOPR]=opr;
@@ -93,6 +93,8 @@ void chartsdata_refresh(void) {
 	data[CHARTS_DATABYTESW]=dbw;
 	data[CHARTS_DATALLOPR]=dopr;
 	data[CHARTS_DATALLOPW]=dopw;
+	data[CHARTS_MOVELS]=movl;
+	data[CHARTS_MOVEHS]=movh;
 	replicator_stats(data+CHARTS_CSREPIN,data+CHARTS_CSREPOUT,&repl);
 	data[CHARTS_REPL]=repl;
 	hdd_op_stats(&op_cr,&op_de,&op_ve,&op_du,&op_tr,&op_dt,&op_te);

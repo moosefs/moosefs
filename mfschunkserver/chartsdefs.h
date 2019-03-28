@@ -54,8 +54,10 @@
 #define CHARTS_LOAD 28
 #define CHARTS_MEMORY_RSS 29
 #define CHARTS_MEMORY_VIRT 30
+#define CHARTS_MOVELS 31
+#define CHARTS_MOVEHS 32
 
-#define CHARTS 32
+#define CHARTS 33
 
 #define STRID(a,b,c,d) (((((uint8_t)a)*256U+(uint8_t)b)*256U+(uint8_t)c)*256U+(uint8_t)d)
 
@@ -92,6 +94,8 @@
 	{"load"         ,STRID('L','O','A','D'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"memoryrss"    ,STRID('M','E','M','R'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"memoryvirt"   ,STRID('M','E','M','V'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"movels"       ,STRID('M','O','V','L'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"movehs"       ,STRID('M','O','V','H'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{NULL           ,0                     ,0              ,0,0                 ,   0,    0}  \
 };
 
@@ -110,6 +114,7 @@
 	{"hddopsr"      ,STRID('H','D','O','R'),CHARTS_DIRECT(CHARTS_HDRLLOPR)    ,CHARTS_DIRECT(CHARTS_DATALLOPR)   ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"hddopsw"      ,STRID('H','D','O','W'),CHARTS_DIRECT(CHARTS_HDRLLOPW)    ,CHARTS_DIRECT(CHARTS_DATALLOPW)   ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"mem"          ,STRID('T','M','E','M'),CHARTS_CALC(0)                    ,CHARTS_DIRECT(CHARTS_MEMORY_RSS)  ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"move"         ,STRID('M','O','V','E'),CHARTS_DIRECT(CHARTS_MOVELS)      ,CHARTS_DIRECT(CHARTS_MOVEHS)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{NULL           ,0                     ,CHARTS_NONE                       ,CHARTS_NONE                       ,CHARTS_NONE                       ,0              ,0,0                 ,   0, 0}  \
 };
 

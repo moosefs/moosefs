@@ -381,6 +381,8 @@ static uint32_t stats_databytesr = 0;
 static uint32_t stats_databytesw = 0;
 static uint32_t stats_dataopr = 0;
 static uint32_t stats_dataopw = 0;
+static uint32_t stats_movels = 0;
+static uint32_t stats_movehs = 00;
 static uint64_t stats_rtime = 0;
 static uint64_t stats_wtime = 0;
 
@@ -628,7 +630,7 @@ uint8_t hdd_spacechanged(void) {
 #endif
 }
 
-void hdd_stats(uint64_t *br,uint64_t *bw,uint32_t *opr,uint32_t *opw,uint32_t *dbr,uint32_t *dbw,uint32_t *dopr,uint32_t *dopw,uint64_t *rtime,uint64_t *wtime) {
+void hdd_stats(uint64_t *br,uint64_t *bw,uint32_t *opr,uint32_t *opw,uint32_t *dbr,uint32_t *dbw,uint32_t *dopr,uint32_t *dopw,uint32_t *movl,uint32_t *movh,uint64_t *rtime,uint64_t *wtime) {
 	zassert(pthread_mutex_lock(&statslock));
 	*br = stats_bytesr;
 	*bw = stats_bytesw;
@@ -638,6 +640,8 @@ void hdd_stats(uint64_t *br,uint64_t *bw,uint32_t *opr,uint32_t *opw,uint32_t *d
 	*dbw = stats_databytesw;
 	*dopr = stats_dataopr;
 	*dopw = stats_dataopw;
+	*movl = stats_movels;
+	*movh = stats_movehs;
 	*rtime = stats_rtime;
 	*wtime = stats_wtime;
 	stats_bytesr = 0;
@@ -648,6 +652,8 @@ void hdd_stats(uint64_t *br,uint64_t *bw,uint32_t *opr,uint32_t *opw,uint32_t *d
 	stats_databytesw = 0;
 	stats_dataopr = 0;
 	stats_dataopw = 0;
+	stats_movels = 0;
+	stats_movehs = 0;
 	stats_rtime = 0;
 	stats_wtime = 0;
 	zassert(pthread_mutex_unlock(&statslock));
@@ -669,6 +675,16 @@ void hdd_op_stats(uint32_t *op_create,uint32_t *op_delete,uint32_t *op_version,u
 	stats_truncate = 0;
 	stats_duptrunc = 0;
 	stats_test = 0;
+	zassert(pthread_mutex_unlock(&statslock));
+}
+
+static inline void hdd_stats_move(uint8_t hsflag) {
+	zassert(pthread_mutex_lock(&statslock));
+	if (hsflag) {
+		stats_movehs++;
+	} else {
+		stats_movels++;
+	}
 	zassert(pthread_mutex_unlock(&statslock));
 }
 
@@ -4828,7 +4844,9 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 		syslog(LOG_NOTICE,"move chunk %s -> %s (can't find valid chunk to move)",fsrc->path,fdst->path);
 		return MFS_ERROR_NOCHUNK;
 	}
+#ifdef MFSDEBUG
 	syslog(LOG_NOTICE,"move chunk %s -> %s (chunk: %016"PRIX64"_%08"PRIX32")",fsrc->path,fdst->path,c->chunkid,c->version);
+#endif
 	status = hdd_io_begin(c,MODE_EXISTING);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c);
@@ -5290,6 +5308,7 @@ void hdd_move_finished(uint8_t status,void *arg) {
 	zassert(pthread_cond_signal(&highspeed_cond));
 	zassert(pthread_mutex_unlock(&folderlock));
 	free(r);
+	hdd_stats_move(1);
 }
 
 void* hdd_highspeed_rebalance_thread(void *arg) {
@@ -5464,6 +5483,7 @@ void* hdd_rebalance_thread(void *arg) {
 			fdst->rebalance_in_progress--;
 			fdst->rebalance_last_usec = en;
 			zassert(pthread_mutex_unlock(&folderlock));
+			hdd_stats_move(0);
 			rebalance_is_on = 1;
 #ifdef HAVE___SYNC_FETCH_AND_OP
 			__sync_fetch_and_or(&global_rebalance_is_on,1);

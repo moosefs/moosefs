@@ -317,6 +317,8 @@ else: # CLI mode
 			('load',28,3,'Server load'),
 			('memoryrss',29,2,'Resident memory usage'),
 			('memoryvirt',30,2,'Virtual memory usage'),
+			('movels',31,1,'Low speed move ops'),
+			('movehs',32,1,'High speed move ops'),
 			('cpu',100,0,'Cpu usage (total sys+user)')
 	]
 	ccchartsabr = {
@@ -7221,6 +7223,7 @@ if "CC" in sectionset:
 				(20,'repl','number of chunk replications per minute'),
 				(21,'create','number of chunk creations per minute'),
 				(22,'delete','number of chunk deletions per minute'),
+				(108,'move','number of chunk internal rebalances per minute (low speed + high speed)'),
 				(28,'load','load - max operations in queue'),
 			)
 

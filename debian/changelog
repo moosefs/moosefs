@@ -43,8 +43,10 @@ moosefs (3.0.104-1) unstable; urgency=medium
   * (mount) fixed changing processname
   * (supervisor) added reloading config parameters on SIGHUP (aka 'reload' -
     'pro' version only)
+  * (cs) fixed exiting protocol
+  * (cs) added internal rebalance chart
 
- -- MooseFS Team <contact@moosefs.com>  Mon, 12 Mar 2018 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Sun, 18 Mar 2018 12:00:00 +0100
 
 moosefs (3.0.103-1) unstable; urgency=medium
 

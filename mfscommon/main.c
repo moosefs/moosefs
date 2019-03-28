@@ -75,6 +75,9 @@
 #include <sys/resource.h>
 #include <grp.h>
 #include <pwd.h>
+#ifdef USE_PTHREADS
+#include <pthread.h>
+#endif
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
@@ -184,6 +187,9 @@ typedef struct timeentry {
 
 static timeentry *timehead=NULL;
 
+#ifdef USE_PTHREADS
+static pthread_mutex_t nowlock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 static uint32_t now;
 static uint64_t usecnow;
 //static int alcnt=0;
@@ -406,7 +412,15 @@ int canexit() {
 }
 
 uint32_t main_time() {
+#ifdef USE_PTHREADS
+	uint32_t ret;
+	zassert(pthread_mutex_lock(&nowlock));
+	ret = now;
+	zassert(pthread_mutex_unlock(&nowlock));
+	return ret;
+#else
 	return now;
+#endif
 }
 
 /*
@@ -431,7 +445,13 @@ void main_keep_alive(void) {
 	usecnow = tv.tv_sec;
 	usecnow *= 1000000;
 	usecnow += tv.tv_usec;
+#ifdef USE_PTHREADS
+	zassert(pthread_mutex_lock(&nowlock));
+#endif
 	now = tv.tv_sec;
+#ifdef USE_PTHREADS
+	zassert(pthread_mutex_unlock(&nowlock));
+#endif
 	if (usecnow>useclast && useclast>0) {
 		useclast = usecnow - useclast;
 	} else {
@@ -478,7 +498,13 @@ void mainloop() {
 		usecnow = tv.tv_sec;
 		usecnow *= 1000000;
 		usecnow += tv.tv_usec;
+#ifdef USE_PTHREADS
+		zassert(pthread_mutex_lock(&nowlock));
+#endif
 		now = tv.tv_sec;
+#ifdef USE_PTHREADS
+		zassert(pthread_mutex_unlock(&nowlock));
+#endif
 		if (usecnow>useclast && useclast>0) {
 			useclast = usecnow - useclast;
 		} else {
@@ -625,7 +651,13 @@ int initialize(void) {
 	int ok;
 	ok = 1;
 	for (i=0 ; (long int)(RunTab[i].fn)!=0 && ok ; i++) {
+#ifdef USE_PTHREADS
+		zassert(pthread_mutex_lock(&nowlock));
+#endif
 		now = time(NULL);
+#ifdef USE_PTHREADS
+		zassert(pthread_mutex_unlock(&nowlock));
+#endif
 		if (RunTab[i].fn()<0) {
 			mfs_arg_syslog(LOG_ERR,"init: %s failed !!!",RunTab[i].name);
 			ok=0;
@@ -639,13 +671,25 @@ int initialize_late(void) {
 	int ok;
 	ok = 1;
 	for (i=0 ; (long int)(LateRunTab[i].fn)!=0 && ok ; i++) {
+#ifdef USE_PTHREADS
+		zassert(pthread_mutex_lock(&nowlock));
+#endif
 		now = time(NULL);
+#ifdef USE_PTHREADS
+		zassert(pthread_mutex_unlock(&nowlock));
+#endif
 		if (LateRunTab[i].fn()<0) {
 			mfs_arg_syslog(LOG_ERR,"init: %s failed !!!",RunTab[i].name);
 			ok=0;
 		}
 	}
+#ifdef USE_PTHREADS
+	zassert(pthread_mutex_lock(&nowlock));
+#endif
 	now = time(NULL);
+#ifdef USE_PTHREADS
+	zassert(pthread_mutex_unlock(&nowlock));
+#endif
 	return ok;
 }
 

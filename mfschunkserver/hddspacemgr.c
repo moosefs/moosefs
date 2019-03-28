@@ -218,27 +218,27 @@ typedef struct folder {
 #define SCST_SCANFINISHED 3
 #define SCST_SENDNEEDED 4
 #define SCST_WORKING 5
-	unsigned int scanstate:3;
-	unsigned int needrefresh:1;
+	uint8_t scanstate;
+	uint8_t needrefresh;
 #define MFR_NO 0
 #define MFR_YES 1
 #define MFR_READONLY 2
-	unsigned int markforremoval:2;
+	uint8_t markforremoval;
 #define REBALANCE_STD 0
 #define REBALANCE_FORCE_SRC 1
 #define REBALANCE_FORCE_DST 2
-	unsigned int balancemode:2;
-	unsigned int damaged:1;
+	uint8_t balancemode;
+	uint8_t damaged;
 #define REMOVING_NO 0
 #define REMOVING_INPROGRESS 1
 #define REMOVING_START 2
 #define REMOVING_END 3
-	unsigned int toremove:2;
+	uint8_t toremove;
 #define REBALANCE_NONE 0
 #define REBALANCE_SRC 1
 #define REBALANCE_DST 2
-	unsigned int tmpbalancemode:2;
-	unsigned int ignoresize:1;
+	uint8_t tmpbalancemode;
+	uint8_t ignoresize;
 	uint8_t scanprogress;
 	uint64_t sizelimit;
 	uint64_t leavefree;
@@ -1947,6 +1947,7 @@ uint32_t hdd_get_chunks_next_list_count() {
 	uint32_t res = 0;
 	uint32_t i = 0;
 	chunk *c;
+	zassert(pthread_mutex_lock(&folderlock)); // c->owner !!!
 	if (hdd_get_chunks_partialmode) {
 		zassert(pthread_mutex_lock(&hashlock));
 	}
@@ -1958,8 +1959,11 @@ uint32_t hdd_get_chunks_next_list_count() {
 		}
 		i++;
 	}
-	if (res==0 && hdd_get_chunks_partialmode) {
-		zassert(pthread_mutex_unlock(&hashlock));
+	if (res==0) {
+		if (hdd_get_chunks_partialmode) {
+			zassert(pthread_mutex_unlock(&hashlock));
+		}
+		zassert(pthread_mutex_unlock(&folderlock));
 	}
 	return res;
 }
@@ -1985,6 +1989,7 @@ void hdd_get_chunks_next_list_data(uint8_t *buff) {
 	if (hdd_get_chunks_partialmode) {
 		zassert(pthread_mutex_unlock(&hashlock));
 	}
+	zassert(pthread_mutex_unlock(&folderlock));
 }
 
 /*
@@ -4839,6 +4844,19 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 	pthread_mutex_unlock(&cfglock);
 #endif
 
+	zassert(pthread_mutex_lock(&folderlock));
+	if (folderactions==0) {
+		zassert(pthread_mutex_unlock(&folderlock));
+		return MFS_ERROR_NOTDONE;
+	}
+	if (!(
+		(fsrc->damaged==0 && fsrc->toremove==REMOVING_NO && fsrc->markforremoval==MFR_NO && fsrc->scanstate==SCST_WORKING && fsrc->total>0) ||
+		(fdst->damaged==0 && fdst->toremove==REMOVING_NO && fdst->markforremoval==MFR_NO && fdst->scanstate==SCST_WORKING && fdst->total>0)
+	)) {
+		zassert(pthread_mutex_unlock(&folderlock));
+		return MFS_ERROR_NOTDONE;
+	}
+	zassert(pthread_mutex_unlock(&folderlock));
 	c = hdd_random_chunk(fsrc);
 	if (c==NULL) {
 		syslog(LOG_NOTICE,"move chunk %s -> %s (can't find valid chunk to move)",fsrc->path,fdst->path);
@@ -5024,9 +5042,11 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 	}
 
 	// generate new file name
+	zassert(pthread_mutex_lock(&folderlock));
 	c->owner = fdst;
 	hdd_generate_filename(fname,c);
 	c->owner = fsrc;
+	zassert(pthread_mutex_unlock(&folderlock));
 
 	if (rename(tmp_filename,fname)<0) {
 		mfs_arg_errlog_silent(LOG_WARNING,"move_chunk: file:%s->%s - rename error",tmp_filename,fname);
@@ -6099,7 +6119,7 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen) {
 		hdd_add_chunk(f,pathid,chunkid,version,blocks,hdrsize);
 	}
 
-	syslog(LOG_NOTICE,"scanning folder %s: .chunkdb used - full scan don't needed",f->path);
+	syslog(LOG_NOTICE,"scanning folder %s: .chunkdb used - full scan not needed",f->path);
 	free(chunkbuff);
 	return 0;
 }
@@ -6272,9 +6292,8 @@ void* hdd_folder_scan(void *arg) {
 	free(fullname);
 //	fprintf(stderr,"hdd space manager: %s: %"PRIu32" chunks found\n",f->path,f->chunkcount);
 
-	hdd_testshuffle(f);
-
 	zassert(pthread_mutex_lock(&folderlock));
+	hdd_testshuffle(f);
 	if (f->scanstate==SCST_SCANTERMINATE) {
 		syslog(LOG_NOTICE,"scanning folder %s: interrupted",f->path);
 	} else {

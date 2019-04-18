@@ -4009,7 +4009,7 @@ uint8_t chunk_labelset_can_be_fulfilled(uint8_t labelcnt,uint32_t **labelmasks) 
 		}
 	}
 
-	if (allcsids > stdcsids) {
+	if (allcsids > olcsids) {
 		matching = do_perfect_match(labelcnt,allcscnt,labelmasks,allcsids);
 
 		r = 1;

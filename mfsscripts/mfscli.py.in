@@ -2377,8 +2377,10 @@ if not cgimode:
 		allowedsections = ["IN","CS","HD","EX","QU","MC","CC"]
 	elif followerfound:
 		allowedsections = ["IN","MC"]
-	else:
+	elif len(masterlist)>0:
 		allowedsections = ["IN"]
+	else:
+		sys.exit(1)
 
 	filtered_sectionset = []
 	for section in sectionset:

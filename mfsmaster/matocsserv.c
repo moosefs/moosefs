@@ -768,39 +768,43 @@ uint16_t matocsserv_almostfull_servers(void) {
 	return cnt;
 }
 
+// std - standard servers that can be use for write
+// ol - standard and overloaded servers - can't be used for write, but are present and have free space
+// all - all correct servers - standard, overloaded and servers without free space
 void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT],uint16_t *olcscnt,uint16_t olcsids[MAXCSCOUNT],uint16_t *allcscnt,uint16_t allcsids[MAXCSCOUNT]) {
 	matocsserventry *eptr;
 	uint32_t gracecnt;
-	uint32_t allcnt;
+	uint32_t stdcnt;
 	uint32_t totalcnt;
 
 	gracecnt = 0;
-	allcnt = 0;
+	stdcnt = 0;
 	totalcnt = 0;
 
 	*stdcscnt = 0;
 	*olcscnt = 0;
 	*allcscnt = 0;
 
-	for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
+	for (eptr = matocsservhead ; eptr && totalcnt<MAXCSCOUNT ; eptr=eptr->next) {
+		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) { // is this correct CS?
 			allcsids[*allcscnt] = eptr->csid;
 			(*allcscnt)++;
-			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
-				totalcnt++;
+			totalcnt++;
+			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) { // server is not overloaded and have enough free space ?
 				olcsids[*olcscnt] = eptr->csid;
 				(*olcscnt)++;
 				if ((eptr->privflag & 2) == 0) {
 					if ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr)) {
 						gracecnt++;
+						stdcsids[MAXCSCOUNT-gracecnt] = eptr->csid;
 					} else {
 						stdcsids[*stdcscnt] = eptr->csid;
 						(*stdcscnt)++;
-						allcnt++;
+						stdcnt++;
 					}
 				}
 			} else {
-				if ((eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE) {
+				if ((eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE) { // does it have available space ?
 					olcsids[*olcscnt] = eptr->csid;
 					(*olcscnt)++;
 				}
@@ -808,59 +812,39 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 		}
 	}
 
-	if ((gracecnt*5) > (gracecnt+allcnt)) { // there are more than 20% CS in 'grace' state - add all of them to the list
-		for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->csptr!=NULL && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
-				if ((eptr->privflag & 2)==0 && ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr))) {
-					stdcsids[*stdcscnt] = eptr->csid;
-					(*stdcscnt)++;
-				}
-			}
+	if ((gracecnt*5) > (gracecnt+stdcnt)) { // there are more than 20% CS in 'grace' state - add all of them to the list
+		while (gracecnt>0) {
+			stdcsids[*stdcscnt] = stdcsids[MAXCSCOUNT-gracecnt];
+			(*stdcscnt)++;
+			gracecnt--;
 		}
 	}
 }
 
+/* servers used when new chunk is created */
 uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *overloaded) {
 	matocsserventry* servtab[MAXCSCOUNT];
 	matocsserventry *eptr;
 	uint32_t i;
 	uint32_t gracecnt;
-	uint32_t allcnt;
+	uint32_t stdcnt;
 	uint32_t totalcnt;
-//	uint32_t wspacecnt;
-//	uint32_t now = main_time();
-
-//	matocsserv_recalc_createflag(tolerance);
-
-/*
-	totalcnt = 0;
-	wspacecnt = 0;
-
-	for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
-		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL && eptr->cancreatechunks) {
-			totalcnt++;
-			if (eptr->cancreatechunks && (eptr->totalspace - eptr->usedspace) * 100 > eptr->totalspace) { // used space <= 99%
-				wspacecnt++;
-			}
-		}
-	}
-*/
 	gracecnt = 0;
-	allcnt = 0;
+	stdcnt = 0;
 	totalcnt = 0;
 	*overloaded = 0;
 
-	for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
+	for (eptr = matocsservhead ; eptr && totalcnt<MAXCSCOUNT ; eptr=eptr->next) {
 		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
 			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
 				totalcnt++;
 				if ((eptr->privflag & 2) == 0) {
-	//			if (eptr->cancreatechunks) {
 					if ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr)) {
 						gracecnt++;
+						servtab[MAXCSCOUNT-gracecnt] = eptr;
 					} else {
-						servtab[allcnt] = eptr;
-						allcnt++;
+						servtab[stdcnt] = eptr;
+						stdcnt++;
 					}
 				}
 			} else {
@@ -871,25 +855,21 @@ uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *over
 		}
 	}
 
-	if ((gracecnt*5) > (gracecnt+allcnt)) { // there are more than 20% CS in 'grace' or 'rebalance' state - add all of them to the list
-		for (eptr = matocsservhead ; eptr && allcnt<MAXCSCOUNT ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && (eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->csptr!=NULL && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
-				if ((eptr->privflag & 2)==0 && ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr))) {
-//				if (eptr->cancreatechunks && csdb_server_is_overloaded(eptr->csptr,now)) {
-					servtab[allcnt] = eptr;
-					allcnt++;
-				}
-			}
+	if ((gracecnt*5) > (gracecnt+stdcnt)) { // there are more than 20% CS in 'grace' or 'rebalance' state - add all of them to the list
+		while (gracecnt>0) {
+			servtab[stdcnt] = servtab[MAXCSCOUNT-gracecnt];
+			stdcnt++;
+			gracecnt--;
 		}
 	}
 
-	matocsserv_weighted_roundrobin_sort(servtab,allcnt);
+	matocsserv_weighted_roundrobin_sort(servtab,stdcnt);
 
-	for (i=0 ; i<allcnt ; i++) {
+	for (i=0 ; i<stdcnt ; i++) {
 		csids[i] = servtab[i]->csid;
 	}
 
-	return allcnt;
+	return stdcnt;
 }
 
 void matocsserv_useservers_wrandom(void* servers[MAXCSCOUNT],uint16_t cnt) {

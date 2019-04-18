@@ -147,7 +147,7 @@ typedef struct worker_s {
 
 static pthread_mutex_t fcblock;
 static pthread_cond_t fcbcond;
-static uint8_t fcbwaiting;
+static uint16_t fcbwaiting;
 static cblock *cacheblocks,*freecblockshead;
 static uint32_t freecacheblocks;
 static uint32_t cacheblockcount;

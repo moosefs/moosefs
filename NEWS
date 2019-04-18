@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.105-1 (WIP)
 
   - (nbd) fixed segfault when filename not specified
+  - (client) fixed size of waiting threads counter (very rare deadlock in write module)
 
 * MooseFS 3.0.104-1 (2019-03-18)
 

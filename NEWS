@@ -1,6 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.104-1 (2018-03-18)
+* MooseFS 3.0.105-1 (WIP)
+
+  - (nbd) fixed segfault when filename not specified
+
+* MooseFS 3.0.104-1 (2019-03-18)
 
   - (master) fixed taking into account labels in classes 1-9
   - (master) fixed recovering userperm and otherperm in ACL (in practice it doesn't matter - mainly cosmetics)
@@ -9,7 +13,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) fixed handling internal packets with size zero (client disconnection during chunkserver registration)
   - (client) fixed symlink cache handling (potential race condition)
   - (master) added global option for preventing using same ip or same rack for more than one chunk copy
-  - (clinet) added ignoring '_netdev' option - sometimes needed in case of mounting from fstab
+  - (client) added ignoring '_netdev' option - sometimes needed in case of mounting from fstab
   - (master) added defining rackid as string paths in mfstopology.cfg (introdiced optional higher distances between servers)
   - (master) fixed desync on adding damaged chunk
   - (master) added changelog save mode (background,async and sync)

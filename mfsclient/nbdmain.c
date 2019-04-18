@@ -607,7 +607,7 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	struct stat stbuf;
 
 #define nbd_start_err_msg(format, ...) {\
-        syslog(LOG_ERR,(format), __VA_ARGS__); \
+	syslog(LOG_ERR,(format), __VA_ARGS__); \
 	snprintf(errmsg,NBD_ERR_SIZE,(format), __VA_ARGS__); \
 }
 
@@ -1870,10 +1870,14 @@ int nbd_remove_mapping(const char *appname,int argc,char *argv[]) {
 		goto err;
 	}
 
-	pleng = strlen(filename);
-	if (pleng>65535) {
-		fprintf(stderr,"MFS file name too long\n");
-		goto err;
+	if (filename!=NULL) {
+		pleng = strlen(filename);
+		if (pleng>65535) {
+			fprintf(stderr,"MFS file name too long\n");
+			goto err;
+		}
+	} else {
+		pleng = 0;
 	}
 	if (device!=NULL) {
 		dleng = strlen(device);
@@ -1902,8 +1906,10 @@ int nbd_remove_mapping(const char *appname,int argc,char *argv[]) {
 	put32bit(&wptr,dsize);
 
 	put16bit(&wptr,pleng);
-	memcpy(wptr,filename,pleng);
-	wptr+=pleng;
+	if (pleng>0) {
+		memcpy(wptr,filename,pleng);
+		wptr+=pleng;
+	}
 	put8bit(&wptr,dleng);
 	if (dleng>0) {
 		memcpy(wptr,device,dleng);
@@ -2071,10 +2077,14 @@ int nbd_resize_bdev(const char *appname,int argc,char *argv[]) {
 		goto err;
 	}
 
-	pleng = strlen(filename);
-	if (pleng>65535) {
-		fprintf(stderr,"MFS file name too long\n");
-		goto err;
+	if (filename!=NULL) {
+		pleng = strlen(filename);
+		if (pleng>65535) {
+			fprintf(stderr,"MFS file name too long\n");
+			goto err;
+		}
+	} else {
+		pleng = 0;
 	}
 	if (device!=NULL) {
 		dleng = strlen(device);
@@ -2103,8 +2113,10 @@ int nbd_resize_bdev(const char *appname,int argc,char *argv[]) {
 	put32bit(&wptr,dsize);
 
 	put16bit(&wptr,pleng);
-	memcpy(wptr,filename,pleng);
-	wptr+=pleng;
+	if (pleng>0) {
+		memcpy(wptr,filename,pleng);
+		wptr+=pleng;
+	}
 	put8bit(&wptr,dleng);
 	if (dleng>0) {
 		memcpy(wptr,device,dleng);

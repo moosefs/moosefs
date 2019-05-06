@@ -5,6 +5,7 @@ This file lists noteworthy changes in MooseFS.
   - (nbd) fixed segfault when filename not specified
   - (client) fixed size of waiting threads counter (very rare deadlock in write module)
   - (cli) fixed status returned in case of master name that can't be resolved (issue #238)
+  - (nbd) added optios for specifying subfolder on MFS for block devices (issue #252)
 
 * MooseFS 3.0.104-1 (2019-03-18)
 

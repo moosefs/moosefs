@@ -1308,7 +1308,7 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 	fg = 0;
 	bdhead = NULL;
 
-	while ((ch = getopt(argc, argv, "H:P:p:x:l:Fh?")) != -1) {
+	while ((ch = getopt(argc, argv, "H:P:S:p:x:l:Fh?")) != -1) {
 		switch (ch) {
 			case 'H':
 				if (mcfg.masterhost!=NULL) {
@@ -1321,6 +1321,12 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 					free(mcfg.masterport);
 				}
 				mcfg.masterport = strdup(optarg);
+				break;
+			case 'S':
+				if (mcfg.masterpath!=NULL) {
+					free(mcfg.masterpath);
+				}
+				mcfg.masterpath = strdup(optarg);
 				break;
 			case 'p':
 				if (mcfg.masterpassword!=NULL) {
@@ -1372,7 +1378,9 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 		mcfg.masterport = strdup("9421");
 	}
 	mcfg.mountpoint = strdup("[NBD]");
-	mcfg.masterpath = strdup("/");
+	if (mcfg.masterpath==NULL) {
+		mcfg.masterpath = strdup("/");
+	}
 	mcfg.read_cache_mb = 128;
 	mcfg.write_cache_mb = 128;
 	mcfg.io_try_cnt = 30;

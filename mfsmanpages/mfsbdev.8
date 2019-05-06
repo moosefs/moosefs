@@ -1,10 +1,11 @@
-.TH mfsbdev "8" "March 2019" "MooseFS 3.0.104-1" "This is part of MooseFS"
+.TH mfsbdev "23" "May 2019" "MooseFS 3.0.105-1" "This is part of MooseFS"
 .SH NAME
 mfsbdev \- \fBMooseFS\fP block device daemon/management tool
 .SH SYNOPSIS
 .B mfsbdev start
 [\fB-H\fP \fImasterhost\fP]
 [\fB-P\fP \fImasterport\fP]
+[\fB-S\fP \fImasterpath\fP]
 [\fB-p\fP \fImasterpassword\fP | \fB-x\fP \fIpasswordfile\fP]
 [\fB-l\fP \fIlinksocket\fP]
 [\fB-F\fP]
@@ -63,6 +64,9 @@ socket is specified via -l option, the default is used: /dev/mfs/nbdsock
 .PP
 .B -P
 - master port; default is '9421'
+.PP
+.B -S
+- master path (subfolder in MFS that will be used as a root for all block device mappings); default is '/'
 .PP
 .B -p
 - master password; mutually exclusive with -x option; if neither -p nor -x are supplied, the tool tries

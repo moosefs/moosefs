@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.104], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.105], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -22,7 +22,7 @@ AC_DEFINE_UNQUOTED([VERSHEX], [(($versmaj)*0x10000+($versmid)*0x100+($versmin)*2
 #AC_DEFINE_UNQUOTED([VERSMIN], [$versmin], [Minor MFS version])
 #AC_DEFINE_UNQUOTED([VERSHEX], [(($versmaj)*0x10000+($versmid)*0x100+($versmin))], [Full MFS version as a hex number])
 AC_DEFINE_UNQUOTED([RELEASE], [$release], [Release number])
-AC_DEFINE_UNQUOTED([VERSION2INT(maj,med,min)], [((maj)*0x10000+(med)*0x100+(((maj)>1)?((min)*2):(min)))], [Version converter from human readable format to binary format used in MFS packets])
+AC_DEFINE([VERSION2INT(maj,med,min)], [((maj)*0x10000+(med)*0x100+(((maj)>1)?((min)*2):(min)))], [Version converter from human readable format to binary format used in MFS packets])
 AC_DEFINE_UNQUOTED([VERSSTR], ["${PACKAGE_VERSION}-${release}"], [MFS version - string])
 
 # Checks for programs.
@@ -153,7 +153,7 @@ AC_CHECK_MEMBERS([struct stat.st_rdev])
 AC_CHECK_MEMBERS([struct stat.st_birthtime])
 AC_CHECK_MEMBERS([struct stat.st_blksize])
 AC_CHECK_MEMBERS([struct stat.st_flags])
-AC_CHECK_MEMBER([struct sockaddr_in.sin_len], [ AC_DEFINE(HAVE_SOCKADDR_SIN_LEN, 1, [Do we have sockaddr.sin_len?]) ], [], [
+AC_CHECK_MEMBER([struct sockaddr_in.sin_len], [ AC_DEFINE([HAVE_SOCKADDR_SIN_LEN], [1], [Do we have sockaddr.sin_len?]) ], [], [
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -262,10 +262,10 @@ AC_RUN_IFELSE(
 	[AC_LANG_PROGRAM([#include <inttypes.h>],[uint16_t x = __builtin_bswap16(0x1234)])],
 	[
 	AC_MSG_RESULT(yes)
-	AC_DEFINE_UNQUOTED([BSWAP16(x)], [__builtin_bswap16(x)], [bswap16])
+	AC_DEFINE([BSWAP16(x)], [__builtin_bswap16(x)], [bswap16])
 	],[
 	AC_MSG_RESULT(no)
-	AC_DEFINE_UNQUOTED([BSWAP16(x)], [((((x)<<8)&0xFF00) | (((x)>>8)&0xFF))], [bswap16])
+	AC_DEFINE([BSWAP16(x)], [((((x)<<8)&0xFF00) | (((x)>>8)&0xFF))], [bswap16])
 	])
 
 AC_MSG_CHECKING([for __builtin_bswap32])
@@ -273,10 +273,10 @@ AC_RUN_IFELSE(
 	[AC_LANG_PROGRAM([#include <inttypes.h>],[uint32_t x = __builtin_bswap32(0x12345678)])],
 	[
 	AC_MSG_RESULT(yes)
-	AC_DEFINE_UNQUOTED([BSWAP32(x)], [__builtin_bswap32(x)], [bswap32])
+	AC_DEFINE([BSWAP32(x)], [__builtin_bswap32(x)], [bswap32])
 	],[
 	AC_MSG_RESULT(no)
-	AC_DEFINE_UNQUOTED([BSWAP32(x)], [((((x)<<24)&0xFF000000) | (((x)<<8)&0xFF0000) | (((x)>>8)&0xFF00) | (((x)>>24)&0xFF))], [bswap32])
+	AC_DEFINE([BSWAP32(x)], [((((x)<<24)&0xFF000000) | (((x)<<8)&0xFF0000) | (((x)>>8)&0xFF00) | (((x)>>24)&0xFF))], [bswap32])
 	])
 
 AC_MSG_CHECKING([for __builtin_bswap64])
@@ -284,10 +284,10 @@ AC_RUN_IFELSE(
 	[AC_LANG_PROGRAM([#include <inttypes.h>],[uint64_t x = __builtin_bswap64(0x123456789ABCDEF0)])],
 	[
 	AC_MSG_RESULT(yes)
-	AC_DEFINE_UNQUOTED([BSWAP64(x)], [__builtin_bswap64(x)], [bswap64])
+	AC_DEFINE([BSWAP64(x)], [__builtin_bswap64(x)], [bswap64])
 	],[
 	AC_MSG_RESULT(no)
-	AC_DEFINE_UNQUOTED([BSWAP64(x)], [((((x)<<56)&0xFF00000000000000) | (((x)<<40)&0xFF000000000000) | (((x)<<24)&0xFF0000000000) | (((x)<<8)&0xFF00000000) | (((x)>>8)&0xFF000000) | (((x)>>24)&0xFF0000) | (((x)>>40)&0xFF00) | (((x)>>56)&0xFF))], [bswap64])
+	AC_DEFINE([BSWAP64(x)], [((((x)<<56)&0xFF00000000000000) | (((x)<<40)&0xFF000000000000) | (((x)<<24)&0xFF0000000000) | (((x)<<8)&0xFF00000000) | (((x)>>8)&0xFF000000) | (((x)>>24)&0xFF0000) | (((x)>>40)&0xFF00) | (((x)>>56)&0xFF))], [bswap64])
 	])
 
 
@@ -314,7 +314,7 @@ int main(void) {
 	}
 ]])],[ac_have_working_poll=yes],[ac_have_working_poll=no])
 if test "$ac_have_working_poll" = "no" ; then
-	AC_DEFINE_UNQUOTED(BROKEN_POLL, 1,[poll does not work properly on devices])
+	AC_DEFINE([BROKEN_POLL], [1],[poll does not work properly on devices])
 fi
 AC_MSG_RESULT($ac_have_working_poll)
 fi dnl poll() was found
@@ -325,7 +325,7 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>]],
 	       [[unsigned long long int foo, bar; bar = __sync_add_and_fetch(&foo, 1); bar = __sync_sub_and_fetch(&foo, 1); bar = __sync_or_and_fetch(&foo, 1); bar = __sync_and_and_fetch(&foo, 1); bar = __sync_xor_and_fetch(&foo, 1); ]])],
 	       [ac_have___sync_op_and_fetch=yes], [ac_have___sync_op_and_fetch=no])
 if test "$ac_have___sync_op_and_fetch" = "yes" ; then
-	AC_DEFINE_UNQUOTED(HAVE___SYNC_OP_AND_FETCH, 1, [have __sync_OP_and_fetch intrinsics])
+	AC_DEFINE([HAVE___SYNC_OP_AND_FETCH], [1], [have __sync_OP_and_fetch intrinsics])
 fi
 AC_MSG_RESULT($ac_have___sync_op_and_fetch)
 
@@ -335,7 +335,7 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>]],
 	       [[unsigned long long int foo, bar; bar = __sync_fetch_and_add(&foo, 1); bar = __sync_fetch_and_sub(&foo, 1); bar = __sync_fetch_and_or(&foo, 1); bar = __sync_fetch_and_and(&foo, 1); bar = __sync_fetch_and_xor(&foo, 1); ]])],
 	       [ac_have___sync_fetch_and_op=yes], [ac_have___sync_fetch_and_op=no])
 if test "$ac_have___sync_fetch_and_op" = "yes" ; then
-	AC_DEFINE_UNQUOTED(HAVE___SYNC_FETCH_AND_OP, 1, [have __sync_fetch_and_OP intrinsics])
+	AC_DEFINE([HAVE___SYNC_FETCH_AND_OP], [1], [have __sync_fetch_and_OP intrinsics])
 fi
 AC_MSG_RESULT($ac_have___sync_fetch_and_op)
 
@@ -356,9 +356,9 @@ int main(void) {
 }
 ]])],[ac_have_working_attribute_fallthrough=yes],[ac_have_working_attribute_fallthrough=no])
 if test "$ac_have_working_attribute_fallthrough" = "yes" ; then
-	AC_DEFINE_UNQUOTED(nobreak,__attribute__((fallthrough)),[have __attribute__((fallthrough))])
+	AC_DEFINE([nobreak],[__attribute__((fallthrough))],[have __attribute__((fallthrough))])
 else
-	AC_DEFINE_UNQUOTED(nobreak,,[do not have __attribute__((fallthrough))])
+	AC_DEFINE([nobreak],[],[do not have __attribute__((fallthrough))])
 fi
 AC_MSG_RESULT($ac_have_working_attribute_fallthrough)
 CFLAGS="$saved_cflags"
@@ -513,7 +513,7 @@ if test "$fuse" != "no" ; then
 	esac
 fi
 
-AC_CHECK_LIB(fuse, fuse_version, [AC_DEFINE([HAVE_FUSE_VERSION],[1],[libfuse has function fuse_version])])
+AC_CHECK_LIB([fuse], [fuse_version], [AC_DEFINE([HAVE_FUSE_VERSION],[1],[libfuse has function fuse_version])])
 
 AM_CONDITIONAL([WITH_MOUNT], [test "$fuse" != "no" -a "$enable_mfsmount" != "no"])
 

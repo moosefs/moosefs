@@ -2990,13 +2990,13 @@ if "IN" in sectionset:
 						tab.append("total space",humanize_number(totalspace," "))
 						tab.append("avail space",humanize_number(availspace," "))
 						if freespace!=None:
-							tab.append("avail space",humanize_number(freespace," "))
+							tab.append("free space",humanize_number(freespace," "))
 						tab.append("trash space",humanize_number(trspace," "))
 					else:
 						tab.append("total space",totalspace)
 						tab.append("avail space",availspace)
 						if freespace!=None:
-							tab.append("avail space",freespace)
+							tab.append("free space",freespace)
 						tab.append("trash space",trspace)
 					tab.append("trash files",trfiles)
 					if ttymode:

@@ -1,6 +1,5 @@
 moosefs (3.0.105-1) unstable; urgency=medium
 
-  * (all) This is 'work in progress' version !!!
   * (nbd) fixed segfault when filename not specified
   * (client) fixed size of waiting threads counter (very rare deadlock in write
     module)
@@ -9,9 +8,9 @@ moosefs (3.0.105-1) unstable; urgency=medium
   * (nbd) added option for specifying subfolder on MFS for block devices (issue
     #252)
   * (netdump) fixed using deprecated function pcap_lookupdev
-  * (cli) fixed 'free space' in plane mode
+  * (cli) fixed 'free space' in plain mode
 
- -- MooseFS Team <contact@moosefs.com>  Fri, 24 May 2019 08:00:00 +0200
+ -- MooseFS Team <contact@moosefs.com>  Fri, 24 May 2019 13:00:00 +0200
 
 moosefs (3.0.104-1) unstable; urgency=medium
 

@@ -456,6 +456,9 @@ if test "$pcap" = "no"; then
 	fi
 else
 	PCAP_LIBS=-lpcap
+	# check for new PCAP pcap_findalldevs
+	AC_CHECK_LIB([pcap], [pcap_findalldevs], [AC_DEFINE([HAVE_PCAP_FINDALLDEVS],[1],[libpcap has function pcap_findalldevs])])
+
 fi
 AC_SUBST([PCAP_LIBS])
 

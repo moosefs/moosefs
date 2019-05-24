@@ -475,8 +475,19 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 }
 
 void usage(const char *appname) {
-	fprintf(stderr,"usage: %s [-xy] [-r pcap_file] [-i interface] [-p portrange] [-f pcap_filter] [-c packet_count] [-s max_bytes_to_show] [-e commands] [-o commands]\n\t-e: do not display this commands\n\t-o: when present only this commands will be displayed\n\t-x: ignore maintenance packets like 'CSTOMA_SPACE' or 'CLTOMA_FUSE_TIME_SYNC'\n\t-y: do not show SYN/FIN packets\n\t-p: show only packets on given port range (default: 9419-9422)\n",appname);
+#ifdef HAVE_PCAP_FINDALLDEVS
+	fprintf(stderr,"usage: %s -l | %s [-xyn] [-r pcap_file] [-i interface] [-p portrange] [-f pcap_filter] [-c packet_count] [-s max_bytes_to_show] [-e commands] [-o commands]\n",appname,appname);
+#else
+	fprintf(stderr,"usage: %s [-xyn] [-r pcap_file] [-i interface] [-p portrange] [-f pcap_filter] [-c packet_count] [-s max_bytes_to_show] [-e commands] [-o commands]\n",appname);
+#endif
+	fprintf(stderr,"\t-e: do not display this commands\n\t-o: when present only this commands will be displayed\n\t-x: ignore maintenance packets like 'CSTOMA_SPACE' or 'CLTOMA_FUSE_TIME_SYNC'\n\t-y: do not show SYN/FIN packets\n\t-n: show NOP packets\n\t-p: show only packets on given port range (default: 9419-9422)\n");
 }
+
+#ifdef HAVE_PCAP_FINDALLDEVS
+#define ARGLIST "s:p:i:f:c:e:o:r:hxyln?"
+#else
+#define ARGLIST "s:p:i:f:c:e:o:r:hxyn?"
+#endif
 
 int main(int argc, char **argv) {
 	int ch;
@@ -488,6 +499,9 @@ int main(int argc, char **argv) {
 	int32_t packetcnt;
 	bpf_u_int32 devnet;
 	bpf_u_int32 devmask;
+#ifdef HAVE_PCAP_FINDALLDEVS
+	pcap_if_t *alldevsp,*devit;
+#endif
 	pcap_t *handle;
 	int datalink;
 	struct bpf_program fp;
@@ -506,7 +520,7 @@ int main(int argc, char **argv) {
 	udm.maxport = 9422;
 	udm.showmfsnops = 0;
 
-	while ((ch = getopt(argc, argv, "s:p:i:f:c:e:o:r:hxyn?")) != -1) {
+	while ((ch = getopt(argc, argv, ARGLIST)) != -1) {
 		switch (ch) {
 			case 's':
 				udm.maxdatainpacket = strtoul(optarg,NULL,0);
@@ -567,6 +581,32 @@ int main(int argc, char **argv) {
 				}
 				pcapfile = strdup(optarg);
 				break;
+#ifdef HAVE_PCAP_FINDALLDEVS
+			case 'l':
+				if (pcap_findalldevs(&alldevsp,errbuf)<0) {
+					fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
+					goto err;
+				}
+				ok = 0;
+				if (alldevsp==NULL) {
+					printf("Network device list is empty\n");
+					goto err;
+				}
+				for (devit = alldevsp ; devit != NULL ; devit = devit->next) {
+#ifndef PCAP_IF_UP
+#define PCAP_IF_UP 0
+#endif
+#ifndef PCAP_IF_RUNNING
+#define PCAP_IF_RUNNING 0
+#endif
+					if (devit->addresses!=NULL && (devit->flags&(PCAP_IF_UP|PCAP_IF_RUNNING))==(PCAP_IF_UP|PCAP_IF_RUNNING)) {
+						printf("%s\n",devit->name);
+					}
+				}
+				pcap_freealldevs(alldevsp);
+				goto err;
+				break; // not needed - left intentionally
+#endif
 			default:
 				usage(argv[0]);
 				goto err;
@@ -579,7 +619,20 @@ int main(int argc, char **argv) {
 	}
 	if (dev==NULL && pcapfile==NULL) {
 		if (pcap_lookupnet("any",&devnet, &devmask, errbuf)<0) { // 'any' device is supported?
+#ifdef HAVE_PCAP_FINDALLDEVS
+			if (pcap_findalldevs(&alldevsp,errbuf)<0) {
+				fprintf(stderr, "Couldn't find default device: %s\n", errbuf);
+				goto err;
+			}
+			if (alldevsp==NULL) {
+				fprintf(stderr, "Couldn't find default device (empty devices list)\n");
+				goto err;
+			}
+			dev = strdup(alldevsp->name);
+			pcap_freealldevs(alldevsp);
+#else
 			dev = pcap_lookupdev(errbuf);
+#endif
 		} else {
 			dev = strdup("any");
 		}

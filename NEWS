@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.106-1 (WIP)
+
+  - (tools) better handling unrecognized options
+
 * MooseFS 3.0.105-1 (2019-05-24)
 
   - (nbd) fixed segfault when filename not specified

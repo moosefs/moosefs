@@ -3391,6 +3391,8 @@ int main(int argc,char **argv) {
 			case 'p':
 				snapmode |= SNAPSHOT_MODE_PRESERVE_HARDLINKS;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3405,6 +3407,8 @@ int main(int argc,char **argv) {
 			case 'f':
 				snapmode |= SNAPSHOT_MODE_FORCE_REMOVAL;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3437,6 +3441,8 @@ int main(int argc,char **argv) {
 			case 'r':
 				rflag=1;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3469,6 +3475,8 @@ int main(int argc,char **argv) {
 			case 'g':
 				numbermode=3;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3506,6 +3514,8 @@ int main(int argc,char **argv) {
 			case 'r':
 				rflag=1;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3586,6 +3596,8 @@ int main(int argc,char **argv) {
 			case 'r':
 				rflag=1;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3653,6 +3665,8 @@ int main(int argc,char **argv) {
 					usage(f);
 				}
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3697,6 +3711,8 @@ int main(int argc,char **argv) {
 			case 'g':
 				numbermode=3;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3716,6 +3732,8 @@ int main(int argc,char **argv) {
 			case 's':
 				fileinfomode |= FILEINFO_SIGNATURE;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3766,6 +3784,8 @@ int main(int argc,char **argv) {
 			case 'p':
 				dirinfomode |= DIRINFO_PRECISE;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -3899,6 +3919,8 @@ int main(int argc,char **argv) {
 				hrealsize = v;
 				qflags |= QUOTA_FLAG_HREALSIZE;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		if (qflags==0) {
@@ -4003,6 +4025,8 @@ int main(int argc,char **argv) {
 				}
 				qflags |= QUOTA_FLAG_HALL;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		if (qflags==0) {
@@ -4093,6 +4117,8 @@ int main(int argc,char **argv) {
 				}
 				chgmask |= SCLASS_CHG_FORCE;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -4151,7 +4177,9 @@ int main(int argc,char **argv) {
 		}
 		break;
 	case MFSCPSC:
-		while (getopt(argc,argv,"")!=-1);
+		if (getopt(argc,argv,"")!=-1) {
+			usage(f);
+		}
 		argc -= optind;
 		argv += optind;
 		if (argc<2) {
@@ -4162,7 +4190,9 @@ int main(int argc,char **argv) {
 		argv++;
 		break;
 	case MFSMVSC:
-		while (getopt(argc,argv,"")!=-1);
+		if (getopt(argc,argv,"")!=-1) {
+			usage(f);
+		}
 		argc -= optind;
 		argv += optind;
 		if (argc!=2) {
@@ -4176,6 +4206,8 @@ int main(int argc,char **argv) {
 			case 'l':
 				longmode |= 1;
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -4200,6 +4232,8 @@ int main(int argc,char **argv) {
 					usage(f);
 				}
 				break;
+			default:
+				usage(f);
 			}
 		}
 		argc -= optind;
@@ -4207,7 +4241,9 @@ int main(int argc,char **argv) {
 		break;
 	case MFSRMSC:
 	default:
-		while (getopt(argc,argv,"")!=-1);
+		if (getopt(argc,argv,"")!=-1) {
+			usage(f);
+		}
 		argc -= optind;
 		argv += optind;
 //		argc--;	// skip appname

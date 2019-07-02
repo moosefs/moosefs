@@ -884,7 +884,7 @@ void meta_term(void) {
 			meta_cleanup();
 			return;
 		} else if (status==2) {
-			mfs_syslog(LOG_NOTICE,"no metedata to store");
+			mfs_syslog(LOG_NOTICE,"no metadata to store");
 			return;
 		}
 		syslog(LOG_ERR,"can't store metadata - try to make more space on your hdd or change privieleges - retrying after 10 seconds");

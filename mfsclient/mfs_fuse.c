@@ -2698,6 +2698,9 @@ void mfs_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char *
 		status = fs_link(ino,newparent,newnleng,(const uint8_t*)newname,ctx.uid,1,&gidtmp,&inode,attr);
 	}
 	status = mfs_errorconv(status);
+	if (status==ENOSPC) {
+		status=EMLINK;
+	}
 	if (status!=0) {
 		oplog_printf(&ctx,"link (%lu,%lu,%s): %s",(unsigned long int)ino,(unsigned long int)newparent,newname,strerr(status));
 		fuse_reply_err(req, status);

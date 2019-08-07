@@ -32,6 +32,8 @@
 
 #define MODE_FAST 1
 #define MODE_EMPTY 2
+#define MODE_NAME 4
+#define MODE_REPAIR 8
 
 static inline int hdd_check_filename(const char *fname,uint64_t *chunkid,uint32_t *version) {
 	uint64_t namechunkid;
@@ -79,10 +81,11 @@ static inline int hdd_check_filename(const char *fname,uint64_t *chunkid,uint32_
 	return 0;
 }
 
-int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t repair) {
+int chunk_repair(const char *fname,uint8_t mode,uint8_t showok) {
 	uint64_t namechunkid;
 	uint32_t nameversion;
-	uint32_t i;
+	char *newname;
+	uint32_t i,j;
 	int fd;
 	uint8_t buff[MFSBLOCKSIZE];
 	uint32_t crc[1024];
@@ -95,7 +98,7 @@ int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t repair) {
 
 	// check fname
 	// name should be in format: ..../chunk_XXXXXXXXXXXXXXXX_YYYYYYYY.mfs
-	if (repair) {
+	if (mode&MODE_REPAIR) {
 		fd = open(fname,O_RDWR);
 	} else {
 		fd = open(fname,O_RDONLY);
@@ -105,14 +108,9 @@ int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t repair) {
 		return ret | 16;
 	}
 	i = strlen(fname);
-	if (i<35) {
-		fprintf(stderr,"%s: wrong chunk name format !!! (skip header)\n",fname);
-		ret |= 1;
-	} else {
-		if (hdd_check_filename(fname+(i-35),&namechunkid,&nameversion)<0) {
-			fprintf(stderr,"%s: wrong chunk name format !!! (skip header)\n",fname);
-			ret |= 1;
-		} else {
+	if (i<35 || hdd_check_filename(fname+(i-35),&namechunkid,&nameversion)<0) {
+		if (mode&MODE_NAME) {
+			fprintf(stderr,"%s: wrong chunk name - try to fix it using header data\n",fname);
 			if (read(fd,buff,20)!=20) {
 				fprintf(stderr,"%s: error reading header !!!\n",fname);
 				close(fd);
@@ -120,35 +118,73 @@ int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t repair) {
 			}
 			if (memcmp(buff,MFSSIGNATURE "C 1.",7)!=0 || (buff[7]!='0' && buff[7]!='1')) {
 				fprintf(stderr,"%s: wrong chunk header !!!\n",fname);
-				memcpy(buff,MFSSIGNATURE "C 1.0",8);
-				ret |= 1;
+				close(fd);
+				return ret | 16;
+			}
+			if (buff[7]=='1') { // this is chunk 1.1 - check 'empty' crc values
+				mode |= MODE_EMPTY;
 			}
 			rp = buff+8;
-			wp = (uint8_t*)rp;
-			if (get64bit(&rp)!=namechunkid) {
-				fprintf(stderr,"%s: wrong chunk number in header !!!\n",fname);
-				put64bit(&wp,namechunkid);
-				ret |= 1;
+			namechunkid = get64bit(&rp);
+			nameversion = get32bit(&rp);
+			j = i;
+			while (j>0 && fname[j-1]!='/') {j--;}
+			newname = malloc(j+35+1);
+			if (j>0) {
+				memcpy(newname,fname,j);
 			}
-			wp = (uint8_t*)rp;
-			if (get32bit(&rp)!=nameversion) {
-				fprintf(stderr,"%s: wrong chunk version in header !!!\n",fname);
-				put32bit(&wp,nameversion);
-				ret |= 1;
+			snprintf(newname+j,35+1,"chunk_%016"PRIX64"_%08"PRIX32".mfs",namechunkid,nameversion);
+			newname[j+35] = 0;
+			if (rename(fname,newname)<0) {
+				fprintf(stderr,"%s->%s: rename error !!!\n",fname,newname);
+				free(newname);
+				close(fd);
+				return ret | 16;
 			}
-			if (repair && (ret&1)) {
-				if (lseek(fd,0,SEEK_SET)!=0) {
-					fprintf(stderr,"%s: error setting file pointer\n",fname);
-					close(fd);
-					return ret | 16;
-				}
-				if (write(fd,buff,20)!=20) {
-					fprintf(stderr,"%s: error writing header !!!\n",fname);
-					close(fd);
-					return ret | 16;
-				}
-				ret |= 4;
+			fprintf(stderr,"%s: changed name to: %s\n",fname,newname);
+		} else {
+			fprintf(stderr,"%s: wrong chunk name format !!! (skip header)\n",fname);
+			ret |= 1;
+		}
+	} else {
+		if (read(fd,buff,20)!=20) {
+			fprintf(stderr,"%s: error reading header !!!\n",fname);
+			close(fd);
+			return ret | 16;
+		}
+		if (memcmp(buff,MFSSIGNATURE "C 1.",7)!=0 || (buff[7]!='0' && buff[7]!='1')) {
+			fprintf(stderr,"%s: wrong chunk header !!!\n",fname);
+			memcpy(buff,MFSSIGNATURE "C 1.0",8);
+			ret |= 1;
+		}
+		if (buff[7]=='1') { // this is chunk 1.1 - check 'empty' crc values
+			mode |= MODE_EMPTY;
+		}
+		rp = buff+8;
+		wp = (uint8_t*)rp;
+		if (get64bit(&rp)!=namechunkid) {
+			fprintf(stderr,"%s: wrong chunk number in header !!!\n",fname);
+			put64bit(&wp,namechunkid);
+			ret |= 1;
+		}
+		wp = (uint8_t*)rp;
+		if (get32bit(&rp)!=nameversion) {
+			fprintf(stderr,"%s: wrong chunk version in header !!!\n",fname);
+			put32bit(&wp,nameversion);
+			ret |= 1;
+		}
+		if ((mode&MODE_REPAIR) && (ret&1)) {
+			if (lseek(fd,0,SEEK_SET)!=0) {
+				fprintf(stderr,"%s: error setting file pointer\n",fname);
+				close(fd);
+				return ret | 16;
 			}
+			if (write(fd,buff,20)!=20) {
+				fprintf(stderr,"%s: error writing header !!!\n",fname);
+				close(fd);
+				return ret | 16;
+			}
+			ret |= 4;
 		}
 	}
 
@@ -176,7 +212,7 @@ int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t repair) {
 	}
 
 	// check data crc
-	if ((mode&MODE_FAST) && repair==0) {
+	if ((mode&(MODE_FAST|MODE_REPAIR))==MODE_FAST) {
 		s = lseek(fd,-MFSBLOCKSIZE,SEEK_END);
 		if (s<(hdrsize + CHUNKCRCSIZE)) {
 			fprintf(stderr,"%s: wrong file size\n",fname);
@@ -233,7 +269,7 @@ int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t repair) {
 				ret |= 2;
 			}
 		}
-		if (repair && (ret&2)) {
+		if ((mode&MODE_REPAIR) && (ret&2)) {
 			// write crc
 			wp = buff;
 			for (i=0 ; i<1024 ; i++) {
@@ -266,24 +302,24 @@ int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t repair) {
 }
 
 void usage(const char *appname) {
-	fprintf(stderr,"usage: %s [-frex] chunk_file ...\n",appname);
+	fprintf(stderr,"usage: %s [-frnex] chunk_file ...\n",appname);
 	fprintf(stderr,"\n");
 	fprintf(stderr,"-f: fast check (check only header and crc of last data block)\n");
 	fprintf(stderr,"-r: repair (fix header info from file name and recalculate crc)\n");
-	fprintf(stderr,"-e: check crc values for non existing blocks - may fail in case of chunks 1.0 that were truncated\n");
+	fprintf(stderr,"-n: when file name is wrong then try to fix it usng header\n");
+	fprintf(stderr,"-e: force checking crc values for non existing blocks in chunks 1.0 - may fail in case of chunks that were truncated\n");
 	fprintf(stderr,"-x: print 'OK' for good files\n");
 }
 
 int main(int argc,char *argv[]) {
 	int ch;
 	uint8_t mode = 0;
-	uint8_t repair = 0;
 	uint8_t verbose = 0;
 	uint8_t ret = 0;
 	const char *appname;
 
 	appname = argv[0];
-	while ((ch = getopt(argc,argv,"hvfrx?")) != -1) {
+	while ((ch = getopt(argc,argv,"hvfenrx?")) != -1) {
 		switch(ch) {
 			case 'h':
 				usage(appname);
@@ -297,8 +333,11 @@ int main(int argc,char *argv[]) {
 			case 'e':
 				mode |= MODE_EMPTY;
 				break;
+			case 'n':
+				mode |= MODE_NAME;
+				break;
 			case 'r':
-				repair=1;
+				mode |= MODE_REPAIR;
 				break;
 			case 'x':
 				verbose++;
@@ -325,7 +364,7 @@ int main(int argc,char *argv[]) {
 	mycrc32_init();
 
 	while (argc>0) {
-		ret |= chunk_repair(*argv,mode,verbose,repair);
+		ret |= chunk_repair(*argv,mode,verbose);
 		argv++;
 		argc--;
 	}

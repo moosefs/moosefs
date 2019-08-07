@@ -5,6 +5,9 @@ mfschunktool - checks chunk integrity offline
 \fBmfschunktool\fP 
 [\fB\-f\fP]
 [\fB\-r\fP]
+[\fB\-n\fP]
+[\fB\-e\fP]
+[\fB\-x\fP]
 \fIchunk_file\fP ...
 .SH DESCRIPTION
 \fBmfschunktool\fP checks chunk integrity using stored CRC checksums in chunk's header.
@@ -18,6 +21,15 @@ turn on fast mode (in this mode only last block is tested - usually this is enou
 .TP
 \fB\-r\fP
 turn on repair mode (if checksums on given chunk don't match then they will be overwritten by checksums calculated using actual data)
+.TP
+\fB\-n\fP
+turn on name fixing mode (if the chunk file name is not correct but there is proper file header then tool will rename give file using data stored in the header)
+.TP
+\fB\-e\fP
+turn on empty block crc check (force checking crc values for non existing blocks in chunks 1.0 - may fail in case of chunks that were truncated)
+.TP
+\fB\-x\fP
+turn on reporting successful check (print 'OK' message when everything is correct)
 .PP
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.

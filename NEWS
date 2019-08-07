@@ -7,6 +7,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added limit for number of hardlinks allowed for one object
   - (master) added option for automatic removal of unused chunkservers (issue #247)
   - (metadirinfo) fixed segfault when output filename is not specified
+  - (chunktool) added file name fixing option (issue #276)
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

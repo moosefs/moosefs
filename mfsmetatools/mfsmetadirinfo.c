@@ -866,6 +866,8 @@ int main(int argc,char *argv[]) {
 			fprintf(stderr,"error opening output file '%s'\n",outfname);
 			goto error;
 		}
+	} else {
+		ofd = stdout;
 	}
 
 	fd = fopen(argv[0],"rb");

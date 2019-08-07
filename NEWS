@@ -12,6 +12,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) added new charts with number of chunk creations and interna changes (also successful and unsuccesful)
   - (master) added ignoring chunk with id zero sent from chunkserver
   - (metadump) added option for dumping parts of metadata
+  - (master) added more logs to background data write subprocess (connected with issue #280)
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

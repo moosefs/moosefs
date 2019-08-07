@@ -161,6 +161,7 @@ void bgsaver_worker(void) {
 	for (;;) {
 		l = readall(eptr->data_pipe[PIPE_READ],auxbuff,8);
 		if (l!=8) {
+			mfs_errlog_silent(LOG_ERR,"background data writer - reading pipe error");
 			goto err;
 		}
 		rptr = auxbuff;
@@ -176,14 +177,17 @@ void bgsaver_worker(void) {
 				if (buff!=NULL) {
 					buffsize = leng;
 				} else {
+					syslog(LOG_ERR,"background data writer - out of memory (alloc size: %"PRIu32")",newleng);
 					goto err;
 				}
 			}
 			l = readall(eptr->data_pipe[PIPE_READ],buff,leng);
 		} else {
+			syslog(LOG_ERR,"background data writer - packet too long (packet size: %"PRIu32")",leng);
 			goto err;
 		}
 		if (l!=(int32_t)leng) {
+			mfs_errlog_silent(LOG_ERR,"background data writer - reading pipe error");
 			goto err;
 		}
 		switch (cmd) {
@@ -344,6 +348,7 @@ void bgsaver_worker(void) {
 				goto err;
 				break; // just silent compiler warnings
 			default:
+				syslog(LOG_ERR,"background data writer - got unrecognized command (%"PRIu32")",cmd);
 				goto err;
 		}
 		if (cmd==BGSAVER_START || cmd==BGSAVER_WRITE || cmd==BGSAVER_FINISH) { // status required
@@ -377,6 +382,7 @@ err:
 	if (chlogbuff!=NULL) {
 		free(chlogbuff);
 	}
+	syslog(LOG_NOTICE,"background data writer - exiting");
 	exit(0);
 }
 

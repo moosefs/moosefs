@@ -276,6 +276,16 @@ else: # CLI mode
 			('memoryvirt',25,2,'Virtual memory usage'),
 			('usedspace',26,2,'RAW disk space usage'),
 			('totalspace',27,2,'RAW disk space connected'),
+			('create',28,1,'Number of chunk creation attempts'),
+			('change',29,1,'Number of chunk internal operation attempts'),
+			('delete_ok',30,1,'Number of successful chunk deletions'),
+			('delete_err',31,1,'Number of unsuccessful chunk deletions'),
+			('replicate_ok',32,1,'Number of successful chunk replications'),
+			('replicate_err',33,1,'Number of unsuccessful chunk replications'),
+			('create_ok',34,1,'Number of successful chunk creations'),
+			('create_err',35,1,'Number of unsuccessful chunk creations'),
+			('change_ok',36,1,'Number of successful chunk internal operations'),
+			('change_err',37,1,'Number of unsuccessful chunk internal operations'),
 			('cpu',100,0,'Cpu usage (total sys+user)')
 	]
 	mcchartsabr = {
@@ -6714,8 +6724,10 @@ if "MC" in sectionset:
 				(100,'cpu','cpu usage (percent)'),
 				(101,'memory','memory usage (if available - rss + virt)'),
 				(102,'space','raw disk space usage (total / used)'),
-				(2,'dels','chunk deletions (per minute)'),
-				(3,'repl','chunk replications (per minute)'),
+				(103,'dels','chunk deletions per minute (successful/unsuccessful)'),
+				(104,'repl','chunk replications per minute (successful/unsuccessful)'),
+				(105,'creat','chunk creations per minute (successful/unsuccessful)'),
+				(106,'change','chunk internal operations per minute (successful/unsuccessful)'),
 				(4,'statfs','statfs operations (per minute)'),
 				(5,'getattr','getattr operations (per minute)'),
 				(6,'setattr','setattr operations (per minute)'),
@@ -7225,6 +7237,7 @@ if "CC" in sectionset:
 				(20,'repl','number of chunk replications per minute'),
 				(21,'create','number of chunk creations per minute'),
 				(22,'delete','number of chunk deletions per minute'),
+				(33,'change','number of chunk internal operations (duplicate,truncate,etc.) per minute'),
 				(108,'move','number of chunk internal rebalances per minute (low speed + high speed)'),
 				(28,'load','load - max operations in queue'),
 			)

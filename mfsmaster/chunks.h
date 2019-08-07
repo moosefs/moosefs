@@ -27,6 +27,19 @@
 
 #define MAXCSCOUNT 10000
 
+#define CHUNK_OP_DELETE_TRY     0
+#define CHUNK_OP_REPLICATE_TRY  1
+#define CHUNK_OP_CREATE_TRY     2
+#define CHUNK_OP_CHANGE_TRY     3
+#define CHUNK_OP_DELETE_OK      4
+#define CHUNK_OP_REPLICATE_OK   5
+#define CHUNK_OP_CREATE_OK      6
+#define CHUNK_OP_CHANGE_OK      7
+#define CHUNK_OP_DELETE_ERR     8
+#define CHUNK_OP_REPLICATE_ERR  9
+#define CHUNK_OP_CREATE_ERR    10
+#define CHUNK_OP_CHANGE_ERR    11
+
 typedef enum {
 	CHUNK_FLOOP_NOTFOUND,
 	CHUNK_FLOOP_DELETED,
@@ -52,7 +65,7 @@ int chunk_mr_chunkdel(uint32_t ts,uint64_t chunkid,uint32_t version);
 
 // void chunk_text_dump(FILE *fd);
 
-void chunk_stats(uint32_t *del,uint32_t *repl);
+void chunk_stats(uint32_t chunkops[12]);
 void chunk_store_info(uint8_t *buff);
 uint32_t chunk_get_missing_count(void);
 void chunk_store_chunkcounters(uint8_t *buff,uint8_t matrixid);

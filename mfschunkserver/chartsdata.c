@@ -105,6 +105,7 @@ void chartsdata_refresh(void) {
 	data[CHARTS_TRUNCATE]=op_tr;
 	data[CHARTS_DUPTRUNC]=op_dt;
 	data[CHARTS_TEST]=op_te;
+	data[CHARTS_CHANGE]=op_ve+op_du+op_tr+op_dt;
 
 	charts_add(data,main_time()-60);
 }

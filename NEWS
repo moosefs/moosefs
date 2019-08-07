@@ -8,6 +8,8 @@ This file lists noteworthy changes in MooseFS.
   - (master) added option for automatic removal of unused chunkservers (issue #247)
   - (metadirinfo) fixed segfault when output filename is not specified
   - (chunktool) added file name fixing option (issue #276)
+  - (all) changed chunk replication and deletion charts into two color charts (successful/unsuccessful - issue #273)
+  - (all) added new charts with number of chunk creations and interna changes (also successful and unsuccesful)
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

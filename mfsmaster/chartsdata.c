@@ -135,7 +135,8 @@ void chartsdata_resusage(uint64_t *mem,uint64_t *syscpu,uint64_t *usrcpu) {
 void chartsdata_refresh(void) {
 	uint64_t data[CHARTS];
 	uint32_t fsdata[16];
-	uint32_t i,del,repl; //,bin,bout,opr,opw,dbr,dbw,dopr,dopw,repl;
+	uint32_t chunkops[12];
+	uint32_t i;
 	uint64_t total,avail;
 
 	for (i=0 ; i<CHARTS ; i++) {
@@ -153,9 +154,20 @@ void chartsdata_refresh(void) {
 		data[CHARTS_MEMORY_VIRT] = virt;
 	}
 
-	chunk_stats(&del,&repl);
-	data[CHARTS_DELCHUNK]=del;
-	data[CHARTS_REPLCHUNK]=repl;
+	chunk_stats(chunkops);
+	data[CHARTS_DELCHUNK]=chunkops[CHUNK_OP_DELETE_TRY];
+	data[CHARTS_REPLCHUNK]=chunkops[CHUNK_OP_REPLICATE_TRY];
+	data[CHARTS_CREATECHUNK]=chunkops[CHUNK_OP_CREATE_TRY];
+	data[CHARTS_CHANGECHUNK]=chunkops[CHUNK_OP_CHANGE_TRY];
+	data[CHARTS_DELETECHUNK_OK]=chunkops[CHUNK_OP_DELETE_OK];
+	data[CHARTS_REPLICATECHUNK_OK]=chunkops[CHUNK_OP_REPLICATE_OK];
+	data[CHARTS_CREATECHUNK_OK]=chunkops[CHUNK_OP_CREATE_OK];
+	data[CHARTS_CHANGECHUNK_OK]=chunkops[CHUNK_OP_CHANGE_OK];
+	data[CHARTS_DELETECHUNK_ERR]=chunkops[CHUNK_OP_DELETE_ERR];
+	data[CHARTS_REPLICATECHUNK_ERR]=chunkops[CHUNK_OP_REPLICATE_ERR];
+	data[CHARTS_CREATECHUNK_ERR]=chunkops[CHUNK_OP_CREATE_ERR];
+	data[CHARTS_CHANGECHUNK_ERR]=chunkops[CHUNK_OP_CHANGE_ERR];
+
 	fs_stats(fsdata);
 	for (i=0 ; i<16 ; i++) {
 		data[CHARTS_STATFS+i]=fsdata[i];

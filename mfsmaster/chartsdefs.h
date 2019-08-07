@@ -51,8 +51,18 @@
 #define CHARTS_MEMORY_VIRT 25
 #define CHARTS_USED_SPACE 26
 #define CHARTS_TOTAL_SPACE 27
+#define CHARTS_CREATECHUNK 28
+#define CHARTS_CHANGECHUNK 29
+#define CHARTS_DELETECHUNK_OK 30
+#define CHARTS_DELETECHUNK_ERR 31
+#define CHARTS_REPLICATECHUNK_OK 32
+#define CHARTS_REPLICATECHUNK_ERR 33
+#define CHARTS_CREATECHUNK_OK 34
+#define CHARTS_CREATECHUNK_ERR 35
+#define CHARTS_CHANGECHUNK_OK 36
+#define CHARTS_CHANGECHUNK_ERR 37
 
-#define CHARTS 28
+#define CHARTS 38
 
 #define STRID(a,b,c,d) (((((uint8_t)a)*256U+(uint8_t)b)*256U+(uint8_t)c)*256U+(uint8_t)d)
 
@@ -86,6 +96,16 @@
 	{"memoryvirt"   ,STRID('M','E','M','V'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"usedspace"    ,STRID('U','S','P','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"totalspace"   ,STRID('T','S','P','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"create"       ,STRID('N','E','W','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"change"       ,STRID('I','N','T','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"delete_ok"    ,STRID('D','E','L','O'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"delete_err"   ,STRID('D','E','L','E'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"replicate_ok" ,STRID('R','E','P','O'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"replicate_err",STRID('R','E','P','E'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"create_ok"    ,STRID('N','E','W','O'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"create_err"   ,STRID('N','E','W','E'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"change_ok"    ,STRID('I','N','T','O'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"change_err"   ,STRID('I','N','T','E'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{NULL           ,0                     ,0              ,0,0                 ,   0, 0}  \
 };
 
@@ -97,10 +117,14 @@
 
 /* name , statid , c1_def , c2_def , c3_def , join mode , percent , scale , multiplier , divisor */
 #define ESTATDEFS { \
-	{"cpu"          ,STRID('T','C','P','U'),CHARTS_DIRECT(CHARTS_UCPU)        ,CHARTS_DIRECT(CHARTS_SCPU)            ,CHARTS_NONE                       ,CHARTS_MODE_ADD,1,CHARTS_SCALE_MICRO, 100,60}, \
-	{"mem"          ,STRID('T','M','E','M'),CHARTS_CALC(0)                    ,CHARTS_DIRECT(CHARTS_MEMORY_RSS)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"space"        ,STRID('S','P','A','C'),CHARTS_CALC(1)                    ,CHARTS_DIRECT(CHARTS_USED_SPACE)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{NULL           ,0                     ,CHARTS_NONE                       ,CHARTS_NONE                           ,CHARTS_NONE                       ,0              ,0,0                 ,   0, 0}  \
+	{"cpu"            ,STRID('T','C','P','U'),CHARTS_DIRECT(CHARTS_UCPU)                 ,CHARTS_DIRECT(CHARTS_SCPU)                ,CHARTS_NONE                       ,CHARTS_MODE_ADD,1,CHARTS_SCALE_MICRO, 100,60}, \
+	{"mem"            ,STRID('T','M','E','M'),CHARTS_CALC(0)                             ,CHARTS_DIRECT(CHARTS_MEMORY_RSS)          ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"space"          ,STRID('S','P','A','C'),CHARTS_CALC(1)                             ,CHARTS_DIRECT(CHARTS_USED_SPACE)          ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"delete_stat"    ,STRID('D','E','L','S'),CHARTS_DIRECT(CHARTS_DELETECHUNK_ERR)      ,CHARTS_DIRECT(CHARTS_DELETECHUNK_OK)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"replicate_stat" ,STRID('R','E','P','S'),CHARTS_DIRECT(CHARTS_REPLICATECHUNK_ERR)   ,CHARTS_DIRECT(CHARTS_REPLICATECHUNK_OK)   ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"create_stat"    ,STRID('N','E','W','S'),CHARTS_DIRECT(CHARTS_CREATECHUNK_ERR)      ,CHARTS_DIRECT(CHARTS_CREATECHUNK_OK)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"change_stat"    ,STRID('I','N','T','S'),CHARTS_DIRECT(CHARTS_CHANGECHUNK_ERR)      ,CHARTS_DIRECT(CHARTS_CHANGECHUNK_OK)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{NULL             ,0                     ,CHARTS_NONE                                ,CHARTS_NONE                               ,CHARTS_NONE                       ,0              ,0,0                 ,   0, 0}  \
 };
 
 #endif

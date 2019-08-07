@@ -56,8 +56,9 @@
 #define CHARTS_MEMORY_VIRT 30
 #define CHARTS_MOVELS 31
 #define CHARTS_MOVEHS 32
+#define CHARTS_CHANGE 33
 
-#define CHARTS 33
+#define CHARTS 34
 
 #define STRID(a,b,c,d) (((((uint8_t)a)*256U+(uint8_t)b)*256U+(uint8_t)c)*256U+(uint8_t)d)
 
@@ -96,6 +97,7 @@
 	{"memoryvirt"   ,STRID('M','E','M','V'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"movels"       ,STRID('M','O','V','L'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"movehs"       ,STRID('M','O','V','H'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"change"       ,STRID('C','H','G','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{NULL           ,0                     ,0              ,0,0                 ,   0,    0}  \
 };
 

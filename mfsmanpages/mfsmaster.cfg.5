@@ -197,6 +197,9 @@ Set atime modification mode (default is 0 = always modify atime - see NOTES)
 .TP
 .B RESERVE_SPACE
 Set amount of space reserved for superuser (default is 0 = do not reserve space for superuser - see NOTES)
+.TP
+.B MAX_ALLOWED_HARD_LINKS
+Define limit for number of hardlinks allowed for one object (default is 32767; possible values are from 8 to 65000)
 .SH NOTES
 .PP
 Chunks in master are tested in a loop. Speed (or frequency) is regulated by two

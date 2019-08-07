@@ -134,6 +134,7 @@ typedef struct _quotanode {
 
 static quotanode *quotahead;
 static uint32_t QuotaDefaultGracePeriod;
+static uint16_t MaxAllowedHardLinks;
 static uint8_t AtimeMode;
 
 typedef struct _fsnode {
@@ -164,19 +165,26 @@ typedef struct _fsnode {
 		struct _sdata {				// type==TYPE_SYMLINK
 			uint8_t *path;
 			uint32_t pleng;
+			uint16_t nlink;
 			uint8_t end;
 		} sdata;
 		struct _devdata {
 			uint32_t rdev;			// type==TYPE_BLOCKDEV ; type==TYPE_CHARDEV
+			uint16_t nlink;
 			uint8_t end;
 		} devdata;
 		struct _fdata {				// type==TYPE_FILE ; type==TYPE_TRASH ; type==TYPE_SUSTAINED
 			uint64_t length;
 			uint64_t *chunktab;
 			uint32_t chunks;
+			uint16_t nlink;			// for TRASH and SUSTAINED should be 0
 			uint8_t realsize_ratio;		// max goal
 			uint8_t end;
 		} fdata;
+		struct _odata {
+			uint16_t nlink;
+			uint8_t end;
+		} odata;
 	} data;
 } fsnode;
 
@@ -338,7 +346,7 @@ static inline void fsnode_init(void) {
 	nrelemsize[1] = offsetof(fsnode,data)+offsetof(struct _fdata,end);
 	nrelemsize[2] = offsetof(fsnode,data)+offsetof(struct _sdata,end);
 	nrelemsize[3] = offsetof(fsnode,data)+offsetof(struct _devdata,end);
-	nrelemsize[4] = offsetof(fsnode,data);
+	nrelemsize[4] = offsetof(fsnode,data)+offsetof(struct _odata,end);
 	for (i=0 ; i<NODE_MAX_INDX ; i++) {
 		nrbheads[i] = NULL;
 		nrbfreeheads[i] = NULL;
@@ -857,13 +865,13 @@ uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint
 			changelog("%"PRIu32"|FREEINODES():%"PRIu32",%"PRIu32",%"PRIu32,ts,fi,si,ics);
 		}
 	} else {
-		meta_version_inc();
 		if (freeinodes!=fi || sustainedinodes!=si || (inode_chksum!=0 && inode_chksum!=ics)) {
 			syslog(LOG_WARNING,"FREEINODES data mismatch: my:(%"PRIu32",%"PRIu32",%"PRIu32") != expected:(%"PRIu32",%"PRIu32",%"PRIu32")",fi,si,ics,freeinodes,sustainedinodes,inode_chksum);
 			return MFS_ERROR_MISMATCH;
 		}
+		meta_version_inc();
 	}
-	return 0;
+	return MFS_STATUS_OK;
 }
 
 void fsnodes_freeinodes(void) {
@@ -2060,7 +2068,6 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 	uint8_t type;
 	uint8_t flags;
 	uint16_t mode;
-	uint32_t nlink;
 	uint64_t dleng;
 
 	(void)sesflags;
@@ -2131,12 +2138,11 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 	put32bit(&ptr,node->atime);
 	put32bit(&ptr,node->mtime);
 	put32bit(&ptr,node->ctime);
-	nlink = fsnodes_nlink(MFS_ROOT_ID,node);
 	switch (node->type) {
 	case TYPE_FILE:
 	case TYPE_TRASH:
 	case TYPE_SUSTAINED:
-		put32bit(&ptr,nlink);
+		put32bit(&ptr,node->data.fdata.nlink);
 		put64bit(&ptr,node->data.fdata.length);
 		break;
 	case TYPE_DIRECTORY:
@@ -2183,7 +2189,7 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 		put64bit(&ptr,dleng);
 		break;
 	case TYPE_SYMLINK:
-		put32bit(&ptr,nlink);
+		put32bit(&ptr,node->data.sdata.nlink);
 		*ptr++=0;
 		*ptr++=0;
 		*ptr++=0;
@@ -2192,7 +2198,7 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 		break;
 	case TYPE_BLOCKDEV:
 	case TYPE_CHARDEV:
-		put32bit(&ptr,nlink);
+		put32bit(&ptr,node->data.devdata.nlink);
 		put32bit(&ptr,node->data.devdata.rdev);
 		*ptr++=0;
 		*ptr++=0;
@@ -2200,7 +2206,7 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 		*ptr++=0;
 		break;
 	default:
-		put32bit(&ptr,nlink);
+		put32bit(&ptr,node->data.odata.nlink);
 		*ptr++=0;
 		*ptr++=0;
 		*ptr++=0;
@@ -2223,8 +2229,27 @@ static inline void fsnodes_remove_edge(uint32_t ts,fsedge *e) {
 		fsnodes_sub_stats(e->parent,&sr);
 		e->parent->mtime = e->parent->ctime = ts;
 		e->parent->data.ddata.elements--;
-		if (e->child->type==TYPE_DIRECTORY) {
-			e->parent->data.ddata.nlink--;
+		switch (e->child->type) {
+			case TYPE_FILE:
+			case TYPE_TRASH:
+			case TYPE_SUSTAINED:
+				// TRASH and SUSTAINED here are only pro forma and to avoid potential future bugs
+				e->child->data.fdata.nlink--;
+				break;
+			case TYPE_DIRECTORY:
+				// directories doesn't have hard links - nlink here is calculated differently
+				e->parent->data.ddata.nlink--;
+				break;
+			case TYPE_SYMLINK:
+				e->child->data.sdata.nlink--;
+				break;
+			case TYPE_BLOCKDEV:
+			case TYPE_CHARDEV:
+				e->child->data.devdata.nlink--;
+				break;
+			default:
+				e->child->data.odata.nlink--;
+				break;
 		}
 		e->parent->eattr &= ~(EATTR_SNAPSHOT);
 	}
@@ -2276,8 +2301,27 @@ static inline void fsnodes_link(uint32_t ts,fsnode *parent,fsnode *child,uint16_
 	fsnodes_edge_add(e);
 
 	parent->data.ddata.elements++;
-	if (child->type==TYPE_DIRECTORY) {
-		parent->data.ddata.nlink++;
+	switch (child->type) {
+		case TYPE_FILE:
+		case TYPE_TRASH:
+		case TYPE_SUSTAINED:
+			// TRASH and SUSTAINED here are only pro forma and to avoid potential future bugs
+			child->data.fdata.nlink++;
+			break;
+		case TYPE_DIRECTORY:
+			// directories doesn't have hard links - nlink here is calculated differently
+			parent->data.ddata.nlink++;
+			break;
+		case TYPE_SYMLINK:
+			child->data.sdata.nlink++;
+			break;
+		case TYPE_BLOCKDEV:
+		case TYPE_CHARDEV:
+			child->data.devdata.nlink++;
+			break;
+		default:
+			child->data.odata.nlink++;
+			break;
 	}
 	parent->eattr &= ~(EATTR_SNAPSHOT);
 	fsnodes_get_stats(child,&sr,1);
@@ -2363,18 +2407,26 @@ static inline fsnode* fsnodes_create_node(uint32_t ts,fsnode* node,uint16_t nlen
 		p->data.ddata.nlink = 2;
 		p->data.ddata.elements = 0;
 		break;
+	case TYPE_TRASH:
+	case TYPE_SUSTAINED:
 	case TYPE_FILE:
 		p->data.fdata.length = 0;
 		p->data.fdata.chunks = 0;
 		p->data.fdata.chunktab = NULL;
+		p->data.fdata.nlink = 0;
 		break;
 	case TYPE_SYMLINK:
 		p->data.sdata.pleng = 0;
 		p->data.sdata.path = NULL;
+		p->data.sdata.nlink = 0;
 		break;
 	case TYPE_BLOCKDEV:
 	case TYPE_CHARDEV:
 		p->data.devdata.rdev = 0;
+		p->data.devdata.nlink = 0;
+		break;
+	default:
+		p->data.odata.nlink = 0;
 	}
 	p->parents = NULL;
 	fsnodes_node_add(p);
@@ -4669,8 +4721,12 @@ uint8_t fs_end_setlength(uint64_t chunkid) {
 }
 
 uint8_t fs_mr_unlock(uint64_t chunkid) {
-	meta_version_inc();
-	return chunk_mr_unlock(chunkid);
+	uint8_t status;
+	status = chunk_mr_unlock(chunkid);
+	if (status==MFS_STATUS_OK) {
+		meta_version_inc();
+	}
+	return status;
 }
 
 uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[ATTR_RECORD_SIZE]) {
@@ -5290,6 +5346,8 @@ uint8_t fs_univ_link(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t in
 	statsrecord sr;
 	fsnode *sp;
 	fsnode *dwd;
+	uint16_t nlink;
+
 	*inode = 0;
 	if (attr) {
 		memset(attr,0,ATTR_RECORD_SIZE);
@@ -5300,11 +5358,30 @@ uint8_t fs_univ_link(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t in
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode_src,NULL,&sp,0)==0 || fsnodes_node_find_ext(rootinode,sesflags,&parent_dst,NULL,&dwd,0)==0) {
 		return MFS_ERROR_ENOENT;
 	}
-	if (sp->type==TYPE_TRASH || sp->type==TYPE_SUSTAINED) {
-		return MFS_ERROR_ENOENT;
+	nlink = 0;
+	switch (sp->type) {
+		case TYPE_TRASH:
+		case TYPE_SUSTAINED:
+			return MFS_ERROR_ENOENT;
+		case TYPE_DIRECTORY:
+			return MFS_ERROR_EPERM;
+		case TYPE_FILE:
+			nlink = sp->data.fdata.nlink;
+			break;
+		case TYPE_SOCKET:
+		case TYPE_FIFO:
+			nlink = sp->data.odata.nlink;
+			break;
+		case TYPE_BLOCKDEV:
+		case TYPE_CHARDEV:
+			nlink = sp->data.devdata.nlink;
+			break;
+		case TYPE_SYMLINK:
+			nlink = sp->data.sdata.nlink;
+			break;
 	}
-	if (sp->type==TYPE_DIRECTORY) {
-		return MFS_ERROR_EPERM;
+	if ((sesflags&SESFLAG_METARESTORE)==0 && nlink>=MaxAllowedHardLinks) {
+		return MFS_ERROR_NOSPACE;
 	}
 	if (dwd->type!=TYPE_DIRECTORY) {
 		return MFS_ERROR_ENOTDIR;
@@ -5969,10 +6046,10 @@ uint8_t fs_mr_write(uint32_t ts,uint32_t inode,uint32_t indx,uint8_t opflag,uint
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
 	p->eattr &= ~(EATTR_SNAPSHOT);
-	meta_version_inc();
 	if (canmodmtime) {
 		p->mtime = p->ctime = ts;
 	}
+	meta_version_inc();
 	return MFS_STATUS_OK;
 }
 
@@ -6186,8 +6263,10 @@ uint8_t fs_mr_repair(uint32_t ts,uint32_t inode,uint32_t indx,uint32_t nversion)
 	for (e=p->parents ; e ; e=e->nextparent) {
 		fsnodes_add_sub_stats(e->parent,&nsr,&psr);
 	}
-	meta_version_inc();
 	p->mtime = p->ctime = ts;
+	if (status==MFS_STATUS_OK) {
+		meta_version_inc();
+	}
 	return status;
 }
 
@@ -6531,7 +6610,9 @@ uint8_t fs_mr_setxattr(uint32_t ts,uint32_t inode,uint32_t anleng,const uint8_t 
 		return status;
 	}
 	p->ctime = ts;
-	meta_version_inc();
+	if (status==MFS_STATUS_OK) {
+		meta_version_inc();
+	}
 	return status;
 }
 
@@ -7183,6 +7264,7 @@ uint8_t fs_mr_set_file_chunk(uint32_t inode,uint32_t indx,uint64_t chunkid) {
 	if (chunkid>0) {
 		chunk_add_file(chunkid,node->sclassid);
 	}
+	meta_version_inc();
 	return MFS_STATUS_OK;
 }
 
@@ -7516,11 +7598,11 @@ uint8_t fs_univ_emptytrash(uint32_t ts,uint8_t sesflags,uint32_t bid,uint32_t fr
 			changelog("%"PRIu32"|EMPTYTRASH(%"PRIu32"):%"PRIu32",%"PRIu32",%"PRIu32,ts,bid,fi,si,ics);
 		}
 	} else {
-		meta_version_inc();
 		if (freeinodes!=fi || sustainedinodes!=si || (inode_chksum!=0 && ics!=inode_chksum)) {
 			syslog(LOG_WARNING,"EMPTYTRASH data mismatch: my:(%"PRIu32",%"PRIu32",%"PRIu32") != expected:(%"PRIu32",%"PRIu32",%"PRIu32")",fi,si,ics,freeinodes,sustainedinodes,inode_chksum);
 			return MFS_ERROR_MISMATCH;
 		}
+		meta_version_inc();
 	}
 	return MFS_STATUS_OK;
 }
@@ -7576,11 +7658,11 @@ uint8_t fs_univ_emptysustained(uint32_t ts,uint8_t sesflags,uint32_t bid,uint32_
 			changelog("%"PRIu32"|EMPTYSUSTAINED(%"PRIu32"):%"PRIu32",%"PRIu32,ts,bid,fi,ics);
 		}
 	} else {
-		meta_version_inc();
 		if (freeinodes!=fi || (inode_chksum!=0 && inode_chksum!=ics)) {
 			syslog(LOG_WARNING,"EMPTYSUSTAINED data mismatch: my:(%"PRIu32",%"PRIu32") != expected:(%"PRIu32",%"PRIu32")",fi,ics,freeinodes,inode_chksum);
 			return MFS_ERROR_MISMATCH;
 		}
+		meta_version_inc();
 	}
 	return MFS_STATUS_OK;
 }
@@ -7618,11 +7700,11 @@ uint8_t fs_mr_renumerate_edges(uint64_t expected_nextedgeid) {
 	fsnodes_keep_alive_begin();
 	fs_renumerate_edges(root);
 	edgesneedrenumeration = 0;
-	meta_version_inc();
 	if (nextedgeid!=expected_nextedgeid) {
 		syslog(LOG_WARNING,"RENUMERATEEDGES data mismatch: my:%"PRIu64" != expected:%"PRIu64,nextedgeid,expected_nextedgeid);
 		return MFS_ERROR_MISMATCH;
 	}
+	meta_version_inc();
 	return MFS_STATUS_OK;
 }
 
@@ -7976,8 +8058,27 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 			current_edgeid = edgeid;
 		}
 		e->parent->data.ddata.elements++;
-		if (e->child->type==TYPE_DIRECTORY) {
-			e->parent->data.ddata.nlink++;
+		switch (e->child->type) {
+			case TYPE_FILE:
+			case TYPE_TRASH:
+			case TYPE_SUSTAINED:
+				// TRASH and SUSTAINED here are only pro forma and to avoid potential future bugs
+				e->child->data.fdata.nlink++;
+				break;
+			case TYPE_DIRECTORY:
+				// directories doesn't have hard links - nlink here is calculated differently
+				e->parent->data.ddata.nlink++;
+				break;
+			case TYPE_SYMLINK:
+				e->child->data.sdata.nlink++;
+				break;
+			case TYPE_BLOCKDEV:
+			case TYPE_CHARDEV:
+				e->child->data.devdata.nlink++;
+				break;
+			default:
+				e->child->data.odata.nlink++;
+				break;
 		}
 		fsnodes_edge_add(e);
 	}
@@ -8250,14 +8351,18 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 		p->data.ddata.children = NULL;
 		p->data.ddata.nlink = 2;
 		p->data.ddata.elements = 0;
+		break;
 	case TYPE_SOCKET:
 	case TYPE_FIFO:
+		p->data.odata.nlink = 0;
 		break;
 	case TYPE_BLOCKDEV:
 	case TYPE_CHARDEV:
+		p->data.devdata.nlink = 0;
 		p->data.devdata.rdev = get32bit(&ptr);
 		break;
 	case TYPE_SYMLINK:
+		p->data.sdata.nlink = 0;
 		pleng = get32bit(&ptr);
 		p->data.sdata.pleng = pleng;
 		if (pleng>0) {
@@ -8290,6 +8395,7 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 	case TYPE_FILE:
 	case TYPE_TRASH:
 	case TYPE_SUSTAINED:
+		p->data.fdata.nlink = 0;
 		p->data.fdata.length = get64bit(&ptr);
 		ch = get32bit(&ptr);
 		p->data.fdata.chunks = ch;
@@ -8846,6 +8952,7 @@ void fs_cs_disconnected(void) {
 
 
 void fs_reload(void) {
+	uint32_t mlink;
 	if (cfg_isdefined("QUOTA_TIME_LIMIT") && !cfg_isdefined("QUOTA_DEFAULT_GRACE_PERIOD")) {
 		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400); // deprecated option
 	} else {
@@ -8856,6 +8963,16 @@ void fs_reload(void) {
 		syslog(LOG_NOTICE,"unrecognized value for ATIME_MODE - using defaults");
 		AtimeMode = 0;
 	}
+	mlink = cfg_getuint32("MAX_ALLOWED_HARD_LINKS",32767);
+	if (mlink<8) {
+		syslog(LOG_NOTICE,"MAX_ALLOWED_HARD_LINKS is less than 8 - less that minimum number of hard links requierd by POSIX - setting to 8");
+		mlink = 8;
+	}
+	if (mlink>65000) {
+		syslog(LOG_NOTICE,"MAX_ALLOWED_HARD_LINKS is greater than 65000 - setting to 65000");
+		mlink = 65000;
+	}
+	MaxAllowedHardLinks = mlink;
 }
 
 int fs_strinit(void) {

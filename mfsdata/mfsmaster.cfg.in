@@ -201,3 +201,7 @@
 #  #U or #.#U - amount in multiplies of 'max bytes currently used by one of chunkservers'
 #  #C or #.#C - amount in multiplies of 'max total bytes of chunkserver - the highest capacity of one chunkserver'
 # RESERVE_SPACE = 0
+
+# Define limit for number of hardlinks allowed for one object.
+# Minimum value is 8 (required by POSIX) and maximum value is 65000 (same as in ext4 on Linux). Default value is 32767.
+# MAX_ALLOWED_HARD_LINKS = 32767

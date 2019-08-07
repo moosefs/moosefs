@@ -3,6 +3,8 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.106-1 (WIP)
 
   - (tools) better handling unrecognized options
+  - (master) better hard links handling
+  - (master) added limit for number of hardlinks allowed for one object
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

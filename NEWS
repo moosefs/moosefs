@@ -11,6 +11,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) changed chunk replication and deletion charts into two color charts (successful/unsuccessful - issue #273)
   - (all) added new charts with number of chunk creations and interna changes (also successful and unsuccesful)
   - (master) added ignoring chunk with id zero sent from chunkserver
+  - (metadump) added option for dumping parts of metadata
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

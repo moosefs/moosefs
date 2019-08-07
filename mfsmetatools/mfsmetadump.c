@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <inttypes.h>
 
@@ -1242,7 +1243,7 @@ int fs_load_pre17(FILE *fd) {
 	return 0;
 }
 
-int fs_load(FILE *fd,uint8_t fver) {
+int fs_load(FILE *fd,uint8_t fver,const char section[4]) {
 	uint32_t maxnodeid,nextsessionid;
 	uint64_t sleng;
 	off_t offbegin;
@@ -1260,12 +1261,16 @@ int fs_load(FILE *fd,uint8_t fver) {
 		version = get64bit(&ptr);
 		nextsessionid = get32bit(&ptr);
 
-		printf("# maxnodeid: %"PRIu32" ; version: %"PRIu64" ; nextsessionid: %"PRIu32"\n",maxnodeid,version,nextsessionid);
+		if (section[0]==0 || memcmp(section,"HEAD",4)==0) {
+			printf("# maxnodeid: %"PRIu32" ; version: %"PRIu64" ; nextsessionid: %"PRIu32"\n",maxnodeid,version,nextsessionid);
+		}
 	} else {
 		version = get64bit(&ptr);
 		fileid = get64bit(&ptr);
 
-		printf("# version: %"PRIu64" ; fileid: 0x%"PRIX64"\n",version,fileid);
+		if (section[0]==0 || memcmp(section,"HEAD",4)==0) {
+			printf("# version: %"PRIu64" ; fileid: 0x%"PRIX64"\n",version,fileid);
+		}
 	}
 
 	while (1) {
@@ -1274,103 +1279,109 @@ int fs_load(FILE *fd,uint8_t fver) {
 			return -1;
 		}
 		if (memcmp(hdr,"[MFS EOF MARKER]",16)==0) {
-			printf("# -------------------------------------------------------------------\n");
-			printf("# MFS END OF FILE MARKER\n");
-			printf("# -------------------------------------------------------------------\n");
+			if (section[0]==0) {
+				printf("# -------------------------------------------------------------------\n");
+				printf("# MFS END OF FILE MARKER\n");
+				printf("# -------------------------------------------------------------------\n");
+			}
 			return 0;
 		}
 		ptr = hdr+8;
 		sleng = get64bit(&ptr);
 		offbegin = ftello(fd);
-		printf("# -------------------------------------------------------------------\n");
-		printf("# section header: %c%c%c%c%c%c%c%c (%02X%02X%02X%02X%02X%02X%02X%02X) ; length: %"PRIu64"\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),dispchar(hdr[4]),dispchar(hdr[5]),dispchar(hdr[6]),dispchar(hdr[7]),hdr[0],hdr[1],hdr[2],hdr[3],hdr[4],hdr[5],hdr[6],hdr[7],sleng);
-		mver = (((hdr[5]-'0')&0xF)<<4)+(hdr[7]&0xF);
-		printf("# section type: %c%c%c%c ; version: 0x%02"PRIX8"\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),mver);
-		if (memcmp(hdr,"SESS",4)==0) {
-			if (sessions_load(fd,mver)<0) {
-				printf("error reading metadata (SESS)\n");
-				return -1;
+		if (section==0 || memcmp(hdr,section,4)==0) {
+			printf("# -------------------------------------------------------------------\n");
+			printf("# section header: %c%c%c%c%c%c%c%c (%02X%02X%02X%02X%02X%02X%02X%02X) ; length: %"PRIu64"\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),dispchar(hdr[4]),dispchar(hdr[5]),dispchar(hdr[6]),dispchar(hdr[7]),hdr[0],hdr[1],hdr[2],hdr[3],hdr[4],hdr[5],hdr[6],hdr[7],sleng);
+			mver = (((hdr[5]-'0')&0xF)<<4)+(hdr[7]&0xF);
+			printf("# section type: %c%c%c%c ; version: 0x%02"PRIX8"\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),mver);
+			if (memcmp(hdr,"SESS",4)==0) {
+				if (sessions_load(fd,mver)<0) {
+					printf("error reading metadata (SESS)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"LABS",4)==0) {
+				if (labelset_load(fd,mver)<0) {
+					printf("error reading metadata (LABS)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"SCLA",4)==0) {
+				if (labelset_load(fd,mver)<0) {
+					printf("error reading metadata (SCLA)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"NODE",4)==0) {
+				if (fs_loadnodes(fd,fver,mver)<0) {
+					printf("error reading metadata (NODE)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"EDGE",4)==0) {
+				if (fs_loadedges(fd,mver)<0) {
+					printf("error reading metadata (EDGE)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"FREE",4)==0) {
+				if (fs_loadfree(fd,mver)<0) {
+					printf("error reading metadata (FREE)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"QUOT",4)==0) {
+				if (fs_loadquota(fd,mver)<0) {
+					printf("error reading metadata (QUOT)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"XATR",4)==0) {
+				if (xattr_load(fd,mver)<0) {
+					printf("error reading metadata (XATR)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"PACL",4)==0) {
+				if (posix_acl_load(fd,mver)<0) {
+					printf("error reading metadata (PACL)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"FLCK",4)==0) {
+				if (flock_load(fd,mver)<0) {
+					printf("error reading metadata (FLCK)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"PLCK",4)==0) {
+				if (posix_lock_load(fd,mver)<0) {
+					printf("error reading metadata (PLCK)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"OPEN",4)==0) {
+				if (of_load(fd,mver)<0) {
+					printf("error reading metadata (OPEN)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"CSDB",4)==0) {
+				if (csdb_load(fd,mver)<0) {
+					printf("error reading metadata (CSDB)\n");
+					return -1;
+				}
+			} else if (memcmp(hdr,"CHNK",4)==0) {
+				if (chunk_load(fd,mver)<0) {
+					printf("error reading metadata (CHNK)\n");
+					return -1;
+				}
+			} else {
+				printf("unknown file part\n");
+				if (hexdump(fd,sleng)<0) {
+					return -1;
+				}
 			}
-		} else if (memcmp(hdr,"LABS",4)==0) {
-			if (labelset_load(fd,mver)<0) {
-				printf("error reading metadata (LABS)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"SCLA",4)==0) {
-			if (labelset_load(fd,mver)<0) {
-				printf("error reading metadata (SCLA)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"NODE",4)==0) {
-			if (fs_loadnodes(fd,fver,mver)<0) {
-				printf("error reading metadata (NODE)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"EDGE",4)==0) {
-			if (fs_loadedges(fd,mver)<0) {
-				printf("error reading metadata (EDGE)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"FREE",4)==0) {
-			if (fs_loadfree(fd,mver)<0) {
-				printf("error reading metadata (FREE)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"QUOT",4)==0) {
-			if (fs_loadquota(fd,mver)<0) {
-				printf("error reading metadata (QUOT)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"XATR",4)==0) {
-			if (xattr_load(fd,mver)<0) {
-				printf("error reading metadata (XATR)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"PACL",4)==0) {
-			if (posix_acl_load(fd,mver)<0) {
-				printf("error reading metadata (PACL)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"FLCK",4)==0) {
-			if (flock_load(fd,mver)<0) {
-				printf("error reading metadata (FLCK)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"PLCK",4)==0) {
-			if (posix_lock_load(fd,mver)<0) {
-				printf("error reading metadata (PLCK)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"OPEN",4)==0) {
-			if (of_load(fd,mver)<0) {
-				printf("error reading metadata (OPEN)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"CSDB",4)==0) {
-			if (csdb_load(fd,mver)<0) {
-				printf("error reading metadata (CSDB)\n");
-				return -1;
-			}
-		} else if (memcmp(hdr,"CHNK",4)==0) {
-			if (chunk_load(fd,mver)<0) {
-				printf("error reading metadata (CHNK)\n");
+			if ((off_t)(offbegin+sleng)!=ftello(fd)) {
+				fprintf(stderr,"some data in this section have not been read - file corrupted\n");
 				return -1;
 			}
 		} else {
-			printf("unknown file part\n");
-			if (hexdump(fd,sleng)<0) {
-				return -1;
-			}
-		}
-		if ((off_t)(offbegin+sleng)!=ftello(fd)) {
-			fprintf(stderr,"some data in this section have not been read - file corrupted\n");
-			return -1;
+			fseeko(fd,sleng,SEEK_CUR);
 		}
 	}
 	return 0;
 }
 
-int fs_loadall(const char *fname) {
+int fs_loadall(const char *fname,const char section[4]) {
 	FILE *fd;
 	uint8_t hdr[8];
 	uint8_t fver;
@@ -1386,12 +1397,19 @@ int fs_loadall(const char *fname) {
 		fclose(fd);
 		return -1;
 	}
-	printf("# header: %c%c%c%c%c%c%c%c (%02X%02X%02X%02X%02X%02X%02X%02X)\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),dispchar(hdr[4]),dispchar(hdr[5]),dispchar(hdr[6]),dispchar(hdr[7]),hdr[0],hdr[1],hdr[2],hdr[3],hdr[4],hdr[5],hdr[6],hdr[7]);
+	if (memcmp(section,"HEAD",4)==0 || section[0]==0) {
+		printf("# header: %c%c%c%c%c%c%c%c (%02X%02X%02X%02X%02X%02X%02X%02X)\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),dispchar(hdr[4]),dispchar(hdr[5]),dispchar(hdr[6]),dispchar(hdr[7]),hdr[0],hdr[1],hdr[2],hdr[3],hdr[4],hdr[5],hdr[6],hdr[7]);
+	}
 	if (memcmp(hdr,"MFSM NEW",8)==0) {
 		printf("empty file\n");
 	} else if (memcmp(hdr,MFSSIGNATURE "M ",5)==0 && hdr[5]>='1' && hdr[5]<='9' && hdr[6]=='.' && hdr[7]>='0' && hdr[7]<='9') {
 		fver = ((hdr[5]-'0')<<4)+(hdr[7]-'0');
 		if (fver<0x17) {
+			if (section[0]!=0) {
+				printf("old format detected - can't dump sections separatelly");
+				fclose(fd);
+				return -1;
+			}
 			if (fs_load_pre17(fd)<0) {
 				printf("error reading metadata (structure)\n");
 				fclose(fd);
@@ -1403,7 +1421,7 @@ int fs_loadall(const char *fname) {
 				return -1;
 			}
 		} else {
-			if (fs_load(fd,fver)<0) {
+			if (fs_load(fd,fver,section)<0) {
 				fclose(fd);
 				return -1;
 			}
@@ -1422,10 +1440,61 @@ int fs_loadall(const char *fname) {
 	return 0;
 }
 
-int main(int argc,char **argv) {
-	if (argc!=2) {
-		printf("usage: %s metadata_file\n",argv[0]);
+void usage(const char *appname) {
+//	printf("usage: %s [-f J|C[separator]] [-o outputfile] [-a sum_name] metadata.mfs PATH ...\n",appname);
+	printf("usage: %s [-s section to dump] metadata.mfs\n",appname);
+	printf("section names:\n");
+	printf("\tHEAD - header info\n");
+	printf("\tSESS - client sessions\n");
+	printf("\tLABS - labels (not used)\n");
+	printf("\tSCLA - storage classes\n");
+	printf("\tNODE - tree nodes (i-nodes)\n");
+	printf("\tEDGE - tree edges (file names)\n");
+	printf("\tFREE - free nodes (deleted i-nodes)\n");
+	printf("\tQUOT - quota definitions\n");
+	printf("\tXATR - xattr data\n");
+	printf("\tPACL - posix acl data\n");
+	printf("\tFLCK - flock data\n");
+	printf("\tPLCK - posix locks (lockf,ioctl) data\n");
+	printf("\tOPEN - open files\n");
+	printf("\tCSDB - active chunkservers\n");
+	printf("\tCHNK - chunks\n");
+	exit(1);
+}
+
+int main(int argc,char *argv[]) {
+	int ch;
+	char *appname;
+	char section[4];
+
+	appname = argv[0];
+	memset(section,0,4);
+
+	while ((ch=getopt(argc,argv,"s:"))>=0) {
+		switch(ch) {
+			case 's':
+				if (strlen(optarg)!=4) {
+					printf("wrong section name\n");
+					usage(appname);
+				}
+				memcpy(section,optarg,4);
+				break;
+			default:
+				usage(appname);
+				return 1;
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
+	if (argc<1) {
+		usage(appname);
 		return 1;
 	}
-	return (fs_loadall(argv[1])<0)?1:0;
+
+//	if (argc!=2) {
+//		printf("usage: %s metadata_file\n",argv[0]);
+//		return 1;
+//	}
+	return (fs_loadall(argv[1],section)<0)?1:0;
 }

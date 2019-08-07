@@ -2,11 +2,12 @@
 .SH NAME
 mfsmetadump - dump MooseFS metadata info in human readable format
 .SH SYNOPSIS
-\fBmfsmetadump\fP \fImetadata_file\fP
+\fBmfsmetadump\fP [\fB\-s\fP \fIsection_name\fP] \fImetadata_file\fP
 .SH DESCRIPTION
 \fBmfsmetadump\fP dumps MooseFS metadata info in human readable format. 
 Output consists of several sections with different types of information. Every section consist
-of header data - rows starting with hash (#) sign - and content data (may be empty).
+of header data - rows starting with hash (#) sign - and content data (may be empty). If option
+\fB-s\fP is specified then only given section of the file will be dumped.
 .SH FILE HEADER
 .TP 20
 header

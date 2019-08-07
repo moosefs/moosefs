@@ -168,6 +168,9 @@ Maximum number of seconds server can be in maintenance mode (default value is 0 
 .B CS_TEMP_MAINTENANCE_MODE_TIMEOUT
 Maximum number of seconds server can be in "temporary" maintenance mode (server is switched to this mode whenever is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 1800)
 .TP
+.B CS_DAYS_TO_REMOVE_UNUSED
+How many days unused (disconnected) chunkserver should be kept in master data structures (valid values: 0 - 365 ; 0 means indefinitely ; default value: 7)
+.TP
 .B ACCEPTABLE_DIFFERENCE
 Maximum difference between space usage of chunkservers (deprecated, use \fBACCEPTABLE_PERCENTAGE_DIFFERENCE\fP instead)
 .TP

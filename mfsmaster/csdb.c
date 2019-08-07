@@ -55,6 +55,7 @@ static uint32_t HeavyLoadThreshold;
 static double HeavyLoadRatioThreshold;
 static uint32_t MaintenanceModeTimeout;
 static uint32_t TempMaintenanceModeTimeout;
+static uint32_t SecondsToRemoveUnusedCS;
 
 #define CSDBHASHSIZE 256
 #define CSDBHASHFN(ip,port) (hash32((ip)^((port)<<16))%(CSDBHASHSIZE))
@@ -67,6 +68,7 @@ typedef struct csdbentry {
 	uint32_t heavyloadts;		// last timestamp of heavy load state (load > thresholds)
 	uint32_t load;
 	uint32_t maintenance_timeout;
+	uint32_t disconnection_time;
 	uint8_t maintenance;
 	uint8_t tmpremoved;
 //	uint8_t fastreplication;
@@ -96,10 +98,12 @@ void csdb_disconnect_check(void) {
 }
 
 void csdb_self_check(void) {
-	uint32_t hash;
-	uint32_t now = main_time();
+	uint32_t hash,now;
 	csdbentry *csptr;
 	uint32_t ds,dsm,s,trs;
+
+	now = main_time();
+
 	ds = 0;
 	dsm = 0;
 	s = 0;
@@ -258,6 +262,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 	csptr->maintenance_timeout = 0;
 	csptr->maintenance = 0;
 	csptr->tmpremoved = 0;
+	csptr->disconnection_time = main_time();
 //	csptr->fastreplication = 1;
 	csptr->load = 0;
 	csptr->eptr = eptr;
@@ -455,6 +460,38 @@ uint8_t csdb_remove_server(uint32_t ip,uint16_t port) {
 	return MFS_ERROR_NOTFOUND;
 }
 
+void csdb_remove_unused(void) {
+	uint32_t hash,now;
+	csdbentry *csptr,**cspptr;
+
+	if (SecondsToRemoveUnusedCS>0) {
+		now = main_time();
+		for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
+			cspptr = csdbhash + hash;
+			while ((csptr=*cspptr)) {
+				if (csptr->eptr==NULL && csptr->disconnection_time+SecondsToRemoveUnusedCS<now) {
+					if (csptr->csid>0) {
+						csdb_delid(csptr->csid);
+					}
+					if (csptr->maintenance) {
+						disconnected_servers_in_maintenance--;
+					}
+					if (csptr->tmpremoved) {
+						tmpremoved_servers--;
+					}
+					*cspptr = csptr->next;
+					free(csptr);
+					servers--;
+					disconnected_servers--;
+					changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_DEL,csptr->ip,csptr->port);
+				} else {
+					cspptr = &(csptr->next);
+				}
+			}
+		}
+	}
+}
+
 uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 	uint32_t hash,hashid;
 	csdbentry *csptr,**cspptr,*csidptr;
@@ -480,6 +517,7 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 			csptr->maintenance_timeout = 0;
 			csptr->maintenance = 0;
 			csptr->tmpremoved = 0;
+			csptr->disconnection_time = main_time();
 //			csptr->fastreplication = 1;
 			csptr->load = 0;
 			csptr->eptr = NULL;
@@ -947,6 +985,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		csptr->maintenance = maintenance;
 		csptr->maintenance_timeout = maintenance_timeout;
 		csptr->tmpremoved = 0;
+		csptr->disconnection_time = main_time();
 //		csptr->fastreplication = fastreplication;
 		csptr->next = csdbhash[hash];
 		csdbhash[hash] = csptr;
@@ -988,11 +1027,18 @@ uint32_t csdb_getdisconnecttime(void) {
 }
 
 void csdb_reload(void) {
+	uint32_t dtr;
 	HeavyLoadGracePeriod = cfg_getuint32("CS_HEAVY_LOAD_GRACE_PERIOD",900);
 	HeavyLoadThreshold = cfg_getuint32("CS_HEAVY_LOAD_THRESHOLD",150);
 	HeavyLoadRatioThreshold = cfg_getdouble("CS_HEAVY_LOAD_RATIO_THRESHOLD",3.0);
 	MaintenanceModeTimeout = cfg_getuint32("CS_MAINTENANCE_MODE_TIMEOUT",0);
 	TempMaintenanceModeTimeout = cfg_getuint32("CS_TEMP_MAINTENANCE_MODE_TIMEOUT",1800);
+	dtr = cfg_getuint32("CS_DAYS_TO_REMOVE_UNUSED",7);
+	if (dtr>365) {
+		syslog(LOG_WARNING,"CS_DAYS_TO_REMOVE_UNUSED - value is too big (max=365) - use zero for infinite value");
+		dtr = 0;
+	}
+	SecondsToRemoveUnusedCS = dtr * 86400;
 }
 
 int csdb_init(void) {
@@ -1015,5 +1061,6 @@ int csdb_init(void) {
 	loadsum = 0;
 	main_reload_register(csdb_reload);
 	main_time_register(1,0,csdb_self_check);
+	main_time_register(600,300,csdb_remove_unused);
 	return 0;
 }

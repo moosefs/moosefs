@@ -161,6 +161,9 @@
 # Maximum number of seconds server can be in "temporary" maintenance mode (server is switched to this mode whenever is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 1800)
 # CS_TEMP_MAINTENANCE_MODE_TIMEOUT = 1800
 
+# How many days unused (disconnected) chunkserver should be kept in master data structures (valid values: 0 - 365 ; 0 means indefinitely ; default value is 7)
+# CS_DAYS_TO_REMOVE_UNUSED = 7
+
 ###############################################
 # CLIENTS CONNECTION OPTIONS                  #
 ###############################################

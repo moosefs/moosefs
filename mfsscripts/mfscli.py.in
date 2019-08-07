@@ -1,4 +1,4 @@
-#!@PYTHON@
+#!/usr/bin/env @PYTHON@
 
 # Copyright (C) 2019 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 # 
@@ -103,13 +103,21 @@ try:
 except NameError:
 	xrange = range
 
+def myunicode(x):
+	if sys.version_info[0]<3:
+		return unicode(x)
+	else:
+		return str(x)
+
 #parse parameters and auxilinary functions
 if cgimode:
 	# in CGI mode set default output encoding to utf-8 (our html page encoding)
 	if sys.version_info[0]<3:
 		sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
-	else:
+	elif sys.version_info[1]<7:
 		sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+	else:
+		sys.stdout.reconfigure(encoding='utf-8')
 
 	try:
 		import urllib.parse as xurllib
@@ -378,7 +386,7 @@ else: # CLI mode
 			print("\t-n : do not resolve ip addresses (default when output device is not tty)")
 			print("\t-f frame charset number : set frame charset to be displayed as table frames in ttymode")
 			print("\t\t-f0 : use simple ascii frames '+','-','|' (default for non utf-8 encodings)")
-			if sys.stdout.encoding=='UTF-8':
+			if (sys.stdout.encoding=='UTF-8' or sys.stdout.encoding=='utf-8'):
 				if sys.version_info[0]<3:
 					print("\t\t-f1 : use utf-8 frames: \xe2\x94\x8f\xe2\x94\xb3\xe2\x94\x93\xe2\x94\xa3\xe2\x95\x8b\xe2\x94\xab\xe2\x94\x97\xe2\x94\xbb\xe2\x94\x9b\xe2\x94\x81\xe2\x94\x83\xe2\x95\xb8\xe2\x95\xb9\xe2\x95\xba\xe2\x95\xbb")
 					print("\t\t-f2 : use utf-8 frames: \xe2\x94\x8c\xe2\x94\xac\xe2\x94\x90\xe2\x94\x9c\xe2\x94\xbc\xe2\x94\xa4\xe2\x94\x94\xe2\x94\xb4\xe2\x94\x98\xe2\x94\x80\xe2\x94\x82\xe2\x95\xb4\xe2\x95\xb5\xe2\x95\xb6\xe2\x95\xb7")
@@ -775,13 +783,34 @@ else: # CLI mode
 	else:
 		colorcode=["","","","","","","",""]
 
-	if ttymode and sys.stdout.encoding=='UTF-8':
+	if ttymode and (sys.stdout.encoding=='UTF-8' or sys.stdout.encoding=='utf-8'):
 		if frameset>=0 and frameset<=3:
 			tabbleframes=frameset
 		else:
 			tabbleframes=0
 	else:
 		tabbleframes=0
+
+	# terminal encoding mambo jumbo (mainly replace unicode chars that can't be printed with '?' instead of throwing exception)
+	term_encoding = sys.stdout.encoding
+	if term_encoding==None:
+		term_encoding = 'utf-8'
+	if sys.version_info[0]<3:
+		sys.stdout = codecs.getwriter(term_encoding)(sys.stdout,'replace')
+		sys.stdout.encoding = term_encoding
+	elif sys.version_info[1]<7:
+		sys.stdout = codecs.getwriter(term_encoding)(sys.stdout.detach(),'replace')
+		sys.stdout.encoding = term_encoding
+	else:
+		sys.stdout.reconfigure(errors='replace')
+
+	# lines prepared for JSON output (force utf-8):
+	#if sys.version_info[0]<3:
+	#	sys.stdout = codecs.getwriter('utf-8')(sys.stdout)
+	#elif sys.version_info[1]<7:
+	#	sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+	#else:
+	#	sys.stdout.reconfigure(encoding='utf-8')
 
 	# frames:
 	#  +-----+-----+-----+-----+
@@ -864,13 +893,13 @@ else: # CLI mode
 						ccnt+=celldata[2]
 					else:
 						if celldata[0]!=None:
-							cstr = str(celldata[0])
+							cstr = myunicode(celldata[0])
 							if len(cstr) > self.cwidth[ccnt]:
 								self.cwidth[ccnt] = len(cstr)
 						ccnt+=1
 				else:
 					if celldata!=None:
-						cstr = str(celldata)
+						cstr = myunicode(celldata)
 						if len(cstr) > self.cwidth[ccnt]:
 							self.cwidth[ccnt] = len(cstr)
 					ccnt+=1
@@ -887,7 +916,7 @@ else: # CLI mode
 			for celldata in rowdata:
 				if type(celldata)==tuple:
 					if celldata[0]!=None:
-						cstr = str(celldata[0])
+						cstr = myunicode(celldata[0])
 					else:
 						cstr = ""
 					if len(celldata)==3:
@@ -903,7 +932,7 @@ else: # CLI mode
 						ccnt+=1
 				else:
 					if celldata!=None:
-						cstr = str(celldata)
+						cstr = myunicode(celldata)
 						if len(cstr) > self.cwidth[ccnt]:
 							self.cwidth[ccnt] = len(cstr)
 						rdata.append((cstr,self.defattrs[ccnt]))
@@ -980,7 +1009,7 @@ else: # CLI mode
 					ccnt = 0
 					for celldata in rowdata:
 						if type(celldata)==tuple and len(celldata)==3 and celldata[0]!=None:
-							cstr = str(celldata[0])
+							cstr = myunicode(celldata[0])
 							clen = len(cstr)
 							cwidth = sum(self.cwidth[ccnt:ccnt+celldata[2]])+3*(celldata[2]-1)
 							if clen > cwidth:
@@ -1040,8 +1069,7 @@ else: # CLI mode
 							ccnt+=1
 						if cstr==None:
 							cstr = ""
-						if type(cstr)!=str:
-							cstr = str(cstr)
+						cstr = myunicode(cstr)
 						if cstr=="---":
 							if nsep==0:
 								line += self.frames[(13,6,0,3)[sepdata[cpos]]]
@@ -1074,9 +1102,9 @@ else: # CLI mode
 					row = []
 					for celldata in rowdata:
 						if type(celldata)==tuple:
-							cstr = str(celldata[0])
+							cstr = myunicode(celldata[0])
 						elif celldata!=None:
-							cstr = str(celldata)
+							cstr = myunicode(celldata)
 						else:
 							cstr = ""
 						row.append(cstr)
@@ -2737,7 +2765,7 @@ if "IN" in sectionset:
 				out.append("""</table>""")
 				print("\n".join(out))
 			else:
-				print(tab)
+				print(myunicode(tab))
 		except Exception:
 			print_exception()
 
@@ -2811,7 +2839,7 @@ if "IN" in sectionset:
 					tab.append("chunks",chunks)
 					tab.append("all chunk copies",allcopies)
 					tab.append("regular chunk copies",tdcopies)
-					print(tab)
+					print(myunicode(tab))
 			elif length==76:
 				v1,v2,v3,memusage,total,avail,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies = struct.unpack(">HBBQQQQLQLLLLLLL",masterinfo)
 				strver,sortver = version_str_and_sort((v1,v2,v3))
@@ -2890,7 +2918,7 @@ if "IN" in sectionset:
 					tab.append("chunks",chunks)
 					tab.append("all chunk copies",allcopies)
 					tab.append("regular chunk copies",tdcopies)
-					print(tab)
+					print(myunicode(tab))
 			elif length==101 or length==121 or length==129 or length==137:
 				if length>=137:
 					v1,v2,v3,memusage,syscpu,usercpu,totalspace,availspace,freespace,trspace,trfiles,respace,refiles,nodes,dirs,files,chunks,allcopies,tdcopies,lastsuccessfulstore,lastsaveseconds,lastsavestatus = struct.unpack(">HBBQQQQQQQLQLLLLLLLLLB",masterinfo[:109])
@@ -3034,7 +3062,7 @@ if "IN" in sectionset:
 						tab.append("last save status",("Saved in background","4") if lastsavestatus==0 else ("Downloaded from another master","4") if lastsavestatus==1 else ("Saved in foreground","2") if lastsavestatus==2 else ("Unknown status: %u" % lastsavestatus,"1"))
 					else:
 						tab.append("last save status","-")
-					print(tab)
+					print(myunicode(tab))
 			else:
 				if cgimode:
 					out = []
@@ -3214,7 +3242,7 @@ if "IN" in sectionset:
 						tab.append(("---","",5))
 						percent = 100.0 * totalused / totalallocated
 						tab.append("total",humanize_number(totalused," "),humanize_number(totalallocated," "),"%.2f %%" % percent,"-")
-					print(tab)
+					print(myunicode(tab))
 		except Exception:
 			print_exception()
 
@@ -3393,7 +3421,7 @@ if "IN" in sectionset:
 #							out.append("chunkclass overgoal: %s%u%s" % (colorcode[4],classsum[4],ttyreset))
 #							out.append("chunkclass pending deletion: %s%u%s" % (colorcode[5],classsum[5],ttyreset))
 #							out.append("chunkclass to be removed: %s%u%s" % (colorcode[6],classsum[6],ttyreset))
-					print(tab)
+					print(myunicode(tab))
 				else:
 					out.append("%schunkclass missing:%s%u" % (mtypeprefix,plaintextseparator,classsum[INmatrix][0]))
 					out.append("%schunkclass endangered:%s%u" % (mtypeprefix,plaintextseparator,classsum[INmatrix][1]))
@@ -3456,7 +3484,7 @@ if "IN" in sectionset:
 						tab.append((time.asctime(time.localtime(loopstart)),"c"),(time.asctime(time.localtime(loopend)),"c"),"%u/%u" % (del_invalid,del_invalid+ndel_invalid),"%u/%u" % (del_unused,del_unused+ndel_unused),"%u/%u" % (del_dclean,del_dclean+ndel_dclean),"%u/%u" % (del_ogoal,del_ogoal+ndel_ogoal),"%u/%u" % (rep_ugoal,rep_ugoal+nrep_ugoal),rebalnce)
 					else:
 						tab.append(("no data","c",8))
-					print(tab)
+					print(myunicode(tab))
 				else:
 					out = []
 					if loopstart>0:
@@ -3523,7 +3551,7 @@ if "IN" in sectionset:
 						tab.append((time.asctime(time.localtime(loopstart)),"c"),(time.asctime(time.localtime(loopend)),"c"),"%u/%u" % (del_invalid,del_invalid+ndel_invalid),"%u/%u" % (del_unused,del_unused+ndel_unused),"%u/%u" % (del_dclean,del_dclean+ndel_dclean),"%u/%u" % (del_ogoal,del_ogoal+ndel_ogoal),"%u/%u" % (rep_ugoal,rep_ugoal+nrep_ugoal),rebalnce,locked_unused,locked_used)
 					else:
 						tab.append(("no data","c",10))
-					print(tab)
+					print(myunicode(tab))
 				else:
 					out = []
 					if loopstart>0:
@@ -3594,7 +3622,7 @@ if "IN" in sectionset:
 						tab.append((time.asctime(time.localtime(loopstart)),"c"),(time.asctime(time.localtime(loopend)),"c"),"%u/%u" % (del_invalid,del_invalid+ndel_invalid),"%u/%u" % (del_unused,del_unused+ndel_unused),"%u/%u" % (del_dclean,del_dclean+ndel_dclean),"%u/%u" % (del_ogoal,del_ogoal+ndel_ogoal),"%u/%u" % (rep_ugoal,rep_ugoal+nrep_ugoal),"%u/%u/%u" % (rep_wlab,labels_dont_match,rep_wlab+nrep_wlab+labels_dont_match),rebalnce,locked_unused,locked_used)
 					else:
 						tab.append(("no data","c",11))
-					print(tab)
+					print(myunicode(tab))
 				else:
 					out = []
 					if loopstart>0:
@@ -3699,7 +3727,7 @@ if "IN" in sectionset:
 								tab.append((line.strip(),"l",tabwidth))
 					else:
 						tab.append(("no data","c",tabwidth))
-					print(tab)
+					print(myunicode(tab))
 				else:
 					out = []
 					if loopstart>0:
@@ -3852,7 +3880,7 @@ if "IN" in sectionset:
 					out.append("""</table>""")
 				print("\n".join(out))
 			else:
-				print(tab)
+				print(myunicode(tab))
 		except Exception:
 			print_exception()
 
@@ -4263,7 +4291,7 @@ if "CS" in sectionset:
 						tab.append(("ip/host","c"),("port","c"),("remove command","c",9))
 						tab.append(("---","",11))
 				else:
-					print(tab)
+					print(myunicode(tab))
 					print("")
 					if masterconn.version_at_least(2,0,11):
 						tab = Tabble("Disconnected chunk servers",4)
@@ -4379,7 +4407,7 @@ if "CS" in sectionset:
 				out.append("""</table>""")
 				print("\n".join(out))
 			else:
-				print(tab)
+				print(myunicode(tab))
 		except Exception:
 			print_exception()
 
@@ -4441,7 +4469,7 @@ if "CS" in sectionset:
 				out.append("""</table>""")
 				print("\n".join(out))
 			else:
-				print(tab)
+				print(myunicode(tab))
 		except Exception:
 			print_exception()
 
@@ -4878,7 +4906,7 @@ if "HD" in sectionset:
 				out.append("""</table>""")
 				print("\n".join(out))
 			else:
-				print(tab)
+				print(myunicode(tab))
 	except Exception:
 		print_exception()
 
@@ -5155,7 +5183,7 @@ if "EX" in sectionset:
 			out.append("""</table>""")
 			print("\n".join(out))
 		else:
-			print(tab)
+			print(myunicode(tab))
 	except Exception:
 		print_exception()
 
@@ -5491,7 +5519,7 @@ if "MS" in sectionset and leaderfound:
 				tab.append(*dline)
 				tab.append(("---","",tabcols))
 			else:
-				print(tab)
+				print(myunicode(tab))
 				print("")
 				tab = Tabble("inactive mounts, parameters",5)
 		for sf,sessionid,host,sortipnum,ipnum,info,openfiles,expire in dservers:
@@ -5517,7 +5545,7 @@ if "MS" in sectionset and leaderfound:
 			out.append("""</table>""")
 			print("\n".join(out))
 		else:
-			print(tab)
+			print(myunicode(tab))
 	except Exception:
 		print_exception()
 
@@ -5649,7 +5677,7 @@ if "MO" in sectionset and leaderfound:
 			out.append("""</table>""")
 			print("\n".join(out))
 		else:
-			print(tab)
+			print(myunicode(tab))
 	except Exception:
 		print_exception()
 
@@ -5969,7 +5997,7 @@ if "RS" in sectionset and leaderfound:
 				out.append("""</table>""")
 				print("\n".join(out))
 			else:
-				print(tab)
+				print(myunicode(tab))
 		except Exception:
 			print_exception()
 
@@ -6085,7 +6113,7 @@ if "RS" in sectionset and leaderfound:
 				print("\n".join(out))
 			else:
 				#print(openfiles)
-				print(tab)
+				print(myunicode(tab))
 		except Exception:
 			print_exception()
 
@@ -6230,7 +6258,7 @@ if "RS" in sectionset and leaderfound:
 				print("\n".join(out))
 			else:
 #				print(locks)
-				print(tab)
+				print(myunicode(tab))
 		except Exception:
 			print_exception()
 
@@ -6712,7 +6740,7 @@ if "QU" in sectionset:
 			out.append("""</table>""")
 			print("\n".join(out))
 		else:
-			print(tab)
+			print(myunicode(tab))
 	except Exception:
 		print_exception()
 
@@ -7181,7 +7209,7 @@ if "MC" in sectionset:
 		if cgimode:
 			print("\n".join(out))
 		else:
-			print(tab)
+			print(myunicode(tab))
 	except Exception:
 		print_exception()
 
@@ -7683,7 +7711,7 @@ if "CC" in sectionset:
 		if cgimode:
 			print("\n".join(out))
 		else:
-			print(tab)
+			print(myunicode(tab))
 	except Exception:
 		print_exception()
 

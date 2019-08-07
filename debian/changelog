@@ -1,3 +1,26 @@
+moosefs (3.0.106-1) unstable; urgency=medium
+
+  * (tools) better handling unrecognized options
+  * (master) better hard links handling
+  * (master) added limit for number of hardlinks allowed for one object
+  * (master) added option for automatic removal of unused chunkservers (issue
+    #247)
+  * (metadirinfo) fixed segfault when output filename is not specified
+  * (chunktool) added file name fixing option (issue #276)
+  * (all) changed chunk replication and deletion charts into two color charts
+    (successful/unsuccessful - issue #273)
+  * (all) added new charts with number of chunk creations and interna changes
+    (also successful and unsuccesful)
+  * (master) added ignoring chunk with id zero sent from chunkserver
+  * (metadump) added option for dumping parts of metadata
+  * (master) added more logs to background data write subprocess (connected
+    with issue #280)
+  * (master) fixed LEADER/FOLLOWER desync on SETCHUNK command (pro only)
+  * (cli+cgi) fixed shebang in python scripts (preference for python3 in
+    configure)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 07 Aug 2019 13:00:00 +0200
+
 moosefs (3.0.105-1) unstable; urgency=medium
 
   * (nbd) fixed segfault when filename not specified

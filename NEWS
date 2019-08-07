@@ -13,6 +13,8 @@ This file lists noteworthy changes in MooseFS.
   - (master) added ignoring chunk with id zero sent from chunkserver
   - (metadump) added option for dumping parts of metadata
   - (master) added more logs to background data write subprocess (connected with issue #280)
+  - (master) fixed LEADER/FOLLOWER desync on SETCHUNK command (pro only)
+  - (cli+cgi) fixed shebang in python scripts (preference for python3 in configure)
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

@@ -1,4 +1,4 @@
-#!@PYTHON@
+#!/usr/bin/env @PYTHON@
 
 import fcntl
 import errno
@@ -399,6 +399,7 @@ class HTTP(ClientHandler):
 	def make_cgi_env(self):
 		"""Set CGI environment variables"""
 		env = {}
+		env['PATH'] = os.environ['PATH']
 		env['SERVER_SOFTWARE'] = "AsyncServer"
 		env['SERVER_NAME'] = "AsyncServer"
 		env['GATEWAY_INTERFACE'] = 'CGI/1.1'

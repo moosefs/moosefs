@@ -1,4 +1,4 @@
-.TH mfschunktool "8" "May 2019" "MooseFS 3.0.105-1" "This is part of MooseFS"
+.TH mfschunktool "8" "August 2019" "MooseFS 3.0.106-1" "This is part of MooseFS"
 .SH NAME
 mfschunktool - checks chunk integrity offline
 .SH SYNOPSIS
@@ -23,10 +23,10 @@ turn on fast mode (in this mode only last block is tested - usually this is enou
 turn on repair mode (if checksums on given chunk don't match then they will be overwritten by checksums calculated using actual data)
 .TP
 \fB\-n\fP
-turn on name fixing mode (if the chunk file name is not correct but there is proper file header then tool will rename give file using data stored in the header)
+turn on name fixing mode (if the chunk file name is not correct but there is proper file header, the tool will rename given file using data stored in the header)
 .TP
 \fB\-e\fP
-turn on empty block crc check (force checking crc values for non existing blocks in chunks 1.0 - may fail in case of chunks that were truncated)
+turn on empty block crc check for 1.0 version chunks (force checking crc values for non existing blocks - may fail in case of chunks that were truncated)
 .TP
 \fB\-x\fP
 turn on reporting successful check (print 'OK' message when everything is correct)

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.105], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.106], [bugs@moosefs.com], [moosefs])
 release=1
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
@@ -54,7 +54,7 @@ if test "$GCC" = "yes"; then
 	fi
 fi
 
-root_sbindir="xxx";
+root_sbindir="xxx"
 
 case $target_os in
   *linux*)
@@ -415,15 +415,15 @@ AC_ARG_WITH([systemdsystemunitdir],
 
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 
-if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then
-	AM_PATH_PYTHON([2.5],,[:])
-	if test "$PYTHON" = ":"; then
-		enable_mfscgi=no
-		enable_mfscli=no
-		enable_mfssgiserv=no
-		PYTHON="/usr/bin/env python"
-	fi
+AC_CHECK_PROGS(PYTHON, [python3 python2 python], [na])
+if test "$PYTHON" = na; then
+	PYTHON = "python"
+	AC_MSG_RESULT([Python binary not found !!!])
+else
+	AC_MSG_RESULT([Python binary for script shebangs: $PYTHON])
 fi
+
+dnl AX_PYTHON
 dnl if test "$enable_mfscgi" = "no"; then
 dnl	enable_mfscgiserv=no
 dnl fi

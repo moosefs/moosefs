@@ -1894,7 +1894,7 @@ int restore_net(uint64_t lv,const char *ptr) {
 		return -1;
 	}
 	if (lv+1!=meta_version()) {
-		syslog(LOG_WARNING,"desync - meta version has not been increased after operation (%s)",ptr);
+		syslog(LOG_WARNING,"desync - meta version has not been increased after the operation (%s)",ptr);
 		return -1;
 	}
 	return 0;

@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.106-1 (WIP)
+* MooseFS 3.0.106-1 (2019-08-07)
 
   - (tools) better handling unrecognized options
   - (master) better hard links handling

@@ -2307,7 +2307,7 @@ void chunk_server_has_chunk(uint16_t csid,uint64_t chunkid,uint32_t version) {
 			loglastts = main_time();
 		}
 #endif
-		if (chunkid>nextchunkid+UINT64_C(1000000000)) {
+		if (chunkid==0 || chunkid>nextchunkid+UINT64_C(1000000000)) {
 #ifndef MFSDEBUG
 			if (ilogcount<10) {
 #endif

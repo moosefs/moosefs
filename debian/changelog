@@ -18,8 +18,9 @@ moosefs (3.0.106-1) unstable; urgency=medium
   * (master) fixed LEADER/FOLLOWER desync on SETCHUNK command (pro only)
   * (cli+cgi) fixed shebang in python scripts (preference for python3 in
     configure)
+  * (master) changed pipe in bgsaver to nonblocking mode
 
- -- MooseFS Team <contact@moosefs.com>  Wed, 07 Aug 2019 13:00:00 +0200
+ -- MooseFS Team <contact@moosefs.com>  Thu, 08 Aug 2019 13:00:00 +0200
 
 moosefs (3.0.105-1) unstable; urgency=medium
 

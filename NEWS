@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.106-1 (2019-08-07)
+* MooseFS 3.0.106-1 (2019-08-08)
 
   - (tools) better handling unrecognized options
   - (master) better hard links handling
@@ -15,6 +15,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added more logs to background data write subprocess (connected with issue #280)
   - (master) fixed LEADER/FOLLOWER desync on SETCHUNK command (pro only)
   - (cli+cgi) fixed shebang in python scripts (preference for python3 in configure)
+  - (master) changed pipe in bgsaver to nonblocking mode
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

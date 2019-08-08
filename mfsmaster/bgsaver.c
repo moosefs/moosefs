@@ -26,7 +26,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <errno.h>
 #ifdef HAVE_WRITEV
 #include <sys/uio.h>
 #endif
@@ -93,13 +96,26 @@ static uint8_t termdelay;
 // child sync part
 
 int32_t writeall(int sock,uint8_t *buff,uint32_t leng) {
+	struct pollfd pfd;
 	uint32_t bsent;
 	int res;
 	bsent = 0;
 	while (bsent<leng) {
 		res = write(sock,buff+bsent,leng-bsent);
-		if (res<0) {
-			return -1;
+		if (res<=0) {
+			if (ERRNO_ERROR) {
+				return -1;
+			} else {
+				pfd.fd = sock;
+				pfd.revents = 0;
+				pfd.events = POLLOUT;
+				if (poll(&pfd,1,100)<0) {
+					if (errno!=EINTR) {
+						return -1;
+					}
+				}
+			}
+			res = 0;
 		}
 		bsent += res;
 	}
@@ -107,13 +123,26 @@ int32_t writeall(int sock,uint8_t *buff,uint32_t leng) {
 }
 
 int32_t readall(int sock,uint8_t *buf,uint32_t leng) {
+	struct pollfd pfd;
 	uint32_t brecv;
 	int res;
 	brecv = 0;
 	while (brecv<leng) {
 		res = read(sock,buf+brecv,leng-brecv);
 		if (res<=0) {
-			return -1;
+			if (ERRNO_ERROR) {
+				return -1;
+			} else {
+				pfd.fd = sock;
+				pfd.revents = 0;
+				pfd.events = POLLIN;
+				if (poll(&pfd,1,100)<0) {
+					if (errno!=EINTR) {
+						return -1;
+					}
+				}
+			}
+			res = 0;
 		}
 		brecv += res;
 	}
@@ -879,6 +908,19 @@ void bgsaver_term(void) {
 	bgsaversingleton = NULL;
 }
 
+int bgsaver_nonblock(int fd) {
+#ifdef O_NONBLOCK
+	int flags = fcntl(fd, F_GETFL, 0);
+	if (flags == -1) {
+		return -1;
+	}
+	return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#else
+	int yes = 1;
+	return ioctl(fd, FIONBIO, &yes);
+#endif
+}
+
 int bgsaver_init(void) {
 	int e;
 	bgsaverconn *eptr;
@@ -916,6 +958,8 @@ int bgsaver_init(void) {
 	}
 	close(eptr->data_pipe[PIPE_READ]);
 	close(eptr->status_pipe[PIPE_WRITE]);
+	bgsaver_nonblock(eptr->data_pipe[PIPE_WRITE]);
+	bgsaver_nonblock(eptr->status_pipe[PIPE_READ]);
 
 	eptr->mode = DATA;
 	eptr->input_end = 0;

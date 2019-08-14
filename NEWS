@@ -16,6 +16,8 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed LEADER/FOLLOWER desync on SETCHUNK command (pro only)
   - (cli+cgi) fixed shebang in python scripts (preference for python3 in configure)
   - (master) changed pipe in bgsaver to nonblocking mode
+  - (master) added check if the background saving process is alive
+  - (master) added lockfile for background saving process
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

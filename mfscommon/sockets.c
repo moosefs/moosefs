@@ -55,7 +55,7 @@
 #include "sockets.h"
 #include "clocks.h"
 
-/* Acid's simple socket library - ver 4.0 */
+/* Acid's simple socket library - ver 5.0 */
 
 /* ---------------SOCK ADDR--------------- */
 
@@ -162,7 +162,7 @@ static inline int sockaddrpathfill(struct sockaddr_un *sa,const char *path) {
 
 /* ---------- SOCKET UNIVERSAL ----------- */
 
-static inline int socknonblock(int sock) {
+static inline int descnonblock(int sock) {
 #ifdef WIN32
 	u_long yes = 1;
 	return ioctlsocket(sock, FIONBIO, &yes);
@@ -512,6 +512,24 @@ static inline int streamaccept(int lsock) {
 	return sock;
 }
 
+/* -------------- UNIVERSAL -------------- */
+
+int univnonblock(int fd) {
+	return descnonblock(fd);
+}
+
+int32_t univtoread(int fd,void *buff,uint32_t leng,uint32_t msecto) {
+	return streamtoread(fd,buff,leng,msecto);
+}
+
+int32_t univtowrite(int fd,const void *buff,uint32_t leng,uint32_t msecto) {
+	return streamtowrite(fd,buff,leng,msecto);
+}
+
+int32_t univtoforward(int srcfd,int dstfd,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto) {
+	return streamtoforward(srcfd,dstfd,buff,leng,rcvd,sent,msecto);
+}
+
 /* ----------------- TCP ----------------- */
 
 int tcpsetacceptfilter(int sock) {
@@ -537,7 +555,7 @@ int tcpsocket(void) {
 }
 
 int tcpnonblock(int sock) {
-	return socknonblock(sock);
+	return descnonblock(sock);
 }
 
 int tcpgetstatus(int sock) {
@@ -645,7 +663,7 @@ int tcpnumconnect(int sock,uint32_t ip,uint16_t port) {
 
 int tcpstrtoconnect(int sock,const char *hostname,const char *service,uint32_t msecto) {
 	struct sockaddr_in sa;
-	if (socknonblock(sock)<0) {
+	if (descnonblock(sock)<0) {
 		return -1;
 	}
 	if (sockaddrfill(&sa,hostname,service,AF_INET,SOCK_STREAM,0)<0) {
@@ -697,7 +715,7 @@ int tcpstrtoconnect(int sock,const char *hostname,const char *service,uint32_t m
 
 int tcpnumtoconnect(int sock,uint32_t ip,uint16_t port,uint32_t msecto) {
 	struct sockaddr_in sa;
-	if (socknonblock(sock)<0) {
+	if (descnonblock(sock)<0) {
 		return -1;
 	}
 	sockaddrnumfill(&sa,ip,port);
@@ -869,7 +887,7 @@ int udpsocket(void) {
 }
 
 int udpnonblock(int sock) {
-	return socknonblock(sock);
+	return descnonblock(sock);
 }
 
 int udpgetstatus(int sock) {
@@ -939,7 +957,7 @@ int unixsocket(void) {
 }
 
 int unixnonblock(int sock) {
-	return socknonblock(sock);
+	return descnonblock(sock);
 }
 
 int unixgetstatus(int sock) {
@@ -964,7 +982,7 @@ int unixconnect(int sock,const char *path) {
 int unixtoconnect(int sock,const char *path,uint32_t msecto) {
 	struct sockaddr_un sa;
 
-	if (socknonblock(sock)<0) {
+	if (descnonblock(sock)<0) {
 		return -1;
 	}
 	if (sockaddrpathfill(&sa,path)<0) {

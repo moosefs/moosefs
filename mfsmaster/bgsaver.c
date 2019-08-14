@@ -48,7 +48,7 @@
 
 #define MAXLOGNUMBER 1000U
 
-enum {BGSAVER_START,BGSAVER_WRITE,BGSAVER_FINISH,BGSAVER_DONE,BGSAVER_CHANGELOG,BGSAVER_ROTATELOG,BGSAVER_TERMINATE};
+enum {BGSAVER_ALIVE,BGSAVER_START,BGSAVER_WRITE,BGSAVER_FINISH,BGSAVER_DONE,BGSAVER_CHANGELOG,BGSAVER_CHANGELOG_ACK,BGSAVER_ROTATELOG,BGSAVER_TERMINATE};
 
 enum {FREE,DATA,KILL}; // bgsaverconn.mode
 
@@ -90,6 +90,11 @@ static bgsaverconn *bgsaversingleton=NULL;
 
 static uint32_t BackLogsNumber;
 
+static uint32_t changelog_delay = 0;
+static double bgsaver_last_activity;
+static double bgsaver_last_check;
+static uint32_t bgsaver_last_check_count;
+static uint32_t bgsaver_last_report;
 static uint8_t terminating;
 static uint8_t termdelay;
 
@@ -152,7 +157,8 @@ int32_t readall(int sock,uint8_t *buf,uint32_t leng) {
 
 void bgsaver_worker(void) {
 	bgsaverconn *eptr = bgsaversingleton;
-	uint8_t auxbuff[9],*wptr;
+	struct pollfd pfd;
+	uint8_t auxbuff[12],*wptr;
 	const uint8_t *rptr;
 	int32_t l;
 	uint32_t cmd;
@@ -164,16 +170,17 @@ void bgsaver_worker(void) {
 	uint32_t speedlimit;
 	uint64_t bytes;
 	double starttime;
+	double last_alive_send;
 	uint8_t status;
 	ssize_t ret;
 	int fd;
 	int logfd;
+	int lf;
 	char *chlogbuff;
 	uint32_t chlogbuffsize;
 	uint32_t chloglostcnt;
-
-	close(eptr->data_pipe[PIPE_WRITE]);
-	close(eptr->status_pipe[PIPE_READ]);
+	uint32_t timestamp;
+	static uint32_t last_timestamp;
 
 	buff = NULL;
 	buffsize = 0;
@@ -187,7 +194,39 @@ void bgsaver_worker(void) {
 	chlogbuffsize = 0;
 	chloglostcnt = 0;
 
+	pfd.fd = eptr->data_pipe[PIPE_READ];
+	last_alive_send = monotonic_seconds();
+	timestamp = 0;
+	last_timestamp = 0;
+
+	lf = open(".bgwriter.lock",O_RDWR,0666);
+	if (lf<0) {
+		mfs_errlog(LOG_ERR,"background data writer - can't open lockfile");
+		goto err;
+	}
+	if (lockf(lf,F_TLOCK,0)<0) {
+		mfs_errlog(LOG_ERR,"background data writer - can't get lock on lockfile");
+		goto err;
+	}
+
 	for (;;) {
+		if (last_alive_send+1.0<monotonic_seconds()) {
+			wptr = auxbuff;
+			put32bit(&wptr,BGSAVER_ALIVE);
+			put32bit(&wptr,0);
+			writeall(eptr->status_pipe[PIPE_WRITE],auxbuff,8);
+			last_alive_send = monotonic_seconds();
+		}
+		pfd.revents = 0;
+		pfd.events = POLLIN;
+		poll(&pfd,1,100);
+		if ((pfd.revents&(POLLERR|POLLHUP))!=0) {
+			mfs_errlog_silent(LOG_ERR,"background data writer - HUP/ERR detected on data pipe");
+			goto err;
+		}
+		if ((pfd.revents&POLLIN)==0) {
+			continue;
+		}
 		l = readall(eptr->data_pipe[PIPE_READ],auxbuff,8);
 		if (l!=8) {
 			mfs_errlog_silent(LOG_ERR,"background data writer - reading pipe error");
@@ -296,12 +335,13 @@ void bgsaver_worker(void) {
 				break;
 			case BGSAVER_CHANGELOG:
 				status = 0;
-				if (leng>=8) {
+				if (leng>=12) {
 					uint64_t version;
 
 					rptr = buff;
 					version = get64bit(&rptr);
-					leng -= 8;
+					timestamp = get32bit(&rptr);
+					leng -= 12;
 
 					if (logfd<0) {
 						logfd = open("changelog.0.mfs",O_WRONLY | O_CREAT | O_APPEND,0666);
@@ -400,6 +440,14 @@ void bgsaver_worker(void) {
 				chloglostcnt++;
 			}
 			if (status==1) {
+				if (cmd==BGSAVER_CHANGELOG && timestamp>=last_timestamp) {
+					last_timestamp = timestamp;
+					wptr = auxbuff;
+					put32bit(&wptr,BGSAVER_CHANGELOG_ACK);
+					put32bit(&wptr,4);
+					put32bit(&wptr,timestamp);
+					writeall(eptr->status_pipe[PIPE_WRITE],auxbuff,12);
+				}
 				chloglostcnt = 0;
 			}
 		}
@@ -410,6 +458,12 @@ err:
 	}
 	if (chlogbuff!=NULL) {
 		free(chlogbuff);
+	}
+	if (lf>=0) {
+		if (lockf(lf,F_ULOCK,0)<0) { // pro forma
+			syslog(LOG_NOTICE,"background data writer - error removing lock from lockfile");
+		}
+		close(lf);
 	}
 	syslog(LOG_NOTICE,"background data writer - exiting");
 	exit(0);
@@ -535,8 +589,9 @@ void bgsaver_changelog(uint64_t version,const char *message) {
 	}
 	l = strlen(message);
 
-	buff = bgsaver_createpacket(eptr,BGSAVER_CHANGELOG,8+l+1);
+	buff = bgsaver_createpacket(eptr,BGSAVER_CHANGELOG,8+4+l+1);
 	put64bit(&buff,version);
+	put32bit(&buff,main_time());
 	memcpy(buff,message,l+1); // copy message with ending zero
 }
 
@@ -550,10 +605,46 @@ void bgsaver_rotatelog(void) {
 	bgsaver_createpacket(eptr,BGSAVER_ROTATELOG,0);
 }
 
+void bgsaver_changelog_ack(bgsaverconn *eptr,const uint8_t *data,uint32_t length) {
+	const uint8_t *rptr;
+	uint32_t timestamp,timestamp_ack;
+
+	if (length!=4) {
+		syslog(LOG_WARNING,"mallformed packet from bgworker");
+		eptr->mode = KILL;
+		return;
+	}
+	rptr = data;
+	timestamp_ack = get32bit(&rptr);
+	timestamp = main_time();
+	if (timestamp > timestamp_ack) {
+		changelog_delay = timestamp - timestamp_ack - 1;
+	} else {
+		changelog_delay = 0;
+	}
+}
+
+void bgsaver_alive(bgsaverconn *eptr,const uint8_t *data,uint32_t length) {
+	(void)eptr;
+	(void)data;
+	if (length!=0) {
+		syslog(LOG_WARNING,"mallformed packet from bgworker");
+		eptr->mode = KILL;
+		return;
+	}
+	bgsaver_last_activity = monotonic_seconds();
+}
+
 void bgsaver_gotpacket(bgsaverconn *eptr,uint32_t type,const uint8_t *data,uint32_t length) {
 	switch (type) {
 		case BGSAVER_DONE:
 			bgsaver_done(eptr,data,length);
+			break;
+		case BGSAVER_CHANGELOG_ACK:
+			bgsaver_changelog_ack(eptr,data,length);
+			break;
+		case BGSAVER_ALIVE:
+			bgsaver_alive(eptr,data,length);
 			break;
 		default:
 			syslog(LOG_NOTICE,"got unknown message (type:%"PRIu32")",type);
@@ -847,6 +938,31 @@ void bgsaver_serve(struct pollfd *pdesc) {
 	bgsaver_disconnection_check();
 }
 
+void bgsaver_alive_check(void) {
+	double now = monotonic_seconds();
+
+	if (bgsaver_last_check + 5.0 < now) { // after long loop
+		bgsaver_last_check_count = 0;
+	} else if (bgsaver_last_check_count<5) {
+		bgsaver_last_check_count++;
+	}
+	bgsaver_last_check = now;
+
+	if (bgsaver_last_check_count >= 5) { // check is active
+		if (now - bgsaver_last_activity > bgsaver_last_report + 50) {
+			bgsaver_last_report += 50;
+			if (bgsaver_last_report<300) {
+				syslog(LOG_WARNING,"background data writer is not responding (last ping received more than %u seconds ago)",bgsaver_last_report);
+			} else {
+				syslog(LOG_ERR,"background data writer is not responding (last ping received more than %u seconds ago) - terminating",bgsaver_last_report);
+				main_exit();
+			}
+		} else if (now - bgsaver_last_activity < 5.0) {
+			bgsaver_last_report = 0;
+		}
+	}
+}
+
 void bgsaver_reload(void) {
 	BackLogsNumber = cfg_getuint32("BACK_LOGS",50);
 	if (BackLogsNumber>MAXLOGNUMBER) {
@@ -874,7 +990,7 @@ void bgsaver_wantexit(void) {
 
 int bgsaver_canexit(void) {
 	bgsaverconn *eptr = bgsaversingleton;
-	return (eptr->mode==FREE)?1:0;
+	return (eptr->mode==FREE||bgsaver_last_report>0)?1:0;
 }
 
 void bgsaver_term(void) {
@@ -908,22 +1024,22 @@ void bgsaver_term(void) {
 	bgsaversingleton = NULL;
 }
 
-int bgsaver_nonblock(int fd) {
-#ifdef O_NONBLOCK
-	int flags = fcntl(fd, F_GETFL, 0);
-	if (flags == -1) {
-		return -1;
-	}
-	return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-#else
-	int yes = 1;
-	return ioctl(fd, FIONBIO, &yes);
-#endif
-}
-
 int bgsaver_init(void) {
+	int lf;
 	int e;
 	bgsaverconn *eptr;
+
+	lf = open(".bgwriter.lock",O_RDWR|O_CREAT,0666);
+	if (lf<0) {
+		mfs_errlog(LOG_ERR,"can't create bgsaver lockfile");
+		return -1;
+	}
+	if (lockf(lf,F_TEST,0)<0) {
+		mfs_errlog(LOG_ERR,"bgsaver lock exists");
+		close(lf);
+		return -1;
+	}
+	close(lf);
 
 	bgsaver_reload();
 
@@ -938,6 +1054,10 @@ int bgsaver_init(void) {
 		mfs_errlog(LOG_ERR,"can't create pipe");
 		return -1;
 	}
+	univnonblock(eptr->data_pipe[PIPE_READ]);
+	univnonblock(eptr->data_pipe[PIPE_WRITE]);
+	univnonblock(eptr->status_pipe[PIPE_READ]);
+	univnonblock(eptr->status_pipe[PIPE_WRITE]);
 	e = fork();
 	if (e<0) {
 		mfs_errlog(LOG_ERR,"fork error");
@@ -953,13 +1073,13 @@ int bgsaver_init(void) {
 		close(STDERR_FILENO);
 		sassert(dup(f)==STDERR_FILENO);
 		processname_set("mfsmaster (data writer)");
+		close(eptr->data_pipe[PIPE_WRITE]);
+		close(eptr->status_pipe[PIPE_READ]);
 		bgsaver_worker();
 		exit(0);
 	}
 	close(eptr->data_pipe[PIPE_READ]);
 	close(eptr->status_pipe[PIPE_WRITE]);
-	bgsaver_nonblock(eptr->data_pipe[PIPE_WRITE]);
-	bgsaver_nonblock(eptr->status_pipe[PIPE_READ]);
 
 	eptr->mode = DATA;
 	eptr->input_end = 0;
@@ -974,9 +1094,14 @@ int bgsaver_init(void) {
 	eptr->pdescpos_w = -1;
 
 	terminating = 0;
+	bgsaver_last_activity = monotonic_seconds();
+	bgsaver_last_check = monotonic_seconds();
+	bgsaver_last_check_count = 0;
+	bgsaver_last_report = 0;
 
 	termdelay = 0;
 	main_wantexit_register(bgsaver_wantexit);
+	main_time_register(1,0,bgsaver_alive_check);
 	main_canexit_register(bgsaver_canexit);
 	main_reload_register(bgsaver_reload);
 	main_destruct_register(bgsaver_term);

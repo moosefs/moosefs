@@ -30,6 +30,13 @@
 #  define ERRNO_ERROR (errno!=EAGAIN)
 #endif
 
+/* -------------- UNIVERSAL -------------- */
+
+int univnonblock(int fd);
+int32_t univtoread(int fd,void *buff,uint32_t leng,uint32_t msecto);
+int32_t univtowrite(int fd,const void *buff,uint32_t leng,uint32_t msecto);
+int32_t univtoforward(int srcfd,int dstfd,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto);
+
 /* ----------------- TCP ----------------- */
 
 int tcpsocket(void);

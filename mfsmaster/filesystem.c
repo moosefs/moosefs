@@ -198,6 +198,7 @@ static uint32_t *freebitmask;
 static uint32_t bitmasksize;
 static uint32_t searchpos;
 static freenode *freelist,**freetail;
+static uint32_t freelastts;
 
 static uint32_t trash_bid;
 static uint32_t sustained_bid;
@@ -807,14 +808,29 @@ uint32_t fsnodes_get_next_id() {
 	return i;
 }
 
+void fsnodes_free_fixts(uint32_t ts) {
+	syslog(LOG_WARNING,"last freed inode has higher timestamp than the current one - fixing timestamps in free inoes list");
+	freenode *n;
+	for (n=freelist ; n!=NULL ; n=n->next) {
+		if (n->ftime > ts) {
+			n->ftime = ts;
+		}
+	}
+	freelastts = ts;
+}
+
 void fsnodes_free_id(uint32_t inode,uint32_t ts) {
 	freenode *n;
+	if (ts<freelastts) {
+		fsnodes_free_fixts(ts);
+	}
 	n = freenode_malloc();
 	n->inode = inode;
 	n->ftime = ts;
 	n->next = NULL;
 	*freetail = n;
 	freetail = &(n->next);
+	freelastts = ts;
 }
 
 uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint32_t sustainedinodes,uint32_t inode_chksum) {
@@ -828,6 +844,9 @@ uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint
 	n = freelist;
 	sn = NULL;
 	snt = &sn;
+	if (ts<freelastts) {
+		fsnodes_free_fixts(ts);
+	}
 	while (n && n->ftime+MFS_INODE_REUSE_DELAY<ts) {
 		ics ^= n->inode;
 		if (((sesflags&SESFLAG_METARESTORE)==0 || sustainedinodes>0) && of_isfileopen(n->inode)) {
@@ -855,10 +874,12 @@ uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint
 	} else {
 		freelist = NULL;
 		freetail = &(freelist);
+		freelastts = 0;
 	}
 	if (sn) {
 		*freetail = sn;
 		freetail = snt;
+		freelastts = ts;
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		if (fi>0 || si>0) {
@@ -7747,6 +7768,7 @@ void fs_cleanupfreenodes(void) {
 	freenode_free_all();
 	freelist = NULL;
 	freetail = &freelist;
+	freelastts = 0;
 }
 
 void fs_cleanup(void) {
@@ -8721,6 +8743,7 @@ int fs_loadfree(bio *fd,uint8_t mver) {
 	t = get32bit(&ptr);
 	freelist = NULL;
 	freetail = &(freelist);
+	freelastts = 0;
 	l=0;
 	while (t>0) {
 		if (l==0) {
@@ -8759,6 +8782,7 @@ int fs_loadfree(bio *fd,uint8_t mver) {
 		n->next = NULL;
 		*freetail = n;
 		freetail = &(n->next);
+		freelastts = ftime;
 		fsnodes_used_inode(nodeid);
 		l--;
 		t--;
@@ -8993,6 +9017,7 @@ int fs_strinit(void) {
 	quotahead = NULL;
 	freelist = NULL;
 	freetail = &(freelist);
+	freelastts = 0;
 	fsnodes_edgeid_init();
 	fsnodes_node_hash_init();
 	fsnodes_edge_hash_init();

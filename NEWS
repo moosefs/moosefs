@@ -18,6 +18,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) changed pipe in bgsaver to nonblocking mode
   - (master) added check if the background saving process is alive
   - (master) added lockfile for background saving process
+  - (master) added protection against time going back in the free inodes list
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

@@ -269,6 +269,15 @@
 	clptr = (const char*)eptr; \
 }
 
+int do_idle(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	meta_version_inc(); // no-operation - just increase meta version and return OK.
+	return MFS_STATUS_OK;
+}
+
 int do_access(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode;
 	EAT(ptr,filename,lv,'(');
@@ -1429,7 +1438,7 @@ int do_write(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 #define HASHCODESTR(str) (((((uint8_t*)(str))[0]*256U+((uint8_t*)(str))[1])*256U+((uint8_t*)(str))[2])*256U+((uint8_t*)(str))[3])
 #define HASHCODE(a,b,c,d) (((((uint8_t)a)*256U+(uint8_t)b)*256U+(uint8_t)c)*256U+(uint8_t)d)
 
-int restore_line(const char *filename,uint64_t lv,const char *line) {
+int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts) {
 	const char *ptr;
 	uint32_t ts;
 	uint32_t hc;
@@ -1442,9 +1451,14 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 //	EAT(ptr,filename,lv,':');
 //	EAT(ptr,filename,lv,' ');
 	GETU32(ts,ptr);
+	if (rts!=NULL) {
+		*rts = ts;
+	}
 	EAT(ptr,filename,lv,'|');
 	hc = HASHCODESTR(ptr);
 	switch (hc) {
+		case HASHCODE('I','D','L','E'):
+			return do_idle(filename,lv,ts,ptr+4);
 		case HASHCODE('A','C','C','E'):
 			if (strncmp(ptr,"ACCESS",6)==0) {
 				return do_access(filename,lv,ts,ptr+6);
@@ -1878,13 +1892,13 @@ int restore_line(const char *filename,uint64_t lv,const char *line) {
 	return status;
 }
 
-int restore_net(uint64_t lv,const char *ptr) {
+int restore_net(uint64_t lv,const char *ptr,uint32_t *rts) {
 	int status;
 	if (lv!=meta_version()) {
 		syslog(LOG_WARNING,"desync - invalid meta version (version in packet: %"PRIu64" / expected: %"PRIu64" / packet data: %s)",lv,meta_version(),ptr);
 		return -1;
 	}
-	status = restore_line("NET",lv,ptr);
+	status = restore_line("NET",lv,ptr,rts);
 	if (status<0) {
 		syslog(LOG_WARNING,"desync - operation (%s) parse error",ptr);
 		return -1;
@@ -1932,7 +1946,7 @@ int restore_file(void *shfilename,uint64_t lv,const char *ptr,uint8_t vlevel) {
 			if (vlevel>0) {
 				mfs_arg_syslog(LOG_WARNING,"%s: change%s",filename,ptr);
 			}
-			status = restore_line(filename,lv,ptr);
+			status = restore_line(filename,lv,ptr,NULL);
 			if (status<0) { // parse error - just ignore this line
 				return 0;
 			}

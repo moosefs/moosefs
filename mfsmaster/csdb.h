@@ -49,6 +49,6 @@ int csdb_init(void);
 uint8_t csdb_mr_op(uint8_t csop,uint32_t ip,uint16_t port,uint32_t arg);
 #define csdb_mr_csadd(x,y) csdb_mr_op(0,x,y,0)
 #define csdb_mr_csdel(x,y) csdb_mr_op(1,x,y,0)
-uint32_t csdb_getdisconnecttime(void);
+// uint32_t csdb_getdisconnecttime(void);
 
 #endif

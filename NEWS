@@ -19,6 +19,8 @@ This file lists noteworthy changes in MooseFS.
   - (master) added check if the background saving process is alive
   - (master) added lockfile for background saving process
   - (master) added protection against time going back in the free inodes list
+  - (master) added protection in FOLLOWER against not keeping up with the LEADER (pro only)
+  - (master) changed condition for removing chunk from data structures (all chunkservers have to be connected)
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

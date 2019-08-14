@@ -83,9 +83,10 @@ static uint32_t disconnected_servers;
 static uint32_t disconnected_servers_in_maintenance;
 static uint32_t servers;
 static uint32_t tmpremoved_servers;
-static uint32_t disconnecttime;
+// static uint32_t disconnecttime;
 static uint32_t loadsum;
 
+/*
 void csdb_disconnect_check(void) {
 	static uint8_t laststate=0;
 	if (disconnected_servers && laststate==0) {
@@ -96,6 +97,7 @@ void csdb_disconnect_check(void) {
 		laststate = 0;
 	}
 }
+*/
 
 void csdb_self_check(void) {
 	uint32_t hash,now;
@@ -146,7 +148,7 @@ void csdb_self_check(void) {
 		syslog(LOG_WARNING,"csdb: temporary removed servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",tmpremoved_servers,trs);
 		tmpremoved_servers = trs;
 	}
-	csdb_disconnect_check();
+//	csdb_disconnect_check();
 }
 
 uint16_t csdb_newid(void) {
@@ -295,7 +297,7 @@ void csdb_lost_connection(void *v_csptr) {
 			disconnected_servers_in_maintenance++;
 		}
 	}
-	csdb_disconnect_check();
+//	csdb_disconnect_check();
 }
 
 void csdb_server_load(void *v_csptr,uint32_t load) {
@@ -1022,9 +1024,11 @@ void csdb_cleanup(void) {
 	servers = 0;
 }
 
+/*
 uint32_t csdb_getdisconnecttime(void) {
 	return disconnecttime;
 }
+*/
 
 void csdb_reload(void) {
 	uint32_t dtr;
@@ -1057,7 +1061,7 @@ int csdb_init(void) {
 	disconnected_servers_in_maintenance = 0;
 	servers = 0;
 	tmpremoved_servers = 0;
-	disconnecttime = 0;
+//	disconnecttime = 0;
 	loadsum = 0;
 	main_reload_register(csdb_reload);
 	main_time_register(1,0,csdb_self_check);

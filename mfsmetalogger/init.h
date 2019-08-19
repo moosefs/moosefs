@@ -45,4 +45,6 @@ struct {
 	{(runfn)0,"****"}
 },LateRunTab[]={
 	{(runfn)0,"****"}
+},RestoreRunTab[]={
+	{(runfn)0,"****"}
 };

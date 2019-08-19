@@ -76,4 +76,7 @@ struct {
 	{(runfn)0,"****"}
 },LateRunTab[]={
 	{(runfn)0,"****"}
+},RestoreRunTab[]={
+	{meta_restore,"metadata restore"},
+	{(runfn)0,"****"}
 };

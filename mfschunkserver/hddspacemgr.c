@@ -7108,6 +7108,11 @@ void hdd_reload(void) {
 	hdd_folders_reinit();
 }
 
+int hdd_restore(void) {
+	mfs_syslog(LOG_NOTICE,"not implemented in the chunkserver");
+	return 0;
+}
+
 int hdd_late_init(void) {
 	zassert(pthread_mutex_lock(&termlock));
 	term = 0;

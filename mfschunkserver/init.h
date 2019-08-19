@@ -58,4 +58,7 @@ struct {
 },LateRunTab[]={
 	{hdd_late_init,"hdd space manager - threads"},
 	{(runfn)0,"****"}
+},RestoreRunTab[]={
+	{hdd_restore,"hdd space restore"},
+	{(runfn)0,"****"}
 };

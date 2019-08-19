@@ -101,6 +101,9 @@ int hdd_chunkop(uint64_t chunkid,uint32_t version,uint32_t newversion,uint64_t c
 /* meta id */
 void hdd_setmetaid(uint64_t metaid);
 
+/* restore */
+int hdd_restore(void);
+
 /* initialization */
 int hdd_late_init(void);
 int hdd_init(void);

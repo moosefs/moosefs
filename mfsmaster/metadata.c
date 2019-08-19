@@ -1414,7 +1414,7 @@ uint8_t meta_mr_setmetaid(uint64_t newmetaid) {
 }
 
 
-int meta_init(void) {
+int meta_prepare_data_structures(void) {
 	metaversion = 0;
 	metaid = 0;
 	if (dict_init()<0) {
@@ -1459,6 +1459,38 @@ int meta_init(void) {
 	}
 	if (of_init()<0) {
 		mfs_syslog(LOG_ERR,"open-files init error");
+		return -1;
+	}
+	return 0;
+}
+
+int meta_restore(void) {
+	uint8_t status;
+
+	if (meta_prepare_data_structures()<0) {
+		return -1;
+	}
+	allowautorestore = 1;
+	fprintf(stderr,"loading metadata ...\n");
+	if (meta_loadall()<0) {
+		return -1;
+	}
+	status = meta_storeall(0);
+	if (status==1) {
+		if (rename("metadata.mfs.back","metadata.mfs")<0) {
+			mfs_errlog(LOG_WARNING,"can't rename metadata.mfs.back -> metadata.mfs");
+		}
+		meta_cleanup();
+		return 0;
+	} else if (status==2) {
+		mfs_syslog(LOG_NOTICE,"no metadata to store");
+		return 0;
+	}
+	return -1;
+}
+
+int meta_init(void) {
+	if (meta_prepare_data_structures()<0) {
 		return -1;
 	}
 	fprintf(stderr,"loading metadata ...\n");

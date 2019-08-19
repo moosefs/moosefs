@@ -43,5 +43,7 @@ uint8_t meta_mr_setmetaid(uint64_t newmetaid);
 void meta_info(uint32_t *lsstore,uint32_t *lstime,uint8_t *lsstat);
 int meta_init(void);
 
+int meta_restore(void);
+
 
 #endif

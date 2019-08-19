@@ -55,12 +55,14 @@ produce more verbose output
 even more verbose output
 .TP
 \fIACTION\fP
-is the one of \fBstart\fP, \fBstop\fP, \fBrestart\fP, \fBreload\fP, \fBtest\fP or \fBkill\fP. 
+is the one of \fBstart\fP, \fBstop\fP, \fBrestart\fP, \fBreload\fP, \fBtest\fP, \fBrestore\fP or \fBkill\fP. 
 Default action is \fBrestart\fP. The \fBtest\fP action will yield one of two responses:
 "mfsmaster pid: PID" or "mfsmaster is not running". The \fBkill\fP
 action will send a SIGKILL to the currently running master 
 process. SIGHUP or \fBreload\fP action forces \fBmfsmaster\fP 
-to reload all configuration files.
+to reload all configuration files. \fBrestore\fP tries to restore metadata file
+using backup metadata files and changelogs; if successful it will store recovered
+metadata file end stop, it will never start master process.
 .SH FILES
 .TP
 \fBmfsmaster.cfg\fP

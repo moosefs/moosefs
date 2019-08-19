@@ -21,6 +21,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added protection against time going back in the free inodes list
   - (master) added protection in FOLLOWER against not keeping up with the LEADER (pro only)
   - (master) changed condition for removing chunk from data structures (all chunkservers have to be connected)
+  - (master) added 'restore' run mode (works similar to 'mfsmaster -a' but without running daemon)
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.106-1 (2019-08-08)
+* MooseFS 3.0.106-1 (2019-08-27)
 
   - (tools) better handling unrecognized options
   - (master) better hard links handling
@@ -22,6 +22,8 @@ This file lists noteworthy changes in MooseFS.
   - (master) added protection in FOLLOWER against not keeping up with the LEADER (pro only)
   - (master) changed condition for removing chunk from data structures (all chunkservers have to be connected)
   - (master) added 'restore' run mode (works similar to 'mfsmaster -a' but without running daemon)
+  - (master) take write replication counters into account in server ordering for new chunk creations
+  - (master) changed calcualting replication limits in chunk rebalance procedure (using actual usage difference)
 
 * MooseFS 3.0.105-1 (2019-05-24)
 

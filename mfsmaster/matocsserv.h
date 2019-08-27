@@ -50,10 +50,6 @@ void matocsserv_getservdata(void *e,uint32_t *ver,uint64_t *uspc,uint64_t *tspc,
 
 void matocsserv_write_counters(void *e,uint8_t x);
 
-// uint8_t matocsserv_can_create_chunks(void *e,double tolerance);
-uint8_t matocsserv_is_privileged(void *e,uint8_t dstflag);
-void matocsserv_want_to_be_privileged(void *dst,void *src);
-
 uint8_t matocsserv_has_avail_space(void *e);
 double matocsserv_get_usage(void *e);
 

@@ -130,7 +130,9 @@ typedef struct matocsserventry {
 	uint16_t csid;
 	uint8_t registered;
 
-	uint8_t privflag;
+	uint8_t wrepbalance;
+	uint8_t rrepbalance;
+	uint8_t rebalaneflags;
 
 	uint8_t passwordrnd[32];
 
@@ -412,7 +414,7 @@ void matocsserv_log_extra_info(void) {
 					usage = 0.0;
 				}
 			}
-			syslog(LOG_NOTICE,"cs %s:%u ; usedspace: %"PRIu64" ; totalspace: %"PRIu64" ; usage: %.2lf%% ; load: %"PRIu32" ; timeout: %"PRIu16" ; chunkscount: %"PRIu32" ; errorcounter: %"PRIu32" ; writecounter: %"PRIu16" ; rrepcounter: %"PRIu16" ; wrepcounter: %"PRIu16" ; delcounter: %"PRIu32" ; create_total: %"PRIu32" ; rrep_total: %"PRIu32" ; wrep_total: %"PRIu32" ; del_total: %"PRIu32" ; create/s: %.4lf ; rrep/s: %.4lf ; wrep/s: %.4lf ; del/s: %.4lf ; csid: %"PRIu16" ; privflag: %"PRIu8" ; dist: %"PRIu32" ; first: %"PRIu8" ; corr: %.4lf ; hlstatus: %"PRIu8" (%s) ; overloaded: %"PRIu8" ; maintained: %"PRIu8,eptr->servstrip,eptr->servport,eptr->usedspace,eptr->totalspace,usage,eptr->load,eptr->timeout,eptr->chunkscount,eptr->errorcounter,eptr->writecounter,eptr->rrepcounter,eptr->wrepcounter,eptr->delcounter,eptr->create_total_counter,eptr->rrep_total_counter,eptr->wrep_total_counter,eptr->del_total_counter,eptr->create_total_counter/dur,eptr->rrep_total_counter/dur,eptr->wrep_total_counter/dur,eptr->del_total_counter/dur,eptr->csid,eptr->privflag,eptr->dist,eptr->first,eptr->corr,eptr->hlstatus,hlstatus_name,overloaded,maintained);
+			syslog(LOG_NOTICE,"cs %s:%u ; usedspace: %"PRIu64" ; totalspace: %"PRIu64" ; usage: %.2lf%% ; load: %"PRIu32" ; timeout: %"PRIu16" ; chunkscount: %"PRIu32" ; errorcounter: %"PRIu32" ; writecounter: %"PRIu16" ; rrepcounter: %"PRIu16" ; wrepcounter: %"PRIu16" ; delcounter: %"PRIu32" ; create_total: %"PRIu32" ; rrep_total: %"PRIu32" ; wrep_total: %"PRIu32" ; del_total: %"PRIu32" ; create/s: %.4lf ; rrep/s: %.4lf ; wrep/s: %.4lf ; del/s: %.4lf ; csid: %"PRIu16" ; dist: %"PRIu32" ; first: %"PRIu8" ; corr: %.4lf ; hlstatus: %"PRIu8" (%s) ; overloaded: %"PRIu8" ; maintained: %"PRIu8,eptr->servstrip,eptr->servport,eptr->usedspace,eptr->totalspace,usage,eptr->load,eptr->timeout,eptr->chunkscount,eptr->errorcounter,eptr->writecounter,eptr->rrepcounter,eptr->wrepcounter,eptr->delcounter,eptr->create_total_counter,eptr->rrep_total_counter,eptr->wrep_total_counter,eptr->del_total_counter,eptr->create_total_counter/dur,eptr->rrep_total_counter/dur,eptr->wrep_total_counter/dur,eptr->del_total_counter/dur,eptr->csid,eptr->dist,eptr->first,eptr->corr,eptr->hlstatus,hlstatus_name,overloaded,maintained);
 			eptr->create_total_counter = 0;
 			eptr->rrep_total_counter = 0;
 			eptr->wrep_total_counter = 0;
@@ -573,7 +575,7 @@ static inline void matocsserv_weighted_roundrobin_sort(matocsserventry* servers[
 			expdist /= servers[i]->totalspace;
 			servtab[i].err = (expdist + servers[i]->corr) / (servers[i]->dist + 1);
 		}
-		servtab[i].err += 1000.0 * servers[i]->writecounter;
+		servtab[i].err += 1000.0 * (servers[i]->writecounter + servers[i]->wrepcounter);
 		servtab[i].ptr = servers[i];
 	}
 
@@ -790,10 +792,8 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 			allcsids[*allcscnt] = eptr->csid;
 			(*allcscnt)++;
 			totalcnt++;
-			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) { // server is not overloaded and have enough free space ?
-				olcsids[*olcscnt] = eptr->csid;
-				(*olcscnt)++;
-				if ((eptr->privflag & 2) == 0) {
+			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U))) { // server have enough space
+				if (eptr->hlstatus!=HLSTATUS_OVERLOADED) { // server is not overloaded ?
 					if ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr)) {
 						gracecnt++;
 						stdcsids[MAXCSCOUNT-gracecnt] = eptr->csid;
@@ -802,9 +802,7 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 						(*stdcscnt)++;
 						stdcnt++;
 					}
-				}
-			} else {
-				if ((eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE) { // does it have available space ?
+				} else {
 					olcsids[*olcscnt] = eptr->csid;
 					(*olcscnt)++;
 				}
@@ -836,9 +834,9 @@ uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *over
 
 	for (eptr = matocsservhead ; eptr && totalcnt<MAXCSCOUNT ; eptr=eptr->next) {
 		if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->usedspace<=eptr->totalspace && eptr->csptr!=NULL) {
-			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U)) && eptr->hlstatus!=HLSTATUS_OVERLOADED) {
-				totalcnt++;
-				if ((eptr->privflag & 2) == 0) {
+			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U))) {
+				if (eptr->hlstatus!=HLSTATUS_OVERLOADED) {
+					totalcnt++;
 					if ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr)) {
 						gracecnt++;
 						servtab[MAXCSCOUNT-gracecnt] = eptr;
@@ -846,9 +844,7 @@ uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *over
 						servtab[stdcnt] = eptr;
 						stdcnt++;
 					}
-				}
-			} else {
-				if ((eptr->totalspace - eptr->usedspace)>MFSCHUNKSIZE) {
+				} else {
 					(*overloaded)++;
 				}
 			}
@@ -1082,64 +1078,6 @@ void matocsserv_write_counters(void *e,uint8_t x) {
 	}
 }
 
-uint8_t matocsserv_is_privileged(void *e,uint8_t dstflag) {
-	matocsserventry *eptr = (matocsserventry *)e;
-	if (dstflag) {
-		return eptr->privflag & 2;
-	} else {
-		return eptr->privflag & 1;
-	}
-}
-
-void matocsserv_want_to_be_privileged(void *dst,void *src) {
-	matocsserventry *dsteptr = (matocsserventry *)dst;
-	matocsserventry *srceptr = (matocsserventry *)src;
-	matocsserventry *eptr;
-	static uint32_t lastupdate = 0;
-	static uint8_t srcfilled = 0;
-	static uint8_t dstfilled = 0;
-	uint32_t totalcnt;
-	uint32_t srcprivs;
-	uint32_t dstprivs;
-
-	if (lastupdate + 15 < main_time()) {
-		lastupdate = main_time();
-		for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
-			eptr->privflag = 0;
-		}
-		if (dsteptr!=NULL && srceptr!=NULL) {
-			dsteptr->privflag |= 2;
-			srceptr->privflag |= 1;
-		}
-		srcfilled = 0;
-		dstfilled = 0;
-	} else if ((srcfilled==0 || dstfilled==0) && (dsteptr!=NULL && srceptr!=NULL)) {
-		totalcnt = 0;
-		srcprivs = 0;
-		dstprivs = 0;
-		for (eptr = matocsservhead ; eptr ; eptr=eptr->next) {
-			if (eptr->mode!=KILL && eptr->totalspace>0 && eptr->csptr!=NULL) {
-				totalcnt++;
-				if (eptr->privflag & 1) {
-					srcprivs++;
-				} else if (eptr->privflag & 2) {
-					dstprivs++;
-				}
-			}
-		}
-		if (srcprivs * 10 < totalcnt) {
-			srceptr->privflag |= 1;
-		} else {
-			srcfilled = 1;
-		}
-		if (dstprivs * 10 < totalcnt) {
-			dsteptr->privflag |= 2;
-		} else {
-			dstfilled = 1;
-		}
-	}
-}
-
 void matocsserv_hlstatus_fix(void) {
 	matocsserventry *eptr;
 	uint32_t now = main_time();
@@ -1154,10 +1092,6 @@ void matocsserv_hlstatus_fix(void) {
 			}
 		}
 	}
-}
-
-void matocsserv_privileged_cleanup(void) {
-	matocsserv_want_to_be_privileged(NULL,NULL);
 }
 
 uint8_t matocsserv_has_avail_space(void *e) {
@@ -2604,8 +2538,6 @@ void matocsserv_serve(struct pollfd *pdesc) {
 			eptr->csid = MAXCSCOUNT;
 			eptr->registered = UNREGISTERED;
 
-			eptr->privflag = 0;
-
 			memset(eptr->passwordrnd,0,32);
 
 			eptr->dist = 0;
@@ -2936,7 +2868,6 @@ int matocsserv_init(void) {
 	main_poll_register(matocsserv_desc,matocsserv_serve);
 	main_keepalive_register(matocsserv_keep_alive);
 	main_info_register(matocsserv_log_extra_info);
-	main_time_register(1,0,matocsserv_privileged_cleanup);
 	main_time_register(1,0,matocsserv_hlstatus_fix);
 	main_time_register(1,0,matocsserv_calculate_space);
 //	main_time_register(TIMEMODE_SKIP_LATE,60,0,matocsserv_status);

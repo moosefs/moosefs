@@ -40,6 +40,7 @@ void* main_time_register (uint32_t seconds,uint32_t offset,void (*fun)(void));
 int main_time_change(void *x,uint32_t seconds,uint32_t offset);
 void main_exit(void);
 uint32_t main_time(void);
+uint64_t main_utime(void);
 void main_keep_alive(void);
 
 #endif

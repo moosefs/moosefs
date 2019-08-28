@@ -424,11 +424,17 @@ uint32_t main_time(void) {
 #endif
 }
 
-/*
-uint64_t main_utime() {
-	return usecnow;
+uint64_t main_utime(void) {
+	struct timeval tv;
+	uint64_t usec;
+
+	gettimeofday(&tv,NULL);
+	usec = tv.tv_sec;
+	usec *= 1000000;
+	usec += tv.tv_usec;
+	return usec;
 }
-*/
+
 static inline void destruct(void) {
 	deentry *deit;
 	for (deit = dehead ; deit!=NULL ; deit=deit->next ) {
@@ -568,7 +574,7 @@ void mainloop() {
 					timeit->nextevent += timeit->useconds;
 				}
 			}
-		} else if (usecnow>prevtime+UINT64_C(3600000000)) {
+		} else if (usecnow>prevtime+UINT64_C(5000000)) {
 			// time went forward !!! - just recalculate "nextevent" time
 			for (timeit = timehead ; timeit != NULL ; timeit = timeit->next) {
 				timeit->nextevent = ((usecnow / timeit->useconds) * timeit->useconds) + timeit->usecoffset;

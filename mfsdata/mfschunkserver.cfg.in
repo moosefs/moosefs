@@ -5,55 +5,78 @@
 # user to run daemon as (default is @DEFAULT_USER@)
 # WORKING_USER = @DEFAULT_USER@
 
-# group to run daemon as (optional - if empty then default user group will be used)
+# group to run daemon as
+# (optional - if empty then default user group will be used)
 # WORKING_GROUP = @DEFAULT_GROUP@
 
 # name of process to place in syslog messages (default is mfschunkserver)
 # SYSLOG_IDENT = mfschunkserver
 
-# whether to perform mlockall() to avoid swapping out mfschunkserver process (default is 0, i.e. no)
+# whether to perform mlockall() to avoid swapping out mfschunkserver process
+# (default is 0, i.e. no)
 # LOCK_MEMORY = 0
 
-# Linux only: limit malloc arenas to given value - prevents server from using huge amount of virtual memory (default is 4)
+# Linux only: limit malloc arenas to given value - prevents server from
+# using huge amount of virtual memory
+# (default is 4)
 # LIMIT_GLIBC_MALLOC_ARENAS = 4
 
-# Linux only: disable out of memory killer (default is 1)
+# Linux only: disable out of memory killer
+# (default is 1)
 # DISABLE_OOM_KILLER = 1
 
-# nice level to run daemon with (default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with)
+# nice level to run daemon with. note: process must be started as root to
+# increase priority, if setting of priority fails, process retains the nice
+# level it started with.
+# (default is -19)
 # NICE_LEVEL = -19
 
-# set default umask for group and others (user has always 0, default is 027 - block write for group and block all for others)
+# set default umask for group and others (user has always 0, default is 027
+# - block write for group and block all for others)
 # FILE_UMASK = 027
 
 # where to store daemon lock file (default is @DATA_PATH@)
 # DATA_PATH = @DATA_PATH@
 
-# alternate location/name of mfshdd.cfg file (default is @ETC_PATH@/mfs/mfshdd.cfg)
+# alternate location/name of mfshdd.cfg file
+# (default is @ETC_PATH@/mfs/mfshdd.cfg)
 # HDD_CONF_FILENAME = @ETC_PATH@/mfs/mfshdd.cfg
 
-# Speed of background chunk tests in MB/s per disk (formally entry defined in mfshdd.cfg). Value can be given as a decimal number (default is 1.0)
-# Deprecates: HDD_TEST_FREQ (if HDD_TEST_SPEED is not defined, but there is redefined HDD_TEST_FREQ, then HDD_TEST_SPEED = 10 / HDD_TEST_FREQ)
+# Speed of background chunk tests in MB/s per disk (formally entry defined
+# in mfshdd.cfg). Value can be given as a decimal number
+# (default is 1.0)
+# Deprecates: HDD_TEST_FREQ (if HDD_TEST_SPEED is not defined, but there is
+# redefined HDD_TEST_FREQ, then HDD_TEST_SPEED = 10 / HDD_TEST_FREQ)
 # HDD_TEST_SPEED = 1.0
 
-# Do not test chunk integrity when last I/O (including test) was performed less than HDD_MIN_TEST_INTERVAL seconds ago.
+# Do not test chunk integrity when last I/O (including test) was performed
+# less than HDD_MIN_TEST_INTERVAL seconds ago.
 # HDD_MIN_TEST_INTERVAL = 86400
 
-# If possible use posix_fadvise(POSIX_DONTNEED) after each chunk test (but only if last I/O operation was performed more than HDD_FADVISE_MIN_TIME seconds ago). Using zero will always perform posix_fadvise (flush cache) and using negative value will never flush cache after tests. This setting is valid only for systems that support posix_fadivise.
+# If possible use posix_fadvise(POSIX_DONTNEED) after each chunk test (but
+# only if last I/O operation was performed more than HDD_FADVISE_MIN_TIME
+# seconds ago). Using zero will always perform posix_fadvise (flush cache)
+# and using negative value will never flush cache after tests. This setting
+# is valid only for systems that support posix_fadivise.
 # HDD_FADVISE_MIN_TIME = 86400
 
-# how much space should be left unused on each hard drive (default: 256MiB)
+# how much space should be left unused on each hard drive
+# (default: 256MiB)
 # number format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B?
 # examples: 0.5GB ; .5G ; 2.56GiB ; 1256M etc.
 # HDD_LEAVE_SPACE_DEFAULT = 256MiB
 
-# percent of total work time the chunkserver is allowed to spend on hdd space rebalancing
+# percent of total work time the chunkserver is allowed to spend on hdd
+# space rebalancing
 # HDD_REBALANCE_UTILIZATION = 20
 
-# maximum simultaneous writes in high speed disk rebalance (0 means use standard rebalance)
+# maximum simultaneous writes in high speed disk rebalance
+# (0 means use standard rebalance)
 # HDD_HIGH_SPEED_REBALANCE_LIMIT = 0
 
-# How many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged
+# How many i/o errors (COUNT) to tolerate in given amount of seconds
+# (PERIOD) on a single hard drive; if the number of errors exceeds this
+# setting, the offending hard drive will be marked as damaged
 # HDD_ERROR_TOLERANCE_COUNT = 2
 # HDD_ERROR_TOLERANCE_PERIOD = 600
 
@@ -74,20 +97,25 @@
 # labels string (default is empty - no labels)
 # LABELS = 
 
-# local address to use for master connections (default is *, i.e. default local address)
+# local address to use for master connections
+# (default is *, i.e. default local address)
 # BIND_HOST = *
 
-# MooseFS master host, IP is allowed only in single-master installations (default is @DEFAULT_MASTERNAME@)
+# MooseFS master host, IP is allowed only in single-master installations
+# (default is @DEFAULT_MASTERNAME@)
 # MASTER_HOST = @DEFAULT_MASTERNAME@
 
 # MooseFS master command port (default is @DEFAULT_MASTER_CS_PORT@)
 # MASTER_PORT = @DEFAULT_MASTER_CS_PORT@
 
 
-# timeout in seconds for master connections. Value >0 forces given timeout, but when value is 0 then CS asks master for timeout (default is 0 - ask master)
+# timeout in seconds for master connections. Value >0 forces given timeout,
+# but when value is 0 then CS asks master for timeout
+# (default is 0 - ask master)
 # MASTER_TIMEOUT = 0
 
-# delay in seconds before next try to reconnect to master if not connected (default is 5)
+# delay in seconds before next try to reconnect to master if not connected
+# (default is 5)
 # MASTER_RECONNECTION_DELAY = 5
 
 # authentication string (used only when master requires authorization)
@@ -100,6 +128,7 @@
 # IP address to listen for client (mount) connections (* means any)
 # CSSERV_LISTEN_HOST = *
 
-# port to listen for client (mount) connections (default is @DEFAULT_CS_DATA_PORT@)
+# port to listen for client (mount) connections
+# (default is @DEFAULT_CS_DATA_PORT@)
 # CSSERV_LISTEN_PORT = @DEFAULT_CS_DATA_PORT@
 

@@ -535,7 +535,9 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 	uint32_t writeid;
 	uint8_t status;
 	uint8_t gotlast;
+	double lastnopsent;
 
+	lastnopsent = 0.0;
 	wrdata.chunkid = gchunkid;
 	wrdata.version = gversion;
 	if (pipe(wrdata.pipe)<0) {
@@ -556,7 +558,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 	wrdata.condwaiting = 0;
 	wrdata.term = 0;
 	lwt_minthread_create(&wrthread,0,mainserv_write_thread,&wrdata);
-	
+
 	pdataleng = 4096;
 #ifdef MMAP_ALLOC
 	pdata = mmap(NULL,pdataleng,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
@@ -565,6 +567,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 #endif
 	passert(pdata);
 	gotlast = 0;
+
 	while (1) {
 		if (poll(pfd,3,SERV_TIMEOUT)<0) {
 			break;
@@ -623,8 +626,12 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 				}
 			}
 			if (cmd==ANTOAN_NOP) {
-				if (mainserv_towrite(sock,hdr,8,SERV_TIMEOUT)!=8) {
-					break;
+				double now = monotonic_seconds();
+				if (lastnopsent + 0.5 < now) {
+					if (mainserv_towrite(sock,hdr,8,SERV_TIMEOUT)!=8) {
+						break;
+					}
+					lastnopsent = now;
 				}
 			} else if (cmd==CLTOCS_WRITE_FINISH) {
 				if (leng<12) {
@@ -931,7 +938,9 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 	uint16_t offset;
 	uint8_t rstat;
 	uint8_t status;
+	double lastnopsent;
 
+	lastnopsent = 0.0;
 	status = 0; // make gcc happy
 	writeid = 0;
 	packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
@@ -949,6 +958,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 #endif
 	passert(pdata);
 	rstat = 0;
+
 	while (1) {
 		if (mainserv_toread(sock,pdata,8,SERV_TIMEOUT)!=8) {
 			break;
@@ -997,8 +1007,12 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 			break;
 		}
 		if (cmd==ANTOAN_NOP) {
-			if (mainserv_towrite(sock,pdata,8,SERV_TIMEOUT)!=8) {
-				break;
+			double now = monotonic_seconds();
+			if (lastnopsent + 0.5 < now) {
+				if (mainserv_towrite(sock,pdata,8,SERV_TIMEOUT)!=8) {
+					break;
+				}
+				lastnopsent = now;
 			}
 		}
 		if (cmd==CLTOCS_WRITE_DATA) {

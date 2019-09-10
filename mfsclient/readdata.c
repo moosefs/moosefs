@@ -524,6 +524,7 @@ void* read_worker(void *arg) {
 	int i;
 	struct pollfd pfd[3];
 	uint32_t sent,tosend,received,currentpos;
+	uint8_t notdone;
 	uint8_t recvbuff[20];
 	uint8_t sendbuff[29];
 #ifdef HAVE_READV
@@ -988,6 +989,7 @@ void* read_worker(void *arg) {
 
 		reccmd = 0; // makes gcc happy
 		recleng = 0; // makes gcc happy
+		notdone = 0;
 
 		do {
 			now = monotonic_seconds();
@@ -1385,7 +1387,12 @@ void* read_worker(void *arg) {
 								fprintf(stderr,"%.6lf: readworker inode: %"PRIu32" ; rreq: %"PRIu64":%"PRIu64"/%"PRIu32" ; read error: %s\n",monotonic_seconds(),inode,rreq->offset,rreq->offset+rreq->leng,rreq->leng,mfsstrerr(recstatus));
 #endif
 								status = EIO;
-								currentpos = 0; // start again from beginning
+								if (recstatus==MFS_ERROR_NOTDONE) {
+									notdone = 1;
+									// in such case do not reset pos
+								} else {
+									currentpos = 0; // start again from beginning
+								}
 								break;
 							}
 							if (currentpos != rleng) {
@@ -1465,7 +1472,9 @@ void* read_worker(void *arg) {
 		zassert(pthread_mutex_lock(&(ind->lock)));
 		rreq->currentpos = currentpos;
 		if (status!=0) {
-			ind->trycnt++;
+			if (notdone==0) {
+				ind->trycnt++;
+			}
 			trycnt = ind->trycnt;
 			if (trycnt>=maxretries) {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
@@ -1474,7 +1483,11 @@ void* read_worker(void *arg) {
 			} else {
 				zassert(pthread_mutex_unlock(&(ind->lock)));
 				chunksdatacache_invalidate(inode,chindx);
-				read_job_end(rreq,0,(trycnt<3)?0:(1000+((trycnt<30)?((trycnt-3)*300000):10000000)));
+				if (notdone) {
+					read_job_end(rreq,0,300000);
+				} else {
+					read_job_end(rreq,0,(trycnt<3)?0:(1000+((trycnt<30)?((trycnt-3)*300000):10000000)));
+				}
 			}
 		} else {
 			zassert(pthread_mutex_unlock(&(ind->lock)));

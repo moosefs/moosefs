@@ -216,13 +216,54 @@ void csserv_iothread_finished(uint8_t status,void *e) {
 }
 
 void csserv_read_init(csserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t *ptr;
+
 	eptr->state = READ;
 	eptr->jobid = job_serv_read(csserv_iothread_finished,eptr,eptr->sock,data,length);
+	if (eptr->jobid==0) { // not done - queue full
+		if (length!=20 && length!=21) {
+			syslog(LOG_NOTICE,"CLTOCS_READ - wrong size (%"PRIu32"/20|21)",length);
+			eptr->state = CLOSE;
+			return;
+		}
+		if (length==21) {
+			data++; // skip proto version
+		}
+		ptr = csserv_create_packet(eptr,CSTOCL_READ_STATUS,8+1);
+		memcpy(ptr,data,8); // copy chunkid directly from source packet
+		ptr+=8;
+		put8bit(&ptr,MFS_ERROR_NOTDONE);
+		eptr->state = IDLE;
+	}
 }
 
 void csserv_write_init(csserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t *ptr;
+
 	eptr->state = WRITE;
 	eptr->jobid = job_serv_write(csserv_iothread_finished,eptr,eptr->sock,data,length);
+	if (eptr->jobid==0) { // not done - queue full
+		if (length&1) {
+			if (length<13 || ((length-13)%6)!=0) {
+				syslog(LOG_NOTICE,"CLTOCS_WRITE - wrong size (%"PRIu32"/13+N*6)",length);
+				eptr->state = CLOSE;
+				return;
+			}
+			data++; // skip proto version
+		} else {
+			if (length<12 || ((length-12)%6)!=0) {
+				syslog(LOG_NOTICE,"CLTOCS_WRITE - wrong size (%"PRIu32"/12+N*6)",length);
+				eptr->state = CLOSE;
+				return;
+			}
+		}
+		ptr = csserv_create_packet(eptr,CSTOCL_WRITE_STATUS,8+4+1);
+		memcpy(ptr,data,8); // copy chunkid directly from source packet
+		ptr+=8;
+		put32bit(&ptr,0);
+		put8bit(&ptr,MFS_ERROR_NOTDONE);
+		eptr->state = IDLE;
+	}
 }
 
 /* IDLE operations */

@@ -4,9 +4,12 @@ This file lists noteworthy changes in MooseFS.
 
   - (master) added NOP command to changelog
   - (master+supervisor) added time check
+  - (cs) fixed behaviour when job queue is full
   - (cli+cgi) added time data to master servers
   - (cs) fixed NOP packets ping-pong
   - (client) fixed NOP flooding in write module
+  - (cs) fixed race condition in bgjobs module (jobhash)
+  - (cs+mount) added new status returned to mount when queue is full and support for it in client module
 
 * MooseFS 3.0.106-1 (2019-08-27)
 

@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (master+supervisor) added time check
   - (cli+cgi) added time data to master servers
   - (cs) fixed NOP packets ping-pong
+  - (client) fixed NOP flooding in write module
 
 * MooseFS 3.0.106-1 (2019-08-27)
 

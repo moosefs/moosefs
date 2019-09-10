@@ -1152,6 +1152,7 @@ void* write_worker(void *arg) {
 					put32bit(&wptr,0);
 					sent = 0;
 					sending_mode = 3;
+					lastsent = now;
 				}
 			}
 

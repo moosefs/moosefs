@@ -21,7 +21,7 @@
 #ifndef _MFS_META_FUSE_H_
 #define _MFS_META_FUSE_H_
 
-#include <fuse_lowlevel.h>
+#include "fusecommon.h"
 
 #if FUSE_USE_VERSION >= 26
 void mfs_meta_statfs(fuse_req_t req, fuse_ino_t ino);
@@ -33,7 +33,11 @@ void mfs_meta_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
 void mfs_meta_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
 void mfs_meta_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set, struct fuse_file_info *fi);
 void mfs_meta_unlink(fuse_req_t req, fuse_ino_t parent, const char *name);
+#if FUSE_VERSION >= 30
+void mfs_meta_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname,unsigned int flags);
+#else
 void mfs_meta_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname);
+#endif
 void mfs_meta_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
 void mfs_meta_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
 void mfs_meta_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);

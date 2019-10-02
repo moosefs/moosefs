@@ -10,6 +10,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) fixed NOP flooding in write module
   - (cs) fixed race condition in bgjobs module (jobhash)
   - (cs+mount) added new status returned to mount when queue is full and support for it in client module
+  - (mount) added initial support for libfuse3
 
 * MooseFS 3.0.106-1 (2019-08-27)
 

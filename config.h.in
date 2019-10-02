@@ -104,6 +104,9 @@
 /* Define to 1 if you have the `ftruncate' function. */
 #undef HAVE_FTRUNCATE
 
+/* libfuse3 detected */
+#undef HAVE_FUSE3
+
 /* libfuse has function fuse_version */
 #undef HAVE_FUSE_VERSION
 

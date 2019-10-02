@@ -48,11 +48,14 @@
 #  endif
 #endif
 
+#include "fusecommon.h"
+
 #include <fuse.h>
 #include <fuse_opt.h>
-#include <fuse_lowlevel.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -103,6 +106,10 @@ const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 // #define DEFAULT_OPTIONS "allow_other,default_permissions,daemon_timeout=600,iosize=65536,novncache"
 #else
 #define DEFAULT_OPTIONS "allow_other"
+#endif
+
+#if FUSE_VERSION >= 30 || defined(__APPLE__)
+#define FUSE_ALLOWS_NOT_EMPTY_DIRS 1
 #endif
 
 static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn);
@@ -159,7 +166,10 @@ static struct fuse_lowlevel_ops mfs_oper = {
 	.setlk		= mfs_setlk,
 #endif
 #if FUSE_VERSION >= 29
-	.flock          = mfs_flock,
+	.flock		= mfs_flock,
+#endif
+#if FUSE_VERSION >= 30
+	.readdirplus	= mfs_readdirplus,
 #endif
 };
 
@@ -185,6 +195,9 @@ struct mfsopts {
 #endif
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	int allowoomkiller;
+#endif
+#ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
+	int nonempty;
 #endif
 	int nostdmountoptions;
 	int meta;
@@ -271,6 +284,9 @@ static struct fuse_opt mfs_opts_stage2[] = {
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	MFS_OPT("mfsallowoomkiller", allowoomkiller, 1),
 #endif
+#ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
+	MFS_OPT("nonempty", nonempty, 1),
+#endif
 	MFS_OPT("mfswritecachesize=%u", writecachesize, 0),
 	MFS_OPT("mfsreadaheadsize=%u", readaheadsize, 0),
 	MFS_OPT("mfsreadaheadleng=%u", readaheadleng, 0),
@@ -323,119 +339,134 @@ static struct fuse_opt mfs_opts_stage2[] = {
 };
 
 static void usage(const char *progname) {
-	fprintf(stderr,"usage: %s [HOST[:PORT]:[PATH]] [options] mountpoint\n",progname);
-	fprintf(stderr,"\n");
-	fprintf(stderr,"general options:\n");
-	fprintf(stderr,"    -o opt,[opt...]         mount options\n");
-	fprintf(stderr,"    -h   --help             print help\n");
-	fprintf(stderr,"    -V   --version          print version\n");
-	fprintf(stderr,"\n");
-	fprintf(stderr,"MFS options:\n");
-	fprintf(stderr,"    -c CFGFILE                  equivalent to '-o mfscfgfile=CFGFILE'\n");
-	fprintf(stderr,"    -m   --meta                 equivalent to '-o mfsmeta'\n");
-	fprintf(stderr,"    -H HOST                     equivalent to '-o mfsmaster=HOST'\n");
-	fprintf(stderr,"    -P PORT                     equivalent to '-o mfsport=PORT'\n");
-	fprintf(stderr,"    -B IP                       equivalent to '-o mfsbind=IP'\n");
-	fprintf(stderr,"    -L IP                       equivalent to '-o mfsproxy=IP'\n");
-	fprintf(stderr,"    -S PATH                     equivalent to '-o mfssubfolder=PATH'\n");
-	fprintf(stderr,"    -p   --password             similar to '-o mfspassword=PASSWORD', but show prompt and ask user for password\n");
-	fprintf(stderr,"    -n   --nostdopts            do not add standard MFS mount options: '-o " DEFAULT_OPTIONS ",fsname=MFS'\n");
-	fprintf(stderr,"    -o mfscfgfile=CFGFILE       load some mount options from external file (if not specified then use default file: " ETC_PATH "/mfs/mfsmount.cfg or " ETC_PATH "/mfsmount.cfg)\n");
-	fprintf(stderr,"    -o mfsdebug                 print some debugging information\n");
-	fprintf(stderr,"    -o mfsmeta                  mount meta filesystem (trash etc.)\n");
-	fprintf(stderr,"    -o mfsflattrash             use flat trash structure in meta\n");
-	fprintf(stderr,"    -o mfsdelayedinit           connection with master is done in background - with this option mount can be run without network (good for being run from fstab / init scripts etc.)\n");
+	FILE *fd;
+
+#if FUSE_VERSION >= 30
+	fd = stdout;
+#else /* FUSE2 */
+	fd = stderr;
+#endif
+
+	fprintf(fd,"usage: %s [HOST[:PORT]:[PATH]] [options] mountpoint\n",progname);
+	fprintf(fd,"\n");
+	fprintf(fd,"general options:\n");
+	fprintf(fd,"    -o opt,[opt...]         mount options\n");
+#if FUSE_VERSION >= 30
+	fuse_cmdline_help();
+#else /* FUSE2 */
+	fprintf(fd,"    -h   --help             print help\n");
+	fprintf(fd,"    -V   --version          print version\n");
+#endif
+	fprintf(fd,"\n");
+	fprintf(fd,"MFS options:\n");
+	fprintf(fd,"    -c CFGFILE                  equivalent to '-o mfscfgfile=CFGFILE'\n");
+	fprintf(fd,"    -m   --meta                 equivalent to '-o mfsmeta'\n");
+	fprintf(fd,"    -H HOST                     equivalent to '-o mfsmaster=HOST'\n");
+	fprintf(fd,"    -P PORT                     equivalent to '-o mfsport=PORT'\n");
+	fprintf(fd,"    -B IP                       equivalent to '-o mfsbind=IP'\n");
+	fprintf(fd,"    -L IP                       equivalent to '-o mfsproxy=IP'\n");
+	fprintf(fd,"    -S PATH                     equivalent to '-o mfssubfolder=PATH'\n");
+	fprintf(fd,"    -p   --password             similar to '-o mfspassword=PASSWORD', but show prompt and ask user for password\n");
+	fprintf(fd,"    -n   --nostdopts            do not add standard MFS mount options: '-o " DEFAULT_OPTIONS ",fsname=MFS'\n");
+#ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
+	fprintf(fd,"    -o nonempty                 allow to mount MFS in nonempty directory\n");
+#endif
+	fprintf(fd,"    -o mfscfgfile=CFGFILE       load some mount options from external file (if not specified then use default file: " ETC_PATH "/mfs/mfsmount.cfg or " ETC_PATH "/mfsmount.cfg)\n");
+	fprintf(fd,"    -o mfsdebug                 print some debugging information\n");
+	fprintf(fd,"    -o mfsmeta                  mount meta filesystem (trash etc.)\n");
+	fprintf(fd,"    -o mfsflattrash             use flat trash structure in meta\n");
+	fprintf(fd,"    -o mfsdelayedinit           connection with master is done in background - with this option mount can be run without network (good for being run from fstab / init scripts etc.)\n");
 #if defined(__linux__)
-	fprintf(stderr,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 1)\n");
+	fprintf(fd,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 1)\n");
 #else
-	fprintf(stderr,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 0)\n");
+	fprintf(fd,"    -o mfsmkdircopysgid=N       sgid bit should be copied during mkdir operation (default: 0)\n");
 #endif
 #if defined(DEFAULT_SUGID_CLEAR_MODE_EXT)
-	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: EXT)\n");
+	fprintf(fd,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: EXT)\n");
 #elif defined(DEFAULT_SUGID_CLEAR_MODE_BSD)
-	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: BSD)\n");
+	fprintf(fd,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: BSD)\n");
 #elif defined(DEFAULT_SUGID_CLEAR_MODE_OSX)
-	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: OSX)\n");
+	fprintf(fd,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: OSX)\n");
 #else
-	fprintf(stderr,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: NEVER)\n");
+	fprintf(fd,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: NEVER)\n");
 #endif
 #if defined(__FreeBSD__)
-	fprintf(stderr,"    -o mfscachemode=CMODE       set cache mode (see below ; default: DIRECT)\n");
+	fprintf(fd,"    -o mfscachemode=CMODE       set cache mode (see below ; default: DIRECT)\n");
 #else
-	fprintf(stderr,"    -o mfscachemode=CMODE       set cache mode (see below ; default: AUTO)\n");
+	fprintf(fd,"    -o mfscachemode=CMODE       set cache mode (see below ; default: AUTO)\n");
 #endif
-	fprintf(stderr,"    -o mfscachefiles            (deprecated) equivalent to '-o mfscachemode=YES'\n");
-	fprintf(stderr,"    -o mfsattrcacheto=SEC       set attributes cache timeout in seconds (default: 1.0)\n");
-	fprintf(stderr,"    -o mfsxattrcacheto=SEC      set extended attributes (xattr) cache timeout in seconds (default: 30.0)\n");
-	fprintf(stderr,"    -o mfsentrycacheto=SEC      set file entry cache timeout in seconds (default: 0.0)\n");
-	fprintf(stderr,"    -o mfsdirentrycacheto=SEC   set directory entry cache timeout in seconds (default: 1.0)\n");
-	fprintf(stderr,"    -o mfsnegentrycacheto=SEC   set negative entry cache timeout in seconds (default: 0.0)\n");
-	fprintf(stderr,"    -o mfsgroupscacheto=SEC     set supplementary groups cache timeout in seconds (default: 300.0)\n");
-	fprintf(stderr,"    -o mfsrlimitnofile=N        on startup mfsmount tries to change number of descriptors it can simultaneously open (default: 100000)\n");
-	fprintf(stderr,"    -o mfsnice=N                on startup mfsmount tries to change his 'nice' value (default: -19)\n");
+	fprintf(fd,"    -o mfscachefiles            (deprecated) equivalent to '-o mfscachemode=YES'\n");
+	fprintf(fd,"    -o mfsattrcacheto=SEC       set attributes cache timeout in seconds (default: 1.0)\n");
+	fprintf(fd,"    -o mfsxattrcacheto=SEC      set extended attributes (xattr) cache timeout in seconds (default: 30.0)\n");
+	fprintf(fd,"    -o mfsentrycacheto=SEC      set file entry cache timeout in seconds (default: 0.0)\n");
+	fprintf(fd,"    -o mfsdirentrycacheto=SEC   set directory entry cache timeout in seconds (default: 1.0)\n");
+	fprintf(fd,"    -o mfsnegentrycacheto=SEC   set negative entry cache timeout in seconds (default: 0.0)\n");
+	fprintf(fd,"    -o mfsgroupscacheto=SEC     set supplementary groups cache timeout in seconds (default: 300.0)\n");
+	fprintf(fd,"    -o mfsrlimitnofile=N        on startup mfsmount tries to change number of descriptors it can simultaneously open (default: 100000)\n");
+	fprintf(fd,"    -o mfsnice=N                on startup mfsmount tries to change his 'nice' value (default: -19)\n");
 #ifdef MFS_USE_MEMLOCK
-	fprintf(stderr,"    -o mfsmemlock               try to lock memory\n");
+	fprintf(fd,"    -o mfsmemlock               try to lock memory\n");
 #endif
 #ifdef MFS_USE_MALLOPT
-	fprintf(stderr,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 4)\n");
+	fprintf(fd,"    -o mfslimitarenas=N         if N>0 then limit glibc malloc arenas (default: 4)\n");
 #endif
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
-	fprintf(stderr,"    -o mfsallowoomkiller        do not disable out of memory killer\n");
+	fprintf(fd,"    -o mfsallowoomkiller        do not disable out of memory killer\n");
 #endif
-	fprintf(stderr,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)\n");
-	fprintf(stderr,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
-	fprintf(stderr,"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n");
-	fprintf(stderr,"    -o mfsreadaheadleng=N       define amount of bytes to be additionally read (default: 1048576)\n");
-	fprintf(stderr,"    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n");
-	fprintf(stderr,"    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n");
-	fprintf(stderr,"    -o mfstimeout=N             define maximum timeout in seconds before I/O error is returned (default: 0 - which means no timeout)\n");
-	fprintf(stderr,"    -o mfslogretry=N            define minimal retry counter on which system will start log I/O messages (default: 5)\n");
-	fprintf(stderr,"    -o mfsmaster=HOST           define mfsmaster location (default: " DEFAULT_MASTERNAME ")\n");
-	fprintf(stderr,"    -o mfsport=PORT             define mfsmaster port number (default: " DEFAULT_MASTER_CLIENT_PORT ")\n");
-	fprintf(stderr,"    -o mfsbind=IP               define source ip address for connections (default: NOT DEFINED - chosen automatically by OS)\n");
-	fprintf(stderr,"    -o mfsproxy=IP              define listen ip address of local master proxy for communication with tools (default: 127.0.0.1)\n");
-	fprintf(stderr,"    -o mfssubfolder=PATH        define subfolder to mount as root (default: /)\n");
-	fprintf(stderr,"    -o mfspassword=PASSWORD     authenticate to mfsmaster with given password\n");
-	fprintf(stderr,"    -o mfspassfile=FILENAME     authenticate to mfsmaster with password from given file\n");
-	fprintf(stderr,"    -o mfsmd5pass=MD5           authenticate to mfsmaster using directly given md5 (only if mfspassword is not defined)\n");
-	fprintf(stderr,"    -o mfsdonotrememberpassword do not remember password in memory - more secure, but when session is lost then new session is created without password\n");
-	fprintf(stderr,"    -o mfspreflabels=LABELEXPR  specify preferred labels for choosing chunkservers during I/O\n");
-	fprintf(stderr,"    -o mfsnoxattrs              turn off xattr support\n");
+	fprintf(fd,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)\n");
+	fprintf(fd,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
+	fprintf(fd,"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n");
+	fprintf(fd,"    -o mfsreadaheadleng=N       define amount of bytes to be additionally read (default: 1048576)\n");
+	fprintf(fd,"    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n");
+	fprintf(fd,"    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n");
+	fprintf(fd,"    -o mfstimeout=N             define maximum timeout in seconds before I/O error is returned (default: 0 - which means no timeout)\n");
+	fprintf(fd,"    -o mfslogretry=N            define minimal retry counter on which system will start log I/O messages (default: 5)\n");
+	fprintf(fd,"    -o mfsmaster=HOST           define mfsmaster location (default: " DEFAULT_MASTERNAME ")\n");
+	fprintf(fd,"    -o mfsport=PORT             define mfsmaster port number (default: " DEFAULT_MASTER_CLIENT_PORT ")\n");
+	fprintf(fd,"    -o mfsbind=IP               define source ip address for connections (default: NOT DEFINED - chosen automatically by OS)\n");
+	fprintf(fd,"    -o mfsproxy=IP              define listen ip address of local master proxy for communication with tools (default: 127.0.0.1)\n");
+	fprintf(fd,"    -o mfssubfolder=PATH        define subfolder to mount as root (default: /)\n");
+	fprintf(fd,"    -o mfspassword=PASSWORD     authenticate to mfsmaster with given password\n");
+	fprintf(fd,"    -o mfspassfile=FILENAME     authenticate to mfsmaster with password from given file\n");
+	fprintf(fd,"    -o mfsmd5pass=MD5           authenticate to mfsmaster using directly given md5 (only if mfspassword is not defined)\n");
+	fprintf(fd,"    -o mfsdonotrememberpassword do not remember password in memory - more secure, but when session is lost then new session is created without password\n");
+	fprintf(fd,"    -o mfspreflabels=LABELEXPR  specify preferred labels for choosing chunkservers during I/O\n");
+	fprintf(fd,"    -o mfsnoxattrs              turn off xattr support\n");
 #if FUSE_VERSION >= 26
-	fprintf(stderr,"    -o mfsnoposixlocks          turn off support for global posix locks (lockf + ioctl) - locks will work locally\n");
+	fprintf(fd,"    -o mfsnoposixlocks          turn off support for global posix locks (lockf + ioctl) - locks will work locally\n");
 #endif
 #if FUSE_VERSION >= 29
-	fprintf(stderr,"    -o mfsnobsdlocks            turn off support for global BSD locks (flock) - locks will work locally\n");
+	fprintf(fd,"    -o mfsnobsdlocks            turn off support for global BSD locks (flock) - locks will work locally\n");
 #endif
-	fprintf(stderr,"\n");
-	fprintf(stderr,"CMODE can be set to:\n");
-	fprintf(stderr,"    DIRECT                      forces direct io (bypasses cache)\n");
-	fprintf(stderr,"    NO,NONE or NEVER            never allow files data to be kept in cache (safest but can reduce efficiency)\n");
-	fprintf(stderr,"    YES or ALWAYS               always allow files data to be kept in cache (dangerous)\n");
-	fprintf(stderr,"    AUTO                        file cache is managed by mfsmaster automatically (should be very safe and efficient)\n");
-	fprintf(stderr,"\n");
-	fprintf(stderr,"SMODE can be set to:\n");
-	fprintf(stderr,"    NEVER                       MFS will not change suid and sgid bit on chown\n");
-	fprintf(stderr,"    ALWAYS                      clear suid and sgid on every chown - safest operation\n");
-	fprintf(stderr,"    OSX                         standard behavior in OS X and Solaris (chown made by unprivileged user clear suid and sgid)\n");
-	fprintf(stderr,"    BSD                         standard behavior in *BSD systems (like in OSX, but only when something is really changed)\n");
-	fprintf(stderr,"    EXT                         standard behavior in most file systems on Linux (directories not changed, others: suid cleared always, sgid only when group exec bit is set)\n");
-	fprintf(stderr,"    XFS                         standard behavior in XFS on Linux (like EXT but directories are changed by unprivileged users)\n");
-	fprintf(stderr,"SMODE extra info:\n");
-	fprintf(stderr,"    btrfs,ext2,ext3,ext4,hfs[+],jfs,ntfs and reiserfs on Linux work as 'EXT'.\n");
-	fprintf(stderr,"    Only xfs on Linux works a little different. Beware that there is a strange\n");
-	fprintf(stderr,"    operation - chown(-1,-1) which is usually converted by a kernel into something\n");
-	fprintf(stderr,"    like 'chmod ug-s', and therefore can't be controlled by MFS as 'chown'\n");
-	fprintf(stderr,"\n");
-	fprintf(stderr,"LABELEXPR grammar:\n");
-	fprintf(stderr,"    LABELEXPR -> S ';' LABELEXPR | S\n");
-	fprintf(stderr,"    S -> S '+' M | M\n");
-	fprintf(stderr,"    M -> M L | L\n");
-	fprintf(stderr,"    L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']'\n");
-	fprintf(stderr,"\n");
-	fprintf(stderr,"    Subexpressions should be placed in priority order.\n");
-	fprintf(stderr,"    Up to nine subexpressions (priorities) can be specified.\n");
-	fprintf(stderr,"\n");
+	fprintf(fd,"\n");
+	fprintf(fd,"CMODE can be set to:\n");
+	fprintf(fd,"    DIRECT                      forces direct io (bypasses cache)\n");
+	fprintf(fd,"    NO,NONE or NEVER            never allow files data to be kept in cache (safest but can reduce efficiency)\n");
+	fprintf(fd,"    YES or ALWAYS               always allow files data to be kept in cache (dangerous)\n");
+	fprintf(fd,"    AUTO                        file cache is managed by mfsmaster automatically (should be very safe and efficient)\n");
+	fprintf(fd,"\n");
+	fprintf(fd,"SMODE can be set to:\n");
+	fprintf(fd,"    NEVER                       MFS will not change suid and sgid bit on chown\n");
+	fprintf(fd,"    ALWAYS                      clear suid and sgid on every chown - safest operation\n");
+	fprintf(fd,"    OSX                         standard behavior in OS X and Solaris (chown made by unprivileged user clear suid and sgid)\n");
+	fprintf(fd,"    BSD                         standard behavior in *BSD systems (like in OSX, but only when something is really changed)\n");
+	fprintf(fd,"    EXT                         standard behavior in most file systems on Linux (directories not changed, others: suid cleared always, sgid only when group exec bit is set)\n");
+	fprintf(fd,"    XFS                         standard behavior in XFS on Linux (like EXT but directories are changed by unprivileged users)\n");
+	fprintf(fd,"SMODE extra info:\n");
+	fprintf(fd,"    btrfs,ext2,ext3,ext4,hfs[+],jfs,ntfs and reiserfs on Linux work as 'EXT'.\n");
+	fprintf(fd,"    Only xfs on Linux works a little different. Beware that there is a strange\n");
+	fprintf(fd,"    operation - chown(-1,-1) which is usually converted by a kernel into something\n");
+	fprintf(fd,"    like 'chmod ug-s', and therefore can't be controlled by MFS as 'chown'\n");
+	fprintf(fd,"\n");
+	fprintf(fd,"LABELEXPR grammar:\n");
+	fprintf(fd,"    LABELEXPR -> S ';' LABELEXPR | S\n");
+	fprintf(fd,"    S -> S '+' M | M\n");
+	fprintf(fd,"    M -> M L | L\n");
+	fprintf(fd,"    L -> 'a' .. 'z' | 'A' .. 'Z' | '(' S ')' | '[' S ']'\n");
+	fprintf(fd,"\n");
+	fprintf(fd,"    Subexpressions should be placed in priority order.\n");
+	fprintf(fd,"    Up to nine subexpressions (priorities) can be specified.\n");
+	fprintf(fd,"\n");
 }
 
 static void mfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *outargs) {
@@ -555,6 +586,9 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 		return 0;
 	case KEY_VERSION:
 		fprintf(stderr, "MFS version %s\n",VERSSTR);
+#if FUSE_VERSION >= 30
+		fuse_lowlevel_version();
+#else
 		{
 			struct fuse_args helpargs = FUSE_ARGS_INIT(0, NULL);
 
@@ -563,9 +597,14 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 			fuse_parse_cmdline(&helpargs,NULL,NULL,NULL);
 			fuse_mount(NULL,&helpargs);
 		}
+#endif
 		exit(0);
 	case KEY_HELP:
 		usage(outargs->argv[0]);
+#if FUSE_VERSION >= 30
+		printf("fuse lowlevel options:\n");
+		fuse_lowlevel_help();
+#else
 		{
 			struct fuse_args helpargs = FUSE_ARGS_INIT(0, NULL);
 
@@ -574,6 +613,7 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 			fuse_parse_cmdline(&helpargs,NULL,NULL,NULL);
 			fuse_mount("",&helpargs);
 		}
+#endif
 		exit(1);
 	default:
 		fprintf(stderr, "internal error\n");
@@ -584,6 +624,120 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	int *piped = (int*)userdata;
 	char s;
+#if FUSE_VERSION >= 30
+
+//	conn->max_write - default should be set to maximum value, so we don't want to decrease it
+	conn->max_read = 0; // we do not have limit
+//	conn->max_readahead - same as with max_write
+
+// FUSE_CAP_ASYNC_READ (on)
+// FUSE_CAP_POSIX_LOCKS (on)
+// FUSE_CAP_ATOMIC_O_TRUNC (on)
+// FUSE_CAP_EXPORT_SUPPORT (off)
+// FUSE_CAP_DONT_MASK (off)
+// FUSE_CAP_SPLICE_WRITE (off)
+// FUSE_CAP_SPLICE_MOVE (off)
+// FUSE_CAP_SPLICE_READ (on)
+// FUSE_CAP_FLOCK_LOCKS (on)
+// FUSE_CAP_IOCTL_DIR (on)
+// FUSE_CAP_AUTO_INVAL_DATA (on)
+// FUSE_CAP_READDIRPLUS (on)
+// FUSE_CAP_READDIRPLUS_AUTO (on)
+// FUSE_CAP_ASYNC_DIO (on)
+// FUSE_CAP_WRITEBACK_CACHE (off)
+// FUSE_CAP_NO_OPEN_SUPPORT (doesn't matter)
+// FUSE_CAP_PARALLEL_DIROPS (on)
+// FUSE_CAP_POSIX_ACL (off)
+// FUSE_CAP_HANDLE_KILLPRIV (on)
+
+// ensure that FUSE_CAP_ASYNC_READ is on
+#ifdef FUSE_CAP_ASYNC_READ
+	conn->want |= FUSE_CAP_ASYNC_READ;
+#endif
+// turn off FUSE_CAP_ATOMIC_O_TRUNC - as for now we don't support O_TRUNC flag
+#ifdef FUSE_CAP_ATOMIC_O_TRUNC
+	conn->want &= ~FUSE_CAP_ATOMIC_O_TRUNC;
+#endif
+// turn on FUSE_CAP_EXPORT_SUPPORT (we do support lookups of "." and "..")
+#ifdef FUSE_CAP_EXPORT_SUPPORT
+	conn->want |= FUSE_CAP_EXPORT_SUPPORT;
+#endif
+// turn on CAP_DONT_MASK
+#ifdef FUSE_CAP_DONT_MASK
+	conn->want |= FUSE_CAP_DONT_MASK;
+#endif
+// turn off SPLICE flags - as for now we don't support them
+#ifdef FUSE_CAP_SPLICE_WRITE
+	conn->want &= ~FUSE_CAP_SPLICE_WRITE;
+#endif
+#ifdef FUSE_CAP_SPLICE_MOVE
+	conn->want &= ~FUSE_CAP_SPLICE_MOVE;
+#endif
+#ifdef FUSE_CAP_SPLICE_READ
+	conn->want &= ~FUSE_CAP_SPLICE_READ;
+#endif
+// ignore FUSE_CAP_IOCTL_DIR - we do not use ioctl's, so leave default
+// turn off FUSE_CAP_AUTO_INVAL_DATA - we have to check it later, but likely it will highly decrease efficiency
+#ifdef FUSE_CAP_AUTO_INVAL_DATA
+	conn->want &= ~FUSE_CAP_AUTO_INVAL_DATA;
+#endif
+// turn on FUSE_CAP_READDIRPLUS and FUSE_CAP_READDIRPLUS_AUTO, but not for "meta" filesystem
+	if (mfsopts.meta) {
+#ifdef FUSE_CAP_READDIRPLUS
+		conn->want &= ~FUSE_CAP_READDIRPLUS;
+#endif
+#ifdef FUSE_CAP_READDIRPLUS_AUTO
+		conn->want &= ~FUSE_CAP_READDIRPLUS_AUTO;
+#endif
+	} else {
+#ifdef FUSE_CAP_READDIRPLUS
+		conn->want |= FUSE_CAP_READDIRPLUS;
+#endif
+#ifdef FUSE_CAP_READDIRPLUS_AUTO
+		conn->want |= FUSE_CAP_READDIRPLUS_AUTO;
+#endif
+	}
+// turn on async direct requests
+#ifdef FUSE_CAP_ASYNC_DIO
+	conn->want |= FUSE_CAP_ASYNC_DIO;
+#endif
+// turn off write back cache - we do that on our side, and it introduces posix incompatibilities in the kernel
+#ifdef FUSE_CAP_WRITEBACK_CACHE
+	conn->want &= ~FUSE_CAP_WRITEBACK_CACHE;
+#endif
+// turn on parallel directory ops
+#ifdef FUSE_CAP_PARALLEL_DIROPS
+	conn->want |= FUSE_CAP_PARALLEL_DIROPS;
+#endif
+// turn off FUSE_CAP_POSIX_ACL - we are doing all checks on our side
+#ifdef FUSE_CAP_POSIX_ACL
+	conn->want &= ~FUSE_CAP_POSIX_ACL;
+#endif
+// turn off FUSE_CAP_HANDLE_KILLPRIV - we have to implement it first
+#ifdef FUSE_CAP_HANDLE_KILLPRIV
+	conn->want &= ~FUSE_CAP_HANDLE_KILLPRIV;
+#endif
+// locks
+#ifdef FUSE_CAP_FLOCK_LOCKS
+	if (mfsopts.nobsdlocks==0) {
+		conn->want |= FUSE_CAP_FLOCK_LOCKS;
+	} else {
+		conn->want &= ~FUSE_CAP_FLOCK_LOCKS;
+	}
+#endif
+#ifdef FUSE_CAP_POSIX_LOCKS
+	if (mfsopts.noposixlocks==0) {
+		conn->want |= FUSE_CAP_POSIX_LOCKS;
+	} else {
+		conn->want &= ~FUSE_CAP_POSIX_LOCKS;
+	}
+#endif
+//	conn->max_background - leave default
+//	conn->congestion_threshold - leave default
+	conn->time_gran = 1000000000;
+
+#else /* FUSE2 */
+
 	conn->max_write = 131072;
 	conn->max_readahead = 131072;
 #if defined(FUSE_CAP_BIG_WRITES) || defined(FUSE_CAP_DONT_MASK) || defined(FUSE_CAP_FLOCK_LOCKS) || defined(FUSE_CAP_POSIX_LOCKS)
@@ -605,6 +759,7 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 		conn->want |= FUSE_CAP_POSIX_LOCKS;
 	}
 #endif
+#endif /* FUSE2/3 */
 	if (piped[1]>=0) {
 		s=0;
 		if (write(piped[1],&s,1)!=1) {
@@ -644,6 +799,9 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 #endif
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	BOOLOPT("mfsallowoomkiller",allowoomkiller);
+#endif
+#ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
+	BOOLOPT("nonempty",nonempty);
 #endif
 	NUMOPT("mfswritecachesize","u",writecachesize);
 	NUMOPT("mfsreadaheadsize","u",readaheadsize);
@@ -690,9 +848,16 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	return leng;
 }
 
+#if FUSE_VERSION >= 30
+int mainloop(struct fuse_args *args,struct fuse_cmdline_opts *cmdopts) {
+#else
 int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
+#endif
 	struct fuse_session *se;
+#if FUSE_VERSION < 30
+	/* FUSE2 */
 	struct fuse_chan *ch;
+#endif
 	struct rlimit rls;
 	int piped[2];
 	char s;
@@ -743,15 +908,27 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	}
 
 	if (mfsopts.delayedinit) {
+#if FUSE_VERSION >= 30
+		fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,cmdopts->mountpoint,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,1);
+#else /* FUSE2 */
 		fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,mp,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,1);
+#endif
 	} else {
+#if FUSE_VERSION >= 30
+		if (fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,cmdopts->mountpoint,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,0)<0) {
+#else /* FUSE2 */
 		if (fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,mp,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,0)<0) {
+#endif
 			return 1;
 		}
 	}
 	memset(md5pass,0,16);
 
+#if FUSE_VERSION >= 30
+	if (cmdopts->foreground==0) {
+#else /* FUSE2 */
 	if (fg==0) {
+#endif
 		openlog(STR(APPNAME), LOG_PID | LOG_NDELAY , LOG_DAEMON);
 	} else {
 #if defined(LOG_PERROR)
@@ -793,7 +970,11 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 #endif
 
 	piped[0] = piped[1] = -1;
+#if FUSE_VERSION >= 30
+	if (cmdopts->foreground==0) {
+#else /* FUSE2 */
 	if (fg==0) {
+#endif
 		if (pipe(piped)<0) {
 			fprintf(stderr,"pipe error\n");
 			return 1;
@@ -887,31 +1068,12 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 //	dir_cache_init();
 	fs_init_threads(mfsopts.ioretries,mfsopts.timeout);
 	if (masterproxy_init(mfsopts.proxyhost)<0) {
-		fs_term();
-//		dir_cache_term();
-		negentry_cache_term();
-		symlink_cache_term();
-		chunksdatacache_term();
-		chunkrwlock_term();
-		conncache_term();
-		return 1;
+		err = 1;
+		goto exit2;
 	}
 
-//	fs_term();
-//	negentry_cache_term();
-//	symlink_cache_term();
-//	chunksdatacache_term();
-//	chunkrwlock_term();
-//	conncache_term();
-//	return 1;
-
-	if (mfsopts.meta==0) {
-		csdb_init();
-		delay_init();
-		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry);
-		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry);
-	}
-
+#if FUSE_VERSION < 30
+	/* FUSE2 */
  	ch = fuse_mount(mp, args);
 	if (ch==NULL) {
 		fprintf(stderr,"error in fuse_mount\n");
@@ -921,33 +1083,38 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 			}
 			close(piped[1]);
 		}
-		if (mfsopts.meta==0) {
-			write_data_term();
-			read_data_term();
-			delay_term();
-			csdb_term();
-		}
-		masterproxy_term();
-		fs_term();
-//		dir_cache_term();
-		negentry_cache_term();
-		symlink_cache_term();
-		chunksdatacache_term();
-		chunkrwlock_term();
-		conncache_term();
-		return 1;
+		err = 1;
+		goto exit2;
 	}
-
+#endif
 	if (mfsopts.meta) {
 		mfs_meta_init(mfsopts.debug,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.flattrash);
+#if FUSE_VERSION >= 30
+		se = fuse_session_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), (void*)piped);
+#else /* FUSE2 */
 		se = fuse_lowlevel_new(args, &mfs_meta_oper, sizeof(mfs_meta_oper), (void*)piped);
+#endif
 	} else {
+		csdb_init();
+		delay_init();
+		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry);
+		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry);
+#if FUSE_VERSION >= 30
+		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
+		se = fuse_session_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
+		mfs_setsession(se);
+#else /* FUSE2 */
 		mfs_init(ch,mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
 		se = fuse_lowlevel_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
+#endif
 	}
 	if (se==NULL) {
+#if FUSE_VERSION >= 30
+		fprintf(stderr,"error in fuse_session_new\n");
+#else /* FUSE2 */
 		fuse_unmount(mp,ch);
 		fprintf(stderr,"error in fuse_lowlevel_new\n");
+#endif
 		portable_usleep(100000);	// time for print other error messages by FUSE
 		if (piped[1]>=0) {
 			if (write(piped[1],&s,1)!=1) {
@@ -955,56 +1122,53 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 			}
 			close(piped[1]);
 		}
-		if (mfsopts.meta==0) {
-			write_data_term();
-			read_data_term();
-			delay_term();
-			csdb_term();
-		}
-		masterproxy_term();
-		fs_term();
-//		dir_cache_term();
-		negentry_cache_term();
-		symlink_cache_term();
-		chunksdatacache_term();
-		chunkrwlock_term();
-		conncache_term();
-		return 1;
+		err = 1;
+		goto exit1;
 	}
 
 //	fprintf(stderr,"check\n");
-	fuse_session_add_chan(se, ch);
 
 	if (fuse_set_signal_handlers(se)<0) {
 		fprintf(stderr,"error in fuse_set_signal_handlers\n");
+#if FUSE_VERSION >= 30
+		fuse_session_destroy(se);
+#else
 		fuse_session_remove_chan(ch);
 		fuse_session_destroy(se);
 		fuse_unmount(mp,ch);
+#endif
 		if (piped[1]>=0) {
 			if (write(piped[1],&s,1)!=1) {
 				fprintf(stderr,"pipe write error\n");
 			}
 			close(piped[1]);
 		}
-		if (mfsopts.meta==0) {
-			write_data_term();
-			read_data_term();
-			delay_term();
-			csdb_term();
-		}
-		masterproxy_term();
-		fs_term();
-//		dir_cache_term();
-		negentry_cache_term();
-		symlink_cache_term();
-		chunksdatacache_term();
-		chunkrwlock_term();
-		conncache_term();
-		return 1;
+		err = 1;
+		goto exit1;
 	}
 
+#if FUSE_VERSION >= 30
+	if (fuse_session_mount(se,cmdopts->mountpoint)<0) {
+		fprintf(stderr,"error in fuse_session_mount\n");
+		fuse_session_destroy(se);
+		if (piped[1]>=0) {
+			if (write(piped[1],&s,1)!=1) {
+				fprintf(stderr,"pipe write error\n");
+			}
+			close(piped[1]);
+		}
+		err = 1;
+		goto exit1;
+	}
+#else /* FUSE2 */
+	fuse_session_add_chan(se, ch);
+#endif
 
+#if FUSE_VERSION >= 30
+	if (mfsopts.debug==0 && cmdopts->foreground==0) {
+#else
 	if (mfsopts.debug==0 && fg==0) {
+#endif
 		setsid();
 		setpgid(0,getpid());
 		if ((i = open("/dev/null", O_RDWR, 0)) != -1) {
@@ -1015,18 +1179,35 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		}
 	}
 
+#if FUSE_VERSION >= 30
+	sinodes_init(cmdopts->mountpoint);
+#else /* FUSE2 */
 	sinodes_init(mp);
+#endif
 	sstats_init();
 
 	{
 		char pname[256];
+#if FUSE_VERSION >= 30
+		snprintf(pname,256,"mfsmount (mounted on: %s)",cmdopts->mountpoint);
+#else /* FUSE2 */
 		snprintf(pname,256,"mfsmount (mounted on: %s)",mp);
+#endif
 		pname[255] = 0;
 		processname_set(pname);
 	}
 
+#if FUSE_VERSION >= 30
+	if (cmdopts->singlethread==0) {
+		struct fuse_loop_config lopts;
+		memset(&lopts,0,sizeof(lopts));
+		lopts.clone_fd = cmdopts->clone_fd;
+		lopts.max_idle_threads = cmdopts->max_idle_threads;
+		err = fuse_session_loop_mt(se,&lopts);
+#else
 	if (mt) {
 		err = fuse_session_loop_mt(se);
+#endif
 	} else {
 		err = fuse_session_loop(se);
 	}
@@ -1043,9 +1224,15 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	sinodes_term();
 
 	fuse_remove_signal_handlers(se);
+#if FUSE_VERSION >= 30
+	fuse_session_unmount(se);
+	fuse_session_destroy(se);
+#else /* FUSE2 */
 	fuse_session_remove_chan(ch);
 	fuse_session_destroy(se);
 	fuse_unmount(mp,ch);
+#endif
+exit1:
 	if (mfsopts.meta==0) {
 		mfs_term();
 		write_data_term();
@@ -1054,6 +1241,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		csdb_term();
 	}
 	masterproxy_term();
+exit2:
 	fs_term();
 //	dir_cache_term();
 	negentry_cache_term();
@@ -1251,11 +1439,74 @@ char* password_read(const char *filename) {
 	return ret;
 }
 
+#ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
+int check_if_dir_is_empty(const char *mp) {
+	DIR *dd = NULL;
+	struct stat st;
+	struct dirent *de;
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
+	struct dirent *destorage = NULL;
+#endif
+	int res = 0;
+
+	if (stat(mp,&st)<0) {
+		fprintf(stderr,"stat mountpoint '%s': %s\n",mp,strerr(errno));
+		goto err;
+	}
+	if ((st.st_mode & S_IFMT) != S_IFDIR) {
+		fprintf(stderr,"given mountpoint '%s' is not a directory\n",mp);
+		goto err;
+	}
+
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
+	destorage = (struct dirent*)malloc(sizeof(struct dirent)+pathconf(mp,_PC_NAME_MAX)+1);
+	passert(destorage);
+#endif
+
+	dd = opendir(mp);
+	if (dd==NULL) {
+		fprintf(stderr,"error opening '%s': %s\n",mp,strerr(errno));
+		goto err;
+	}
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
+	while (readdir_r(dd,destorage,&de)==0 && de!=NULL) {
+#else
+	while ((de = readdir(dd)) != NULL) {
+#endif
+		if (de->d_name[0]=='.') {
+			if (de->d_name[1]==0) {
+				continue;
+			}
+			if (de->d_name[1]=='.' && de->d_name[2]==0) {
+				continue;
+			}
+		}
+		fprintf(stderr,"mountpoint '%s' is not empty\n",mp);
+		goto err;
+	}
+	res = 1;
+err:
+	if (dd!=NULL) {
+		closedir(dd);
+	}
+#if !defined(__GLIBC__) || (__GLIBC__ < 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ < 23))
+	if (destorage!=NULL) {
+		free(destorage);
+	}
+#endif
+	return res;
+}
+#endif
+
 int main(int argc, char *argv[]) {
 	int res;
-	int mt,fg;
 	int i;
+#if FUSE_VERSION >= 30
+	struct fuse_cmdline_opts cmdopts;
+#else
+	int mt,fg;
 	char *mountpoint;
+#endif
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	struct fuse_args defaultargs = FUSE_ARGS_INIT(0, NULL);
 
@@ -1573,21 +1824,47 @@ int main(int argc, char *argv[]) {
 
 //	dump_args("combined_args_before_fuse_parse_cmdline",&args);
 
+#if FUSE_VERSION >= 30
+	if (fuse_parse_cmdline(&args,&cmdopts)<0) {
+#else
 	if (fuse_parse_cmdline(&args,&mountpoint,&mt,&fg)<0) {
+#endif
 		fprintf(stderr,"see: %s -h for help\n",argv[0]);
 		return 1;
 	}
 
+#if FUSE_VERSION >= 30
+	if (!cmdopts.mountpoint) {
+		if (defaultmountpoint) {
+			cmdopts.mountpoint = defaultmountpoint;
+#else
 	if (!mountpoint) {
 		if (defaultmountpoint) {
 			mountpoint = defaultmountpoint;
+#endif
 		} else {
 			fprintf(stderr,"no mount point\nsee: %s -h for help\n",argv[0]);
 			return 1;
 		}
 	}
 
+#ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
+	if (mfsopts.nonempty==0) {
+#if FUSE_VERSION >= 30
+		if (check_if_dir_is_empty(cmdopts.mountpoint)==0) {
+#else
+		if (check_if_dir_is_empty(mountpoint)==0) {
+#endif
+			return 1;
+		}
+	}
+#endif
+
+#if FUSE_VERSION >= 30
+	res = mainloop(&args,&cmdopts);
+#else
 	res = mainloop(&args,mountpoint,mt,fg);
+#endif
 	fuse_opt_free_args(&defaultargs);
 	fuse_opt_free_args(&args);
 	free(mfsopts.masterhost);

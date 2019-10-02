@@ -21,7 +21,7 @@
 #ifndef _MFS_FUSE_H_
 #define _MFS_FUSE_H_
 
-#include <fuse_lowlevel.h>
+#include "fusecommon.h"
 
 // int mfs_rootnode_setup(char *path);
 
@@ -44,7 +44,11 @@ void mfs_mkdir (fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 void mfs_rmdir (fuse_req_t req, fuse_ino_t parent, const char *name);
 void mfs_symlink (fuse_req_t req, const char *path, fuse_ino_t parent, const char *name);
 void mfs_readlink (fuse_req_t req, fuse_ino_t ino);
+#if FUSE_VERSION >= 30
+void mfs_rename (fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname,unsigned int flags);
+#else
 void mfs_rename (fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname);
+#endif
 void mfs_link (fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char *newname);
 void mfs_opendir (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
 void mfs_readdir (fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
@@ -72,11 +76,19 @@ void mfs_setlk (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struc
 #if FUSE_VERSION >= 29
 void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int op);
 #endif
+#if FUSE_VERSION >= 30
+void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
+#endif
 
 void mfs_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng);
 void mfs_inode_change_fleng(uint32_t inode,uint64_t fleng);
 
 void mfs_term(void);
+#ifdef HAVE_FUSE3
+void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in);
+void mfs_setsession(struct fuse_session *se);
+#else /* FUSE2 */
 void mfs_init (struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in);
+#endif
 
 #endif

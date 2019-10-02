@@ -21,7 +21,8 @@
 #ifndef _DIRATTRCACHE_H_
 #define _DIRATTRCACHE_H_
 
-#include <fuse_lowlevel.h>
+#include "fusecommon.h"
+
 #include <inttypes.h>
 #include "MFSCommunication.h"
 

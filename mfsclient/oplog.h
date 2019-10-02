@@ -21,7 +21,8 @@
 #ifndef _OPLOG_H_
 #define _OPLOG_H_
 
-#include <fuse_lowlevel.h>
+#include "fusecommon.h"
+
 #include <inttypes.h>
 
 #ifndef __printflike

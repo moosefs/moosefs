@@ -472,7 +472,7 @@ AM_CONDITIONAL([WITH_BDEV], [test "$bdev" != "no" -a "$enable_mfsbdev" != "no"])
 
 if test "$fuse" != "no" -a "enable_mfsmount" != "no"; then
 	if test -n "$PKG_CONFIG"; then
-		PKG_CHECK_MODULES([FUSE], [fuse >= 2.6], , [fuse=no])
+		PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.2.1], [AC_DEFINE([HAVE_FUSE3],[1],[libfuse3 detected])] , [ PKG_CHECK_MODULES([FUSE], [fuse >= 2.6], , [fuse=no]) ])
 	else
 		echo "no pkg-config - can't check FUSE version"
 		fuse=no

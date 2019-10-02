@@ -22,7 +22,8 @@
 #include "config.h"
 #endif
 
-#include <fuse_lowlevel.h>
+#include "fusecommon.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>

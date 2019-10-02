@@ -28,7 +28,8 @@
 #include <string.h>
 #include <inttypes.h>
 #include <pthread.h>
-#include <fuse_lowlevel.h>
+
+#include "fusecommon.h"
 
 #include "MFSCommunication.h"
 #include "chunksdatacache.h"

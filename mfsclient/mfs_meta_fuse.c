@@ -28,7 +28,8 @@
 #include "config.h"
 #endif
 
-#include <fuse_lowlevel.h>
+#include "fusecommon.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -582,10 +583,17 @@ void mfs_meta_unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //	}
 }
 
+#if FUSE_VERSION >= 30
+void mfs_meta_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname,unsigned int flags) {
+#else
 void mfs_meta_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname) {
+#endif
 	int status;
 	uint32_t inode;
 	(void)newname;
+#if FUSE_VERSION >= 30
+	(void)flags;
+#endif
 	if ((!(parent==META_TRASH_INODE || (parent>=META_SUBTRASH_INODE_MIN && parent<=META_SUBTRASH_INODE_MAX))) && newparent!=META_UNDEL_INODE) {
 		fuse_reply_err(req,EACCES);
 		return;

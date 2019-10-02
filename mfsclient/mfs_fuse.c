@@ -28,7 +28,8 @@
 #include "config.h"
 #endif
 
-#include <fuse_lowlevel.h>
+#include "fusecommon.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -608,8 +609,11 @@ static void finfo_change_fleng(uint32_t inode,uint64_t fleng) {
 
 
 
-
-static struct fuse_chan *fuse_ch = NULL;
+#ifdef HAVE_FUSE3
+static struct fuse_session *fuse_comm = NULL;
+#else /* FUSE2 */
+static struct fuse_chan *fuse_comm = NULL;
+#endif
 static int debug_mode = 0;
 static int usedircache = 1;
 static int keep_cache = 0;
@@ -2582,43 +2586,56 @@ void mfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 	}
 }
 
+#if FUSE_VERSION >= 30
+void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname,unsigned int flags) {
+#else /* FUSE2 */
 void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t newparent, const char *newname) {
+#endif
 	uint32_t nleng,newnleng;
 	int status;
 	uint32_t inode;
 	uint8_t attr[ATTR_RECORD_SIZE];
 	struct fuse_ctx ctx;
 	groups *gids;
+#if FUSE_VERSION < 30
+	unsigned int flags = 0;
+#endif
 
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_RENAME);
 	if (debug_mode) {
-		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s) ...",(unsigned long int)parent,name,(unsigned long int)newparent,newname);
-		fprintf(stderr,"rename (%lu,%s,%lu,%s)\n",(unsigned long int)parent,name,(unsigned long int)newparent,newname);
+		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u) ...",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags);
+		fprintf(stderr,"rename (%lu,%s,%lu,%s,%u)\n",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags);
+	}
+	// TODO implement support for new flags available in fuse3
+	if (flags!=0) {
+		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags,strerr(EINVAL));
+		fuse_reply_err(req, EINVAL);
+		return;
 	}
 	if (parent==FUSE_ROOT_ID) {
 		if (IS_SPECIAL_NAME(name)) {
-			oplog_printf(&ctx,"rename (%lu,%s,%lu,%s): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,strerr(EACCES));
+			oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags,strerr(EACCES));
 			fuse_reply_err(req, EACCES);
 			return;
 		}
 	}
 	if (newparent==FUSE_ROOT_ID) {
 		if (IS_SPECIAL_NAME(newname)) {
-			oplog_printf(&ctx,"rename (%lu,%s,%lu,%s): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,strerr(EACCES));
+			oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags,strerr(EACCES));
 			fuse_reply_err(req, EACCES);
 			return;
 		}
 	}
 	nleng = strlen(name);
 	if (nleng>MFS_NAME_MAX) {
-		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,strerr(ENAMETOOLONG));
+		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags,strerr(ENAMETOOLONG));
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
 	newnleng = strlen(newname);
 	if (newnleng>MFS_NAME_MAX) {
-		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,strerr(ENAMETOOLONG));
+		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags,strerr(ENAMETOOLONG));
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
@@ -2633,7 +2650,7 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {
-		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,strerr(status));
+		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags,strerr(status));
 		fuse_reply_err(req, status);
 	} else {
 		negentry_cache_insert(parent,nleng,(const uint8_t*)name);
@@ -2647,7 +2664,7 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 			dcache_invalidate_attr(newparent);
 		}
 		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
-		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s): OK",(unsigned long int)parent,name,(unsigned long int)newparent,newname);
+		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): OK",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags);
 		fuse_reply_err(req, 0);
 	}
 }
@@ -5365,8 +5382,8 @@ void mfs_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng) {
 
 	fdcache_invalidate(inode);
 #if (FUSE_VERSION >= 28) && !defined(__FreeBSD__)
-	if (fuse_ch!=NULL) {
-		fuse_lowlevel_notify_inval_inode(fuse_ch,inode,offset,leng);
+	if (fuse_comm!=NULL) {
+		fuse_lowlevel_notify_inval_inode(fuse_comm,inode,offset,leng);
 		oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): ok",inode,offset,leng);
 	} else {
 		oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): lost",inode,offset,leng);
@@ -5400,12 +5417,24 @@ void mfs_prepare_params(void) {
 	mfs_attr_set_fleng(paramsattr,params_leng);
 }
 
+#ifdef HAVE_FUSE3
+void mfs_setsession(struct fuse_session *se) {
+	fuse_comm = se;
+}
+#endif
+
+#ifdef HAVE_FUSE3
+void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
+#else /* FUSE2 */
 void mfs_init(struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
+#endif
 #ifdef FREEBSD_DELAYED_RELEASE
 	pthread_t th;
 #endif
 	const char* sugid_clear_mode_strings[] = {SUGID_CLEAR_MODE_STRINGS};
-	fuse_ch = ch;
+#ifndef HAVE_FUSE3
+	fuse_comm = ch;
+#endif
 	debug_mode = debug_mode_in;
 	keep_cache = keep_cache_in;
 	direntry_cache_timeout = direntry_cache_timeout_in;

@@ -682,6 +682,10 @@ enum {
 //	OP_GETDIR_CACHED,
 	OP_GETDIR_FULL,
 	OP_GETDIR_SMALL,
+#if FUSE_VERSION >= 30
+	OP_READDIRPLUS,
+	OP_GETDIR_PLUS,
+#endif
 	STATNODES
 };
 
@@ -710,6 +714,9 @@ void mfs_statsptr_init(void) {
 	statsptr[OP_CREATE] = stats_get_subnode(s,"create",0,1);
 	statsptr[OP_RELEASEDIR] = stats_get_subnode(s,"releasedir",0,1);
 	statsptr[OP_READDIR] = stats_get_subnode(s,"readdir",0,1);
+#if FUSE_VERSION >= 30
+	statsptr[OP_READDIRPLUS] = stats_get_subnode(s,"readdirplus",0,1);
+#endif
 	statsptr[OP_OPENDIR] = stats_get_subnode(s,"opendir",0,1);
 	statsptr[OP_LINK] = stats_get_subnode(s,"link",0,1);
 	statsptr[OP_RENAME] = stats_get_subnode(s,"rename",0,1);
@@ -750,6 +757,9 @@ void mfs_statsptr_init(void) {
 			statsptr[OP_GETDIR_FULL] = stats_get_subnode(rd,"with_attrs",0,1);
 		}
 		statsptr[OP_GETDIR_SMALL] = stats_get_subnode(rd,"without_attrs",0,1);
+#if FUSE_VERSION >= 30
+		statsptr[OP_GETDIR_PLUS] = stats_get_subnode(rd,"with_attrs+",0,1);
+#endif
 	}
 }
 
@@ -2866,6 +2876,7 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 		return;
 	}
 	attrsize = master_attrsize();
+
 	zassert(pthread_mutex_lock(&(dirinfo->lock)));
 	if (dirinfo->wasread==0 || (dirinfo->wasread==1 && off==0)) {
 		const uint8_t *dbuff;
@@ -3011,6 +3022,171 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 	}
 	zassert(pthread_mutex_unlock(&(dirinfo->lock)));
 }
+
+#if FUSE_VERSION >= 30
+void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi) {
+	int status;
+	dirbuf *dirinfo;
+	char buffer[READDIR_BUFFSIZE];
+	char name[MFS_NAME_MAX+1];
+	const uint8_t *ptr,*eptr;
+	uint8_t end;
+	size_t opos,oleng;
+	uint8_t nleng;
+	uint32_t inode;
+	uint64_t maxfleng;
+	uint8_t type;
+	uint8_t mattr;
+	uint8_t attrsize;
+	struct fuse_entry_param e;
+	struct fuse_ctx ctx;
+	groups *gids;
+
+	ctx = *(fuse_req_ctx(req));
+	mfs_stats_inc(OP_READDIRPLUS);
+	if (debug_mode) {
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu) [handle:%08"PRIX32"] ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh));
+		} else {
+			oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu) ...",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+		}
+		fprintf(stderr,"readdirplus (%lu,%llu,%llu)\n",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+	}
+	if (fi==NULL) {
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	dirinfo = dirbuf_get(fi->fh);
+	if (dirinfo==NULL) {
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		fuse_reply_err(req,EBADF);
+		return;
+	}
+	if (off<0) {
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EINVAL));
+		fuse_reply_err(req,EINVAL);
+		return;
+	}
+	attrsize = master_attrsize();
+
+	zassert(pthread_mutex_lock(&(dirinfo->lock)));
+	if (dirinfo->wasread==0 || (dirinfo->wasread==1 && (off==0 || dirinfo->dataformat==0))) {
+		const uint8_t *dbuff;
+		uint32_t dsize;
+		uint8_t needscopy;
+
+		if (full_permissions) {
+			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+			status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,1,0,&dbuff,&dsize);
+			groups_rel(gids);
+		} else {
+			uint32_t gidtmp = ctx.gid;
+			status = fs_readdir(ino,ctx.uid,1,&gidtmp,1,0,&dbuff,&dsize);
+		}
+		if (status==0) {
+			mfs_stats_inc(OP_GETDIR_PLUS);
+		}
+		needscopy = 1;
+		dirinfo->dataformat = 1;
+		status = mfs_errorconv(status);
+		if (status!=0) {
+			oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(status));
+			fuse_reply_err(req, status);
+			zassert(pthread_mutex_unlock(&(dirinfo->lock)));
+			return;
+		}
+		if (dirinfo->dcache) {
+			dcache_release(dirinfo->dcache);
+			dirinfo->dcache = NULL;
+		}
+		if (dirinfo->p) {
+			free((uint8_t*)(dirinfo->p));
+			dirinfo->p = NULL;
+		}
+		if (needscopy) {
+			dirinfo->p = malloc(dsize);
+			if (dirinfo->p == NULL) {
+				oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EINVAL));
+				fuse_reply_err(req,EINVAL);
+				zassert(pthread_mutex_unlock(&(dirinfo->lock)));
+				return;
+			}
+			memcpy((uint8_t*)(dirinfo->p),dbuff,dsize);
+		} else {
+			dirinfo->p = dbuff;
+		}
+		dirinfo->size = dsize;
+		if (usedircache && dirinfo->dataformat==1) {
+			dirinfo->dcache = dcache_new(&ctx,ino,dirinfo->p,dirinfo->size,attrsize);
+		}
+	}
+
+	if (dirinfo->wasread<2) {
+		dirinfo->wasread=1;
+	}
+	// assert(dirinfo->dataformat>0);
+
+	if (off>=(off_t)(dirinfo->size)) {
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+		fuse_reply_buf(req, NULL, 0);
+	} else {
+		if (size>READDIR_BUFFSIZE) {
+			size=READDIR_BUFFSIZE;
+		}
+		ptr = dirinfo->p+off;
+		eptr = dirinfo->p+dirinfo->size;
+		opos = 0;
+		end = 0;
+
+		while (ptr<eptr && end==0) {
+			nleng = ptr[0];
+			ptr++;
+			memcpy(name,ptr,nleng);
+			name[nleng]=0;
+			ptr+=nleng;
+			off+=nleng+((dirinfo->dataformat)?(attrsize+5):6);
+			if (ptr+5<=eptr) {
+				inode = get32bit(&ptr);
+				type = mfs_attr_get_type(ptr);
+				if (type==TYPE_FILE) {
+					maxfleng = write_data_inode_getmaxfleng(inode);
+				} else {
+					maxfleng = 0;
+				}
+
+				memset(&e, 0, sizeof(e));
+				e.ino = inode;
+				e.generation = 1;
+				mattr = mfs_attr_get_mattr(ptr);
+				e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
+				e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((type==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
+				mfs_attr_to_stat(inode,ptr,&e.attr);
+				if (maxfleng>(uint64_t)(e.attr.st_size)) {
+					e.attr.st_size=maxfleng;
+					// mfs_attr_set_fleng(ptr,maxfleng);
+				}
+				if (type==TYPE_FILE) {
+					read_inode_set_length_passive(inode,e.attr.st_size);
+					finfo_change_fleng(inode,e.attr.st_size);
+				}
+				fs_fix_amtime(inode,&(e.attr.st_atime),&(e.attr.st_mtime));
+				ptr+=attrsize;
+				oleng = fuse_add_direntry_plus(req, buffer + opos, size - opos, name, &e, off);
+				if (opos+oleng>size) {
+					end=1;
+				} else {
+					opos+=oleng;
+				}
+			}
+		}
+
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)opos);
+		fuse_reply_buf(req,buffer,opos);
+	}
+	zassert(pthread_mutex_unlock(&(dirinfo->lock)));
+}
+#endif
 
 void mfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	(void)ino;

@@ -299,6 +299,7 @@ char* changelog_escape_name(uint32_t nleng,const uint8_t *name) {
 	return currescname;
 }
 
+
 void changelog_reload(void) {
 	BackLogsNumber = cfg_getuint32("BACK_LOGS",50);
 	if (BackLogsNumber>MAXLOGNUMBER) {
@@ -306,9 +307,9 @@ void changelog_reload(void) {
 		BackLogsNumber = MAXLOGNUMBER;
 	}
 	ChangelogSecondsToRemember = cfg_getuint16("CHANGELOG_PRESERVE_SECONDS",1800);
-	if (ChangelogSecondsToRemember>3600) {
-		mfs_arg_syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
-		ChangelogSecondsToRemember=3600;
+	if (ChangelogSecondsToRemember>15000) {
+		mfs_arg_syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 15000 seconds",ChangelogSecondsToRemember);
+		ChangelogSecondsToRemember=15000;
 	}
 	ChangelogSaveMode = cfg_getuint8("CHANGELOG_SAVE_MODE",0);
 	if (ChangelogSaveMode>2) {

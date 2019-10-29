@@ -374,6 +374,14 @@ static void dirbuf_freeall(void) {
 
 enum {IO_READWRITE,IO_READONLY,IO_WRITEONLY};
 
+typedef struct _lock_owner {
+#ifdef FLUSH_EXTRA_LOCKS
+	pid_t pid;
+#endif
+	uint64_t lock_owner;
+	struct _lock_owner *next;
+} finfo_lock_owner;
+
 typedef struct _finfo {
 	uint64_t fleng;
 	uint32_t inode;
@@ -388,6 +396,8 @@ typedef struct _finfo {
 	void *rdata;
 	void *wdata;
 	double create;
+	finfo_lock_owner *posix_lo_head;
+	finfo_lock_owner *flock_lo_head;
 	pthread_mutex_t lock;
 	pthread_cond_t rwcond;
 	pthread_cond_t opencond;
@@ -3246,6 +3256,8 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 #else
 	fileinfo->uselocks = 0;
 #endif
+	fileinfo->posix_lo_head = NULL;
+	fileinfo->flock_lo_head = NULL;
 	fileinfo->readers_cnt = 0;
 	fileinfo->writers_cnt = 0;
 	fileinfo->writing = 0;
@@ -3734,6 +3746,11 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 	if (fileinfo!=NULL) {
 		uint8_t uselocks;
+		uint64_t *lock_owner_tab;
+		uint32_t lock_owner_posix_cnt;
+		uint32_t lock_owner_flock_cnt;
+		uint32_t indx;
+
 		zassert(pthread_mutex_lock(&(fileinfo->lock)));
 		// rwlock_wait_for_unlock:
 		while (fileinfo->writing | fileinfo->writers_cnt | fileinfo->readers_cnt) {
@@ -3744,13 +3761,102 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 #else
 		uselocks = fileinfo->uselocks;
 #endif
-		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-		if (uselocks&1) {
-			fs_flock(ino,0,fi->lock_owner,FLOCK_RELEASE);
+
+		// any locks left?
+		lock_owner_tab = NULL;
+		lock_owner_posix_cnt = 0;
+		lock_owner_flock_cnt = 0;
+		if (fileinfo->posix_lo_head!=NULL || fileinfo->flock_lo_head!=NULL) {
+			finfo_lock_owner *flo,**flop;
+
+			for (flo=fileinfo->posix_lo_head ; flo!=NULL ; flo=flo->next) {
+				lock_owner_posix_cnt++;
+			}
+			for (flo=fileinfo->flock_lo_head ; flo!=NULL ; flo=flo->next) {
+				if (flo->lock_owner!=fi->lock_owner) {
+					lock_owner_flock_cnt++;
+				}
+			}
+			if (lock_owner_posix_cnt+lock_owner_flock_cnt>0) {
+				lock_owner_tab = malloc(sizeof(uint64_t)*(lock_owner_posix_cnt+lock_owner_flock_cnt));
+				passert(lock_owner_tab);
+			}
+
+			indx = 0;
+			flop = &(fileinfo->posix_lo_head);
+			while ((flo=*flop)!=NULL) {
+				if (indx<lock_owner_posix_cnt) {
+					lock_owner_tab[indx] = flo->lock_owner;
+				}
+				indx++;
+				*flop = flo->next;
+				free(flo);
+			}
+			massert(indx==lock_owner_posix_cnt,"loop mismatch");
+			massert(fileinfo->posix_lo_head==NULL,"list not freed");
+
+			indx = 0;
+			flop = &(fileinfo->flock_lo_head);
+			while ((flo=*flop)!=NULL) {
+				if (flo->lock_owner!=fi->lock_owner) {
+					if (indx<lock_owner_flock_cnt) {
+						lock_owner_tab[lock_owner_posix_cnt+indx] = flo->lock_owner;
+					}
+					indx++;
+				}
+				*flop = flo->next;
+				free(flo);
+			}
+			massert(indx==lock_owner_flock_cnt,"loop mismatch");
+			massert(fileinfo->flock_lo_head==NULL,"list not freed");
 		}
+
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+
+		for (indx=0 ; indx<lock_owner_posix_cnt ; indx++) {
+			int status;
+			status = fs_posixlock(ino,0,lock_owner_tab[indx],POSIX_LOCK_CMD_SET,POSIX_LOCK_UNLCK,0,UINT64_MAX,0,NULL,NULL,NULL,NULL);
+			status = mfs_errorconv(status);
+			if (status!=0) {
+				oplog_printf(&ctx,"release (%lu) - releasing all POSIX-type locks for %016"PRIX64" (left by kernel): %s",(unsigned long int)ino,lock_owner_tab[indx],strerr(status));
+			} else {
+				oplog_printf(&ctx,"release (%lu) - releasing all POSIX-type locks for %016"PRIX64" (left by kernel): OK",(unsigned long int)ino,lock_owner_tab[indx]);
+			}
+		}
+
+		if (uselocks&1) {
+			int status;
+			status = fs_flock(ino,0,fi->lock_owner,FLOCK_RELEASE);
+			status = mfs_errorconv(status);
+			if (status!=0) {
+				oplog_printf(&ctx,"release (%lu) - releasing all FLOCK-type locks for %016"PRIX64" (received from kernel): %s",(unsigned long int)ino,(uint64_t)(fi->lock_owner),strerr(status));
+			} else {
+				oplog_printf(&ctx,"release (%lu) - releasing all FLOCK-type locks for %016"PRIX64" (received from kernel): OK",(unsigned long int)ino,(uint64_t)(fi->lock_owner));
+			}
+		}
+
+		for (indx=0 ; indx<lock_owner_flock_cnt ; indx++) {
+			int status;
+			status = fs_flock(ino,0,lock_owner_tab[lock_owner_posix_cnt+indx],FLOCK_RELEASE);
+			status = mfs_errorconv(status);
+			if (status!=0) {
+				oplog_printf(&ctx,"release (%lu) - releasing all FLOCK-type locks for %016"PRIX64" (left by kernel): %s",(unsigned long int)ino,lock_owner_tab[indx],strerr(status));
+			} else {
+				oplog_printf(&ctx,"release (%lu) - releasing all FLOCK-type locks for %016"PRIX64" (left by kernel): OK",(unsigned long int)ino,lock_owner_tab[indx]);
+			}
+		}
+
+		if (lock_owner_tab!=NULL) {
+			free(lock_owner_tab);
+		}
+
 	}
 	dcache_invalidate_attr(ino);
-	oplog_printf(&ctx,"release (%lu): OK",(unsigned long int)ino);
+	if (fileinfo!=NULL) {
+		oplog_printf(&ctx,"release (%lu) [handle:%08"PRIX32",uselocks:%u,lock_owner:%016"PRIX64"]: OK",(unsigned long int)ino,(uint32_t)(fi->fh),fileinfo->uselocks,(uint64_t)(fi->lock_owner));
+	} else {
+		oplog_printf(&ctx,"release (%lu) [handle:%08"PRIX32",lock_owner:%016"PRIX64"]: OK",(unsigned long int)ino,(uint32_t)(fi->fh),(uint64_t)(fi->lock_owner));
+	}
 	fuse_reply_err(req,0);
 	if (fi->fh>0) {
 		if (fileinfo!=NULL) {
@@ -4231,6 +4337,11 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	finfo *fileinfo;
 	int err;
 	uint8_t uselocks;
+#ifdef FLUSH_EXTRA_LOCKS
+	uint64_t *lock_owner_tab;
+	uint32_t lock_owner_cnt;
+	uint32_t indx;
+#endif
 	groups *gids;
 	struct fuse_ctx ctx;
 
@@ -4261,7 +4372,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		return;
 	}
 	if (fileinfo->inode!=ino) {
-		oplog_printf(&ctx,"flush (%lu!=%lu): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,strerr(EBADF));
+		oplog_printf(&ctx,"flush (%lu!=%lu) [handle:%08"PRIX32"]: %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -4310,20 +4421,76 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fileinfo->ops_in_progress--;
 		fileinfo->lastuse = monotonic_seconds();
 #endif
-		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-	} else {
-		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 	}
 
-	if (uselocks&2) {
-		fs_posixlock(ino,0,fi->lock_owner,POSIX_LOCK_CMD_SET,POSIX_LOCK_UNLCK,0,UINT64_MAX,0,NULL,NULL,NULL,NULL);
+#ifdef FLUSH_EXTRA_LOCKS
+	lock_owner_tab = NULL;
+	lock_owner_cnt = 0;
+	if (fileinfo->posix_lo_head!=NULL) {
+		finfo_lock_owner *flo,**flop;
+
+		for (flo=fileinfo->posix_lo_head ; flo!=NULL ; flo=flo->next) {
+			if (flo->pid==ctx.pid && flo->lock_owner!=fi->lock_owner) {
+				lock_owner_cnt++;
+			}
+		}
+		if (lock_owner_cnt>0) {
+			lock_owner_tab = malloc(sizeof(uint64_t)*lock_owner_cnt);
+			passert(lock_owner_tab);
+		}
+		indx = 0;
+		flop = &(fileinfo->posix_lo_head);
+		while ((flo=*flop)!=NULL) {
+			if (flo->pid==ctx.pid && flo->lock_owner!=fi->lock_owner) {
+				if (indx<lock_owner_cnt) {
+					lock_owner_tab[indx] = flo->lock_owner;
+				}
+				indx++;
+			}
+			if (flo->pid==ctx.pid || flo->lock_owner==fi->lock_owner) {
+				*flop = flo->next;
+				free(flo);
+			} else {
+				flop = &(flo->next);
+			}
+		}
+		massert(indx==lock_owner_cnt,"loop mismatch");
 	}
+#endif
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+
+	if (uselocks&2) {
+		int status;
+		status = fs_posixlock(ino,0,fi->lock_owner,POSIX_LOCK_CMD_SET,POSIX_LOCK_UNLCK,0,UINT64_MAX,0,NULL,NULL,NULL,NULL);
+		status = mfs_errorconv(status);
+		if (status!=0) {
+			oplog_printf(&ctx,"flush (%lu) - releasing all POSIX-type locks for %016"PRIX64" (received from kernel): %s",(unsigned long int)ino,(uint64_t)(fi->lock_owner),strerr(status));
+		} else {
+			oplog_printf(&ctx,"flush (%lu) - releasing all POSIX-type locks for %016"PRIX64" (received from kernel): OK",(unsigned long int)ino,(uint64_t)(fi->lock_owner));
+		}
+	}
+#ifdef FLUSH_EXTRA_LOCKS
+	for (indx=0 ; indx<lock_owner_cnt ; indx++) {
+		int status;
+		status = fs_posixlock(ino,0,lock_owner_tab[indx],POSIX_LOCK_CMD_SET,POSIX_LOCK_UNLCK,0,UINT64_MAX,0,NULL,NULL,NULL,NULL);
+		status = mfs_errorconv(status);
+		if (status!=0) {
+			oplog_printf(&ctx,"flush (%lu) - releasing all POSIX-type locks for %016"PRIX64" (data structures): %s",(unsigned long int)ino,lock_owner_tab[indx],strerr(status));
+		} else {
+			oplog_printf(&ctx,"flush (%lu) - releasing all POSIX-type locks for %016"PRIX64" (data structures): OK",(unsigned long int)ino,lock_owner_tab[indx]);
+		}
+	}
+
+	if (lock_owner_tab!=NULL) {
+		free(lock_owner_tab);
+	}
+#endif
 	if (err!=0) {
-		oplog_printf(&ctx,"flush (%lu): %s",(unsigned long int)ino,strerr(err));
+		oplog_printf(&ctx,"flush (%lu) [handle:%08"PRIX32",uselocks:%u,lock_owner:%016"PRIX64"]: %s",(unsigned long int)ino,(uint32_t)(fi->fh),uselocks,(uint64_t)(fi->lock_owner),strerr(err));
 	} else {
 		fdcache_invalidate(ino);
 		dcache_invalidate_attr(ino);
-		oplog_printf(&ctx,"flush (%lu): OK",(unsigned long int)ino);
+		oplog_printf(&ctx,"flush (%lu) [handle:%08"PRIX32",uselocks:%u,lock_owner:%016"PRIX64"]: OK",(unsigned long int)ino,(uint32_t)(fi->fh),uselocks,(uint64_t)(fi->lock_owner));
 	}
 	fuse_reply_err(req,err);
 }
@@ -4360,15 +4527,15 @@ void mfs_fsync(fuse_req_t req, fuse_ino_t ino, int datasync, struct fuse_file_in
 		return;
 	}
 	if (fileinfo->inode!=ino) {
-		oplog_printf(&ctx,"fsync (%lu!=%lu,%d): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,datasync,strerr(EBADF));
+		oplog_printf(&ctx,"fsync (%lu!=%lu,%d) [handle:%08"PRIX32"]: %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,datasync,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
 	err = mfs_do_fsync(fileinfo);
 	if (err!=0) {
-		oplog_printf(&ctx,"fsync (%lu,%d): %s",(unsigned long int)ino,datasync,strerr(err));
+		oplog_printf(&ctx,"fsync (%lu,%d) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,datasync,(uint32_t)(fi->fh),strerr(err));
 	} else {
-		oplog_printf(&ctx,"fsync (%lu,%d): OK",(unsigned long int)ino,datasync);
+		oplog_printf(&ctx,"fsync (%lu,%d) [handle:%08"PRIX32"]: OK",(unsigned long int)ino,datasync,(uint32_t)(fi->fh));
 	}
 	fuse_reply_err(req,err);
 }
@@ -4525,16 +4692,37 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 		return;
 	}
 
-	// wait for full open
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+
+	// wait for full open
 	while (fileinfo->open_in_master==0) {
 		fileinfo->open_waiting++;
 		zassert(pthread_cond_wait(&(fileinfo->opencond),&(fileinfo->lock)));
 		fileinfo->open_waiting--;
 	}
-	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 
 	owner = fi->lock_owner;
+
+	// track all locks to unlock them on release
+	if (lock_mode!=FLOCK_UNLOCK) {
+		finfo_lock_owner *flo;
+
+		// add owner_id to list
+		for (flo=fileinfo->flock_lo_head ; flo!=NULL ; flo=flo->next) {
+			if (flo->lock_owner==owner) {
+				break;
+			}
+		}
+		if (flo==NULL) {
+			flo = malloc(sizeof(finfo_lock_owner));
+			flo->lock_owner = owner;
+			flo->next = fileinfo->flock_lo_head;
+			fileinfo->flock_lo_head = flo;
+		}
+	}
+
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+
 #ifdef HAVE___SYNC_OP_AND_FETCH
 	do {
 		reqid = __sync_add_and_fetch(&flock_reqid,1);
@@ -4580,9 +4768,9 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 		fld = NULL;
 	}
 	if (status==0) {
-		oplog_printf(&ctx,"flock (%"PRIu32",%lu,%016"PRIX64",%s): OK",reqid,(unsigned long int)ino,owner,lock_mode_str);
+		oplog_printf(&ctx,"flock (%"PRIu32",%lu,%016"PRIX64",%s) [handle:%08"PRIX32"]: OK",reqid,(unsigned long int)ino,owner,lock_mode_str,(uint32_t)(fi->fh));
 	} else {
-		oplog_printf(&ctx,"flock (%"PRIu32",%lu,%016"PRIX64",%s): %s",reqid,(unsigned long int)ino,owner,lock_mode_str,strerr(status));
+		oplog_printf(&ctx,"flock (%"PRIu32",%lu,%016"PRIX64",%s) [handle:%08"PRIX32"]: %s",reqid,(unsigned long int)ino,owner,lock_mode_str,(uint32_t)(fi->fh),strerr(status));
 	}
 	fuse_reply_err(req,status);
 	if (fld!=NULL) {
@@ -4766,7 +4954,7 @@ void mfs_getlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 		rlock.l_len = (rend - rstart);
 	}
 	rlock.l_pid = rpid;
-	oplog_printf(&ctx,"getlk (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c): (start:%"PRIu64" end:%"PRIu64" type:%c pid:%"PRIu32")",(unsigned long int)ino,owner,start,end,ctype,rstart,rend,rctype,rpid);
+	oplog_printf(&ctx,"getlk (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c) [handle:%08"PRIX32"]: (start:%"PRIu64" end:%"PRIu64" type:%c pid:%"PRIu32")",(unsigned long int)ino,owner,start,end,ctype,(uint32_t)(fi->fh),rstart,rend,rctype,rpid);
 	fuse_reply_lock(req,&rlock);
 }
 
@@ -4855,18 +5043,43 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 		return;
 	}
 
-	if (type!=POSIX_LOCK_UNLCK) {
-		// wait for full open
-		zassert(pthread_mutex_lock(&(fileinfo->lock)));
-		while (fileinfo->open_in_master==0) {
-			fileinfo->open_waiting++;
-			zassert(pthread_cond_wait(&(fileinfo->opencond),&(fileinfo->lock)));
-			fileinfo->open_waiting--;
-		}
-		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+	owner = fi->lock_owner;
+
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+
+	// wait for full open
+	while (fileinfo->open_in_master==0) {
+		fileinfo->open_waiting++;
+		zassert(pthread_cond_wait(&(fileinfo->opencond),&(fileinfo->lock)));
+		fileinfo->open_waiting--;
 	}
 
-	owner = fi->lock_owner;
+	// track all locks to unlock them on release
+	if (type!=POSIX_LOCK_UNLCK) {
+		finfo_lock_owner *flo;
+		// add pid,owner_id to list
+		for (flo=fileinfo->posix_lo_head ; flo!=NULL ; flo=flo->next) {
+#ifdef FLUSH_EXTRA_LOCKS
+			if (flo->pid==ctx.pid && flo->lock_owner==owner) {
+#else
+			if (flo->lock_owner==owner) {
+#endif
+				break;
+			}
+		}
+		if (flo==NULL) {
+			flo = malloc(sizeof(finfo_lock_owner));
+#ifdef FLUSH_EXTRA_LOCKS
+			flo->pid = ctx.pid;
+#endif
+			flo->lock_owner = owner;
+			flo->next = fileinfo->posix_lo_head;
+			fileinfo->posix_lo_head = flo;
+		}
+	}
+
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+
 	start = lock->l_start;
 	if (lock->l_len==0) {
 		end = UINT64_MAX;
@@ -4924,9 +5137,9 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 		fuse_req_interrupt_func(req,NULL,NULL);
 	}
 	if (status==0) {
-		oplog_printf(&ctx,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c): OK",cmdname,(unsigned long int)ino,owner,start,end,ctype);
+		oplog_printf(&ctx,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c) [handle:%08"PRIX32"]: OK",cmdname,(unsigned long int)ino,owner,start,end,ctype,(uint32_t)(fi->fh));
 	} else {
-		oplog_printf(&ctx,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c): %s",cmdname,(unsigned long int)ino,owner,start,end,ctype,strerr(status));
+		oplog_printf(&ctx,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c) [handle:%08"PRIX32"]: %s",cmdname,(unsigned long int)ino,owner,start,end,ctype,(uint32_t)(fi->fh),strerr(status));
 	}
 	fuse_reply_err(req,status);
 	if (pld!=NULL) {

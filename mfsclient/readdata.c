@@ -2181,7 +2181,7 @@ void read_data_set_length_active(inodedata *ind,uint64_t newlength) {
 	if (ind->waiting_writers>0) {
 		zassert(pthread_cond_signal(&(ind->writerscond)));
 	} else {
-		zassert(pthread_cond_signal(&(ind->readerscond)));
+		zassert(pthread_cond_broadcast(&(ind->readerscond)));
 	}
 	zassert(pthread_mutex_unlock(&(ind->lock)));
 }

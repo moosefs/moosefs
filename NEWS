@@ -13,6 +13,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) added initial support for libfuse3
   - (mount) added support for readdirplus
   - (mount) workaround for bug in fuse (wrong lock_owner in flush)
+  - (mount) fixed deadlock in readdata.c (closes issue #306)
 
 * MooseFS 3.0.106-1 (2019-08-27)
 

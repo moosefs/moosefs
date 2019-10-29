@@ -22,11 +22,12 @@
 #  include "config.h"
 #endif
 
+#if defined(__NetBSD__)
+#  define _KMEMUSER
+#endif
+
 #include <sys/types.h>
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
-#  if defined(__NetBSD__)
-#    define _KMEMUSER
-#  endif
 #  include <sys/sysctl.h>
 #endif
 #if defined(__FreeBSD__)

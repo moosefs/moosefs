@@ -25,6 +25,7 @@
 #include <stddef.h>
 #include <time.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/uio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -457,6 +458,9 @@ void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t leng
 					} else {
 						eptr->logstate = SYNC; // desync
 					}
+		} else if (rversion==3 || rversion==4) { // just ignore PRO components
+			eptr->mode = KILL;
+			return;
 		} else {
 			syslog(LOG_NOTICE,"ANTOMA_REGISTER - wrong version (%"PRIu8"/1)",rversion);
 			eptr->mode = KILL;

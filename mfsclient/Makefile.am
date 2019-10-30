@@ -25,6 +25,7 @@ mfsmount_SOURCES=\
 	fdcache.c fdcache.h \
 	sustained_inodes.c sustained_inodes.h \
 	sustained_stats.c sustained_stats.h \
+	inoleng.c inoleng.h \
 	getgroups.c getgroups.h \
 	mfs_fuse.c mfs_fuse.h \
 	mfs_meta_fuse.c mfs_meta_fuse.h \
@@ -72,6 +73,7 @@ libmfsio_la_SOURCES=\
 	chunkrwlock.c chunkrwlock.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
+	inoleng.c inoleng.h \
 	csdb.c csdb.h \
 	stats.c stats.h \
 	mfsio.c mfsio.h \

@@ -86,6 +86,7 @@
 #include "negentrycache.h"
 //#include "dircache.h"
 #include "chunksdatacache.h"
+#include "inoleng.h"
 #include "conncache.h"
 #include "chunkrwlock.h"
 #include "readdata.h"
@@ -1060,6 +1061,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	syslog(LOG_NOTICE,"monotonic clock function: %s",monotonic_method());
 	syslog(LOG_NOTICE,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
 
+	inoleng_init();
 	conncache_init(200);
 	chunkrwlock_init();
 	chunksdatacache_init();
@@ -1249,6 +1251,7 @@ exit2:
 	chunksdatacache_term();
 	chunkrwlock_term();
 	conncache_term();
+	inoleng_term();
 	return err ? 1 : 0;
 }
 

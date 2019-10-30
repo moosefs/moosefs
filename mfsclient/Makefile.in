@@ -96,10 +96,11 @@ bin_PROGRAMS = mfstools$(EXEEXT) $(am__EXEEXT_1)
 @WITH_BDEV_TRUE@sbin_PROGRAMS = mfsbdev$(EXEEXT)
 subdir = mfsclient
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/ax_pthread.m4 \
-	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
-	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
-	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_compile_flag.m4 \
+	$(top_srcdir)/m4/ax_pthread.m4 $(top_srcdir)/m4/libtool.m4 \
+	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
+	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
@@ -148,7 +149,8 @@ am_libmfsio_la_OBJECTS = libmfsio_la-labelparser.lo \
 	libmfsio_la-heapsorter.lo libmfsio_la-csorder.lo \
 	libmfsio_la-chunksdatacache.lo libmfsio_la-chunkrwlock.lo \
 	libmfsio_la-readdata.lo libmfsio_la-writedata.lo \
-	libmfsio_la-csdb.lo libmfsio_la-stats.lo libmfsio_la-mfsio.lo \
+	libmfsio_la-inoleng.lo libmfsio_la-csdb.lo \
+	libmfsio_la-stats.lo libmfsio_la-mfsio.lo \
 	../mfscommon/libmfsio_la-clocks.lo \
 	../mfscommon/libmfsio_la-delayrun.lo \
 	../mfscommon/libmfsio_la-pcqueue.lo \
@@ -182,7 +184,7 @@ am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	mfsmount-symlinkcache.$(OBJEXT) \
 	mfsmount-negentrycache.$(OBJEXT) mfsmount-xattrcache.$(OBJEXT) \
 	mfsmount-fdcache.$(OBJEXT) mfsmount-sustained_inodes.$(OBJEXT) \
-	mfsmount-sustained_stats.$(OBJEXT) \
+	mfsmount-sustained_stats.$(OBJEXT) mfsmount-inoleng.$(OBJEXT) \
 	mfsmount-getgroups.$(OBJEXT) mfsmount-mfs_fuse.$(OBJEXT) \
 	mfsmount-mfs_meta_fuse.$(OBJEXT) mfsmount-mastercomm.$(OBJEXT) \
 	mfsmount-extrapackets.$(OBJEXT) mfsmount-heapsorter.$(OBJEXT) \
@@ -263,6 +265,7 @@ am__depfiles_remade = ../mfscommon/$(DEPDIR)/clocks.Po \
 	./$(DEPDIR)/libmfsio_la-csorder.Plo \
 	./$(DEPDIR)/libmfsio_la-extrapackets.Plo \
 	./$(DEPDIR)/libmfsio_la-heapsorter.Plo \
+	./$(DEPDIR)/libmfsio_la-inoleng.Plo \
 	./$(DEPDIR)/libmfsio_la-labelparser.Plo \
 	./$(DEPDIR)/libmfsio_la-mastercomm.Plo \
 	./$(DEPDIR)/libmfsio_la-mfsio.Plo \
@@ -278,6 +281,7 @@ am__depfiles_remade = ../mfscommon/$(DEPDIR)/clocks.Po \
 	./$(DEPDIR)/mfsmount-fdcache.Po \
 	./$(DEPDIR)/mfsmount-getgroups.Po \
 	./$(DEPDIR)/mfsmount-heapsorter.Po \
+	./$(DEPDIR)/mfsmount-inoleng.Po \
 	./$(DEPDIR)/mfsmount-labelparser.Po \
 	./$(DEPDIR)/mfsmount-mastercomm.Po \
 	./$(DEPDIR)/mfsmount-masterproxy.Po \
@@ -516,6 +520,7 @@ mfsmount_SOURCES = \
 	fdcache.c fdcache.h \
 	sustained_inodes.c sustained_inodes.h \
 	sustained_stats.c sustained_stats.h \
+	inoleng.c inoleng.h \
 	getgroups.c getgroups.h \
 	mfs_fuse.c mfs_fuse.h \
 	mfs_meta_fuse.c mfs_meta_fuse.h \
@@ -562,6 +567,7 @@ libmfsio_la_SOURCES = \
 	chunkrwlock.c chunkrwlock.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
+	inoleng.c inoleng.h \
 	csdb.c csdb.h \
 	stats.c stats.h \
 	mfsio.c mfsio.h \
@@ -911,6 +917,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-csorder.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-extrapackets.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-heapsorter.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-inoleng.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-labelparser.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-mastercomm.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-mfsio.Plo@am__quote@ # am--include-marker
@@ -927,6 +934,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-fdcache.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-getgroups.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-heapsorter.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-inoleng.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-labelparser.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-mastercomm.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-masterproxy.Po@am__quote@ # am--include-marker
@@ -1037,6 +1045,13 @@ libmfsio_la-writedata.lo: writedata.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='writedata.c' object='libmfsio_la-writedata.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-writedata.lo `test -f 'writedata.c' || echo '$(srcdir)/'`writedata.c
+
+libmfsio_la-inoleng.lo: inoleng.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-inoleng.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-inoleng.Tpo -c -o libmfsio_la-inoleng.lo `test -f 'inoleng.c' || echo '$(srcdir)/'`inoleng.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libmfsio_la-inoleng.Tpo $(DEPDIR)/libmfsio_la-inoleng.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='inoleng.c' object='libmfsio_la-inoleng.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -c -o libmfsio_la-inoleng.lo `test -f 'inoleng.c' || echo '$(srcdir)/'`inoleng.c
 
 libmfsio_la-csdb.lo: csdb.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libmfsio_la_CPPFLAGS) $(CPPFLAGS) $(libmfsio_la_CFLAGS) $(CFLAGS) -MT libmfsio_la-csdb.lo -MD -MP -MF $(DEPDIR)/libmfsio_la-csdb.Tpo -c -o libmfsio_la-csdb.lo `test -f 'csdb.c' || echo '$(srcdir)/'`csdb.c
@@ -1317,6 +1332,20 @@ mfsmount-sustained_stats.obj: sustained_stats.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sustained_stats.c' object='mfsmount-sustained_stats.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-sustained_stats.obj `if test -f 'sustained_stats.c'; then $(CYGPATH_W) 'sustained_stats.c'; else $(CYGPATH_W) '$(srcdir)/sustained_stats.c'; fi`
+
+mfsmount-inoleng.o: inoleng.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-inoleng.o -MD -MP -MF $(DEPDIR)/mfsmount-inoleng.Tpo -c -o mfsmount-inoleng.o `test -f 'inoleng.c' || echo '$(srcdir)/'`inoleng.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-inoleng.Tpo $(DEPDIR)/mfsmount-inoleng.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='inoleng.c' object='mfsmount-inoleng.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-inoleng.o `test -f 'inoleng.c' || echo '$(srcdir)/'`inoleng.c
+
+mfsmount-inoleng.obj: inoleng.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-inoleng.obj -MD -MP -MF $(DEPDIR)/mfsmount-inoleng.Tpo -c -o mfsmount-inoleng.obj `if test -f 'inoleng.c'; then $(CYGPATH_W) 'inoleng.c'; else $(CYGPATH_W) '$(srcdir)/inoleng.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-inoleng.Tpo $(DEPDIR)/mfsmount-inoleng.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='inoleng.c' object='mfsmount-inoleng.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-inoleng.obj `if test -f 'inoleng.c'; then $(CYGPATH_W) 'inoleng.c'; else $(CYGPATH_W) '$(srcdir)/inoleng.c'; fi`
 
 mfsmount-getgroups.o: getgroups.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-getgroups.o -MD -MP -MF $(DEPDIR)/mfsmount-getgroups.Tpo -c -o mfsmount-getgroups.o `test -f 'getgroups.c' || echo '$(srcdir)/'`getgroups.c
@@ -1878,6 +1907,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/libmfsio_la-csorder.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-extrapackets.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-heapsorter.Plo
+	-rm -f ./$(DEPDIR)/libmfsio_la-inoleng.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-labelparser.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-mastercomm.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-mfsio.Plo
@@ -1894,6 +1924,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/mfsmount-fdcache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-getgroups.Po
 	-rm -f ./$(DEPDIR)/mfsmount-heapsorter.Po
+	-rm -f ./$(DEPDIR)/mfsmount-inoleng.Po
 	-rm -f ./$(DEPDIR)/mfsmount-labelparser.Po
 	-rm -f ./$(DEPDIR)/mfsmount-mastercomm.Po
 	-rm -f ./$(DEPDIR)/mfsmount-masterproxy.Po
@@ -1994,6 +2025,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/libmfsio_la-csorder.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-extrapackets.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-heapsorter.Plo
+	-rm -f ./$(DEPDIR)/libmfsio_la-inoleng.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-labelparser.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-mastercomm.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-mfsio.Plo
@@ -2010,6 +2042,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/mfsmount-fdcache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-getgroups.Po
 	-rm -f ./$(DEPDIR)/mfsmount-heapsorter.Po
+	-rm -f ./$(DEPDIR)/mfsmount-inoleng.Po
 	-rm -f ./$(DEPDIR)/mfsmount-labelparser.Po
 	-rm -f ./$(DEPDIR)/mfsmount-mastercomm.Po
 	-rm -f ./$(DEPDIR)/mfsmount-masterproxy.Po

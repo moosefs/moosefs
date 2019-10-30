@@ -37,6 +37,7 @@
 
 #include "MFSCommunication.h"
 #include "mastercomm.h"
+#include "inoleng.h"
 #include "readdata.h"
 #include "writedata.h"
 #include "csdb.h"
@@ -511,7 +512,7 @@ static uint64_t mfs_attr_to_size(const uint8_t attr[ATTR_RECORD_SIZE]) {
 enum {MFS_IO_READWRITE,MFS_IO_READONLY,MFS_IO_WRITEONLY,MFS_IO_FORBIDDEN};
 
 typedef struct file_info {
-	uint64_t fleng;
+	void *flengptr;
 	uint32_t inode;
 	uint8_t mode;
 	uint8_t writing;
@@ -622,28 +623,8 @@ static file_info* mfs_get_fi(int fd) {
 	return NULL;
 }
 
-// TODO
-
 static void finfo_change_fleng(uint32_t inode,uint64_t fleng) {
-#if 0
-	uint32_t i;
-	finfo *fileinfo;
-	zassert(pthread_mutex_lock(&finfo_tab_lock));
-	if (finfo_tab!=NULL) {
-		for (i=finfo_inode_hash[inode&1023] ; i!=0 ; i=fileinfo->next) {
-			fileinfo = finfo_tab[i];
-			zassert(pthread_mutex_lock(&(fileinfo->lock)));
-			if (fileinfo->inode==inode) {
-				fileinfo->fleng = fleng;
-			}
-			zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-		}
-	}
-	zassert(pthread_mutex_unlock(&finfo_tab_lock));
-#else
-	(void)inode;
-	(void)fleng;
-#endif
+	inoleng_update_fleng(inode,fleng);
 }
 
 //
@@ -1002,7 +983,7 @@ off_t mfs_lseek(int fildes, off_t offset, int whence) {
 			fileinfo->offset += offset;
 			break;
 		case SEEK_END:
-			fileinfo->offset = fileinfo->fleng + offset;
+			fileinfo->offset = inoleng_getfleng(fileinfo->flengptr) + offset;
 			break;
 		default:
 			errno = EINVAL;
@@ -1157,6 +1138,7 @@ int mfs_open(const char *path,int oflag,...) {
 	fildes = mfs_next_fd();
 	fileinfo = mfs_get_fi(fildes);
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	fileinfo->flengptr = inoleng_acquire(inode);
 	fileinfo->inode = inode;
 	fileinfo->mode = MFS_IO_FORBIDDEN;
 	fileinfo->offset = 0;
@@ -1166,7 +1148,7 @@ int mfs_open(const char *path,int oflag,...) {
 	fileinfo->writers_cnt = 0;
 	fileinfo->writing = 0;
 
-	fileinfo->fleng = fsize;
+	inoleng_setfleng(fileinfo->flengptr,fsize);
 	if ((oflag&O_ACCMODE) == O_RDONLY) {
 		fileinfo->mode = MFS_IO_READONLY;
 		fileinfo->rdata = read_data_new(inode,fsize);
@@ -1312,8 +1294,8 @@ static ssize_t mfs_pwrite_int(file_info *fileinfo,const void *buf,size_t nbyte,o
 		errno = err;
 		return -1;
 	}
-	if ((uint64_t)(offset+nbyte)>fileinfo->fleng) {
-		fileinfo->fleng = offset+nbyte;
+	if ((uint64_t)(offset+nbyte)>inoleng_getfleng(fileinfo->flengptr)) {
+		inoleng_setfleng(fileinfo->flengptr,offset+nbyte);
 		newfleng = offset+nbyte;
 	} else {
 		newfleng = 0;
@@ -1421,6 +1403,10 @@ int mfs_close(int fildes) {
 	if (fileinfo->wdata != NULL) {
 		write_data_end(fileinfo->wdata);
 		fileinfo->wdata = NULL;
+	}
+	if (fileinfo->flengptr != NULL) {
+		inoleng_release(fileinfo->flengptr);
+		fileinfo->flengptr = NULL;
 	}
 	if (fileinfo->mode != MFS_IO_FORBIDDEN) {
 		fs_dec_acnt(fileinfo->inode);
@@ -1555,10 +1541,10 @@ int mfs_fcntl_locks(int fildes, int function, struct flock *fl) {
 			start = fl->l_start;
 		}
 	} else if (fl->l_whence==SEEK_END) {
-		if (fl->l_start > (off_t)fileinfo->fleng) {
+		if (fl->l_start > (off_t)inoleng_getfleng(fileinfo->flengptr)) {
 			start = 0;
 		} else {
-			start = fileinfo->fleng + fl->l_start;
+			start = inoleng_getfleng(fileinfo->flengptr) + fl->l_start;
 		}
 	} else {
 		errno = EINVAL;
@@ -1647,6 +1633,7 @@ int mfs_init(mfscfg *mcfg,uint8_t stage) {
 	}
 
 	if (stage==0 || stage==2) {
+		inoleng_init();
 		conncache_init(200);
 		chunkrwlock_init();
 		chunksdatacache_init();
@@ -1719,5 +1706,6 @@ void mfs_term(void) {
 	chunksdatacache_term();
 	chunkrwlock_term();
 	conncache_term();
+	inoleng_term();
 	stats_term();
 }

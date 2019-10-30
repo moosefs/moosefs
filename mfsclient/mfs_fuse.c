@@ -74,6 +74,7 @@
 #include "negentrycache.h"
 #include "xattrcache.h"
 #include "fdcache.h"
+#include "inoleng.h"
 
 #if MFS_ROOT_ID != FUSE_ROOT_ID
 #error FUSE_ROOT_ID is not equal to MFS_ROOT_ID
@@ -383,7 +384,7 @@ typedef struct _lock_owner {
 } finfo_lock_owner;
 
 typedef struct _finfo {
-	uint64_t fleng;
+	void *flengptr;
 	uint32_t inode;
 	uint8_t mode;
 	uint8_t uselocks;
@@ -424,7 +425,10 @@ static void finfo_free_resources(finfo *fileinfo) {
 	if (fileinfo->wdata) {
 		write_data_end(fileinfo->wdata);
 	}
-	fileinfo->rdata = fileinfo->wdata = NULL;
+	if (fileinfo->flengptr) {
+		inoleng_release(fileinfo->flengptr);
+	}
+	fileinfo->rdata = fileinfo->wdata = fileinfo->flengptr = NULL;
 }
 
 #ifdef FREEBSD_DELAYED_RELEASE
@@ -504,6 +508,7 @@ static uint32_t finfo_new(uint32_t inode) {
 		zassert(pthread_cond_init(&(fileinfo->opencond),NULL));
 		fileinfo->rdata = NULL;
 		fileinfo->wdata = NULL;
+		fileinfo->flengptr = NULL;
 		fileinfo->findex = i;
 	}
 	findex = fileinfo->findex;
@@ -601,20 +606,7 @@ static void finfo_freeall(void) {
 }
 
 static void finfo_change_fleng(uint32_t inode,uint64_t fleng) {
-	uint32_t i;
-	finfo *fileinfo;
-	zassert(pthread_mutex_lock(&finfo_tab_lock));
-	if (finfo_tab!=NULL) {
-		for (i=finfo_inode_hash[inode&1023] ; i!=0 ; i=fileinfo->next) {
-			fileinfo = finfo_tab[i];
-			zassert(pthread_mutex_lock(&(fileinfo->lock)));
-			if (fileinfo->inode==inode) {
-				fileinfo->fleng = fleng;
-			}
-			zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-		}
-	}
-	zassert(pthread_mutex_unlock(&finfo_tab_lock));
+	inoleng_update_fleng(inode,fleng);
 }
 
 
@@ -3261,7 +3253,8 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 	fileinfo = finfo_get(findex);
 	passert(fileinfo);
 	pthread_mutex_lock(&(fileinfo->lock)); // make helgrind happy
-	fileinfo->fleng = fleng;
+	fileinfo->flengptr = inoleng_acquire(inode);
+	inoleng_setfleng(fileinfo->flengptr,fleng);
 	fileinfo->inode = inode;
 #ifdef HAVE___SYNC_OP_AND_FETCH
 	__sync_and_and_fetch(&(fileinfo->uselocks),0);
@@ -4125,7 +4118,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 //		}
 //	}
 	if (fileinfo->rdata == NULL) {
-		fileinfo->rdata = read_data_new(ino,fileinfo->fleng);
+		fileinfo->rdata = read_data_new(ino,inoleng_getfleng(fileinfo->flengptr));
 	}
 	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 
@@ -4255,7 +4248,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	fileinfo->ops_in_progress++;
 #endif
 	if (fileinfo->wdata==NULL) {
-		fileinfo->wdata = write_data_new(ino,fileinfo->fleng);
+		fileinfo->wdata = write_data_new(ino,inoleng_getfleng(fileinfo->flengptr));
 	}
 	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 
@@ -4281,8 +4274,8 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		fuse_reply_err(req,err);
 	} else {
 		uint64_t newfleng;
-		if ((uint64_t)(off+size)>fileinfo->fleng) {
-			fileinfo->fleng = off+size;
+		if ((uint64_t)(off+size)>inoleng_getfleng(fileinfo->flengptr)) {
+			inoleng_setfleng(fileinfo->flengptr,off+size);
 			newfleng = off+size;
 		} else {
 			newfleng = 0;

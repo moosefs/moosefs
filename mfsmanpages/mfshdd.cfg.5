@@ -1,4 +1,4 @@
-.TH mfshdd.cfg "5" "August 2019" "MooseFS 3.0.106-1" "This is part of MooseFS"
+.TH mfshdd.cfg "5" "October 2019" "MooseFS 3.0.107-1" "This is part of MooseFS"
 .SH NAME
 mfshdd.cfg \- list of MooseFS storage directories for \fBmfschunkserver\fP
 .SH DESCRIPTION
@@ -18,9 +18,9 @@ Path can be prefixed with one or more special characters. These characters work 
 means this directory (hard drive) is "marked for removal" 
 and all data will be replicated to other hard drives, usually on other chunkservers
 .IP \fB<\fP
-means that all data from this hard drive should be moved to other hard drives
+means that all data from this hard drive should be moved to other local hard drives
 .IP \fB>\fP
-means that all data from other hard drives should be moved to this hard drive
+means that all data from other local hard drives should be moved to this hard drive
 .IP \fB~\fP
 means that significant (more than 10% in less than minute) change of total blocks count will not mark this drive as damaged (useful for compressed filesystems)
 .RE

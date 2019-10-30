@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.107-1 (WIP)
+* MooseFS 3.0.107-1 (2019-10-30)
 
   - (master) added NOP command to changelog
   - (master+supervisor) added time check

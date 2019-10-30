@@ -1,3 +1,29 @@
+moosefs (3.0.107-1) unstable; urgency=medium
+
+  * (all) This is 'work in progress' version !!!
+  * (master) added NOP command to changelog
+  * (master+supervisor) added time check
+  * (cs) fixed behaviour when job queue is full
+  * (cli+cgi) added time data to master servers
+  * (cs) fixed NOP packets ping-pong
+  * (client) fixed NOP flooding in write module
+  * (cs) fixed race condition in bgjobs module (jobhash)
+  * (cs+mount) added new status returned to mount when queue is full and
+    support for it in client module
+  * (mount) added initial support for libfuse3 (related to issue #302)
+  * (mount) added support for readdirplus (related to issue #302)
+  * (mount) workaround for bug in fuse (wrong lock_owner in flush - issue #305)
+  * (mount) fixed deadlock in readdata.c (closes issue #306)
+  * (mount+master) fixed few small issues related to POSIX compliance (checked
+    by pjd)
+  * (all) changed prefered C standard from C99 to C11 and added tests for
+    atomics
+  * (mount) move read/write structures initialization from open to read/write
+  * (mount,mfsio) added new inode->fleng map
+  * (configure) added option disable_all, added summary at the end
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 30 Oct 2019 07:00:00 +0100
+
 moosefs (3.0.106-1) unstable; urgency=medium
 
   * (tools) better handling unrecognized options
@@ -19,8 +45,21 @@ moosefs (3.0.106-1) unstable; urgency=medium
   * (cli+cgi) fixed shebang in python scripts (preference for python3 in
     configure)
   * (master) changed pipe in bgsaver to nonblocking mode
+  * (master) added check if the background saving process is alive
+  * (master) added lockfile for background saving process
+  * (master) added protection against time going back in the free inodes list
+  * (master) added protection in FOLLOWER against not keeping up with the
+    LEADER (pro only)
+  * (master) changed condition for removing chunk from data structures (all
+    chunkservers have to be connected)
+  * (master) added 'restore' run mode (works similar to 'mfsmaster -a' but
+    without running daemon)
+  * (master) take write replication counters into account in server ordering
+    for new chunk creations
+  * (master) changed calcualting replication limits in chunk rebalance
+    procedure (using actual usage difference)
 
- -- MooseFS Team <contact@moosefs.com>  Thu, 08 Aug 2019 13:00:00 +0200
+ -- MooseFS Team <contact@moosefs.com>  Tue, 27 Aug 2019 13:00:00 +0200
 
 moosefs (3.0.105-1) unstable; urgency=medium
 

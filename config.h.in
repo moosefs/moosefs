@@ -15,6 +15,9 @@
 /* bswap64 */
 #undef BSWAP64
 
+/* Build number */
+#undef BUILDNO
+
 /* Define to 1 if the `closedir' function returns void instead of `int'. */
 #undef CLOSEDIR_VOID
 

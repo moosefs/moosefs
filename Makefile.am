@@ -48,6 +48,7 @@ SYSTEMDDIR=
 endif
 
 RELEASE = @release@
+BUILDNO = @buildno@
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -71,11 +72,12 @@ dist-hook:
 	rm -f tmp
 
 mfsdist: dist
+	mv $(distdir).tar.gz ../moosefs-dist/$(distdir)-b$(BUILDNO).tar.gz ; \
 	if grep -q '(WIP)' NEWS; then \
-		mv $(distdir).tar.gz ../moosefs-dist/$(distdir)-WIP.tar.gz ; \
-		ln -sf $(distdir)-WIP.tar.gz ../moosefs-dist/moosefs-3.x-LATEST.tar.gz ; \
+		ln -sf $(distdir)-b$(BUILDNO).tar.gz ../moosefs-dist/$(distdir)-WIP.tar.gz ; \
+		ln -sf $(distdir)-b$(BUILDNO).tar.gz ../moosefs-dist/moosefs-3.x-LATEST.tar.gz ; \
 	else \
-		mv $(distdir).tar.gz ../moosefs-dist/$(distdir)-$(RELEASE).tar.gz ; \
-		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/$(distdir).tar.gz ; \
-		ln -sf $(distdir)-$(RELEASE).tar.gz ../moosefs-dist/moosefs-3.x-LATEST.tar.gz ; \
+		ln -sf $(distdir)-b$(BUILDNO).tar.gz ../moosefs-dist/$(distdir).tar.gz ; \
+		ln -sf $(distdir)-b$(BUILDNO).tar.gz ../moosefs-dist/$(distdir)-$(RELEASE).tar.gz ; \
+		ln -sf $(distdir)-b$(BUILDNO).tar.gz ../moosefs-dist/moosefs-3.x-LATEST.tar.gz ; \
 	fi

@@ -463,6 +463,7 @@ build_cpu = @build_cpu@
 build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
+buildno = @buildno@
 datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@

@@ -4,6 +4,7 @@
 AC_PREREQ(2.60)
 AC_INIT([MFS], [3.0.106], [bugs@moosefs.com], [moosefs])
 release=1
+buildno=$(cat buildno.txt)
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
 AC_CONFIG_HEADER([config.h])
@@ -22,6 +23,7 @@ AC_DEFINE_UNQUOTED([VERSHEX], [(($versmaj)*0x10000+($versmid)*0x100+($versmin)*2
 #AC_DEFINE_UNQUOTED([VERSMIN], [$versmin], [Minor MFS version])
 #AC_DEFINE_UNQUOTED([VERSHEX], [(($versmaj)*0x10000+($versmid)*0x100+($versmin))], [Full MFS version as a hex number])
 AC_DEFINE_UNQUOTED([RELEASE], [$release], [Release number])
+AC_DEFINE_UNQUOTED([BUILDNO], [$buildno], [Build number])
 AC_DEFINE([VERSION2INT(maj,med,min)], [((maj)*0x10000+(med)*0x100+(((maj)>1)?((min)*2):(min)))], [Version converter from human readable format to binary format used in MFS packets])
 AC_DEFINE_UNQUOTED([VERSSTR], ["${PACKAGE_VERSION}-${release}"], [MFS version - string])
 
@@ -679,6 +681,7 @@ AC_DEFINE_UNQUOTED([PROTO_BASE], [$PROTO_BASE], [Base value for protocol command
 AC_DEFINE_UNQUOTED([LIGHT_MFS], [$LIGHT_MFS], [Build light version])
 
 AC_SUBST([release])
+AC_SUBST([buildno])
 
 AC_CONFIG_FILES([Makefile
 		mfsmanpages/Makefile
@@ -713,7 +716,7 @@ AC_OUTPUT
 echo
 echo "Summary:"
 echo
-echo "VERSION / RELEASE ................... ${PACKAGE_VERSION} / ${release}"
+echo "VERSION / RELEASE / BUILDNO ......... ${PACKAGE_VERSION} / ${release} / ${buildno}"
 echo
 echo "CC .................................. $CC"
 echo "CFLAGS .............................. $CFLAGS"

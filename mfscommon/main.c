@@ -1286,7 +1286,7 @@ int main(int argc,char **argv) {
 	while ((ch = getopt(argc, argv, "nuvfdc:t:h?" MODULE_OPTIONS_GETOPT)) != -1) {
 		switch(ch) {
 			case 'v':
-				printf("version: %s\n",VERSSTR);
+				printf("version: %s ; build: %s\n",VERSSTR,STR(BUILDNO));
 				return 0;
 			case 'd':
 				printf("option '-d' is deprecated - use '-f' instead\n");

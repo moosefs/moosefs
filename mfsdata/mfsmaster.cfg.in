@@ -142,8 +142,8 @@
 # Threshold for chunkserver load (default is 150)
 # CS_HEAVY_LOAD_THRESHOLD = 150
 
-# Threshold ratio for chunkserver load (default is 5.0, Whenever chunkserver load is higher than previously specified threshold and this ratio times higher than average load, then chunkserver is switched into 'grace' mode)
-# CS_HEAVY_LOAD_RATIO_THRESHOLD = 5.0
+# Threshold ratio for chunkserver load (default is 3.0, Whenever chunkserver load is higher than previously specified threshold and this ratio times higher than average load, then chunkserver is switched into 'grace' mode)
+# CS_HEAVY_LOAD_RATIO_THRESHOLD = 3.0
 
 # Defines how long chunkservers will remain in 'grace' mode (in seconds)
 # CS_HEAVY_LOAD_GRACE_PERIOD = 900

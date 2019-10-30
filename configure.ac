@@ -40,12 +40,27 @@ if test "X$MFS_FORCE_DEBUG" = "XYES"; then
 	enable_debug=yes
 fi
 
+AX_CHECK_COMPILE_FLAG([-std=c11], [ CCSTD="-std=c11" ], [
+	AX_CHECK_COMPILE_FLAG([-std=gnu99], [ CCSTD="-std=gnu99" ], [
+		AX_CHECK_COMPILE_FLAG([-std=c99], [ CCSTD="-std=c99" ], [
+			CCSTD=""
+		])
+	])
+])
+
+if test "$CCSTD" = "-std=c11"; then
+	ac_have_atomics=maybe
+	AC_DEFINE([HAVE_C11_COMPILER], [1], [Compiler understands C11 standard])
+else
+	ac_have_atomics=no
+fi
+
 if test "$GCC" = "yes"; then
 	if test "$enable_externalcflags" != "yes" ; then
 		if test "$enable_gperftools" = "yes" -o "$enable_debug" = "yes" ; then
-			CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
+			CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG $CCSTD -Wall -Wextra -Wshadow -pedantic -fwrapv"
 		else
-			CFLAGS="-O2 $CFLAGS -g -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
+			CFLAGS="-O2 $CFLAGS -g $CCSTD -Wall -Wextra -Wshadow -pedantic -fwrapv"
 		fi
 	fi
 	if test "$enable_gperftools" = "yes"; then
@@ -249,6 +264,9 @@ AC_CHECK_FUNCS([mallopt])
 # core dumps
 AC_CHECK_HEADERS([sys/prctl.h], [AC_CHECK_FUNCS([prctl])])
 
+# check for asprintf
+AC_CHECK_FUNCS([asprintf])
+
 dnl optional thread functions
 dnl AC_CHECK_FUNCS([pthread_spin_lock])
 
@@ -338,6 +356,28 @@ if test "$ac_have___sync_fetch_and_op" = "yes" ; then
 	AC_DEFINE([HAVE___SYNC_FETCH_AND_OP], [1], [have __sync_fetch_and_OP intrinsics])
 fi
 AC_MSG_RESULT($ac_have___sync_fetch_and_op)
+
+AC_MSG_CHECKING([for __sync_bool_compare_and_swap])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>]],
+	       [[unsigned long long int foo; int i,j; foo = 54; i = __sync_bool_compare_and_swap(&foo,54,7); j = __sync_bool_compare_and_swap(&foo,23,77); ]])],
+	       [ac_have___sync_bool_compare_and_swap=yes], [ac_have___sync_bool_compare_and_swap=no])
+if test "$ac_have___sync_bool_compare_and_swap" = "yes" ; then
+	AC_DEFINE([HAVE___SYNC_BOOL_COMPARE_AND_SWAP], [1], [have __sync_bool_compare_and_swap intrinsic])
+fi
+AC_MSG_RESULT($ac_have___sync_bool_compare_and_swap)
+
+if test "$ac_have_atomics" != "no" ; then
+	AC_MSG_CHECKING([for _Atomic support])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <stdatomic.h>]],
+		       [[_Atomic unsigned long long int foo; atomic_init(&foo,41); atomic_fetch_add(&foo,1); ]])],
+		       [ac_have_atomics=yes], [ac_have_atomics=no])
+	AC_MSG_RESULT($ac_have_atomics)
+fi
+if test "$ac_have_atomics" = "yes" ; then
+	AC_DEFINE([HAVE_ATOMICS], [1], [have support for atomic operations])
+fi
+
+
 
 saved_cflags="$CFLAGS"
 CFLAGS="-Werror"

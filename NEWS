@@ -15,6 +15,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) workaround for bug in fuse (wrong lock_owner in flush - issue #305)
   - (mount) fixed deadlock in readdata.c (closes issue #306)
   - (mount+master) fixed few small issues related to POSIX compliance (checked by pjd)
+  - (all) changed prefered C standard from C99 to C11 and added tests for atomics
 
 * MooseFS 3.0.106-1 (2019-08-27)
 

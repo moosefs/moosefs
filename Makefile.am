@@ -53,7 +53,7 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS=mfstests mfsdata mfsmanpages $(MASTERDIR) $(METALOGGERDIR) $(SUPERVISORDIR) $(CHUNKSERVERDIR) $(CLIENTDIR) $(SCRIPTSDIR) $(NETDUMPDIR) $(SYSTEMDDIR)
 
-EXTRA_DIST=m4/ax_pthread.m4 debian rpm macosx freebsd debian_sysv_to_systemd.sh linux_build.sh macosx_build.sh freebsd_build.sh sanitize_build.sh README.md
+EXTRA_DIST=m4/ax_pthread.m4 m4/ax_check_compile_flag.m4 debian rpm macosx freebsd debian_sysv_to_systemd.sh linux_build.sh macosx_build.sh freebsd_build.sh sanitize_build.sh README.md buildno.txt
 
 distclean-local:
 	-rm -rf mfscommon/$(DEPDIR)

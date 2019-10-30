@@ -63,14 +63,23 @@
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 
+/* Define to 1 if you have the `asprintf' function. */
+#undef HAVE_ASPRINTF
+
 /* Define to 1 if you have the `atexit' function. */
 #undef HAVE_ATEXIT
+
+/* have support for atomic operations */
+#undef HAVE_ATOMICS
 
 /* Define to 1 if you have the <attr/xattr.h> header file. */
 #undef HAVE_ATTR_XATTR_H
 
 /* Define to 1 if you have the `bzero' function. */
 #undef HAVE_BZERO
+
+/* Compiler understands C11 standard */
+#undef HAVE_C11_COMPILER
 
 /* Define to 1 if you have the `clock_gettime' function. */
 #undef HAVE_CLOCK_GETTIME
@@ -399,6 +408,9 @@
 
 /* Define to 1 if the system has the type `_Bool'. */
 #undef HAVE__BOOL
+
+/* have __sync_bool_compare_and_swap intrinsic */
+#undef HAVE___SYNC_BOOL_COMPARE_AND_SWAP
 
 /* have __sync_fetch_and_OP intrinsics */
 #undef HAVE___SYNC_FETCH_AND_OP

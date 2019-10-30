@@ -634,6 +634,7 @@ ac_includes_default="\
 ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
+buildno
 release
 LIGHT_MFS
 PROTO_BASE
@@ -646,11 +647,6 @@ DEFAULT_MASTER_CONTROL_PORT
 DEFAULT_PORTBASE
 DEFAULT_GROUP
 DEFAULT_USER
-RUN_PATH
-SBIN_PATH
-BIN_PATH
-ETC_PATH
-DATA_PATH
 ZLIB_LIBS
 CREATE_DATA_DIR_FALSE
 CREATE_DATA_DIR_TRUE
@@ -745,6 +741,11 @@ CFLAGS
 CC
 ac_ct_AR
 AR
+RUN_PATH
+SBIN_PATH
+BIN_PATH
+ETC_PATH
+DATA_PATH
 AM_BACKSLASH
 AM_DEFAULT_VERBOSITY
 AM_DEFAULT_V
@@ -840,7 +841,7 @@ enable_externalcflags
 enable_gperftools
 enable_debug
 enable_largefile
-enable_generalmans
+enable_all
 enable_mfsmaster
 enable_mfsmetalogger
 enable_mfssupervisor
@@ -1511,7 +1512,8 @@ Optional Features:
   --enable-gperftools     Build with google perftools on (debug only)
   --enable-debug          Build version without optimizations
   --disable-largefile     omit support for large files
-  --disable-general-mans  Do not install general mans
+  --disable-all           By default do not build anything except for manually
+                          enabled modules
   --disable-mfsmaster     Do not build mfsmaster
   --disable-mfsmetalogger Do not build mfsmetalogger
   --disable-mfssupervisor Do not build mfssupervisor
@@ -2647,6 +2649,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 release=1
+buildno=$(cat buildno.txt)
 
 ac_config_headers="$ac_config_headers config.h"
 
@@ -3440,11 +3443,55 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+cat >>confdefs.h <<_ACEOF
+#define BUILDNO $buildno
+_ACEOF
+
+
 $as_echo "#define VERSION2INT(maj,med,min) ((maj)*0x10000+(med)*0x100+(((maj)>1)?((min)*2):(min)))" >>confdefs.h
 
 
 cat >>confdefs.h <<_ACEOF
 #define VERSSTR "${PACKAGE_VERSION}-${release}"
+_ACEOF
+
+
+# Define paths
+test "$prefix" = "NONE" && prefix="$ac_default_prefix"
+test "$exec_prefix" = "NONE" && exec_prefix="$prefix"
+eval DATA_PATH="${localstatedir}/mfs"
+eval ETC_PATH="${sysconfdir}"
+eval BIN_PATH="${bindir}"
+eval SBIN_PATH="${sbindir}"
+# use system /var/run when using system-wide installation prefix
+if test "${prefix#/usr}" != "${prefix}" -o "${prefix#/opt}" != "${prefix}"; then
+	RUN_PATH="/var/run/mfs"
+else
+	RUN_PATH="${prefix}/var/run/mfs"
+fi
+
+
+
+
+
+
+cat >>confdefs.h <<_ACEOF
+#define PREFIX "${prefix}"
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define ETC_PATH "$ETC_PATH"
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define DATA_PATH "$DATA_PATH"
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define RUN_PATH "$RUN_PATH"
 _ACEOF
 
 
@@ -13213,12 +13260,131 @@ if test "X$MFS_FORCE_DEBUG" = "XYES"; then
 	enable_debug=yes
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -std=c11" >&5
+$as_echo_n "checking whether C compiler accepts -std=c11... " >&6; }
+if ${ax_cv_check_cflags___std_c11+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -std=c11"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___std_c11=yes
+else
+  ax_cv_check_cflags___std_c11=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___std_c11" >&5
+$as_echo "$ax_cv_check_cflags___std_c11" >&6; }
+if test "x$ax_cv_check_cflags___std_c11" = xyes; then :
+   CCSTD="-std=c11"
+else
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -std=gnu99" >&5
+$as_echo_n "checking whether C compiler accepts -std=gnu99... " >&6; }
+if ${ax_cv_check_cflags___std_gnu99+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -std=gnu99"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___std_gnu99=yes
+else
+  ax_cv_check_cflags___std_gnu99=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___std_gnu99" >&5
+$as_echo "$ax_cv_check_cflags___std_gnu99" >&6; }
+if test "x$ax_cv_check_cflags___std_gnu99" = xyes; then :
+   CCSTD="-std=gnu99"
+else
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -std=c99" >&5
+$as_echo_n "checking whether C compiler accepts -std=c99... " >&6; }
+if ${ax_cv_check_cflags___std_c99+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -std=c99"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___std_c99=yes
+else
+  ax_cv_check_cflags___std_c99=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___std_c99" >&5
+$as_echo "$ax_cv_check_cflags___std_c99" >&6; }
+if test "x$ax_cv_check_cflags___std_c99" = xyes; then :
+   CCSTD="-std=c99"
+else
+
+			CCSTD=""
+
+fi
+
+
+fi
+
+
+fi
+
+
+if test "$CCSTD" = "-std=c11"; then
+	ac_have_atomics=maybe
+
+$as_echo "#define HAVE_C11_COMPILER 1" >>confdefs.h
+
+else
+	ac_have_atomics=no
+fi
+
 if test "$GCC" = "yes"; then
 	if test "$enable_externalcflags" != "yes" ; then
 		if test "$enable_gperftools" = "yes" -o "$enable_debug" = "yes" ; then
-			CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
+			CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG $CCSTD -Wall -Wextra -Wshadow -pedantic -fwrapv"
 		else
-			CFLAGS="-O2 $CFLAGS -g -std=c99 -Wall -Wextra -Wshadow -pedantic -fwrapv"
+			CFLAGS="-O2 $CFLAGS -g $CCSTD -Wall -Wextra -Wshadow -pedantic -fwrapv"
 		fi
 	fi
 	if test "$enable_gperftools" = "yes"; then
@@ -13235,7 +13401,7 @@ case $target_os in
 	bdev=maybe
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -DDEFAULT_SUGID_CLEAR_MODE_EXT"
 	# Check whether exec_prefix=/usr:
-	root_sbindir="${sbindir}"
+	eval root_sbindir="${sbindir}"
 	case $exec_prefix:$prefix in
 	NONE:NONE | NONE:/usr | /usr:*)
 		root_sbindir="/sbin"
@@ -16219,6 +16385,19 @@ fi
 done
 
 
+# check for asprintf
+for ac_func in asprintf
+do :
+  ac_fn_c_check_func "$LINENO" "asprintf" "ac_cv_func_asprintf"
+if test "x$ac_cv_func_asprintf" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_ASPRINTF 1
+_ACEOF
+
+fi
+done
+
+
 
 
 ac_ext=c
@@ -16464,6 +16643,66 @@ $as_echo "#define HAVE___SYNC_FETCH_AND_OP 1" >>confdefs.h
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_have___sync_fetch_and_op" >&5
 $as_echo "$ac_have___sync_fetch_and_op" >&6; }
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for __sync_bool_compare_and_swap" >&5
+$as_echo_n "checking for __sync_bool_compare_and_swap... " >&6; }
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/types.h>
+int
+main ()
+{
+unsigned long long int foo; int i,j; foo = 54; i = __sync_bool_compare_and_swap(&foo,54,7); j = __sync_bool_compare_and_swap(&foo,23,77);
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_have___sync_bool_compare_and_swap=yes
+else
+  ac_have___sync_bool_compare_and_swap=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+if test "$ac_have___sync_bool_compare_and_swap" = "yes" ; then
+
+$as_echo "#define HAVE___SYNC_BOOL_COMPARE_AND_SWAP 1" >>confdefs.h
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_have___sync_bool_compare_and_swap" >&5
+$as_echo "$ac_have___sync_bool_compare_and_swap" >&6; }
+
+if test "$ac_have_atomics" != "no" ; then
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for _Atomic support" >&5
+$as_echo_n "checking for _Atomic support... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <stdatomic.h>
+int
+main ()
+{
+_Atomic unsigned long long int foo; atomic_init(&foo,41); atomic_fetch_add(&foo,1);
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_have_atomics=yes
+else
+  ac_have_atomics=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_have_atomics" >&5
+$as_echo "$ac_have_atomics" >&6; }
+fi
+if test "$ac_have_atomics" = "yes" ; then
+
+$as_echo "#define HAVE_ATOMICS 1" >>confdefs.h
+
+fi
+
+
 
 saved_cflags="$CFLAGS"
 CFLAGS="-Werror"
@@ -16754,81 +16993,103 @@ fi
 
 
 
-# Check whether --enable-generalmans was given.
-if test "${enable_generalmans+set}" = set; then :
-  enableval=$enable_generalmans;
+# Check whether --enable-all was given.
+if test "${enable_all+set}" = set; then :
+  enableval=$enable_all;
 fi
+
+
 
 # Check whether --enable-mfsmaster was given.
 if test "${enable_mfsmaster+set}" = set; then :
   enableval=$enable_mfsmaster;
+else
+  enable_mfsmaster="$enable_all"
 fi
 
 # Check whether --enable-mfsmetalogger was given.
 if test "${enable_mfsmetalogger+set}" = set; then :
   enableval=$enable_mfsmetalogger;
+else
+  enable_mfsmetalogger="$enable_all"
 fi
 
 # Check whether --enable-mfssupervisor was given.
 if test "${enable_mfssupervisor+set}" = set; then :
   enableval=$enable_mfssupervisor;
+else
+  enable_mfssupervisor="$enable_all"
 fi
 
 # Check whether --enable-mfschunkserver was given.
 if test "${enable_mfschunkserver+set}" = set; then :
   enableval=$enable_mfschunkserver;
+else
+  enable_mfschunkserver="$enable_all"
 fi
 
 # Check whether --enable-mfsmount was given.
 if test "${enable_mfsmount+set}" = set; then :
   enableval=$enable_mfsmount;
+else
+  enable_mfsmount="$enable_all"
 fi
 
 # Check whether --enable-mfsbdev was given.
 if test "${enable_mfsbdev+set}" = set; then :
   enableval=$enable_mfsbdev;
+else
+  enable_mfsbdev="$enable_all"
 fi
 
 # Check whether --enable-mfscgi was given.
 if test "${enable_mfscgi+set}" = set; then :
   enableval=$enable_mfscgi;
+else
+  enable_mfscgi="$enable_all"
 fi
 
 # Check whether --enable-mfscli was given.
 if test "${enable_mfscli+set}" = set; then :
   enableval=$enable_mfscli;
+else
+  enable_mfscli="$enable_all"
 fi
 
 # Check whether --enable-mfscgiserv was given.
 if test "${enable_mfscgiserv+set}" = set; then :
   enableval=$enable_mfscgiserv;
+else
+  enable_mfscgiserv="$enable_all"
 fi
 
 # Check whether --enable-mfsnetdump was given.
 if test "${enable_mfsnetdump+set}" = set; then :
   enableval=$enable_mfsnetdump;
+else
+  enable_mfsnetdump="$enable_all"
 fi
 
 
 # Check whether --with-mfscgi-dir was given.
 if test "${with_mfscgi_dir+set}" = set; then :
-  withval=$with_mfscgi_dir; CGIDIR=$withval
+  withval=$with_mfscgi_dir; CGIDIR="${withval}"
 else
-  CGIDIR=$datadir/mfscgi
+  eval eval CGIDIR="${datadir}/mfscgi"
 fi
 
 
 # Check whether --with-mfscgiserv-dir was given.
 if test "${with_mfscgiserv_dir+set}" = set; then :
-  withval=$with_mfscgiserv_dir; CGISERVDIR=$withval
+  withval=$with_mfscgiserv_dir; CGISERVDIR="${withval}"
 else
-  CGISERVDIR=$sbindir
+  eval CGISERVDIR="${sbindir}"
 fi
 
 
 # Check whether --with-zlib was given.
 if test "${with_zlib+set}" = set; then :
-  withval=$with_zlib; use_zlib=$withval
+  withval=$with_zlib; use_zlib="${withval}"
 else
   use_zlib=yes
 fi
@@ -16836,7 +17097,7 @@ fi
 
 # Check whether --with-systemdsystemunitdir was given.
 if test "${with_systemdsystemunitdir+set}" = set; then :
-  withval=$with_systemdsystemunitdir; systemdunitdir=$withval
+  withval=$with_systemdsystemunitdir; systemdunitdir="${withval}"
 fi
 
 
@@ -17137,6 +17398,65 @@ if test "$fuse" != "no" -a "enable_mfsmount" != "no"; then
 	if test -n "$PKG_CONFIG"; then
 
 pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fuse3 >= 3.2.1" >&5
+$as_echo_n "checking for fuse3 >= 3.2.1... " >&6; }
+
+if test -n "$FUSE_CFLAGS"; then
+    pkg_cv_FUSE_CFLAGS="$FUSE_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"fuse3 >= 3.2.1\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "fuse3 >= 3.2.1") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_FUSE_CFLAGS=`$PKG_CONFIG --cflags "fuse3 >= 3.2.1" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$FUSE_LIBS"; then
+    pkg_cv_FUSE_LIBS="$FUSE_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"fuse3 >= 3.2.1\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "fuse3 >= 3.2.1") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_FUSE_LIBS=`$PKG_CONFIG --libs "fuse3 >= 3.2.1" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        FUSE_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "fuse3 >= 3.2.1" 2>&1`
+        else
+	        FUSE_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "fuse3 >= 3.2.1" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$FUSE_PKG_ERRORS" >&5
+
+
+pkg_failed=no
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for fuse >= 2.6" >&5
 $as_echo_n "checking for fuse >= 2.6... " >&6; }
 
@@ -17204,6 +17524,89 @@ else
 	FUSE_LIBS=$pkg_cv_FUSE_LIBS
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
+
+fi
+elif test $pkg_failed = untried; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+pkg_failed=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for fuse >= 2.6" >&5
+$as_echo_n "checking for fuse >= 2.6... " >&6; }
+
+if test -n "$FUSE_CFLAGS"; then
+    pkg_cv_FUSE_CFLAGS="$FUSE_CFLAGS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"fuse >= 2.6\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "fuse >= 2.6") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_FUSE_CFLAGS=`$PKG_CONFIG --cflags "fuse >= 2.6" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+if test -n "$FUSE_LIBS"; then
+    pkg_cv_FUSE_LIBS="$FUSE_LIBS"
+ elif test -n "$PKG_CONFIG"; then
+    if test -n "$PKG_CONFIG" && \
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"fuse >= 2.6\""; } >&5
+  ($PKG_CONFIG --exists --print-errors "fuse >= 2.6") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; then
+  pkg_cv_FUSE_LIBS=`$PKG_CONFIG --libs "fuse >= 2.6" 2>/dev/null`
+		      test "x$?" != "x0" && pkg_failed=yes
+else
+  pkg_failed=yes
+fi
+ else
+    pkg_failed=untried
+fi
+
+
+
+if test $pkg_failed = yes; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+if $PKG_CONFIG --atleast-pkgconfig-version 0.20; then
+        _pkg_short_errors_supported=yes
+else
+        _pkg_short_errors_supported=no
+fi
+        if test $_pkg_short_errors_supported = yes; then
+	        FUSE_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "fuse >= 2.6" 2>&1`
+        else
+	        FUSE_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "fuse >= 2.6" 2>&1`
+        fi
+	# Put the nasty error message in config.log where it belongs
+	echo "$FUSE_PKG_ERRORS" >&5
+
+	fuse=no
+elif test $pkg_failed = untried; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+	fuse=no
+else
+	FUSE_CFLAGS=$pkg_cv_FUSE_CFLAGS
+	FUSE_LIBS=$pkg_cv_FUSE_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+fi
+else
+	FUSE_CFLAGS=$pkg_cv_FUSE_CFLAGS
+	FUSE_LIBS=$pkg_cv_FUSE_LIBS
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_FUSE3 1" >>confdefs.h
 
 fi
 	else
@@ -17390,56 +17793,18 @@ fi
 
 fi
 
-test "$prefix" = "NONE" && prefix=$ac_default_prefix
-test "$exec_prefix" = "NONE" && exec_prefix=$prefix
-eval DATA_PATH=${localstatedir}/mfs
-eval ETC_PATH=${sysconfdir}
-eval BIN_PATH=${bindir}
-eval SBIN_PATH=${sbindir}
-# use system /var/run when using system-wide installation prefix
-if test "${prefix#/usr}" != "${prefix}" -o "${prefix#/opt}" != "${prefix}"; then
-	RUN_PATH=/var/run/mfs
-else
-	RUN_PATH=${prefix}/var/run/mfs
-fi
-
-
-
-
-
-
-cat >>confdefs.h <<_ACEOF
-#define PREFIX "${prefix}"
-_ACEOF
-
-
-cat >>confdefs.h <<_ACEOF
-#define ETC_PATH "$ETC_PATH"
-_ACEOF
-
-
-cat >>confdefs.h <<_ACEOF
-#define DATA_PATH "$DATA_PATH"
-_ACEOF
-
-
-cat >>confdefs.h <<_ACEOF
-#define RUN_PATH "$RUN_PATH"
-_ACEOF
-
-
 DEFAULT_USER=nobody
 DEFAULT_GROUP=
 
 # Check whether --with-default-user was given.
 if test "${with_default_user+set}" = set; then :
-  withval=$with_default_user; DEFAULT_USER=$withval
+  withval=$with_default_user; DEFAULT_USER="${withval}"
 fi
 
 
 # Check whether --with-default-group was given.
 if test "${with_default_group+set}" = set; then :
-  withval=$with_default_group; DEFAULT_GROUP=$withval
+  withval=$with_default_group; DEFAULT_GROUP="${withval}"
 fi
 
 
@@ -17460,13 +17825,13 @@ DEFAULT_MASTERNAME=mfsmaster
 
 # Check whether --with-default-portbase was given.
 if test "${with_default_portbase+set}" = set; then :
-  withval=$with_default_portbase; DEFAULT_PORTBASE=$withval
+  withval=$with_default_portbase; DEFAULT_PORTBASE="${withval}"
 fi
 
 
 # Check whether --with-default-mastername was given.
 if test "${with_default_mastername+set}" = set; then :
-  withval=$with_default_mastername; DEFAULT_MASTERNAME=$withval
+  withval=$with_default_mastername; DEFAULT_MASTERNAME="${withval}"
 fi
 
 DEFAULT_MASTER_CONTROL_PORT=$((DEFAULT_PORTBASE+19))
@@ -17535,6 +17900,7 @@ _ACEOF
 cat >>confdefs.h <<_ACEOF
 #define LIGHT_MFS $LIGHT_MFS
 _ACEOF
+
 
 
 
@@ -19923,3 +20289,51 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
+echo
+echo "Summary:"
+echo
+echo "VERSION / RELEASE / BUILDNO ......... ${PACKAGE_VERSION} / ${release} / ${buildno}"
+echo
+echo "CC .................................. $CC"
+echo "CFLAGS .............................. $CFLAGS"
+echo "CPPFLAGS ............................ $CPPFLAGS"
+echo "PYTHON .............................. $PYTHON"
+echo
+echo "PREFIX .............................. ${prefix}"
+echo "RUN_PATH ............................ $RUN_PATH"
+echo "DATA_PATH ........................... $DATA_PATH"
+echo "ETC_PATH ............................ $ETC_PATH"
+echo "BIN_PATH ............................ $BIN_PATH"
+echo "SBIN_PATH ........................... $SBIN_PATH"
+echo "CGI_PATH ............................ $CGIDIR"
+echo "CGISERV_PATH ........................ $CGISERVDIR"
+echo
+echo "DEFAULT_USER:DEFAULT_GROUP .......... ${DEFAULT_USER}:${DEFAULT_GROUP}"
+echo "MASTER DNS NAME ..................... ${DEFAULT_MASTERNAME}"
+echo "PORTS ............................... ${DEFAULT_MASTER_CONTROL_PORT}:${DEFAULT_MASTER_CS_PORT}:${DEFAULT_MASTER_CLIENT_PORT}:${DEFAULT_CS_DATA_PORT}:${DEFAULT_CGISERV_HTTP_PORT}"
+echo
+if test "$BUILD_MASTER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_MASTER ........................ $RESULT"
+if test "$BUILD_METALOGGER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_METALOGGER .................... $RESULT"
+if test "$BUILD_SUPERVISOR_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_SUPERVISOR .................... $RESULT"
+if test "$BUILD_CHUNKSERVER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_CHUNKSERVER ................... $RESULT"
+if test "$BUILD_NETDUMP_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_NETDUMP ....................... $RESULT"
+if test "$BUILD_SCRIPTS_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_SCRIPTS ....................... $RESULT"
+if test "$INSTALL_CGI_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    CGI ............................. $RESULT"
+if test "$INSTALL_CLI_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    CLI ............................. $RESULT"
+if test "$INSTALL_CGISERV_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    CGISERV ......................... $RESULT"
+if test "$BUILD_CLIENT_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_CLIENT ........................ $RESULT"
+if test "$WITH_MOUNT_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    MOUNT ........................... $RESULT"
+if test "$WITH_BDEV_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    BDEV ............................ $RESULT"
+echo

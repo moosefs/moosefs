@@ -3278,7 +3278,7 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 	 * so can't open it write-only - use read-write instead */
 	if (accmode == O_RDONLY) {
 		fileinfo->mode = IO_READONLY;
-		fileinfo->rdata = read_data_new(inode,fleng);
+		fileinfo->rdata = NULL; // read_data_new(inode,fleng);
 		fileinfo->wdata = NULL;
 	} else {
 		fileinfo->mode = IO_READWRITE;
@@ -3288,12 +3288,12 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 #else
 	if (accmode == O_RDONLY) {
 		fileinfo->mode = IO_READONLY;
-		fileinfo->rdata = read_data_new(inode,fleng);
+		fileinfo->rdata = NULL; // read_data_new(inode,fleng);
 		fileinfo->wdata = NULL;
 	} else if (accmode == O_WRONLY) {
 		fileinfo->mode = IO_WRITEONLY;
 		fileinfo->rdata = NULL;
-		fileinfo->wdata = write_data_new(inode,fleng);
+		fileinfo->wdata = NULL; // write_data_new(inode,fleng);
 	} else {
 		fileinfo->mode = IO_READWRITE;
 		fileinfo->rdata = NULL;

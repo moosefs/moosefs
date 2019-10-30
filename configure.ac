@@ -25,6 +25,29 @@ AC_DEFINE_UNQUOTED([RELEASE], [$release], [Release number])
 AC_DEFINE([VERSION2INT(maj,med,min)], [((maj)*0x10000+(med)*0x100+(((maj)>1)?((min)*2):(min)))], [Version converter from human readable format to binary format used in MFS packets])
 AC_DEFINE_UNQUOTED([VERSSTR], ["${PACKAGE_VERSION}-${release}"], [MFS version - string])
 
+# Define paths
+test "$prefix" = "NONE" && prefix="$ac_default_prefix"
+test "$exec_prefix" = "NONE" && exec_prefix="$prefix"
+eval DATA_PATH="${localstatedir}/mfs"
+eval ETC_PATH="${sysconfdir}"
+eval BIN_PATH="${bindir}"
+eval SBIN_PATH="${sbindir}"
+# use system /var/run when using system-wide installation prefix
+if test "${prefix#/usr}" != "${prefix}" -o "${prefix#/opt}" != "${prefix}"; then
+	RUN_PATH="/var/run/mfs"
+else
+	RUN_PATH="${prefix}/var/run/mfs"
+fi
+AC_SUBST([DATA_PATH])
+AC_SUBST([ETC_PATH])
+AC_SUBST([BIN_PATH])
+AC_SUBST([SBIN_PATH])
+AC_SUBST([RUN_PATH])
+AC_DEFINE_UNQUOTED([PREFIX], ["${prefix}"], [Installation prefix])
+AC_DEFINE_UNQUOTED([ETC_PATH], ["$ETC_PATH"], [Configuration directory])
+AC_DEFINE_UNQUOTED([DATA_PATH], ["$DATA_PATH"], [Data directory])
+AC_DEFINE_UNQUOTED([RUN_PATH], ["$RUN_PATH"], [PID file directory])
+
 # Checks for programs.
 AM_PROG_AR
 AC_PROG_CC(mycc gcc llvm-gcc clang)
@@ -77,7 +100,7 @@ case $target_os in
 	bdev=maybe
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -DDEFAULT_SUGID_CLEAR_MODE_EXT"
 	# Check whether exec_prefix=/usr:
-	root_sbindir="${sbindir}"
+	eval root_sbindir="${sbindir}"
 	case $exec_prefix:$prefix in
 	NONE:NONE | NONE:/usr | /usr:*)
 		root_sbindir="/sbin"
@@ -415,43 +438,67 @@ AC_SUBST([systemdunitdir])
 dnl this is work in progress
 dnl AC_ARG_ENABLE([lightmfs], [AS_HELP_STRING([--enable-lightmfs], [Build special version])])
 
-AC_ARG_ENABLE([generalmans],
-	[AS_HELP_STRING([--disable-general-mans], [Do not install general mans])])
+AC_ARG_ENABLE([all],
+	[AS_HELP_STRING([--disable-all], [By default do not build anything except for manually enabled modules])])
+
+dnl AC_ARG_ENABLE([generalmans],
+dnl	[AS_HELP_STRING([--disable-general-mans], [Do not install general mans])])
+
 AC_ARG_ENABLE([mfsmaster],
-	[AS_HELP_STRING([--disable-mfsmaster], [Do not build mfsmaster])])
+	[AS_HELP_STRING([--disable-mfsmaster], [Do not build mfsmaster])],
+	[],
+	[enable_mfsmaster="$enable_all"])
 AC_ARG_ENABLE([mfsmetalogger],
-	[AS_HELP_STRING([--disable-mfsmetalogger], [Do not build mfsmetalogger])])
+	[AS_HELP_STRING([--disable-mfsmetalogger], [Do not build mfsmetalogger])],
+	[],
+	[enable_mfsmetalogger="$enable_all"])
 AC_ARG_ENABLE([mfssupervisor],
-	[AS_HELP_STRING([--disable-mfssupervisor], [Do not build mfssupervisor])])
+	[AS_HELP_STRING([--disable-mfssupervisor], [Do not build mfssupervisor])],
+	[],
+	[enable_mfssupervisor="$enable_all"])
 AC_ARG_ENABLE([mfschunkserver],
-	[AS_HELP_STRING([--disable-mfschunkserver], [Do not build mfschunkserver])])
+	[AS_HELP_STRING([--disable-mfschunkserver], [Do not build mfschunkserver])],
+	[],
+	[enable_mfschunkserver="$enable_all"])
 AC_ARG_ENABLE([mfsmount],
-	[AS_HELP_STRING([--disable-mfsmount], [Do not build mfsmount])])
+	[AS_HELP_STRING([--disable-mfsmount], [Do not build mfsmount])],
+	[],
+	[enable_mfsmount="$enable_all"])
 AC_ARG_ENABLE([mfsbdev],
-	[AS_HELP_STRING([--disable-mfsbdev], [Do not build mfsbdev])])
+	[AS_HELP_STRING([--disable-mfsbdev], [Do not build mfsbdev])],
+	[],
+	[enable_mfsbdev="$enable_all"])
 AC_ARG_ENABLE([mfscgi],
-	[AS_HELP_STRING([--disable-mfscgi], [Do not install CGI scripts])])
+	[AS_HELP_STRING([--disable-mfscgi], [Do not install CGI scripts])],
+	[],
+	[enable_mfscgi="$enable_all"])
 AC_ARG_ENABLE([mfscli],
-	[AS_HELP_STRING([--disable-mfscli], [Do not install CLI script])])
+	[AS_HELP_STRING([--disable-mfscli], [Do not install CLI script])],
+	[],
+	[enable_mfscli="$enable_all"])
 AC_ARG_ENABLE([mfscgiserv],
-	[AS_HELP_STRING([--disable-mfscgiserv], [Do not install CGI server])])
+	[AS_HELP_STRING([--disable-mfscgiserv], [Do not install CGI server])],
+	[],
+	[enable_mfscgiserv="$enable_all"])
 AC_ARG_ENABLE([mfsnetdump],
-	[AS_HELP_STRING([--disable-mfsnetdump], [Do not build mfsnetdump])])
+	[AS_HELP_STRING([--disable-mfsnetdump], [Do not build mfsnetdump])],
+	[],
+	[enable_mfsnetdump="$enable_all"])
 AC_ARG_WITH([mfscgi-dir],
 	[AS_HELP_STRING([--with-mfscgi-dir=CGIDIR], [Choose CGI directory (default=DATADIR/mfscgi)])],
-	[CGIDIR=$withval],
-	[CGIDIR=$datadir/mfscgi])
+	[CGIDIR="${withval}"],
+	[eval eval CGIDIR="${datadir}/mfscgi"])
 AC_ARG_WITH([mfscgiserv-dir],
 	[AS_HELP_STRING([--with-mfscgiserv-dir=CGISERVDIR], [Choose CGI directory (default=SBINDIR)])],
-	[CGISERVDIR=$withval],
-	[CGISERVDIR=$sbindir])
+	[CGISERVDIR="${withval}"],
+	[eval CGISERVDIR="${sbindir}"])
 AC_ARG_WITH([zlib],
 	[AS_HELP_STRING([--without-zlib], [Do not use zlib for PNG compression])],
-	[use_zlib=$withval],
+	[use_zlib="${withval}"],
 	[use_zlib=yes])
 AC_ARG_WITH([systemdsystemunitdir],
 	[AS_HELP_STRING([--with-systemdsystemunitdir=PATH], [Path to install systemd units (no=omit)])],
-	[systemdunitdir=$withval])
+	[systemdunitdir="${withval}"])
 
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 
@@ -578,36 +625,14 @@ if test "$use_zlib" = "yes"; then
 	AC_SUBST([ZLIB_LIBS])
 fi
 
-test "$prefix" = "NONE" && prefix=$ac_default_prefix
-test "$exec_prefix" = "NONE" && exec_prefix=$prefix
-eval DATA_PATH=${localstatedir}/mfs
-eval ETC_PATH=${sysconfdir}
-eval BIN_PATH=${bindir}
-eval SBIN_PATH=${sbindir}
-# use system /var/run when using system-wide installation prefix
-if test "${prefix#/usr}" != "${prefix}" -o "${prefix#/opt}" != "${prefix}"; then
-	RUN_PATH=/var/run/mfs
-else
-	RUN_PATH=${prefix}/var/run/mfs
-fi
-AC_SUBST([DATA_PATH])
-AC_SUBST([ETC_PATH])
-AC_SUBST([BIN_PATH])
-AC_SUBST([SBIN_PATH])
-AC_SUBST([RUN_PATH])
-AC_DEFINE_UNQUOTED([PREFIX], ["${prefix}"], [Installation prefix])
-AC_DEFINE_UNQUOTED([ETC_PATH], ["$ETC_PATH"], [Configuration directory])
-AC_DEFINE_UNQUOTED([DATA_PATH], ["$DATA_PATH"], [Data directory])
-AC_DEFINE_UNQUOTED([RUN_PATH], ["$RUN_PATH"], [PID file directory])
-
 DEFAULT_USER=nobody
 DEFAULT_GROUP=
 AC_ARG_WITH([default-user],
 	[AS_HELP_STRING([--with-default-user=USER], [Choose default user to run daemons as])],
-	[DEFAULT_USER=$withval])
+	[DEFAULT_USER="${withval}"])
 AC_ARG_WITH([default-group],
 	[AS_HELP_STRING([--with-default-group=GROUP], [Choose default group to run daemons as])],
-	[DEFAULT_GROUP=$withval])
+	[DEFAULT_GROUP="${withval}"])
 AC_DEFINE_UNQUOTED([DEFAULT_USER], ["$DEFAULT_USER"], [Default working user])
 AC_DEFINE_UNQUOTED([DEFAULT_GROUP], ["$DEFAULT_GROUP"], [Default working group])
 AC_SUBST([DEFAULT_USER])
@@ -617,10 +642,10 @@ DEFAULT_PORTBASE=9400
 DEFAULT_MASTERNAME=mfsmaster
 AC_ARG_WITH([default-portbase],
 	[AS_HELP_STRING([--with-default-portbase=NUMBER], [Default communiaction port base (default=9400, which means ports 9419,9420,etc.)])],
-	[DEFAULT_PORTBASE=$withval])
+	[DEFAULT_PORTBASE="${withval}"])
 AC_ARG_WITH([default-mastername],
 	[AS_HELP_STRING([--with-default-mastername=MASTER_DNS_NAME], [Defines default DNS name pointing to all masters (default=mfsmaster)])],
-	[DEFAULT_MASTERNAME=$withval])
+	[DEFAULT_MASTERNAME="${withval}"])
 DEFAULT_MASTER_CONTROL_PORT=$((DEFAULT_PORTBASE+19))
 DEFAULT_MASTER_CS_PORT=$((DEFAULT_PORTBASE+20))
 DEFAULT_MASTER_CLIENT_PORT=$((DEFAULT_PORTBASE+21))
@@ -685,3 +710,51 @@ AC_CONFIG_FILES([Makefile
 		systemd/moosefs-metalogger@.service
 ])
 AC_OUTPUT
+echo
+echo "Summary:"
+echo
+echo "VERSION / RELEASE ................... ${PACKAGE_VERSION} / ${release}"
+echo
+echo "CC .................................. $CC"
+echo "CFLAGS .............................. $CFLAGS"
+echo "CPPFLAGS ............................ $CPPFLAGS"
+echo "PYTHON .............................. $PYTHON"
+echo
+echo "PREFIX .............................. ${prefix}"
+echo "RUN_PATH ............................ $RUN_PATH"
+echo "DATA_PATH ........................... $DATA_PATH"
+echo "ETC_PATH ............................ $ETC_PATH"
+echo "BIN_PATH ............................ $BIN_PATH"
+echo "SBIN_PATH ........................... $SBIN_PATH"
+echo "CGI_PATH ............................ $CGIDIR"
+echo "CGISERV_PATH ........................ $CGISERVDIR"
+echo
+echo "DEFAULT_USER:DEFAULT_GROUP .......... ${DEFAULT_USER}:${DEFAULT_GROUP}"
+echo "MASTER DNS NAME ..................... ${DEFAULT_MASTERNAME}"
+echo "PORTS ............................... ${DEFAULT_MASTER_CONTROL_PORT}:${DEFAULT_MASTER_CS_PORT}:${DEFAULT_MASTER_CLIENT_PORT}:${DEFAULT_CS_DATA_PORT}:${DEFAULT_CGISERV_HTTP_PORT}"
+echo
+if test "$BUILD_MASTER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_MASTER ........................ $RESULT"
+if test "$BUILD_METALOGGER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_METALOGGER .................... $RESULT"
+if test "$BUILD_SUPERVISOR_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_SUPERVISOR .................... $RESULT"
+if test "$BUILD_CHUNKSERVER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_CHUNKSERVER ................... $RESULT"
+if test "$BUILD_NETDUMP_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_NETDUMP ....................... $RESULT"
+if test "$BUILD_SCRIPTS_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_SCRIPTS ....................... $RESULT"
+if test "$INSTALL_CGI_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    CGI ............................. $RESULT"
+if test "$INSTALL_CLI_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    CLI ............................. $RESULT"
+if test "$INSTALL_CGISERV_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    CGISERV ......................... $RESULT"
+if test "$BUILD_CLIENT_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_CLIENT ........................ $RESULT"
+if test "$WITH_MOUNT_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    MOUNT ........................... $RESULT"
+if test "$WITH_BDEV_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "    BDEV ............................ $RESULT"
+echo

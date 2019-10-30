@@ -18,6 +18,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) changed prefered C standard from C99 to C11 and added tests for atomics
   - (mount) move read/write structures initialization from open to read/write
   - (mount,mfsio) added new inode->fleng map
+  - (configure) added option disable_all, added summary at the end
 
 * MooseFS 3.0.106-1 (2019-08-27)
 

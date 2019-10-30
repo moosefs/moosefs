@@ -109,7 +109,7 @@ const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 #define DEFAULT_OPTIONS "allow_other"
 #endif
 
-#if FUSE_VERSION >= 30 || defined(__APPLE__)
+#if FUSE_VERSION >= 30 || defined(__APPLE__) || defined(__FreeBSD__)
 #define FUSE_ALLOWS_NOT_EMPTY_DIRS 1
 #endif
 
@@ -733,6 +733,7 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 		conn->want &= ~FUSE_CAP_POSIX_LOCKS;
 	}
 #endif
+	conn->want &= conn->capable; // we don't want to request things that kernel can't do
 //	conn->max_background - leave default
 //	conn->congestion_threshold - leave default
 	conn->time_gran = 1000000000;

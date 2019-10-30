@@ -2429,7 +2429,7 @@ void matoclserv_fuse_mkdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 }
 
 void matoclserv_fuse_unlink(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t inode,uid,gids;
+	uint32_t inode,uid,gids,uinode;
 	uint32_t *gid;
 	uint32_t i;
 	uint8_t nleng;
@@ -2470,15 +2470,21 @@ void matoclserv_fuse_unlink(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_unlink(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_UNLINK,5);
-	put32bit(&ptr,msgid);
-	put8bit(&ptr,status);
+	status = fs_unlink(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,&uinode);
+	if (((eptr->version>=VERSION2INT(3,0,107) && eptr->version<VERSION2INT(4,0,0)) || eptr->version>=VERSION2INT(4,18,0)) && status==MFS_STATUS_OK) {
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_UNLINK,8);
+		put32bit(&ptr,msgid);
+		put32bit(&ptr,uinode);
+	} else {
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_UNLINK,5);
+		put32bit(&ptr,msgid);
+		put8bit(&ptr,status);
+	}
 	sessions_inc_stats(eptr->sesdata,9);
 }
 
 void matoclserv_fuse_rmdir(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
-	uint32_t inode,uid,gids;
+	uint32_t inode,uid,gids,uinode;
 	uint32_t *gid;
 	uint32_t i;
 	uint8_t nleng;
@@ -2519,10 +2525,16 @@ void matoclserv_fuse_rmdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_rmdir(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid);
-	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RMDIR,5);
-	put32bit(&ptr,msgid);
-	put8bit(&ptr,status);
+	status = fs_rmdir(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,&uinode);
+	if (((eptr->version>=VERSION2INT(3,0,107) && eptr->version<VERSION2INT(4,0,0)) || eptr->version>=VERSION2INT(4,18,0)) && status==MFS_STATUS_OK) {
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RMDIR,5);
+		put32bit(&ptr,msgid);
+		put32bit(&ptr,uinode);
+	} else {
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RMDIR,5);
+		put32bit(&ptr,msgid);
+		put8bit(&ptr,status);
+	}
 	sessions_inc_stats(eptr->sesdata,5);
 }
 

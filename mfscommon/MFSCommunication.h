@@ -1064,6 +1064,8 @@
 // 0x01A5
 #define MATOCL_FUSE_UNLINK (PROTO_BASE+421)
 // msgid:32 status:8
+// since 3.0.107 (after succesful remove):
+// msgid:32 inode:32
 
 // 0x01A6
 #define CLTOMA_FUSE_RMDIR (PROTO_BASE+422)
@@ -1073,6 +1075,8 @@
 // 0x01A7
 #define MATOCL_FUSE_RMDIR (PROTO_BASE+423)
 // msgid:32 status:8
+// since 3.0.107 (after succesful remove):
+// msgid:32 inode:32
 
 // 0x01A8
 #define CLTOMA_FUSE_RENAME (PROTO_BASE+424)

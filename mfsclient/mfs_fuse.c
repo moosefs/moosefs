@@ -2051,7 +2051,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 	}
 */
 	status = EINVAL;
+#if defined(FUSE_SET_ATTR_ATIME_NOW) && defined(FUSE_SET_ATTR_MTIME_NOW)
+	if ((to_set & (FUSE_SET_ATTR_MODE|FUSE_SET_ATTR_UID|FUSE_SET_ATTR_GID|FUSE_SET_ATTR_ATIME|FUSE_SET_ATTR_MTIME|FUSE_SET_ATTR_SIZE|FUSE_SET_ATTR_ATIME_NOW|FUSE_SET_ATTR_MTIME_NOW)) == 0) {
+#else
 	if ((to_set & (FUSE_SET_ATTR_MODE|FUSE_SET_ATTR_UID|FUSE_SET_ATTR_GID|FUSE_SET_ATTR_ATIME|FUSE_SET_ATTR_MTIME|FUSE_SET_ATTR_SIZE)) == 0) {	// change other flags or change nothing
+#endif
 //		status = fs_getattr(ino,ctx.uid,ctx.gid,attr);
 		// ext3 compatibility - change ctime during this operation (usually chown(-1,-1))
 		if (full_permissions) {
@@ -2061,72 +2065,6 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		} else {
 			uint32_t gidtmp = ctx.gid;
 			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,1,&gidtmp,0,0,0,0,0,0,0,0,attr);
-		}
-		if (status==MFS_ERROR_ENOENT) {
-			status = sstats_get(ino,attr,0);
-			if (status==MFS_STATUS_OK) {
-				mfs_attr_modify(to_set,attr,stbuf);
-			}
-		}
-		if (status==MFS_STATUS_OK) {
-			sstats_set(ino,attr,0);
-		}
-		status = mfs_errorconv(status);
-		if (status!=0) {
-			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
-			fuse_reply_err(req, status);
-			return;
-		}
-	}
-	if (to_set & (FUSE_SET_ATTR_MODE|FUSE_SET_ATTR_UID|FUSE_SET_ATTR_GID|FUSE_SET_ATTR_ATIME|FUSE_SET_ATTR_MTIME)) {
-		uint32_t masterversion = master_version();
-//#if !(defined(FUSE_SET_ATTR_ATIME_NOW) && defined(FUSE_SET_ATTR_MTIME_NOW))
-//		time_t now = time(NULL);
-//#endif
-		setmask = 0;
-		if (to_set & FUSE_SET_ATTR_MODE) {
-			setmask |= SET_MODE_FLAG;
-			if (no_xattrs==0 && xattr_cache_on) {
-				xattr_cache_del(ino,6+1+5+1+3+1+6,(const uint8_t*)"system.posix_acl_access");
-			}
-		}
-		if (to_set & FUSE_SET_ATTR_UID) {
-			setmask |= SET_UID_FLAG;
-		}
-		if (to_set & FUSE_SET_ATTR_GID) {
-			setmask |= SET_GID_FLAG;
-		}
-#if defined(FUSE_SET_ATTR_ATIME_NOW)
-		if (((to_set & FUSE_SET_ATTR_ATIME_NOW) || ((to_set & FUSE_SET_ATTR_ATIME) && stbuf->st_atime<0)) && masterversion>=VERSION2INT(2,1,13)) {
-#else
-		if ((to_set & FUSE_SET_ATTR_ATIME) && stbuf->st_atime<0 && masterversion>=VERSION2INT(2,1,13)) {
-#endif
-			setmask |= SET_ATIME_NOW_FLAG;
-		} else if (to_set & FUSE_SET_ATTR_ATIME) {
-			setmask |= SET_ATIME_FLAG;
-		}
-#if defined(FUSE_SET_ATTR_MTIME_NOW)
-		if (((to_set & FUSE_SET_ATTR_MTIME_NOW) || ((to_set & FUSE_SET_ATTR_MTIME) && stbuf->st_mtime<0)) && masterversion>=VERSION2INT(2,1,13)) {
-#else
-		if ((to_set & FUSE_SET_ATTR_MTIME) && stbuf->st_mtime<0 && masterversion>=VERSION2INT(2,1,13)) {
-#endif
-			setmask |= SET_MTIME_NOW_FLAG;
-		} else if (to_set & FUSE_SET_ATTR_MTIME) {
-			setmask |= SET_MTIME_FLAG;
-		}
-		if (setmask & (SET_ATIME_NOW_FLAG|SET_ATIME_FLAG)) {
-			fs_no_atime(ino);
-		}
-		if (setmask & (SET_MTIME_NOW_FLAG|SET_MTIME_FLAG)) {
-			fs_no_mtime(ino);
-		}
-		if (full_permissions) {
-			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,gids->gidcnt,gids->gidtab,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,0,sugid_clear_mode,attr);
-			groups_rel(gids);
-		} else {
-			uint32_t gidtmp = ctx.gid;
-			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,1,&gidtmp,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,0,sugid_clear_mode,attr);
 		}
 		if (status==MFS_ERROR_ENOENT) {
 			status = sstats_get(ino,attr,0);
@@ -2213,6 +2151,76 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		finfo_change_fleng(ino,stbuf->st_size);
 		write_data_inode_setmaxfleng(ino,stbuf->st_size);
 		read_inode_set_length_active(ino,stbuf->st_size);
+	}
+#if defined(FUSE_SET_ATTR_ATIME_NOW) && defined(FUSE_SET_ATTR_MTIME_NOW)
+	if (to_set & (FUSE_SET_ATTR_MODE|FUSE_SET_ATTR_UID|FUSE_SET_ATTR_GID|FUSE_SET_ATTR_ATIME|FUSE_SET_ATTR_MTIME|FUSE_SET_ATTR_ATIME_NOW|FUSE_SET_ATTR_MTIME_NOW)) {
+#else
+	if (to_set & (FUSE_SET_ATTR_MODE|FUSE_SET_ATTR_UID|FUSE_SET_ATTR_GID|FUSE_SET_ATTR_ATIME|FUSE_SET_ATTR_MTIME)) {
+#endif
+		uint32_t masterversion = master_version();
+//#if !(defined(FUSE_SET_ATTR_ATIME_NOW) && defined(FUSE_SET_ATTR_MTIME_NOW))
+//		time_t now = time(NULL);
+//#endif
+		setmask = 0;
+		if (to_set & FUSE_SET_ATTR_MODE) {
+			setmask |= SET_MODE_FLAG;
+			if (no_xattrs==0 && xattr_cache_on) {
+				xattr_cache_del(ino,6+1+5+1+3+1+6,(const uint8_t*)"system.posix_acl_access");
+			}
+		}
+		if (to_set & FUSE_SET_ATTR_UID) {
+			setmask |= SET_UID_FLAG;
+		}
+		if (to_set & FUSE_SET_ATTR_GID) {
+			setmask |= SET_GID_FLAG;
+		}
+#if defined(FUSE_SET_ATTR_ATIME_NOW)
+		if (((to_set & FUSE_SET_ATTR_ATIME_NOW) || ((to_set & FUSE_SET_ATTR_ATIME) && stbuf->st_atime<0)) && masterversion>=VERSION2INT(2,1,13)) {
+#else
+		if ((to_set & FUSE_SET_ATTR_ATIME) && stbuf->st_atime<0 && masterversion>=VERSION2INT(2,1,13)) {
+#endif
+			setmask |= SET_ATIME_NOW_FLAG;
+		} else if (to_set & FUSE_SET_ATTR_ATIME) {
+			setmask |= SET_ATIME_FLAG;
+		}
+#if defined(FUSE_SET_ATTR_MTIME_NOW)
+		if (((to_set & FUSE_SET_ATTR_MTIME_NOW) || ((to_set & FUSE_SET_ATTR_MTIME) && stbuf->st_mtime<0)) && masterversion>=VERSION2INT(2,1,13)) {
+#else
+		if ((to_set & FUSE_SET_ATTR_MTIME) && stbuf->st_mtime<0 && masterversion>=VERSION2INT(2,1,13)) {
+#endif
+			setmask |= SET_MTIME_NOW_FLAG;
+		} else if (to_set & FUSE_SET_ATTR_MTIME) {
+			setmask |= SET_MTIME_FLAG;
+		}
+		if (setmask & (SET_ATIME_NOW_FLAG|SET_ATIME_FLAG)) {
+			fs_no_atime(ino);
+		}
+		if (setmask & (SET_MTIME_NOW_FLAG|SET_MTIME_FLAG)) {
+			fs_no_mtime(ino);
+		}
+		if (full_permissions) {
+			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,gids->gidcnt,gids->gidtab,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,0,sugid_clear_mode,attr);
+			groups_rel(gids);
+		} else {
+			uint32_t gidtmp = ctx.gid;
+			status = fs_setattr(ino,(fi!=NULL)?1:0,ctx.uid,1,&gidtmp,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,0,sugid_clear_mode,attr);
+		}
+		if (status==MFS_ERROR_ENOENT) {
+			status = sstats_get(ino,attr,0);
+			if (status==MFS_STATUS_OK) {
+				mfs_attr_modify(to_set,attr,stbuf);
+			}
+		}
+		if (status==MFS_STATUS_OK) {
+			sstats_set(ino,attr,0);
+		}
+		status = mfs_errorconv(status);
+		if (status!=0) {
+			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+			fuse_reply_err(req, status);
+			return;
+		}
 	}
 	if (status!=0) {	// should never happened but better check than sorry
 		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
@@ -2334,6 +2342,7 @@ void mfs_mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode,
 
 void mfs_unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	uint32_t nleng;
+	uint32_t inode;
 	int status;
 	struct fuse_ctx ctx;
 	groups *gids;
@@ -2361,11 +2370,11 @@ void mfs_unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
 	if (full_permissions) {
 		gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-		status = fs_unlink(parent,nleng,(const uint8_t*)name,ctx.uid,gids->gidcnt,gids->gidtab);
+		status = fs_unlink(parent,nleng,(const uint8_t*)name,ctx.uid,gids->gidcnt,gids->gidtab,&inode);
 		groups_rel(gids);
 	} else {
 		uint32_t gidtmp = ctx.gid;
-		status = fs_unlink(parent,nleng,(const uint8_t*)name,ctx.uid,1,&gidtmp);
+		status = fs_unlink(parent,nleng,(const uint8_t*)name,ctx.uid,1,&gidtmp,&inode);
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {
@@ -2376,6 +2385,7 @@ void mfs_unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //		if (newdircache) {
 //			dir_cache_unlink(parent,nleng,(const uint8_t*)name);
 //		}
+		fdcache_invalidate(inode);
 		dcache_invalidate_attr(parent);
 		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
 		oplog_printf(&ctx,"unlink (%lu,%s): OK",(unsigned long int)parent,name);
@@ -2463,6 +2473,7 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 
 void mfs_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	uint32_t nleng;
+	uint32_t inode;
 	int status;
 	struct fuse_ctx ctx;
 	groups *gids;
@@ -2489,17 +2500,18 @@ void mfs_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
 
 	if (full_permissions) {
 		gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-		status = fs_rmdir(parent,nleng,(const uint8_t*)name,ctx.uid,gids->gidcnt,gids->gidtab);
+		status = fs_rmdir(parent,nleng,(const uint8_t*)name,ctx.uid,gids->gidcnt,gids->gidtab,&inode);
 		groups_rel(gids);
 	} else {
 		uint32_t gidtmp = ctx.gid;
-		status = fs_rmdir(parent,nleng,(const uint8_t*)name,ctx.uid,1,&gidtmp);
+		status = fs_rmdir(parent,nleng,(const uint8_t*)name,ctx.uid,1,&gidtmp,&inode);
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {
 		oplog_printf(&ctx,"rmdir (%lu,%s): %s",(unsigned long int)parent,name,strerr(status));
 		fuse_reply_err(req, status);
 	} else {
+		(void)inode; // for future use
 		negentry_cache_insert(parent,nleng,(const uint8_t*)name);
 //		if (newdircache) {
 //			dir_cache_unlink(parent,nleng,(const uint8_t*)name);

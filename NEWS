@@ -10,10 +10,11 @@ This file lists noteworthy changes in MooseFS.
   - (client) fixed NOP flooding in write module
   - (cs) fixed race condition in bgjobs module (jobhash)
   - (cs+mount) added new status returned to mount when queue is full and support for it in client module
-  - (mount) added initial support for libfuse3
-  - (mount) added support for readdirplus
-  - (mount) workaround for bug in fuse (wrong lock_owner in flush)
+  - (mount) added initial support for libfuse3 (related to issue #302)
+  - (mount) added support for readdirplus (related to issue #302)
+  - (mount) workaround for bug in fuse (wrong lock_owner in flush - issue #305)
   - (mount) fixed deadlock in readdata.c (closes issue #306)
+  - (mount+master) fixed few small issues related to POSIX compliance (checked by pjd)
 
 * MooseFS 3.0.106-1 (2019-08-27)
 

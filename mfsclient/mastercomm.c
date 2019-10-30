@@ -3335,7 +3335,7 @@ uint8_t fs_mkdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mode
 	return ret;
 }
 
-uint8_t fs_unlink(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid) {
+uint8_t fs_unlink(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -3378,6 +3378,10 @@ uint8_t fs_unlink(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid
 		ret = MFS_ERROR_IO;
 	} else if (i==1) {
 		ret = rptr[0];
+		*inode = 0;
+	} else if (i==4) {
+		ret = MFS_STATUS_OK;
+		*inode = get32bit(&rptr);
 	} else {
 		fs_disconnect();
 		ret = MFS_ERROR_IO;
@@ -3385,7 +3389,7 @@ uint8_t fs_unlink(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid
 	return ret;
 }
 
-uint8_t fs_rmdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid) {
+uint8_t fs_rmdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
@@ -3428,6 +3432,10 @@ uint8_t fs_rmdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,
 		ret = MFS_ERROR_IO;
 	} else if (i==1) {
 		ret = rptr[0];
+		*inode = 0;
+	} else if (i==4) {
+		ret = MFS_STATUS_OK;
+		*inode = get32bit(&rptr);
 	} else {
 		fs_disconnect();
 		ret = MFS_ERROR_IO;

@@ -2176,7 +2176,9 @@ static inline void fsnodes_fill_attr(fsnode *node,fsnode *parent,uint32_t uid,ui
 		 * 3001298 =  12.98 GB
 		 * 4001401 =  14.01 TB
 		 */
-		if (dleng<UINT64_C(0x400)) {
+		if (dleng==0) { // never return size 0 for directories
+			dleng = 1;
+		} else if (dleng<UINT64_C(0x400)) {
 			dleng *= 100;
 		} else if (dleng<UINT64_C(0x100000)) {
 			dleng *= 100;
@@ -5218,12 +5220,12 @@ uint8_t fs_univ_unlink(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_unlink(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid) {
-	return fs_univ_unlink(main_time(),rootinode,sesflags,parent,nleng,name,uid,gids,gid,0,NULL);
+uint8_t fs_unlink(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode) {
+	return fs_univ_unlink(main_time(),rootinode,sesflags,parent,nleng,name,uid,gids,gid,0,inode);
 }
 
-uint8_t fs_rmdir(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid) {
-	return fs_univ_unlink(main_time(),rootinode,sesflags,parent,nleng,name,uid,gids,gid,1,NULL);
+uint8_t fs_rmdir(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode) {
+	return fs_univ_unlink(main_time(),rootinode,sesflags,parent,nleng,name,uid,gids,gid,1,inode);
 }
 
 uint8_t fs_mr_unlink(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *name,uint32_t inode) {

@@ -704,7 +704,7 @@ int mfs_unlink(const char *path) {
 		return -1;
 	}
 	mfs_get_credentials(&cr);
-	status = fs_unlink(parent,nleng,(const uint8_t*)name,cr.uid,cr.gidcnt,cr.gidtab);
+	status = fs_unlink(parent,nleng,(const uint8_t*)name,cr.uid,cr.gidcnt,cr.gidtab,&inode);
 	if (status!=MFS_STATUS_OK) {
 		errno = mfs_errorconv(status);
 		return -1;
@@ -746,7 +746,7 @@ int mfs_rmdir(const char *path) {
 		return -1;
 	}
 	mfs_get_credentials(&cr);
-	status = fs_rmdir(parent,nleng,(const uint8_t*)name,cr.uid,cr.gidcnt,cr.gidtab);
+	status = fs_rmdir(parent,nleng,(const uint8_t*)name,cr.uid,cr.gidcnt,cr.gidtab,&inode);
 	if (status!=MFS_STATUS_OK) {
 		errno = mfs_errorconv(status);
 		return -1;

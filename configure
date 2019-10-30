@@ -17110,7 +17110,8 @@ else
 fi
 
 
-for ac_prog in python3 python2 python
+if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then
+	for ac_prog in python3 python2 python python3.7 python3.6 python3.5 python3.4 python2.7
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
@@ -17153,13 +17154,14 @@ fi
 done
 test -n "$PYTHON" || PYTHON="na"
 
-if test "$PYTHON" = na; then
-	PYTHON = "python"
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: Python binary not found !!!" >&5
-$as_echo "Python binary not found !!!" >&6; }
-else
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: Python binary for script shebangs: $PYTHON" >&5
+	if test "$PYTHON" = na; then
+		PYTHON="python"
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: Python binary not found !!! - using default in shebangs" >&5
+$as_echo "Python binary not found !!! - using default in shebangs" >&6; }
+	else
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: Python binary for script shebangs: $PYTHON" >&5
 $as_echo "Python binary for script shebangs: $PYTHON" >&6; }
+	fi
 fi
 
  if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then

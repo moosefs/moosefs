@@ -504,12 +504,14 @@ AC_ARG_WITH([systemdsystemunitdir],
 
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 
-AC_CHECK_PROGS(PYTHON, [python3 python2 python], [na])
-if test "$PYTHON" = na; then
-	PYTHON = "python"
-	AC_MSG_RESULT([Python binary not found !!!])
-else
-	AC_MSG_RESULT([Python binary for script shebangs: $PYTHON])
+if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then
+	AC_CHECK_PROGS(PYTHON, [python3 python2 python python3.7 python3.6 python3.5 python3.4 python2.7], [na])
+	if test "$PYTHON" = na; then
+		PYTHON="python"
+		AC_MSG_RESULT([Python binary not found !!! - using default in shebangs])
+	else
+		AC_MSG_RESULT([Python binary for script shebangs: $PYTHON])
+	fi
 fi
 
 dnl AX_PYTHON

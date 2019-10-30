@@ -18,6 +18,10 @@
 %define _groupname	mfs
 %define _username	mfs
 
+%define rpm_maj_v %(eval "rpm --version | cut -d' ' -f3 | cut -d'.' -f1")
+%define rpm_min_v %(eval "rpm --version | cut -d' ' -f3 | cut -d'.' -f2")
+%define rpm_has_bool_ops %(eval "if [ %{rpm_maj_v} -ge 5 -o %{rpm_maj_v} -ge 4 -a %{rpm_min_v} -ge 13 ]; then echo 1; else echo 0; fi")
+
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
 Version:	3.0.106
@@ -26,12 +30,21 @@ License:	commercial
 Group:		System Environment/Daemons
 URL:		http://www.moosefs.com/
 Source0:	%{name}-%{version}.tar.gz
+%if %{rpm_has_bool_ops}
+BuildRequires:	(fuse-devel or fuse3-devel >= 3.2.1)
+%else
 BuildRequires:	fuse-devel
+%endif
 BuildRequires:	pkgconfig
 BuildRequires:	zlib-devel
 BuildRequires:	libpcap-devel
+%if %{rpm_has_bool_ops}
+BuildRequires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
+%else
+BuildRequires:	python
+%endif
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-Requires(pre):  shadow-utils
+Requires(pre):	shadow-utils
 
 
 %define		_localstatedir	/var/lib

@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.107-1 (2019-10-30)
+* MooseFS 3.0.107-1 (2019-11-04)
 
   - (master) added NOP command to changelog
   - (master+supervisor) added time check
@@ -19,6 +19,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) move read/write structures initialization from open to read/write
   - (mount,mfsio) added new inode->fleng map
   - (configure) added option disable_all, added summary at the end
+  - (freebsd) detecting new fuse version in the kernel and adjusting behaviour
 
 * MooseFS 3.0.106-1 (2019-08-27)
 

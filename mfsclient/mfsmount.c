@@ -392,7 +392,7 @@ static void usage(const char *progname) {
 	fprintf(fd,"    -o mfssugidclearmode=SMODE  set sugid clear mode (see below ; default: NEVER)\n");
 #endif
 #if defined(__FreeBSD__)
-	fprintf(fd,"    -o mfscachemode=CMODE       set cache mode (see below ; default: DIRECT)\n");
+	fprintf(fd,"    -o mfscachemode=CMODE       set cache mode (see below ; default: FBSDAUTO)\n");
 #else
 	fprintf(fd,"    -o mfscachemode=CMODE       set cache mode (see below ; default: AUTO)\n");
 #endif
@@ -762,6 +762,13 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	}
 #endif
 #endif /* FUSE2/3 */
+#if defined(__FreeBSD__)
+	if (conn->proto_major>7 || (conn->proto_major==7 && conn->proto_minor>=23)) { // This is "New" Fuse introduced in FBSD 12.1 with many fixes - we want to change our default behaviour
+		mfs_freebsd_workarounds(0);
+	} else {
+		mfs_freebsd_workarounds(1);
+	}
+#endif
 	if (piped[1]>=0) {
 		s=0;
 		if (write(piped[1],&s,1)!=1) {
@@ -837,6 +844,7 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 			(mfsopts.keepcache==1)?"YES":
 			(mfsopts.keepcache==2)?"NO":
 			(mfsopts.keepcache==3)?"DIRECT":
+			(mfsopts.keepcache==4)?"FBSDAUTO":
 			"(unknown value)");
 	DIRECTOPT("working_sugid_clear_mode",
 			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_NEVER)?"NEVER":
@@ -1700,7 +1708,7 @@ int main(int argc, char *argv[]) {
 
 	if (mfsopts.cachemode==NULL) {
 #if defined(__FreeBSD__)
-		mfsopts.keepcache = 3;
+		mfsopts.keepcache = 4;
 #else
 		mfsopts.keepcache = (mfsopts.cachefiles)?1:0;
 #endif
@@ -1712,6 +1720,10 @@ int main(int argc, char *argv[]) {
 		mfsopts.keepcache=2;
 	} else if (strcasecmp(mfsopts.cachemode,"DIRECT")==0) {
 		mfsopts.keepcache=3;
+#if defined(__FreeBSD__)
+	} else if (strcasecmp(mfsopts.cachemode,"FBSDAUTO")==0) {
+		mfsopts.keepcache=4;
+#endif
 	} else {
 		fprintf(stderr,"unrecognized cachemode option\nsee: %s -h for help\n",argv[0]);
 		return 1;

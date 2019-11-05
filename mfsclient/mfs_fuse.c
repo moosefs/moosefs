@@ -101,8 +101,8 @@
 #endif
 
 #if defined(__FreeBSD__)
+static int freebsd_workarounds = 1;
 // workaround for bug in FreeBSD Fuse version (kernel part)
-#  define FREEBSD_FALSE_TRUNCATE_WORKAROUND 1
 #  define FREEBSD_DELAYED_RELEASE 1
 #  define FREEBSD_RELEASE_DELAY 10.0
 #endif
@@ -2091,10 +2091,14 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
 			trycnt = 0;
 			while (1) {
-#ifdef FREEBSD_FALSE_TRUNCATE_WORKAROUND
-				status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
-#else
+#if defined(__FreeBSD__)
+				if (freebsd_workarounds) {
+					status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
+				} else {
+#endif
 				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
+#if defined(__FreeBSD__)
+				}
 #endif
 				if (status==MFS_STATUS_OK || status==MFS_ERROR_EROFS || status==MFS_ERROR_EACCES || status==MFS_ERROR_EPERM || status==MFS_ERROR_ENOENT || status==MFS_ERROR_QUOTA || status==MFS_ERROR_NOSPACE || status==MFS_ERROR_CHUNKLOST) {
 					break;
@@ -2114,10 +2118,14 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			uint32_t trycnt;
 			trycnt = 0;
 			while (1) {
-#ifdef FREEBSD_FALSE_TRUNCATE_WORKAROUND
-				status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
-#else
+#if defined(__FreeBSD__)
+				if (freebsd_workarounds) {
+					status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
+				} else {
+#endif
 				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
+#if defined(__FreeBSD__)
+				}
 #endif
 				if (status==MFS_STATUS_OK || status==MFS_ERROR_EROFS || status==MFS_ERROR_EACCES || status==MFS_ERROR_EPERM || status==MFS_ERROR_ENOENT || status==MFS_ERROR_QUOTA || status==MFS_ERROR_NOSPACE || status==MFS_ERROR_CHUNKLOST) {
 					break;
@@ -3266,19 +3274,21 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 	fileinfo->readers_cnt = 0;
 	fileinfo->writers_cnt = 0;
 	fileinfo->writing = 0;
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__)
+	if (freebsd_workarounds) {
 	/* old FreeBSD fuse reads whole file when opening with O_WRONLY|O_APPEND,
 	 * so can't open it write-only - use read-write instead */
-	if (accmode == O_RDONLY) {
-		fileinfo->mode = IO_READONLY;
-		fileinfo->rdata = NULL; // read_data_new(inode,fleng);
-		fileinfo->wdata = NULL;
+		if (accmode == O_RDONLY) {
+			fileinfo->mode = IO_READONLY;
+			fileinfo->rdata = NULL; // read_data_new(inode,fleng);
+			fileinfo->wdata = NULL;
+		} else {
+			fileinfo->mode = IO_READWRITE;
+			fileinfo->rdata = NULL;
+			fileinfo->wdata = NULL;
+		}
 	} else {
-		fileinfo->mode = IO_READWRITE;
-		fileinfo->rdata = NULL;
-		fileinfo->wdata = NULL;
-	}
-#else
+#endif
 	if (accmode == O_RDONLY) {
 		fileinfo->mode = IO_READONLY;
 		fileinfo->rdata = NULL; // read_data_new(inode,fleng);
@@ -3291,6 +3301,8 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 		fileinfo->mode = IO_READWRITE;
 		fileinfo->rdata = NULL;
 		fileinfo->wdata = NULL;
+	}
+#if defined(__FreeBSD__)
 	}
 #endif
 	fileinfo->create = now;
@@ -3439,12 +3451,12 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	} else {
 		if (keep_cache==1) {
 			fi->keep_cache=1;
-		} else if (keep_cache==2 || keep_cache==3) {
+		} else if (keep_cache==2 || keep_cache>=3) {
 			fi->keep_cache=0;
 		} else {
 			fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 		}
-		fi->direct_io = (keep_cache==3)?1:0;
+		fi->direct_io = (keep_cache>=3)?1:0;
 	}
 	if (debug_mode) {
 		fprintf(stderr,"create (%lu) ok -> use %s io ; %s data cache\n",(unsigned long int)inode,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear");
@@ -3647,12 +3659,12 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	} else {
 		if (keep_cache==1) {
 			fi->keep_cache=1;
-		} else if (keep_cache==2 || keep_cache==3) {
+		} else if (keep_cache==2 || keep_cache>=3) {
 			fi->keep_cache=0;
 		} else {
 			fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
 		}
-		fi->direct_io = (keep_cache==3)?1:0;
+		fi->direct_io = (keep_cache>=3)?1:0;
 	}
 	if (debug_mode) {
 		fprintf(stderr,"open (%lu) ok -> use %s io ; %s data cache\n",(unsigned long int)ino,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear");
@@ -5775,7 +5787,12 @@ void mfs_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng) {
 	ctx.pid = 0;
 
 	fdcache_invalidate(inode);
-#if (FUSE_VERSION >= 28) && !defined(__FreeBSD__)
+#if (FUSE_VERSION >= 28)
+#if defined(__FreeBSD__)
+	if (freebsd_workarounds) {
+		oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): not supported",inode,offset,leng);
+	} else 
+#endif
 	if (fuse_comm!=NULL) {
 		fuse_lowlevel_notify_inval_inode(fuse_comm,inode,offset,leng);
 		oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): ok",inode,offset,leng);
@@ -5810,6 +5827,25 @@ void mfs_prepare_params(void) {
 	}
 	mfs_attr_set_fleng(paramsattr,params_leng);
 }
+
+#if defined(__FreeBSD__)
+void mfs_freebsd_workarounds(int on) {
+	freebsd_workarounds = on;
+	if (keep_cache==4) {
+		if (on) {
+			if (debug_mode) {
+				fprintf(stderr,"cachemode change fbsdauto -> direct\n");
+			}
+			keep_cache=3;
+		} else {
+			if (debug_mode) {
+				fprintf(stderr,"cachemode change fbsdauto -> auto\n");
+			}
+			keep_cache=0;
+		}
+	}
+}
+#endif
 
 #ifdef HAVE_FUSE3
 void mfs_setsession(struct fuse_session *se) {
@@ -5852,7 +5888,7 @@ void mfs_init(struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double di
 	fdcache_init();
 	mfs_aclstorage_init();
 	if (debug_mode) {
-		fprintf(stderr,"cache parameters: file_keep_cache=%s direntry_cache_timeout=%.2lf entry_cache_timeout=%.2lf attr_cache_timeout=%.2lf xattr_cache_timeout_in=%.2lf (%s)\n",(keep_cache==1)?"always":(keep_cache==2)?"never":(keep_cache==3)?"direct":"auto",direntry_cache_timeout,entry_cache_timeout,attr_cache_timeout,xattr_cache_timeout_in,xattr_cache_on?"on":"off");
+		fprintf(stderr,"cache parameters: file_keep_cache=%s direntry_cache_timeout=%.2lf entry_cache_timeout=%.2lf attr_cache_timeout=%.2lf xattr_cache_timeout_in=%.2lf (%s)\n",(keep_cache==1)?"always":(keep_cache==2)?"never":(keep_cache==3)?"direct":(keep_cache==4)?"fbsdauto":"auto",direntry_cache_timeout,entry_cache_timeout,attr_cache_timeout,xattr_cache_timeout_in,xattr_cache_on?"on":"off");
 		fprintf(stderr,"mkdir copy sgid=%d\nsugid clear mode=%s\n",mkdir_copy_sgid_in,(sugid_clear_mode_in<SUGID_CLEAR_MODE_OPTIONS)?sugid_clear_mode_strings[sugid_clear_mode_in]:"???");
 	}
 	mfs_statsptr_init();

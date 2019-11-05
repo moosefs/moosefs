@@ -20,8 +20,9 @@ moosefs (3.0.107-1) unstable; urgency=medium
   * (mount) move read/write structures initialization from open to read/write
   * (mount,mfsio) added new inode->fleng map
   * (configure) added option disable_all, added summary at the end
+  * (freebsd) detecting new fuse version in the kernel and adjusting behaviour
 
- -- MooseFS Team <contact@moosefs.com>  Wed, 30 Oct 2019 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Mon, 04 Nov 2019 12:00:00 +0100
 
 moosefs (3.0.106-1) unstable; urgency=medium
 

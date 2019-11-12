@@ -1957,7 +1957,7 @@ else:
 master_minusectime = None
 master_maxusectime = None
 if leader_usectime==None or leader_usectime==0:
-	for sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exportschecksum,metaid,lastsavemetaversion,lastsavemetachecksum,usectime,chlogtime in masterlistinfo:
+	for sortip,strip,sortver,strver,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exportschecksum,usectime,chlogtime in masterlistinfo:
 		if usectime!=None and usectime>0:
 			if master_minusectime==None or usectime<master_minusectime:
 				master_minusectime = usectime

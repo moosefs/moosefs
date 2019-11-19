@@ -100,7 +100,7 @@ case $target_os in
   *linux*)
 	fuse=maybe
 	bdev=maybe
-	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -DDEFAULT_SUGID_CLEAR_MODE_EXT"
+	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DDEFAULT_SUGID_CLEAR_MODE_EXT"
 	# Check whether exec_prefix=/usr:
 	eval root_sbindir="${sbindir}"
 	case $exec_prefix:$prefix in

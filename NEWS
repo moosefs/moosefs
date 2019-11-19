@@ -3,6 +3,8 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 3.0.108-1 (WIP)
 
   - (cli+cgi) fixed bug related to masterinfolist
+  - (master) fixed sign in reporting time difference
+  - (cgiserv) added 'content-type: text/plain' to cgi outputs with errors
 
 * MooseFS 3.0.107-1 (2019-11-04)
 

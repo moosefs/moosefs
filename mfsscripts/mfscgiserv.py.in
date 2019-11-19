@@ -348,8 +348,10 @@ class HTTP(ClientHandler):
 				response = cgiout + cgierr
 				if sys.version>='3':
 					response = response.decode('latin-1')
+				if not response.startswith('Content-Type:'):
+					response = "Content-Type: text/plain\r\n\r\n" + response
 			except Exception:
-				response = "Content-type: text/plain\r\n\r\n" + traceback.format_exc()
+				response = "Content-Type: text/plain\r\n\r\n" + traceback.format_exc()
 			# for HEAD request, don't send message body even if the script
 			# returns one (RFC 3875)
 			head_lines = []
@@ -372,18 +374,26 @@ class HTTP(ClientHandler):
 					response = cgiout + cgierr
 					if sys.version>='3':
 						response = response.decode('latin-1')
+					if not response.startswith('Content-Type:'):
+						response = "Content-Type: text/plain\r\n\r\n" + response
 					resp_line = "%s 200 Ok\r\n" %self.protocol
 					if sys.version>='3':
 						resp_line = resp_line.encode('ascii')
 					return [resp_line + response]
 				else:
 					proc = subprocess.Popen(self.file_name, env=e, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+					firstline = proc.stdout.readline()
+					if sys.version>='3':
+						firstline = firstline.decode('latin-1')
+					if not firstline.startswith('Content-Type:'):
+						firstline = "Content-Type: text/plain\r\n\r\n" + firstline
 					resp_line = "%s 200 Ok\r\n" %self.protocol
 					if sys.version>='3':
 						resp_line = resp_line.encode('ascii')
-					return [resp_line,proc.stdout,proc.stderr]
+						firstline = firstline.encode('ascii')
+					return [resp_line,firstline,proc.stdout,proc.stderr]
 			except Exception:
-				response = "Content-type: text/plain\r\n\r\n" + traceback.format_exc()
+				response = "Content-Type: text/plain\r\n\r\n" + traceback.format_exc()
 				resp_line = "%s 200 Ok\r\n" %self.protocol
 				if sys.version>='3':
 					resp_line = resp_line.encode('ascii')

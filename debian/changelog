@@ -1,3 +1,12 @@
+moosefs (3.0.108-1) unstable; urgency=medium
+
+  * (cli+cgi) fixed bug related to masterinfolist
+  * (master) fixed sign in reporting time difference
+  * (cgiserv) added 'content-type: text/plain' to cgi outputs with errors
+  * (master) fixed rmdir packet size
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 19 Nov 2019 12:00:00 +0100
+
 moosefs (3.0.107-1) unstable; urgency=medium
 
   * (master) added NOP command to changelog

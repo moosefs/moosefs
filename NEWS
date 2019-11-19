@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.108-1 (WIP)
+* MooseFS 3.0.108-1 (2019-11-19)
 
   - (cli+cgi) fixed bug related to masterinfolist
   - (master) fixed sign in reporting time difference

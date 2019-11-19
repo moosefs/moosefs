@@ -22,9 +22,9 @@ There are predefined storage classes provided as equivalents of goals 1 to 9 (na
 can be created/modified/deleted etc. by administrator using \fBmfsscadmin\fP tool.
 .PP
 \fBmfsgetsclass\fP prints current \fIstorage class\fP of given object(s).
-\fB-r\fP option enables recursive mode, which works as usual for every
-given file, but for every given directory additionally prints current
-\fIstorage class\fP of all contained objects (files and directories).
+\fB-r\fP option enables recursive mode, for files there is no difference,
+for directories it shows the number of objects in each \fIstorage class\fP
+containded in the whole subtree of this directory.
 .PP
 \fBmfssetsclass\fP changes current \fIstorage class\fP of given object(s).
 \fB-r\fP option enables recursive mode.

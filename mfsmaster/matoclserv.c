@@ -2527,7 +2527,7 @@ void matoclserv_fuse_rmdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
 	status = fs_rmdir(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,&uinode);
 	if (((eptr->version>=VERSION2INT(3,0,107) && eptr->version<VERSION2INT(4,0,0)) || eptr->version>=VERSION2INT(4,18,0)) && status==MFS_STATUS_OK) {
-		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RMDIR,5);
+		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RMDIR,8);
 		put32bit(&ptr,msgid);
 		put32bit(&ptr,uinode);
 	} else {

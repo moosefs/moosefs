@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.109-1 (2019-11-21)
+
+  - (mfscgiserv) fixed handling redirects (bug intr in 3.0.108)
+
 * MooseFS 3.0.108-1 (2019-11-19)
 
   - (cli+cgi) fixed bug related to masterinfolist

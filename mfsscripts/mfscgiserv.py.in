@@ -348,7 +348,7 @@ class HTTP(ClientHandler):
 				response = cgiout + cgierr
 				if sys.version>='3':
 					response = response.decode('latin-1')
-				if not response.startswith('Content-Type:'):
+				if not ( response.startswith('Content-Type:') or response.startswith('Status:') ):
 					response = "Content-Type: text/plain\r\n\r\n" + response
 			except Exception:
 				response = "Content-Type: text/plain\r\n\r\n" + traceback.format_exc()
@@ -374,7 +374,7 @@ class HTTP(ClientHandler):
 					response = cgiout + cgierr
 					if sys.version>='3':
 						response = response.decode('latin-1')
-					if not response.startswith('Content-Type:'):
+					if not ( response.startswith('Content-Type:') or response.startswith('Status:') ):
 						response = "Content-Type: text/plain\r\n\r\n" + response
 					resp_line = "%s 200 Ok\r\n" %self.protocol
 					if sys.version>='3':
@@ -385,7 +385,7 @@ class HTTP(ClientHandler):
 					firstline = proc.stdout.readline()
 					if sys.version>='3':
 						firstline = firstline.decode('latin-1')
-					if not firstline.startswith('Content-Type:'):
+					if not ( firstline.startswith('Content-Type:') or firstline.startswith('Status:') ):
 						firstline = "Content-Type: text/plain\r\n\r\n" + firstline
 					resp_line = "%s 200 Ok\r\n" %self.protocol
 					if sys.version>='3':

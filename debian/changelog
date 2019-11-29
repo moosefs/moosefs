@@ -1,8 +1,9 @@
 moosefs (3.0.109-1) unstable; urgency=medium
 
   * (mfscgiserv) fixed handling redirects (bug intr in 3.0.108)
+  * (cs) added allowance for starting with invalid entries in 'mfshdd.cfg'
 
- -- MooseFS Team <contact@moosefs.com>  Thu, 21 Nov 2019 12:00:00 +0100
+ -- MooseFS Team <contact@moosefs.com>  Thu, 28 Nov 2019 12:00:00 +0100
 
 moosefs (3.0.108-1) unstable; urgency=medium
 

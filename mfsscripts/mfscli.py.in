@@ -4778,7 +4778,9 @@ if "HD" in sectionset:
 						hostavg[hostkey] = (usedsum[hostkey] * 100.0) / totalsum[hostkey]
 			for sf,hostkey,sortippath,ippath,hostpath,flags,errchunkid,errtime,used,total,chunkscnt,rbw,wbw,usecreadavg,usecwriteavg,usecfsyncavg,usecreadmax,usecwritemax,usecfsyncmax,rops,wops,fsyncops,rbytes,wbytes,mfrstatus in hdd+shdd:
 				statuslist = []
-				if (flags&2) and (flags&4)==0:
+				if (flags&8):
+					statuslist.append('invalid')
+				if (flags&2) and (flags&4)==0 and (flags&8)==0:
 					statuslist.append('damaged')
 				if flags&1:
 					if mfrstatus==1:

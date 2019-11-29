@@ -283,6 +283,12 @@ typedef struct folder {
 	struct folder *next;
 } folder;
 
+typedef struct cfgline {
+	char *path;
+	folder *f;
+	struct cfgline *next;
+} cfgline;
+
 /*
 typedef struct damaged {
 	char *path;
@@ -301,6 +307,7 @@ typedef struct _rebalance {
 #ifndef HAVE___SYNC_OP_AND_FETCH
 static pthread_mutex_t cfglock = PTHREAD_MUTEX_INITIALIZER;
 #endif
+//static uint8_t AllowStartingWithInvalidDisks;
 static uint8_t Sparsification;
 static double HDDTestMBPS = 1.0;
 static uint32_t HDDRebalancePerc = 20;
@@ -311,6 +318,9 @@ static uint64_t LeaveFree;
 static uint8_t DoFsyncBeforeClose = 0;
 static uint32_t MinTimeBetweenTests = 86400;
 static int32_t MinFlushCacheTime = 86400;
+
+/* cfg data - locked by folderlock together with folderhead */
+static cfgline *cfglinehead = NULL;
 
 /* folders data */
 static folder *folderhead = NULL;
@@ -751,13 +761,13 @@ static inline void hdd_stats_datafsync(folder *f,int64_t fsynctime) {
 }
 
 uint32_t hdd_diskinfo_size(void) {
-	folder *f;
+	cfgline *cl;
 	uint32_t s,sl;
 
 	s = 0;
 	zassert(pthread_mutex_lock(&folderlock));
-	for (f=folderhead ; f ; f=f->next ) {
-		sl = strlen(f->path);
+	for (cl=cfglinehead ; cl!=NULL ; cl=cl->next ) {
+		sl = strlen(cl->path);
 		if (sl>255) {
 			sl = 255;
 		}
@@ -767,6 +777,7 @@ uint32_t hdd_diskinfo_size(void) {
 }
 
 void hdd_diskinfo_data(uint8_t *buff) {
+	cfgline *cl;
 	folder *f;
 	hddstats s;
 	uint32_t sl;
@@ -774,44 +785,51 @@ void hdd_diskinfo_data(uint8_t *buff) {
 	uint32_t pos;
 	if (buff) {
 		zassert(pthread_mutex_lock(&statslock));
-		for (f=folderhead ; f ; f=f->next ) {
-			sl = strlen(f->path);
+		for (cl=cfglinehead ; cl!=NULL ; cl=cl->next ) {
+			f = cl->f;
+			sl = strlen(cl->path);
 			if (sl>255) {
 				put16bit(&buff,34+3*64+255);	// size of this entry
 				put8bit(&buff,255);
 				memcpy(buff,"(...)",5);
-				memcpy(buff+5,f->path+(sl-250),250);
+				memcpy(buff+5,cl->path+(sl-250),250);
 				buff += 255;
 			} else {
 				put16bit(&buff,34+3*64+sl);	// size of this entry
 				put8bit(&buff,sl);
 				if (sl>0) {
-					memcpy(buff,f->path,sl);
+					memcpy(buff,cl->path,sl);
 					buff += sl;
 				}
 			}
-			put8bit(&buff,((f->markforremoval)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANINPROGRESS)?4:0));
-			ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
-			put64bit(&buff,f->lasterrtab[ei].chunkid);
-			put32bit(&buff,f->lasterrtab[ei].timestamp);
-			if (f->scanstate==SCST_SCANINPROGRESS) {
-				put64bit(&buff,f->scanprogress);
-				put64bit(&buff,0);
+			if (f!=NULL) {
+				put8bit(&buff,((f->markforremoval)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANINPROGRESS)?4:0));
+				ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
+				put64bit(&buff,f->lasterrtab[ei].chunkid);
+				put32bit(&buff,f->lasterrtab[ei].timestamp);
+				if (f->scanstate==SCST_SCANINPROGRESS) {
+					put64bit(&buff,f->scanprogress);
+					put64bit(&buff,0);
+				} else {
+					put64bit(&buff,f->total-f->avail);
+					put64bit(&buff,f->total);
+				}
+				put32bit(&buff,f->chunkcount);
+				s = f->stats[f->statspos];
+				hdd_stats_binary_pack(&buff,&s);	// 64B
+				for (pos=1 ; pos<60 ; pos++) {
+					hdd_stats_add(&s,&(f->stats[(f->statspos+pos)%STATSHISTORY]));
+				}
+				hdd_stats_binary_pack(&buff,&s);	// 64B
+				for (pos=60 ; pos<24*60 ; pos++) {
+					hdd_stats_add(&s,&(f->stats[(f->statspos+pos)%STATSHISTORY]));
+				}
+				hdd_stats_binary_pack(&buff,&s);	// 64B
 			} else {
-				put64bit(&buff,f->total-f->avail);
-				put64bit(&buff,f->total);
+				put8bit(&buff,2+8);
+				memset(buff,0,32+3*64);
+				buff+=32+3*64;
 			}
-			put32bit(&buff,f->chunkcount);
-			s = f->stats[f->statspos];
-			hdd_stats_binary_pack(&buff,&s);	// 64B
-			for (pos=1 ; pos<60 ; pos++) {
-				hdd_stats_add(&s,&(f->stats[(f->statspos+pos)%STATSHISTORY]));
-			}
-			hdd_stats_binary_pack(&buff,&s);	// 64B
-			for (pos=60 ; pos<24*60 ; pos++) {
-				hdd_stats_add(&s,&(f->stats[(f->statspos+pos)%STATSHISTORY]));
-			}
-			hdd_stats_binary_pack(&buff,&s);	// 64B
 		}
 		zassert(pthread_mutex_unlock(&statslock));
 	}
@@ -1735,6 +1753,7 @@ void* hdd_folder_scan(void *arg);
 
 void hdd_check_folders(void) {
 	folder *f,**fptr;
+	cfgline *cl;
 	uint32_t i;
 	double monotonic_time;
 	uint32_t err;
@@ -1802,6 +1821,11 @@ void hdd_check_folders(void) {
 						free(f->chunktab);
 					}
 					free(f->path);
+					for (cl=cfglinehead ; cl!=NULL ; cl=cl->next) {
+						if (cl->f==f) {
+							cl->f = NULL;
+						}
+					}
 					free(f);
 				}
 			} else {
@@ -6372,6 +6396,16 @@ void hdd_blockbuffer_free(void *addr) {
 # endif
 #endif
 
+void hdd_clear_cfglines(void) {
+	cfgline *cl;
+	while ((cl=cfglinehead)!=NULL) {
+		free(cl->path);
+		cfglinehead = cl->next;
+		free(cl);
+	}
+	cfglinehead = NULL;
+}
+
 void hdd_term(void) {
 	uint32_t i,m,l;
 	folder *f,*fn;
@@ -6488,6 +6522,7 @@ void hdd_term(void) {
 		}
 	}
 	syslog(LOG_NOTICE,"freeing data structures");
+	hdd_clear_cfglines();
 	for (f=folderhead ; f ; f=fn) {
 		fn = f->next;
 		if (f->scanstate==SCST_WORKING && f->toremove==REMOVING_NO) {
@@ -6560,6 +6595,7 @@ int hdd_parseline(char *hddcfgline) {
 	char *lockfname;
 	char *metaidfname;
 	struct stat sb;
+	cfgline *cl;
 	folder *f;
 	uint8_t lockneeded;
 	uint8_t cannotbeused;
@@ -6687,6 +6723,19 @@ int hdd_parseline(char *hddcfgline) {
 			}
 		}
 	}
+
+	// add line to cfgline
+	cl = malloc(sizeof(cfgline));
+	passert(cl);
+	cl->path = malloc(l+1);
+	passert(cl->path);
+	memcpy(cl->path,pptr,l);
+	cl->path[l] = 0;
+	cl->f = NULL;
+	zassert(pthread_mutex_lock(&folderlock));
+	cl->next = cfglinehead;
+	cfglinehead = cl;
+	zassert(pthread_mutex_unlock(&folderlock));
 
 	mainmetaid = masterconn_getmetaid();
 	if (mainmetaid>0) {
@@ -6849,6 +6898,7 @@ int hdd_parseline(char *hddcfgline) {
 			f->markforremoval = mfr;
 			f->balancemode = bm;
 			f->ignoresize = is;
+			cl->f = f;
 			zassert(pthread_mutex_unlock(&folderlock));
 			if (lfd>=0) {
 				close(lfd);
@@ -6925,6 +6975,7 @@ int hdd_parseline(char *hddcfgline) {
 	f->wfrchunks = NULL;
 	f->next = folderhead;
 	folderhead = f;
+	cl->f = f;
 	zassert(pthread_mutex_unlock(&folderlock));
 	return 2;
 }
@@ -6967,6 +7018,7 @@ int hdd_folders_reinit(void) {
 			f->toremove = REMOVING_START;
 		}
 	}
+	hdd_clear_cfglines();
 	zassert(pthread_mutex_unlock(&folderlock));
 
 	while (fgets(buff,999,fd)) {
@@ -7185,7 +7237,9 @@ int hdd_init(void) {
 	hdd_options_common(1);
 
 	if (hdd_folders_reinit()<0) {
-		return -1;
+		if (cfg_getuint8("ALLOW_STARTING_WITH_INVALID_DISKS",0)==0) {
+			return -1;
+		}
 	}
 
 	hdd_open_files_handle(OF_INIT);

@@ -78,6 +78,9 @@ enables/disables fsync before chunk closing; default is 0 (off)
 .B HDD_SPARSIFY_ON_WRITE
 enables/disables sparsification (skip leading and trailing zeroz) during writing new block; default is 1 (on)
 .TP
+.B ALLOW_STARTING_WITH_INVALID_DISKS
+when set to one chunkserver will not abort start even when incorrect entries are found in 'mfshdd.cfg' file; default is 0 (do not start with invalid entries)
+.TP
 .BR WORKERS_MAX ", " WORKERS_MAX_IDLE
 maximum number of active workers and maximum number of idle workers; defaults are 250 and 40
 .TP

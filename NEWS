@@ -1,8 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.109-1 (2019-11-21)
+* MooseFS 3.0.109-1 (2019-11-28)
 
   - (mfscgiserv) fixed handling redirects (bug intr in 3.0.108)
+  - (cs) added allowance for starting with invalid entries in 'mfshdd.cfg'
 
 * MooseFS 3.0.108-1 (2019-11-19)
 

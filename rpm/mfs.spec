@@ -102,7 +102,11 @@ MooseFS client: mfsmount and mfstools.
 %package cli
 Summary:	MooseFS CLI Utility
 Group:		System Environment/Daemons
-Requires:	python >= 2.5
+#%if %{rpm_has_bool_ops}
+#Requires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
+#%else
+#Requires:	python >= 2.5
+#%endif
 
 %description cli
 MooseFS CLI utilities.
@@ -113,7 +117,11 @@ MooseFS CLI utilities.
 %package cgi
 Summary:	MooseFS CGI Monitor
 Group:		System Environment/Daemons
-Requires:	python >= 2.5
+#%if %{rpm_has_bool_ops}
+#Requires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
+#%else
+#Requires:	python >= 2.5
+#%endif
 
 %description cgi
 MooseFS CGI monitor.

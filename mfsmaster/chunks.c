@@ -354,6 +354,17 @@ void mfsdebug_flush(void) {
 }
 #endif
 
+// input:
+//  - number of desired copies -> labelcnt
+//  - definition of desired labels -> labelmasks
+//  - number of available servers -> servcnt
+//  - pointers to servers -> servers
+// output:
+//  [0 .. labelscnt-1] -> matching server index (+labelcnt)
+//  [labelcnt .. labelcnt+servcnt-1] -> matching label definition
+// example:
+//   3,6,[A,A,A],[B,A,A,C,A,A] -> [4,5,7,-1,0,1,-1,2,-1,-1]
+
 int32_t* do_perfect_match(uint32_t labelcnt,uint32_t servcnt,uint32_t **labelmasks,uint16_t *servers) {
 	uint32_t s,i,l,x,v,vi,sp,rsp,sid,sids,gr;
 	int32_t t;

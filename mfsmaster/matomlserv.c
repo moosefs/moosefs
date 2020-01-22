@@ -1020,7 +1020,7 @@ void matomlserv_serve(struct pollfd *pdesc) {
 
 // write
 	for (eptr=matomlservhead ; eptr ; eptr=eptr->next) {
-		if ((eptr->lastwrite+(eptr->timeout/3.0))<now && eptr->outputhead==NULL) {
+		if ((eptr->lastwrite+(eptr->timeout/3.0))<now && eptr->outputhead==NULL && eptr->clienttype!=UNKNOWN) {
 			matomlserv_createpacket(eptr,ANTOAN_NOP,0);
 		}
 		if (eptr->pdescpos>=0) {
@@ -1056,7 +1056,7 @@ void matomlserv_keep_alive(void) {
 	}
 // write
 	for (eptr=matomlservhead ; eptr ; eptr=eptr->next) {
-		if ((eptr->lastwrite+(eptr->timeout/3.0))<now && eptr->outputhead==NULL) {
+		if ((eptr->lastwrite+(eptr->timeout/3.0))<now && eptr->outputhead==NULL && eptr->clienttype!=UNKNOWN) {
 			matomlserv_createpacket(eptr,ANTOAN_NOP,0);
 		}
 		if (eptr->mode == DATA && eptr->outputhead) {

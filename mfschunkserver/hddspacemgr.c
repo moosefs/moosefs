@@ -972,6 +972,7 @@ static inline void hdd_remove_chunk_from_test_chain(chunk *c,folder *f) {
 		f->subf_count[c->pathid]--;
 		if (f->subf_count[c->pathid]<f->min_count) {
 			f->min_count = f->subf_count[c->pathid];
+			f->min_pathid = c->pathid;
 		}
 	}
 }

@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.110-1 (WIP)
+
+  - (cs) fixed bug that may lead to creating much more chunks in one subfolder (issues #319,#326)
+
 * MooseFS 3.0.109-1 (2019-11-28)
 
   - (mfscgiserv) fixed handling redirects (bug intr in 3.0.108)

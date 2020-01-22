@@ -6486,7 +6486,7 @@ void hdd_term(void) {
 	for (i=0 ; i<HASHSIZE ; i++) {
 		for (c=hashtab[i] ; c ; c=cn) {
 			cn = c->next;
-			if (c->owner!=NULL) {
+			if (c->owner!=NULL && c->state!=CH_DELETED) {
 				hdd_folder_dump_chunkdb_chunk(c->owner,c);
 			}
 			if (c->state==CH_AVAIL && c->owner!=NULL) {

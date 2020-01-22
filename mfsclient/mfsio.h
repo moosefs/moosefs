@@ -16,6 +16,8 @@ typedef struct _mfscfg {
 	int read_cache_mb;
 	int write_cache_mb;
 	int io_try_cnt;
+	int error_on_lost_chunk;
+	int error_on_no_space;
 	int sugid_clear_mode;
 	int mkdir_copy_sgid;
 } mfscfg;

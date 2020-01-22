@@ -155,6 +155,8 @@ static uint32_t cacheblockcount;
 static double optimeout;
 static uint32_t maxretries;
 static uint32_t minlogretry;
+static uint8_t erroronlostchunk;
+static uint8_t erroronnospace;
 
 static inodedata **idhash;
 
@@ -744,11 +746,27 @@ void* write_worker(void *arg) {
 		// get chunk data from master
 //		start = monotonic_seconds();
 		wrstatus = fs_writechunk(inode,chindx,chunkopflags,&csdataver,&mfleng,&chunkid,&version,&csdata,&csdatasize);
+
+// rdstatus potential results:
+// MFS_ERROR_NOCHUNK - internal error (can't be repaired)
+// MFS_ERROR_ENOENT - internal error (wrong inode - can't be repaired)
+// MFS_ERROR_EPERM - internal error (wrong inode - can't be repaired)
+// MFS_ERROR_INDEXTOOBIG - requested file position is too big
+// MFS_ERROR_CHUNKLOST - according to master chunk is definitelly lost (all chunkservers are connected and chunk is not there)
+// MFS_ERROR_QUOTA - disk quota exceeded (quit immediatelly - no retry)
+// MFS_ERROR_NOSPACE - no space on disk
+// MFS_ERROR_IO (for future use)
+// MFS_ERROR_NOCHUNKSERVERS - can't create new chunk - no space available, but maybe only temporarily
+// MFS_ERROR_CSNOTPRESENT - can't modify chunk - chunk is lost, but maybe only temporarily
+
 		if (wrstatus!=MFS_STATUS_OK) {
 			if (wrstatus!=MFS_ERROR_LOCKED && wrstatus!=MFS_ERROR_EAGAIN) {
-				if (wrstatus==MFS_ERROR_ENOENT) {
+				if (wrstatus==MFS_ERROR_ENOENT || wrstatus==MFS_ERROR_EPERM || wrstatus==MFS_ERROR_NOCHUNK) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,EBADF,0);
+				} else if (wrstatus==MFS_ERROR_INDEXTOOBIG) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",inode,chindx,mfsstrerr(wrstatus));
+					write_job_end(chd,EINVAL,0);
 				} else if (wrstatus==MFS_ERROR_QUOTA) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",inode,chindx,mfsstrerr(wrstatus));
 #ifdef EDQUOT
@@ -756,10 +774,10 @@ void* write_worker(void *arg) {
 #else
 					write_job_end(chd,ENOSPC,0);
 #endif
-				} else if (wrstatus==MFS_ERROR_NOSPACE) {
+				} else if (wrstatus==MFS_ERROR_NOSPACE && erroronnospace) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,ENOSPC,0);
-				} else if (wrstatus==MFS_ERROR_CHUNKLOST) {
+				} else if (wrstatus==MFS_ERROR_CHUNKLOST && erroronlostchunk) {
 					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_writechunk returned status: %s",inode,chindx,mfsstrerr(wrstatus));
 					write_job_end(chd,ENXIO,0);
 				} else if (wrstatus==MFS_ERROR_IO) {
@@ -774,9 +792,9 @@ void* write_worker(void *arg) {
 					}
 					chd->trycnt++;
 					if (chd->trycnt>=maxretries) {
-						if (wrstatus==MFS_ERROR_NOCHUNKSERVERS) {
+						if (wrstatus==MFS_ERROR_NOCHUNKSERVERS || wrstatus==MFS_ERROR_NOSPACE) {
 							write_job_end(chd,ENOSPC,0);
-						} else if (wrstatus==MFS_ERROR_CSNOTPRESENT) {
+						} else if (wrstatus==MFS_ERROR_CSNOTPRESENT || wrstatus==MFS_ERROR_CHUNKLOST) {
 							write_job_end(chd,ENXIO,0);
 						} else {
 							write_job_end(chd,EIO,0);
@@ -1503,12 +1521,14 @@ void* write_worker(void *arg) {
 	return NULL;
 }
 
-void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint32_t logretry) {
+void write_data_init (uint32_t cachesize,uint32_t retries,uint32_t timeout,uint32_t logretry,uint8_t erronlostchunk,uint8_t erronnospace) {
 	uint32_t i;
 	size_t mystacksize;
 //	sigset_t oldset;
 //	sigset_t newset;
 
+	erroronlostchunk = erronlostchunk;
+	erroronnospace = erronnospace;
 	cacheblockcount = (cachesize/MFSBLOCKSIZE);
 	maxretries = retries;
 	if (optimeout>0) {

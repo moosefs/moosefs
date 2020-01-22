@@ -197,6 +197,8 @@ static uint64_t usectimeout;
 static uint32_t maxretries;
 static uint32_t minlogretry;
 static uint64_t maxreadaheadsize;
+static uint8_t erroronlostchunk;
+static uint8_t erroronnospace;
 
 static uint64_t reqbufftotalsize;
 #ifndef HAVE___SYNC_OP_AND_FETCH
@@ -393,7 +395,7 @@ void read_job_end(rrequest *rreq,int status,uint32_t delay) {
 	fprintf(stderr,"%.6lf: readworker end (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" - rreq->mode: %s->%s\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,ind->inode,read_data_modename(pmode),read_data_modename(rreq->mode));
 #endif
 
-	if (ind->closing || status!=MFS_STATUS_OK || breakmode) {
+	if (ind->closing || status!=0 || breakmode) {
 #ifdef RDEBUG
 		fprintf(stderr,"%.6lf: readworker end (rreq: %"PRIu64":%"PRIu64"/%"PRIu32") inode: %"PRIu32" - closing: %u ; status: %d ; breakmode: %u\n",monotonic_seconds(),rreq->offset,rreq->offset+rreq->leng,rreq->leng,ind->inode,ind->closing,status,breakmode);
 #endif
@@ -707,50 +709,84 @@ void* read_worker(void *arg) {
 #endif
 		}
 
+// rdstatus potential results:
+// MFS_ERROR_NOCHUNK - internal error (can't be repaired)
+// MFS_ERROR_ENOENT - internal error (wrong inode - can't be repaired)
+// MFS_ERROR_EPERM - internal error (wrong inode - can't be repaired)
+// MFS_ERROR_INDEXTOOBIG - requested file position is too big
+// MFS_ERROR_CHUNKLOST - according to master chunk is definitelly lost (all chunkservers are connected and chunk is not there)
+// statuses that are here just in case:
+// MFS_ERROR_QUOTA (used in write only)
+// MFS_ERROR_NOSPACE (used in write only)
+// MFS_ERROR_IO (for future use)
+// MFS_ERROR_NOCHUNKSERVERS (used in write only)
+// MFS_ERROR_CSNOTPRESENT (used in write only)
+
 		if (rdstatus!=MFS_STATUS_OK) {
-			if (rdstatus==MFS_ERROR_ENOENT) {
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
-				read_job_end(rreq,EBADF,0);
-			} else if (rdstatus==MFS_ERROR_QUOTA) {
+			if (rdstatus!=MFS_ERROR_LOCKED && rdstatus!=MFS_ERROR_EAGAIN) {
+				if (rdstatus==MFS_ERROR_ENOENT || rdstatus==MFS_ERROR_EPERM || rdstatus==MFS_ERROR_NOCHUNK) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
+					read_job_end(rreq,EBADF,0);
+				} else if (rdstatus==MFS_ERROR_INDEXTOOBIG) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
+					read_job_end(rreq,EINVAL,0);
+				} else if (rdstatus==MFS_ERROR_QUOTA) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
 #ifdef EDQUOT
-				read_job_end(rreq,EDQUOT,0);
+					read_job_end(rreq,EDQUOT,0);
 #else
-				read_job_end(rreq,ENOSPC,0);
+					read_job_end(rreq,ENOSPC,0);
 #endif
-			} else if (rdstatus==MFS_ERROR_NOSPACE) {
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
-				read_job_end(rreq,ENOSPC,0);
-			} else if (rdstatus==MFS_ERROR_CHUNKLOST) {
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
-				read_job_end(rreq,ENXIO,0);
-			} else if (rdstatus==MFS_ERROR_IO) {
-				syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
-				read_job_end(rreq,EIO,0);
+				} else if (rdstatus==MFS_ERROR_NOSPACE && erroronnospace) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
+					read_job_end(rreq,ENOSPC,0);
+				} else if (rdstatus==MFS_ERROR_CHUNKLOST && erroronlostchunk) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
+					read_job_end(rreq,ENXIO,0);
+				} else if (rdstatus==MFS_ERROR_IO) {
+					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
+					read_job_end(rreq,EIO,0);
+				} else {
+					zassert(pthread_mutex_lock(&(ind->lock)));
+					if (ind->trycnt >= minlogretry) {
+						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
+					}
+					ind->trycnt++;
+					trycnt = ind->trycnt;
+					if (trycnt >= maxretries) {
+						zassert(pthread_mutex_unlock(&(ind->lock)));
+						if (rdstatus==MFS_ERROR_NOCHUNKSERVERS || rdstatus==MFS_ERROR_NOSPACE) {
+							read_job_end(rreq,ENOSPC,0);
+						} else if (rdstatus==MFS_ERROR_CSNOTPRESENT || rdstatus==MFS_ERROR_CHUNKLOST) {
+							read_job_end(rreq,ENXIO,0);
+						} else {
+							read_job_end(rreq,EIO,0);
+						}
+					} else {
+						if (rreq->mode == BREAK) {
+							zassert(pthread_mutex_unlock(&(ind->lock)));
+							read_job_end(rreq,0,0);
+						} else {
+							rreq->mode = INQUEUE;
+							zassert(pthread_mutex_unlock(&(ind->lock)));
+							read_delayed_enqueue(rreq,1000+((trycnt<30)?((trycnt-1)*300000):10000000));
+						}
+					}
+				}
 			} else {
 				zassert(pthread_mutex_lock(&(ind->lock)));
-				if (ind->trycnt >= minlogretry) {
-					syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
-				}
-				ind->trycnt++;
-				trycnt = ind->trycnt;
-				if (trycnt >= maxretries) {
+				if (ind->trycnt<=2) {
+					ind->trycnt++;
+					trycnt = ind->trycnt;
 					zassert(pthread_mutex_unlock(&(ind->lock)));
-					if (rdstatus==MFS_ERROR_NOCHUNKSERVERS) {
-						read_job_end(rreq,ENOSPC,0);
-					} else if (rdstatus==MFS_ERROR_CSNOTPRESENT) {
-						read_job_end(rreq,ENXIO,0);
-					} else {
-						read_job_end(rreq,EIO,0);
-					}
+					read_delayed_enqueue(rreq,1000);
+				} else if (ind->trycnt<=6) {
+					ind->trycnt++;
+					trycnt = ind->trycnt;
+					zassert(pthread_mutex_unlock(&(ind->lock)));
+					read_delayed_enqueue(rreq,100000);
 				} else {
-					if (rreq->mode == BREAK) {
-						zassert(pthread_mutex_unlock(&(ind->lock)));
-						read_job_end(rreq,0,0);
-					} else {
-						rreq->mode = INQUEUE;
-						zassert(pthread_mutex_unlock(&(ind->lock)));
-						read_delayed_enqueue(rreq,1000+((trycnt<30)?((trycnt-1)*300000):10000000));
-					}
+					read_delayed_enqueue(rreq,500000);
 				}
 			}
 			chunkrwlock_runlock(inode,chindx);
@@ -1504,7 +1540,7 @@ void read_data_ranges_free(void* ptr) {
 	}
 }
 
-void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t timeout,uint32_t logretry) {
+void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t readaheadtrigger,uint32_t retries,uint32_t timeout,uint32_t logretry,uint8_t erronlostchunk,uint8_t erronnospace) {
 	uint32_t i;
 	size_t mystacksize;
 //	sigset_t oldset;
@@ -1517,6 +1553,8 @@ void read_data_init (uint64_t readaheadsize,uint32_t readaheadleng,uint32_t read
 	readahead_leng = readaheadleng;
 	readahead_trigger = readaheadtrigger;
 	maxreadaheadsize = readaheadsize;
+	erroronlostchunk = erronlostchunk;
+	erroronnospace = erronnospace;
 	reqbufftotalsize = 0;
 
 	zassert(pthread_key_create(&rangesstorage,read_data_ranges_free));

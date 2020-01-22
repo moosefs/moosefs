@@ -1641,8 +1641,8 @@ int mfs_init(mfscfg *mcfg,uint8_t stage) {
 
 		csdb_init();
 		delay_init();
-		read_data_init(mcfg->read_cache_mb*1024*1024,0x200000,10*0x200000,mcfg->io_try_cnt,0,5);
-		write_data_init(mcfg->write_cache_mb*1024*1024,mcfg->io_try_cnt,0,5);
+		read_data_init(mcfg->read_cache_mb*1024*1024,0x200000,10*0x200000,mcfg->io_try_cnt,0,5,mcfg->error_on_lost_chunk,mcfg->error_on_no_space);
+		write_data_init(mcfg->write_cache_mb*1024*1024,mcfg->io_try_cnt,0,5,mcfg->error_on_lost_chunk,mcfg->error_on_no_space);
 
 		zassert(pthread_mutex_init(&fdtablock,NULL));
 		fdtab = malloc(sizeof(file_info)*FDTABSIZE_INIT);

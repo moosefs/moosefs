@@ -221,6 +221,8 @@ struct mfsopts {
 	unsigned readaheadsize;
 	unsigned readaheadleng;
 	unsigned readaheadtrigger;
+	int erroronlostchunk;
+	int erroronnospace;
 	unsigned ioretries;
 	unsigned timeout;
 	unsigned logretry;
@@ -292,6 +294,8 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfsreadaheadsize=%u", readaheadsize, 0),
 	MFS_OPT("mfsreadaheadleng=%u", readaheadleng, 0),
 	MFS_OPT("mfsreadaheadtrigger=%u", readaheadtrigger, 0),
+	MFS_OPT("mfserroronlostchunk", erroronlostchunk, 1),
+	MFS_OPT("mfserroronnospace", erroronnospace, 1),
 	MFS_OPT("mfsioretries=%u", ioretries, 0),
 	MFS_OPT("mfstimeout=%u", timeout, 0),
 	MFS_OPT("mfslogretry=%u", logretry, 0),
@@ -419,6 +423,8 @@ static void usage(const char *progname) {
 	fprintf(fd,"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n");
 	fprintf(fd,"    -o mfsreadaheadleng=N       define amount of bytes to be additionally read (default: 1048576)\n");
 	fprintf(fd,"    -o mfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 10 * mfsreadaheadleng)\n");
+	fprintf(fd,"    -o mfserroronlostchunk      when all known chunkservers are connected to the master and the required chunk is missing then immediately finish I/O and return an error\n");
+	fprintf(fd,"    -o mfserroronnospace        when all known chunkservers are connected to the master and there is no free space then immediately finish I/O and return an error\n");
 	fprintf(fd,"    -o mfsioretries=N           define number of retries before I/O error is returned (default: 30)\n");
 	fprintf(fd,"    -o mfstimeout=N             define maximum timeout in seconds before I/O error is returned (default: 0 - which means no timeout)\n");
 	fprintf(fd,"    -o mfslogretry=N            define minimal retry counter on which system will start log I/O messages (default: 5)\n");
@@ -816,6 +822,8 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	NUMOPT("mfsreadaheadsize","u",readaheadsize);
 	NUMOPT("mfsreadaheadleng","u",readaheadleng);
 	NUMOPT("mfsreadaheadtrigger","u",readaheadtrigger);
+	BOOLOPT("mfserroronlostchunk",erroronlostchunk);
+	BOOLOPT("mfserroronnospace",erroronnospace);
 	NUMOPT("mfsioretries","u",ioretries);
 	NUMOPT("mfstimeout","u",timeout);
 	NUMOPT("mfslogretry","u",logretry);
@@ -1108,8 +1116,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	} else {
 		csdb_init();
 		delay_init();
-		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry);
-		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry);
+		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry,mfsopts.erroronlostchunk,mfsopts.erroronnospace);
+		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry,mfsopts.erroronlostchunk,mfsopts.erroronnospace);
 #if FUSE_VERSION >= 30
 		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
 		se = fuse_session_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
@@ -1577,6 +1585,8 @@ int main(int argc, char *argv[]) {
 	mfsopts.readaheadsize = 0;
 	mfsopts.readaheadleng = 0;
 	mfsopts.readaheadtrigger = 0;
+	mfsopts.erroronlostchunk = 0;
+	mfsopts.erroronnospace = 0;
 	mfsopts.ioretries = 30;
 	mfsopts.timeout = 0;
 	mfsopts.logretry = 5;

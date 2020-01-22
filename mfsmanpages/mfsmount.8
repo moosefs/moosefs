@@ -151,6 +151,12 @@ define amount of bytes to be additionally read (in range: 128KiB..2MiB - default
 \fB\-o mfsreadaheadtrigger=\fP\fIN\fP
 define amount of bytes read sequentially that turns on read ahead (default: 10 * \fBmfsreadaheadleng\fP)
 .TP
+\fB\-o mfserroronlostchunk\fP
+when all known chunkservers are connected to the master and the required chunk is missing then immediately finish I/O and return an error
+.TP
+\fB\-o mfserroronnospace\fP
+when all known chunkservers are connected to the master and there is no free space then immediately finish I/O and return an error
+.TP
 \fB\-o mfsioretries=\fP\fIN\fP
 specify number of retiries before I/O error is returned (default: 30)
 .TP

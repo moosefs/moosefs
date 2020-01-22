@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) added option for controling subdirectory selection algorithm for newly created chunks (issues #319,#326)
   - (cs) prevent potential dumping deleted chunks to 'chunk.db'
   - (client) added options for setting behaviour when master returns unavailable chunks or no space status (issue #322)
+  - (cgi) fixed logo and icon (file type for favicon.ico, change to current logotype - issue #328)
 
 * MooseFS 3.0.109-1 (2019-11-28)
 

@@ -63,6 +63,9 @@
 # enables/disables sparsification (skip zeros) during write
 # HDD_SPARSIFY_ON_WRITE = 1
 
+# how many chunks should be created in one directory before moving to the next one (higher values are better with most OSes cacheing algorithms, low values lead to more even chunk distribution, default is 10000 which works best in most cases)
+# HDD_RR_CHUNK_COUNT = 10000
+
 # when set to one chunkserver will not abort start even when incorrect entries are found in 'mfshdd.cfg' file
 # ALLOW_STARTING_WITH_INVALID_DISKS = 0
 

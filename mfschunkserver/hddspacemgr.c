@@ -314,6 +314,7 @@ static uint32_t HDDRebalancePerc = 20;
 static uint32_t HSRebalanceLimit = 0;
 static uint32_t HDDErrorCount = 2;
 static uint32_t HDDErrorTime = 600;
+static uint32_t HDDRoundRobinChunkCount = 10000;
 static uint64_t LeaveFree;
 static uint8_t DoFsyncBeforeClose = 0;
 static uint32_t MinTimeBetweenTests = 86400;
@@ -981,6 +982,7 @@ static inline void hdd_remove_chunk_from_test_chain(chunk *c,folder *f) {
 static inline void hdd_add_chunk_to_test_chain(chunk *c,folder *f) {
 	uint8_t recalcmin;
 	uint16_t i;
+
 	c->testnext = NULL;
 	c->testprev = f->testtail;
 	*(c->testprev) = c;
@@ -1001,7 +1003,7 @@ static inline void hdd_add_chunk_to_test_chain(chunk *c,folder *f) {
 			}
 		}
 	}
-	if (c->pathid==f->current_pathid && f->subf_count[c->pathid]>f->min_count+10000) {
+	if (c->pathid==f->current_pathid && f->subf_count[c->pathid]>=f->min_count+HDDRoundRobinChunkCount) {
 		f->current_pathid = f->min_pathid;
 	}
 }
@@ -7090,6 +7092,14 @@ static inline void hdd_options_common(uint8_t initflag) {
 	} else if (HDDErrorTime>86400) {
 		mfs_syslog(LOG_NOTICE,"hdd space manager: error tolerance period too big - changed to 86400 seconds (1 day)");
 		HDDErrorTime = 86400;
+	}
+	HDDRoundRobinChunkCount = cfg_getint32("HDD_RR_CHUNK_COUNT",10000);
+	if (HDDRoundRobinChunkCount<1) {
+		mfs_syslog(LOG_NOTICE,"hdd space manager: round robin chunk count too small - changed to 1");
+		HDDRoundRobinChunkCount = 1;
+	} else if (HDDRoundRobinChunkCount>100000) {
+		mfs_syslog(LOG_NOTICE,"hdd space manager: round robin chunk count too big - changed to 100000");
+		HDDRoundRobinChunkCount = 100000;
 	}
 	zassert(pthread_mutex_unlock(&folderlock));
 	zassert(pthread_mutex_lock(&testlock));

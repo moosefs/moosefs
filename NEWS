@@ -8,6 +8,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) added options for setting behaviour when master returns unavailable chunks or no space status (issue #322)
   - (cgi) fixed logo and icon (file type for favicon.ico, change to current logotype - issue #328)
   - (master) turning off sending NOP's to unregistered clients (matoml module)
+  - (cs) fixed reporting wrong number of hours in duplications removal message
 
 * MooseFS 3.0.109-1 (2019-11-28)
 

@@ -1590,7 +1590,7 @@ static inline void hdd_wfr_check(folder *f) {
 		} else {
 			// report
 			if (f->wfrlast+3600<now) {
-				syslog(LOG_WARNING,"on drive '%s' %"PRIu32" chunk duplicates detected - will remove them in %u hours",f->path,f->wfrcount,(now+3599U-f->wfrtime)/3600U);
+				syslog(LOG_WARNING,"on drive '%s' %"PRIu32" chunk duplicates detected - will remove them in about %u hours",f->path,f->wfrcount,(f->wfrtime+7*86400+3599U-now)/3600U);
 				f->wfrlast = now;
 			}
 		}

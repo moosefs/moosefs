@@ -10,6 +10,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) turning off sending NOP's to unregistered clients (matoml module)
   - (cs) fixed reporting wrong number of hours in duplications removal message
   - (cs) redesigned duplicates removal procedure to do it in groups of 100 files (issue #327)
+  - (cs) introduce mypread and mypwrite macro (code cleaning)
 
 * MooseFS 3.0.109-1 (2019-11-28)
 

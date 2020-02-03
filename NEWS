@@ -11,6 +11,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed reporting wrong number of hours in duplications removal message
   - (cs) redesigned duplicates removal procedure to do it in groups of 100 files (issue #327)
   - (cs) introduce mypread and mypwrite macro (code cleaning)
+  - (cs) added check for changed crc before every chunk file close (just in case)
 
 * MooseFS 3.0.109-1 (2019-11-28)
 

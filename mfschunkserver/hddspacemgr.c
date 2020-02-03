@@ -72,6 +72,8 @@
 #define USE_PIO 1
 #endif
 
+#define DUPLICATES_DELETE_LIMIT 100
+
 /* usec's to wait after last rebalance before choosing disk for new chunk */
 #define REBALANCE_GRACE_PERIOD 10000000
 
@@ -1573,25 +1575,57 @@ static inline void hdd_wfr_add(folder *f,const char *fname) {
 }
 
 static inline void hdd_wfr_check(folder *f) {
+	static char **fnames = NULL;
 	waitforremoval *wfr;
-	uint32_t now = main_time();
+	uint32_t now;
+	uint32_t limit;
 
-	if (f->wfrcount>0) {
-		if (f->wfrtime+7*86400<now) {
-			// unlink
-			while ((wfr = f->wfrchunks)!=NULL) {
-				unlink(wfr->fname);
-				f->wfrchunks = wfr->next;
-				f->wfrcount--;
-				free(wfr->fname);
-				free(wfr);
+	if (f==NULL) {
+		if (fnames!=NULL) {
+			if (fnames[0]==NULL) {
+				free(fnames);
+				fnames=NULL;
+			} else {
+				for (limit=0 ; limit<DUPLICATES_DELETE_LIMIT && fnames[limit]!=NULL ; limit++) {
+					unlink(fnames[limit]);
+					free(fnames[limit]);
+					fnames[limit]=NULL;
+				}
 			}
-			massert(f->wfrcount==0,"wait for removal count mismatch after unlink");
-		} else {
-			// report
-			if (f->wfrlast+3600<now) {
-				syslog(LOG_WARNING,"on drive '%s' %"PRIu32" chunk duplicates detected - will remove them in about %u hours",f->path,f->wfrcount,(f->wfrtime+7*86400+3599U-now)/3600U);
-				f->wfrlast = now;
+		}
+	} else {
+		if (f->wfrcount>0) {
+			now = main_time();
+			if (f->wfrtime+7*86400<now) {
+				// unlink
+				if (fnames==NULL) {
+					fnames = malloc(sizeof(char*)*DUPLICATES_DELETE_LIMIT);
+					for (limit=0 ; limit<DUPLICATES_DELETE_LIMIT ; limit++) {
+						fnames[limit]=NULL;
+					}
+				}
+				limit = 0;
+				while (limit<DUPLICATES_DELETE_LIMIT && (wfr = f->wfrchunks)!=NULL) {
+					fnames[limit] = wfr->fname;
+					f->wfrchunks = wfr->next;
+					f->wfrcount--;
+					free(wfr);
+					limit++;
+				}
+				if (f->wfrchunks==NULL) {
+					massert(f->wfrcount==0,"wait for removal count mismatch after unlink");
+				} else {
+					if (f->wfrlast+300<now) {
+						syslog(LOG_WARNING,"on drive '%s' chunk duplicates are being removed - %"PRIu32" left",f->path,f->wfrcount);
+						f->wfrlast = now;
+					}
+				}
+			} else {
+				// report
+				if (f->wfrlast+3600<now) {
+					syslog(LOG_WARNING,"on drive '%s' %"PRIu32" chunk duplicates detected - will remove them in about %u hours",f->path,f->wfrcount,(f->wfrtime+7*86400+3599U-now)/3600U);
+					f->wfrlast = now;
+				}
 			}
 		}
 	}
@@ -1909,6 +1943,7 @@ void hdd_check_folders(void) {
 		zassert(pthread_mutex_unlock(&dclock));
 #endif
 	}
+	hdd_wfr_check(NULL);
 }
 
 static inline void hdd_error_occured(chunk *c) {

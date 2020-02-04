@@ -13,6 +13,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) introduce mypread and mypwrite macro (code cleaning)
   - (cs) added check for changed crc before every chunk file close (just in case)
   - (cs) never use open chunk as a chunk duplicate that needs to be deleted
+  - (cs) never use disk with pending duplicates as destination disk during internal rebalace (issue #327)
 
 * MooseFS 3.0.109-1 (2019-11-28)
 

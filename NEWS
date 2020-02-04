@@ -12,6 +12,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) redesigned duplicates removal procedure to do it in groups of 100 files (issue #327)
   - (cs) introduce mypread and mypwrite macro (code cleaning)
   - (cs) added check for changed crc before every chunk file close (just in case)
+  - (cs) never use open chunk as a chunk duplicate that needs to be deleted
 
 * MooseFS 3.0.109-1 (2019-11-28)
 

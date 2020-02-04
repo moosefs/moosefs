@@ -5887,13 +5887,13 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 		}
 	}
 	if (c->pathid!=0xFFFF) { // already have this chunk
-		if (version <= c->version) {	// current chunk is older
+		if (version <= c->version || c->crcrefcount) {	// new chunk is older than existing one or existing one is open
 			if (f->markforremoval!=MFR_READONLY) { // this is R/W fs?
 				hdd_create_filename(fname,f,pathid,chunkid,version);
 				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
 			}
 			currf = NULL;
-		} else { // current chunk is better, so use it, and clear older one
+		} else { // new chunk is better than existing one, so use it, and clear the existing
 			prevf = c->owner;
 			if (c->owner->markforremoval!=MFR_READONLY) { // current chunk is on R/W fs?
 				hdd_generate_filename(fname,c);

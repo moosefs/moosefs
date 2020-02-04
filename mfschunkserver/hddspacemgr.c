@@ -4804,7 +4804,7 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 		return MFS_ERROR_NOTDONE;
 	}
 	if (!(
-		(fsrc->damaged==0 && fsrc->toremove==REMOVING_NO && fsrc->markforremoval==MFR_NO && fsrc->scanstate==SCST_WORKING && fsrc->total>0) ||
+		(fsrc->damaged==0 && fsrc->toremove==REMOVING_NO && fsrc->markforremoval==MFR_NO && fsrc->scanstate==SCST_WORKING && fsrc->total>0) &&
 		(fdst->damaged==0 && fdst->toremove==REMOVING_NO && fdst->markforremoval==MFR_NO && fdst->scanstate==SCST_WORKING && fdst->total>0 && fdst->wfrcount==0)
 	)) {
 		zassert(pthread_mutex_unlock(&folderlock));

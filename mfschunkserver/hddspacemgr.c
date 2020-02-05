@@ -1826,6 +1826,7 @@ void* hdd_folder_scan(void *arg);
 void hdd_check_folders(void) {
 	folder *f,**fptr;
 	cfgline *cl;
+	waitforremoval *wfr;
 	uint32_t i;
 	double monotonic_time;
 	uint32_t err;
@@ -1893,6 +1894,12 @@ void hdd_check_folders(void) {
 						free(f->chunktab);
 					}
 					free(f->path);
+					while (f->wfrchunks) {
+						wfr = f->wfrchunks;
+						f->wfrchunks = f->wfrchunks->next;
+						free(wfr->fname);
+						free(wfr);
+					}
 					for (cl=cfglinehead ; cl!=NULL ; cl=cl->next) {
 						if (cl->f==f) {
 							cl->f = NULL;
@@ -6341,6 +6348,7 @@ void hdd_term(void) {
 	lostchunk *lc,*lcn;
 	newchunk *nc,*ncn;
 	damagedchunk *dmc,*dmcn;
+	waitforremoval *wfr;
 
 	syslog(LOG_NOTICE,"terminating aux threads");
 	zassert(pthread_mutex_lock(&termlock));
@@ -6461,6 +6469,12 @@ void hdd_term(void) {
 			free(f->chunktab);
 		}
 		free(f->path);
+		while (f->wfrchunks) {
+			wfr = f->wfrchunks;
+			f->wfrchunks = f->wfrchunks->next;
+			free(wfr->fname);
+			free(wfr);
+		}
 		free(f);
 	}
 	for (i=0 ; i<DHASHSIZE ; i++) {

@@ -286,8 +286,8 @@ typedef struct folder {
 	uint16_t min_pathid;
 	uint16_t current_pathid;
 	uint32_t subf_count[256];
-	uint32_t wfrtime;
-	uint32_t wfrlast;
+	double wfrtime;
+	double wfrlast;
 	uint32_t wfrcount;
 	waitforremoval *wfrchunks;
 	struct folder *next;
@@ -325,6 +325,7 @@ static uint32_t HSRebalanceLimit = 0;
 static uint32_t HDDErrorCount = 2;
 static uint32_t HDDErrorTime = 600;
 static uint32_t HDDRoundRobinChunkCount = 10000;
+static uint32_t HDDKeepDuplicatesHours = 7*24;
 static uint64_t LeaveFree;
 static uint8_t DoFsyncBeforeClose = 0;
 static uint32_t MinTimeBetweenTests = 86400;
@@ -1621,8 +1622,8 @@ static inline void hdd_wfr_check(folder *f) {
 		}
 	} else {
 		if (f->wfrcount>0) {
-			now = main_time();
-			if (f->wfrtime+7*86400<now) {
+			now = monotonic_seconds();
+			if (f->wfrtime+HDDKeepDuplicatesHours*3600.0<now) {
 				// unlink
 				if (fnames==NULL) {
 					fnames = malloc(sizeof(char*)*DUPLICATES_DELETE_LIMIT);
@@ -1641,15 +1642,15 @@ static inline void hdd_wfr_check(folder *f) {
 				if (f->wfrchunks==NULL) {
 					massert(f->wfrcount==0,"wait for removal count mismatch after unlink");
 				} else {
-					if (f->wfrlast+300<now) {
+					if (f->wfrlast+300.0<now) {
 						syslog(LOG_WARNING,"on drive '%s' chunk duplicates are being removed - %"PRIu32" left",f->path,f->wfrcount);
 						f->wfrlast = now;
 					}
 				}
 			} else {
 				// report
-				if (f->wfrlast+3600<now) {
-					syslog(LOG_WARNING,"on drive '%s' %"PRIu32" chunk duplicates detected - will remove them in about %u hours",f->path,f->wfrcount,(f->wfrtime+7*86400+3599U-now)/3600U);
+				if (f->wfrlast+3600.0<now) {
+					syslog(LOG_WARNING,"on drive '%s' %"PRIu32" chunk duplicates detected - will remove them in about %u hours",f->path,f->wfrcount,((uint32_t)(f->wfrtime)+HDDKeepDuplicatesHours*3600+3599U-(uint32_t)(now))/3600U);
 					f->wfrlast = now;
 				}
 			}
@@ -6894,8 +6895,8 @@ int hdd_parseline(char *hddcfgline) {
 	f->write_corr = 0.0;
 	f->rebalance_in_progress = 0;
 	f->rebalance_last_usec = 0;
-	f->wfrtime = main_time();
-	f->wfrlast = 0;
+	f->wfrtime = monotonic_seconds();
+	f->wfrlast = 0.0;
 	f->wfrcount = 0;
 	f->wfrchunks = NULL;
 	f->next = folderhead;
@@ -6997,6 +6998,7 @@ void hdd_info(void) {
 static inline void hdd_options_common(uint8_t initflag) {
 	char *LeaveFreeStr;
 	uint8_t sp;
+	uint32_t tmp;
 
 	zassert(pthread_mutex_lock(&folderlock));
 	HDDErrorCount = cfg_getuint32("HDD_ERROR_TOLERANCE_COUNT",2);
@@ -7023,6 +7025,20 @@ static inline void hdd_options_common(uint8_t initflag) {
 		mfs_syslog(LOG_NOTICE,"hdd space manager: round robin chunk count too big - changed to 100000");
 		HDDRoundRobinChunkCount = 100000;
 	}
+	tmp = cfg_getint32("HDD_KEEP_DUPLICATES_HOURS",168);
+	if (tmp>100*24) {
+		mfs_syslog(LOG_NOTICE,"hdd space manager: hours to keep duplicates value too big - changed to 2400");
+		tmp = 100*24;
+	}
+	if (tmp!=HDDKeepDuplicatesHours && initflag==0) {
+		folder *f;
+		for (f=folderhead ; f ; f=f->next ) {
+			if (f->wfrcount>0) {
+				f->wfrtime = monotonic_seconds();
+			}
+		}
+	}
+	HDDKeepDuplicatesHours = tmp;
 	zassert(pthread_mutex_unlock(&folderlock));
 	zassert(pthread_mutex_lock(&testlock));
 	if (cfg_isdefined("HDD_TEST_SPEED")) {

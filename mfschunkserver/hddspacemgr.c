@@ -1210,7 +1210,7 @@ static chunk* hdd_chunk_get(uint64_t chunkid,uint8_t cflag) {
 			c->state = CH_LOCKED;
 //			syslog(LOG_WARNING,"hdd_chunk_get returns chunk: %016"PRIX64" (c->state:%u)",c->chunkid,c->state);
 			zassert(pthread_mutex_unlock(&hashlock));
-			if (c->validattr==0) {
+			if (c->validattr==0 && cflag!=CH_NEW_AUTO) {
 				if (hdd_chunk_getattr(c)) {
 					char fname[PATH_MAX];
 					hdd_generate_filename(fname,c);

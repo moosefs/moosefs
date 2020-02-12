@@ -19,6 +19,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed memory leak in removing disk with duplicates
   - (cs) removed unnecessary attribute reading when chunk duplicates are detected (issue #327)
   - (cs) changed allocation of duplicated chunks from malloc to mmap, decreased memory usage by duplicates
+  - (client) reading in O_WRONLY no longer causes EACCES (might be related to issue #334)
 
 * MooseFS 3.0.109-1 (2019-11-28)
 

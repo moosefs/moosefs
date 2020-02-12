@@ -373,7 +373,7 @@ static void dirbuf_freeall(void) {
 
 /* FILE INODE DATA */
 
-enum {IO_READWRITE,IO_READONLY,IO_WRITEONLY};
+enum {IO_RW,IO_RO};
 
 typedef struct _lock_owner {
 #ifdef FLUSH_EXTRA_LOCKS
@@ -3274,37 +3274,13 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 	fileinfo->readers_cnt = 0;
 	fileinfo->writers_cnt = 0;
 	fileinfo->writing = 0;
-#if defined(__FreeBSD__)
-	if (freebsd_workarounds) {
-	/* old FreeBSD fuse reads whole file when opening with O_WRONLY|O_APPEND,
-	 * so can't open it write-only - use read-write instead */
-		if (accmode == O_RDONLY) {
-			fileinfo->mode = IO_READONLY;
-			fileinfo->rdata = NULL; // read_data_new(inode,fleng);
-			fileinfo->wdata = NULL;
-		} else {
-			fileinfo->mode = IO_READWRITE;
-			fileinfo->rdata = NULL;
-			fileinfo->wdata = NULL;
-		}
-	} else {
-#endif
 	if (accmode == O_RDONLY) {
-		fileinfo->mode = IO_READONLY;
-		fileinfo->rdata = NULL; // read_data_new(inode,fleng);
-		fileinfo->wdata = NULL;
-	} else if (accmode == O_WRONLY) {
-		fileinfo->mode = IO_WRITEONLY;
-		fileinfo->rdata = NULL;
-		fileinfo->wdata = NULL; // write_data_new(inode,fleng);
-	} else {
-		fileinfo->mode = IO_READWRITE;
-		fileinfo->rdata = NULL;
-		fileinfo->wdata = NULL;
+		fileinfo->mode = IO_RO;
+	} else { // with writeback cache enabled even in O_WRONLY accmode reading is allowed - hence only IO_RO and IO_RW !!!
+		fileinfo->mode = IO_RW;
 	}
-#if defined(__FreeBSD__)
-	}
-#endif
+	fileinfo->rdata = NULL;
+	fileinfo->wdata = NULL;
 	fileinfo->create = now;
 #ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress = 0;
@@ -4098,12 +4074,6 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		return;
 	}
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
-	if (fileinfo->mode==IO_WRITEONLY) {
-		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EACCES));
-		fuse_reply_err(req,EACCES);
-		return;
-	}
 	// rwlock_rdlock begin
 	while (fileinfo->writing | fileinfo->writers_cnt) {
 		zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
@@ -4242,7 +4212,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		return;
 	}
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
-	if (fileinfo->mode==IO_READONLY) {
+	if (fileinfo->mode==IO_RO) {
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EACCES));
 		fuse_reply_err(req,EACCES);
@@ -4314,7 +4284,7 @@ static inline int mfs_do_fsync(finfo *fileinfo) {
 	err = 0;
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	inode = fileinfo->inode;
-	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_READWRITE || fileinfo->mode==IO_WRITEONLY)) {
+	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_RW)) {
 		// rwlock_wrlock begin
 		fileinfo->writers_cnt++;
 		while (fileinfo->readers_cnt | fileinfo->writing) {
@@ -4406,7 +4376,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 #endif
 
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
-	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_READWRITE || fileinfo->mode==IO_WRITEONLY)) {
+	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_RW)) {
 		// rwlock_wrlock begin
 		fileinfo->writers_cnt++;
 		while (fileinfo->readers_cnt | fileinfo->writing) {

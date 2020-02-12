@@ -1,3 +1,39 @@
+moosefs (3.0.110-1) unstable; urgency=medium
+
+  * (cs) fixed bug that may lead to creating much more chunks in one subfolder
+    (issues #319,#326)
+  * (cs) added option for controling subdirectory selection algorithm for newly
+    created chunks (issues #319,#326)
+  * (cs) prevent potential dumping deleted chunks to 'chunk.db'
+  * (client) added options for setting behaviour when master returns
+    unavailable chunks or no space status (issue #322)
+  * (cgi) fixed logo and icon (file type for favicon.ico, change to current
+    logotype - issue #328)
+  * (master) turning off sending NOP's to unregistered clients (matoml module)
+  * (cs) fixed reporting wrong number of hours in duplications removal message
+  * (cs) redesigned duplicates removal procedure to do it in groups of 100
+    files (issue #327)
+  * (cs) introduce mypread and mypwrite macro (code cleaning)
+  * (cs) added check for changed crc before every chunk file close (just in
+    case)
+  * (cs) never use open chunk as a chunk duplicate that needs to be deleted
+  * (cs) never use disk with pending duplicates as destination disk during
+    internal rebalace (issue #327)
+  * (cs) fixed condidtion in internal rebalance procedure (issue #327)
+  * (cs) added option for setting duplicates retention time in hours (issue
+    #333)
+  * (cs) fixed memory leak in removing disk with duplicates
+  * (cs) removed unnecessary attribute reading when chunk duplicates are
+    detected (issue #327)
+  * (cs) changed allocation of duplicated chunks from malloc to mmap, decreased
+    memory usage by duplicates
+  * (client) reading in O_WRONLY no longer causes EACCES (might be related to
+    issue #334)
+  * (metadump) printing dots for non-printable characters made optional (issue
+    #332)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 12 Feb 2020 12:00:00 +0100
+
 moosefs (3.0.109-1) unstable; urgency=medium
 
   * (mfscgiserv) fixed handling redirects (bug intr in 3.0.108)

@@ -1,13 +1,15 @@
-.TH mfsmetadump "8" "November 2019" "MooseFS 3.0.109-1" "This is part of MooseFS"
+.TH mfsmetadump "8" "February 2020" "MooseFS 3.0.110-1" "This is part of MooseFS"
 .SH NAME
 mfsmetadump - dump MooseFS metadata info in human readable format
 .SH SYNOPSIS
-\fBmfsmetadump\fP [\fB\-s\fP \fIsection_name\fP] \fImetadata_file\fP
+\fBmfsmetadump\fP [\fB-d\fP] [\fB\-s\fP \fIsection_name\fP] \fImetadata_file\fP
 .SH DESCRIPTION
 \fBmfsmetadump\fP dumps MooseFS metadata info in human readable format. 
 Output consists of several sections with different types of information. Every section consist
 of header data - rows starting with hash (#) sign - and content data (may be empty). If option
-\fB-s\fP is specified then only given section of the file will be dumped.
+\fB-s\fP is specified then only given section of the file will be dumped. If option \fB-d\fP is
+specified then all non-printable characters (codes < 32 and > 126) are replaced with '.' (it was
+default behaviour in version < 3.0.110).
 .SH FILE HEADER
 .TP 20
 header
@@ -344,7 +346,7 @@ archive flag
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT
-Copyright (C) 2019 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (C) 2020 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

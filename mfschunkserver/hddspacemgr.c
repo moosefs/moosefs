@@ -130,8 +130,13 @@
 #define mypwrite(a,b,c,d) (lseek((a),(d),SEEK_SET),write((a),(b),(c)))
 #endif
 
+#define WFR_ENTRIES_IN_BLOCK ((4096 / (8+4+2)) - 2)
+
 typedef struct waitforremoval {
-	char *fname;
+	uint64_t chunkid[WFR_ENTRIES_IN_BLOCK];
+	uint32_t version[WFR_ENTRIES_IN_BLOCK];
+	uint16_t pathid[WFR_ENTRIES_IN_BLOCK];
+	uint16_t entries;
 	struct waitforremoval *next;
 } waitforremoval;
 
@@ -468,13 +473,17 @@ void printbacktrace(void) {
 }
 */
 
-void hdd_generate_filename(char fname[PATH_MAX],chunk *c) {
-	int errmem = errno;
-	if (c->pathid<256) {
-		snprintf(fname,PATH_MAX,"%s/%02"PRIX16"/chunk_%016"PRIX64"_%08"PRIX32".mfs",c->owner->path,c->pathid,c->chunkid,c->version);
+static inline void hdd_create_filename(char fname[PATH_MAX],const char *fpath,uint16_t pathid,uint64_t chunkid,uint32_t version) {
+	if (pathid<256) {
+		snprintf(fname,PATH_MAX,"%s/%02"PRIX16"/chunk_%016"PRIX64"_%08"PRIX32".mfs",fpath,pathid,chunkid,version);
 	} else {
 		snprintf(fname,PATH_MAX,"/dev/null");
 	}
+}
+
+void hdd_generate_filename(char fname[PATH_MAX],chunk *c) {
+	int errmem = errno;
+	hdd_create_filename(fname,c->owner->path,c->pathid,c->chunkid,c->version);
 	errno = errmem;
 }
 
@@ -1589,62 +1598,74 @@ static inline folder* hdd_getfolder() {
 }
 */
 
-static inline void hdd_wfr_add(folder *f,const char *fname) {
+static inline void hdd_wfr_add(folder *f,uint64_t chunkid,uint32_t version,uint16_t pathid) {
 	waitforremoval *wfr;
 
-	wfr = malloc(sizeof(waitforremoval));
-	passert(wfr);
-	wfr->fname = strdup(fname);
-	passert(wfr->fname);
-	wfr->next = f->wfrchunks;
-	f->wfrchunks = wfr;
+	if (f->wfrchunks==NULL || f->wfrchunks->entries>=WFR_ENTRIES_IN_BLOCK) {
+#ifdef MMAP_ALLOC
+		massert(sizeof(waitforremoval)<=4096,"bad waitforremoval size");
+		wfr = (waitforremoval*)mmap(NULL,4096,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
+#else
+		wfr = (waitforremoval*)malloc(sizeof(waitforremoval));
+#endif
+		passert(wfr);
+		wfr->entries = 0;
+		wfr->next = f->wfrchunks;
+		f->wfrchunks = wfr;
+	} else {
+		wfr = f->wfrchunks;
+	}
+	wfr->chunkid[wfr->entries] = chunkid;
+	wfr->version[wfr->entries] = version;
+	wfr->pathid[wfr->entries] = pathid;
+	wfr->entries++;
 	f->wfrcount++;
 }
 
 static inline void hdd_wfr_check(folder *f) {
-	static char **fnames = NULL;
-	waitforremoval *wfr;
+	static char fpath[PATH_MAX];
+	static waitforremoval *todelete = NULL;
+	char fname[PATH_MAX];
 	uint32_t now;
-	uint32_t limit;
+	uint32_t i;
 
 	if (f==NULL) {
-		if (fnames!=NULL) {
-			if (fnames[0]==NULL) {
-				free(fnames);
-				fnames=NULL;
-			} else {
-				for (limit=0 ; limit<DUPLICATES_DELETE_LIMIT && fnames[limit]!=NULL ; limit++) {
-					unlink(fnames[limit]);
-					free(fnames[limit]);
-					fnames[limit]=NULL;
-				}
+		if (todelete!=NULL) {
+			for (i=0 ; i<todelete->entries ; i++) {
+				hdd_create_filename(fname,fpath,todelete->pathid[i],todelete->chunkid[i],todelete->version[i]);
+				unlink(fname);
 			}
+#ifdef MMAP_ALLOC
+			munmap((void*)todelete,4096);
+#else
+			free((void*)todelete);
+#endif
+			todelete = NULL;
 		}
 	} else {
-		if (f->wfrcount>0) {
+		if (f->wfrcount>0 && todelete==NULL) {
 			now = monotonic_seconds();
 			if (f->wfrtime+HDDKeepDuplicatesHours*3600.0<now) {
-				// unlink
-				if (fnames==NULL) {
-					fnames = malloc(sizeof(char*)*DUPLICATES_DELETE_LIMIT);
-					for (limit=0 ; limit<DUPLICATES_DELETE_LIMIT ; limit++) {
-						fnames[limit]=NULL;
-					}
-				}
-				limit = 0;
-				while (limit<DUPLICATES_DELETE_LIMIT && (wfr = f->wfrchunks)!=NULL) {
-					fnames[limit] = wfr->fname;
-					f->wfrchunks = wfr->next;
-					f->wfrcount--;
-					free(wfr);
-					limit++;
-				}
-				if (f->wfrchunks==NULL) {
-					massert(f->wfrcount==0,"wait for removal count mismatch after unlink");
-				} else {
+				i = strlen(f->path);
+				if (i>=PATH_MAX) { // unlikely
+					fpath[0]=0;
 					if (f->wfrlast+300.0<now) {
-						syslog(LOG_WARNING,"on drive '%s' chunk duplicates are being removed - %"PRIu32" left",f->path,f->wfrcount);
+						syslog(LOG_ERR,"path too long (%s) - can't remove duplicates",f->path);
 						f->wfrlast = now;
+					}
+				} else {
+					memcpy(fpath,f->path,i+1);
+					todelete = f->wfrchunks;
+					f->wfrchunks = todelete->next;
+					f->wfrcount -= todelete->entries;
+					if (f->wfrchunks==NULL) {
+						massert(f->wfrcount==0,"wait for removal count mismatch after unlink");
+						syslog(LOG_NOTICE,"all duplicates have beed removed from drive '%s'",f->path);
+					} else {
+						if (f->wfrlast+300.0<now) {
+							syslog(LOG_NOTICE,"on drive '%s' chunk duplicates are being removed - %"PRIu32" left",f->path,f->wfrcount);
+							f->wfrlast = now;
+						}
 					}
 				}
 			} else {
@@ -1886,25 +1907,28 @@ void hdd_check_folders(void) {
 					f->chunktab = NULL;
 				} else {
 					*fptr = f->next;
-					syslog(LOG_NOTICE,"folder %s successfully removed",f->path);
 					if (f->lfd>=0) {
 						close(f->lfd);
 					}
 					if (f->chunktab) {
 						free(f->chunktab);
 					}
-					free(f->path);
 					while (f->wfrchunks) {
 						wfr = f->wfrchunks;
-						f->wfrchunks = f->wfrchunks->next;
-						free(wfr->fname);
-						free(wfr);
+						f->wfrchunks = wfr->next;
+#ifdef MMAP_ALLOC
+						munmap((void*)wfr,4096);
+#else
+						free((void*)wfr);
+#endif
 					}
 					for (cl=cfglinehead ; cl!=NULL ; cl=cl->next) {
 						if (cl->f==f) {
 							cl->f = NULL;
 						}
 					}
+					syslog(LOG_NOTICE,"folder %s successfully removed",f->path);
+					free(f->path);
 					free(f);
 				}
 			} else {
@@ -5830,9 +5854,9 @@ static inline int hdd_check_filename(const char *fname,uint64_t *chunkid,uint32_
 	return 0;
 }
 
-void hdd_create_filename(char fname[PATH_MAX],folder *f,uint16_t pathid,uint64_t chunkid,uint32_t version) {
+void hdd_create_filename_for_path(char fname[PATH_MAX],const char *fpath,uint16_t pathid,uint64_t chunkid,uint32_t version) {
 	if (pathid<256) {
-		snprintf(fname,PATH_MAX,"%s/%02"PRIX16"/chunk_%016"PRIX64"_%08"PRIX32".mfs",f->path,pathid,chunkid,version);
+		snprintf(fname,PATH_MAX,"%s/%02"PRIX16"/chunk_%016"PRIX64"_%08"PRIX32".mfs",fpath,pathid,chunkid,version);
 	} else {
 		snprintf(fname,PATH_MAX,"/dev/null");
 	}
@@ -5850,10 +5874,10 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	if (blocks<MFSBLOCKSINCHUNK) {
 		validattr = 1;
 	} else if (f->sizelimit) {
-		hdd_create_filename(fname,f,pathid,chunkid,version);
+		hdd_create_filename(fname,f->path,pathid,chunkid,version);
 		if (stat(fname,&sb)<0) {
 			if (f->markforremoval!=MFR_READONLY) {
-				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
+				hdd_wfr_add(f,chunkid,version,pathid); // add file to 'wait for removal' queue
 			}
 			return;
 		}
@@ -5864,13 +5888,13 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 		hdrsize = (sb.st_size - CHUNKCRCSIZE) & MFSBLOCKMASK;
 		if (hdrsize!=OLDHDRSIZE && hdrsize!=NEWHDRSIZE) {
 			if (f->markforremoval!=MFR_READONLY) {
-				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
+				hdd_wfr_add(f,chunkid,version,pathid); // add file to 'wait for removal' queue
 			}
 			return;
 		}
 		if (sb.st_size<(hdrsize+CHUNKCRCSIZE) || sb.st_size>((uint32_t)hdrsize+CHUNKCRCSIZE+MFSCHUNKSIZE)) {
 			if (f->markforremoval!=MFR_READONLY) {
-				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
+				hdd_wfr_add(f,chunkid,version,pathid); // add file to 'wait for removal' queue
 			}
 			return;
 		}
@@ -5889,7 +5913,7 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	if (c==NULL) { // already have this chunk, but with error state - try, to create new one
 		c = hdd_chunk_get(chunkid,CH_NEW_AUTO);
 		if (c==NULL) {
-			hdd_create_filename(fname,f,pathid,chunkid,version);
+			hdd_create_filename(fname,f->path,pathid,chunkid,version);
 			mfs_arg_syslog(LOG_WARNING,"can't create chunk record for file: %s",fname);
 			return;
 		}
@@ -5897,15 +5921,13 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 	if (c->pathid!=0xFFFF) { // already have this chunk
 		if (version <= c->version || c->crcrefcount) {	// new chunk is older than existing one or existing one is open
 			if (f->markforremoval!=MFR_READONLY) { // this is R/W fs?
-				hdd_create_filename(fname,f,pathid,chunkid,version);
-				hdd_wfr_add(f,fname); // add file to 'wait for removal' queue
+				hdd_wfr_add(f,chunkid,version,pathid); // add file to 'wait for removal' queue
 			}
 			currf = NULL;
 		} else { // new chunk is better than existing one, so use it, and clear the existing
 			prevf = c->owner;
 			if (c->owner->markforremoval!=MFR_READONLY) { // current chunk is on R/W fs?
-				hdd_generate_filename(fname,c);
-				hdd_wfr_add(c->owner,fname); // add file to 'wait for removal' queue
+				hdd_wfr_add(c->owner,chunkid,version,pathid); // add file to 'wait for removal' queue
 			}
 			c->version = version;
 			c->blocks = blocks;
@@ -6471,9 +6493,12 @@ void hdd_term(void) {
 		free(f->path);
 		while (f->wfrchunks) {
 			wfr = f->wfrchunks;
-			f->wfrchunks = f->wfrchunks->next;
-			free(wfr->fname);
-			free(wfr);
+			f->wfrchunks = wfr->next;
+#ifdef MMAP_ALLOC
+			munmap((void*)wfr,4096);
+#else
+			free((void*)wfr);
+#endif
 		}
 		free(f);
 	}
@@ -7174,6 +7199,13 @@ int hdd_init(void) {
 #else
 	fprintf(stderr,"SEEK+READ/WRITE\n");
 #endif
+#endif
+
+#ifdef MMAP_ALLOC
+	if (sizeof(waitforremoval)>4096) {
+		fprintf(stderr,"bad waitforremoval size (%lu - should be <= 4096)",(unsigned long int)sizeof(waitforremoval));
+		return -1;
+	}
 #endif
 
 #ifndef PRESERVE_BLOCK

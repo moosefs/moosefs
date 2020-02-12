@@ -18,6 +18,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) added option for setting duplicates retention time in hours (issue #333)
   - (cs) fixed memory leak in removing disk with duplicates
   - (cs) removed unnecessary attribute reading when chunk duplicates are detected (issue #327)
+  - (cs) changed allocation of duplicated chunks from malloc to mmap, decreased memory usage by duplicates
 
 * MooseFS 3.0.109-1 (2019-11-28)
 

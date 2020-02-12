@@ -66,6 +66,9 @@
 # how many chunks should be created in one directory before moving to the next one (higher values are better with most OSes cacheing algorithms, low values lead to more even chunk distribution, default is 10000 which works best in most cases)
 # HDD_RR_CHUNK_COUNT = 10000
 
+# how many hours duplicate chunks should be kept before deleting
+# HDD_KEEP_DUPLICATES_HOURS = 168
+
 # when set to one chunkserver will not abort start even when incorrect entries are found in 'mfshdd.cfg' file
 # ALLOW_STARTING_WITH_INVALID_DISKS = 0
 

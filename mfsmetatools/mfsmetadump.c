@@ -41,8 +41,14 @@ const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 
 #define MAXSCLASSNLENG 256
 
+static int hide_nonprintable = 0;
+
 static inline char dispchar(uint8_t c) {
-	return (c>=32 && c<=126)?c:'.';
+	if (hide_nonprintable) {
+		return (c>=32 && c<=126)?c:'.';
+	} else {
+		return c;
+	}
 }
 
 static inline void makestrip(char strip[16],uint32_t ip) {
@@ -57,9 +63,11 @@ void print_name(FILE *in,uint32_t nleng) {
 	while (nleng>0) {
 		y = (nleng>1024)?1024:nleng;
 		x = fread(buff,1,y,in);
-		for (i=0 ; i<x ; i++) {
-			if (buff[i]<32 || buff[i]>127) {
-				buff[i]='.';
+		if (hide_nonprintable) {
+			for (i=0 ; i<x ; i++) {
+				if (buff[i]<32 || buff[i]>127) {
+					buff[i]='.';
+				}
 			}
 		}
 		happy = fwrite(buff,1,x,stdout);
@@ -1442,7 +1450,10 @@ int fs_loadall(const char *fname,const char section[4]) {
 
 void usage(const char *appname) {
 //	printf("usage: %s [-f J|C[separator]] [-o outputfile] [-a sum_name] metadata.mfs PATH ...\n",appname);
-	printf("usage: %s [-s section to dump] metadata.mfs\n",appname);
+	printf("usage: %s [-d] [-s section to dump] metadata.mfs\n",appname);
+	printf("options:\n");
+	printf("\td: print dot instead of non printable characters\n");
+	printf("\ts: dump only given section\n");
 	printf("section names:\n");
 	printf("\tHEAD - header info\n");
 	printf("\tSESS - client sessions\n");
@@ -1470,7 +1481,7 @@ int main(int argc,char *argv[]) {
 	appname = argv[0];
 	memset(section,0,4);
 
-	while ((ch=getopt(argc,argv,"s:"))>=0) {
+	while ((ch=getopt(argc,argv,"s:d"))>=0) {
 		switch(ch) {
 			case 's':
 				if (strlen(optarg)!=4) {
@@ -1478,6 +1489,9 @@ int main(int argc,char *argv[]) {
 					usage(appname);
 				}
 				memcpy(section,optarg,4);
+				break;
+			case 'd':
+				hide_nonprintable = 1;
 				break;
 			default:
 				usage(appname);

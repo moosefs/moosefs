@@ -1,41 +1,44 @@
 <img align="right" alt="MooseFS logo" src="https://moosefs.com/Content/Images/moosefs.png" />
 
-# MooseFS - A Petabyte Distributed File System
-MooseFS is a Petabyte Open Source Network Distributed File System. It is easy to deploy and maintain, fault tolerant, highly performing, easily scalable, POSIX compliant.
+# MooseFS – A Petabyte Distributed File System
+MooseFS is a Petabyte Open Source Network Distributed File System. It is easy to deploy and maintain, highly reliable, fault tolerant, highly performing, easily scalable and POSIX compliant.
 
-MooseFS spreads data over several physical commodity servers, which are visible to the user as one big volume. For standard file operations MooseFS acts like ordinary Unix-like file system:
+MooseFS spreads data over a number of commodity servers, which are visible to the user as one resource. For standard file operations MooseFS acts like ordinary Unix-like file system:
 
-* A hierarchical structure (directory tree)
-* Stores POSIX file attributes (permissions, last access and modification times, etc.)
-* Supports ACLs
-* Supports POSIX and BSD locks
-* Supports special files (block and character devices, pipes and sockets)
-* Symbolic links (file names pointing to target files, not necessarily on MooseFS) and hard links (different names of files which refer to the same data on MooseFS)
+* A hierarchical structure – **directory tree**
+* Stores **POSIX file attributes** – permissions, last access and modification times, etc.
+* Supports **ACLs**
+* Supports POSIX and BSD **file locks** – including support for **distributed file locking**
+* Supports **special files** – block and character devices, pipes and sockets
+* Supports **symbolic links** – file names pointing to target files, not necessarily on MooseFS
+* Supports **hard links** – different names of files which refer to the same data on MooseFS
 
 Distinctive MooseFS features:
 
-* High reliability - configurable number of files' copies are stored on separate servers
-* No Single Point of Failure - all hardware and software components may be redundant
-* Parallel data operations - many clients can access many files concurrently
-* Capacity can be dynamically expanded by simply adding new computers/disks on the fly
-* Retired hardware may be removed on the fly
-* Deleted files are retained for a configurable period of time (a file system level "trash bin")
-* Coherent, "atomic" snapshots of files, even while the files are being written/accessed
-* Access to the file system can be limited based on IP address and/or password (similarly as in NFS)
-* Data tiering - supports different storage policies for different files/directories
-* Efficient, pure C implementation
-* Ethernet support
+* **High reliability** – files are stored in several copies on separate servers. The number of copies is called "goal" and is a configurable parameter, even per each file
+* **No Single Point of Failure** – all hardware and software components may be redundant
+* **Parallel** data operations – many clients can access many files concurrently
+* Capacity can be **dynamically expanded** by simply adding new servers/disks on the fly
+* Retired hardware **may be removed on the fly**
+* Deleted files are retained for a configurable period of time (a **file system level "trash bin"**)
+* **Coherent, "atomic" snapshots** of files, even while the files are being written/accessed
+* **Access to the file system can be limited** based on IP address and/or password (similarly as in NFS)
+* **Data tiering** – supports different storage policies for different files/directories in Storage Classes mechanism
+* Per-directory, **"project" quotas** – configurable per RAW space, usable space, number of inodes with hard and soft quotas support
+* Apart from file system storage, MooseFS also provides **block storage** (`mfsbdev`)
+* Efficient, **pure C** implementation
+* **Ethernet** support
 
 ## Supported platforms
-MooseFS can be installed on any POSIX compliant operating system including different Linux distributions, FreeBSD, OS X:
+MooseFS can be installed on any POSIX compliant operating system including various Linux distributions, FreeBSD and macOS:
 
 * Ubuntu
 * Debian
-* RHEL/CentOS
+* RHEL / CentOS
 * OpenSUSE
 * FreeBSD
 * macOS
-* Raspbian - Raspberry Pi 3
+* Raspbian – Raspberry Pi 3
 
 MooseFS Linux Client uses [FUSE](https://github.com/libfuse/libfuse). MooseFS macOS Client uses [FUSE for macOS](https://github.com/osxfuse/osxfuse).
 
@@ -44,18 +47,18 @@ There is a separate MooseFS Client for Microsoft Windows available, built on top
 ## Getting started
 You can install MooseFS using your favourite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download):
 
-* Ubuntu 14/16/18
-* Debian 8/9
-* RHEL/CentOS 6/7
-* FreeBSD 9.3/10/11
+* Ubuntu 14 / 16 / 18
+* Debian 8 / 9 / 10
+* RHEL / CentOS 6 / 7 / 8
+* FreeBSD 11 / 12
 * macOS 10.9-10.14
-* Raspbian 8 (Jessie) - Raspberry Pi 3
+* Raspbian 8 / 9 – Raspberry Pi 3
 
 Minimal set of packages, which are needed to run MooseFS:
 
 * `moosefs-master` MooseFS Master Server for metadata servers,
 * `moosefs-chunkserver` MooseFS Chunkserver for data storage servers,
-* `moosefs-client` MooseFS Client - client side package to mount the filesystem.
+* `moosefs-client` MooseFS Client – client side package to mount the filesystem.
 
 ### Source code
 Feel free to download the source code from our GitHub code repository!
@@ -70,7 +73,7 @@ Recommended packages:
 * Debian/Ubuntu: `sudo apt install fuse`
 * CentOS/RHEL: `sudo yum install fuse`
 
-Building MooseFS on Linux can be easily done by running `./linux_build.sh`. Similarly, use `./freebsd_build.sh` in order to build MooseFS on FreeBSD and respectively `./macosx_build.sh` on macOS. Remember, that these scripts do not install binaries (i.e. do not run `make install`) at the end. Run this command manually.
+Building MooseFS on Linux can be easily done by running `./linux_build.sh`. Similarly, use `./freebsd_build.sh` in order to build MooseFS on FreeBSD and respectively `./macosx_build.sh` on macOS. Remember that these scripts do not install binaries (i.e. do not run `make install`) at the end. Run this command manually.
 
 ### Minimal setup
 Just three steps to have MooseFS up and running:
@@ -91,7 +94,7 @@ chown mfs:mfs metadata.mfs
 rm metadata.mfs.empty
 ```
 4. Run Master Server (as `root`): `mfsmaster start`
-5. Make this machine visible under `mfsmaster` name (e.g. by adding a DNS entry or adding it in `/etc/hosts` on all servers)
+5. Make this machine visible under `mfsmaster` name, e.g. by adding a DNS entry (recommended) or adding it in `/etc/hosts` on **all** servers that run any of MooseFS components
 
 #### 2. Install at least two Chunkservers
 1. Install `moosefs-chunkserver` package
@@ -109,7 +112,7 @@ cp mfshdd.cfg.sample mfshdd.cfg
 ```
 It is recommended to use XFS as an underlying filesystem for disks designated to store chunks.
 
-4. Change the ownership and permissions to `mfs:mfs` to above mentioned locations, e.g.:
+4. Change the ownership and permissions to `mfs:mfs` to above mentioned locations:
 ```
 chown mfs:mfs /mnt/chunks1 /mnt/chunks2 /mnt/chunks3
 chmod 770 /mnt/chunks1 /mnt/chunks2 /mnt/chunks3
@@ -137,12 +140,13 @@ There are more configuration parameters available but most of them may stay with
 MooseFS, for testing purposes, can even be installed on a single machine!
 
 #### Additional tools
-Setting up `moosefs-cli` or `moosefs-cgi` both with `moosefs-cgiserv` is also recommended - it gives you a possibility to monitor the cluster online:
+Setting up `moosefs-cli` or `moosefs-cgi` both with `moosefs-cgiserv` is also recommended – it gives you a possibility to monitor the cluster online:
 1. Install `moosefs-cli moosefs-cgi moosefs-cgiserv` packages (they are typically set up on the Master Server)
 2. Run MooseFS CGI Server (as `root`): `mfscgiserv start`
 3. Open http://mfsmaster:9425 in your web browser
 
-It is also strongly recommended to set up at least one Metalogger on a different machine than Master Server (e.g. on one of Chunkservers). Metalogger constantly synchronizes and backups the metadata:
+It is also **strongly** recommended to set up at least one Metalogger on a different machine than Master Server (e.g. on one of Chunkservers). Metalogger constantly synchronizes and backups the metadata:
+
 1. Install `moosefs-metalogger` package
 2. Prepare default config (as `root`):
 ```
@@ -162,12 +166,12 @@ Refer to [installation guides](https://moosefs.com/support/#documentation) for m
 * (Old) Sourceforge project site: http://sourceforge.net/projects/moosefs
 
 ## Contact us
-* Reporting bugs: [GitHub issue](https://github.com/moosefs/moosefs/issues) or [support@moosefs.com](mailto:support@moosefs.com)
-* General: [contact@moosefs.com](mailto:contact@moosefs.com)
+* Reporting bugs: [GitHub issue](https://github.com/moosefs/moosefs/issues) or [support@moosefs.pro](mailto:support@moosefs.pro)
+* General: [contact@moosefs.pro](mailto:contact@moosefs.pro)
 
 
 ## Copyright
-Copyright (c) 2008-2019 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (c) 2008-2020 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

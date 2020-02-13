@@ -9,7 +9,7 @@ MASTER_SITES=		http://ppa.moosefs.com/src/
 PKGNAMESUFFIX?=		-master
 DISTNAME=		moosefs-${PORTVERSION}-${PORTREVISION}
 
-MAINTAINER=		freebsd@moosefs.com
+MAINTAINER=		freebsd@moosefs.pro
 COMMENT?=		Fault-tolerant distributed filesystem
 
 LICENSE=		GPLv2

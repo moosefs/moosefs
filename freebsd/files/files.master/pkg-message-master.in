@@ -1,6 +1,6 @@
 [
 { type: install
-  message <<EOM
+  message: <<EOM
 A startup script has been installed as:
 
 %%PREFIX%%/etc/rc.d/mfsmaster

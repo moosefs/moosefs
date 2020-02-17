@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.111-1 (WIP)
+
+  - (cs) added protections against segfaults (issue #342)
+
 * MooseFS 3.0.110-1 (2020-02-12)
 
   - (cs) fixed bug that may lead to creating much more chunks in one subfolder (issues #319,#326)

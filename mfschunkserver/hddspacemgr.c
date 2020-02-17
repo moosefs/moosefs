@@ -483,7 +483,11 @@ static inline void hdd_create_filename(char fname[PATH_MAX],const char *fpath,ui
 
 void hdd_generate_filename(char fname[PATH_MAX],chunk *c) {
 	int errmem = errno;
-	hdd_create_filename(fname,c->owner->path,c->pathid,c->chunkid,c->version);
+	if (c->owner!=NULL) {
+		hdd_create_filename(fname,c->owner->path,c->pathid,c->chunkid,c->version);
+	} else {
+		hdd_create_filename(fname,"(unknown)",c->pathid,c->chunkid,c->version);
+	}
 	errno = errmem;
 }
 
@@ -1066,7 +1070,7 @@ static inline void hdd_chunk_remove(chunk *c) {
 		if (c==cp) {
 			*cptr = cp->next;
 			if (cp->fd>=0) {
-				if (cp->crcchanged) { // mainly pro forma
+				if (cp->crcchanged && cp->owner!=NULL) { // mainly pro forma
 					syslog(LOG_WARNING,"hdd_chunk_remove: CRC not flushed - writing now");
 					if (chunk_writecrc(cp)!=MFS_STATUS_OK) {
 						char fname[PATH_MAX];
@@ -2301,9 +2305,11 @@ static inline void chunk_freecrc(chunk *c) {
 static inline int chunk_writecrc(chunk *c) {
 	int ret;
 	char fname[PATH_MAX];
-	zassert(pthread_mutex_lock(&folderlock));
-	c->owner->needrefresh = 1;
-	zassert(pthread_mutex_unlock(&folderlock));
+	if (c->owner!=NULL) {
+		zassert(pthread_mutex_lock(&folderlock));
+		c->owner->needrefresh = 1;
+		zassert(pthread_mutex_unlock(&folderlock));
+	}
 	ret = mypwrite(c->fd,c->crc,CHUNKCRCSIZE,c->hdrsize);
 	if (ret!=CHUNKCRCSIZE) {
 		int errmem = errno;
@@ -2501,7 +2507,7 @@ void hdd_delayed_ops() {
 #endif /* PRESERVE_BLOCK */
 //				printf("descriptor\n");
 				if (c->fd>=0 && c->opento<now) {
-					if (c->crcchanged) { // should never happened !!!
+					if (c->crcchanged && c->owner!=NULL) { // should never happened !!!
 						syslog(LOG_WARNING,"hdd_delayed_ops: CRC not flushed - writing now");
 						if (chunk_writecrc(c)!=MFS_STATUS_OK) {
 							hdd_generate_filename(fname,c); // preserves errno !!!
@@ -2527,6 +2533,7 @@ void hdd_delayed_ops() {
 					}
 //					printf("chunk %llu - free crc record\n",c->chunkid);
 					chunk_freecrc(c);
+					c->crcchanged = 0;
 					c->crcto = 0.0;
 				}
 #ifdef PRESERVE_BLOCK

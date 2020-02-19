@@ -3825,9 +3825,11 @@ static int hdd_int_duplicate(uint64_t chunkid,uint32_t version,uint32_t newversi
 		return status;
 	}
 	c->blocks = oc->blocks;
-	zassert(pthread_mutex_lock(&folderlock));
-	c->owner->needrefresh = 1;
-	zassert(pthread_mutex_unlock(&folderlock));
+	if (c->owner!=NULL) {
+		zassert(pthread_mutex_lock(&folderlock));
+		c->owner->needrefresh = 1;
+		zassert(pthread_mutex_unlock(&folderlock));
+	}
 	hdd_chunk_release(c);
 	hdd_chunk_release(oc);
 	return MFS_STATUS_OK;
@@ -4029,7 +4031,7 @@ static int hdd_int_truncate(uint64_t chunkid,uint32_t version,uint32_t newversio
 			c->crcchanged = 1;
 		}
 	}
-	if (c->blocks != blocks) {
+	if (c->blocks != blocks && c->owner!=NULL) {
 		zassert(pthread_mutex_lock(&folderlock));
 		c->owner->needrefresh = 1;
 		zassert(pthread_mutex_unlock(&folderlock));
@@ -4631,9 +4633,11 @@ static int hdd_int_duptrunc(uint64_t chunkid,uint32_t version,uint32_t newversio
 		return status;
 	}
 	c->blocks = blocks;
-	zassert(pthread_mutex_lock(&folderlock));
-	c->owner->needrefresh = 1;
-	zassert(pthread_mutex_unlock(&folderlock));
+	if (c->owner!=NULL) {
+		zassert(pthread_mutex_lock(&folderlock));
+		c->owner->needrefresh = 1;
+		zassert(pthread_mutex_unlock(&folderlock));
+	}
 	hdd_chunk_release(c);
 	hdd_chunk_release(oc);
 	return MFS_STATUS_OK;
@@ -4662,9 +4666,11 @@ static int hdd_int_delete(uint64_t chunkid,uint32_t version) {
 			mfs_arg_errlog_silent(LOG_WARNING,"delete_chunk: file:%s - chunk already deleted !!!",fname);
 		}
 	} else {
-		zassert(pthread_mutex_lock(&folderlock));
-		c->owner->needrefresh = 1;
-		zassert(pthread_mutex_unlock(&folderlock));
+		if (c->owner!=NULL) {
+			zassert(pthread_mutex_lock(&folderlock));
+			c->owner->needrefresh = 1;
+			zassert(pthread_mutex_unlock(&folderlock));
+		}
 	}
 	hdd_chunk_delete(c);
 	return MFS_STATUS_OK;

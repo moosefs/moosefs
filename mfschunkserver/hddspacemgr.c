@@ -1072,11 +1072,7 @@ static inline void hdd_chunk_remove(chunk *c) {
 			if (cp->fd>=0) {
 				if (cp->crcchanged && cp->owner!=NULL) { // mainly pro forma
 					syslog(LOG_WARNING,"hdd_chunk_remove: CRC not flushed - writing now");
-					if (chunk_writecrc(cp)!=MFS_STATUS_OK) {
-						char fname[PATH_MAX];
-						hdd_generate_filename(fname,cp); // preserves errno !!!
-						mfs_arg_errlog_silent(LOG_WARNING,"hdd_chunk_remove: file:%s - write error",fname);
-					}
+					chunk_writecrc(cp);
 				}
 				close(cp->fd);
 				hdd_open_files_handle(OF_AFTER_CLOSE);
@@ -1226,8 +1222,8 @@ static chunk* hdd_chunk_get(uint64_t chunkid,uint8_t cflag) {
 			if (c->validattr==0 && cflag!=CH_NEW_AUTO) {
 				if (hdd_chunk_getattr(c)) {
 					char fname[PATH_MAX];
-					hdd_generate_filename(fname,c);
 					hdd_report_damaged_chunk(c);
+					hdd_generate_filename(fname,c);
 					unlink(fname);
 					hdd_chunk_delete(c);
 					return NULL;
@@ -1239,11 +1235,7 @@ static chunk* hdd_chunk_get(uint64_t chunkid,uint8_t cflag) {
 				if (c->fd>=0) {
 					if (c->crcchanged) { // mainly pro forma
 						syslog(LOG_WARNING,"hdd_chunk_get: CRC not flushed - writing now");
-						if (chunk_writecrc(c)!=MFS_STATUS_OK) {
-							char fname[PATH_MAX];
-							hdd_generate_filename(fname,c); // preserves errno !!!
-							mfs_arg_errlog_silent(LOG_WARNING,"hdd_chunk_get: file:%s - write error",fname);
-						}
+						chunk_writecrc(c);
 					}
 					close(c->fd);
 					hdd_open_files_handle(OF_AFTER_CLOSE);
@@ -1801,11 +1793,7 @@ uint8_t hdd_senddata(folder *f,int rmflag) {
 						if (c->fd>=0) {
 							if (c->crcchanged) {
 								syslog(LOG_WARNING,"hdd_senddata: CRC not flushed - writing now");
-								if (chunk_writecrc(c)!=MFS_STATUS_OK) {
-									char fname[PATH_MAX];
-									hdd_generate_filename(fname,c); // preserves errno !!!
-									mfs_arg_errlog_silent(LOG_WARNING,"hdd_senddata: file:%s - write error",fname);
-								}
+								chunk_writecrc(c);
 							}
 							close(c->fd);
 							hdd_open_files_handle(OF_AFTER_CLOSE);
@@ -2510,8 +2498,8 @@ void hdd_delayed_ops() {
 					if (c->crcchanged && c->owner!=NULL) { // should never happened !!!
 						syslog(LOG_WARNING,"hdd_delayed_ops: CRC not flushed - writing now");
 						if (chunk_writecrc(c)!=MFS_STATUS_OK) {
-							hdd_generate_filename(fname,c); // preserves errno !!!
-							mfs_arg_errlog_silent(LOG_WARNING,"hdd_delayed_ops: file:%s - write error",fname);
+							hdd_error_occured(c);	// uses and preserves errno !!!
+							hdd_report_damaged_chunk(c);
 						} else {
 							c->crcchanged = 0;
 						}
@@ -2640,16 +2628,11 @@ static int hdd_io_begin(chunk *c,int mode) {
 
 static int hdd_io_end(chunk *c) {
 	int status;
-	char fname[PATH_MAX];
 
 	if (c->crcchanged) {
 		status = chunk_writecrc(c);
 		c->crcchanged = 0;
 		if (status!=MFS_STATUS_OK) {
-			int errmem = errno;
-			hdd_generate_filename(fname,c); // preserves errno !!!
-			mfs_arg_errlog_silent(LOG_WARNING,"hdd_io_end: file:%s - write error",fname);
-			errno = errmem;
 			return status;
 		}
 		c->fsyncneeded = 1;
@@ -6453,11 +6436,7 @@ void hdd_term(void) {
 				if (c->fd>=0) {
 					if (c->crcchanged) {
 						syslog(LOG_WARNING,"hdd_term: CRC not flushed - writing now");
-						if (chunk_writecrc(c)!=MFS_STATUS_OK) {
-							char fname[PATH_MAX];
-							hdd_generate_filename(fname,c); // preserves errno !!!
-							mfs_arg_errlog_silent(LOG_WARNING,"hdd_term: file:%s - write error",fname);
-						}
+						chunk_writecrc(c);
 					}
 					close(c->fd);
 					hdd_open_files_handle(OF_AFTER_CLOSE);

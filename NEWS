@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.111-1 (WIP)
+* MooseFS 3.0.111-1 (2020-02-19)
 
   - (cs) added protections against segfaults (issue #342)
   - (cs) removed unnecessary error messages

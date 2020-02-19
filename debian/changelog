@@ -1,3 +1,10 @@
+moosefs (3.0.111-1) unstable; urgency=medium
+
+  * (cs) added protections against segfaults (issue #342)
+  * (cs) removed unnecessary error messages
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 19 Feb 2020 12:00:00 +0100
+
 moosefs (3.0.110-1) unstable; urgency=medium
 
   * (cs) fixed bug that may lead to creating much more chunks in one subfolder

@@ -476,6 +476,7 @@ void printbacktrace(void) {
 static inline void hdd_create_filename(char fname[PATH_MAX],const char *fpath,uint16_t pathid,uint64_t chunkid,uint32_t version) {
 	if (pathid<256) {
 		snprintf(fname,PATH_MAX,"%s/%02"PRIX16"/chunk_%016"PRIX64"_%08"PRIX32".mfs",fpath,pathid,chunkid,version);
+		fname[PATH_MAX-1]=0;
 	} else {
 		snprintf(fname,PATH_MAX,"/dev/null");
 	}
@@ -1619,7 +1620,7 @@ static inline void hdd_wfr_add(folder *f,uint64_t chunkid,uint32_t version,uint1
 }
 
 static inline void hdd_wfr_check(folder *f) {
-	static char fpath[PATH_MAX];
+	static char fpath[PATH_MAX-100];
 	static waitforremoval *todelete = NULL;
 	char fname[PATH_MAX];
 	uint32_t now;
@@ -1643,7 +1644,7 @@ static inline void hdd_wfr_check(folder *f) {
 			now = monotonic_seconds();
 			if (f->wfrtime+HDDKeepDuplicatesHours*3600.0<now) {
 				i = strlen(f->path);
-				if (i>=PATH_MAX) { // unlikely
+				if (i>=PATH_MAX-100) { // unlikely
 					fpath[0]=0;
 					if (f->wfrlast+300.0<now) {
 						syslog(LOG_ERR,"path too long (%s) - can't remove duplicates",f->path);

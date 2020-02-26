@@ -748,7 +748,7 @@ void* read_worker(void *arg) {
 					read_job_end(rreq,EIO,0);
 				} else {
 					zassert(pthread_mutex_lock(&(ind->lock)));
-					if (ind->trycnt >= minlogretry) {
+					if (trycnt >= minlogretry) {
 						syslog(LOG_WARNING,"file: %"PRIu32", index: %"PRIu32" - fs_readchunk returned status: %s",inode,chindx,mfsstrerr(rdstatus));
 					}
 					ind->trycnt++;
@@ -775,18 +775,17 @@ void* read_worker(void *arg) {
 				}
 			} else {
 				zassert(pthread_mutex_lock(&(ind->lock)));
-				if (ind->trycnt<=2) {
-					ind->trycnt++;
-					trycnt = ind->trycnt;
+				if (rreq->mode == BREAK) {
 					zassert(pthread_mutex_unlock(&(ind->lock)));
-					read_delayed_enqueue(rreq,1000);
-				} else if (ind->trycnt<=6) {
-					ind->trycnt++;
-					trycnt = ind->trycnt;
-					zassert(pthread_mutex_unlock(&(ind->lock)));
-					read_delayed_enqueue(rreq,100000);
+					read_job_end(rreq,0,0);
 				} else {
-					read_delayed_enqueue(rreq,500000);
+					rreq->mode = INQUEUE;
+					if (ind->trycnt<=6) {
+						ind->trycnt++;
+					}
+					trycnt = ind->trycnt;
+					zassert(pthread_mutex_unlock(&(ind->lock)));
+					read_delayed_enqueue(rreq,(trycnt<=2)?1000:(trycnt<=6)?100000:500000);
 				}
 			}
 			chunkrwlock_runlock(inode,chindx);

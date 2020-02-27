@@ -25,8 +25,7 @@ Distinctive MooseFS features:
 =============================
 
   * High reliability – files are stored in several copies on separate servers.
-    The number of copies is called "goal" and is a configurable parameter,
-    even per each file
+    The number of copies is is a configurable parameter, even per each file
   * No Single Point of Failure – all hardware and software components may be
     redundant
   * Parallel data operations – many clients can access many files concurrently
@@ -76,12 +75,14 @@ You can install MooseFS using your favorite package manager on one
 of the following platforms using officially supported repositories
 (https://moosefs.com/download):
 
-  * Ubuntu 14 / 16 / 18
+  * Ubuntu  16 / 18
   * Debian 8 / 9 / 10
-  * RHEL / CentOS 6 / 7 / 8
+  * RHEL / CentOS 7 / 8
   * FreeBSD 11 / 12
   * macOS 10.9-10.14
   * Raspbian 8 / 9 – Raspberry Pi 3
+
+Packages for Ubuntu 14 and CentOS 6 are also available, but no longer supported.
 
 Minimal set of packages, which are needed to run MooseFS:
   * moosefs-master – MooseFS Master Server for metadata servers,
@@ -96,12 +97,18 @@ Source code
 Feel free to download the source code from our GitHub code repository!
 
 Install the following dependencies before building MooseFS from sources:
-  * Debian/Ubuntu: sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config
-  * CentOS/RHEL: sudo yum install gcc gcc-c++ make libpcap-devel zlib-devel fuse-devel pkgconfig
+  * Debian/Ubuntu: sudo apt install build-essential libpcap-dev zlib1g-dev libfuse3-dev pkg-config
+  (if you don't have FUSE v. 3 in your system, use: 
+  sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config )
+  * CentOS/RHEL: sudo yum install gcc gcc-c++ make libpcap-devel zlib-devel fuse3-devel pkgconfig
+  (if you don't have FUSE v. 3 in your system, use:
+  sudo yum install gcc make libpcap-devel zlib-devel fuse-devel pkgconfig )
 
 Recommended packages:
-  * Debian/Ubuntu: sudo apt install fuse
-  * CentOS/RHEL: sudo yum install fuse
+  * Debian/Ubuntu: sudo apt install fuse3
+  (if you don't have FUSE v. 3 in your system, use: sudo apt install fuse )
+  * CentOS/RHEL: sudo yum install fuse3
+  (if you don't have FUSE v. 3 in your system, use: sudo yum install fuse )
 
 Building MooseFS on Linux can be easily done by running ./linux_build.sh.
 Similarly, use ./freebsd_build.sh in order to build MooseFS on FreeBSD
@@ -128,7 +135,7 @@ Just three steps to have MooseFS up and running:
         rm metadata.mfs.empty
    4. Run Master Server (as root): mfsmaster start
    5. Make this machine visible under 'mfsmaster' name, e.g. by adding
-      a DNS entry (recommended) or adding it in /etc/hosts on all servers
+      a DNS entry (recommended) or by adding it in /etc/hosts on all servers
       that run any of MooseFS components
 
 
@@ -153,11 +160,12 @@ Just three steps to have MooseFS up and running:
    5. Start the Chunkserver: mfschunkserver start
 
    Repeat the steps above for second (third, ...) Chunkserver.
+   More than two Chunkservers are strongly recommended.
 
 
 3. Client side: mount MooseFS filesystem
 
-   1. Install moosefs-client fuse libfuse2 packages
+   1. Install moosefs-client package
    2. Mount MooseFS (as root):
         mkdir /mnt/mfs
         mount -t moosefs mfsmaster: /mnt/mfs
@@ -177,7 +185,7 @@ Just three steps to have MooseFS up and running:
 Additional tools
 ----------------
 
-Setting up moosefs-cli or moosefs-cgi both with moosefs-cgiserv is also
+Setting up moosefs-cli or moosefs-cgi with moosefs-cgiserv is also
 recommended – it gives you a possibility to monitor the cluster online:
   1. Install moosefs-cli moosefs-cgi moosefs-cgiserv packages
      (they are typically set up on the Master Server)

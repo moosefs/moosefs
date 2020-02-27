@@ -25,7 +25,7 @@ Distinctive MooseFS features:
 =============================
 
   * High reliability – files are stored in several copies on separate servers.
-    The number of copies is is a configurable parameter, even per each file
+    The number of copies is a configurable parameter, even per each file
   * No Single Point of Failure – all hardware and software components may be
     redundant
   * Parallel data operations – many clients can access many files concurrently
@@ -99,16 +99,16 @@ Feel free to download the source code from our GitHub code repository!
 Install the following dependencies before building MooseFS from sources:
   * Debian/Ubuntu: sudo apt install build-essential libpcap-dev zlib1g-dev libfuse3-dev pkg-config
   (if you don't have FUSE v. 3 in your system, use: 
-  sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config )
+  sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config)
   * CentOS/RHEL: sudo yum install gcc gcc-c++ make libpcap-devel zlib-devel fuse3-devel pkgconfig
   (if you don't have FUSE v. 3 in your system, use:
-  sudo yum install gcc make libpcap-devel zlib-devel fuse-devel pkgconfig )
+  sudo yum install gcc make libpcap-devel zlib-devel fuse-devel pkgconfig)
 
 Recommended packages:
   * Debian/Ubuntu: sudo apt install fuse3
-  (if you don't have FUSE v. 3 in your system, use: sudo apt install fuse )
+  (if you don't have FUSE v. 3 in your system, use: sudo apt install fuse)
   * CentOS/RHEL: sudo yum install fuse3
-  (if you don't have FUSE v. 3 in your system, use: sudo yum install fuse )
+  (if you don't have FUSE v. 3 in your system, use: sudo yum install fuse)
 
 Building MooseFS on Linux can be easily done by running ./linux_build.sh.
 Similarly, use ./freebsd_build.sh in order to build MooseFS on FreeBSD

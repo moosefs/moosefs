@@ -68,16 +68,16 @@ Feel free to download the source code from our GitHub code repository!
 Install the following dependencies before building MooseFS from sources:
 
 * Debian/Ubuntu: `sudo apt install build-essential libpcap-dev zlib1g-dev libfuse3-dev pkg-config`
-(if you don't have FUSE v. 3 in your system, use `sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config` )
+(if you don't have FUSE v. 3 in your system, use `sudo apt install build-essential libpcap-dev zlib1g-dev libfuse-dev pkg-config`)
 * CentOS/RHEL: `sudo yum install gcc make libpcap-devel zlib-devel fuse3-devel pkgconfig`
-(if you don't have FUSE v. 3 in your system, use `sudo yum install gcc make libpcap-devel zlib-devel fuse-devel pkgconfig` )
+(if you don't have FUSE v. 3 in your system, use `sudo yum install gcc make libpcap-devel zlib-devel fuse-devel pkgconfig`)
 
 Recommended packages:
 
 * Debian/Ubuntu: `sudo apt install fuse3`
-(if you don't have FUSE v. 3 in your system, use `sudo apt install fuse` )
+(if you don't have FUSE v. 3 in your system, use `sudo apt install fuse`)
 * CentOS/RHEL: `sudo yum install fuse3`
-(if you don't have FUSE v. 3 in your system, use `sudo yum install fuse` )
+(if you don't have FUSE v. 3 in your system, use `sudo yum install fuse`)
 
 Building MooseFS on Linux can be easily done by running `./linux_build.sh`. Similarly, use `./freebsd_build.sh` in order to build MooseFS on FreeBSD and respectively `./macosx_build.sh` on macOS. Remember that these scripts do not install binaries (i.e. do not run `make install`) at the end. Run this command manually.
 
@@ -147,6 +147,7 @@ MooseFS, for testing purposes, can even be installed on a single machine!
 
 #### Additional tools
 Setting up `moosefs-cli` or `moosefs-cgi` with `moosefs-cgiserv` is also recommended – it gives you a possibility to monitor the cluster online:
+
 1. Install `moosefs-cli moosefs-cgi moosefs-cgiserv` packages (they are typically set up on the Master Server)
 2. Run MooseFS CGI Server (as `root`): `mfscgiserv start`
 3. Open http://mfsmaster:9425 in your web browser

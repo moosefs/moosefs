@@ -4,6 +4,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (cs) silence stupid compiler warning
   - (client) fixed handling LOCKED and EAGAIN status in readdata
+  - (client) added handle info to oplog messages
 
 * MooseFS 3.0.111-1 (2020-02-19)
 

@@ -1891,7 +1891,11 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		icacheflag = 0;
 	}
 	if (status!=0) {
-		oplog_printf(&ctx,"getattr (%lu): %s",(unsigned long int)ino,strerr(status));
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"getattr (%lu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(uint32_t)(fi->fh),strerr(status));
+		} else {
+			oplog_printf(&ctx,"getattr (%lu) [no handle]: %s",(unsigned long int)ino,strerr(status));
+		}
 		fuse_reply_err(req, status);
 		return;
 	}
@@ -1918,7 +1922,11 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	fs_fix_amtime(ino,&(o_stbuf.st_atime),&(o_stbuf.st_mtime));
 	attr_timeout = ((mfs_attr_get_mattr(attr)&MATTR_NOACACHE) || force_mode)?0.0:attr_cache_timeout;
 	mfs_makeattrstr(attrstr,256,&o_stbuf);
-	oplog_printf(&ctx,"getattr (%lu)%s: OK (%.1lf,%s)",(unsigned long int)ino,icacheflag?" (using open dir cache)":(force_mode==1)?" (internal getattr)":(force_mode==2)?" (sustained nodes)":"",attr_timeout,attrstr);
+	if (fi!=NULL) {
+		oplog_printf(&ctx,"getattr (%lu) [handle:%08"PRIX32"]%s: OK (%.1lf,%s)",(unsigned long int)ino,(uint32_t)(fi->fh),icacheflag?" (using open dir cache)":(force_mode==1)?" (internal getattr)":(force_mode==2)?" (sustained nodes)":"",attr_timeout,attrstr);
+	} else {
+		oplog_printf(&ctx,"getattr (%lu) [no handle]%s: OK (%.1lf,%s)",(unsigned long int)ino,icacheflag?" (using open dir cache)":(force_mode==1)?" (internal getattr)":(force_mode==2)?" (sustained nodes)":"",attr_timeout,attrstr);
+	}
 	fuse_reply_attr(req, &o_stbuf, attr_timeout);
 }
 
@@ -2069,19 +2077,31 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		}
 		status = mfs_errorconv(status);
 		if (status!=0) {
-			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+			if (fi!=NULL) {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(status));
+			} else {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [no handle]: %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+			}
 			fuse_reply_err(req, status);
 			return;
 		}
 	}
 	if (to_set & FUSE_SET_ATTR_SIZE) {
 		if (stbuf->st_size<0) {
-			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(EINVAL));
+			if (fi!=NULL) {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(EINVAL));
+			} else {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [no handle]: %s",(unsigned long int)ino,to_set,setattr_str,strerr(EINVAL));
+			}
 			fuse_reply_err(req, EINVAL);
 			return;
 		}
 		if (stbuf->st_size>=MAX_FILE_SIZE) {
-			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(EFBIG));
+			if (fi!=NULL) {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(EFBIG));
+			} else {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [no handle]: %s",(unsigned long int)ino,to_set,setattr_str,strerr(EFBIG));
+			}
 			fuse_reply_err(req, EFBIG);
 			return;
 		}
@@ -2143,7 +2163,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		status = mfs_errorconv(status);
 		// read_inode_ops(ino);
 		if (status!=0) {
-			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+			if (fi!=NULL) {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(status));
+			} else {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [no handle]: %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+			}
 			fuse_reply_err(req, status);
 			return;
 		}
@@ -2217,13 +2241,21 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		}
 		status = mfs_errorconv(status);
 		if (status!=0) {
-			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+			if (fi!=NULL) {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(status));
+			} else {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [no handle]: %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+			}
 			fuse_reply_err(req, status);
 			return;
 		}
 	}
 	if (status!=0) {	// should never happened but better check than sorry
-		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+		if (fi!=NULL) {
+			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(status));
+		} else {
+			oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [no handle]: %s",(unsigned long int)ino,to_set,setattr_str,strerr(status));
+		}
 		fuse_reply_err(req, status);
 		return;
 	}
@@ -2242,7 +2274,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 	fdcache_invalidate(ino);
 	attr_timeout = (mfs_attr_get_mattr(attr)&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 	mfs_makeattrstr(attrstr,256,&o_stbuf);
-	oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]): OK (%.1lf,%s)",(unsigned long int)ino,to_set,setattr_str,attr_timeout,attrstr);
+	if (fi!=NULL) {
+		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: OK (%.1lf,%s)",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),attr_timeout,attrstr);
+	} else {
+		oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [no handle]: OK (%.1lf,%s)",(unsigned long int)ino,to_set,setattr_str,attr_timeout,attrstr);
+	}
 	fuse_reply_attr(req, &o_stbuf, attr_timeout);
 }
 
@@ -2888,12 +2924,12 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 	}
 	dirinfo = dirbuf_get(fi->fh);
 	if (dirinfo==NULL) {
-		oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		oplog_printf(&ctx,"readdir (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
 	if (off<0) {
-		oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EINVAL));
+		oplog_printf(&ctx,"readdir (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EINVAL));
 		fuse_reply_err(req,EINVAL);
 		return;
 	}
@@ -2968,7 +3004,7 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 		}
 		status = mfs_errorconv(status);
 		if (status!=0) {
-			oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(status));
+			oplog_printf(&ctx,"readdir (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(status));
 			fuse_reply_err(req, status);
 			zassert(pthread_mutex_unlock(&(dirinfo->lock)));
 			return;
@@ -2984,7 +3020,7 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 		if (needscopy) {
 			dirinfo->p = malloc(dsize);
 			if (dirinfo->p == NULL) {
-				oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EINVAL));
+				oplog_printf(&ctx,"readdir (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EINVAL));
 				fuse_reply_err(req,EINVAL);
 				zassert(pthread_mutex_unlock(&(dirinfo->lock)));
 				return;
@@ -3003,7 +3039,7 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 	}
 
 	if (off>=(off_t)(dirinfo->size)) {
-		oplog_printf(&ctx,"readdir (%lu,%llu,%llu): OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+		oplog_printf(&ctx,"readdir (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh));
 		fuse_reply_buf(req, NULL, 0);
 	} else {
 		if (size>READDIR_BUFFSIZE) {
@@ -3039,7 +3075,7 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 			}
 		}
 
-		oplog_printf(&ctx,"readdir (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)opos);
+		oplog_printf(&ctx,"readdir (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),(unsigned long int)opos);
 		fuse_reply_buf(req,buffer,opos);
 	}
 	zassert(pthread_mutex_unlock(&(dirinfo->lock)));
@@ -3081,12 +3117,12 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 	}
 	dirinfo = dirbuf_get(fi->fh);
 	if (dirinfo==NULL) {
-		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
 	if (off<0) {
-		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EINVAL));
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EINVAL));
 		fuse_reply_err(req,EINVAL);
 		return;
 	}
@@ -3113,7 +3149,7 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 		dirinfo->dataformat = 1;
 		status = mfs_errorconv(status);
 		if (status!=0) {
-			oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(status));
+			oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(status));
 			fuse_reply_err(req, status);
 			zassert(pthread_mutex_unlock(&(dirinfo->lock)));
 			return;
@@ -3129,7 +3165,7 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 		if (needscopy) {
 			dirinfo->p = malloc(dsize);
 			if (dirinfo->p == NULL) {
-				oplog_printf(&ctx,"readdir (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EINVAL));
+				oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EINVAL));
 				fuse_reply_err(req,EINVAL);
 				zassert(pthread_mutex_unlock(&(dirinfo->lock)));
 				return;
@@ -3150,7 +3186,7 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 	// assert(dirinfo->dataformat>0);
 
 	if (off>=(off_t)(dirinfo->size)) {
-		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh));
 		fuse_reply_buf(req, NULL, 0);
 	} else {
 		if (size>READDIR_BUFFSIZE) {
@@ -3203,7 +3239,7 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 			}
 		}
 
-		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)opos);
+		oplog_printf(&ctx,"readdirplus (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),(unsigned long int)opos);
 		fuse_reply_buf(req,buffer,opos);
 	}
 	zassert(pthread_mutex_unlock(&(dirinfo->lock)));
@@ -3232,7 +3268,7 @@ void mfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 	dirinfo = dirbuf_get(fi->fh);
 	if (dirinfo==NULL) {
-		oplog_printf(&ctx,"releasedir (%lu): %s",(unsigned long int)ino,strerr(EBADF));
+		oplog_printf(&ctx,"releasedir (%lu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -3247,7 +3283,7 @@ void mfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	zassert(pthread_mutex_unlock(&(dirinfo->lock)));
 	dirbuf_release(fi->fh);
 	fi->fh = 0;
-	oplog_printf(&ctx,"releasedir (%lu): OK",(unsigned long int)ino);
+	oplog_printf(&ctx,"releasedir (%lu) [handle:%08"PRIX32"]: OK",(unsigned long int)ino,(uint32_t)(fi->fh));
 	fuse_reply_err(req,0);
 }
 
@@ -4044,12 +4080,12 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	}
 	fileinfo = finfo_get(fi->fh);
 	if (fi->fh==0 || fileinfo==NULL) {
-		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
 	if (fileinfo->inode!=ino) {
-		oplog_printf(&ctx,"read (%lu!=%lu,%llu,%llu): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		oplog_printf(&ctx,"read (%lu!=%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -4069,7 +4105,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 //		return;
 //	}
 	if (off>=MAX_FILE_SIZE || off+size>=MAX_FILE_SIZE) {
-		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EFBIG));
+		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EFBIG));
 		fuse_reply_err(req,EFBIG);
 		return;
 	}
@@ -4114,13 +4150,13 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		if (debug_mode) {
 			fprintf(stderr,"IO error occurred while reading inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
-		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
+		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
 		fuse_reply_err(req,err);
 	} else {
 		if (debug_mode) {
 			fprintf(stderr,"%"PRIu32" bytes have been read from inode %lu (offset:%llu)\n",ssize,(unsigned long int)ino,(unsigned long long int)off);
 		}
-		oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)ssize);
+		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),(unsigned long int)ssize);
 //		fuse_reply_buf(req,(char*)buff,ssize);
 		fuse_reply_iov(req,iov,iovcnt);
 	}
@@ -4188,12 +4224,12 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	}
 	fileinfo = finfo_get(fi->fh);
 	if (fi->fh==0 || fileinfo==NULL) {
-		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
 	if (fileinfo->inode!=ino) {
-		oplog_printf(&ctx,"write (%lu!=%lu,%llu,%llu): %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
+		oplog_printf(&ctx,"write (%lu!=%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)(fileinfo->inode),(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -4207,14 +4243,14 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 //		return;
 //	}
 	if (off>=MAX_FILE_SIZE || off+size>=MAX_FILE_SIZE) {
-		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EFBIG));
+		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EFBIG));
 		fuse_reply_err(req, EFBIG);
 		return;
 	}
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	if (fileinfo->mode==IO_RO) {
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EACCES));
+		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EACCES));
 		fuse_reply_err(req,EACCES);
 		return;
 	}
@@ -4252,7 +4288,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		if (debug_mode) {
 			fprintf(stderr,"IO error occurred while writing inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
-		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(err));
+		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
 		fuse_reply_err(req,err);
 	} else {
 		uint64_t newfleng;
@@ -4266,7 +4302,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		if (debug_mode) {
 			fprintf(stderr,"%llu bytes have been written to inode %lu (offset:%llu)\n",(unsigned long long int)size,(unsigned long int)ino,(unsigned long long int)off);
 		}
-		oplog_printf(&ctx,"write (%lu,%llu,%llu): OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long long int)size);
+		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),(unsigned long long int)size);
 		if (newfleng>0) {
 			read_inode_set_length_passive(ino,newfleng);
 			write_data_inode_setmaxfleng(ino,newfleng);
@@ -4354,7 +4390,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 	fileinfo = finfo_get(fi->fh);
 	if (fi->fh==0 || fileinfo==NULL) {
-		oplog_printf(&ctx,"flush (%lu): %s",(unsigned long int)ino,strerr(EBADF));
+		oplog_printf(&ctx,"flush (%lu) [handle:%08X"PRIX32"]: %s",(unsigned long int)ino,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}
@@ -4509,7 +4545,7 @@ void mfs_fsync(fuse_req_t req, fuse_ino_t ino, int datasync, struct fuse_file_in
 	}
 	fileinfo = finfo_get(fi->fh);
 	if (fi->fh==0 || fileinfo==NULL) {
-		oplog_printf(&ctx,"fsync (%lu,%d): %s",(unsigned long int)ino,datasync,strerr(EBADF));
+		oplog_printf(&ctx,"fsync (%lu,%d) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,datasync,(uint32_t)(fi->fh),strerr(EBADF));
 		fuse_reply_err(req,EBADF);
 		return;
 	}

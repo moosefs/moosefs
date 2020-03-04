@@ -1291,6 +1291,7 @@ int fs_resolve(uint8_t oninit,const char *bindhostname,const char *masterhostnam
 
 // int fs_connect(uint8_t oninit,const char *bindhostname,const char *masterhostname,const char *masterportname,uint8_t meta,const char *info,const char *subfolder,const uint8_t passworddigest[16],uint8_t *sesflags,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime) {
 int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
+	static const char* disablestr[]={DISABLE_STRINGS};
 	uint32_t i,j;
 	uint8_t *wptr,*regbuff;
 	md5ctx ctx;
@@ -1304,6 +1305,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint8_t mingoal,maxgoal;
 	uint32_t mintrashtime,maxtrashtime;
+	uint32_t disables;
 	int32_t rleng;
 	const char *sesflagposstrtab[]={SESFLAG_POS_STRINGS};
 	const char *sesflagnegstrtab[]={SESFLAG_NEG_STRINGS};
@@ -1521,7 +1523,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 			return -1;
 		}
 		i = get32bit(&rptr);
-		if (!(i==1 || i==4 || (cargs->meta && (i==19 || i==27)) || (cargs->meta==0 && (i==35 || i==43 || i==45)))) {
+		if (!(i==1 || i==4 || (cargs->meta && (i==19 || i==27)) || (cargs->meta==0 && (i==35 || i==43 || i==45 || i==49)))) {
 			if (oninit) {
 				fprintf(stderr,"got incorrect answer from mfsmaster\n");
 			} else {
@@ -1622,12 +1624,12 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	}
 	attrsize = (masterversion>=VERSION2INT(3,0,93))?ATTR_RECORD_SIZE:35;
 	sessionid = get32bit(&rptr);
-	if ((cargs->meta && i==27) || (cargs->meta==0 && (i==43 || i==45))) {
+	if ((cargs->meta && i==27) || (cargs->meta==0 && (i==43 || i==45 || i==49))) {
 		metaid = get64bit(&rptr);
 	}
 	sesflags = get8bit(&rptr);
 	if (!cargs->meta) {
-		if (i==45) {
+		if (i==45 || i==49) {
 			umaskval = get16bit(&rptr);
 		} else {
 			umaskval = 0;
@@ -1647,6 +1649,11 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	maxgoal = get8bit(&rptr);
 	mintrashtime = get32bit(&rptr);
 	maxtrashtime = get32bit(&rptr);
+	if (i==49) {
+		disables = get32bit(&rptr);
+	} else {
+		disables = 0;
+	}
 	free(regbuff);
 	lastwrite = monotonic_seconds();
 	if (oninit==0) {
@@ -1772,6 +1779,17 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 					fprintf(stderr,"0s");
 				}
 				fprintf(stderr,")");
+			}
+		}
+		if (disables>0) {
+			int s;
+			fprintf(stderr," ; disabled commands: ");
+			s = 0;
+			for (i=0,j=1 ; disablestr[i]!=NULL ; i++,j<<=1) {
+				if (disables&j) {
+					fprintf(stderr,"%s%s",s?",":"",disablestr[i]);
+					s = 1;
+				}
 			}
 		}
 		fprintf(stderr,"\n");

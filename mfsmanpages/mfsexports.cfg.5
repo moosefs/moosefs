@@ -71,6 +71,9 @@ specify range in which goal can be set by users
 .TP
 \fBmintrashtime=\fP\fITDUR\fP, \fBmaxtrashtime=\fP\fITDUR\fP
 specify range in which trashtime can be set by users
+.TP
+\fBdisable=\fP\fIOPERATION[:OPERATION[:...]]\fP 
+do not allow the client to perform certain operations
 .PP
 Default options are: \fBro, maproot=999:999, mingoal=1, maxgoal=9, mintrashtime=0, maxtrashtime=4294967295\fP.
 .SH NOTES
@@ -90,6 +93,38 @@ root's objects. Similarly objects with gid equal to mapped gid are seen as
 objects with current user's primary group and all other objects as objects
 with group 0 (usually wheel). With \fBmapall\fP option set attribute cache
 in kernel is always turned off.
+.PP
+Option \fBdisable\fP can take many parameters (operations to disable) in two
+ways: as a list separated by colons (:) or by repeating the option many times.
+List of operations that can be disabled:
+.nf
+.ta +2i
+chown        - don't allow the client to perform the chown operation
+chmod        - don't allow the client to perform the chmod operation
+symlink      - don't allow the client to create symbolic links
+mkfifo       - don't allow the client to create FIFOs
+mkdev        - don't allow the client to create devices
+mksock       - don't allow the client to create sockets
+mkdir        - don't allow the client to create directories
+unlink       - don't allow the client to remove non directory objects (will also deny move/rename operation if target inode already exists!)
+rmdir        - don't allow the client to remove directories (will also deny move/rename operation if target inode already exists!)
+rename       - don't allow the client to change inodes (files, directories) names
+move         - don't allow the client to move inodes (files, directories) to another path
+link         - don't allow the client to create hard links
+create       - don't allow the client to create new files
+readdir      - don't allow the client to list directories ('ls' command will not work)
+read         - don't allow the client to read from files
+write        - don't allow the client to write to files
+truncate     - don't allow the client to shorten the length of a file with truncate command
+setlength    - don't allow the client to increase the length of a file with truncate command
+appendchunks - don't allow the client to add chunks from one file to another (mfsappendchunks)
+snapshot     - don't allow the client to create snapshots
+settrash     - don't allow the client to change trash retention time
+setsclass    - don't allow the client to set storage classes
+seteattr     - don't allow the client to set mfs extra attributes
+setxattr     - don't allow the client to set XATTRs
+setfacl      - don't allow the client to set ACLs
+.fi
 .SH EXAMPLES
 .nf
 .ta +2i
@@ -99,6 +134,8 @@ in kernel is always turned off.
 \fB10.0.0.0-10.0.0.5    /test   rw,maproot=nobody,password=test\fP
 \fB10.1.0.0/255.255.0.0 /public rw,mapall=1000:1000\fP
 \fB10.2.0.0/16          /       rw,alldirs,maproot=0,mintrashtime=2h30m,maxtrashtime=2w\fP
+\fB192.168.1.0/24       /       rw,disable=unlink:rmdir:truncate\fP
+\fB192.168.1.0/24       /       rw,disable=unlink,disable=rmdir,disable=truncate\fP
 .fi
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.

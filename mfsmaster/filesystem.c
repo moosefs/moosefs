@@ -4635,7 +4635,7 @@ uint8_t fs_getattr(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t op
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint64_t length,uint8_t attr[ATTR_RECORD_SIZE],uint32_t *indx,uint64_t *prevchunkid,uint64_t *chunkid) {
+uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint8_t disflags,uint64_t length,uint8_t attr[ATTR_RECORD_SIZE],uint32_t *indx,uint64_t *prevchunkid,uint64_t *chunkid) {
 	fsnode *p;
 	memset(attr,0,ATTR_RECORD_SIZE);
 	if (sesflags&SESFLAG_READONLY) {
@@ -4654,6 +4654,16 @@ uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 	}
 	if (flags & TRUNCATE_FLAG_UPDATE) {
 		return MFS_STATUS_OK;
+	}
+	if (disflags&1) { // truncate (decrease file size) not allowed in session
+		if (length<p->data.fdata.length) {
+			return MFS_ERROR_EPERM;
+		}
+	}
+	if (disflags&2) { // setlength (increase file size) not allowed in session
+		if (length>p->data.fdata.length) {
+			return MFS_ERROR_EPERM;
+		}
 	}
 	if (length>p->data.fdata.length) {
 		uint32_t lastchunk_pre,lastchunksize_pre,lastchunk_post,lastchunksize_post;
@@ -5242,7 +5252,7 @@ uint8_t fs_mr_unlink(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *n
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_univ_move(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t parent_src,uint16_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint16_t nleng_dst,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]) {
+uint8_t fs_univ_move(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t parent_src,uint16_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint16_t nleng_dst,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint8_t delflags,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]) {
 	fsnode *swd;
 	fsedge *se;
 	fsnode *dwd;
@@ -5294,6 +5304,18 @@ uint8_t fs_univ_move(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t pa
 		return MFS_ERROR_EINVAL;
 	}
 	de = fsnodes_lookup(dwd,nleng_dst,name_dst);
+	if (de) {
+		if (delflags&1) { // unlink is not allowed in this session
+			if (de->child->type!=TYPE_DIRECTORY) {
+				return MFS_ERROR_EPERM;
+			}
+		}
+		if (delflags&2) { // rmdir is not allowed in this session
+			if (de->child->type==TYPE_DIRECTORY) {
+				return MFS_ERROR_EPERM;
+			}
+		}
+	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		fsnodes_get_stats(node,&ssr,2);
 		if (de) {
@@ -5347,14 +5369,14 @@ uint8_t fs_univ_move(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t pa
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_rename(uint32_t rootinode,uint8_t sesflags,uint32_t parent_src,uint16_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint16_t nleng_dst,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]) {
-	return fs_univ_move(main_time(),rootinode,sesflags,parent_src,nleng_src,name_src,parent_dst,nleng_dst,name_dst,uid,gids,gid,auid,agid,inode,attr);
+uint8_t fs_rename(uint32_t rootinode,uint8_t sesflags,uint32_t parent_src,uint16_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint16_t nleng_dst,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint8_t delflags,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]) {
+	return fs_univ_move(main_time(),rootinode,sesflags,parent_src,nleng_src,name_src,parent_dst,nleng_dst,name_dst,uid,gids,gid,auid,agid,delflags,inode,attr);
 }
 
 uint8_t fs_mr_move(uint32_t ts,uint32_t parent_src,uint32_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint32_t nleng_dst,const uint8_t *name_dst,uint32_t inode) {
 	uint32_t rinode;
 	uint8_t status;
-	status = fs_univ_move(ts,0,SESFLAG_METARESTORE,parent_src,nleng_src,name_src,parent_dst,nleng_dst,name_dst,0,0,0,0,0,&rinode,NULL);
+	status = fs_univ_move(ts,0,SESFLAG_METARESTORE,parent_src,nleng_src,name_src,parent_dst,nleng_dst,name_dst,0,0,0,0,0,0,&rinode,NULL);
 	if (status!=MFS_STATUS_OK) {
 		return status;
 	}

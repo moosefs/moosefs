@@ -65,6 +65,9 @@ CSTOCL_HDD_LIST = (PROTO_BASE+601)
 
 MFS_MESSAGE = 1
 
+FEATURE_EXPORT_UMASK = 0
+FEATURE_EXPORT_DISABLES = 1
+
 MASKORGROUP = 4
 
 MFS_CSSERV_COMMAND_REMOVE = 0
@@ -1235,6 +1238,16 @@ def getmasteraddresses():
 #		msg = msg + chunk
 #	return msg
 
+def disablesmask_to_string(disables_mask):
+	cmds = ["chown","chmod","symlink","mkfifo","mkdev","mksock","mkdir","unlink","rmdir","rename","move","link","create","readdir","read","write","truncate","setlength","appendchunks","snapshot","settrash","setsclass","seteattr","setxattr","setfacl"]
+	l = []
+	m = 1
+	for cmd in cmds:
+		if disables_mask & m:
+			l.append(cmd)
+		m <<= 1
+	return ",".join(l)
+
 def state_name(stateid):
 	if stateid==STATE_DUMMY:
 		return "DUMMY"
@@ -1479,8 +1492,13 @@ class Master(MFSConn):
 		MFSConn.__init__(self,host,port)
 		self.version = (0,0,0)
 		self.pro = -1
+		self.featuremask = 0
 	def set_version(self,version):
 		self.version,self.pro = version_convert(version)
+		if self.version>=(3,0,72):
+			self.featuremask |= (1<<FEATURE_EXPORT_UMASK)
+		if self.version>=(3,0,112):
+			self.featuremask |= (1<<FEATURE_EXPORT_DISABLES)
 	def version_at_least(self,v1,v2,v3):
 		return (self.version>=(v1,v2,v3))
 	def version_less_than(self,v1,v2,v3):
@@ -1491,6 +1509,8 @@ class Master(MFSConn):
 		return (self.version==(0,0,0))
 	def is_pro(self):
 		return self.pro
+	def has_feature(self,featureid):
+		return True if (self.featuremask & (1<<featureid)) else False
 	def sort_ver(self):
 		sortver = "%05u_%03u_%03u" % self.version
 		if self.pro==1:
@@ -1502,7 +1522,7 @@ class Master(MFSConn):
 		return sortver
 
 class ExportsEntry:
-	def __init__(self,fip1,fip2,fip3,fip4,tip1,tip2,tip3,tip4,path,meta,v1,v2,v3,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime):
+	def __init__(self,fip1,fip2,fip3,fip4,tip1,tip2,tip3,tip4,path,meta,v1,v2,v3,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables):
 		self.ipfrom = (fip1,fip2,fip3,fip4)
 		self.ipto = (tip1,tip2,tip3,tip4)
 		self.version = (v1,v2,v3)
@@ -1524,10 +1544,11 @@ class ExportsEntry:
 		self.maxgoal = maxgoal
 		self.mintrashtime = mintrashtime
 		self.maxtrashtime = maxtrashtime
+		self.disables = disables
 
 
 class Session:
-	def __init__(self,sessionid,ip1,ip2,ip3,ip4,info,openfiles,nsocks,expire,v1,v2,v3,meta,path,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,stats_c,stats_l):
+	def __init__(self,sessionid,ip1,ip2,ip3,ip4,info,openfiles,nsocks,expire,v1,v2,v3,meta,path,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,stats_c,stats_l):
 		self.ip = (ip1,ip2,ip3,ip4)
 		self.version = (v1,v2,v3)
 		self.strip = "%u.%u.%u.%u" % (ip1,ip2,ip3,ip4)
@@ -1551,6 +1572,7 @@ class Session:
 		self.maxgoal = maxgoal
 		self.mintrashtime = mintrashtime
 		self.maxtrashtime = maxtrashtime
+		self.disables = disables
 		self.stats_c = stats_c
 		self.stats_l = stats_l
 
@@ -1588,7 +1610,9 @@ class DataProvider:
 	def get_exports(self):
 		if self.exports==None:
 			self.exports=[]
-			if self.masterconn.version_at_least(3,0,72):
+			if self.masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+				data,length = masterconn.command(CLTOMA_EXPORTS_INFO,MATOCL_EXPORTS_INFO,struct.pack(">B",3))
+			elif self.masterconn.has_feature(FEATURE_EXPORT_UMASK):
 				data,length = masterconn.command(CLTOMA_EXPORTS_INFO,MATOCL_EXPORTS_INFO,struct.pack(">B",2))
 			elif self.masterconn.version_at_least(1,6,26):
 				data,length = masterconn.command(CLTOMA_EXPORTS_INFO,MATOCL_EXPORTS_INFO,struct.pack(">B",1))
@@ -1601,9 +1625,19 @@ class DataProvider:
 				path = data[pos:pos+pleng]
 				path = path.decode('utf-8','replace')
 				pos+=pleng
-				if self.masterconn.version_at_least(3,0,72):
+				if self.masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+					v1,v2,v3,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables = struct.unpack(">HBBBBHLLLLBBLLL",data[pos:pos+38])
+					pos+=38
+					if mingoal<=1 and maxgoal>=9:
+						mingoal = None
+						maxgoal = None
+					if mintrashtime==0 and maxtrashtime==0xFFFFFFFF:
+						mintrashtime = None
+						maxtrashtime = None
+				elif self.masterconn.has_feature(FEATURE_EXPORT_UMASK):
 					v1,v2,v3,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime = struct.unpack(">HBBBBHLLLLBBLL",data[pos:pos+34])
 					pos+=34
+					disables = 0
 					if mingoal<=1 and maxgoal>=9:
 						mingoal = None
 						maxgoal = None
@@ -1613,6 +1647,7 @@ class DataProvider:
 				elif self.masterconn.version_at_least(1,6,26):
 					v1,v2,v3,exportflags,sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime = struct.unpack(">HBBBBLLLLBBLL",data[pos:pos+32])
 					pos+=32
+					disables = 0
 					if mingoal<=1 and maxgoal>=9:
 						mingoal = None
 						maxgoal = None
@@ -1623,6 +1658,7 @@ class DataProvider:
 				else:
 					v1,v2,v3,exportflags,sesflags,rootuid,rootgid,mapalluid,mapallgid = struct.unpack(">HBBBBLLLL",data[pos:pos+22])
 					pos+=22
+					disables = 0
 					mingoal = None
 					maxgoal = None
 					mintrashtime = None
@@ -1631,15 +1667,18 @@ class DataProvider:
 				if path=='.':
 					meta = 1
 					umaskval = None
+					disables = 0
 				else:
 					meta = 0
-				expent = ExportsEntry(fip1,fip2,fip3,fip4,tip1,tip2,tip3,tip4,path,meta,v1,v2,v3,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime)
+				expent = ExportsEntry(fip1,fip2,fip3,fip4,tip1,tip2,tip3,tip4,path,meta,v1,v2,v3,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables)
 				self.exports.append(expent)
 		return self.exports
 	def get_sessions(self):
 		if self.sessions==None:
 			self.sessions=[]
-			if self.masterconn.version_at_least(3,0,72):
+			if self.masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+				data,length = self.masterconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST,struct.pack(">B",4))
+			elif self.masterconn.has_feature(FEATURE_EXPORT_UMASK):
 				data,length = self.masterconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST,struct.pack(">B",3))
 			elif self.masterconn.version_at_least(1,7,8):
 				data,length = self.masterconn.command(CLTOMA_SESSION_LIST,MATOCL_SESSION_LIST,struct.pack(">B",2))
@@ -1674,9 +1713,19 @@ class DataProvider:
 				pos+=pleng
 				info = info.decode('utf-8','replace')
 				path = path.decode('utf-8','replace')
-				if self.masterconn.version_at_least(3,0,72):
+				if self.masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+					sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables = struct.unpack(">BHLLLLBBLLL",data[pos:pos+33])
+					pos+=33
+					if mingoal<=1 and maxgoal>=9:
+						mingoal = None
+						maxgoal = None
+					if mintrashtime==0 and maxtrashtime==0xFFFFFFFF:
+						mintrashtime = None
+						maxtrashtime = None
+				elif self.masterconn.has_feature(FEATURE_EXPORT_UMASK):
 					sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime = struct.unpack(">BHLLLLBBLL",data[pos:pos+29])
 					pos+=29
+					disables = 0
 					if mingoal<=1 and maxgoal>=9:
 						mingoal = None
 						maxgoal = None
@@ -1686,6 +1735,7 @@ class DataProvider:
 				elif self.masterconn.version_at_least(1,6,26):
 					sesflags,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime = struct.unpack(">BLLLLBBLL",data[pos:pos+27])
 					pos+=27
+					disables = 0
 					if mingoal<=1 and maxgoal>=9:
 						mingoal = None
 						maxgoal = None
@@ -1696,6 +1746,7 @@ class DataProvider:
 				else:
 					sesflags,rootuid,rootgid,mapalluid,mapallgid = struct.unpack(">BLLLL",data[pos:pos+17])
 					pos+=17
+					disables = 0
 					mingoal = None
 					maxgoal = None
 					mintrashtime = None
@@ -1715,7 +1766,7 @@ class DataProvider:
 					meta=1
 				else:
 					meta=0
-				ses = Session(sessionid,ip1,ip2,ip3,ip4,info,openfiles,nsocks,expire,v1,v2,v3,meta,path,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,stats_c,stats_l)
+				ses = Session(sessionid,ip1,ip2,ip3,ip4,info,openfiles,nsocks,expire,v1,v2,v3,meta,path,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,stats_c,stats_l)
 				self.sessions.append(ses)
 		return self.sessions
 	def get_chunkservers(self):
@@ -4983,7 +5034,7 @@ if "EX" in sectionset:
 		if cgimode:
 			out = []
 			out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfsexports" cellspacing="0">""")
-			out.append("""	<tr><th colspan="%u">Exports</th></tr>""" % (20 if masterconn.version_at_least(3,0,72) else 19 if masterconn.version_at_least(1,7,0) else 18 if masterconn.version_at_least(1,6,26) else 14))
+			out.append("""	<tr><th colspan="%u">Exports</th></tr>""" % (21 if masterconn.has_feature(FEATURE_EXPORT_DISABLES) else 20 if masterconn.has_feature(FEATURE_EXPORT_UMASK) else 19 if masterconn.version_at_least(1,7,0) else 18 if masterconn.version_at_least(1,6,26) else 14))
 			out.append("""	<tr>""")
 			out.append("""		<th rowspan="2" class="acid_tab_enumerate">#</th>""")
 			out.append("""		<th colspan="2">ip&nbsp;range</th>""")
@@ -5009,8 +5060,10 @@ if "EX" in sectionset:
 			if masterconn.version_at_least(1,6,26):
 				out.append("""		<th colspan="2">goal&nbsp;limit</th>""")
 				out.append("""		<th colspan="2">trashtime&nbsp;limit</th>""")
-			if masterconn.version_at_least(3,0,72):
-				out.append("""          <th rowspan="2">global&nbsp;umask</th>""")
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
+				out.append("""		<th rowspan="2">global&nbsp;umask</th>""")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+				out.append("""		<th rowspan="2">disables&nbsp;mask</th>""")
 			out.append("""	</tr>""")
 			out.append("""	<tr>""")
 #			out.append("""		<th><a href="%s">from</a></th>""" % (createorderlink("EX",1)))
@@ -5036,7 +5089,7 @@ if "EX" in sectionset:
 				out.append("""		<th>max</th>""")
 			out.append("""	</tr>""")
 		elif ttymode:
-			tab = Tabble("Exports",(19 if masterconn.version_at_least(3,0,72) else 18 if masterconn.version_at_least(1,7,0) else 17 if masterconn.version_at_least(1,6,26) else 13))
+			tab = Tabble("Exports",(20 if masterconn.has_feature(FEATURE_EXPORT_DISABLES) else 19 if masterconn.has_feature(FEATURE_EXPORT_UMASK) else 18 if masterconn.version_at_least(1,7,0) else 17 if masterconn.version_at_least(1,6,26) else 13))
 
 			dline = ["r","r","l","c","c","c","c","c","c"]
 			if masterconn.version_at_least(1,7,0):
@@ -5044,7 +5097,9 @@ if "EX" in sectionset:
 			dline.extend(("r","r","r","r"))
 			if masterconn.version_at_least(1,6,26):
 				dline.extend(("r","r","r","r"))
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
+				dline.append("c")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
 				dline.append("c")
 			tab.defattr(*dline)
 
@@ -5054,7 +5109,9 @@ if "EX" in sectionset:
 			dline.extend((("map root","",2),("map users","",2)))
 			if masterconn.version_at_least(1,6,26):
 				dline.extend((("goal limit","",2),("trashtime limit","",2)))
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
+				dline.append("")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
 				dline.append("")
 			tab.header(*dline)
 
@@ -5065,8 +5122,10 @@ if "EX" in sectionset:
 				dline.append(("---","",8))
 			else:
 				dline.append(("---","",4))
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 				dline.append("global umask")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+				dline.append("disables mask")
 			tab.header(*dline)
 
 			dline = ["from","to","","","","","","",""]
@@ -5075,12 +5134,14 @@ if "EX" in sectionset:
 			dline.extend(("uid","gid","uid","gid"))
 			if masterconn.version_at_least(1,6,26):
 				dline.extend(("min","max","min","max"))
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
+				dline.append("")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
 				dline.append("")
 			tab.header(*dline)
 
 		else:
-			tab = Tabble("exports",(19 if masterconn.version_at_least(3,0,72) else 18 if masterconn.version_at_least(1,7,0) else 17 if masterconn.version_at_least(1,6,26) else 13))
+			tab = Tabble("exports",(20 if masterconn.has_feature(FEATURE_EXPORT_DISABLES) else 19 if masterconn.has_feature(FEATURE_EXPORT_UMASK) else 18 if masterconn.version_at_least(1,7,0) else 17 if masterconn.version_at_least(1,6,26) else 13))
 		servers = []
 		for expe in dataprovider.get_exports():
 			sf = expe.ipfrom + expe.ipto
@@ -5143,11 +5204,13 @@ if "EX" in sectionset:
 				sf = expe.maxtrashtime
 			elif EXorder==19:
 				sf = expe.umaskval
-			servers.append((sf,expe.sortipfrom,expe.stripfrom,expe.sortipto,expe.stripto,expe.path,expe.meta,expe.sortver,expe.strver,expe.exportflags,expe.sesflags,expe.umaskval,expe.rootuid,expe.rootgid,expe.mapalluid,expe.mapallgid,expe.mingoal,expe.maxgoal,expe.mintrashtime,expe.maxtrashtime))
+			elif EXorder==20:
+				sf = expe.disables
+			servers.append((sf,expe.sortipfrom,expe.stripfrom,expe.sortipto,expe.stripto,expe.path,expe.meta,expe.sortver,expe.strver,expe.exportflags,expe.sesflags,expe.umaskval,expe.rootuid,expe.rootgid,expe.mapalluid,expe.mapallgid,expe.mingoal,expe.maxgoal,expe.mintrashtime,expe.maxtrashtime,expe.disables))
 		servers.sort()
 		if EXrev:
 			servers.reverse()
-		for sf,sortipfrom,ipfrom,sortipto,ipto,path,meta,sortver,strver,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime in servers:
+		for sf,sortipfrom,ipfrom,sortipto,ipto,path,meta,sortver,strver,exportflags,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables in servers:
 			if cgimode:
 				out.append("""	<tr>""")
 				out.append("""		<td align="right"></td>""")
@@ -5187,11 +5250,13 @@ if "EX" in sectionset:
 					else:
 						out.append("""		<td align="center"><span class="sortkey">-1 </span>-</td>""")
 						out.append("""		<td align="center"><span class="sortkey">-1 </span>-</td>""")
-				if masterconn.version_at_least(3,0,72):
+				if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 					if umaskval==None:
 						out.append("""		<td align="center"><span class="sortkey">-1 </span>-</td>""")
 					else:
 						out.append("""		<td align="center">%03o</td>""" % umaskval)
+				if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+					out.append("""		<td align="center"><span class="sortkey">%u </span><a style="cursor:default" title="%s">%08X</a></td>""" % (disables,disablesmask_to_string(disables),disables))
 				out.append("""	</tr>""")
 			elif ttymode:
 				dline = [ipfrom,ipto,". (META)" if meta else path,strver,"-" if meta else "yes" if exportflags&1 else "no","yes" if exportflags&2 else "no","ro" if sesflags&1 else "rw","no" if sesflags&2 else "yes","-" if meta else "yes" if sesflags&4 else "no"]
@@ -5214,11 +5279,13 @@ if "EX" in sectionset:
 						dline.extend((timeduration_to_shortstr(mintrashtime),timeduration_to_shortstr(maxtrashtime)))
 					else:
 						dline.extend(("-","-"))
-				if masterconn.version_at_least(3,0,72):
+				if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 					if umaskval==None:
 						dline.append("-")
 					else:
 						dline.append("%03o" % umaskval)
+				if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+					dline.append("%08X (%s)" % (disables,disablesmask_to_string(disables)))
 				tab.append(*dline)
 			else:
 				dline = [ipfrom,ipto,". (META)" if meta else path,strver,"-" if meta else "yes" if exportflags&1 else "no","yes" if exportflags&2 else "no","ro" if sesflags&1 else "rw","no" if sesflags&2 else "yes","-" if meta else "yes" if sesflags&4 else "no"]
@@ -5241,11 +5308,13 @@ if "EX" in sectionset:
 						dline.extend((mintrashtime,maxtrashtime))
 					else:
 						dline.extend(("-","-"))
-				if masterconn.version_at_least(3,0,72):
+				if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 					if umaskval==None:
 						dline.append("-")
 					else:
 						dline.append("%03o" % umaskval)
+				if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+					dline.append("%08X" % disables)
 				tab.append(*dline)
 		if cgimode:
 			out.append("""</table>""")
@@ -5260,7 +5329,7 @@ if "MS" in sectionset and leaderfound:
 		if cgimode:
 			out = []
 			out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfsmounts" cellspacing="0">""")
-			out.append("""	<tr><th colspan="%u">Active mounts (parameters)</th></tr>""" % (22 if masterconn.version_at_least(3,0,72) else 21 if masterconn.version_at_least(1,7,8) else 19 if masterconn.version_at_least(1,7,0) else 18 if masterconn.version_at_least(1,6,26) else 14))
+			out.append("""	<tr><th colspan="%u">Active mounts (parameters)</th></tr>""" % (23 if masterconn.has_feature(FEATURE_EXPORT_DISABLES) else 22 if masterconn.has_feature(FEATURE_EXPORT_UMASK) else 21 if masterconn.version_at_least(1,7,8) else 19 if masterconn.version_at_least(1,7,0) else 18 if masterconn.version_at_least(1,6,26) else 14))
 			out.append("""	<tr>""")
 			out.append("""		<th rowspan="2" class="acid_tab_enumerate">#</th>""")
 #			out.append("""		<th rowspan="2"><a href="%s">session&nbsp;id</a></th>""" % (createorderlink("MS",1)))
@@ -5292,8 +5361,10 @@ if "MS" in sectionset and leaderfound:
 			if masterconn.version_at_least(1,6,26):
 				out.append("""		<th colspan="2">goal&nbsp;limits</th>""")
 				out.append("""		<th colspan="2">trashtime&nbsp;limits</th>""")
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 				out.append("""		<th rowspan="2">global umask</th>""")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+				out.append("""		<th rowspan="2">disables mask</th>""")
 			out.append("""	</tr>""")
 			out.append("""	<tr>""")
 #			out.append("""		<th><a href="%s">uid</a></th>""" % (createorderlink("MS",11)))
@@ -5315,7 +5386,7 @@ if "MS" in sectionset and leaderfound:
 				out.append("""		<th>max</th>""")
 			out.append("""	</tr>""")
 		elif ttymode:
-			tab = Tabble("Active mounts (parameters)",(20 if masterconn.version_at_least(3,0,72) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12))
+			tab = Tabble("Active mounts (parameters)",(21 if masterconn.has_feature(FEATURE_EXPORT_DISABLES) else 20 if masterconn.has_feature(FEATURE_EXPORT_UMASK) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12))
 
 			dline = ["r","r","l"]
 			if masterconn.version_at_least(1,7,8):
@@ -5326,7 +5397,9 @@ if "MS" in sectionset and leaderfound:
 			dline.extend(("r","r","r","r"))
 			if masterconn.version_at_least(1,6,26):
 				dline.extend(("r","r","r","r"))
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
+				dline.append("c")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
 				dline.append("c")
 			tab.defattr(*dline)
 
@@ -5338,7 +5411,9 @@ if "MS" in sectionset and leaderfound:
 			dline.extend((("map root","",2),("map users","",2)))
 			if masterconn.version_at_least(1,6,26):
 				dline.extend((("goal limit","",2),("trashtime limit","",2)))
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
+				dline.append("")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
 				dline.append("")
 			tab.header(*dline)
 
@@ -5352,8 +5427,10 @@ if "MS" in sectionset and leaderfound:
 				dline.append(("---","",8))
 			else:
 				dline.append(("---","",4))
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 				dline.append("global umask")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+				dline.append("disables mask")
 			tab.header(*dline)
 
 			dline = ["","","","","","","",""]
@@ -5364,11 +5441,13 @@ if "MS" in sectionset and leaderfound:
 			dline.extend(("uid","gid","uid","gid"))
 			if masterconn.version_at_least(1,6,26):
 				dline.extend(("min","max","min","max"))
-			if masterconn.version_at_least(3,0,72):
+			if masterconn.has_feature(FEATURE_EXPORT_UMASK):
+				dline.append("")
+			if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
 				dline.append("")
 			tab.header(*dline)
 		else:
-			tab = Tabble("active mounts, parameters",(20 if masterconn.version_at_least(3,0,72) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12))
+			tab = Tabble("active mounts, parameters",(21 if masterconn.has_feature(FEATURE_EXPORT_DISABLES) else 20 if masterconn.has_feature(FEATURE_EXPORT_UMASK) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12))
 
 		servers = []
 		dservers = []
@@ -5437,8 +5516,10 @@ if "MS" in sectionset and leaderfound:
 				sf = ses.maxtrashtime
 			elif MSorder==21:
 				sf = ses.umaskval
+			elif MSorder==22:
+				sf = ses.disables
 			if ses.nsocks>0:
-				servers.append((sf,ses.sessionid,ses.host,ses.sortip,ses.strip,ses.info,ses.openfiles,ses.nsocks,ses.sortver,ses.strver,ses.meta,ses.path,ses.sesflags,ses.umaskval,ses.rootuid,ses.rootgid,ses.mapalluid,ses.mapallgid,ses.mingoal,ses.maxgoal,ses.mintrashtime,ses.maxtrashtime))
+				servers.append((sf,ses.sessionid,ses.host,ses.sortip,ses.strip,ses.info,ses.openfiles,ses.nsocks,ses.sortver,ses.strver,ses.meta,ses.path,ses.sesflags,ses.umaskval,ses.rootuid,ses.rootgid,ses.mapalluid,ses.mapallgid,ses.mingoal,ses.maxgoal,ses.mintrashtime,ses.maxtrashtime,ses.disables))
 			else:
 				dservers.append((sf,ses.sessionid,ses.host,ses.sortip,ses.strip,ses.info,ses.openfiles,ses.expire))
 		servers.sort()
@@ -5446,7 +5527,7 @@ if "MS" in sectionset and leaderfound:
 		if MSrev:
 			servers.reverse()
 			dservers.reverse()
-		for sf,sessionid,host,sortipnum,ipnum,info,openfiles,nsocks,sortver,strver,meta,path,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime in servers:
+		for sf,sessionid,host,sortipnum,ipnum,info,openfiles,nsocks,sortver,strver,meta,path,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables in servers:
 			if cgimode:
 				if masterconn.is_pro() and not strver.endswith(" PRO"):
 					verclass = "BADVERSION"
@@ -5497,11 +5578,13 @@ if "MS" in sectionset and leaderfound:
 					else:
 						out.append("""		<td align="center"><span class="sortkey">-1 </span>-</td>""")
 						out.append("""		<td align="center"><span class="sortkey">-1 </span>-</td>""")
-				if masterconn.version_at_least(3,0,72):
+				if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 					if umaskval==None:
 						out.append("""		<td align="center"><span class="sortkey">-1 </span>-</td>""")
 					else:
 						out.append("""		<td align="center">%03o</td>""" % umaskval)
+				if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+					out.append("""		<td align="center"><span class="sortkey">%u </span><a style="cursor:default" title="%s">%08X</a></td>""" % (disables,disablesmask_to_string(disables),disables))
 				out.append("""	</tr>""")
 			elif ttymode:
 				dline = [sessionid,host,info]
@@ -5527,11 +5610,13 @@ if "MS" in sectionset and leaderfound:
 						dline.extend((timeduration_to_shortstr(mintrashtime),timeduration_to_shortstr(maxtrashtime)))
 					else:
 						dline.extend(("-","-"))
-				if masterconn.version_at_least(3,0,72):
+				if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 					if umaskval==None:
 						dline.append("-")
 					else:
 						dline.append("%03o" % umaskval)
+				if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+					dline.append("%08X (%s)" % (disables,disablesmask_to_string(disables)))
 				tab.append(*dline)
 			else:
 				dline = [sessionid,host,info]
@@ -5557,11 +5642,13 @@ if "MS" in sectionset and leaderfound:
 						dline.extend((mintrashtime,maxtrashtime))
 					else:
 						dline.extend(("-","-"))
-				if masterconn.version_at_least(3,0,72):
+				if masterconn.has_feature(FEATURE_EXPORT_UMASK):
 					if umaskval==None:
 						dline.append("-")
 					else:
 						dline.append("%03o" % umaskval)
+				if masterconn.has_feature(FEATURE_EXPORT_DISABLES):
+					dline.append("%08X" % disables)
 				tab.append(*dline)
 		if len(dservers)>0 and masterconn.version_at_least(1,7,8):
 			if cgimode:
@@ -5579,7 +5666,7 @@ if "MS" in sectionset and leaderfound:
 				out.append("""		<th>cmd</th>""")
 				out.append("""	</tr>""")
 			elif ttymode:
-				tabcols = (20 if masterconn.version_at_least(3,0,72) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
+				tabcols = (21 if masterconn.has_feature(FEATURE_EXPORT_DISABLES) else 20 if masterconn.has_feature(FEATURE_EXPORT_UMASK) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
 				tab.append(("---","",tabcols))
 				tab.append(("Inactive mounts (parameters)","1c",tabcols))
 				tab.append(("---","",tabcols))
@@ -5603,7 +5690,7 @@ if "MS" in sectionset and leaderfound:
 				out.append("""		<td align="center"><a href="%s">click to remove</a></td>""" % createlink({"MSremove":("%u" % (sessionid))}))
 				out.append("""	</tr>""")
 			elif ttymode:
-				tabcols = (20 if masterconn.version_at_least(3,0,72) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
+				tabcols = (21 if masterconn.has_feature(FEATURE_EXPORT_DISABLES) else 20 if masterconn.has_feature(FEATURE_EXPORT_UMASK) else 19 if masterconn.version_at_least(1,7,8) else 17 if masterconn.version_at_least(1,7,0) else 16 if masterconn.version_at_least(1,6,26) else 12)
 				dline = [sessionid,host,info,openfiles,expire,("%s -H %s -P %u -CRS/%u" % (sys.argv[0],masterhost,masterport,sessionid),"l",tabcols-5)]
 				tab.append(*dline)
 			else:

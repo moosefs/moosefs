@@ -240,7 +240,9 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 	uint8_t count;
 	uint8_t cs_data[100*14];
 
-	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_WRITE) {
+		status = MFS_ERROR_EPERM;
+	} else if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
 		if (eptr->version>=VERSION2INT(3,0,101)) {
 			status = MFS_ERROR_EROFS;
 		} else {
@@ -349,7 +351,11 @@ static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32
 	uint8_t count;
 	uint8_t cs_data[100*14];
 
-	status = fs_readchunk(inode,indx,chunkopflags,&chunkid,&fleng);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_READ) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_readchunk(inode,indx,chunkopflags,&chunkid,&fleng);
+	}
 	if (status!=MFS_STATUS_OK) {
 		if (status==MFS_ERROR_LOCKED || status==MFS_ERROR_CHUNKBUSY) {
 			i = CHUNKHASH(chunkid);
@@ -430,12 +436,18 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 	uint8_t *ptr;
 	uint8_t status;
 	uint64_t prevchunkid;
+	uint32_t disables;
 	swchunks *swc;
 	lwchunks *lwc;
 	uint64_t chunkid;
 //	uint8_t locked;
 
-	status = fs_try_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,flags,uid,gids,gid,auid,agid,fleng,attr,&indx,&prevchunkid,&chunkid);
+	disables = sessions_get_disables(eptr->sesdata);
+	if ((disables&(DISABLE_TRUNCATE|DISABLE_SETLENGTH))==(DISABLE_TRUNCATE|DISABLE_SETLENGTH)) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_try_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,flags,uid,gids,gid,auid,agid,((disables&DISABLE_TRUNCATE)?1:0)|((disables&DISABLE_SETLENGTH)?2:0),fleng,attr,&indx,&prevchunkid,&chunkid);
+	}
 	if (status==MFS_ERROR_DELAYED) {
 		i = CHUNKHASH(chunkid);
 		swc = malloc(sizeof(swchunks));
@@ -1312,6 +1324,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 		uint16_t umaskval;
 		uint8_t mingoal,maxgoal;
 		uint32_t mintrashtime,maxtrashtime;
+		uint32_t disables;
 		uint32_t rootuid,rootgid;
 		uint32_t mapalluid,mapallgid;
 		uint32_t ileng,pleng;
@@ -1415,10 +1428,10 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			if (length>=77+16+ileng+pleng) {
 				eptr->usepassword = 1;
 				memcpy(eptr->passwordmd5,rptr,16);
-				status = exports_check(eptr->peerip,eptr->version,eptr->path,eptr->passwordrnd,rptr,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime);
+				status = exports_check(eptr->peerip,eptr->version,eptr->path,eptr->passwordrnd,rptr,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime,&disables);
 			} else {
 				eptr->usepassword = 0;
-				status = exports_check(eptr->peerip,eptr->version,eptr->path,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime);
+				status = exports_check(eptr->peerip,eptr->version,eptr->path,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime,&disables);
 			}
 			if (status==MFS_STATUS_OK) {
 				status = fs_getrootinode(&rootinode,eptr->path);
@@ -1430,11 +1443,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 					if (eptr->sesdata==NULL) {
 						sessionid=0;
 					} else {
-						sessions_chg_session(eptr->sesdata,exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,eptr->peerip,eptr->info,eptr->ileng);
+						sessions_chg_session(eptr->sesdata,exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,eptr->peerip,eptr->info,eptr->ileng);
 					}
 				}
 				if (sessionid==0) {
-					eptr->sesdata = sessions_new_session(exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,eptr->peerip,eptr->info,eptr->ileng);
+					eptr->sesdata = sessions_new_session(exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,eptr->peerip,eptr->info,eptr->ileng);
 					created = 1;
 				}
 				if (eptr->sesdata==NULL) {
@@ -1443,7 +1456,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 					return;
 				}
 			}
-			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,(status==MFS_STATUS_OK)?((eptr->version>=VERSION2INT(3,0,72))?45:(eptr->version>=VERSION2INT(3,0,11))?43:(eptr->version>=VERSION2INT(1,6,26))?35:(eptr->version>=VERSION2INT(1,6,21))?25:(eptr->version>=VERSION2INT(1,6,1))?21:13):1);
+			wptr = matoclserv_createpacket(eptr,MATOCL_FUSE_REGISTER,(status==MFS_STATUS_OK)?((eptr->version>=VERSION2INT(3,0,112))?49:(eptr->version>=VERSION2INT(3,0,72))?45:(eptr->version>=VERSION2INT(3,0,11))?43:(eptr->version>=VERSION2INT(1,6,26))?35:(eptr->version>=VERSION2INT(1,6,21))?25:(eptr->version>=VERSION2INT(1,6,1))?21:13):1);
 			if (status!=MFS_STATUS_OK) {
 				put8bit(&wptr,status);
 				eptr->sesdata = NULL;
@@ -1476,6 +1489,9 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				put8bit(&wptr,maxgoal);
 				put32bit(&wptr,mintrashtime);
 				put32bit(&wptr,maxtrashtime);
+			}
+			if (eptr->version>=VERSION2INT(3,0,112)) {
+				put32bit(&wptr,disables);
 			}
 			sessions_attach_session(eptr->sesdata,eptr->peerip,eptr->version);
 			eptr->registered = 1;
@@ -1531,10 +1547,10 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			if (length>=73+16+ileng) {
 				eptr->usepassword = 1;
 				memcpy(eptr->passwordmd5,rptr,16);
-				status = exports_check(eptr->peerip,eptr->version,NULL,eptr->passwordrnd,rptr,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime);
+				status = exports_check(eptr->peerip,eptr->version,NULL,eptr->passwordrnd,rptr,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime,&disables);
 			} else {
 				eptr->usepassword = 0;
-				status = exports_check(eptr->peerip,eptr->version,NULL,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime);
+				status = exports_check(eptr->peerip,eptr->version,NULL,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashtime,&maxtrashtime,&disables);
 			}
 			if (status==MFS_STATUS_OK) {
 				if (sessionid!=0) {
@@ -1542,11 +1558,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 					if (eptr->sesdata==NULL) {
 						sessionid=0;
 					} else {
-						sessions_chg_session(eptr->sesdata,exports_checksum(),0,sesflags,umaskval,0,0,0,0,mingoal,maxgoal,mintrashtime,maxtrashtime,eptr->peerip,eptr->info,eptr->ileng);
+						sessions_chg_session(eptr->sesdata,exports_checksum(),0,sesflags,umaskval,0,0,0,0,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,eptr->peerip,eptr->info,eptr->ileng);
 					}
 				}
 				if (sessionid==0) {
-					eptr->sesdata = sessions_new_session(exports_checksum(),0,sesflags,umaskval,0,0,0,0,mingoal,maxgoal,mintrashtime,maxtrashtime,eptr->peerip,eptr->info,eptr->ileng);
+					eptr->sesdata = sessions_new_session(exports_checksum(),0,sesflags,umaskval,0,0,0,0,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,eptr->peerip,eptr->info,eptr->ileng);
 				}
 				if (eptr->sesdata==NULL) {
 					syslog(LOG_NOTICE,"can't allocate session record");
@@ -1970,7 +1986,7 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 						}
 					}
 				}
-				if (validchunk) {
+				if (validchunk && (sessions_get_disables(eptr->sesdata)&DISABLE_READ)==0) {
 					if (chunkid>0) {
 						if (chunk_get_version_and_csdata(2,chunkid,eptr->peerip,&version,&count,cs_data)==MFS_STATUS_OK) {
 							lflags |= LOOKUP_CHUNK_ZERO_DATA;
@@ -2078,6 +2094,7 @@ void matoclserv_fuse_setattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	uint8_t sugidclearmode;
 	uint16_t attrmode;
 	uint32_t attruid,attrgid,attratime,attrmtime;
+	uint32_t disables;
 	uint8_t winattr,basesize;
 
 	basesize = (eptr->version>=VERSION2INT(3,0,93))?38:37;
@@ -2128,7 +2145,10 @@ void matoclserv_fuse_setattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	} else {
 		sugidclearmode = SUGID_CLEAR_MODE_ALWAYS; // this is safest option
 	}
-	if (setmask&SET_WINATTR_FLAG && basesize==37) {
+	disables = sessions_get_disables(eptr->sesdata);
+	if (((disables&DISABLE_CHOWN) && (setmask&(SET_UID_FLAG|SET_GID_FLAG))) || ((disables&DISABLE_CHMOD) && (setmask&SET_MODE_FLAG))) {
+		status = MFS_ERROR_EPERM;
+	} else if (setmask&SET_WINATTR_FLAG && basesize==37) {
 		status = MFS_ERROR_EINVAL;
 	} else {
 		status = fs_setattr(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,opened,uid,gids,gid,auid,agid,setmask,attrmode,attruid,attrgid,attratime,attrmtime,winattr,sugidclearmode,attr);
@@ -2277,7 +2297,11 @@ void matoclserv_fuse_symlink(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	while (pleng>0 && path[pleng-1]==0) {
 		pleng--;
 	}
-	status = fs_symlink(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,pleng,path,uid,gids,gid,auid,agid,&newinode,attr);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_SYMLINK) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_symlink(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,pleng,path,uid,gids,gid,auid,agid,&newinode,attr);
+	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SYMLINK,(status!=MFS_STATUS_OK)?5:(eptr->asize+8));
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
@@ -2297,6 +2321,7 @@ void matoclserv_fuse_mknod(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	const uint8_t *name;
 	uint8_t type;
 	uint16_t mode,cumask;
+	uint32_t disables;
 	uint32_t newinode;
 	uint8_t attr[ATTR_RECORD_SIZE];
 	uint32_t msgid;
@@ -2345,7 +2370,12 @@ void matoclserv_fuse_mknod(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
 	rdev = get32bit(&data);
-	status = fs_mknod(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,type,mode,cumask,uid,gids,gid,auid,agid,rdev,&newinode,attr);
+	disables = sessions_get_disables(eptr->sesdata);
+	if (((disables&DISABLE_MKFIFO) && (type==TYPE_FIFO)) || ((disables&DISABLE_MKDEV) && (type==TYPE_BLOCKDEV || type==TYPE_CHARDEV)) || ((disables&DISABLE_MKSOCK) && (type==TYPE_SOCKET)) || ((disables&DISABLE_CREATE) && (type==TYPE_FILE))) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_mknod(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,type,mode,cumask,uid,gids,gid,auid,agid,rdev,&newinode,attr);
+	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_MKNOD,(status!=MFS_STATUS_OK)?5:(eptr->asize+8));
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
@@ -2416,7 +2446,11 @@ void matoclserv_fuse_mkdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	} else {
 		copysgid = 0; // by default do not copy sgid bit
 	}
-	status = fs_mkdir(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,mode,cumask,uid,gids,gid,auid,agid,copysgid,&newinode,attr);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_MKDIR) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_mkdir(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,mode,cumask,uid,gids,gid,auid,agid,copysgid,&newinode,attr);
+	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_MKDIR,(status!=MFS_STATUS_OK)?5:(eptr->asize+8));
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
@@ -2470,7 +2504,11 @@ void matoclserv_fuse_unlink(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_unlink(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,&uinode);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_UNLINK) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_unlink(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,&uinode);
+	}
 	if (((eptr->version>=VERSION2INT(3,0,107) && eptr->version<VERSION2INT(4,0,0)) || eptr->version>=VERSION2INT(4,18,0)) && status==MFS_STATUS_OK) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_UNLINK,8);
 		put32bit(&ptr,msgid);
@@ -2525,7 +2563,11 @@ void matoclserv_fuse_rmdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_rmdir(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,&uinode);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_RMDIR) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_rmdir(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,&uinode);
+	}
 	if (((eptr->version>=VERSION2INT(3,0,107) && eptr->version<VERSION2INT(4,0,0)) || eptr->version>=VERSION2INT(4,18,0)) && status==MFS_STATUS_OK) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RMDIR,8);
 		put32bit(&ptr,msgid);
@@ -2545,6 +2587,7 @@ void matoclserv_fuse_rename(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	uint32_t uid,gids,auid,agid;
 	uint32_t *gid;
 	uint32_t i;
+	uint32_t disables;
 	uint8_t attr[ATTR_RECORD_SIZE];
 	uint32_t msgid;
 	uint8_t status;
@@ -2592,7 +2635,12 @@ void matoclserv_fuse_rename(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		agid = gid[0];
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_rename(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode_src,nleng_src,name_src,inode_dst,nleng_dst,name_dst,uid,gids,gid,auid,agid,&inode,attr);
+	disables = sessions_get_disables(eptr->sesdata);
+	if ((disables&(DISABLE_RENAME|DISABLE_MOVE))==(DISABLE_RENAME|DISABLE_MOVE) || ((disables&DISABLE_RENAME) && (nleng_src!=nleng_dst || memcmp(name_src,name_dst,nleng_src)!=0)) || ((disables&DISABLE_MOVE) && inode_src!=inode_dst)) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_rename(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode_src,nleng_src,name_src,inode_dst,nleng_dst,name_dst,uid,gids,gid,auid,agid,((disables&DISABLE_UNLINK)?1:0)|((disables&DISABLE_RMDIR)?2:0),&inode,attr);
+	}
 	if (eptr->version>=VERSION2INT(1,6,21) && status==MFS_STATUS_OK) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_RENAME,eptr->asize+8);
 	} else {
@@ -2655,7 +2703,11 @@ void matoclserv_fuse_link(matoclserventry *eptr,const uint8_t *data,uint32_t len
 		agid = gid[0];
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_link(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_dst,nleng_dst,name_dst,uid,gids,gid,auid,agid,&newinode,attr);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_LINK) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_link(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_dst,nleng_dst,name_dst,uid,gids,gid,auid,agid,&newinode,attr);
+	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_LINK,(status!=MFS_STATUS_OK)?5:(eptr->asize+8));
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
@@ -2728,7 +2780,11 @@ void matoclserv_fuse_readdir(matoclserventry *eptr,const uint8_t *data,uint32_t 
 		maxentries = 0xFFFFFFFF;
 		nedgeid = 0;
 	}
-	status = fs_readdir_size(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,gids,gid,flags,maxentries,nedgeid,&c1,&c2,&dleng,attrmode);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_READDIR) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_readdir_size(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,gids,gid,flags,maxentries,nedgeid,&c1,&c2,&dleng,attrmode);
+	}
 	if (status!=MFS_STATUS_OK) {
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_READDIR,5);
 	} else if (length>=29) {
@@ -2870,7 +2926,11 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
 	sesflags = sessions_get_sesflags(eptr->sesdata);
-	status = fs_mknod(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,TYPE_FILE,mode,cumask,uid,gids,gid,auid,agid,0,&newinode,attr);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_CREATE) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_mknod(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,TYPE_FILE,mode,cumask,uid,gids,gid,auid,agid,0,&newinode,attr);
+	}
 	if (status==MFS_STATUS_OK) {
 		if (CreateFirstChunk) {
 			uint64_t prevchunkid,chunkid,fleng;
@@ -3009,7 +3069,9 @@ void matoclserv_fuse_write_chunk_end(matoclserventry *eptr,const uint8_t *data,u
 		chunkopflags &= ~CHUNKOPFLAG_CANMODTIME;
 	}
 	flenghaschanged = 0;
-	if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_WRITE) {
+		status = MFS_ERROR_EPERM;
+	} else if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_READONLY) {
 		if (eptr->version>=VERSION2INT(3,0,101)) {
 			status = MFS_ERROR_EROFS;
 		} else {
@@ -3362,7 +3424,11 @@ void matoclserv_fuse_settrashtime(matoclserventry *eptr,const uint8_t *data,uint
 	sessions_ugid_remap(eptr->sesdata,&uid,NULL);
 	trashtime = get32bit(&data);
 	smode = get8bit(&data);
-	status = sessions_check_trashtime(eptr->sesdata,smode&SMODE_TMASK,trashtime);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_SETTRASH) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = sessions_check_trashtime(eptr->sesdata,smode&SMODE_TMASK,trashtime);
+	}
 	if (status==MFS_STATUS_OK) {
 		status = fs_settrashtime(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,trashtime,smode,&changed,&notchanged,&notpermitted);
 	}
@@ -3511,7 +3577,9 @@ void matoclserv_fuse_setsclass(matoclserventry *eptr,const uint8_t *data,uint32_
 			eptr->mode = KILL;
 			return;
 		}
-		if (src_sclassid==0 || dst_sclassid==0) {
+		if (sessions_get_disables(eptr->sesdata)&DISABLE_SETSCLASS) {
+			status = MFS_ERROR_EPERM;
+		} else if (src_sclassid==0 || dst_sclassid==0) {
 			status = MFS_ERROR_EINVAL; // new status ? NOSUCHSCLASS ?
 		} else {
 			if (sclass_is_simple_goal(dst_sclassid)) {
@@ -3521,7 +3589,9 @@ void matoclserv_fuse_setsclass(matoclserventry *eptr,const uint8_t *data,uint32_
 			}
 		}
 	} else { // setid == goal
-		if (setid<1 || setid>9) {
+		if (sessions_get_disables(eptr->sesdata)&DISABLE_SETSCLASS) {
+			status = MFS_ERROR_EPERM;
+		} else if (setid<1 || setid>9) {
 			status = MFS_ERROR_EINVAL;
 		} else {
 			src_sclassid = setid;
@@ -3624,7 +3694,11 @@ void matoclserv_fuse_seteattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	sessions_ugid_remap(eptr->sesdata,&uid,NULL);
 	eattr = get8bit(&data);
 	smode = get8bit(&data);
-	status = fs_seteattr(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,eattr,smode,&changed,&notchanged,&notpermitted);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_SETEATTR) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_seteattr(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,eattr,smode,&changed,&notchanged,&notpermitted);
+	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETEATTR,(status!=MFS_STATUS_OK)?5:16);
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
@@ -3844,7 +3918,11 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_setxattr(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,opened,uid,gids,gid,anleng,attrname,avleng,attrvalue,mode);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_SETXATTR) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_setxattr(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,opened,uid,gids,gid,anleng,attrname,avleng,attrvalue,mode);
+	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETXATTR,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
@@ -3967,7 +4045,11 @@ void matoclserv_fuse_setfacl(matoclserventry *eptr,const uint8_t *data,uint32_t 
 //	uid = get32bit(&data);
 //	gid = get32bit(&data);
 //	sessions_ugid_remap(eptr->sesdata,&uid,&gid);
-	status = fs_setfacl(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,data);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_SETFACL) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_setfacl(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,acltype,userperm,groupperm,otherperm,mask,namedusers,namedgroups,data);
+	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SETFACL,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
@@ -4021,7 +4103,11 @@ void matoclserv_fuse_append_slice(matoclserventry *eptr,const uint8_t *data,uint
 		}
 	}
 	sessions_ugid_remap(eptr->sesdata,&uid,gid);
-	status = fs_append_slice(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),flags,inode,inode_src,slice_from,slice_to,uid,gids,gid,&fleng);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_APPENDCHUNKS) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_append_slice(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),flags,inode,inode_src,slice_from,slice_to,uid,gids,gid,&fleng);
+	}
 	if (status==MFS_STATUS_OK) {
 		matoclserv_fuse_fleng_has_changed(NULL,inode,fleng);
 	}
@@ -4084,7 +4170,11 @@ void matoclserv_fuse_snapshot(matoclserventry *eptr,const uint8_t *data,uint32_t
 		requmask = 0;
 	}
 	requmask |= sessions_get_umask(eptr->sesdata);
-	status = fs_snapshot(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_dst,nleng_dst,name_dst,uid,gids,gid,smode,requmask);
+	if (sessions_get_disables(eptr->sesdata)&DISABLE_SNAPSHOT) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_snapshot(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_dst,nleng_dst,name_dst,uid,gids,gid,smode,requmask);
+	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SNAPSHOT,5);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,status);
@@ -4196,7 +4286,11 @@ void matoclserv_fuse_archctl(matoclserventry *eptr,const uint8_t *data,uint32_t 
 		}
 		uid = get32bit(&data);
 		sessions_ugid_remap(eptr->sesdata,&uid,NULL);
-		status = fs_archchg(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,cmd,&changed,&notchanged,&notpermitted);
+		if (sessions_get_disables(eptr->sesdata)&DISABLE_SETEATTR) {
+			status = MFS_ERROR_EPERM;
+		} else {
+			status = fs_archchg(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,uid,cmd,&changed,&notchanged,&notpermitted);
+		}
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_ARCHCTL,(status!=MFS_STATUS_OK)?5:24);
 		put32bit(&ptr,msgid);
 		if (status!=MFS_STATUS_OK) {

@@ -263,6 +263,12 @@
 	clptr = (const char*)eptr; \
 }
 
+#define GETX32(data,clptr) { \
+	char *eptr; \
+	(data)=strtoul(clptr,&eptr,16); \
+	clptr = (const char*)eptr; \
+}
+
 #define GETU64(data,clptr) { \
 	char *eptr; \
 	(data)=strtoull(clptr,&eptr,10); \
@@ -814,6 +820,7 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootinode,sesflags,peerip,sessionid;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
+	uint32_t disables;
 	uint16_t umaskval;
 	uint64_t exportscsum;
 	uint32_t ileng;
@@ -860,6 +867,13 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(maxtrashtime,ptr);
 	EAT(ptr,filename,lv,',');
+	if (ptr[0]=='0' && ptr[1]=='x') {
+		ptr+=2;
+		GETX32(disables,ptr);
+		EAT(ptr,filename,lv,',');
+	} else {
+		disables = 0;
+	}
 	GETU32(peerip,ptr);
 	EAT(ptr,filename,lv,',');
 	GETDATA(info,ileng,infosize,ptr,filename,lv,')');
@@ -867,13 +881,14 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,':');
 	GETU32(sessionid,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng,sessionid);
+	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,peerip,info,ileng,sessionid);
 }
 
 int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootinode,sesflags,peerip,sessionid;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
+	uint32_t disables;
 	uint16_t umaskval;
 	uint64_t exportscsum;
 	uint32_t ileng;
@@ -922,12 +937,19 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,',');
 	GETU32(maxtrashtime,ptr);
 	EAT(ptr,filename,lv,',');
+	if (ptr[0]=='0' && ptr[1]=='x') {
+		ptr+=2;
+		GETX32(disables,ptr);
+		EAT(ptr,filename,lv,',');
+	} else {
+		disables = 0;
+	}
 	GETU32(peerip,ptr);
 	EAT(ptr,filename,lv,',');
 	GETDATA(info,ileng,infosize,ptr,filename,lv,')');
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
-	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,peerip,info,ileng);
+	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,peerip,info,ileng);
 }
 
 int do_sesdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

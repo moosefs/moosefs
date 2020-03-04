@@ -513,6 +513,85 @@
 
 #define ATTR_RECORD_SIZE                   36
 
+#define DISABLE_BIT_CHOWN                  0
+#define DISABLE_BIT_CHMOD                  1
+#define DISABLE_BIT_SYMLINK                2
+#define DISABLE_BIT_MKFIFO                 3
+#define DISABLE_BIT_MKDEV                  4
+#define DISABLE_BIT_MKSOCK                 5
+#define DISABLE_BIT_MKDIR                  6
+#define DISABLE_BIT_UNLINK                 7
+#define DISABLE_BIT_RMDIR                  8
+#define DISABLE_BIT_RENAME                 9
+#define DISABLE_BIT_MOVE                   10
+#define DISABLE_BIT_LINK                   11
+#define DISABLE_BIT_CREATE                 12
+#define DISABLE_BIT_READDIR                13
+#define DISABLE_BIT_READ                   14
+#define DISABLE_BIT_WRITE                  15
+#define DISABLE_BIT_TRUNCATE               16
+#define DISABLE_BIT_SETLENGTH              17
+#define DISABLE_BIT_APPENDCHUNKS           18
+#define DISABLE_BIT_SNAPSHOT               19
+#define DISABLE_BIT_SETTRASH               20
+#define DISABLE_BIT_SETSCLASS              21
+#define DISABLE_BIT_SETEATTR               22
+#define DISABLE_BIT_SETXATTR               23
+#define DISABLE_BIT_SETFACL                24
+
+#define DISABLE_CHOWN                      (UINT32_C(1)<<DISABLE_BIT_CHOWN)
+#define DISABLE_CHMOD                      (UINT32_C(1)<<DISABLE_BIT_CHMOD)
+#define DISABLE_SYMLINK                    (UINT32_C(1)<<DISABLE_BIT_SYMLINK)
+#define DISABLE_MKFIFO                     (UINT32_C(1)<<DISABLE_BIT_MKFIFO)
+#define DISABLE_MKDEV                      (UINT32_C(1)<<DISABLE_BIT_MKDEV)
+#define DISABLE_MKSOCK                     (UINT32_C(1)<<DISABLE_BIT_MKSOCK)
+#define DISABLE_MKDIR                      (UINT32_C(1)<<DISABLE_BIT_MKDIR)
+#define DISABLE_UNLINK                     (UINT32_C(1)<<DISABLE_BIT_UNLINK)
+#define DISABLE_RMDIR                      (UINT32_C(1)<<DISABLE_BIT_RMDIR)
+#define DISABLE_RENAME                     (UINT32_C(1)<<DISABLE_BIT_RENAME)
+#define DISABLE_MOVE                       (UINT32_C(1)<<DISABLE_BIT_MOVE)
+#define DISABLE_LINK                       (UINT32_C(1)<<DISABLE_BIT_LINK)
+#define DISABLE_CREATE                     (UINT32_C(1)<<DISABLE_BIT_CREATE)
+#define DISABLE_READDIR                    (UINT32_C(1)<<DISABLE_BIT_READDIR)
+#define DISABLE_READ                       (UINT32_C(1)<<DISABLE_BIT_READ)
+#define DISABLE_WRITE                      (UINT32_C(1)<<DISABLE_BIT_WRITE)
+#define DISABLE_TRUNCATE                   (UINT32_C(1)<<DISABLE_BIT_TRUNCATE)
+#define DISABLE_SETLENGTH                  (UINT32_C(1)<<DISABLE_BIT_SETLENGTH)
+#define DISABLE_APPENDCHUNKS               (UINT32_C(1)<<DISABLE_BIT_APPENDCHUNKS)
+#define DISABLE_SNAPSHOT                   (UINT32_C(1)<<DISABLE_BIT_SNAPSHOT)
+#define DISABLE_SETTRASH                   (UINT32_C(1)<<DISABLE_BIT_SETTRASH)
+#define DISABLE_SETSCLASS                  (UINT32_C(1)<<DISABLE_BIT_SETSCLASS)
+#define DISABLE_SETEATTR                   (UINT32_C(1)<<DISABLE_BIT_SETEATTR)
+#define DISABLE_SETXATTR                   (UINT32_C(1)<<DISABLE_BIT_SETXATTR)
+#define DISABLE_SETFACL                    (UINT32_C(1)<<DISABLE_BIT_SETFACL)
+
+#define DISABLE_STRINGS \
+	"chown", \
+	"chmod", \
+	"symlink", \
+	"mkfifo", \
+	"mkdev", \
+	"mksock", \
+	"mkdir", \
+	"unlink", \
+	"rmdir", \
+	"rename", \
+	"move", \
+	"link", \
+	"create", \
+	"readdir", \
+	"raad", \
+	"write", \
+	"truncate", \
+	"setlength", \
+	"appendchunks", \
+	"snapshot", \
+	"settrash", \
+	"setsclass", \
+	"seteattr", \
+	"setxattr", \
+	"setfacl"
+
 #define CSTOMA_MAXPACKETSIZE 500000000
 #define CLTOMA_MAXPACKETSIZE 50000000
 #define ANTOMA_MAXPACKETSIZE 1500000
@@ -920,6 +999,7 @@
 //  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 1.6.26 )
 //  version:32 sessionid:32 metaid:64 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.11 )
 //  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.72 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 disables:32 ( version >= 3.0.112 )
 //  status:8
 
 #define REGISTER_RECONNECT 3
@@ -1562,7 +1642,8 @@
 // stats:16 N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 0 or empty and version > 1.6.21
 // stats:16 N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 1 (valid since version 1.6.26)
 // stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 2 (valid since version 1.7.8)
-// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 2 (valid since version 3.0.72)
+// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 3 (valid since version 3.0.72)
+// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 disables:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 4 (valid since version 3.0.112)
 
 
 // 0x01FE
@@ -1631,6 +1712,7 @@
 // N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 ] - vmode = 0 (or not present)
 // N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ] - vmode = 1 (valid since version 1.6.26)
 // N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ] - vmode = 2 (valid since version 3.0.72)
+// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 disables:32 ] - vmode = 3 (valid since version 3.0.112)
 
 
 // 0x020A

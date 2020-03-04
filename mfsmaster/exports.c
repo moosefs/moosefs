@@ -65,6 +65,7 @@ typedef struct _exports {
 	uint32_t rootgid;
 	uint32_t mapalluid;
 	uint32_t mapallgid;
+	uint32_t disables;
 	struct _exports *next;
 } exports;
 
@@ -74,7 +75,7 @@ static char *ExportsFileName;
 
 uint64_t exports_entry_checksum(exports *e) {
 	uint64_t csum;
-	uint8_t edata[58];
+	uint8_t edata[62];
 	uint8_t *ptr;
 	uint32_t crc,murmur;
 
@@ -99,8 +100,9 @@ uint64_t exports_entry_checksum(exports *e) {
 	put32bit(&ptr,e->rootgid);
 	put32bit(&ptr,e->mapalluid);
 	put32bit(&ptr,e->mapallgid);
-	crc = mycrc32(0xFFFFFFFF,edata,58);
-	murmur = murmur3_32(edata,58,0);
+	put32bit(&ptr,e->disables);
+	crc = mycrc32(0xFFFFFFFF,edata,62);
+	murmur = murmur3_32(edata,62,0);
 	if (e->pleng>0) {
 		crc = mycrc32(crc,e->path,e->pleng);
 		murmur = murmur3_32(e->path,e->pleng,murmur);
@@ -162,6 +164,9 @@ uint32_t exports_info_size(uint8_t versmode) {
 	if (versmode>1) {
 		add+=2;
 	}
+	if (versmode>2) {
+		add+=4;
+	}
 	for (e=exports_records ; e ; e=e->next) {
 		if (e->meta) {
 			size+=35+add;
@@ -204,10 +209,13 @@ void exports_info_data(uint8_t versmode,uint8_t *buff) {
 			put32bit(&buff,e->mintrashtime);
 			put32bit(&buff,e->maxtrashtime);
 		}
+		if (versmode>2) {
+			put32bit(&buff,e->disables);
+		}
 	}
 }
 
-uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime) {
+uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime,uint32_t *disables) {
 	const uint8_t *p;
 	uint32_t pleng,i;
 	uint8_t rndstate;
@@ -328,6 +336,7 @@ uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uin
 	*maxgoal = f->maxgoal;
 	*mintrashtime = f->mintrashtime;
 	*maxtrashtime = f->maxtrashtime;
+	*disables = f->disables;
 	return MFS_STATUS_OK;
 }
 
@@ -716,6 +725,123 @@ int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint32_t *r
 	return -1;	// unreachable
 }
 
+int exports_parsedisable(char *disablestr,uint32_t lineno,uint32_t *disables) {
+	char *p;
+	int o;
+
+	while ((p=exports_strsep(&disablestr,":"))) {
+		o=0;
+		switch (*p) {
+			case 'a':
+				if (strcmp(p,"appendchunks")==0) {
+					*disables |= DISABLE_APPENDCHUNKS;
+					o=1;
+				}
+				break;
+			case 'c':
+				if (strcmp(p,"chown")==0) {
+					*disables |= DISABLE_CHOWN;
+					o=1;
+				} else if (strcmp(p,"chmod")==0) {
+					*disables |= DISABLE_CHMOD;
+					o=1;
+				} else if (strcmp(p,"create")==0) {
+					*disables |= DISABLE_CREATE;
+					o=1;
+				}
+				break;
+			case 'l':
+				if (strcmp(p,"link")==0) {
+					*disables |= DISABLE_LINK;
+					o=1;
+				}
+				break;
+			case 'm':
+				if (strcmp(p,"mkfifo")==0) {
+					*disables |= DISABLE_MKFIFO;
+					o=1;
+				} else if (strcmp(p,"mkdev")==0) {
+					*disables |= DISABLE_MKDEV;
+					o=1;
+				} else if (strcmp(p,"mksock")==0) {
+					*disables |= DISABLE_MKSOCK;
+					o=1;
+				} else if (strcmp(p,"mkdir")==0) {
+					*disables |= DISABLE_MKDIR;
+					o=1;
+				} else if (strcmp(p,"move")==0) {
+					*disables |= DISABLE_MOVE;
+					o=1;
+				}
+				break;
+			case 'r':
+				if (strcmp(p,"rmdir")==0) {
+					*disables |= DISABLE_RMDIR;
+					o=1;
+				} else if (strcmp(p,"rename")==0) {
+					*disables |= DISABLE_RENAME;
+					o=1;
+				} else if (strcmp(p,"readdir")==0) {
+					*disables |= DISABLE_READDIR;
+					o=1;
+				} else if (strcmp(p,"read")==0) {
+					*disables |= DISABLE_READ;
+					o=1;
+				}
+				break;
+			case 's':
+				if (strcmp(p,"symlink")==0) {
+					*disables |= DISABLE_SYMLINK;
+					o=1;
+				} else if (strcmp(p,"setlength")==0) {
+					*disables |= DISABLE_SETLENGTH;
+					o=1;
+				} else if (strcmp(p,"snapshot")==0) {
+					*disables |= DISABLE_SNAPSHOT;
+					o=1;
+				} else if (strcmp(p,"settrash")==0) {
+					*disables |= DISABLE_SETTRASH;
+					o=1;
+				} else if (strcmp(p,"setsclass")==0) {
+					*disables |= DISABLE_SETSCLASS;
+					o=1;
+				} else if (strcmp(p,"seteattr")==0) {
+					*disables |= DISABLE_SETEATTR;
+					o=1;
+				} else if (strcmp(p,"setxattr")==0) {
+					*disables |= DISABLE_SETXATTR;
+					o=1;
+				} else if (strcmp(p,"setfacl")==0) {
+					*disables |= DISABLE_SETFACL;
+					o=1;
+				}
+				break;
+			case 't':
+				if (strcmp(p,"truncate")==0) {
+					*disables |= DISABLE_TRUNCATE;
+					o=1;
+				}
+				break;
+			case 'u':
+				if (strcmp(p,"unlink")==0) {
+					*disables |= DISABLE_UNLINK;
+					o=1;
+				}
+				break;
+			case 'w':
+				if (strcmp(p,"write")==0) {
+					*disables |= DISABLE_WRITE;
+					o=1;
+				}
+				break;
+		}
+		if (o==0) {
+			mfs_arg_syslog(LOG_WARNING,"mfsexports: unknown disable command '%s' in line: %"PRIu32" (ignored)",p,lineno);
+		}
+	}
+	return 0;
+}
+
 int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 	char *p;
 	int o;
@@ -771,6 +897,15 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 			if (strcmp(p,"dynamicip")==0) {
 				arec->sesflags |= SESFLAG_DYNAMICIP;
 				o=1;
+			} else if (strncmp(p,"disable=",8)==0) {
+				o=1;
+				if (arec->meta) {
+					mfs_arg_syslog(LOG_WARNING,"meta option ignored: %s",p);
+				} else {
+					if (exports_parsedisable(p+8,lineno,&arec->disables)<0) {
+						return -1;
+					}
+				}
 			}
 			break;
 		case 'c':
@@ -936,6 +1071,7 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec,exports **default
 		arec->rootgid = 999;
 		arec->mapalluid = 999;
 		arec->mapallgid = 999;
+		arec->disables = 0;
 		arec->next = NULL;
 	} else {
 		memcpy(arec,*defaults,sizeof(exports));

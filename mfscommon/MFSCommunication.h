@@ -590,7 +590,8 @@
 	"setsclass", \
 	"seteattr", \
 	"setxattr", \
-	"setfacl"
+	"setfacl", \
+	NULL
 
 #define CSTOMA_MAXPACKETSIZE 500000000
 #define CLTOMA_MAXPACKETSIZE 50000000

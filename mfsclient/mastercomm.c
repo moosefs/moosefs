@@ -67,9 +67,9 @@
 #include "heapsorter.h"
 #include "extrapackets.h"
 #include "massert.h"
-//#ifndef WIN32
-//#include "mfs_fuse.h"
-//#endif
+#ifdef MFSMOUNT
+#include "mfs_fuse.h"
+#endif
 #include "chunksdatacache.h"
 //#include "readdata.h"
 // #include "dircache.h"
@@ -1291,7 +1291,6 @@ int fs_resolve(uint8_t oninit,const char *bindhostname,const char *masterhostnam
 
 // int fs_connect(uint8_t oninit,const char *bindhostname,const char *masterhostname,const char *masterportname,uint8_t meta,const char *info,const char *subfolder,const uint8_t passworddigest[16],uint8_t *sesflags,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime) {
 int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
-	static const char* disablestr[]={DISABLE_STRINGS};
 	uint32_t i,j;
 	uint8_t *wptr,*regbuff;
 	md5ctx ctx;
@@ -1307,6 +1306,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	uint32_t mintrashtime,maxtrashtime;
 	uint32_t disables;
 	int32_t rleng;
+	const char* disablestr[]={DISABLE_STRINGS};
 	const char *sesflagposstrtab[]={SESFLAG_POS_STRINGS};
 	const char *sesflagnegstrtab[]={SESFLAG_NEG_STRINGS};
 #ifndef WIN32
@@ -1656,6 +1656,9 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	}
 	free(regbuff);
 	lastwrite = monotonic_seconds();
+#ifdef MFSMOUNT
+	mfs_setdisables(disables);
+#endif
 	if (oninit==0) {
 		if (sessionlost==2) {
 			syslog(LOG_NOTICE,"registered to master using previous session");

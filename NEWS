@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) fixed handling LOCKED and EAGAIN status in readdata
   - (client) added handle info to oplog messages
   - (all) added support for disabling individual filesystem commands in exports
+  - (client) added handling read/write/readdir disables on client side (better error messages)
 
 * MooseFS 3.0.111-1 (2020-02-19)
 

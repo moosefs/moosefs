@@ -631,6 +631,7 @@ static int no_xattrs = 0;
 static int no_posix_locks = 0;
 static int no_bsd_locks = 0;
 static int full_permissions = 0;
+static uint32_t mfs_disables = 0;
 
 //static int local_mode = 0;
 //static int no_attr_cache = 0;
@@ -2830,7 +2831,9 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		oplog_printf(&ctx,"opendir (%lu): %s",(unsigned long int)ino,strerr(ENOTDIR));
 		fuse_reply_err(req, ENOTDIR);
 	}
-	if (full_permissions) {
+	if (mfs_disables & DISABLE_READDIR) {
+		status = MFS_ERROR_EPERM;
+	} else if (full_permissions) {
 		gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
 		status = fs_access(ino,ctx.uid,gids->gidcnt,gids->gidtab,MODE_MASK_R);	// at least test rights
 		groups_rel(gids);
@@ -3457,7 +3460,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	mattr = mfs_attr_get_mattr(attr);
 	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,inode,0,1);
 	fi->fh = findex;
-	if (mattr&MATTR_DIRECTMODE) {
+	if ((mattr&MATTR_DIRECTMODE) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
 		fi->keep_cache = 0;
 		fi->direct_io = 1;
 	} else {
@@ -3665,7 +3668,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	mattr = mfs_attr_get_mattr(attr);
 	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,ino,mfs_attr_get_fleng(attr),(fdrec)?0:1);
 	fi->fh = findex;
-	if (mattr&MATTR_DIRECTMODE) {
+	if ((mattr&MATTR_DIRECTMODE) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
 		fi->keep_cache = 0;
 		fi->direct_io = 1;
 	} else {
@@ -4073,6 +4076,11 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		return;
 	}
 */
+	if (mfs_disables & DISABLE_READ) {
+		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EPERM));
+		fuse_reply_err(req,EPERM);
+		return;
+	}
 	if (fi==NULL) {
 		oplog_printf(&ctx,"read (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
 		fuse_reply_err(req,EBADF);
@@ -4217,6 +4225,11 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		return;
 	}
 */
+	if (mfs_disables & DISABLE_WRITE) {
+		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EPERM));
+		fuse_reply_err(req,EPERM);
+		return;
+	}
 	if (fi==NULL) {
 		oplog_printf(&ctx,"write (%lu,%llu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,strerr(EBADF));
 		fuse_reply_err(req,EBADF);
@@ -5832,6 +5845,10 @@ void mfs_prepare_params(void) {
 		params_buff = mfsrealloc(params_buff,params_leng);
 	}
 	mfs_attr_set_fleng(paramsattr,params_leng);
+}
+
+void mfs_setdisables(uint32_t disables) {
+	mfs_disables = disables;
 }
 
 #if defined(__FreeBSD__)

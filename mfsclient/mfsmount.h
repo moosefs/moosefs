@@ -23,6 +23,7 @@
 
 #include <inttypes.h>
 
+void main_setparams(uint8_t sesflags,uint16_t umaskval,uint32_t maprootuid,uint32_t maprootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t disables);
 uint32_t main_snprint_parameters(char *buff,uint32_t size);
 
 #endif

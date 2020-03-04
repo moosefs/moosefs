@@ -784,6 +784,32 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	}
 }
 
+static uint8_t params_sesflags = 0;
+static uint16_t params_umaskval = 0;
+static uint32_t params_maprootuid = 0;
+static uint32_t params_maprootgid = 0;
+static uint32_t params_mapalluid = 0;
+static uint32_t params_mapallgid = 0;
+static uint8_t params_mingoal = 0;
+static uint8_t params_maxgoal = 0;
+static uint32_t params_mintrashtime = 0;
+static uint32_t params_maxtrashtime = 0;
+static uint32_t params_disables = 0;
+
+void main_setparams(uint8_t sesflags,uint16_t umaskval,uint32_t maprootuid,uint32_t maprootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t disables) {
+	params_sesflags = sesflags;
+	params_umaskval = umaskval;
+	params_maprootuid = maprootuid;
+	params_maprootgid = maprootgid;
+	params_mapalluid = mapalluid;
+	params_mapallgid = mapallgid;
+	params_mingoal = mingoal;
+	params_maxgoal = maxgoal;
+	params_mintrashtime = mintrashtime;
+	params_maxtrashtime = maxtrashtime;
+	params_disables = disables;
+}
+
 uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	uint32_t leng = 0;
 
@@ -863,6 +889,13 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_XFS)?"XFS":
 			"(unknown value)");
 	DIRECTOPT("no_std_mount_options",(mfsopts.nostdmountoptions)?"(defined)":"(not defined)");
+	bprintf("master_sesflags: %"PRIu8"\n",params_sesflags);
+	bprintf("master_umaskval: 0%03"PRIo16"\n",params_umaskval);
+	bprintf("master_maproot: %"PRIu32":%"PRIu32"\n",params_maprootuid,params_maprootgid);
+	bprintf("master_mapall: %"PRIu32":%"PRIu32"\n",params_mapalluid,params_mapallgid);
+	bprintf("master_goallimit: %"PRIu8":%"PRIu8"\n",params_mingoal,params_maxgoal);
+	bprintf("master_trashlimit: %"PRIu32":%"PRIu32"\n",params_mintrashtime,params_maxtrashtime);
+	bprintf("master_disables: 0x%"PRIX32"\n",params_disables);
 	return leng;
 }
 

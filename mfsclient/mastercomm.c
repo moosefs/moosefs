@@ -69,6 +69,7 @@
 #include "massert.h"
 #ifdef MFSMOUNT
 #include "mfs_fuse.h"
+#include "mfsmount.h"
 #endif
 #include "chunksdatacache.h"
 //#include "readdata.h"
@@ -1658,6 +1659,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	lastwrite = monotonic_seconds();
 #ifdef MFSMOUNT
 	mfs_setdisables(disables);
+	main_setparams(sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables);
 #endif
 	if (oninit==0) {
 		if (sessionlost==2) {

@@ -632,7 +632,7 @@ int posix_acl_load(FILE *fd,uint8_t mver) {
 	uint16_t aclperm;
 	uint32_t acls,acbcnt;
 
-	if (mver>0x10) {
+	if (mver>0x11) {
 		fprintf(stderr,"loading posix_acl: unsupported format\n");
 		return -1;
 	}
@@ -1311,7 +1311,7 @@ int fs_load(FILE *fd,uint8_t fver,const char section[4]) {
 		ptr = hdr+8;
 		sleng = get64bit(&ptr);
 		offbegin = ftello(fd);
-		if (section==0 || memcmp(hdr,section,4)==0) {
+		if (section[0]==0 || memcmp(hdr,section,4)==0) {
 			printf("# -------------------------------------------------------------------\n");
 			printf("# section header: %c%c%c%c%c%c%c%c (%02X%02X%02X%02X%02X%02X%02X%02X) ; length: %"PRIu64"\n",dispchar(hdr[0]),dispchar(hdr[1]),dispchar(hdr[2]),dispchar(hdr[3]),dispchar(hdr[4]),dispchar(hdr[5]),dispchar(hdr[6]),dispchar(hdr[7]),hdr[0],hdr[1],hdr[2],hdr[3],hdr[4],hdr[5],hdr[6],hdr[7],sleng);
 			mver = (((hdr[5]-'0')&0xF)<<4)+(hdr[7]&0xF);
@@ -1524,5 +1524,5 @@ int main(int argc,char *argv[]) {
 //		printf("usage: %s metadata_file\n",argv[0]);
 //		return 1;
 //	}
-	return (fs_loadall(argv[1],section)<0)?1:0;
+	return (fs_loadall(argv[0],section)<0)?1:0;
 }

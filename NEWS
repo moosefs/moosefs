@@ -17,6 +17,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) changed algorithm of reusing csid in chunk module (adding released csid to the end of free list)
   - (all) added support for STRICT and LOOSE mode in KEEP and ARCHIVE
   - (master) fixed segfault during appending chunks of file with positive length and no chunks
+  - (metadump) fixed bugs introduced in verson 3.0.106
 
 * MooseFS 3.0.111-1 (2020-02-19)
 

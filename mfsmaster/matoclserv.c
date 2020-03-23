@@ -4170,9 +4170,17 @@ void matoclserv_fuse_snapshot(matoclserventry *eptr,const uint8_t *data,uint32_t
 		requmask = 0;
 	}
 	requmask |= sessions_get_umask(eptr->sesdata);
-	if (sessions_get_disables(eptr->sesdata)&DISABLE_SNAPSHOT) {
-		status = MFS_ERROR_EPERM;
+	status = MFS_STATUS_OK;
+	if (smode & SNAPSHOT_MODE_DELETE) {
+		if (sessions_get_disables(eptr->sesdata)&(DISABLE_UNLINK|DISABLE_RMDIR)) {
+			status = MFS_ERROR_EPERM;
+		}
 	} else {
+		if (sessions_get_disables(eptr->sesdata)&DISABLE_SNAPSHOT) {
+			status = MFS_ERROR_EPERM;
+		}
+	}
+	if (status==MFS_STATUS_OK) {
 		status = fs_snapshot(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,inode_dst,nleng_dst,name_dst,uid,gids,gid,smode,requmask);
 	}
 	ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_SNAPSHOT,5);

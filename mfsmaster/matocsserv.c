@@ -120,6 +120,7 @@ typedef struct matocsserventry {
 	uint16_t delcounter;
 
 	uint32_t labelmask;
+	char *labelstr;
 
 	uint32_t create_total_counter;
 	uint32_t rrep_total_counter;
@@ -737,6 +738,15 @@ uint16_t matocsserv_servers_with_label(uint8_t label) {
 uint32_t matocsserv_server_get_labelmask(void *e) {
 	matocsserventry *eptr = (matocsserventry *)e;
 	return eptr->labelmask;
+}
+
+const char* matocsserv_server_get_labelstr(void *e) {
+	matocsserventry *eptr = (matocsserventry *)e;
+	if (eptr->labelstr!=NULL) {
+		return eptr->labelstr;
+	} else {
+		return "(undefined)";
+	}
 }
 
 uint32_t matocsserv_server_get_ip(void *e) {
@@ -2038,6 +2048,8 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 
 
 void matocsserv_labels(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t i,l;
+
 	if (length!=4) {
 		syslog(LOG_NOTICE,"CSTOMA_LABELS - wrong size (%"PRIu32"/4)",length);
 		eptr->mode=KILL;
@@ -2045,6 +2057,32 @@ void matocsserv_labels(matocsserventry *eptr,const uint8_t *data,uint32_t length
 	}
 	passert(data);
 	eptr->labelmask = get32bit(&data);
+	if (eptr->labelstr!=NULL) {
+		free(eptr->labelstr);
+	}
+	l = 0;
+	for (i=0 ; i<(1+'Z'-'A') ; i++) {
+		if (eptr->labelmask&(1U<<i)) {
+			l++;
+		}
+	}
+	if (l>0) {
+		l = l*2;
+	} else {
+		l = 1;
+	}
+	eptr->labelstr = malloc(l);
+	passert(eptr->labelstr);
+	l = 0;
+	for (i=0 ; i<(1+'Z'-'A') ; i++) {
+		if (eptr->labelmask&(1U<<i)) {
+			if (l>0) {
+				eptr->labelstr[l++]=',';
+			}
+			eptr->labelstr[l++]='A'+i;
+		}
+	}
+	eptr->labelstr[l]=0;
 }
 
 void matocsserv_space(matocsserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -2600,6 +2638,7 @@ void matocsserv_serve(struct pollfd *pdesc) {
 			eptr->delcounter = 0;
 
 			eptr->labelmask = 0;
+			eptr->labelstr = NULL;
 
 			eptr->create_total_counter = 0;
 			eptr->rrep_total_counter = 0;

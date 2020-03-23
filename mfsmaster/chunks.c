@@ -128,7 +128,6 @@ typedef struct _discserv {
 
 static discserv *discservers = NULL;
 static discserv *discservers_next = NULL;
-static uint32_t discserverspos = 0;
 
 /*
 typedef struct _bcdata {
@@ -246,7 +245,8 @@ typedef struct _csdata {
 } csdata;
 
 static csdata *cstab = NULL;
-static uint32_t csfreehead = 0;
+static uint32_t csfreehead = MAXCSCOUNT;
+static uint32_t csfreetail = MAXCSCOUNT;
 static uint32_t csusedhead = MAXCSCOUNT;
 static uint32_t opsinprogress = 0;
 static uint16_t csregisterinprogress = 0;
@@ -2550,6 +2550,7 @@ uint8_t chunk_get_mfrstatus(uint16_t csid) {
 }
 
 static inline void chunk_server_remove_csid(uint16_t csid) {
+	// remove from used list
 	if (cstab[csid].prev<MAXCSCOUNT) {
 		cstab[cstab[csid].prev].next = cstab[csid].next;
 	} else {
@@ -2558,22 +2559,31 @@ static inline void chunk_server_remove_csid(uint16_t csid) {
 	if (cstab[csid].next<MAXCSCOUNT) {
 		cstab[cstab[csid].next].prev = cstab[csid].prev;
 	}
-	cstab[csid].next = csfreehead;
-	cstab[csid].prev = MAXCSCOUNT;
-	csfreehead = csid;
+	// append to free list
+	cstab[csid].next = MAXCSCOUNT;
+	cstab[csid].prev = csfreetail;
+	cstab[csfreetail].next = csid;
+	csfreetail = csid;
+
+//	cstab[csid].next = csfreehead;
+//	cstab[csid].prev = MAXCSCOUNT;
+//	cstab[csfreehead].prev = csid;
+//	csfreehead = csid;
 }
 
 static inline uint16_t chunk_server_new_csid(void) {
 	uint16_t csid;
 
+	// take first element from free list
 	csid = csfreehead;
 	csfreehead = cstab[csid].next;
 	cstab[csfreehead].prev = MAXCSCOUNT;
+	// add to used list
 	if (csusedhead<MAXCSCOUNT) {
 		cstab[csusedhead].prev = csid;
 	}
 	cstab[csid].next = csusedhead;
-	cstab[csid].prev = MAXCSCOUNT;
+//	cstab[csid].prev = MAXCSCOUNT; // not necessary - it was first element in free list
 	csusedhead = csid;
 	return csid;
 }
@@ -2655,12 +2665,13 @@ void chunk_server_disconnection_loop(void) {
 	chunk *c,*cn;
 	discserv *ds;
 	uint64_t startutime,currutime;
+	static uint32_t discserverspos = 0;
 
 	if (discservers) {
 		startutime = monotonic_useconds();
 		currutime = startutime;
 		while (startutime+10000>currutime) {
-			for (i=0 ; i<1000 ; i++) {
+			for (i=0 ; i<100 ; i++) {
 				if (discserverspos<chunkrehashpos) {
 					for (c=chunkhashtab[discserverspos>>HASHTAB_LOBITS][discserverspos&HASHTAB_MASK] ; c ; c=cn ) {
 						cn = c->next;
@@ -2672,7 +2683,7 @@ void chunk_server_disconnection_loop(void) {
 						ds = discservers;
 						discservers = ds->next;
 						chunk_server_remove_csid(ds->csid);
-						matocsserv_disconnection_finished(cstab[csfreehead].ptr);
+						matocsserv_disconnection_finished(cstab[ds->csid].ptr);
 						free(ds);
 					}
 					return;
@@ -4405,6 +4416,7 @@ void chunk_cleanup(void) {
 	}
 	cstab[0].prev = MAXCSCOUNT;
 	csfreehead = 0;
+	csfreetail = MAXCSCOUNT-1;
 	csusedhead = MAXCSCOUNT;
 	for (i=0 ; i<MAXSCLASS*2 ; i++) {
 		for (j=0 ; j<11 ; j++) {
@@ -4748,6 +4760,7 @@ int chunk_strinit(void) {
 	}
 	cstab[0].prev = MAXCSCOUNT;
 	csfreehead = 0;
+	csfreetail = MAXCSCOUNT-1;
 	csusedhead = MAXCSCOUNT;
 	allchunkcounts = malloc(sizeof(uint32_t*)*MAXSCLASS*2);
 	passert(allchunkcounts);

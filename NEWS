@@ -10,6 +10,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) added session paramaters to '.params' file
   - (tools) fixed packet reallocation error
   - (master) changed syslog message for locked chunks
+  - (client) added dentry invalidator (needed in Linux with kernel < 4.19 - EBUSY bug)
 
 * MooseFS 3.0.111-1 (2020-02-19)
 

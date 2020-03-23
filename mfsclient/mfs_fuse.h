@@ -80,6 +80,7 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
 #endif
 
+void mfs_dentry_invalidate(uint32_t parent,uint8_t nleng,const char *name);
 void mfs_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng);
 void mfs_inode_change_fleng(uint32_t inode,uint64_t fleng);
 

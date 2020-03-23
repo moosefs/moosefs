@@ -183,7 +183,9 @@ am_mfsmount_OBJECTS = mfsmount-labelparser.$(OBJEXT) \
 	mfsmount-dirattrcache.$(OBJEXT) \
 	mfsmount-symlinkcache.$(OBJEXT) \
 	mfsmount-negentrycache.$(OBJEXT) mfsmount-xattrcache.$(OBJEXT) \
-	mfsmount-fdcache.$(OBJEXT) mfsmount-sustained_inodes.$(OBJEXT) \
+	mfsmount-fdcache.$(OBJEXT) \
+	mfsmount-dentry_invalidator.$(OBJEXT) \
+	mfsmount-sustained_inodes.$(OBJEXT) \
 	mfsmount-sustained_stats.$(OBJEXT) mfsmount-inoleng.$(OBJEXT) \
 	mfsmount-getgroups.$(OBJEXT) mfsmount-mfs_fuse.$(OBJEXT) \
 	mfsmount-mfs_meta_fuse.$(OBJEXT) mfsmount-mastercomm.$(OBJEXT) \
@@ -276,6 +278,7 @@ am__depfiles_remade = ../mfscommon/$(DEPDIR)/clocks.Po \
 	./$(DEPDIR)/mfsmount-chunkrwlock.Po \
 	./$(DEPDIR)/mfsmount-chunksdatacache.Po \
 	./$(DEPDIR)/mfsmount-csdb.Po ./$(DEPDIR)/mfsmount-csorder.Po \
+	./$(DEPDIR)/mfsmount-dentry_invalidator.Po \
 	./$(DEPDIR)/mfsmount-dirattrcache.Po \
 	./$(DEPDIR)/mfsmount-extrapackets.Po \
 	./$(DEPDIR)/mfsmount-fdcache.Po \
@@ -519,6 +522,7 @@ mfsmount_SOURCES = \
 	negentrycache.c negentrycache.h \
 	xattrcache.c xattrcache.h \
 	fdcache.c fdcache.h \
+	dentry_invalidator.c dentry_invalidator.h \
 	sustained_inodes.c sustained_inodes.h \
 	sustained_stats.c sustained_stats.h \
 	inoleng.c inoleng.h \
@@ -609,6 +613,7 @@ mfstools_SOURCES = \
 	../mfscommon/md5.c ../mfscommon/md5.h \
 	../mfscommon/liset64.c ../mfscommon/liset64.h \
 	../mfscommon/datapack.h ../mfscommon/mfsstrerr.h \
+	../mfscommon/mfsalloc.h \
 	../mfscommon/MFSCommunication.h
 
 mfstools_LDADD = $(MATH_LIBS)
@@ -930,6 +935,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunksdatacache.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csdb.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csorder.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dentry_invalidator.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirattrcache.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-extrapackets.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-fdcache.Po@am__quote@ # am--include-marker
@@ -1305,6 +1311,20 @@ mfsmount-fdcache.obj: fdcache.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fdcache.c' object='mfsmount-fdcache.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-fdcache.obj `if test -f 'fdcache.c'; then $(CYGPATH_W) 'fdcache.c'; else $(CYGPATH_W) '$(srcdir)/fdcache.c'; fi`
+
+mfsmount-dentry_invalidator.o: dentry_invalidator.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-dentry_invalidator.o -MD -MP -MF $(DEPDIR)/mfsmount-dentry_invalidator.Tpo -c -o mfsmount-dentry_invalidator.o `test -f 'dentry_invalidator.c' || echo '$(srcdir)/'`dentry_invalidator.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-dentry_invalidator.Tpo $(DEPDIR)/mfsmount-dentry_invalidator.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dentry_invalidator.c' object='mfsmount-dentry_invalidator.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-dentry_invalidator.o `test -f 'dentry_invalidator.c' || echo '$(srcdir)/'`dentry_invalidator.c
+
+mfsmount-dentry_invalidator.obj: dentry_invalidator.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-dentry_invalidator.obj -MD -MP -MF $(DEPDIR)/mfsmount-dentry_invalidator.Tpo -c -o mfsmount-dentry_invalidator.obj `if test -f 'dentry_invalidator.c'; then $(CYGPATH_W) 'dentry_invalidator.c'; else $(CYGPATH_W) '$(srcdir)/dentry_invalidator.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-dentry_invalidator.Tpo $(DEPDIR)/mfsmount-dentry_invalidator.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dentry_invalidator.c' object='mfsmount-dentry_invalidator.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-dentry_invalidator.obj `if test -f 'dentry_invalidator.c'; then $(CYGPATH_W) 'dentry_invalidator.c'; else $(CYGPATH_W) '$(srcdir)/dentry_invalidator.c'; fi`
 
 mfsmount-sustained_inodes.o: sustained_inodes.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-sustained_inodes.o -MD -MP -MF $(DEPDIR)/mfsmount-sustained_inodes.Tpo -c -o mfsmount-sustained_inodes.o `test -f 'sustained_inodes.c' || echo '$(srcdir)/'`sustained_inodes.c
@@ -1920,6 +1940,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/mfsmount-chunksdatacache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-csdb.Po
 	-rm -f ./$(DEPDIR)/mfsmount-csorder.Po
+	-rm -f ./$(DEPDIR)/mfsmount-dentry_invalidator.Po
 	-rm -f ./$(DEPDIR)/mfsmount-dirattrcache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-extrapackets.Po
 	-rm -f ./$(DEPDIR)/mfsmount-fdcache.Po
@@ -2038,6 +2059,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/mfsmount-chunksdatacache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-csdb.Po
 	-rm -f ./$(DEPDIR)/mfsmount-csorder.Po
+	-rm -f ./$(DEPDIR)/mfsmount-dentry_invalidator.Po
 	-rm -f ./$(DEPDIR)/mfsmount-dirattrcache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-extrapackets.Po
 	-rm -f ./$(DEPDIR)/mfsmount-fdcache.Po

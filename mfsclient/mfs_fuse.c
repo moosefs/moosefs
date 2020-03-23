@@ -75,6 +75,10 @@
 #include "xattrcache.h"
 #include "fdcache.h"
 #include "inoleng.h"
+#if defined(__linux__) && (FUSE_VERSION >= 28)
+#include "dentry_invalidator.h"
+#define DENTRY_INVALIDATOR 1
+#endif
 
 #if MFS_ROOT_ID != FUSE_ROOT_ID
 #error FUSE_ROOT_ID is not equal to MFS_ROOT_ID
@@ -1752,6 +1756,11 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	mattr = mfs_attr_get_mattr(attr);
 	e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 	e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((type==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
+#ifdef DENTRY_INVALIDATOR
+	if (type==TYPE_DIRECTORY) {
+		dinval_add(parent,nleng,(const uint8_t *)name,inode);
+	}
+#endif
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	if (maxfleng>(uint64_t)(e.attr.st_size)) {
 		e.attr.st_size=maxfleng;
@@ -2501,6 +2510,9 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		mattr = mfs_attr_get_mattr(attr);
 		e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 		e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:direntry_cache_timeout;
+#ifdef DENTRY_INVALIDATOR
+		dinval_add(parent,nleng,(const uint8_t*)name,inode);
+#endif
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
 		oplog_printf(&ctx,"mkdir (%lu,%s,d%s:0%04o): OK (%.1lf,%lu,%.1lf,%s)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr);
@@ -2555,6 +2567,9 @@ void mfs_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //		}
 		dcache_invalidate_attr(parent);
 		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
+#ifdef DENTRY_INVALIDATOR
+		dinval_remove(parent,nleng,(const uint8_t*)name);
+#endif
 		oplog_printf(&ctx,"rmdir (%lu,%s): OK",(unsigned long int)parent,name);
 		fuse_reply_err(req, 0);
 	}
@@ -2733,6 +2748,11 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 			dcache_invalidate_attr(newparent);
 		}
 		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
+#ifdef DENTRY_INVALIDATOR
+		if (mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
+			dinval_change(parent,nleng,(const uint8_t*)name,newparent,newnleng,(const uint8_t*)newname,inode);
+		}
+#endif
 		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): OK",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags);
 		fuse_reply_err(req, 0);
 	}
@@ -3222,6 +3242,11 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 				mattr = mfs_attr_get_mattr(ptr);
 				e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 				e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((type==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
+#ifdef DENTRY_INVALIDATOR
+				if (type==TYPE_DIRECTORY) {
+					dinval_add(ino,nleng,(const uint8_t *)name,inode);
+				}
+#endif
 				mfs_attr_to_stat(inode,ptr,&e.attr);
 				if (maxfleng>(uint64_t)(e.attr.st_size)) {
 					e.attr.st_size=maxfleng;
@@ -5810,7 +5835,7 @@ void mfs_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng) {
 #if defined(__FreeBSD__)
 	if (freebsd_workarounds) {
 		oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): not supported",inode,offset,leng);
-	} else 
+	} else
 #endif
 	if (fuse_comm!=NULL) {
 		fuse_lowlevel_notify_inval_inode(fuse_comm,inode,offset,leng);
@@ -5820,6 +5845,29 @@ void mfs_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng) {
 	}
 #else
 	oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): not supported",inode,offset,leng);
+#endif
+}
+
+void mfs_dentry_invalidate(uint32_t parent,uint8_t nleng,const char *name) {
+	struct fuse_ctx ctx;
+	ctx.uid = 0;
+	ctx.gid = 0;
+	ctx.pid = 0;
+
+#if (FUSE_VERSION >= 28)
+#if defined(__FreeBSD__)
+	if (freebsd_workarounds) {
+		oplog_printf(&ctx,"invalidate entry (%"PRIu32":%s): not supported",parent,name);
+	} else
+#endif
+	if (fuse_comm!=NULL) {
+		fuse_lowlevel_notify_inval_entry(fuse_comm,parent,name,nleng);
+		oplog_printf(&ctx,"invalidate entry (%"PRIu32":%s): ok",parent,name);
+	} else {
+		oplog_printf(&ctx,"invalidate entry (%"PRIu32":%s): lost",parent,name);
+	}
+#else
+	oplog_printf(&ctx,"invalidate entry (%"PRIu32":%s): not supported",parent,name);
 #endif
 }
 
@@ -5916,6 +5964,13 @@ void mfs_init(struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double di
 	}
 	mfs_statsptr_init();
 	mfs_prepare_params();
+#if defined(__linux__)
+#ifdef DENTRY_INVALIDATOR
+	dinval_init(direntry_cache_timeout);
+#else
+	fprintf(stderr,"your libfuse version is too old to properly fix the EBUSY bug\n");
+#endif
+#endif
 #ifdef FREEBSD_DELAYED_RELEASE
 	lwt_minthread_create(&th,1,finfo_delayed_release_cleanup_thread,NULL);
 #endif

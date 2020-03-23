@@ -1867,6 +1867,23 @@ int main(int argc, char *argv[]) {
 		mfsopts.fsyncmintime=0.0;
 	}
 
+#define TIMEOUT_CLAMP(option,name,max) \
+	if ((option) > (max)) { \
+		fprintf(stderr,name " cache timeout too big (%.2lf) - decreased to %.2lf\n",(option),(max)); \
+		(option) = (max); \
+	} \
+	if ((option) < 0.0) { \
+		fprintf(stderr,"negative value of " name " cache timeout - set to 0\n"); \
+		(option) = 0.0; \
+	}
+
+	TIMEOUT_CLAMP(mfsopts.attrcacheto,"attribute",86400.0);
+	TIMEOUT_CLAMP(mfsopts.xattrcacheto,"xattr",86400.0);
+	TIMEOUT_CLAMP(mfsopts.entrycacheto,"entry",86400.0);
+	TIMEOUT_CLAMP(mfsopts.direntrycacheto,"directory entry",86400.0);
+	TIMEOUT_CLAMP(mfsopts.negentrycacheto,"non existing entry",86400.0);
+	TIMEOUT_CLAMP(mfsopts.groupscacheto,"auxiliary groups",86400.0);
+
 	if (csorder_init(mfsopts.preferedlabels)<0) {
 		fprintf(stderr,"error parsing preferred labels expression\nsee: %s -h for help\n",argv[0]);
 		return 1;

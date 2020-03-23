@@ -42,6 +42,7 @@ void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes);
 //int fs_direct_read(int rfd,uint8_t *buff,uint32_t size);
 void fs_add_entry(uint32_t inode);
 void fs_forget_entry(uint32_t inode);
+int fs_isopen(uint32_t inode);
 void fs_inc_acnt(uint32_t inode);
 void fs_dec_acnt(uint32_t inode);
 // uint8_t fs_is_sustained_entry(uint32_t inode);

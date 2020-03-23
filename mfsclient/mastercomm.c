@@ -512,6 +512,26 @@ void fs_forget_entry(uint32_t inode) {
 	pthread_mutex_unlock(&aflock);
 }
 
+int fs_isopen(uint32_t inode) {
+	uint32_t afhash;
+	acquired_file *afptr;
+	pthread_mutex_lock(&aflock);
+	afhash = inode % ACQFILES_HASH_SIZE;
+	for (afptr = af_hash[afhash] ; afptr ; afptr = afptr->next) {
+		if (afptr->inode == inode) {
+			if (afptr->dentry || afptr->cnt) {
+				pthread_mutex_unlock(&aflock);
+				return 1;
+			} else {
+				pthread_mutex_unlock(&aflock);
+				return 0;
+			}
+		}
+	}
+	pthread_mutex_unlock(&aflock);
+	return 0;
+}
+
 void fs_inc_acnt(uint32_t inode) {
 	uint32_t afhash;
 	acquired_file *afptr;

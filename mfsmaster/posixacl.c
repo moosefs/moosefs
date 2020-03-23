@@ -244,6 +244,10 @@ void posix_acl_remove(uint32_t inode,uint8_t acltype) {
 	acn = GLUE_FN_NAME_PREFIX(_find)(inode,acltype);
 	if (acn) {
 		GLUE_FN_NAME_PREFIX(_delete)(acn);
+		if (acn->acltab) {
+			free(acn->acltab);
+		}
+		free(acn);
 	}
 }
 
@@ -546,6 +550,10 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 						// nl=0;
 					}
 					GLUE_FN_NAME_PREFIX(_delete)(acn);
+					if (acn->acltab!=NULL) {
+						free(acn->acltab);
+					}
+					free(acn);
 					errno = err;
 					mfs_errlog(LOG_ERR,"loading posix_acl: read error");
 					return -1;

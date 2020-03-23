@@ -208,7 +208,7 @@
 	"Unknown MFS error"
 
 #define SCLASS_CHG_ADMIN_ONLY              0x0001
-#define SCLASS_CHG_CREATE_MODE             0x0002
+#define SCLASS_CHG_MODE                    0x0002
 #define SCLASS_CHG_CREATE_MASKS            0x0004
 #define SCLASS_CHG_KEEP_MASKS              0x0008
 #define SCLASS_CHG_ARCH_MASKS              0x0010
@@ -330,13 +330,13 @@
 #define GMODE_RECURSIVE                    1
 #define GMODE_ISVALID(x)                   (((uint32_t)(x))<=1)
 
-// create_mode:
+// mode (storage class):
 // loose = use other labels when servers are overloaded or full
 // std = use other labels when servers are full
 // strict = never use other labels
-#define CREATE_MODE_LOOSE                  0
-#define CREATE_MODE_STD                    1
-#define CREATE_MODE_STRICT                 2
+#define SCLASS_MODE_LOOSE                  0
+#define SCLASS_MODE_STD                    1
+#define SCLASS_MODE_STRICT                 2
 
 // extraattr:
 
@@ -580,7 +580,7 @@
 	"link", \
 	"create", \
 	"readdir", \
-	"raad", \
+	"read", \
 	"write", \
 	"truncate", \
 	"setlength", \
@@ -896,17 +896,17 @@
 // Storage Class
 
 #define CLTOMA_SCLASS_CREATE (PROTO_BASE+350)
-// msgid:32 storage_class_name:NAME fver:8 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// msgid:32 storage_class_name:NAME fver:8 admin_only:8 mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
 #define MATOCL_SCLASS_CREATE (PROTO_BASE+351)
 // msgid:32 status:8
 
 #define CLTOMA_SCLASS_CHANGE (PROTO_BASE+352)
-// msgid:32 storage_class_name:NAME fver:8 chgmask:16 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// msgid:32 storage_class_name:NAME fver:8 chgmask:16 admin_only:8 mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
 #define MATOCL_SCLASS_CHANGE (PROTO_BASE+353)
 // msgid:32 status:8
-// msgid:32 fver:8 admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// msgid:32 fver:8 admin_only:8 mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
 
 #define CLTOMA_SCLASS_DELETE (PROTO_BASE+354)
 // msgid:32 storage_class_name:NAME
@@ -934,7 +934,7 @@
 // fver==0:
 //	N * [ storage_class_name:NAME ]
 // fver!=0:
-//	N * [ storage_class_name:NAME admin_only:8 create_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] ]
+//	N * [ storage_class_name:NAME admin_only:8 mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] ]
 
 
 // Fuse
@@ -1814,7 +1814,7 @@
 
 // 0x021F
 #define MATOCL_SCLASS_INFO (PROTO_BASE+543)
-// allservers:16 N*[ sclassid:8 sclassname:NAME files:32 dirs:32 3 * [ stdchunks:64 archchunks:64 ] admin_only:8 create_mode:8 arch_delay:16 3 * [ canbefulfilled:8 labelscnt:8 ] 3 * [ labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ] ]
+// allservers:16 N*[ sclassid:8 sclassname:NAME files:32 dirs:32 3 * [ stdchunks:64 archchunks:64 ] admin_only:8 mode:8 arch_delay:16 3 * [ canbefulfilled:8 labelscnt:8 ] 3 * [ labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ] ]
 //  - redundancy classes (0 - undergoal ; 1 - ok ; 2 - overgoal)
 //  - label sets (0 - create ; 1 - keep ; 2 - archive)
 

@@ -4319,7 +4319,7 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint32_t create_labelmasks[9*MASKORGROUP];
 	uint32_t keep_labelmasks[9*MASKORGROUP];
 	uint32_t arch_labelmasks[9*MASKORGROUP];
-	uint8_t create_mode;
+	uint8_t mode;
 	uint8_t create_labelscnt;
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
@@ -4352,7 +4352,7 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 				return;
 			}
 			admin_only = get8bit(&data);
-			create_mode = get8bit(&data);
+			mode = get8bit(&data);
 			arch_delay = get16bit(&data);
 			create_labelscnt = get8bit(&data);
 			keep_labelscnt = get8bit(&data);
@@ -4371,7 +4371,7 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 			for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
 				arch_labelmasks[i] = get32bit(&data);
 			}
-			status = sclass_create_entry(nleng,name,admin_only,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
+			status = sclass_create_entry(nleng,name,admin_only,mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
 		} else {
 			status = MFS_ERROR_EINVAL;
 		}
@@ -4392,7 +4392,7 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint32_t create_labelmasks[9*MASKORGROUP];
 	uint32_t keep_labelmasks[9*MASKORGROUP];
 	uint32_t arch_labelmasks[9*MASKORGROUP];
-	uint8_t create_mode;
+	uint8_t mode;
 	uint8_t create_labelscnt;
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
@@ -4429,7 +4429,7 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 		chgmask = get16bit(&data);
 		if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_ADMIN || chgmask==0) {
 			admin_only = get8bit(&data);
-			create_mode = get8bit(&data);
+			mode = get8bit(&data);
 			arch_delay = get16bit(&data);
 			create_labelscnt = get8bit(&data);
 			keep_labelscnt = get8bit(&data);
@@ -4448,7 +4448,7 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 			for (i = 0 ; i < arch_labelscnt*MASKORGROUP ; i++) {
 				arch_labelmasks[i] = get32bit(&data);
 			}
-			status = sclass_change_entry(nleng,name,chgmask,&admin_only,&create_mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay);
+			status = sclass_change_entry(nleng,name,chgmask,&admin_only,&mode,&create_labelscnt,create_labelmasks,&keep_labelscnt,keep_labelmasks,&arch_labelscnt,arch_labelmasks,&arch_delay);
 		} else {
 			status = MFS_ERROR_EPERM_NOTADMIN;
 		}
@@ -4462,7 +4462,7 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 	} else {
 		put8bit(&ptr,0); // fver
 		put8bit(&ptr,admin_only);
-		put8bit(&ptr,create_mode);
+		put8bit(&ptr,mode);
 		put16bit(&ptr,arch_delay);
 		put8bit(&ptr,create_labelscnt);
 		put8bit(&ptr,keep_labelscnt);

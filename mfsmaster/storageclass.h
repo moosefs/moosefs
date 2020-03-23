@@ -49,7 +49,7 @@ const uint8_t* sclass_get_name(uint8_t sclassid);
 
 void sclass_incref(uint16_t sclassid,uint8_t type);
 void sclass_decref(uint16_t sclassid,uint8_t type);
-uint8_t sclass_get_create_mode(uint16_t sclassid);
+uint8_t sclass_get_mode(uint16_t sclassid);
 uint8_t sclass_get_create_goal(uint16_t sclassid);
 uint8_t sclass_get_keepmax_goal(uint16_t sclassid);
 uint8_t sclass_get_keeparch_goal(uint16_t sclassid,uint8_t archflag);

@@ -49,7 +49,7 @@ typedef struct _storageclass {
 	uint8_t nleng;
 	uint8_t name[MAXSCLASSNLENG];
 	uint8_t admin_only;
-	uint8_t create_mode;
+	uint8_t mode;
 	uint8_t create_labelscnt;
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
@@ -115,7 +115,7 @@ static inline void sclass_make_changelog(uint16_t sclassid,uint8_t new_flag) {
 		chlogstr[0]='-';
 		chlogstr[1]='\0';
 	}
-	changelog("%"PRIu32"|SCSET(%s,%"PRIu8",W%"PRIu8",K%"PRIu8",A%"PRIu8",%"PRIu8",%"PRIu16",%"PRIu8",%s):%"PRIu16,main_time(),changelog_escape_name(sclasstab[sclassid].nleng,sclasstab[sclassid].name),new_flag,sclasstab[sclassid].create_labelscnt,sclasstab[sclassid].keep_labelscnt,sclasstab[sclassid].arch_labelscnt,sclasstab[sclassid].create_mode,sclasstab[sclassid].arch_delay,sclasstab[sclassid].admin_only,chlogstr,sclassid);
+	changelog("%"PRIu32"|SCSET(%s,%"PRIu8",W%"PRIu8",K%"PRIu8",A%"PRIu8",%"PRIu8",%"PRIu16",%"PRIu8",%s):%"PRIu16,main_time(),changelog_escape_name(sclasstab[sclassid].nleng,sclasstab[sclassid].name),new_flag,sclasstab[sclassid].create_labelscnt,sclasstab[sclassid].keep_labelscnt,sclasstab[sclassid].arch_labelscnt,sclasstab[sclassid].mode,sclasstab[sclassid].arch_delay,sclasstab[sclassid].admin_only,chlogstr,sclassid);
 
 }
 
@@ -149,7 +149,7 @@ static inline void sclass_fix_has_labels_fields(uint8_t sclassid) {
 	sclasstab[sclassid].has_arch_labels = has_labels;
 }
 
-uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only,uint8_t create_mode,uint8_t create_labelscnt,uint32_t *create_labelmasks,uint8_t keep_labelscnt,uint32_t *keep_labelmasks,uint8_t arch_labelscnt,uint32_t *arch_labelmasks,uint16_t arch_delay) {
+uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only,uint8_t mode,uint8_t create_labelscnt,uint32_t *create_labelmasks,uint8_t keep_labelscnt,uint32_t *keep_labelmasks,uint8_t arch_labelscnt,uint32_t *arch_labelmasks,uint16_t arch_delay) {
 	uint32_t sclassid,fsclassid;
 	uint32_t i;
 	if (sclass_name_check(nleng,name)==0) {
@@ -177,7 +177,7 @@ uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only
 	sclasstab[fsclassid].nleng = nleng;
 	memcpy(sclasstab[fsclassid].name,name,nleng);
 	sclasstab[fsclassid].admin_only = admin_only;
-	sclasstab[fsclassid].create_mode = create_mode;
+	sclasstab[fsclassid].mode = mode;
 	sclasstab[fsclassid].create_labelscnt = create_labelscnt;
 	for (i=0 ; i<create_labelscnt ; i++) {
 		memcpy(sclasstab[fsclassid].create_labelmasks[i],create_labelmasks+(i*MASKORGROUP),MASKORGROUP*sizeof(uint32_t));
@@ -196,7 +196,7 @@ uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only
 	return MFS_STATUS_OK;
 }
 
-uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,uint8_t *admin_only,uint8_t *create_mode,uint8_t *create_labelscnt,uint32_t *create_labelmasks,uint8_t *keep_labelscnt,uint32_t *keep_labelmasks,uint8_t *arch_labelscnt,uint32_t *arch_labelmasks,uint16_t *arch_delay) {
+uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,uint8_t *admin_only,uint8_t *mode,uint8_t *create_labelscnt,uint32_t *create_labelmasks,uint8_t *keep_labelscnt,uint32_t *keep_labelmasks,uint8_t *arch_labelscnt,uint32_t *arch_labelmasks,uint16_t *arch_delay) {
 	uint32_t sclassid,fsclassid;
 	uint32_t i;
 	if (sclass_name_check(nleng,name)==0) {
@@ -228,10 +228,10 @@ uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,u
 	} else {
 		*admin_only = sclasstab[fsclassid].admin_only;
 	}
-	if (chgmask & SCLASS_CHG_CREATE_MODE) {
-		sclasstab[fsclassid].create_mode = *create_mode;
+	if (chgmask & SCLASS_CHG_MODE) {
+		sclasstab[fsclassid].mode = *mode;
 	} else {
-		*create_mode = sclasstab[fsclassid].create_mode;
+		*mode = sclasstab[fsclassid].mode;
 	}
 	if (chgmask & SCLASS_CHG_CREATE_MASKS) {
 		sclasstab[fsclassid].create_labelscnt = *create_labelscnt;
@@ -280,7 +280,7 @@ uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,u
 	return MFS_STATUS_OK;
 }
 
-uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid,uint8_t new_flag,uint8_t admin_only,uint8_t create_mode,uint8_t create_labelscnt,uint32_t *create_labelmasks,uint8_t keep_labelscnt,uint32_t *keep_labelmasks,uint8_t arch_labelscnt,uint32_t *arch_labelmasks,uint16_t arch_delay) {
+uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid,uint8_t new_flag,uint8_t admin_only,uint8_t mode,uint8_t create_labelscnt,uint32_t *create_labelmasks,uint8_t keep_labelscnt,uint32_t *keep_labelmasks,uint8_t arch_labelscnt,uint32_t *arch_labelmasks,uint16_t arch_delay) {
 	uint32_t sclassid,fsclassid;
 	uint32_t i;
 	if (sclass_name_check(nleng,name)==0) {
@@ -322,7 +322,7 @@ uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid
 		memcpy(sclasstab[fsclassid].name,name,nleng);
 	}
 	sclasstab[fsclassid].admin_only = admin_only;
-	sclasstab[fsclassid].create_mode = create_mode;
+	sclasstab[fsclassid].mode = mode;
 	sclasstab[fsclassid].create_labelscnt = create_labelscnt;
 	for (i=0 ; i<create_labelscnt ; i++) {
 		memcpy(sclasstab[fsclassid].create_labelmasks[i],create_labelmasks+(i*MASKORGROUP),MASKORGROUP*sizeof(uint32_t));
@@ -381,7 +381,7 @@ static inline uint8_t sclass_univ_duplicate_entry(uint8_t oldnleng,const uint8_t
 	sclasstab[fdsclassid].nleng = newnleng;
 	memcpy(sclasstab[fdsclassid].name,newname,newnleng);
 	sclasstab[fdsclassid].admin_only = sclasstab[fssclassid].admin_only;
-	sclasstab[fdsclassid].create_mode = sclasstab[fssclassid].create_mode;
+	sclasstab[fdsclassid].mode = sclasstab[fssclassid].mode;
 	sclasstab[fdsclassid].create_labelscnt = sclasstab[fssclassid].create_labelscnt;
 	for (i=0 ; i<sclasstab[fssclassid].create_labelscnt ; i++) {
 		memcpy(sclasstab[fdsclassid].create_labelmasks[i],sclasstab[fssclassid].create_labelmasks[i],MASKORGROUP*sizeof(uint32_t));
@@ -517,7 +517,7 @@ uint32_t sclass_list_entries(uint8_t *buff,uint8_t longmode) {
 				buff+=sclasstab[sclassid].nleng;
 				if (longmode&1) {
 					put8bit(&buff,sclasstab[sclassid].admin_only);
-					put8bit(&buff,sclasstab[sclassid].create_mode);
+					put8bit(&buff,sclasstab[sclassid].mode);
 					put16bit(&buff,sclasstab[sclassid].arch_delay);
 					put8bit(&buff,sclasstab[sclassid].create_labelscnt);
 					put8bit(&buff,sclasstab[sclassid].keep_labelscnt);
@@ -578,8 +578,8 @@ void sclass_decref(uint16_t sclassid,uint8_t type) {
 	}
 }
 
-uint8_t sclass_get_create_mode(uint16_t sclassid) {
-	return sclasstab[sclassid].create_mode;
+uint8_t sclass_get_mode(uint16_t sclassid) {
+	return sclasstab[sclassid].mode;
 }
 
 uint8_t sclass_get_create_goal(uint16_t sclassid) {
@@ -682,7 +682,7 @@ uint32_t sclass_info(uint8_t *buff) {
 				put64bit(&buff,sover);
 				put64bit(&buff,aover);
 				put8bit(&buff,sclasstab[i].admin_only);
-				put8bit(&buff,sclasstab[i].create_mode);
+				put8bit(&buff,sclasstab[i].mode);
 				put16bit(&buff,sclasstab[i].arch_delay);
 				put8bit(&buff,chunk_labelset_can_be_fulfilled(sclasstab[i].create_labelscnt,sclasstab[i].create_labelmasks));
 				put8bit(&buff,sclasstab[i].create_labelscnt);
@@ -735,7 +735,7 @@ uint8_t sclass_store(bio *fd) {
 			put16bit(&ptr,i);
 			put8bit(&ptr,sclasstab[i].nleng);
 			put8bit(&ptr,sclasstab[i].admin_only);
-			put8bit(&ptr,sclasstab[i].create_mode);
+			put8bit(&ptr,sclasstab[i].mode);
 			put16bit(&ptr,sclasstab[i].arch_delay);
 			put8bit(&ptr,sclasstab[i].create_labelscnt);
 			put8bit(&ptr,sclasstab[i].keep_labelscnt);
@@ -779,7 +779,7 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 	uint32_t chunkcount;
 	uint16_t sclassid;
 	uint16_t arch_delay;
-	uint8_t create_mode;
+	uint8_t mode;
 	uint8_t create_labelscnt;
 	uint8_t keep_labelscnt;
 	uint8_t arch_labelscnt;
@@ -848,7 +848,7 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 		if (mver>0x15) {
 			nleng = get8bit(&ptr);
 			admin_only = get8bit(&ptr);
-			create_mode = get8bit(&ptr);
+			mode = get8bit(&ptr);
 			arch_delay = get16bit(&ptr);
 			create_labelscnt = get8bit(&ptr);
 			keep_labelscnt = get8bit(&ptr);
@@ -857,7 +857,7 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 		} else if (mver>0x14) {
 			nleng = 0;
 			admin_only = 0;
-			create_mode = get8bit(&ptr);
+			mode = get8bit(&ptr);
 			arch_delay = get16bit(&ptr);
 			create_labelscnt = get8bit(&ptr);
 			keep_labelscnt = get8bit(&ptr);
@@ -866,7 +866,7 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 		} else if (mver>0x13) {
 			nleng = 0;
 			admin_only = 0;
-			create_mode = get8bit(&ptr);
+			mode = get8bit(&ptr);
 			create_labelscnt = get8bit(&ptr);
 			keep_labelscnt = get8bit(&ptr);
 			arch_labelscnt = keep_labelscnt;
@@ -878,7 +878,7 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 			create_labelscnt = get8bit(&ptr);
 			keep_labelscnt = create_labelscnt;
 			arch_labelscnt = create_labelscnt;
-			create_mode = CREATE_MODE_STD;
+			mode = SCLASS_MODE_STD;
 			arch_delay = 0;
 			if (mver==0x12) {
 				chunkcount = get32bit(&ptr);
@@ -908,7 +908,7 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 			break;
 		}
 		if (create_labelscnt==0 || create_labelscnt>MAXLABELSCNT || keep_labelscnt==0 || keep_labelscnt>MAXLABELSCNT || arch_labelscnt==0 || arch_labelscnt>MAXLABELSCNT) {
-			mfs_arg_syslog(LOG_ERR,"loading storage class data: data format error (sclassid: %"PRIu16" ; create_mode: %"PRIu8" ; create_labelscnt: %"PRIu8" ; keep_labelscnt: %"PRIu8" ; arch_labelscnt: %"PRIu8" ; arch_delay: %"PRIu16")",sclassid,create_mode,create_labelscnt,keep_labelscnt,arch_labelscnt,arch_delay);
+			mfs_arg_syslog(LOG_ERR,"loading storage class data: data format error (sclassid: %"PRIu16" ; mode: %"PRIu8" ; create_labelscnt: %"PRIu8" ; keep_labelscnt: %"PRIu8" ; arch_labelscnt: %"PRIu8" ; arch_delay: %"PRIu16")",sclassid,mode,create_labelscnt,keep_labelscnt,arch_labelscnt,arch_delay);
 			free(databuff);
 			databuff = NULL;
 			return -1;
@@ -1016,7 +1016,7 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 				sclasstab[sclassid].arch_labelmasks[i][j] = labelmask;
 			}
 		}
-		sclasstab[sclassid].create_mode = create_mode;
+		sclasstab[sclassid].mode = mode;
 		sclasstab[sclassid].arch_delay = arch_delay;
 		sclasstab[sclassid].create_labelscnt = create_labelscnt;
 		sclasstab[sclassid].keep_labelscnt = keep_labelscnt;
@@ -1046,7 +1046,7 @@ void sclass_cleanup(void) {
 		sclasstab[i].nleng = 0;
 		sclasstab[i].name[0] = 0;
 		sclasstab[i].admin_only = 0;
-		sclasstab[i].create_mode = CREATE_MODE_STD;
+		sclasstab[i].mode = SCLASS_MODE_STD;
 		sclasstab[i].has_create_labels = 0;
 		sclasstab[i].create_labelscnt = 0;
 		sclasstab[i].has_keep_labels = 0;
@@ -1083,7 +1083,7 @@ int sclass_init(void) {
 		sclasstab[i].nleng = 0;
 		sclasstab[i].name[0] = 0;
 		sclasstab[i].admin_only = 0;
-		sclasstab[i].create_mode = CREATE_MODE_STD;
+		sclasstab[i].mode = SCLASS_MODE_STD;
 		sclasstab[i].has_create_labels = 0;
 		sclasstab[i].create_labelscnt = 0;
 		sclasstab[i].has_keep_labels = 0;

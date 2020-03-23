@@ -15,6 +15,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) when chunk can't be located always send to master info about lost chunk
   - (supervisor,master,cs) fixed buffer overrun in mastersupervisor code (PRO only, intr. in 3.0.107)
   - (master) changed algorithm of reusing csid in chunk module (adding released csid to the end of free list)
+  - (all) added support for STRICT and LOOSE mode in KEEP and ARCHIVE
 
 * MooseFS 3.0.111-1 (2020-02-19)
 

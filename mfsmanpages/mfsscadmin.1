@@ -4,20 +4,20 @@ mfsscadmin \- \fBMooseFS\fP storage class administration tool
 .SH SYNOPSIS
 .B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBcreate\fP|\fBmake\fP
 [\fB-a\fP \fIadmin_only\fP]
-[\fB-m\fP \fIcreation_mode\fP]
+[\fB-m\fP \fImode\fP]
 [\fB-C\fP \fICREATION_LABELS\fP] \fB-K\fP \fIKEEP_LABELS\fP [\fB-A\fP \fIARCH_LABELS\fP \fB-d\fP \fIARCH_DELAY\fP]
 \fISCLASS_NAME\fP...
 .PP
 .B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBcreate\fP|\fBmake\fP
 [\fB-a\fP \fIadmin_only\fP]
-[\fB-m\fP \fIcreation_mode\fP]
+[\fB-m\fP \fImode\fP]
 \fILABELS\fP
 \fISCLASS_NAME\fP...
 .PP
 .B mfsscadmin [\fB/\fP\fIMOUNTPOINT\fP] \fBchange\fP|\fBmodify\fP
 [\fB-f\fP]
 [\fB-a\fP \fIadmin_only\fP]
-[\fB-m\fP \fIcreation_mode\fP]
+[\fB-m\fP \fImode\fP]
 [\fB-C\fP \fICREATION_LABELS\fP]
 [\fB-K\fP \fIKEEP_LABELS\fP]
 [\fB-A\fP \fIARCH_LABELS\fP]
@@ -127,18 +127,27 @@ has the \fBC\fP label and either \fBX\fP or \fBY\fP label
 \fBA,BC,BC,BC\fP expression is equivalent to \fBA,3BC\fP expression
 .PP
 \fB*,*\fP expression is equivalent to \fB2*\fP expression is equivalent to \fB2\fP expression
-.SH CREATION MODES
-It is important to specify what to do in case when there is no space available on all servers
-marked with labels needed for new chunk creation. Also all servers marked with such labels can be temporariliy overloaded.
-The question is if the system should create chunks on other servers or not.
+.SH MODES
+It is important to specify what to do when it is not possible to meet
+the labels requirement of a storage class, i.e.: there is no space available on all servers with needed labels, there is not enough servers with needed labels or servers with needed labels are all busy.
+The question is if the system should create chunks on other servers (with non-matching labels) or not. This decision must be made by the user and hence the \fB-m\fP option.
 .PP
-Answer to this question should be resolved by user and hence the \fB-m\fP option. By default (no options or option \fB-m D\fP) in case of overloaded servers system will wait for them, but in case of no space available will use other servers and will replicate data to correct servers when it becomes possible.
+In DEFAULT mode (no option or option \fB-m D\fP) in case of overloaded servers the system will wait for them, but in case of no space available it will use other servers and will replicate data to correct servers when it becomes possible. This means if some servers are in busy state for a long time, it might not be possible to create new chunks with certain storage classes and endangered (undergoal) chunks from those classes are at higher risk of being completely lost due to delayed replications.
 .PP
-Option \fB-m S\fP turns on STRICT mode. In this mode the system will return error (ENOSPC) in case of no space
-available on servers marked with labels specified for chunk creation. It will still wait for overloaded servers.
+Option \fB-m S\fP turns on STRICT mode. In this mode, during writing a new file, the system will return error (ENOSPC) in case of no space
+available on servers marked with labels specified for chunk creation. It will still wait for overloaded servers. Undergoal repliactions will not be performed if there is no space on servers with labels matching the storage class. This means high risk of loosing data if servers with some lables are permamently filled up with data!
 .PP
-Option \fB-m L\fP turns on LOOSE mode. In this mode the system will use other servers in case of overloaded servers 
-or no space on servers and will replicate data to correct servers when it becomes possible.
+Option \fB-m L\fP turns on LOOSE mode. In this mode the system will immediately use other servers in case of overloaded servers or no space on servers and will replicate data to correct servers when it becomes possible. There is no delay or error on file creation and undergoal replications are always done as soon as possible.
+.PP
+This table sums up the modes:
+.TS
+tab(@); llll.
+@DEFAULT@STRICT@LOOSE
+CREATE - BUSY@WAIT@WAIT@WRITE ANY
+CREATE - NO SPACE@WRITE ANY@ENOSPC@WRITE ANY
+REPLICATE - BUSY@WAIT@WAIT@WRITE ANY
+REPLICATE - NO SPACE@WRITE ANY@NO COPY@WRITE ANY
+.TE
 .SH PREDEFINED STORAGE CLASSES
 For compatibility reasons, every fresh or freshly upgraded instance of MooseFS has 9 predefined 
 storage classes. Their names are single digits, from \fB1\fP to \fB9\fP, and their definitions 

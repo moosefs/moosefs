@@ -1063,7 +1063,7 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 	int32_t *matching;
 	uint32_t **labelmasks;
 	uint8_t labelcnt;
-	uint8_t create_mode;
+	uint8_t sclass_mode;
 	uint16_t servcount;
 	uint16_t goodlabelscount;
 	uint16_t overloaded;
@@ -1075,7 +1075,7 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 		*olflag = (overloaded>0)?1:0;
 		return 0;
 	}
-	create_mode = sclass_get_create_mode(sclassid);
+	sclass_mode = sclass_get_mode(sclassid);
 	labelcnt = sclass_get_create_goal(sclassid);
 	if (servcount < labelcnt && servcount + overloaded >= labelcnt) {
 		*olflag = 1;
@@ -1096,7 +1096,7 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 		// match servers to labels
 		matching = do_perfect_match(labelcnt,servcount,labelmasks,csids);
 
-		if (create_mode != CREATE_MODE_STRICT) {
+		if (sclass_mode != SCLASS_MODE_STRICT) {
 			goodlabelscount = 0;
 			// extend matching to fulfill goal
 			for (i=0 ; i<labelcnt ; i++) {
@@ -1116,7 +1116,7 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 				}
 			}
 
-			if (create_mode == CREATE_MODE_STD) {
+			if (sclass_mode == SCLASS_MODE_STD) {
 				if (goodlabelscount < labelcnt && goodlabelscount + overloaded >= labelcnt) {
 					*olflag = 1;
 					return 0;
@@ -1144,7 +1144,7 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 				csids[j] = x;
 			}
 		}
-		if (create_mode == CREATE_MODE_STRICT) {
+		if (sclass_mode == SCLASS_MODE_STRICT) {
 			if (i < labelcnt && i + overloaded >= labelcnt) {
 				*olflag = 1;
 				return 0;
@@ -3185,6 +3185,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 //	static uint16_t *bcsids;
 //	static uint16_t bservcount;
 	static uint16_t *rcsids = NULL;
+	uint16_t servmaxpos[4];
 	uint16_t rservcount;
 	uint16_t srccsid,dstcsid;
 	double repl_read_counter;
@@ -3746,7 +3747,6 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 //		if ((csdb_getdisconnecttime()+ReplicationsDelayDisconnect)<now) {
 			uint32_t rgvc,rgtdc;
 			uint32_t lclass;
-			uint8_t allservflag;
 
 			if (vc+tdc==1 && goal>2) { // highest priority - chunks with only one copy and high goal
 				j = DPRIORITY_ENDANGERED_HIGHGOAL;
@@ -3780,7 +3780,15 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					}
 				}
 			}
-			rservcount = matocsserv_getservers_lessrepl(rcsids,MaxWriteRepl[lclass],(j<2)?1:0,&allservflag);
+
+			matocsserv_get_server_groups(rcsids,MaxWriteRepl[lclass],servmaxpos);
+			// rservcount = number of servers that are allowed to start new replication
+			if (j<DPRIORITY_UNDERGOAL_MFR) {
+				rservcount = servmaxpos[CSSTATE_OVERLOADED];
+			} else {
+				rservcount = servmaxpos[CSSTATE_OK];
+			}
+//			rservcount = matocsserv_getservers_lessrepl(rcsids,MaxWriteRepl[lclass],(j<DPRIORITY_UNDERGOAL_MFR)?1:0,&allservflag);
 			rgvc=0;
 			rgtdc=0;
 			vripcnt=0;
@@ -3808,10 +3816,27 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			}
 			if (rgvc+rgtdc>0 && rservcount>0) { // have at least one server to read from and at least one to write to
 				if ((DoNotUseSameIP | DoNotUseSameRack | LabelUniqueMask) || sclass_has_keeparch_labels(c->sclassid,c->archflag)) { // labels version
-					uint32_t dstservcnt;
-					uint8_t allowallservers;
+					uint8_t sclass_mode;
+					uint16_t maxlimited;
+					uint16_t dstservcnt;
 					// reverse order - do_perfect_match matches servers 'from right' - this is important when ReplicationsRespectTopology>1
 					servcnt = 0;
+					// first set all servers with limited write replication counter
+					for (i=servmaxpos[CSSTATE_OVERLOADED] ; i<servmaxpos[CSSTATE_LIMIT_REACHED] ; i++) {
+						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
+						if (s==NULL) {
+							servers[servcnt++] = rcsids[i];
+						}
+					}
+					// then add overloaded servers (but only when they are not already included in rservcount)
+					for (i=rservcount ; i<servmaxpos[CSSTATE_OVERLOADED] ; i++) {
+						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
+						if (s==NULL) {
+							servers[servcnt++] = rcsids[i];
+						}
+					}
+					maxlimited = servcnt;
+					// then all valid servers in reverse order (matching from the 'right')
 					for (i=0 ; i<rservcount ; i++) {
 						for (s=c->slisthead ; s && s->csid!=rcsids[rservcount-1-i] ; s=s->next) {}
 						if (s==NULL) {
@@ -3825,7 +3850,40 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						}
 					}
 					labelcnt = sclass_get_keeparch_labelmasks(c->sclassid,c->archflag,&labelmasks);
+					sclass_mode = sclass_get_mode(c->sclassid);
 					matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
+					for (i=0 ; i<labelcnt ; i++) {
+						if (matching[i]<0) { // matched but only on 'no space' server (or totally unmatched)
+							if (sclass_mode==SCLASS_MODE_STRICT) {
+								canbefixed = 0;
+							} else { // all other modes - labels matched to 'no space' servers only can be replicated anywhere
+								for (i=maxlimited ; i<dstservcnt ; i++) { // check all possibe destination servers
+									if (matching[i+labelcnt]<0) { // matched to label? - if not then we can use it
+										if (chunk_undergoal_replicate(c, servers[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+											return;
+										}
+									}
+								}
+							}
+						} else if (matching[i]<maxlimited) { // matched but only on 'busy' server
+							if (sclass_mode==SCLASS_MODE_STRICT) {
+								canbefixed = 0;
+							} else if (sclass_mode==SCLASS_MODE_LOOSE) { // in loose mode labels matched only to overloaded servers
+								for (i=maxlimited ; i<dstservcnt ; i++) { // check all possibe destination servers
+									if (matching[i+labelcnt]<0) { // matched to label? - if not then we can use it
+										if (chunk_undergoal_replicate(c, servers[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+											return;
+										}
+									}
+								}
+							} // in standard mode - we leave matching and then do not perform replication
+						} else if (matching[i]<dstservcnt) { // can be replicated to correct label
+							if (chunk_undergoal_replicate(c, servers[matching[i]], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+								return;
+							}
+						}
+					}
+/*
 					allowallservers = 0;
 					if (scount<=rservcount) { // all servers can accept replication
 						uint32_t unmatchedlabels;
@@ -3847,6 +3905,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							}
 						}
 					}
+*/
 /*
 					if (vc < sclass_getgoal(c->sclassid) && csdb_servers_count()<=rservcount) { // all servers can accept replications
 						for (i=0 ; i<labelcnt ; i++) {
@@ -3856,28 +3915,30 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						}
 					}
 */
-					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
+/*					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
 						if (matching[i+labelcnt]>=0 || allowallservers) {
 							if (chunk_undergoal_replicate(c, servers[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
 								return;
 							}
 						}
 					}
+*/
 				} else { // classic goal version
-					if (goal>scount && vc==scount) {
+					if (goal>servmaxpos[CSSTATE_LIMIT_REACHED] && vc==servmaxpos[CSSTATE_LIMIT_REACHED]) {
 						canbefixed = 0;
-					}
-					for (i=0 ; i<rservcount ; i++) {
-						for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
-						if (!s) {
-							if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
-								return;
+					} else {
+						for (i=0 ; i<rservcount ; i++) {
+							for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
+							if (!s) {
+								if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+									return;
+								}
 							}
 						}
 					}
 				}
 			}
-			if (canbefixed && allservflag==0) { // enqueue only chunks which can be fixed and only if there are servers which reached replication limits
+			if (canbefixed) { // enqueue only chunks which can be fixed and only if there are servers which reached replication limits
 				chunk_priority_enqueue(j,c);
 			}
 		}
@@ -3918,6 +3979,11 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 	if (goal == vc && vc+tdc>0) {
 		double maxdiff;
+		uint8_t sclass_mode;
+		uint8_t need_label_version;
+
+//		need_label_version = ((DoNotUseSameIP | DoNotUseSameRack | LabelUniqueMask) || sclass_has_keeparch_labels(c->sclassid,c->archflag))?1:0;
+		need_label_version = sclass_has_keeparch_labels(c->sclassid,c->archflag)?1:0;
 
 		servcnt = 0;
 		for (s=c->slisthead ; s ; s=s->next) {
@@ -3931,8 +3997,17 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				servers[extraservcnt++] = s->csid;
 			}
 		}
-		labelcnt = sclass_get_keeparch_labelmasks(c->sclassid,c->archflag,&labelmasks);
-		matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
+
+		if (need_label_version) {
+			labelcnt = sclass_get_keeparch_labelmasks(c->sclassid,c->archflag,&labelmasks);
+			sclass_mode = sclass_get_mode(c->sclassid);
+			matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
+		} else {
+			// set something to silence potential compiler warnings
+			labelcnt = goal;
+			sclass_mode = SCLASS_MODE_LOOSE;
+			matching = NULL;
+		}
 
 		if (dservcount==0) {
 			dservcount = matocsserv_getservers_ordered(dcsids);
@@ -3944,41 +4019,76 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 		for (i=0 ; i<servcnt ; i++) {
 			uint32_t *labelmask;
-			uint8_t unmatched;
+			uint8_t anyunmatched;
 			double srcusage,dstusage;
 			uint8_t lclass;
 
-			if (matching[labelcnt+i]>=0) {
-				labelmask = labelmasks[matching[labelcnt+i]];
-				unmatched = 0;
-			} else {
-				labelmask = NULL;
-				unmatched = 1;
+			labelmask = NULL;
+			anyunmatched = 0;
+			if (need_label_version) {
+				if (matching[labelcnt+i]>=0) {
+					labelmask = labelmasks[matching[labelcnt+i]];
+				} else if (sclass_mode!=SCLASS_MODE_LOOSE) {
+					anyunmatched = 1;
+					// in normal and strict mode you can use any definition that do not match any copy (it will even fix wrong labels)
+				}
 			}
 			srcusage = matocsserv_get_usage(cstab[servers[i]].ptr);
 			repl_read_counter = matocsserv_replication_read_counter(cstab[servers[i]].ptr,now);
 			if (repl_read_counter < MaxReadRepl[2] || repl_read_counter < MaxReadRepl[3]) { // here accept any rebalance limit
 				for (j=0 ; j<dservcount ; j++) {
-					for (k=0 ; k<extraservcnt && servers[k]!=dcsids[j] ; k++) { }
-					if (k==extraservcnt) { // not one of copies
-						dstusage = matocsserv_get_usage(cstab[dcsids[j]].ptr);
-						if (srcusage - dstusage < maxdiff) {
+					dstusage = matocsserv_get_usage(cstab[dcsids[j]].ptr);
+					if (srcusage - dstusage < maxdiff) { // already found better src,dst pair
+						break;
+					}
+					if (((srcusage - dstusage) <= AcceptableDifference) && last_rebalance+(0.01/(srcusage-dstusage))>=now) { // when difference is small then do not hurry
+						break;
+					}
+					k = 0;
+					while (k<extraservcnt) {
+						if (servers[k]==dcsids[j]) {
 							break;
 						}
-						if (((srcusage - dstusage) <= AcceptableDifference) && last_rebalance+(0.01/(srcusage-dstusage))>=now) {
+						if (DoNotUseSameIP) {
+							if (matocsserv_server_get_ip(cstab[servers[k]].ptr)==matocsserv_server_get_ip(cstab[dcsids[j]].ptr)) {
+								break;
+							}
+						} else if (DoNotUseSameRack) {
+							if (topology_get_rackid(matocsserv_server_get_ip(cstab[servers[k]].ptr))==topology_get_rackid(matocsserv_server_get_ip(cstab[dcsids[j]].ptr))) {
+								break;
+							}
+						} else if (LabelUniqueMask) {
+							if ((matocsserv_server_get_labelmask(cstab[servers[k]].ptr) & LabelUniqueMask) == (matocsserv_server_get_labelmask(cstab[dcsids[j]].ptr) & LabelUniqueMask)) {
+								break;
+							}
+						}
+						k++;
+					}
+					if (k<extraservcnt) { // one of existing copies is on this server or this server has same IP/RACKID/UNIQLABELS
+						continue;
+					}
+					if (anyunmatched) { // check if this server match any of unmatched labels
+						for (k=0 ; k<labelcnt ; k++) {
+							if (matching[k]<0) {
+								if (matocsserv_server_has_labels(cstab[dcsids[j]].ptr,labelmasks[k])) {
+									break;
+								}
+							}
+						}
+						if (k==labelcnt) { // nope
 							break;
 						}
-						if (unmatched || matocsserv_server_has_labels(cstab[dcsids[j]].ptr,labelmask)) {
-							if ((srcusage - dstusage) > AcceptableDifference*1.5) { // now we know usage difference, so we can set proper limit class
-								lclass = 3;
-							} else {
-								lclass = 2;
-							}
-							if (repl_read_counter < MaxReadRepl[lclass] && matocsserv_replication_write_counter(cstab[dcsids[j]].ptr,now)<MaxWriteRepl[lclass]) {
-								maxdiff = srcusage - dstusage;
-								dstcsid = dcsids[j];
-								srccsid = servers[i];
-							}
+					}
+					if (labelmask==NULL || matocsserv_server_has_labels(cstab[dcsids[j]].ptr,labelmask)) { // if we have specific label then check if this server has them
+						if ((srcusage - dstusage) > AcceptableDifference*1.5) { // now we know usage difference, so we can set proper limit class
+							lclass = 3;
+						} else {
+							lclass = 2;
+						}
+						if (repl_read_counter < MaxReadRepl[lclass] && matocsserv_replication_write_counter(cstab[dcsids[j]].ptr,now)<MaxWriteRepl[lclass]) {
+							maxdiff = srcusage - dstusage;
+							dstcsid = dcsids[j];
+							srccsid = servers[i];
 						}
 					}
 				}
@@ -4136,6 +4246,7 @@ void chunk_jobs_main(void) {
 		return;
 	}
 
+	// full servers are not included here
 	scount = matocsserv_servers_count();
 
 	if (scount==0 || chunkrehashpos==0) {

@@ -872,6 +872,78 @@ void matocsserv_useservers_wrandom(void* servers[MAXCSCOUNT],uint16_t cnt) {
 	matocsserv_weighted_roundrobin_used((matocsserventry **)servers,cnt);
 }
 
+void matocsserv_get_server_groups(uint16_t csids[MAXCSCOUNT],double replimit,uint16_t positions[4]) {
+	matocsserventry *eptr;
+	uint16_t i,j,r;
+	uint16_t x;
+	uint8_t csstate,stage;
+	uint16_t counters[4];
+	uint32_t now = main_time();
+	double a;
+
+	counters[CSSTATE_OK] = 0;
+	counters[CSSTATE_OVERLOADED] = 0;
+	counters[CSSTATE_LIMIT_REACHED] = 0;
+	counters[CSSTATE_NO_SPACE] = 0;
+
+	for (stage=0 ; stage<2 ; stage++) {
+		i = 0;
+		for (eptr = matocsservhead ; eptr && i<MAXCSCOUNT; eptr=eptr->next) {
+			if (eptr->mode!=KILL && eptr->csptr!=NULL) {
+				a = ((uint32_t)(eptr->csid*UINT32_C(0x9874BF31)+now*UINT32_C(0xB489FC37)))/4294967296.0;
+				if (eptr->totalspace==0 || (eptr->totalspace - eptr->usedspace)<=(eptr->totalspace/100)) {
+					csstate=CSSTATE_NO_SPACE;
+				} else if (eptr->wrepcounter+a>=replimit) {
+					csstate=CSSTATE_LIMIT_REACHED;
+				} else if (!((eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0)) {
+					csstate=CSSTATE_OVERLOADED;
+				} else {
+					csstate=CSSTATE_OK;
+				}
+				if (stage==0) {
+					counters[csstate]++;
+				} else {
+					csids[positions[csstate]] = eptr->csid;
+					positions[csstate]++;
+				}
+				i++;
+			}
+		}
+		if (stage==0) {
+			positions[CSSTATE_OK] = 0;
+			positions[CSSTATE_OVERLOADED] = counters[CSSTATE_OK];
+			positions[CSSTATE_LIMIT_REACHED] = positions[CSSTATE_OVERLOADED] + counters[CSSTATE_OVERLOADED];
+			positions[CSSTATE_NO_SPACE] = positions[CSSTATE_LIMIT_REACHED] + counters[CSSTATE_LIMIT_REACHED];
+		}
+	}
+
+	massert(positions[CSSTATE_OK]==counters[CSSTATE_OK],"data integrity error");
+	massert(positions[CSSTATE_OVERLOADED]==(counters[CSSTATE_OK]+counters[CSSTATE_OVERLOADED]),"data integrity error");
+	massert(positions[CSSTATE_LIMIT_REACHED]==(counters[CSSTATE_OK]+counters[CSSTATE_OVERLOADED]+counters[CSSTATE_LIMIT_REACHED]),"data integrity error");
+	massert(positions[CSSTATE_NO_SPACE]==(counters[CSSTATE_OK]+counters[CSSTATE_OVERLOADED]+counters[CSSTATE_LIMIT_REACHED]+counters[CSSTATE_NO_SPACE]),"data integrity error");
+
+	// shuffle normal servers
+	for (i=1 ; i<counters[CSSTATE_OK] ; i++) {
+		r = rndu32_ranged(i+1);
+		if (r!=i) {
+			x = csids[i];
+			csids[i] = csids[r];
+			csids[r] = x;
+		}
+	}
+	// shuffle overloaded servers
+	for (i=1 ; i<counters[CSSTATE_OVERLOADED] ; i++) {
+		r = positions[CSSTATE_OK] + rndu32_ranged(i+1);
+		j = positions[CSSTATE_OK] + i;
+		if (r!=j) {
+			x = csids[j];
+			csids[j] = csids[r];
+			csids[r] = x;
+		}
+	}
+}
+
+/*
 uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replimit,uint8_t highpriority,uint8_t *allservflag) {
 	matocsserventry *eptr;
 	uint32_t j,k,r,hpadd;
@@ -936,7 +1008,7 @@ uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replim
 	}
 	return j;
 }
-
+*/
 void matocsserv_calculate_space(void) {
 	matocsserventry *eptr;
 	uint64_t tspace,uspace,rspace;

@@ -1022,7 +1022,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 	uint32_t chunkcount;
 	uint16_t sclassid;
 	uint16_t arch_delay;
-	uint8_t create_mode;
+	uint8_t mode;
 	uint8_t admin_only;
 	uint8_t nleng;
 	uint8_t name[MAXSCLASSNLENG];
@@ -1080,7 +1080,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 		if (mver>0x15) {
 			nleng = get8bit(&ptr);
 			admin_only = get8bit(&ptr);
-			create_mode = get8bit(&ptr);
+			mode = get8bit(&ptr);
 			arch_delay = get16bit(&ptr);
 			create_labelscnt = get8bit(&ptr);
 			keep_labelscnt = get8bit(&ptr);
@@ -1089,7 +1089,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 		} else if (mver>0x14) {
 			nleng = 0;
 			admin_only = 0;
-			create_mode = get8bit(&ptr);
+			mode = get8bit(&ptr);
 			arch_delay = get16bit(&ptr);
 			create_labelscnt = get8bit(&ptr);
 			keep_labelscnt = get8bit(&ptr);
@@ -1098,7 +1098,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 		} else if (mver>0x13) {
 			nleng = 0;
 			admin_only = 0;
-			create_mode = get8bit(&ptr);
+			mode = get8bit(&ptr);
 			create_labelscnt = get8bit(&ptr);
 			keep_labelscnt = get8bit(&ptr);
 			arch_labelscnt = keep_labelscnt;
@@ -1110,7 +1110,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 			create_labelscnt = get8bit(&ptr);
 			keep_labelscnt = create_labelscnt;
 			arch_labelscnt = create_labelscnt;
-			create_mode = CREATE_MODE_STD;
+			mode = SCLASS_MODE_STD;
 			arch_delay = 0;
 			if (mver==0x12) {
 				chunkcount = get32bit(&ptr);
@@ -1130,7 +1130,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 			break;
 		}
 		if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9 || arch_labelscnt==0 || arch_labelscnt>9) {
-			fprintf(stderr,"loading labelset: data format error (sclassid: %"PRIu16" ; create_mode: %"PRIu8" ; create_labelscnt: %"PRIu8" ; keep_labelscnt: %"PRIu8" ; arch_labelscnt: %"PRIu8" ; arch_delay: %"PRIu16")\n",sclassid,create_mode,create_labelscnt,keep_labelscnt,arch_labelscnt,arch_delay);
+			fprintf(stderr,"loading labelset: data format error (sclassid: %"PRIu16" ; mode: %"PRIu8" ; create_labelscnt: %"PRIu8" ; keep_labelscnt: %"PRIu8" ; arch_labelscnt: %"PRIu8" ; arch_delay: %"PRIu16")\n",sclassid,mode,create_labelscnt,keep_labelscnt,arch_labelscnt,arch_delay);
 			free(databuff);
 			databuff=NULL;
 			return -1;
@@ -1161,7 +1161,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 			fseek(fd,chunkcount*8,SEEK_CUR);
 		}
 		ptr = databuff;
-		printf("SCLASS|#:%5"PRIu16"|x:%u|m:%u|d:%5"PRIu16,sclassid,admin_only,create_mode,arch_delay);
+		printf("SCLASS|#:%5"PRIu16"|x:%u|m:%u|d:%5"PRIu16,sclassid,admin_only,mode,arch_delay);
 		if (mver<=0x13) {
 			printf("|c+k+a: ");
 		} else {

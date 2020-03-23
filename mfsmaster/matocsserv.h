@@ -40,6 +40,13 @@ uint16_t matocsserv_getservers_wrandom(uint16_t csids[MAXCSCOUNT],uint16_t *over
 void matocsserv_useservers_wrandom(void* servers[MAXCSCOUNT],uint16_t cnt);
 uint16_t matocsserv_getservers_lessrepl(uint16_t csids[MAXCSCOUNT],double replimit,uint8_t highpriority,uint8_t *allservflag);
 
+#define CSSTATE_NO_SPACE 3
+#define CSSTATE_LIMIT_REACHED 2
+#define CSSTATE_OVERLOADED 1
+#define CSSTATE_OK 0
+
+void matocsserv_get_server_groups(uint16_t csids[MAXCSCOUNT],double replimit,uint16_t counters[4]);
+
 
 int matocsserv_have_availspace(void);
 void matocsserv_getspace(uint64_t *totalspace,uint64_t *availspace,uint64_t *freespace);

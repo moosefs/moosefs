@@ -46,6 +46,7 @@
 #include "sockets.h"
 #include "hashfn.h"
 #include "clocks.h"
+#include "mfsalloc.h"
 #include "md5.h"
 #include "MFSCommunication.h"
 
@@ -362,13 +363,16 @@ static inline void master_sendcheck(uint8_t bytes) {
 		mc->sbuff = malloc(mc->sbuffsize);
 		mc->wptr = mc->sbuff + 12; // leave space for command and length
 	} else if ((mc->wptr - mc->sbuff) + bytes > (long int)mc->sbuffsize) {
+		uint32_t pleng;
+		pleng = (mc->wptr - mc->sbuff);
 		if (bytes>mc->sbuffsize) {
 			mc->sbuffsize += (bytes * 3) / 2;
 		} else {
 			mc->sbuffsize *= 3;
 			mc->sbuffsize /= 2;
 		}
-		mc->sbuff = realloc(mc->sbuff,mc->sbuffsize);
+		mc->sbuff = mfsrealloc(mc->sbuff,mc->sbuffsize);
+		mc->wptr = mc->sbuff + pleng;
 	}
 	passert(mc->sbuff);
 }

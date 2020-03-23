@@ -5867,6 +5867,7 @@ void mfs_dentry_invalidate(uint32_t parent,uint8_t nleng,const char *name) {
 		oplog_printf(&ctx,"invalidate entry (%"PRIu32":%s): lost",parent,name);
 	}
 #else
+	(void)nleng;
 	oplog_printf(&ctx,"invalidate entry (%"PRIu32":%s): not supported",parent,name);
 #endif
 }

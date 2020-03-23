@@ -2787,7 +2787,11 @@ static inline uint8_t fsnodes_append_slice_of_chunks(uint32_t ts,fsnode *dstobj,
 		return MFS_ERROR_EINVAL;
 	}
 
-	srcchunks = (slice_to - slice_from) + 1;
+	if (srcobj->data.fdata.length>0) {
+		srcchunks = (slice_to - slice_from) + 1;
+	} else {
+		srcchunks = 0;
+	}
 
 	if (dstobj->data.fdata.length>0) {
 		dstchunks = 1+((dstobj->data.fdata.length-1)>>MFSCHUNKBITS);
@@ -2830,7 +2834,11 @@ static inline uint8_t fsnodes_append_slice_of_chunks(uint32_t ts,fsnode *dstobj,
 	}
 
 	for (i=0 ; i<srcchunks ; i++) {
-		chunkid = srcobj->data.fdata.chunktab[slice_from+i];
+		if (slice_from+i < srcobj->data.fdata.chunks) {
+			chunkid = srcobj->data.fdata.chunktab[slice_from+i];
+		} else {
+			chunkid = 0;
+		}
 		dstobj->data.fdata.chunktab[i+dstchunks] = chunkid;
 		if (chunkid>0) {
 			if (chunk_add_file(chunkid,dstobj->sclassid)!=MFS_STATUS_OK) {

@@ -1203,6 +1203,8 @@ static chunk* hdd_chunk_get(uint64_t chunkid,uint8_t cflag) {
 			c->testprev = NULL;
 			c->next = hashtab[hashpos];
 			hashtab[hashpos] = c;
+		} else {
+			hdd_report_lost_chunk(chunkid);
 		}
 //		syslog(LOG_WARNING,"hdd_chunk_get returns chunk: %016"PRIX64" (c->state:%u)",c->chunkid,c->state);
 		zassert(pthread_mutex_unlock(&hashlock));

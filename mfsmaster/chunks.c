@@ -3190,6 +3190,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	uint16_t srccsid,dstcsid;
 	double repl_read_counter;
 	uint16_t i,j,k;
+	uint16_t prilevel;
 	uint32_t vc,tdc,ivc,bc,tdb,dc,wvc,tdw;
 	uint32_t goal;
 	static loop_info inforec;
@@ -3749,29 +3750,29 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 			uint32_t lclass;
 
 			if (vc+tdc==1 && goal>2) { // highest priority - chunks with only one copy and high goal
-				j = DPRIORITY_ENDANGERED_HIGHGOAL;
+				prilevel = DPRIORITY_ENDANGERED_HIGHGOAL;
 				lclass = 0;
 			} else if (vc+tdc==1 && goal==2) { // next priority - chunks with only one copy
-				j = DPRIORITY_ENDANGERED;
+				prilevel = DPRIORITY_ENDANGERED;
 				lclass = 0;
 			} else if (vc==1 && tdc>0) { // next priority - chunks on one regular disk and some "marked for removal" disks
-				j = DPRIORITY_UNDERGOAL_MFR;
+				prilevel = DPRIORITY_UNDERGOAL_MFR;
 				lclass = 1;
 			} else if (tdc>0) { // next priority - chunks on "marked for removal" disks
-				j = DPRIORITY_MFR;
+				prilevel = DPRIORITY_MFR;
 				lclass = 1;
 			} else if (vc < goal) { // next priority - standard undergoal chunks
-				j = DPRIORITY_UNDERGOAL;
+				prilevel = DPRIORITY_UNDERGOAL;
 				lclass = 1;
 			} else { // lowest priority - wrong labeled chunks
-				j = DPRIORITY_WRONGLABEL;
+				prilevel = DPRIORITY_WRONGLABEL;
 				lclass = 1;
 			}
 			if (extrajob==0) {
-				for (i=0 ; i<j ; i++) {
+				for (i=0 ; i<prilevel ; i++) {
 					if (chunks_priority_leng[i]>0) { // we have chunks with higher priority than current chunk
-						chunk_priority_enqueue(j,c); // in such case only enqueue this chunk for future processing
-						if (j<5) {
+						chunk_priority_enqueue(prilevel,c); // in such case only enqueue this chunk for future processing
+						if (prilevel<DPRIORITY_WRONGLABEL) {
 							inforec.notdone.copy_undergoal++;
 						} else {
 							inforec.notdone.copy_wronglabels++;
@@ -3783,7 +3784,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 
 			matocsserv_get_server_groups(rcsids,MaxWriteRepl[lclass],servmaxpos);
 			// rservcount = number of servers that are allowed to start new replication
-			if (j<DPRIORITY_UNDERGOAL_MFR) {
+			if (prilevel<DPRIORITY_UNDERGOAL_MFR) {
 				rservcount = servmaxpos[CSSTATE_OVERLOADED];
 			} else {
 				rservcount = servmaxpos[CSSTATE_OK];
@@ -3853,32 +3854,42 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 					sclass_mode = sclass_get_mode(c->sclassid);
 					matching = do_perfect_match(labelcnt,servcnt,labelmasks,servers);
 					for (i=0 ; i<labelcnt ; i++) {
-						if (matching[i]<0) { // matched but only on 'no space' server (or totally unmatched)
+						int32_t servpos;
+						if (matching[i]<(int32_t)labelcnt) {
+							servpos=-1;
+						} else {
+							servpos=matching[i]-labelcnt;
+						}
+//						syslog(LOG_NOTICE,"labelpos: %u ; serverpos: %d ; serverip: %s ; serverlabels: %s",i,servpos,matocsserv_getstrip(cstab[servers[servpos]].ptr),matocsserv_server_get_labelstr(cstab[servers[servpos]].ptr));
+						if (servpos<0) { // matched but only on 'no space' server (or totally unmatched)
 							if (sclass_mode==SCLASS_MODE_STRICT) {
 								canbefixed = 0;
 							} else { // all other modes - labels matched to 'no space' servers only can be replicated anywhere
-								for (i=maxlimited ; i<dstservcnt ; i++) { // check all possibe destination servers
-									if (matching[i+labelcnt]<0) { // matched to label? - if not then we can use it
-										if (chunk_undergoal_replicate(c, servers[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+								for (j=maxlimited ; j<dstservcnt ; j++) { // check all possibe destination servers
+									if (matching[j+labelcnt]<0) { // matched to label? - if not then we can use it
+										syslog(LOG_NOTICE,"replicate to first available server (STD MODE and LOOSE MODE)");
+										if (chunk_undergoal_replicate(c, servers[j], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
 											return;
 										}
 									}
 								}
 							}
-						} else if (matching[i]<maxlimited) { // matched but only on 'busy' server
+						} else if (servpos<maxlimited) { // matched but only on 'busy' server
 							if (sclass_mode==SCLASS_MODE_STRICT) {
 								canbefixed = 0;
 							} else if (sclass_mode==SCLASS_MODE_LOOSE) { // in loose mode labels matched only to overloaded servers
-								for (i=maxlimited ; i<dstservcnt ; i++) { // check all possibe destination servers
-									if (matching[i+labelcnt]<0) { // matched to label? - if not then we can use it
-										if (chunk_undergoal_replicate(c, servers[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+								for (j=maxlimited ; j<dstservcnt ; j++) { // check all possibe destination servers
+									if (matching[j+labelcnt]<0) { // matched to label? - if not then we can use it
+										syslog(LOG_NOTICE,"replicate to first available server (LOOSE MODE)");
+										if (chunk_undergoal_replicate(c, servers[j], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
 											return;
 										}
 									}
 								}
 							} // in standard mode - we leave matching and then do not perform replication
-						} else if (matching[i]<dstservcnt) { // can be replicated to correct label
-							if (chunk_undergoal_replicate(c, servers[matching[i]], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+						} else if (servpos<dstservcnt) { // can be replicated to correct label
+							syslog(LOG_NOTICE,"replicate to correct label (all modes)");
+							if (chunk_undergoal_replicate(c, servers[servpos], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
 								return;
 							}
 						}
@@ -3917,7 +3928,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 */
 /*					for (i=0 ; i<dstservcnt && canbefixed ; i++) {
 						if (matching[i+labelcnt]>=0 || allowallservers) {
-							if (chunk_undergoal_replicate(c, servers[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+							if (chunk_undergoal_replicate(c, servers[i], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
 								return;
 							}
 						}
@@ -3930,7 +3941,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						for (i=0 ; i<rservcount ; i++) {
 							for (s=c->slisthead ; s && s->csid!=rcsids[i] ; s=s->next) {}
 							if (!s) {
-								if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, j, &inforec, rgvc, rgtdc)>=0) {
+								if (chunk_undergoal_replicate(c, rcsids[i], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
 									return;
 								}
 							}
@@ -3939,7 +3950,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 				}
 			}
 			if (canbefixed) { // enqueue only chunks which can be fixed and only if there are servers which reached replication limits
-				chunk_priority_enqueue(j,c);
+				chunk_priority_enqueue(prilevel,c);
 			}
 		}
 		if (vc < goal) {

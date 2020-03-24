@@ -5675,6 +5675,7 @@ uint8_t fs_univ_append_slice(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uin
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		// fix slices and check quota
 		lastsrcchunk = (sp->data.fdata.length-1)>>MFSCHUNKBITS;
+		// convert slice_from and slice_to from user notation (with negative values) to absolute positive number of chunks
 		if (flags&APPEND_SLICE_FROM_NEG) {
 			if (slice_from>lastsrcchunk+1) {
 				slice_from = 0;
@@ -5692,7 +5693,14 @@ uint8_t fs_univ_append_slice(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uin
 				slice_to = lastsrcchunk+1-slice_to;
 			}
 		}
-		slice_to--; // change [from,to) -> [from,to] ; 0 can become 0xFFFFFFFF here - it is ok, because 0 means end of file
+		// do we have anything to append?
+		if (slice_to<=slice_from) {
+			if (fleng!=NULL) {
+				*fleng = p->data.fdata.length;
+			}
+			return MFS_STATUS_OK;
+		}
+		slice_to--; // change [from,to) -> [from,to] ; it is ok because slice_to can't be 0 here
 		if (slice_to>=lastsrcchunk) {
 			slice_to = lastsrcchunk;
 			if (slice_to<slice_from) {

@@ -409,7 +409,6 @@ void matomlserv_get_config(matomlserventry *eptr,const uint8_t *data,uint32_t le
 	memcpy(ptr,val,vleng);
 }
 
-
 void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t rversion;
 	uint64_t req_minversion,chlog_minversion;

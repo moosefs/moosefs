@@ -13,11 +13,13 @@ This file lists noteworthy changes in MooseFS.
   - (client) added dentry invalidator (needed in Linux with kernel < 4.19 - EBUSY bug)
   - (master) fixed memory leaks in xattr and posixacl modules
   - (cs) when chunk can't be located always send to master info about lost chunk
-  - (supervisor,master,cs) fixed buffer overrun in mastersupervisor code (PRO only, intr. in 3.0.107)
+  - (supervisor,master,cs) fixed buffer overrun in mastersupervisor code (HA only, intr. in 3.0.107)
   - (master) changed algorithm of reusing csid in chunk module (adding released csid to the end of free list)
   - (all) added support for STRICT and LOOSE mode in KEEP and ARCHIVE
   - (master) fixed segfault during appending chunks of file with positive length and no chunks
   - (metadump) fixed bugs introduced in verson 3.0.106
+  - (master) added protection between neverending desyncing between newer LEADER and older FOLLOWER (HA only)
+  - (master) fixed slices with 'to' set to 0 in mfsappendchunks
 
 * MooseFS 3.0.111-1 (2020-02-19)
 

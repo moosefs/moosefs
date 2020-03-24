@@ -1,3 +1,35 @@
+moosefs (3.0.112-1) unstable; urgency=medium
+
+  * (cs) silence stupid compiler warning
+  * (client) fixed handling LOCKED and EAGAIN status in readdata
+  * (client) added handle info to oplog messages
+  * (all) added support for disabling individual filesystem commands in exports
+  * (client) added handling read/write/readdir disables on client side (better
+    error messages)
+  * (client) added session paramaters to '.params' file
+  * (tools) fixed packet reallocation error
+  * (master) changed syslog message for locked chunks
+  * (client) added dentry invalidator (needed in Linux with kernel < 4.19 -
+    EBUSY bug)
+  * (master) fixed memory leaks in xattr and posixacl modules
+  * (cs) when chunk can't be located always send to master info about lost
+    chunk
+  * (supervisor,master,cs) fixed buffer overrun in mastersupervisor code (HA
+    only, intr. in 3.0.107)
+  * (master) changed algorithm of reusing csid in chunk module (adding released
+    csid to the end of free list)
+  * (all) added support for STRICT and LOOSE mode in KEEP and ARCHIVE
+  * (master) fixed segfault during appending chunks of file with positive
+    length and no chunks
+  * (metadump) fixed bugs introduced in verson 3.0.106
+  * (master) added protection between neverending desyncing between newer
+    LEADER and older FOLLOWER (HA only)
+  * (master) fixed slices with 'to' set to 0 in mfsappendchunks
+  * (master) removed starting protection time from client communication module
+  * (man) fixed typo in mfsappendchunks man page
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 24 Mar 2020 12:00:00 +0100
+
 moosefs (3.0.111-1) unstable; urgency=medium
 
   * (cs) added protections against segfaults (issue #342)

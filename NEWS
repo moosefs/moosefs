@@ -20,6 +20,7 @@ This file lists noteworthy changes in MooseFS.
   - (metadump) fixed bugs introduced in verson 3.0.106
   - (master) added protection between neverending desyncing between newer LEADER and older FOLLOWER (HA only)
   - (master) fixed slices with 'to' set to 0 in mfsappendchunks
+  - (master) removed starting protection time from client communication module
 
 * MooseFS 3.0.111-1 (2020-02-19)
 

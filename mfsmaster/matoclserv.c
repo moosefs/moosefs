@@ -129,7 +129,6 @@ typedef struct matoclserventry {
 static matoclserventry *matoclservhead=NULL;
 static int lsock;
 static int32_t lsockpdescpos;
-static int starting;
 
 #define CHUNKHASHSIZE 256
 #define CHUNKHASH(chunkid) ((chunkid)&0xFF)
@@ -1366,11 +1365,6 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				eptr->mode = KILL;
 				return;
 			}
-			if (starting) {
-				eptr->mode = KILL;
-				return;
-			}
-
 			eptr->version = get32bit(&rptr);
 			eptr->asize = (eptr->version>=VERSION2INT(3,0,93))?ATTR_RECORD_SIZE:35;
 
@@ -1505,11 +1499,6 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				eptr->mode = KILL;
 				return;
 			}
-			if (starting) {
-				eptr->mode = KILL;
-				return;
-			}
-
 			eptr->version = get32bit(&rptr);
 			eptr->asize = (eptr->version>=VERSION2INT(3,0,93))?ATTR_RECORD_SIZE:35;
 
@@ -1605,10 +1594,6 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 
 			sessionid = get32bit(&rptr);
-			if (starting) {
-				eptr->mode = KILL;
-				return;
-			}
 			if (iptosesid_check(eptr->peerip)) { // patch for clients < 3.0
 				eptr->mode = KILL;
 				return;
@@ -5822,18 +5807,6 @@ void matoclserv_disconnect_all(void) {
 	matoclserv_disconnection_loop();
 }
 
-void matoclserv_start_cond_check(void) {
-	if (starting) {
-// very simple condition checking if all chunkservers have been connected
-// in the future master will know his chunkservers list and then this condition will be changed
-		if (chunk_get_missing_count()<100) {
-			starting=0;
-		} else {
-			starting--;
-		}
-	}
-}
-
 void matoclserv_reload(void) {
 	char *oldListenHost,*oldListenPort;
 	int newlsock;
@@ -5899,7 +5872,6 @@ int matoclserv_init(void) {
 
 	CreateFirstChunk = 0;
 
-	starting = 12;
 	lsock = tcpsocket();
 	if (lsock<0) {
 		mfs_errlog(LOG_ERR,"main master server module: can't create socket");
@@ -5919,7 +5891,6 @@ int matoclserv_init(void) {
 
 	matoclservhead = NULL;
 
-	main_time_register(10,0,matoclserv_start_cond_check);
 	main_time_register(1,0,matoclserv_timeout_waiting_ops);
 	main_reload_register(matoclserv_reload);
 	main_destruct_register(matoclserv_term);

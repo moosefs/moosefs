@@ -16,7 +16,7 @@ appends a lazy copy of specified file(s) to specified snapshot file ("lazy"
 means that creation of new chunks is delayed to the moment one copy is
 modified). If multiple files are given, they are merged into one target file in such a way
 that each file begins at \fIchunk\fP (64MB) boundary; padding space is left
-empty. Optionally only slice of chunks can be appended (option \fB-s\fP). Slice definition is similar to Python: \fIFROM\fP is included, \fITO\fP excluded, negative numbers mean backwards from the end. If \fIFROM\fP or \fTO\fP is not specified then it means from the beginning or to the end of file respectively. See examples below.
+empty. Optionally only slice of chunks can be appended (option \fB-s\fP). Slice definition is similar to Python: \fIFROM\fP is included, \fITO\fP excluded, negative numbers mean backwards from the end. If \fIFROM\fP or \fITO\fP is not specified then it means from the beginning or to the end of file respectively. See examples below.
 
 .PP
 \fBmfsmakesnapshot\fP makes a "real" snapshot (lazy copy, like in case of

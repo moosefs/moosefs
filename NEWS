@@ -21,6 +21,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added protection between neverending desyncing between newer LEADER and older FOLLOWER (HA only)
   - (master) fixed slices with 'to' set to 0 in mfsappendchunks
   - (master) removed starting protection time from client communication module
+  - (man) fixed typo in mfsappendchunks man page
 
 * MooseFS 3.0.111-1 (2020-02-19)
 

@@ -30,37 +30,56 @@
 
 #include "mfstest.h"
 
+uint64_t wallclock_utime(void) {
+	struct timeval tv;
+	uint64_t usec;
+
+	gettimeofday(&tv,NULL);
+	usec = tv.tv_sec;
+	usec *= 1000000;
+	usec += tv.tv_usec;
+	return usec;
+}
+
 int main(void) {
 	double st,en;
 	uint64_t stusec,enusec;
 	uint64_t stnsec,ennsec;
+	uint64_t wcstusec,wcenusec;
 
 	if (strcmp(monotonic_method(),"time")==0) {
 		printf("testing classic 'time(NULL)' clock doesn't make sense\n");
 		return 77;
 	}
+
 	mfstest_init();
 
 	mfstest_start(monotonic_clocks);
+
 	printf("used method: %s\n",monotonic_method());
 	st = monotonic_seconds();
 	stusec = monotonic_useconds();
 	stnsec = monotonic_nseconds();
+	wcstusec = wallclock_utime();
 	portable_usleep(10000);
 	en = monotonic_seconds();
 	enusec = monotonic_useconds();
 	ennsec = monotonic_nseconds();
+	wcenusec = wallclock_utime();
 	en -= st;
 	enusec -= stusec;
 	ennsec -= stnsec;
-	printf("second: %.6lf ; %"PRIu64" ; %"PRIu64"\n",en,enusec,ennsec);
+	wcenusec -= wcstusec;
+	printf("second: %.6lf ; %"PRIu64" ; %"PRIu64" ; %"PRIu64"\n",en,enusec,ennsec,wcenusec);
 
 	mfstest_assert_double_ge(en,0.01);
 	mfstest_assert_uint64_ge(enusec,10000);
 	mfstest_assert_uint64_ge(ennsec,10000000);
-	mfstest_assert_double_lt(en,0.012);
-	mfstest_assert_uint64_lt(enusec,12000);
-	mfstest_assert_uint64_lt(ennsec,12000000);
+	mfstest_assert_uint64_ge(wcenusec,10000);
+	mfstest_assert_double_lt(en,0.02);
+	mfstest_assert_uint64_lt(enusec,20000);
+	mfstest_assert_uint64_lt(ennsec,20000000);
+	mfstest_assert_uint64_lt(wcenusec,20000);
 
 	mfstest_end();
 	mfstest_return();

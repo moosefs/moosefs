@@ -39,6 +39,15 @@ void set_variable(void *arg) {
 	global_variable = *a;
 }
 
+void corrected_usleep(uint64_t us) {
+	uint64_t st,en;
+	st = monotonic_useconds();
+	do {
+		portable_usleep(100);
+		en = monotonic_useconds();
+	} while (st+us>=en);
+}
+
 int main(void) {
 	uint32_t values[7] = {0,1,2,3,4,5,6};
 	mfstest_init();
@@ -49,27 +58,27 @@ int main(void) {
 
 	global_variable = 0xFFFFFFFF;
 	delay_run(set_variable,values,10000);
-	portable_usleep(20000);
+	corrected_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,0);
 	delay_run(set_variable,values+2,30000);
 	delay_run(set_variable,values+3,50000);
 	delay_run(set_variable,values+1,10000);
 	mfstest_assert_uint32_eq(global_variable,0);
-	portable_usleep(20000);
+	corrected_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,1);
-	portable_usleep(20000);
+	corrected_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,2);
-	portable_usleep(20000);
+	corrected_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,3);
 	delay_run(set_variable,values+6,60000);
-	portable_usleep(10000);
+	corrected_usleep(10000);
 	delay_run(set_variable,values+4,10000);
-	portable_usleep(20000);
+	corrected_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,4);
 	delay_run(set_variable,values+5,10000);
-	portable_usleep(20000);
+	corrected_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,5);
-	portable_usleep(20000);
+	corrected_usleep(20000);
 	mfstest_assert_uint32_eq(global_variable,6);
 
 	delay_term();

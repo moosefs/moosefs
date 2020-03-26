@@ -3867,7 +3867,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							} else { // all other modes - labels matched to 'no space' servers only can be replicated anywhere
 								for (j=maxlimited ; j<dstservcnt ; j++) { // check all possibe destination servers
 									if (matching[j+labelcnt]<0) { // matched to label? - if not then we can use it
-										syslog(LOG_NOTICE,"replicate to first available server (STD MODE and LOOSE MODE)");
+//										syslog(LOG_NOTICE,"replicate to first available server (STD MODE and LOOSE MODE)");
 										if (chunk_undergoal_replicate(c, servers[j], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
 											return;
 										}
@@ -3880,7 +3880,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							} else if (sclass_mode==SCLASS_MODE_LOOSE) { // in loose mode labels matched only to overloaded servers
 								for (j=maxlimited ; j<dstservcnt ; j++) { // check all possibe destination servers
 									if (matching[j+labelcnt]<0) { // matched to label? - if not then we can use it
-										syslog(LOG_NOTICE,"replicate to first available server (LOOSE MODE)");
+//										syslog(LOG_NOTICE,"replicate to first available server (LOOSE MODE)");
 										if (chunk_undergoal_replicate(c, servers[j], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
 											return;
 										}
@@ -3888,7 +3888,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 								}
 							} // in standard mode - we leave matching and then do not perform replication
 						} else if (servpos<dstservcnt) { // can be replicated to correct label
-							syslog(LOG_NOTICE,"replicate to correct label (all modes)");
+//							syslog(LOG_NOTICE,"replicate to correct label (all modes)");
 							if (chunk_undergoal_replicate(c, servers[servpos], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
 								return;
 							}

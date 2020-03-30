@@ -1886,7 +1886,7 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		if (fdcache_find(&ctx,ino,attr,NULL)) {
 			status = MFS_STATUS_OK;
 		} else {
-			status = fs_getattr(ino,(fi!=NULL)?1:0,ctx.uid,ctx.gid,attr);
+			status = fs_getattr(ino,(fi!=NULL || fs_isopen(ino))?1:0,ctx.uid,ctx.gid,attr);
 		}
 		if (status==MFS_ERROR_ENOENT) {
 			if (ctx.pid==getpid()) {

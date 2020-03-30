@@ -1313,6 +1313,9 @@ static inline void fsnodes_node_add(fsnode *p) {
 // returns 1 only if f is ancestor of p
 static inline int fsnodes_isancestor(fsnode *f,fsnode *p) {
 	fsedge *e;
+	if (p->type==TYPE_TRASH || p->type==TYPE_SUSTAINED || f->type!=TYPE_DIRECTORY) {
+		return 0;
+	}
 	for (e=p->parents ; e ; e=e->nextparent) {	// check all parents of 'p' because 'p' can be any object, so it can be hardlinked
 		p=e->parent;	// warning !!! since this point 'p' is used as temporary variable
 		while (p) {
@@ -4538,7 +4541,7 @@ uint8_t fs_access(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t ui
 	if ((sesflags&SESFLAG_READONLY) && (modemask&MODE_MASK_W)) {
 		return MFS_ERROR_EROFS;
 	}
-	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
+	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,1)==0) {
 		return MFS_ERROR_ENOENT;
 	}
 	return fsnodes_access_ext(p,uid,gids,gid,modemask,sesflags)?MFS_STATUS_OK:MFS_ERROR_EACCES;
@@ -4776,7 +4779,7 @@ uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 	uint8_t chtime = 1;
 
 	memset(attr,0,ATTR_RECORD_SIZE);
-	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
+	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,flags & TRUNCATE_FLAG_OPENED)==0) {
 		return MFS_ERROR_ENOENT;
 	}
 	if (flags & TRUNCATE_FLAG_UPDATE) {
@@ -6227,7 +6230,7 @@ void fs_amtime_update(uint32_t rootinode,uint8_t sesflags,uint32_t *inodetab,uin
 	ts = main_time();
 
 	for (i=0 ; i<cnt ; i++) {
-		if (fsnodes_node_find_ext(rootinode,sesflags,inodetab+i,NULL,&p,0)) {
+		if (fsnodes_node_find_ext(rootinode,sesflags,inodetab+i,NULL,&p,1)) {
 			chg = 0;
 			atime = atimetab[i];
 			mtime = mtimetab[i];

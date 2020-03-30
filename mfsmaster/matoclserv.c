@@ -148,6 +148,7 @@ typedef struct _swchunks {
 	uint32_t gid;
 	uint32_t auid;
 	uint32_t agid;
+	uint8_t flags;
 	uint8_t type;
 	struct _swchunks *next;
 } swchunks;
@@ -462,6 +463,7 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 		swc->auid = auid;
 		swc->agid = agid;
 		swc->fleng = fleng;
+		swc->flags = flags;
 		swc->type = FUSE_TRUNCATE;
 		swc->next = swchunkshash[i];
 		swchunkshash[i] = swc;
@@ -582,7 +584,7 @@ void matoclserv_timeout_waiting_ops(void) {
 void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 	uint32_t msgid,inode,indx,uid,gid,auid,agid;
 	uint64_t fleng,prevchunkid;
-	uint8_t type,attr[ATTR_RECORD_SIZE];
+	uint8_t flags,type,attr[ATTR_RECORD_SIZE];
 	uint32_t version;
 	uint8_t *ptr;
 	uint8_t count;
@@ -601,6 +603,7 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 	gid = 0;
 	auid = 0;
 	agid = 0;
+	flags = 0;
 	pswc = swchunkshash + CHUNKHASH(chunkid);
 	while ((swc = *pswc)) {
 		if (swc->chunkid == chunkid) {
@@ -609,6 +612,7 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 			msgid = swc->msgid;
 			fleng = swc->fleng;
 			type = swc->type;
+			flags = swc->flags;
 			inode = swc->inode;
 			indx = swc->indx;
 			uid = swc->uid;
@@ -702,7 +706,13 @@ void matoclserv_chunk_status(uint64_t chunkid,uint8_t status) {
 			return;
 		}
 		fs_end_setlength(chunkid); // chunk unlock
-		fs_do_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,0,uid,gid,auid,agid,fleng,attr);
+		status = fs_do_setlength(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,flags,uid,gid,auid,agid,fleng,attr);
+		if (status!=MFS_STATUS_OK) {
+			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_TRUNCATE,5);
+			put32bit(&ptr,msgid);
+			put8bit(&ptr,status);
+			return;
+		}
 		ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_TRUNCATE,eptr->asize+4);
 		put32bit(&ptr,msgid);
 		memcpy(ptr,attr,eptr->asize);

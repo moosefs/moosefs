@@ -2234,11 +2234,11 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 		}
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-			status = fs_setattr(ino,(fi!=NULL || is_open(ino))?1:0,ctx.uid,gids->gidcnt,gids->gidtab,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,0,sugid_clear_mode,attr);
+			status = fs_setattr(ino,(fi!=NULL || fs_isopen(ino))?1:0,ctx.uid,gids->gidcnt,gids->gidtab,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,0,sugid_clear_mode,attr);
 			groups_rel(gids);
 		} else {
 			uint32_t gidtmp = ctx.gid;
-			status = fs_setattr(ino,(fi!=NULL || is_open(ino))?1:0,ctx.uid,1,&gidtmp,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,0,sugid_clear_mode,attr);
+			status = fs_setattr(ino,(fi!=NULL || fs_isopen(ino))?1:0,ctx.uid,1,&gidtmp,setmask,stbuf->st_mode&07777,stbuf->st_uid,stbuf->st_gid,stbuf->st_atime,stbuf->st_mtime,0,sugid_clear_mode,attr);
 		}
 		if (status==MFS_ERROR_ENOENT) {
 			status = sstats_get(ino,attr,0);

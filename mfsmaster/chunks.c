@@ -1589,12 +1589,15 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 	uint32_t i;
 	chunk *oc,*c;
 	uint8_t csstable,csalldata;
+	uint8_t cschanges;
 
-	if (ts>(starttime+60) && csregisterinprogress==0) {
+	if (ts>(starttime+10) && csregisterinprogress==0) {
 		csstable = 1;
 	} else {
 		csstable = 0;
 	}
+
+	cschanges = (csstable==0 || (csreceivingchunks&2))?1:0;
 
 	if (chunk_counters_in_progress()==0 && csdb_have_all_servers()) {
 		csalldata = 1;
@@ -1680,7 +1683,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 				if (c->operation!=NONE) {
 					return MFS_ERROR_CHUNKBUSY;
 				}
-				if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
+				if (cschanges) {
 					vc = 0;
 					for (s=c->slisthead ; s ; s=s->next) {
 						if (s->valid==VALID) {
@@ -1743,7 +1746,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 				if (oc->operation!=NONE) {
 					return MFS_ERROR_CHUNKBUSY;
 				}
-				if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
+				if (cschanges) {
 					vc = 0;
 					for (os=oc->slisthead ; os ; os=os->next) {
 						if (os->valid==VALID) {
@@ -1823,13 +1826,16 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 	uint32_t i;
 	chunk *oc,*c;
 	uint8_t csstable,csalldata;
+	uint8_t cschanges;
 	uint32_t vc;
 
-	if (ts>(starttime+60) && csregisterinprogress==0) {
+	if (ts>(starttime+10) && csregisterinprogress==0) {
 		csstable = 1;
 	} else {
 		csstable = 0;
 	}
+
+	cschanges = (csstable==0 || (csreceivingchunks&2))?1:0;
 
 	if (chunk_counters_in_progress()==0 && csdb_have_all_servers()) {
 		csalldata = 1;
@@ -1858,7 +1864,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			if (c->operation!=NONE) {
 				return MFS_ERROR_CHUNKBUSY;
 			}
-			if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
+			if (cschanges) {
 				vc = 0;
 				for (os=oc->slisthead ; os ; os=os->next) {
 					if (os->valid==VALID) {
@@ -1914,7 +1920,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 			if (oc->operation!=NONE) {
 				return MFS_ERROR_CHUNKBUSY;
 			}
-			if (csstable==0 || discservers!=NULL || discservers_next!=NULL || csreceivingchunks) {
+			if (cschanges) {
 				vc = 0;
 				for (os=oc->slisthead ; os ; os=os->next) {
 					if (os->valid==VALID) {

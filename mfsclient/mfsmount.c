@@ -1156,7 +1156,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		se = fuse_session_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
 		mfs_setsession(se);
 #else /* FUSE2 */
-		mfs_init(ch,mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
+		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
 		se = fuse_lowlevel_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
 #endif
 	}
@@ -1214,6 +1214,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	}
 #else /* FUSE2 */
 	fuse_session_add_chan(se, ch);
+	mfs_setchan(ch);
 #endif
 
 #if FUSE_VERSION >= 30

@@ -5923,20 +5923,17 @@ void mfs_freebsd_workarounds(int on) {
 void mfs_setsession(struct fuse_session *se) {
 	fuse_comm = se;
 }
+#else
+void mfs_setchan(struct fuse_chan *ch) {
+	fuse_comm = ch;
+}
 #endif
 
-#ifdef HAVE_FUSE3
 void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
-#else /* FUSE2 */
-void mfs_init(struct fuse_chan *ch,int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
-#endif
 #ifdef FREEBSD_DELAYED_RELEASE
 	pthread_t th;
 #endif
 	const char* sugid_clear_mode_strings[] = {SUGID_CLEAR_MODE_STRINGS};
-#ifndef HAVE_FUSE3
-	fuse_comm = ch;
-#endif
 	debug_mode = debug_mode_in;
 	keep_cache = keep_cache_in;
 	direntry_cache_timeout = direntry_cache_timeout_in;

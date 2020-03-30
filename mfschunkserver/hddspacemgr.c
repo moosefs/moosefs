@@ -3840,7 +3840,6 @@ static int hdd_int_version(uint64_t chunkid,uint32_t version,uint32_t newversion
 		if (rename(fname,ofname)>=0) {
 			c->version = version;
 		}
-		hdd_report_damaged_chunk(c);
 		hdd_chunk_release(c);
 		return status;
 	}
@@ -3915,7 +3914,6 @@ static int hdd_int_truncate(uint64_t chunkid,uint32_t version,uint32_t newversio
 		if (rename(fname,ofname)>=0) {
 			c->version = version;
 		}
-		hdd_report_damaged_chunk(c);
 		hdd_chunk_release(c);
 		return status;	//can't change file version
 	}

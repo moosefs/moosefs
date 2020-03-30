@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) delayed setting channel for fuse notifications (very rare segfault in libfuse2 during init)
   - (client+master) changed conditions for ancestor test in getattr (issue #350)
   - (cs) added parameter for number of chunks to be send in single regiter packet
+  - (cs) fixed reporting damaged chunks in testing function (issue #352)
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

@@ -141,6 +141,7 @@ static uint64_t stats_bytesin=0;
 
 // from config
 // static uint32_t BackLogsNumber;
+static uint32_t ChunksPerRegisterPacket;
 static char *MasterHost;
 static char *MasterPort;
 static char *BindHost;
@@ -400,14 +401,14 @@ void masterconn_sendchunksinfo(masterconn *eptr) {
 	syslog(LOG_NOTICE,"register ver. %u - chunks info",(unsigned int)((eptr->new_register_mode)?6:5));
 #endif
 	hdd_get_chunks_begin(0);
-	while ((chunks = hdd_get_chunks_next_list_count())) {
+	while ((chunks = hdd_get_chunks_next_list_count(ChunksPerRegisterPacket))) {
 		buff = masterconn_create_attached_packet(eptr,CSTOMA_REGISTER,1+chunks*(8+4));
 		if (eptr->new_register_mode) {
 			put8bit(&buff,61);
 		} else {
 			put8bit(&buff,51);
 		}
-		hdd_get_chunks_next_list_data(buff);
+		hdd_get_chunks_next_list_data(ChunksPerRegisterPacket,buff);
 	}
 	hdd_get_chunks_end();
 	if (eptr->new_register_mode) {
@@ -435,7 +436,7 @@ void masterconn_sendchunksinfo(masterconn *eptr) {
 void masterconn_sendnextchunks(masterconn *eptr) {
 	uint8_t *buff;
 	uint32_t chunks;
-	chunks = hdd_get_chunks_next_list_count();
+	chunks = hdd_get_chunks_next_list_count(ChunksPerRegisterPacket);
 	if (chunks==0) {
 		hdd_get_chunks_end();
 		buff = masterconn_create_attached_packet(eptr,CSTOMA_REGISTER,1);
@@ -444,7 +445,7 @@ void masterconn_sendnextchunks(masterconn *eptr) {
 	} else {
 		buff = masterconn_create_attached_packet(eptr,CSTOMA_REGISTER,1+chunks*(8+4));
 		put8bit(&buff,61);
-		hdd_get_chunks_next_list_data(buff);
+		hdd_get_chunks_next_list_data(ChunksPerRegisterPacket,buff);
 	}
 }
 
@@ -1684,6 +1685,14 @@ void masterconn_reload(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t ReconnectionDelay;
 
+	ChunksPerRegisterPacket = cfg_getuint32("CHUNKS_PER_REGISTER_PACKET",10000);
+	if (ChunksPerRegisterPacket<1000) {
+		ChunksPerRegisterPacket = 1000;
+	}
+	if (ChunksPerRegisterPacket>100000) {
+		ChunksPerRegisterPacket = 100000;
+	}
+
 	if (AuthCode) {
 		free(AuthCode);
 		AuthCode = NULL;
@@ -1734,6 +1743,14 @@ int masterconn_init(void) {
 	masterconn_initcsid();
 
 	manager_time_hook = NULL;
+
+	ChunksPerRegisterPacket = cfg_getuint32("CHUNKS_PER_REGISTER_PACKET",10000);
+	if (ChunksPerRegisterPacket<1000) {
+		ChunksPerRegisterPacket = 1000;
+	}
+	if (ChunksPerRegisterPacket>100000) {
+		ChunksPerRegisterPacket = 100000;
+	}
 
 	if (cfg_isdefined("AUTH_CODE")) {
 		AuthCode = cfg_getstr("AUTH_CODE","");

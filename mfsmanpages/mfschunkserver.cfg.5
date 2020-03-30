@@ -117,6 +117,9 @@ authentication string (used only when master requires authorization)
 .B BIND_HOST
 local address to use for connecting with master (default is \fB*\fP, i.e. default local address)
 .TP
+.B CHUNKS_PER_REGISTER_PACKET
+maximum number of chunks system will try to put in a single register message (default is 10000, limits 1000-100000)
+.TP
 .B CSSERV_LISTEN_HOST
 IP address to listen on for client (mount) connections (\fB*\fP means any)
 .TP

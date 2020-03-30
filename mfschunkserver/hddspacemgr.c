@@ -2035,7 +2035,6 @@ static inline void hdd_error_occured(chunk *c) {
 
 /* interface */
 
-#define CHUNKS_CUT_COUNT 10000
 static uint32_t hdd_get_chunks_pos = 0;
 static pthread_cond_t hdd_get_chunks_cond = PTHREAD_COND_INITIALIZER;
 static uint8_t hdd_get_chunks_waiting = 0;
@@ -2066,7 +2065,7 @@ void hdd_get_chunks_end() {
 	zassert(pthread_mutex_unlock(&hashlock));
 }
 
-uint32_t hdd_get_chunks_next_list_count() {
+uint32_t hdd_get_chunks_next_list_count(uint32_t stopcount) {
 	uint32_t res = 0;
 	uint32_t i = 0;
 	chunk *c;
@@ -2074,7 +2073,7 @@ uint32_t hdd_get_chunks_next_list_count() {
 	if (hdd_get_chunks_partialmode) {
 		zassert(pthread_mutex_lock(&hashlock));
 	}
-	while (res<CHUNKS_CUT_COUNT && hdd_get_chunks_pos+i<HASHSIZE) {
+	while (res<stopcount && hdd_get_chunks_pos+i<HASHSIZE) {
 		for (c=hashtab[hdd_get_chunks_pos+i] ; c ; c=c->next) {
 			if (c->owner!=NULL) {
 				res++;
@@ -2091,11 +2090,11 @@ uint32_t hdd_get_chunks_next_list_count() {
 	return res;
 }
 
-void hdd_get_chunks_next_list_data(uint8_t *buff) {
+void hdd_get_chunks_next_list_data(uint32_t stopcount,uint8_t *buff) {
 	uint32_t res = 0;
 	uint32_t v;
 	chunk *c;
-	while (res<CHUNKS_CUT_COUNT && hdd_get_chunks_pos<HASHSIZE) {
+	while (res<stopcount && hdd_get_chunks_pos<HASHSIZE) {
 		for (c=hashtab[hdd_get_chunks_pos] ; c ; c=c->next) {
 			if (c->owner!=NULL) {
 				put64bit(&buff,c->chunkid);

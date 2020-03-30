@@ -102,6 +102,9 @@
 # authentication string (used only when master requires authorization)
 # AUTH_CODE = mfspassword
 
+# maximum number of chunks system will try to put in a single register message (default is 10000, limits 1000-100000)
+# CHUNKS_PER_REGISTER_PACKET = 10000
+
 ###############################################
 # CLIENTS CONNECTION OPTIONS                  #
 ###############################################

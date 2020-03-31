@@ -4025,6 +4025,7 @@ void matoclserv_fuse_setfacl(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	uid = get32bit(&data);
+	sessions_ugid_remap(eptr->sesdata,&uid,NULL);
 	acltype = get8bit(&data);
 	userperm = get16bit(&data);
 	groupperm = get16bit(&data);

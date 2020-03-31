@@ -9,6 +9,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed reporting damaged chunks in testing function (issue #352)
   - (client) changed open test in setattr (related to issue #350)
   - (master) fixed handling truncate for open files (related to issue #350)
+  - (master) added uid mapping in setfacl function
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

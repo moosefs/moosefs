@@ -3450,13 +3450,13 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	} else {
 		uint8_t oflags;
 		uint32_t gidtmp = ctx.gid;
-		oflags = AFTER_CREATE;
+		oflags = OPEN_AFTER_CREATE;
 		if ((fi->flags & O_ACCMODE) == O_RDONLY) {
-			oflags |= WANT_READ;
+			oflags |= OPEN_READ;
 		} else if ((fi->flags & O_ACCMODE) == O_WRONLY) {
-			oflags |= WANT_WRITE;
+			oflags |= OPEN_WRITE;
 		} else if ((fi->flags & O_ACCMODE) == O_RDWR) {
-			oflags |= WANT_READ | WANT_WRITE;
+			oflags |= OPEN_READ | OPEN_WRITE;
 		} else {
 			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(EINVAL));
 			fuse_reply_err(req, EINVAL);
@@ -3522,7 +3522,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 }
 
 void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
-	uint8_t oflags,mmode;
+	uint8_t oflags,mmode,noatomictrunc;
 	uint16_t lflags;
 	void *fdrec;
 	uint8_t attr[ATTR_RECORD_SIZE];
@@ -3650,16 +3650,24 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	oflags = 0;
 	mmode = 0;
 	if ((fi->flags & O_ACCMODE) == O_RDONLY) {
-		oflags |= WANT_READ;
+		oflags |= OPEN_READ;
 		mmode = MODE_MASK_R;
 	} else if ((fi->flags & O_ACCMODE) == O_WRONLY) {
-		oflags |= WANT_WRITE;
+		oflags |= OPEN_WRITE;
 		mmode = MODE_MASK_W;
 	} else if ((fi->flags & O_ACCMODE) == O_RDWR) {
-		oflags |= WANT_READ | WANT_WRITE;
+		oflags |= OPEN_READ | OPEN_WRITE;
 		mmode = MODE_MASK_R | MODE_MASK_W;
 	}
-	fdrec = fdcache_acquire(&ctx,ino,attr,&lflags);
+	if (fi->flags & O_TRUNC) {
+		uint32_t mver = master_version();
+		noatomictrunc = (mver<VERSION2INT(3,0,113))?1:0;
+		oflags |= OPEN_TRUNCATE;
+		fdrec=NULL; // with trunc flag we have to communicate with master, so can't use fdcache
+	} else {
+		fdrec = fdcache_acquire(&ctx,ino,attr,&lflags);
+		noatomictrunc = 0;
+	}
 	if (fdrec) {
 		if ((lflags & LOOKUP_RO_FILESYSTEM) && (mmode & MODE_MASK_W)) {
 			status = MFS_ERROR_EROFS;
@@ -3675,10 +3683,16 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		if (full_permissions) {
 			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,2); // allow group refresh again (see: getxattr for "com.apple.quarantine")
 			status = fs_opencheck(ino,ctx.uid,gids->gidcnt,gids->gidtab,oflags,attr);
+			if (status==MFS_STATUS_OK && (fi->flags & O_TRUNC) && noatomictrunc) {
+				status = fs_truncate(ino,TRUNCATE_FLAG_OPENED,ctx.uid,gids->gidcnt,gids->gidtab,0,attr);
+			}
 			groups_rel(gids);
 		} else {
 			uint32_t gidtmp = ctx.gid;
 			status = fs_opencheck(ino,ctx.uid,1,&gidtmp,oflags,attr);
+			if (status==MFS_STATUS_OK && (fi->flags & O_TRUNC) && noatomictrunc) {
+				status = fs_truncate(ino,TRUNCATE_FLAG_OPENED,ctx.uid,1,&gidtmp,0,attr);
+			}
 		}
 	}
 
@@ -3688,6 +3702,15 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		oplog_printf(&ctx,"open (%lu)%s: %s",(unsigned long int)ino,(fdrec)?" (using cached data from lookup)":"",strerr(status));
 		fuse_reply_err(req, status);
 		return ;
+	}
+
+	if (fi->flags & O_TRUNC) {
+		chunksdatacache_clear_inode(ino,0);
+		finfo_change_fleng(ino,0);
+		write_data_inode_setmaxfleng(ino,0);
+		read_inode_set_length_active(ino,0);
+		dcache_setattr(ino,attr);
+		fdcache_invalidate(ino);
 	}
 
 	mattr = mfs_attr_get_mattr(attr);

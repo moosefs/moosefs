@@ -1054,6 +1054,7 @@ int mfs_open(const char *path,int oflag,...) {
 	uint64_t fsize;
 	uint32_t parent;
 	uint32_t inode;
+	uint8_t noatomictrunc;
 	uint8_t name[256];
 	uint8_t nleng;
 	uint8_t attr[ATTR_RECORD_SIZE];
@@ -1067,14 +1068,22 @@ int mfs_open(const char *path,int oflag,...) {
 	mfsoflag = 0;
 	switch (oflag&O_ACCMODE) {
 		case O_RDONLY:
-			mfsoflag |= WANT_READ;
+			mfsoflag |= OPEN_READ;
 			break;
 		case O_WRONLY:
-			mfsoflag |= WANT_WRITE;
+			mfsoflag |= OPEN_WRITE;
 			break;
 		case O_RDWR:
-			mfsoflag |= WANT_READ | WANT_WRITE;
+			mfsoflag |= OPEN_READ | OPEN_WRITE;
 			break;
+	}
+	if (oflag&O_TRUNC) {
+		uint32_t mver;
+		mver = master_version();
+		noatomictrunc = (mver<VERSION2INT(3,0,113))?1:0;
+		mfsoflag |= OPEN_TRUNCATE;
+	} else {
+		noatomictrunc = 0;
 	}
 
 	needopen = 1;
@@ -1125,7 +1134,7 @@ int mfs_open(const char *path,int oflag,...) {
 			errno = mfs_errorconv(status);
 			return -1;
 		}
-		if (oflag&O_TRUNC) {
+		if (mfsoflag&OPEN_TRUNCATE && noatomictrunc) {
 			if (mfs_truncate_int(inode,1,0,attr)<0) {
 				return -1;
 			}

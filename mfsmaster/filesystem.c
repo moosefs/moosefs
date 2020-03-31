@@ -5877,7 +5877,7 @@ uint8_t fs_checkfile(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 
 uint8_t fs_opencheck(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint8_t flags,uint8_t attr[ATTR_RECORD_SIZE]) {
 	fsnode *p;
-	if ((sesflags&SESFLAG_READONLY) && (flags&WANT_WRITE)) {
+	if ((sesflags&SESFLAG_READONLY) && (flags&OPEN_WRITE)) {
 		return MFS_ERROR_EROFS;
 	}
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,0)==0) {
@@ -5886,16 +5886,25 @@ uint8_t fs_opencheck(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 	if (p->type!=TYPE_FILE && p->type!=TYPE_TRASH && p->type!=TYPE_SUSTAINED) {
 		return MFS_ERROR_EPERM;
 	}
-	if ((flags&AFTER_CREATE)==0) {
+	if ((flags&OPEN_AFTER_CREATE)==0) {
 		uint8_t modemask=0;
-		if (flags&WANT_READ) {
+		if (flags&OPEN_READ) {
 			modemask|=MODE_MASK_R;
 		}
-		if (flags&WANT_WRITE) {
+		if (flags&OPEN_WRITE) {
 			modemask|=MODE_MASK_W;
 		}
 		if (!fsnodes_access_ext(p,uid,gids,gid,modemask,sesflags)) {
 			return MFS_ERROR_EACCES;
+		}
+		if (flags&OPEN_TRUNCATE) {
+			uint32_t ts = main_time();
+			if (!fsnodes_access_ext(p,uid,gids,gid,MODE_MASK_W,sesflags)) {
+				return MFS_ERROR_EACCES;
+			}
+			fsnodes_setlength(p,0);
+			changelog("%"PRIu32"|LENGTH(%"PRIu32",0,1)",ts,inode);
+			p->ctime = p->mtime = ts;
 		}
 	}
 	fsnodes_fill_attr(p,NULL,uid,gid[0],auid,agid,sesflags,attr,1);

@@ -661,9 +661,9 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 #ifdef FUSE_CAP_ASYNC_READ
 	conn->want |= FUSE_CAP_ASYNC_READ;
 #endif
-// turn off FUSE_CAP_ATOMIC_O_TRUNC - as for now we don't support O_TRUNC flag
+// turn on FUSE_CAP_ATOMIC_O_TRUNC
 #ifdef FUSE_CAP_ATOMIC_O_TRUNC
-	conn->want &= ~FUSE_CAP_ATOMIC_O_TRUNC;
+	conn->want |= FUSE_CAP_ATOMIC_O_TRUNC;
 #endif
 // turn on FUSE_CAP_EXPORT_SUPPORT (we do support lookups of "." and "..")
 #ifdef FUSE_CAP_EXPORT_SUPPORT

@@ -2839,7 +2839,11 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	}
 	flags = get8bit(&data);
 	sesflags = sessions_get_sesflags(eptr->sesdata);
-	status = fs_opencheck(sessions_get_rootinode(eptr->sesdata),sesflags,inode,uid,gids,gid,auid,agid,flags,attr);
+	if ((flags&OPEN_TRUNCATE) && sessions_get_disables(eptr->sesdata)&DISABLE_TRUNCATE) {
+		status = MFS_ERROR_EPERM;
+	} else {
+		status = fs_opencheck(sessions_get_rootinode(eptr->sesdata),sesflags,inode,uid,gids,gid,auid,agid,flags,attr);
+	}
 	if (status==MFS_STATUS_OK) {
 		of_openfile(sessions_get_id(eptr->sesdata),inode);
 	}

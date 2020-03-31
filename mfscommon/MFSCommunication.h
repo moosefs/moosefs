@@ -467,11 +467,11 @@
 #define HLSTATUS_REBALANCE                 3
 #define HLSTATUS_GRACEFUL                  4
 
-// flags: "flags" fileld in "CLTOMA_FUSE_AQUIRE"
-#define WANT_READ                          1
-#define WANT_WRITE                         2
-#define AFTER_CREATE                       4
-
+// flags: "flags" fileld in "CLTOMA_FUSE_OPEN"
+#define OPEN_READ                          0x01
+#define OPEN_WRITE                         0x02
+#define OPEN_AFTER_CREATE                  0x04
+#define OPEN_TRUNCATE                      0x08
 
 #define MFS_XATTR_CREATE_OR_REPLACE        0
 #define MFS_XATTR_CREATE_ONLY              1

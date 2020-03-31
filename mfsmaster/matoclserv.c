@@ -2846,6 +2846,9 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 	}
 	if (status==MFS_STATUS_OK) {
 		of_openfile(sessions_get_id(eptr->sesdata),inode);
+		if (flags&OPEN_CACHE_CLEARED) {
+			dcm_access(inode,sessions_get_id(eptr->sesdata));
+		}
 	}
 	if (eptr->version>=VERSION2INT(1,6,9) && status==MFS_STATUS_OK) {
 		if ((sesflags&SESFLAG_ATTRBIT)==0 || (attr[0]&MATTR_DIRECTMODE)==0) {

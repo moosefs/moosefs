@@ -472,6 +472,7 @@
 #define OPEN_WRITE                         0x02
 #define OPEN_AFTER_CREATE                  0x04
 #define OPEN_TRUNCATE                      0x08
+#define OPEN_CACHE_CLEARED                 0x10
 
 #define MFS_XATTR_CREATE_OR_REPLACE        0
 #define MFS_XATTR_CREATE_ONLY              1

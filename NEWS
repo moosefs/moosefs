@@ -11,6 +11,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed handling truncate for open files (related to issue #350)
   - (master) added uid mapping in setfacl function
   - (master+client) added support for atomic truncate with open
+  - (master+client) fixed keep cache conditions
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

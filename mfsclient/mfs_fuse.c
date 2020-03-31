@@ -3744,6 +3744,9 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	} else if (fdrec) {
 		finfo *fileinfo;
 		uint32_t gidtmp = 0;
+		if (fi->keep_cache==0) {
+			oflags |= OPEN_CACHE_CLEARED;
+		}
 		fs_opencheck(ino,0,1,&gidtmp,oflags,attr); // just send "opencheck" to make sure that master knows that this file is open
 		fileinfo = finfo_get(fi->fh);
 		if (fileinfo!=NULL) {

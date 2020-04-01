@@ -80,7 +80,7 @@
 # MASTER CONNECTION OPTIONS                   #
 ###############################################
 
-# labels string (default is empty - no labels)
+# labels string (default is empty - no labels); labels should be defined as a set of letters (case insensitive) separated by ',' or ';'
 # LABELS = 
 
 # local address to use for master connections (default is *, i.e. default local address)

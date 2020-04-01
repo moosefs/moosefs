@@ -309,17 +309,58 @@ static uint32_t labelmask = 0;
 
 void masterconn_parselabels(void) {
 	char *labelsstr,*p,c;
+	uint32_t mask;
+	uint8_t sep,perr;
 
 	labelsstr = cfg_getstr("LABELS","");
 	labelmask = 0;
 
+	perr = 0;
+	sep = 0;
 	for (p=labelsstr ; *p ; p++) {
 		c = *p;
 		if (c>='A' && c<='Z') {
-			labelmask |= (1 << (c-'A'));
+			mask = (1<<(c-'A'));
 		} else if (c>='a' && c<='z') {
-			labelmask |= (1 << (c-'a'));
+			mask = (1<<(c-'a'));
+		} else {
+			mask = 0;
 		}
+		if (mask) { // letter
+			if (sep) {
+				syslog(LOG_NOTICE,"LABELS: separator not found before label %c",c);
+				perr = 1;
+			} else {
+				sep = 1;
+			}
+			if (labelmask & mask) {
+				syslog(LOG_NOTICE,"LABELS: found duplicate label %c",c);
+				perr = 1;
+			}
+			labelmask |= mask;
+		} else if (c==',' || c==';') {
+			if (sep) {
+				sep = 0;
+			} else {
+				if (labelmask!=0) {
+					syslog(LOG_NOTICE,"LABELS: more than one separator found");
+				} else {
+					syslog(LOG_NOTICE,"LABELS: found separator at the beginning of definition");
+				}
+				perr = 1;
+			}
+		} else if (c!=' ' && c!='\t') {
+			syslog(LOG_NOTICE,"LABELS: unrecognized character %c",c);
+			perr = 1;
+		}
+	}
+	if (sep==0 && labelmask!=0) {
+		syslog(LOG_NOTICE,"LABELS: found separator at the end of definition");
+		perr = 1;
+	}
+
+	if (perr) {
+		syslog(LOG_NOTICE,"in the current version of chunkserver the only correct LABELS format is a set of letters separated by ',' or ';' - please change your config file appropriately");
 	}
 
 	free(labelsstr);

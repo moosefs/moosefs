@@ -19,6 +19,7 @@ mfsbdev \- \fBMooseFS\fP block device daemon/management tool
 [\fB-d\fP \fInbddevice\fP]
 [\fB-n\fP \fIlinkname\fP]
 [\fB-s\fP \fIbdevsize\fP]
+[\fB-r\fP]
 .PP
 .B mfsbdev unmap
 [\fB-l\fP \fIlinksocket\fP]
@@ -98,8 +99,10 @@ default is a combination of master hostname, port and mfs file name
 - size of the block device, both SI and IEC suffixes can be used; default is the size
 of the file the block device is mapped to
 .PP
-.B
--t
+.B -r
+- maps block device as readonly (allows multiple mappings of the same file)
+.PP
+.B -t
 - forces the list command to display information in a format ready to use with
 map (m parameter) or unmap (u parameter) command
 

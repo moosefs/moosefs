@@ -134,11 +134,14 @@ MFSNBD_RESIZE:
 
 */
 
+#define FLAG_READONLY 1
+
 typedef struct nbdcommon {
 	char *linkname;
 	char *nbddevice;
 	char *mfsfile;
 	uint64_t fsize;
+	uint32_t flags;
 	int sp[2];
 	int mfsfd;
 	int nbdfd;
@@ -244,7 +247,7 @@ void nbd_worker_fn(void *data,uint32_t workerscnt) {
 	switch (r->cmd) {
 		case NBD_CMD_READ:
 			if (r->offset + r->length > nbdcp->fsize) {
-				r->status = 75; // EOVERFLOW
+				r->status = EOVERFLOW;
 			} else {
 				if (mfs_pread(nbdcp->mfsfd,r->data,r->length,r->offset)<0) {
 					r->status = errno;
@@ -254,8 +257,10 @@ void nbd_worker_fn(void *data,uint32_t workerscnt) {
 			}
 			break;
 		case NBD_CMD_WRITE:
-			if (r->offset + r->length > nbdcp->fsize) {
-				r->status = 75; // EOVERFLOW
+			if (nbdcp->flags & FLAG_READONLY) {
+				r->status = EROFS;
+			} else if (r->offset + r->length > nbdcp->fsize) {
+				r->status = EOVERFLOW;
 			} else {
 				if (mfs_pwrite(nbdcp->mfsfd,r->data,r->length,r->offset)<0) {
 					r->status = errno;
@@ -270,7 +275,9 @@ void nbd_worker_fn(void *data,uint32_t workerscnt) {
 			break;
 #ifdef NBD_CMD_FLUSH
 		case NBD_CMD_FLUSH:
-			if (mfs_fsync(nbdcp->mfsfd)<0) {
+			if (nbdcp->flags & FLAG_READONLY) {
+				r->status = EROFS;
+			} else if (mfs_fsync(nbdcp->mfsfd)<0) {
 				r->status = errno;
 			} else {
 				r->status = 0;
@@ -603,6 +610,7 @@ char* nbd_packet_to_str(const uint8_t *pstr,uint32_t pleng) {
 
 int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	uint64_t size;
+	int omode,lmode;
 	int err,status;
 	struct stat stbuf;
 
@@ -644,20 +652,31 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 		goto err3;
 	}
 
-	if (nbdcp->fsize!=0) {
-		nbdcp->mfsfd = mfs_open(nbdcp->mfsfile,O_RDWR|O_CREAT,0666);
+	if (nbdcp->flags & FLAG_READONLY) {
+		omode = O_RDONLY;
+		lmode = LOCK_SH;
 	} else {
-		nbdcp->mfsfd = mfs_open(nbdcp->mfsfile,O_RDWR,0666);
+		omode = O_RDWR;
+		lmode = LOCK_EX;
 	}
+	if (nbdcp->fsize!=0) {
+		omode |= O_CREAT;
+	}
+	nbdcp->mfsfd = mfs_open(nbdcp->mfsfile,omode,0666);
 	if (nbdcp->mfsfd<0) {
 		nbd_start_err_msg("error opening MFS file %s: %s",nbdcp->mfsfile,strerror(errno));
 		goto err3;
 	}
 
+	if (mfs_flock(nbdcp->mfsfd,lmode|LOCK_NB)<0) {
+		nbd_start_err_msg("MFS file %s is locked (likely mapped elsewhere)",nbdcp->mfsfile);
+		goto err4;
+	}
+
 	if (nbdcp->fsize==0) {
 		if (mfs_fstat(nbdcp->mfsfd,&stbuf)<0) {
 			nbd_start_err_msg("can't stat MFS file '%s': %s",nbdcp->mfsfile,strerror(errno));
-			goto err4;
+			goto err5;
 		}
 		nbdcp->fsize = stbuf.st_size;
 	}
@@ -666,7 +685,7 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 
 	if (nbdcp->fsize==0) {
 		nbd_start_err_msg("%s","file size too low (less than one 4k block)");
-		goto err4;
+		goto err5;
 	}
 
 // use size
@@ -674,25 +693,25 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	err = ioctl(nbdcp->nbdfd, NBD_SET_SIZE, nbdcp->fsize);
 	if (err<0) {
 		syslog(LOG_ERR,"error setting block device size (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err4;
+		goto err5;
 	}
 #endif
 // use blocks
 	err = ioctl(nbdcp->nbdfd, NBD_SET_BLKSIZE, 4096);
 	if (err<0) {
 		nbd_start_err_msg("error setting block device bock size (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err4;
+		goto err5;
 	}
 	err = ioctl(nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, nbdcp->fsize / 4096);
 	if (err<0) {
 		nbd_start_err_msg("error setting block device number of blocks (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err4;
+		goto err5;
 	}
 
 	err = ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
 	if (err<0) {
 		nbd_start_err_msg("error clearing socket for NBD device (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err4;
+		goto err5;
 	}
 
 	err = ioctl(nbdcp->nbdfd, NBD_SET_TIMEOUT, 1800);
@@ -703,25 +722,25 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	nbdcp->aqueue = squeue_new(0);
 	if (nbdcp->aqueue==NULL) {
 		nbd_start_err_msg("%s","can't create queue");
-		goto err4;
+		goto err5;
 	}
 
 	err = lwt_minthread_create(&(nbdcp->ctrl_thread),0,nbd_controller_thread,nbdcp);
 	if (err<0) {
 		nbd_start_err_msg("can't create controller thread: %s",strerror(errno));
-		goto err5;
+		goto err6;
 	}
 
 	err = lwt_minthread_create(&(nbdcp->send_thread),0,send_thread,nbdcp);
 	if (err<0) {
 		nbd_start_err_msg("can't create send thread: %s",strerror(errno));
-		goto err6;
+		goto err7;
 	}
 
 	err = lwt_minthread_create(&(nbdcp->recv_thread),0,receive_thread,nbdcp);
 	if (err<0) {
 		nbd_start_err_msg("can't create receive thread: %s",strerror(errno));
-		goto err7;
+		goto err8;
 	}
 
 	err = fork(); // reread partition tables - needs to be done in separate process
@@ -749,16 +768,18 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	}
 	return 0;
 
-err7:
+err8:
 	squeue_close(nbdcp->aqueue);
 	pthread_join(nbdcp->send_thread,NULL);
-err6:
+err7:
 	ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
 	ioctl(nbdcp->nbdfd, NBD_DISCONNECT);
 	ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
 	pthread_join(nbdcp->ctrl_thread,NULL);
-err5:
+err6:
 	squeue_delete(nbdcp->aqueue);
+err5:
+	mfs_flock(nbdcp->mfsfd,LOCK_UN); // just in case
 err4:
 	mfs_close(nbdcp->mfsfd);
 err3:
@@ -792,6 +813,7 @@ void nbd_stop(nbdcommon *nbdcp) {
 
 	squeue_delete(nbdcp->aqueue);
 
+	mfs_flock(nbdcp->mfsfd,LOCK_UN); // just in case
 	mfs_close(nbdcp->mfsfd);
 
 	err = unlink(nbdcp->linkname);
@@ -861,38 +883,40 @@ void nbd_handle_add_device(int sock,const uint8_t *buff,uint32_t leng) {
 	uint16_t pleng;
 	uint8_t dleng,nleng;
 	uint64_t size;
+	uint32_t flags;
 	static bdlist *bdl;
 
 	wptr = ans;
 	put32bit(&wptr,MFSNBD_ADD);
 	put32bit(&wptr,0);
 	rptr = buff;
-	if (leng<12U) {
+	if (leng<16U) {
 		unixtowrite(sock,ans,8,1000);
 		return;
 	}
 	pleng = get16bit(&rptr);
 	path = rptr;
 	rptr += pleng;
-	if (leng<12U+pleng) {
+	if (leng<16U+pleng) {
 		unixtowrite(sock,ans,8,1000);
 		return;
 	}
 	dleng = get8bit(&rptr);
 	device = rptr;
 	rptr += dleng;
-	if (leng<12U+pleng+dleng) {
+	if (leng<16U+pleng+dleng) {
 		unixtowrite(sock,ans,8,1000);
 		return;
 	}
 	nleng = get8bit(&rptr);
 	name = rptr;
 	rptr += nleng;
-	if (leng!=12U+pleng+dleng+nleng) {
+	if (leng!=16U+pleng+dleng+nleng) {
 		unixtowrite(sock,ans,8,1000);
 		return;
 	}
 	size = get64bit(&rptr);
+	flags = get32bit(&rptr);
 	if (pleng==0) {
 		msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"empty filename");
 		status = MFSNBD_ERROR;
@@ -905,6 +929,7 @@ void nbd_handle_add_device(int sock,const uint8_t *buff,uint32_t leng) {
 		bdl->nbdcp->nbddevice = nbd_packet_to_str(device,dleng);
 		bdl->nbdcp->linkname = nbd_packet_to_str(name,nleng);
 		bdl->nbdcp->fsize = size;
+		bdl->nbdcp->flags = flags;
 		bdl->nbdcp->linkname = linkname_generate(bdl->nbdcp->linkname,mcfg.masterhost,mcfg.masterport,bdl->nbdcp->mfsfile);
 		if (nbd_linktest(bdl->nbdcp)<0) {
 			msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"link exists");
@@ -1038,7 +1063,7 @@ void nbd_handle_list_devices(int sock,const uint8_t *buff,uint32_t leng) {
 		if (nleng>255) {
 			nleng = 255;
 		}
-		dsize += pleng + dleng + nleng + 12;
+		dsize += pleng + dleng + nleng + 16;
 		dcnt++;
 	}
 	ans = malloc(8+dsize);
@@ -1070,6 +1095,7 @@ void nbd_handle_list_devices(int sock,const uint8_t *buff,uint32_t leng) {
 		memcpy(wptr,bdl->nbdcp->linkname+NBD_LINK_PREFIX_LENG,nleng);
 		wptr+=nleng;
 		put64bit(&wptr,bdl->nbdcp->fsize);
+		put32bit(&wptr,bdl->nbdcp->flags);
 	}
 	unixtowrite(sock,ans,8+dsize,1000);
 	free(ans);
@@ -1383,6 +1409,8 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 	}
 	mcfg.read_cache_mb = 128;
 	mcfg.write_cache_mb = 128;
+	mcfg.error_on_lost_chunk = 0;
+	mcfg.error_on_no_space = 0;
 	mcfg.io_try_cnt = 30;
 
 	if (lsockname==NULL) {
@@ -1608,6 +1636,7 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 	const uint8_t *rptr;
 	char *filename,*device,*linkname;
 	uint64_t size;
+	uint32_t flags;
 	uint32_t dsize,pleng,dleng,nleng;
 	uint8_t aleng,status;
 	char *answer;
@@ -1625,9 +1654,10 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 	linkname = NULL;
 	answer = NULL;
 	size = 0;
+	flags = 0;
 	res = 1;
 
-	while ((ch = getopt(argc, argv, "l:f:d:n:s:?")) != -1) {
+	while ((ch = getopt(argc, argv, "l:f:d:n:s:r?")) != -1) {
 		switch (ch) {
 			case 'l':
 				if (lsockname!=NULL) {
@@ -1659,6 +1689,9 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 				break;
 			case 's':
 				size = sizestrtod(optarg,NULL);
+				break;
+			case 'r':
+				flags |= FLAG_READONLY;
 				break;
 			case 'h':
 			default:
@@ -1704,7 +1737,7 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 	} else {
 		nleng = 0;
 	}
-	dsize = 12 + pleng + dleng + nleng;
+	dsize = 16 + pleng + dleng + nleng;
 
 	buff = malloc(8+dsize);
 	passert(buff);
@@ -1726,6 +1759,7 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 		wptr+=nleng;
 	}
 	put64bit(&wptr,size);
+	put32bit(&wptr,flags);
 
 	if (unixtowrite(csock,buff,8+dsize,1000)!=(ssize_t)(8+dsize)) {
 		fprintf(stderr,"unable to send data to '%s': %s\n",lsockname,strerror(errno));
@@ -2222,6 +2256,7 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 	uint16_t pleng;
 	uint8_t dleng,nleng;
 	uint64_t size;
+	uint32_t flags;
 	uint8_t displaymode;
 	char *path,*device,*linkname;
 	char *lsockname;
@@ -2323,6 +2358,7 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 		linkname = nbd_packet_to_str(rptr,nleng);
 		rptr += nleng;
 		size = get64bit(&rptr);
+		flags = get32bit(&rptr);
 		if (displaymode!=0) {
 			if (displaymode==1) {
 				printf("%s map",appname);
@@ -2343,10 +2379,13 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 			}
 			if (displaymode==1) {
 				printf(" -s %"PRIu64,size);
+				if (flags & FLAG_READONLY) {
+					printf(" -r");
+				}
 			}
 			printf("\n");
 		} else {
-			printf("file: %s ; device: %s ; link: %s ; size: %"PRIu64" (%.3lfGiB)\n",(path==NULL)?"":path,(device==NULL)?"":device,(linkname==NULL)?"":linkname,size,size/(1024.0*1024.0*1024.0));
+			printf("file: %s ; device: %s ; link: %s ; size: %"PRIu64" (%.3lfGiB) ; rwmode: %s\n",(path==NULL)?"":path,(device==NULL)?"":device,(linkname==NULL)?"":linkname,size,size/(1024.0*1024.0*1024.0),(flags & FLAG_READONLY)?"ro":"rw");
 		}
 		if (path!=NULL) {
 			free(path);

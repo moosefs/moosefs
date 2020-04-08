@@ -5034,9 +5034,15 @@ uint8_t hdd_is_rebalance_on(void) {
 }
 
 int hdd_move(void *fsrcv,void *fdstv) {
+	int status;
 	folder *fsrc = (folder*)fsrcv;
 	folder *fdst = (folder*)fdstv;
-	return hdd_int_move(fsrc,fdst);
+	status = hdd_int_move(fsrc,fdst);
+	if (status!=MFS_STATUS_OK) {
+		// in case of error - wait a little
+		portable_usleep(1000);
+	}
+	return status;
 }
 
 static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t *changed,uint8_t rebalance_is_on,uint8_t hsmode) {
@@ -5088,7 +5094,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 				usage = f->total-f->avail;
 				usage /= f->total;
 				if (abovecnt==0) {
-					if (f->balancemode==REBALANCE_FORCE_DST && usage<REBALANCE_DST_MAX_USAGE) {
+					if (f->balancemode==REBALANCE_FORCE_DST && usage<REBALANCE_DST_MAX_USAGE && f->wfrcount==0) {
 						f->tmpbalancemode = REBALANCE_DST;
 						rebalance_servers |= 1;
 					} else if (f->chunkcount>0) {
@@ -5099,12 +5105,12 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 					if (f->balancemode==REBALANCE_FORCE_SRC && f->chunkcount>0) {
 						f->tmpbalancemode = REBALANCE_SRC;
 						rebalance_servers |= 2;
-					} else if (usage<REBALANCE_DST_MAX_USAGE) {
+					} else if (usage<REBALANCE_DST_MAX_USAGE && f->wfrcount==0) {
 						f->tmpbalancemode = REBALANCE_DST;
 						rebalance_servers |= 1;
 					}
 				} else {
-					if (f->balancemode==REBALANCE_FORCE_DST && usage<REBALANCE_DST_MAX_USAGE) {
+					if (f->balancemode==REBALANCE_FORCE_DST && usage<REBALANCE_DST_MAX_USAGE && f->wfrcount==0) {
 						f->tmpbalancemode = REBALANCE_DST;
 						rebalance_servers |= 1;
 					} else if (f->balancemode==REBALANCE_FORCE_SRC && f->chunkcount>0) {
@@ -5153,7 +5159,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 					if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
 						usage = f->total-f->avail;
 						usage /= f->total;
-						if ((((usage < avgusage - rebalancediff) && belowcnt>0) || ((usage <= avgusage + rebalancediff) && belowcnt==0)) && usage<REBALANCE_DST_MAX_USAGE) {
+						if ((((usage < avgusage - rebalancediff) && belowcnt>0) || ((usage <= avgusage + rebalancediff) && belowcnt==0)) && usage<REBALANCE_DST_MAX_USAGE && f->wfrcount==0) {
 							f->tmpbalancemode = REBALANCE_DST;
 							rebalance_servers |= 1;
 						} else if ((((usage > avgusage + rebalancediff) && abovecnt>0) || ((usage >= avgusage - rebalancediff) && abovecnt==0)) && f->chunkcount>0) {
@@ -5434,7 +5440,10 @@ void* hdd_rebalance_thread(void *arg) {
 #endif
 			}
 			st = monotonic_useconds();
-			(void)hdd_int_move(fsrc,fdst);
+			if (hdd_int_move(fsrc,fdst)!=MFS_STATUS_OK) {
+				// in case of error - wait a little
+				portable_usleep(1000);
+			}
 			en = monotonic_useconds();
 			zassert(pthread_mutex_lock(&folderlock));
 			fsrc->rebalance_in_progress--;

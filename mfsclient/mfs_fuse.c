@@ -109,6 +109,7 @@ static int freebsd_workarounds = 1;
 // workaround for bug in FreeBSD Fuse version (kernel part)
 #  define FREEBSD_DELAYED_RELEASE 1
 #  define FREEBSD_RELEASE_DELAY 10.0
+#  define FREEBSD_XONLY_ACCESS 1
 #endif
 
 #define RANDOM_BUFFSIZE 0x100000
@@ -1386,6 +1387,18 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 		fprintf(stderr,"access (%lu,0x%X)\n",(unsigned long int)ino,mask);
 	}
 	mfs_stats_inc(OP_ACCESS);
+#ifdef FREEBSD_XONLY_ACCESS
+	if (mask & X_OK) { // have X?
+		if (mask & (R_OK|W_OK)) {
+			oplog_printf(&ctx,"access (%lu,0x%X): (change mask to X_OK only - kernel bug workaround)",(unsigned long int)ino,mask);
+			mask = X_OK; // check X only
+		}
+	} else {
+		oplog_printf(&ctx,"access (%lu,0x%X): OK (forced - kernel bug workaround)",(unsigned long int)ino,mask);
+		fuse_reply_err(req,0);
+		return;
+	}
+#endif
 #if (R_OK==MODE_MASK_R) && (W_OK==MODE_MASK_W) && (X_OK==MODE_MASK_X)
 	mmode = mask;
 #else

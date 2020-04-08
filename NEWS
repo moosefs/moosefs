@@ -15,6 +15,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) introduced official label format defined in chunkserver configuration
   - (nbd) added readonly mode and locking
   - (cs) fixed condition in choosing disks for internal rebalance
+  - (mount) added workaround in access for a bug in FreeBSD kernel (issue #354)
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

@@ -1,3 +1,28 @@
+moosefs (3.0.113-1) unstable; urgency=medium
+
+  * (master) changed condition that decides if master should wait for more
+    chunks during I/O
+  * (mount) delayed setting channel for fuse notifications (very rare segfault
+    in libfuse2 during init)
+  * (client+master) changed conditions for ancestor test in getattr (issue
+    #350)
+  * (cs) added parameter for number of chunks to be send in single regiter
+    packet
+  * (cs) fixed reporting damaged chunks in testing function (issue #352)
+  * (client) changed open test in setattr (related to issue #350)
+  * (master) fixed handling truncate for open files (related to issue #350)
+  * (master) added uid mapping in setfacl function
+  * (master+client) added support for atomic truncate with open
+  * (master+client) fixed keep cache conditions
+  * (cs) introduced official label format defined in chunkserver configuration
+  * (nbd) added readonly mode and locking
+  * (cs) fixed condition in choosing disks for internal rebalance
+  * (mount) added workaround in access for a bug in FreeBSD kernel (issue #354)
+  * (cs) fixed master reconnection conditions (reload usually shouldn't cause
+    reconnection)
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 09 Apr 2020 13:00:00 +0200
+
 moosefs (3.0.112-1) unstable; urgency=medium
 
   * (cs) silence stupid compiler warning

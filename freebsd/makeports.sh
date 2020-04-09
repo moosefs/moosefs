@@ -29,10 +29,10 @@ PORTNAMES="master chunkserver client metalogger cgi cgiserv cli netdump"
 
 PORTFILES="Makefile pkg-descr pkg-plist files"
 
-VERSION=3.0.112
+VERSION=3.0.113
 RELEASE=1
 
-cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^PORTREVISION=.*$/PORTREVISION=		${RELEASE}/" | sed "s/^DISTNAME=.*$/DISTNAME=		moosefs-\${PORTVERSION}-\${PORTREVISION}/" | uniq > .tmp
+cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^DISTVERSION=.*$/DISTVERSION=		${VERSION}/" | sed "s/^DISTVERSIONSUFFIX=.*$/DISTVERSIONSUFFIX=		${RELEASE}/" | uniq > .tmp
 mv .tmp "${FILEBASEDIR}/files/Makefile.master"
 
 for portname in ${PORTNAMES}; do

@@ -847,7 +847,9 @@ uint16_t csserv_getlistenport() {
 }
 
 void csserv_reload(void) {
-	char *oldListenHost,*oldListenPort;
+	char *newListenHost,*newListenPort;
+	uint32_t newmylistenip;
+	uint16_t newmylistenport;
 	int newlsock;
 
 	if (lsock<0) { // this is exiting stage - ignore reload
@@ -855,13 +857,11 @@ void csserv_reload(void) {
 	}
 //	ThreadedServer = 1-ThreadedServer;
 
-	oldListenHost = ListenHost;
-	oldListenPort = ListenPort;
-	ListenHost = cfg_getstr("CSSERV_LISTEN_HOST","*");
-	ListenPort = cfg_getstr("CSSERV_LISTEN_PORT",DEFAULT_CS_DATA_PORT);
-	if (strcmp(oldListenHost,ListenHost)==0 && strcmp(oldListenPort,ListenPort)==0) {
-		free(oldListenHost);
-		free(oldListenPort);
+	newListenHost = cfg_getstr("CSSERV_LISTEN_HOST","*");
+	newListenPort = cfg_getstr("CSSERV_LISTEN_PORT",DEFAULT_CS_DATA_PORT);
+	if (strcmp(newListenHost,ListenHost)==0 && strcmp(newListenPort,ListenPort)==0) {
+		free(newListenHost);
+		free(newListenPort);
 		mfs_arg_syslog(LOG_NOTICE,"main server module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
 		return;
 	}
@@ -869,21 +869,18 @@ void csserv_reload(void) {
 	newlsock = tcpsocket();
 	if (newlsock<0) {
 		mfs_errlog(LOG_WARNING,"main server module: socket address has changed, but can't create new socket");
-		free(ListenHost);
-		free(ListenPort);
-		ListenHost = oldListenHost;
-		ListenPort = oldListenPort;
+		free(newListenHost);
+		free(newListenPort);
 		return;
 	}
 	tcpnonblock(newlsock);
 	tcpnodelay(newlsock);
 	tcpreuseaddr(newlsock);
-	if (tcpstrlisten(newlsock,ListenHost,ListenPort,100)<0) {
+	tcpresolve(newListenHost,newListenPort,&newmylistenip,&newmylistenport,1);
+	if (tcpnumlisten(newlsock,newmylistenip,newmylistenport,100)<0) {
 		mfs_arg_errlog(LOG_ERR,"main server module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
-		free(ListenHost);
-		free(ListenPort);
-		ListenHost = oldListenHost;
-		ListenPort = oldListenPort;
+		free(newListenHost);
+		free(newListenPort);
 		tcpclose(newlsock);
 		return;
 	}
@@ -891,10 +888,15 @@ void csserv_reload(void) {
 		mfs_errlog_silent(LOG_NOTICE,"main server module: can't set accept filter");
 	}
 	mfs_arg_syslog(LOG_NOTICE,"main server module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
-	free(oldListenHost);
-	free(oldListenPort);
+	free(ListenHost);
+	free(ListenPort);
+	ListenHost = newListenHost;
+	ListenPort = newListenPort;
 	tcpclose(lsock);
 	lsock = newlsock;
+	mylistenip = newmylistenip;
+	mylistenport = newmylistenport;
+	masterconn_forcereconnect();
 }
 
 int csserv_init(void) {

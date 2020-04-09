@@ -149,8 +149,11 @@ static uint32_t Timeout;
 static uint16_t ChunkServerID = 0;
 static uint64_t MetaID = 0;
 static char *AuthCode = NULL;
+static uint32_t LabelMask = 0;
 
 static uint64_t hddmetaid;
+
+static int reconnectisneeded = 0;
 
 // static FILE *logfd;
 
@@ -305,15 +308,14 @@ uint8_t* masterconn_create_attached_packet(masterconn *eptr,uint32_t type,uint32
 	return ptr;
 }
 
-static uint32_t labelmask = 0;
-
-void masterconn_parselabels(void) {
+uint8_t masterconn_parselabels(void) {
 	char *labelsstr,*p,c;
 	uint32_t mask;
 	uint8_t sep,perr;
+	uint32_t newlabelmask;
 
 	labelsstr = cfg_getstr("LABELS","");
-	labelmask = 0;
+	newlabelmask = 0;
 
 	perr = 0;
 	sep = 0;
@@ -333,16 +335,16 @@ void masterconn_parselabels(void) {
 			} else {
 				sep = 1;
 			}
-			if (labelmask & mask) {
+			if (newlabelmask & mask) {
 				syslog(LOG_NOTICE,"LABELS: found duplicate label %c",c);
 				perr = 1;
 			}
-			labelmask |= mask;
+			newlabelmask |= mask;
 		} else if (c==',' || c==';') {
 			if (sep) {
 				sep = 0;
 			} else {
-				if (labelmask!=0) {
+				if (newlabelmask!=0) {
 					syslog(LOG_NOTICE,"LABELS: more than one separator found");
 				} else {
 					syslog(LOG_NOTICE,"LABELS: found separator at the beginning of definition");
@@ -354,7 +356,7 @@ void masterconn_parselabels(void) {
 			perr = 1;
 		}
 	}
-	if (sep==0 && labelmask!=0) {
+	if (sep==0 && newlabelmask!=0) {
 		syslog(LOG_NOTICE,"LABELS: found separator at the end of definition");
 		perr = 1;
 	}
@@ -364,13 +366,19 @@ void masterconn_parselabels(void) {
 	}
 
 	free(labelsstr);
+
+	if (newlabelmask!=LabelMask) {
+		LabelMask = newlabelmask;
+		return 1;
+	}
+	return 0;
 }
 
 void masterconn_sendlabels(masterconn *eptr) {
 	uint8_t *buff;
 
 	buff = masterconn_create_attached_packet(eptr,CSTOMA_LABELS,4);
-	put32bit(&buff,labelmask);
+	put32bit(&buff,LabelMask);
 }
 
 void masterconn_sendregister(masterconn *eptr) {
@@ -766,6 +774,12 @@ void masterconn_check_hdd_reports(void) {
 	uint32_t errorcounter;
 	uint32_t chunkcounter;
 	uint8_t *buff;
+
+	if (reconnectisneeded) {
+		masterconn_send_disconnect_command(); // closes connection
+		eptr->masteraddrvalid = 0;
+		reconnectisneeded = 0;
+	}
 	if (eptr->registerstate==REGISTERED && eptr->mode==DATA) {
 		errorcounter = hdd_errorcounter();
 		while (errorcounter) {
@@ -1679,6 +1693,10 @@ void masterconn_serve(struct pollfd *pdesc) {
 	masterconn_disconnection_check();
 }
 
+void masterconn_forcereconnect(void) {
+	reconnectisneeded = 1;
+}
+
 void masterconn_reconnect(void) {
 	masterconn *eptr = masterconnsingleton;
 	if (eptr->mode==FREE && wantexittime==0.0) {
@@ -1725,6 +1743,11 @@ void masterconn_term(void) {
 void masterconn_reload(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t ReconnectionDelay;
+	char *newAuthCode;
+	char *newMasterHost;
+	char *newMasterPort;
+	char *newBindHost;
+	uint32_t newTimeout;
 
 	ChunksPerRegisterPacket = cfg_getuint32("CHUNKS_PER_REGISTER_PACKET",10000);
 	if (ChunksPerRegisterPacket<1000) {
@@ -1734,37 +1757,71 @@ void masterconn_reload(void) {
 		ChunksPerRegisterPacket = 100000;
 	}
 
-	if (AuthCode) {
-		free(AuthCode);
-		AuthCode = NULL;
-	}
 	if (cfg_isdefined("AUTH_CODE")) {
-		AuthCode = cfg_getstr("AUTH_CODE","");
+		newAuthCode = cfg_getstr("AUTH_CODE","");
+	} else {
+		newAuthCode = NULL;
 	}
 
-	free(MasterHost);
-	free(MasterPort);
-	free(BindHost);
+	if ((AuthCode==NULL && newAuthCode==NULL) || (AuthCode!=NULL && newAuthCode!=NULL && strcmp(AuthCode,newAuthCode)==0)) {
+		if (newAuthCode!=NULL) {
+			free(newAuthCode);
+		}
+	} else {
+		reconnectisneeded = 1;
+		if (AuthCode) {
+			free(AuthCode);
+			AuthCode = NULL;
+		}
+		AuthCode = newAuthCode;
+	}
 
-	MasterHost = cfg_getstr("MASTER_HOST",DEFAULT_MASTERNAME);
-	MasterPort = cfg_getstr("MASTER_PORT",DEFAULT_MASTER_CS_PORT);
-	BindHost = cfg_getstr("BIND_HOST","*");
+	newMasterHost = cfg_getstr("MASTER_HOST",DEFAULT_MASTERNAME);
+	newMasterPort = cfg_getstr("MASTER_PORT",DEFAULT_MASTER_CS_PORT);
+	newBindHost = cfg_getstr("BIND_HOST","*");
 
-	masterconn_send_disconnect_command(); // closes connection
-	eptr->masteraddrvalid = 0;
-	Timeout = cfg_getuint32("MASTER_TIMEOUT",0);
+	if (strcmp(newMasterHost,MasterHost)==0 && strcmp(newMasterPort,MasterPort)==0 && strcmp(newBindHost,BindHost)==0) {
+		free(newMasterHost);
+		free(newMasterPort);
+		free(newBindHost);
+	} else {
+		reconnectisneeded = 1;
+
+		free(MasterHost);
+		free(MasterPort);
+		free(BindHost);
+		MasterHost = newMasterHost;
+		MasterPort = newMasterPort;
+		BindHost = newBindHost;
+	}
 
 	ReconnectionDelay = cfg_getuint32("MASTER_RECONNECTION_DELAY",5);
-
-	if (Timeout>65535) {
-		Timeout=65535;
-	}
-	if (Timeout<10 && Timeout>0) {
-		Timeout=10;
-	}
-
 	main_time_change(reconnect_hook,ReconnectionDelay,0);
-	masterconn_parselabels();
+
+	newTimeout = cfg_getuint32("MASTER_TIMEOUT",0);
+
+	if (newTimeout>65535) {
+		newTimeout=65535;
+	}
+	if (newTimeout<10 && newTimeout>0) {
+		newTimeout=10;
+	}
+
+	if (newTimeout != Timeout) {
+		reconnectisneeded = 1;
+
+		Timeout = newTimeout;
+	}
+
+	if (masterconn_parselabels()) { // labels changed
+		if (reconnectisneeded==0) { // we don't want to restart connection
+			if (eptr && eptr->mode==DATA && eptr->registerstate==REGISTERED) {
+				masterconn_sendlabels(eptr);
+			} else {
+				reconnectisneeded = 1;
+			}
+		}
+	}
 }
 
 void masterconn_wantexit(void) {

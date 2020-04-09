@@ -16,6 +16,7 @@ This file lists noteworthy changes in MooseFS.
   - (nbd) added readonly mode and locking
   - (cs) fixed condition in choosing disks for internal rebalance
   - (mount) added workaround in access for a bug in FreeBSD kernel (issue #354)
+  - (cs) fixed master reconnection conditions (reload usually shouldn't cause reconnection)
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

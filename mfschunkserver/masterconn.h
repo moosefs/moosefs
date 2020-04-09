@@ -36,6 +36,7 @@ uint16_t masterconn_getmasterport(void);
 // void masterconn_send_error_occurred();
 // void masterconn_send_space(uint64_t usedspace,uint64_t totalspace,uint32_t chunkcount,uint64_t tdusedspace,uint64_t tdtotalspace,uint32_t tdchunkcount);
 void masterconn_heavyload(uint32_t load,uint8_t hlstatus);
+void masterconn_forcereconnect(void);
 int masterconn_init(void);
 
 #endif

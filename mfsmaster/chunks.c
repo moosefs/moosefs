@@ -2500,9 +2500,6 @@ void chunk_lost(uint16_t csid,uint64_t chunkid) {
 	chunk *c;
 	slist **sptr,*s;
 
-	cstab[csid].lostchunkdelay = LOSTCHUNKDELAY;
-	csreceivingchunks |= 1;
-
 	c = chunk_find(chunkid);
 	if (c==NULL) {
 		return;
@@ -2525,6 +2522,10 @@ void chunk_lost(uint16_t csid,uint64_t chunkid) {
 			c->needverincrease = 1;
 			*sptr = s->next;
 			slist_free(s);
+
+			cstab[csid].lostchunkdelay = LOSTCHUNKDELAY;
+			csreceivingchunks |= 1;
+
 		} else {
 			sptr = &(s->next);
 		}

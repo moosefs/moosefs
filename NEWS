@@ -21,6 +21,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed calculating size limits
   - (cs) added handling inode limits in local filesystems on chunkservers (issue #358)
   - (master) added topology grouping when new chunks are about to be created (prefer closer servers)
+  - (master) added more error messages to bgsaver
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

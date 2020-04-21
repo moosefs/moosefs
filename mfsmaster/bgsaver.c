@@ -45,6 +45,7 @@
 #include "mfsalloc.h"
 #include "processname.h"
 #include "clocks.h"
+#include "errno.h"
 
 #define MAXLOGNUMBER 1000U
 
@@ -261,16 +262,17 @@ void bgsaver_worker(void) {
 		switch (cmd) {
 			case BGSAVER_START:
 				if (leng!=4) {
+					syslog(LOG_ERR,"background data writer - leng error (BGSAVER_START packet)");
 					status = 0;
 				} else {
 					rptr = buff;
 					speedlimit = get32bit(&rptr);
 					if (fd>=0) {
 						close(fd);
-						fd = -1;
 					}
 					fd = open("metadata_download.tmp",O_WRONLY | O_TRUNC | O_CREAT,0666);
 					if (fd<0) {
+						mfs_errlog_silent(LOG_ERR,"background data writer - error opening 'metadata_download.tmp'");
 						status = 0;
 					} else {
 						bytes = 0;
@@ -288,7 +290,8 @@ void bgsaver_worker(void) {
 					wleng = get32bit(&rptr);
 					wcrc = get32bit(&rptr);
 					if (wleng!=leng-16) {
-						ret = 0;
+						syslog(LOG_ERR,"background data writer - leng error (BGSAVER_WRITE packet)");
+						status = 0;
 					} else {
 #ifdef HAVE_PWRITE
 						ret = pwrite(fd,rptr,wleng,woffset);
@@ -296,22 +299,24 @@ void bgsaver_worker(void) {
 						lseek(fd,woffset,SEEK_SET);
 						ret = write(fd,rptr,wleng);
 #endif /* HAVE_PWRITE */
-					}
-					if (ret!=(ssize_t)wleng) {
-						status = 0;
-					} else if (wcrc != mycrc32(0,rptr,wleng)) {
-						status = 0;
-					} else {
-						if (speedlimit>0) {
-							double seconds_passed = monotonic_seconds() - starttime;
-							double expected_seconds;
-							bytes += wleng;
-							expected_seconds = (double)bytes / (double)speedlimit;
-							if (expected_seconds>seconds_passed) {
-								usleep((expected_seconds - seconds_passed) * 1000000);
+						if (ret!=(ssize_t)wleng) {
+							mfs_errlog_silent(LOG_ERR,"background data writer - error writing 'metadata_download.tmp'");
+							status = 0;
+						} else if (wcrc != mycrc32(0,rptr,wleng)) {
+							syslog(LOG_ERR,"background data writer - crc error (BGSAVER_WRITE packet)");
+							status = 0;
+						} else {
+							if (speedlimit>0) {
+								double seconds_passed = monotonic_seconds() - starttime;
+								double expected_seconds;
+								bytes += wleng;
+								expected_seconds = (double)bytes / (double)speedlimit;
+								if (expected_seconds>seconds_passed) {
+									usleep((expected_seconds - seconds_passed) * 1000000);
+								}
 							}
+							status = 1;
 						}
-						status = 1;
 					}
 				}
 				if (status==0) {
@@ -321,13 +326,16 @@ void bgsaver_worker(void) {
 				break;
 			case BGSAVER_FINISH:
 				if (leng!=0) {
+					syslog(LOG_ERR,"background data writer - leng error (BGSAVER_FINISH packet)");
 					status = 0;
 				} else {
 					status = 1;
 					if (fsync(fd)<0) {
+						mfs_errlog_silent(LOG_ERR,"background data writer - error syncing 'metadata_download.tmp'");
 						status = 0;
 					}
 					if (close(fd)<0) {
+						mfs_errlog_silent(LOG_ERR,"background data writer - error closing 'metadata_download.tmp'");
 						status = 0;
 					}
 					fd = -1;
@@ -370,8 +378,12 @@ void bgsaver_worker(void) {
 							wleng = snprintf(chlogbuff,chlogbuffsize,"%"PRIu64": %s\n",version,rptr);
 							if (write(logfd,chlogbuff,wleng)==(ssize_t)wleng) {
 								status = 1;
+							} else {
+								mfs_errlog_silent(LOG_ERR,"background data writer - error writing 'changelog.0.mfs'");
 							}
 						}
+					} else {
+						mfs_errlog_silent(LOG_ERR,"background data writer - error opening 'changelog.0.mfs'");
 					}
 				}
 				break;
@@ -385,9 +397,11 @@ void bgsaver_worker(void) {
 					status = 1;
 					if (logfd) {
 						if (fsync(logfd)<0) {
+							mfs_errlog_silent(LOG_ERR,"background data writer - error syncing 'changelog.0.mfs'");
 							status = 0;
 						}
 						if (close(logfd)<0) {
+							mfs_errlog_silent(LOG_ERR,"background data writer - error closing 'changelog.0.mfs'");
 							status = 0;
 						}
 						logfd=-1;
@@ -396,10 +410,18 @@ void bgsaver_worker(void) {
 						for (i=BackLogsNumber ; i>0 ; i--) {
 							snprintf(logname1,100,"changelog.%"PRIu32".mfs",i);
 							snprintf(logname2,100,"changelog.%"PRIu32".mfs",i-1);
-							rename(logname2,logname1);
+							if (rename(logname2,logname1)<0) {
+								if (errno!=ENOENT) {
+									mfs_arg_errlog_silent(LOG_ERR,"background data writer - error renaming '%s'->'%s'",logname2,logname1);
+								}
+							}
 						}
 					} else {
-						unlink("changelog.0.mfs");
+						if (unlink("changelog.0.mfs")<0) {
+							if (errno!=ENOENT) {
+								mfs_errlog_silent(LOG_ERR,"background data writer - error deleting 'changelog.0.mfs'");
+							}
+						}
 					}
 				}
 				break;
@@ -515,6 +537,7 @@ void bgsaver_open(uint32_t speedlimit,void *ud,void (*donefn)(void*,int)) {
 
 	if (eptr==NULL || eptr->mode!=DATA) {
 		donefn(ud,-1);
+		return;
 	}
 
 	buff = bgsaver_createpacket(eptr,BGSAVER_START,4);
@@ -529,6 +552,7 @@ void bgsaver_store(const uint8_t *data,uint64_t offset,uint32_t leng,uint32_t cr
 
 	if (eptr==NULL || eptr->mode!=DATA) {
 		donefn(ud,-1);
+		return;
 	}
 
 	buff = bgsaver_createpacket(eptr,BGSAVER_WRITE,16+leng);
@@ -545,6 +569,7 @@ void bgsaver_close(void *ud,void (*donefn)(void*,int)) {
 
 	if (eptr==NULL || eptr->mode!=DATA) {
 		donefn(ud,-1);
+		return;
 	}
 
 	bgsaver_createpacket(eptr,BGSAVER_FINISH,0);

@@ -4782,6 +4782,7 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 	uint32_t leng;
 	int new_fd;
 	uint16_t new_hdrsize;
+	uint16_t oldpathid,newpathid;
 	chunk *c;
 	uint64_t ts,te;
 	const uint8_t *writeptr;
@@ -5008,10 +5009,17 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 		return status;
 	}
 
+	zassert(pthread_mutex_lock(&testlock));
+	oldpathid = c->pathid;
+	newpathid = fdst->current_pathid;
+	zassert(pthread_mutex_unlock(&testlock));
+
 	// generate new file name
 	zassert(pthread_mutex_lock(&folderlock));
 	c->owner = fdst;
+	c->pathid = newpathid;
 	hdd_generate_filename(fname,c);
+	c->pathid = oldpathid;
 	c->owner = fsrc;
 	zassert(pthread_mutex_unlock(&folderlock));
 
@@ -5044,6 +5052,7 @@ static int hdd_int_move(folder *fsrc,folder *fdst) {
 	zassert(pthread_mutex_unlock(&folderlock));
 	zassert(pthread_mutex_lock(&testlock));
 	hdd_remove_chunk_from_test_chain(c,fsrc);
+	c->pathid = newpathid;
 	hdd_add_chunk_to_test_chain(c,fdst);
 	zassert(pthread_mutex_unlock(&testlock));
 	hdd_chunk_release(c);

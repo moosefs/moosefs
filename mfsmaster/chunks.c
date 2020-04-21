@@ -204,6 +204,7 @@ static uint64_t nextchunkid=1;
 
 typedef struct _csopchunk {
 	uint64_t chunkid;
+	uint8_t status;
 	struct _csopchunk *next;
 } csopchunk;
 
@@ -1036,18 +1037,32 @@ void chunk_addopchunk(uint16_t csid,uint64_t chunkid) {
 	csopchunk *csop;
 	csop = malloc(sizeof(csopchunk));
 	csop->chunkid = chunkid;
+	csop->status = MFS_ERROR_MISMATCH;
 	csop->next = cstab[csid].opchunks;
 	cstab[csid].opchunks = csop;
 	opsinprogress++;
 	return;
 }
 
-void chunk_delopchunk(uint16_t csid,uint64_t chunkid) {
-	csopchunk **csopp,*csop;
+void chunk_statusopchunk(uint16_t csid,uint64_t chunkid,uint8_t status) {
+	csopchunk *csop;
+	for (csop=cstab[csid].opchunks ; csop!=NULL; csop=csop->next) {
+		if (csop->chunkid==chunkid) {
+			csop->status = status;
+			return;
+		}
+	}
+}
 
+uint8_t chunk_delopchunk(uint16_t csid,uint64_t chunkid) {
+	csopchunk **csopp,*csop;
+	uint8_t status;
+
+	status = MFS_ERROR_MISMATCH;
 	csopp = &(cstab[csid].opchunks);
 	while ((csop = (*csopp))) {
 		if (csop->chunkid == chunkid) {
+			status = csop->status;
 			*csopp = csop->next;
 			free(csop);
 			if (opsinprogress>0) {
@@ -1057,6 +1072,7 @@ void chunk_delopchunk(uint16_t csid,uint64_t chunkid) {
 			csopp = &(csop->next);
 		}
 	}
+	return status;
 }
 
 static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t sclassid,uint8_t *olflag) {
@@ -1236,6 +1252,14 @@ static inline int chunk_remove_disconnected_chunks(chunk *c) {
 			}
 		}
 		if (opfinished) {
+			uint8_t nospace,status;
+			nospace = 1;
+			for (s=c->slisthead ; s ; s=s->next) {
+				status = chunk_delopchunk(s->csid,c->chunkid);
+				if (status!=MFS_ERROR_MISMATCH && status!=MFS_ERROR_NOSPACE) {
+					nospace = 0;
+				}
+			}
 			if (c->operation==REPLICATE) {
 				c->operation = NONE;
 				c->lockedto = 0;
@@ -1244,7 +1268,11 @@ static inline int chunk_remove_disconnected_chunks(chunk *c) {
 				if (validcopies) {
 					chunk_emergency_increase_version(c);
 				} else {
-					matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOTDONE);
+					if (nospace) {
+						matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOSPACE);
+					} else {
+						matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOTDONE);
+					}
 					c->operation = NONE;
 				}
 			}
@@ -2939,7 +2967,8 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 					s->valid=VALID;
 				}
 			}
-			chunk_delopchunk(s->csid,c->chunkid);
+			chunk_statusopchunk(s->csid,c->chunkid,status);
+//			chunk_delopchunk(s->csid,c->chunkid);
 		}
 		if (s->valid==BUSY || s->valid==TDBUSY) {
 			opfinished=0;
@@ -2949,6 +2978,14 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 		}
 	}
 	if (opfinished) {
+		uint8_t nospace;
+		nospace = 1;
+		for (s=c->slisthead ; s ; s=s->next) {
+			status = chunk_delopchunk(s->csid,chunkid);
+			if (status!=MFS_ERROR_MISMATCH && status!=MFS_ERROR_NOSPACE) {
+				nospace = 0;
+			}
+		}
 		if (validcopies) {
 //			syslog(LOG_NOTICE,"operation finished, chunk: %016"PRIX64" ; op: %s ; interrupted: %u",c->chunkid,opstr[c->operation],c->interrupted);
 			if (c->interrupted) {
@@ -2962,7 +2999,11 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 				}
 			}
 		} else {
-			matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOTDONE);
+			if (nospace) {
+				matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOSPACE);
+			} else {
+				matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOTDONE);
+			}
 			c->operation = NONE;
 		}
 	}

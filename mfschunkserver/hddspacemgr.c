@@ -91,6 +91,8 @@
 #define BLOCK_DELAY 10
 #endif
 
+#define INODE_REDUCE_LOG_FREQ 60.0
+
 #define LOSTCHUNKSBLOCKSIZE 1024
 #define NEWCHUNKSBLOCKSIZE 4096
 
@@ -298,6 +300,7 @@ typedef struct folder {
 	uint32_t knowncount_next;
 	uint64_t knownblocks;
 	uint64_t knownblocks_next;
+	double iredlastrep;
 	double wfrtime;
 	double wfrlast;
 	uint32_t wfrcount;
@@ -1468,6 +1471,31 @@ static inline void hdd_refresh_usage(folder *f) {
 			f->avail -= f->leavefree;
 		}
 	}
+
+	// inode limits - reduce available space due to inode limits
+	if (fsinfo.f_files>0) { // BTRFS always returns zeros in all inode related fields - in such case we assume there is no inode limit
+		uint64_t maxavail;
+		if (f->knowncount>0) {
+			maxavail = f->knownblocks;
+			maxavail *= 65536;
+			maxavail /= f->knowncount;
+			maxavail += CHUNKMAXHDRSIZE;
+		} else {
+			maxavail = 65536+CHUNKMAXHDRSIZE;
+		}
+		// maxavail = average chunk size
+		maxavail *= fsinfo.f_favail;
+		if (f->avail > maxavail) {
+			double now = monotonic_seconds();
+			maxavail = f->avail - maxavail;
+			if (f->iredlastrep+INODE_REDUCE_LOG_FREQ<now) {
+				syslog(LOG_WARNING,"disk: %s ; decreasing size reported to the master (%.2lfGiB->%.2lfGiB) due to inode limits",f->path,(f->total)/(1024.0*1024.0*1024.0),(f->total-maxavail)/(1024.0*1024.0*1024.0));
+				f->iredlastrep = now;
+			}
+			f->avail -= maxavail;
+			f->total -= maxavail;
+		}
+	}
 }
 
 static inline folder* hdd_getfolder() {
@@ -2569,7 +2597,11 @@ static int hdd_io_begin(chunk *c,int mode) {
 				mfs_arg_errlog_silent(LOG_WARNING,"hdd_io_begin: file:%s - open error",fname);
 				hdd_open_files_handle(OF_AFTER_CLOSE);
 				errno = errmem;
-				return MFS_ERROR_IO;
+				if (errno==ENOSPC) {
+					return MFS_ERROR_NOSPACE;
+				} else {
+					return MFS_ERROR_IO;
+				}
 			}
 			c->fsyncneeded = 0;
 		}
@@ -3390,9 +3422,11 @@ static int hdd_int_create(uint64_t chunkid,uint32_t version) {
 
 	status = hdd_io_begin(c,MODE_NEW);
 	if (status!=MFS_STATUS_OK) {
-		hdd_error_occured(c,0);	// uses and preserves errno !!!
+		if (status!=MFS_ERROR_NOSPACE) {
+			hdd_error_occured(c,0);	// uses and preserves errno !!!
+		}
 		hdd_chunk_delete(c);
-		return MFS_ERROR_IO;
+		return status;
 	}
 	memset(hdrbuffer,0,CHUNKMAXHDRSIZE);
 	memcpy(hdrbuffer,MFSSIGNATURE "C 1.0",8);
@@ -6938,6 +6972,7 @@ int hdd_parseline(char *hddcfgline) {
 	f->write_corr = 0.0;
 	f->rebalance_in_progress = 0;
 	f->rebalance_last_usec = 0;
+	f->iredlastrep = 0.0;
 	f->wfrtime = monotonic_seconds();
 	f->wfrlast = 0.0;
 	f->wfrcount = 0;

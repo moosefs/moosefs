@@ -106,6 +106,9 @@
 
 #define RANDOM_CHUNK_RETRIES 50
 
+// HASHSIZE / (60 * 1000)
+#define KNOWNBLOCKS_HASH_PER_CYCLE 280
+
 #define HASHSIZE (0x1000000)
 #define HASHPOS(chunkid) ((chunkid)&0xFFFFFF)
 
@@ -291,6 +294,10 @@ typedef struct folder {
 	uint16_t min_pathid;
 	uint16_t current_pathid;
 	uint32_t subf_count[256];
+	uint32_t knowncount;
+	uint32_t knowncount_next;
+	uint64_t knownblocks;
+	uint64_t knownblocks_next;
 	double wfrtime;
 	double wfrlast;
 	uint32_t wfrcount;
@@ -358,7 +365,7 @@ static uint32_t errorcounter = 0;
 static uint8_t hddspacechanged = 0;
 static uint8_t global_rebalance_is_on = 0;
 
-static pthread_t hsrebalancethread,rebalancethread,foldersthread,delayedthread,testerthread;
+static pthread_t hsrebalancethread,rebalancethread,foldersthread,delayedthread,testerthread,knownblocksthread;
 static uint8_t term = 0;
 static uint8_t folderactions = 0;
 static pthread_mutex_t termlock = PTHREAD_MUTEX_INITIALIZER;
@@ -1435,31 +1442,19 @@ static inline void hdd_refresh_usage(folder *f) {
 	}
 
 	if (f->sizelimit) {
-		uint32_t knownblocks;
-		uint32_t knowncount;
 		uint64_t calcsize;
-		chunk *c;
-		knownblocks = 0;
-		knowncount = 0;
-		zassert(pthread_mutex_lock(&hashlock));
-		zassert(pthread_mutex_lock(&testlock));
-		for (c=f->testhead ; c ; c=c->testnext) {
-			if (c->state==CH_AVAIL && c->validattr==1) {
-				knowncount++;
-				knownblocks+=c->blocks;
-			}
-		}
-		zassert(pthread_mutex_unlock(&testlock));
-		zassert(pthread_mutex_unlock(&hashlock));
-		if (knowncount>0) {
-			calcsize = knownblocks;
+		if (f->knowncount>0) {
+			calcsize = f->knownblocks;
 			calcsize *= f->chunkcount;
-			calcsize /= knowncount;
+			calcsize /= f->knowncount;
 			calcsize *= 64;
-			calcsize += f->chunkcount*5;
+			calcsize += f->chunkcount*8;
 			calcsize *= 1024;
 		} else { // unknown result;
-			calcsize = 0;
+			// use data from 'statvfs'
+			calcsize = fsinfo.f_blocks;
+			calcsize -= fsinfo.f_bfree;
+			calcsize *= fsinfo.f_frsize;
 		}
 		f->total = f->sizelimit;
 		f->avail = (calcsize>f->sizelimit)?0:f->sizelimit-calcsize;
@@ -5686,6 +5681,48 @@ void* hdd_tester_thread(void* arg) {
 	return arg;
 }
 
+void* hdd_knownblocks_thread(void *arg) {
+	folder *f;
+	chunk *c;
+	uint32_t i,j;
+
+	for (;;) {
+		zassert(pthread_mutex_lock(&folderlock));
+		for (f=folderhead ; f ; f=f->next) {
+			f->knowncount = f->knowncount_next;
+			f->knowncount_next = 0;
+			f->knownblocks = f->knownblocks_next;
+			f->knownblocks_next = 0;
+		}
+		zassert(pthread_mutex_unlock(&folderlock));
+		for (i=0 ; i<HASHSIZE ; i+=KNOWNBLOCKS_HASH_PER_CYCLE) {
+			zassert(pthread_mutex_lock(&folderlock));
+			zassert(pthread_mutex_lock(&hashlock));
+//			zassert(pthread_mutex_lock(&testlock));
+			for (j=i ; j<i+KNOWNBLOCKS_HASH_PER_CYCLE && j<HASHSIZE ; j++) {
+				for (c=hashtab[j] ; c ; c=c->next) {
+					if (c->state==CH_AVAIL && c->validattr==1 && c->owner!=NULL) {
+						c->owner->knowncount_next++;
+						c->owner->knownblocks_next += c->blocks;
+					}
+				}
+			}
+//			zassert(pthread_mutex_unlock(&testlock));
+			zassert(pthread_mutex_unlock(&hashlock));
+			zassert(pthread_mutex_unlock(&folderlock));
+
+			portable_usleep(1000);
+
+			zassert(pthread_mutex_lock(&termlock));
+			if (term) {
+				zassert(pthread_mutex_unlock(&termlock));
+				return arg;
+			}
+			zassert(pthread_mutex_unlock(&termlock));
+		}
+	}
+}
+
 void hdd_testshuffle(folder *f) {
 	uint32_t i,j,chunksno;
 	chunk **csorttab,*c;
@@ -6344,6 +6381,7 @@ void hdd_term(void) {
 	term = 1;
 	zassert(pthread_mutex_unlock(&termlock));
 	if (i==0) {
+		zassert(pthread_join(knownblocksthread,NULL));
 		zassert(pthread_join(testerthread,NULL));
 		zassert(pthread_join(foldersthread,NULL));
 		zassert(pthread_join(hsrebalancethread,NULL));
@@ -6887,6 +6925,10 @@ int hdd_parseline(char *hddcfgline) {
 	f->min_pathid = 0;
 	f->current_pathid = 0;
 	memset(f->subf_count,0,sizeof(f->subf_count));
+	f->knowncount = 0;
+	f->knownblocks = 0;
+	f->knowncount_next = 0;
+	f->knownblocks_next = 0;
 //	f->carry = (double)(random()&0x7FFFFFFF)/(double)(0x7FFFFFFF);
 	f->read_dist = 0;
 	f->write_dist = 0;
@@ -7120,6 +7162,7 @@ int hdd_late_init(void) {
 	term = 0;
 	zassert(pthread_mutex_unlock(&termlock));
 
+	zassert(lwt_minthread_create(&knownblocksthread,0,hdd_knownblocks_thread,NULL));
 	zassert(lwt_minthread_create(&testerthread,0,hdd_tester_thread,NULL));
 	zassert(lwt_minthread_create(&foldersthread,0,hdd_folders_thread,NULL));
 	zassert(lwt_minthread_create(&rebalancethread,0,hdd_rebalance_thread,NULL));

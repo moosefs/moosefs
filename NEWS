@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.113-1 (2020-04-09)
+* MooseFS 3.0.113-1 (WIP)
 
   - (master) changed condition that decides if master should wait for more chunks during I/O
   - (mount) delayed setting channel for fuse notifications (very rare segfault in libfuse2 during init)
@@ -18,6 +18,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) added workaround in access for a bug in FreeBSD kernel (issue #354)
   - (cs) fixed master reconnection conditions (reload usually shouldn't cause reconnection)
   - (master) changed disk removal detection algorithm (issue #356)
+  - (cs) fixed calculating size limits
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

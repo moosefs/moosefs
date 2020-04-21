@@ -61,7 +61,7 @@ static inline element_type* allocator_name##_malloc() { \
 		allocator_name##_used += sizeof(element_type); \
 		return ret; \
 	} \
-	if (allocator_name##_buckets_head==NULL || allocator_name##_buckets_head->firstfree==bucket_size) { \
+	if (allocator_name##_buckets_head==NULL || allocator_name##_buckets_head->firstfree==(bucket_size)) { \
 		srb = (allocator_name##_bucket*)BUCKETS_ALLOC(sizeof(allocator_name##_bucket)); \
 		passert(srb); \
 		srb->next = allocator_name##_buckets_head; \

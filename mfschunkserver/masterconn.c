@@ -1673,7 +1673,7 @@ void masterconn_serve(struct pollfd *pdesc) {
 			}
 			masterconn_parse(eptr);
 		}
-		if ((eptr->mode==DATA || eptr->mode==CLOSE) && eptr->lastwrite+(eptr->timeout/3.0)<now && eptr->outputhead==NULL) {
+		if ((eptr->mode==DATA || eptr->mode==CLOSE) && eptr->lastwrite+1.0<now && eptr->outputhead==NULL) {
 			masterconn_create_attached_packet(eptr,ANTOAN_NOP,0);
 		}
 		if (eptr->pdescpos>=0) {

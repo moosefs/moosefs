@@ -1298,6 +1298,8 @@ int main(int argc,char **argv) {
 			free(cfgfile);
 			cfgfile = ocfgfile;
 			movewarning = 1;
+		} else {
+			free(ocfgfile);
 		}
 	}
 	if (fd>=0) {
@@ -1316,6 +1318,7 @@ int main(int argc,char **argv) {
 		switch(ch) {
 			case 'v':
 				printf("version: %s ; build: %s\n",VERSSTR,STR(BUILDNO));
+				free(cfgfile);
 				return 0;
 			case 'd':
 				printf("option '-d' is deprecated - use '-f' instead\n");
@@ -1343,6 +1346,7 @@ int main(int argc,char **argv) {
 			MODULE_OPTIONS_SWITCH
 			default:
 				usage(appname);
+				free(cfgfile);
 				return 1;
 		}
 	}
@@ -1369,10 +1373,12 @@ int main(int argc,char **argv) {
 			runmode = RM_RESTORE;
 		} else {
 			usage(appname);
+			free(cfgfile);
 			return 1;
 		}
 	} else if (argc!=0) {
 		usage(appname);
+		free(cfgfile);
 		return 1;
 	}
 
@@ -1394,6 +1400,7 @@ int main(int argc,char **argv) {
 				fputc(0,stderr);
 				close_msg_channel();
 			}
+			free(cfgfile);
 			return 1;
 		}
 		fprintf(stderr,"can't load config file: %s - using defaults\n",cfgfile);

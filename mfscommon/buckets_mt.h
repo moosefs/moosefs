@@ -68,7 +68,7 @@ static inline element_type* allocator_name##_malloc() { \
 		pthread_mutex_unlock(&allocator_name##_lock); \
 		return ret; \
 	} \
-	if (allocator_name##_buckets_head==NULL || allocator_name##_buckets_head->firstfree==bucket_size) { \
+	if (allocator_name##_buckets_head==NULL || allocator_name##_buckets_head->firstfree==(bucket_size)) { \
 		srb = (allocator_name##_bucket*)BUCKETS_MT_ALLOC(sizeof(allocator_name##_bucket)); \
 		passert(srb); \
 		srb->next = allocator_name##_buckets_head; \

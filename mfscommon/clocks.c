@@ -164,39 +164,7 @@ uint32_t monotonic_speed(void) {
 	return i;
 }
 #else
-double monotonic_seconds() {
-	return time(NULL);
-}
-
-uint64_t monotonic_useconds() {
-	return UINT64_C(1000000)*time(NULL);
-}
-
-uint64_t monotonic_nseconds() {
-	return UINT64_C(1000000000)*time(NULL);
-}
-
-const char* monotonic_method() {
-	return "time";
-}
-
-uint32_t monotonic_speed(void) {
-	uint32_t i;
-	uint64_t st,en;
-	i = 0;
-	st = monotonic_useconds();
-	do {
-		en = monotonic_nseconds();
-	} while (en==st);
-
-	st = monotonic_useconds() + 1000000;
-	do {
-		en = monotonic_useconds();
-		i++;
-	} while (en < st);
-	return i / 100;
-}
-
+#error "Can't find valid time function"
 #endif
 
 #if 0

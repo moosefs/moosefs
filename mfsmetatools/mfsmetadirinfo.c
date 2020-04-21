@@ -812,7 +812,6 @@ int main(int argc,char *argv[]) {
 	allname = NULL;
 	sep = ',';
 	format = 0;
-	ofd = stdout;
 	while ((ch=getopt(argc,argv,"f:o:a:"))>=0) {
 		switch(ch) {
 			case 'f':

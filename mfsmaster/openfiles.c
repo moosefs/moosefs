@@ -150,7 +150,7 @@ void of_sync(uint32_t sessionid,uint32_t *inodes,uint32_t inodecnt) {
 	uint32_t i;
 	uint32_t shashpos = OF_SESSION_HASH(sessionid);
 
-	if (inodecnt > bitmasksize*32) {
+	if (inodecnt > bitmasksize*32 || bitmask == NULL) {
 		if (bitmask) {
 			free(bitmask);
 		}

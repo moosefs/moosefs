@@ -385,6 +385,11 @@ static int mfs_path_to_inodes(const char *path,uint32_t *parent,uint32_t *inode,
 	if (inode!=NULL) {
 		*inode = 0;
 	}
+	memset(attr,0,ATTR_RECORD_SIZE);
+	if (path[0]==0) {
+		errno = EINVAL;
+		return -1;
+	}
 	if (path[0]=='/' && path[1]==0) {
 		if (existflag==PATH_TO_INODES_SKIP_LAST) {
 			if (parent!=NULL) {
@@ -1600,22 +1605,24 @@ int mfs_fcntl_locks(int fildes, int function, struct flock *fl) {
 		return -1;
 	}
 
-	memset(fl,0,sizeof(struct flock));
-	if (rtype==POSIX_LOCK_RDLCK) {
-		fl->l_type = F_RDLCK;
-	} else if (rtype==POSIX_LOCK_WRLCK) {
-		fl->l_type = F_WRLCK;
-	} else {
-		fl->l_type = F_UNLCK;
+	if (function==F_GETLK) {
+		memset(fl,0,sizeof(struct flock));
+		if (rtype==POSIX_LOCK_RDLCK) {
+			fl->l_type = F_RDLCK;
+		} else if (rtype==POSIX_LOCK_WRLCK) {
+			fl->l_type = F_WRLCK;
+		} else {
+			fl->l_type = F_UNLCK;
+		}
+		fl->l_whence = SEEK_SET;
+		fl->l_start = rstart;
+		if ((rend-rstart)>INT64_MAX) {
+			fl->l_len = 0;
+		} else {
+			fl->l_len = (rend - rstart);
+		}
+		fl->l_pid = rpid;
 	}
-	fl->l_whence = SEEK_SET;
-	fl->l_start = rstart;
-	if ((rend-rstart)>INT64_MAX) {
-		fl->l_len = 0;
-	} else {
-		fl->l_len = (rend - rstart);
-	}
-	fl->l_pid = rpid;
 
 	return 0;
 }

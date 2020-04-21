@@ -260,10 +260,16 @@ void* mainserv_read_nop_sender(void* arg) {
 				mainserv_read_nop_remove(rn);
 				mainserv_read_nop_append(rn);
 			}
-			sleep_utime = READ_NOPS_INTERVAL - (monotonic_utime - read_nops_head->monotonic_utime);
+			if (monotonic_utime - read_nops_head->monotonic_utime < READ_NOPS_INTERVAL) {
+				sleep_utime = READ_NOPS_INTERVAL - (monotonic_utime - read_nops_head->monotonic_utime);
+			} else {
+				sleep_utime = 0;
+			}
 		}
 		zassert(pthread_mutex_unlock(&read_nops_lock));
-		portable_usleep(sleep_utime);
+		if (sleep_utime>0) {
+			portable_usleep(sleep_utime);
+		}
 	} while (1);
 	return arg;
 }
@@ -1114,7 +1120,7 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 	fwdip = 0; // make old compilers happy
 	if (length&1) {
 		if (length<13 || ((length-13)%6)!=0) {
-			syslog(LOG_NOTICE,"CLTOCS_WRITE - wrong size (%"PRIu32"/12+N*6)",length);
+			syslog(LOG_NOTICE,"CLTOCS_WRITE - wrong size (%"PRIu32"/13+N*6)",length);
 			return 0;
 		}
 		protover = get8bit(&data);

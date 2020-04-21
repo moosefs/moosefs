@@ -1077,21 +1077,23 @@ static inline void hdd_error_occured(chunk *c,int report_damaged) {
 	struct timeval tv;
 	int errmem = errno;
 
-	zassert(pthread_mutex_lock(&folderlock));
-	gettimeofday(&tv,NULL);
 	f = c->owner;
-	i = f->lasterrindx;
-	f->lasterrtab[i].chunkid = c->chunkid;
-	f->lasterrtab[i].errornumber = errmem;
-	f->lasterrtab[i].timestamp = tv.tv_sec;
-	f->lasterrtab[i].monotonic_time = monotonic_seconds();
-	i = (i+1)%LASTERRSIZE;
-	f->lasterrindx = i;
-	zassert(pthread_mutex_unlock(&folderlock));
+	if (f!=NULL) {
+		zassert(pthread_mutex_lock(&folderlock));
+		gettimeofday(&tv,NULL);
+		i = f->lasterrindx;
+		f->lasterrtab[i].chunkid = c->chunkid;
+		f->lasterrtab[i].errornumber = errmem;
+		f->lasterrtab[i].timestamp = tv.tv_sec;
+		f->lasterrtab[i].monotonic_time = monotonic_seconds();
+		i = (i+1)%LASTERRSIZE;
+		f->lasterrindx = i;
+		zassert(pthread_mutex_unlock(&folderlock));
 
-	zassert(pthread_mutex_lock(&dclock));
-	errorcounter++;
-	zassert(pthread_mutex_unlock(&dclock));
+		zassert(pthread_mutex_lock(&dclock));
+		errorcounter++;
+		zassert(pthread_mutex_unlock(&dclock));
+	}
 
 	if (report_damaged) {
 		hdd_report_damaged_chunk(c);
@@ -2347,94 +2349,10 @@ void hdd_test_show_chunks(void) {
 	zassert(pthread_mutex_unlock(&hashlock));
 }
 
-#if 0
-void hdd_test_show_openedchunks(void) {
-	dopchunk *cc,*tcc;
-	uint32_t dhashpos;
-	chunk *c;
-	double now;
-
-	printf("lock doplock\n");
-	if (pthread_mutex_lock(&doplock)<0) {
-		printf("lock error: %u\n",errno);
-	}
-	printf("lock ndoplock\n");
-	if (pthread_mutex_lock(&ndoplock)<0) {
-		printf("lock error: %u\n",errno);
-	}
-/* append new chunks */
-	cc = newdopchunks;
-	while (cc) {
-		dhashpos = DHASHPOS(cc->chunkid);
-		for (tcc=dophashtab[dhashpos] ; tcc && tcc->chunkid!=cc->chunkid ; tcc=tcc->next) {}
-		if (tcc) {	// found - ignore
-			tcc = cc;
-			cc = cc->next;
-			free(tcc);
-		} else {	// not found - add
-			tcc = cc;
-			cc = cc->next;
-			tcc->next = dophashtab[dhashpos];
-			dophashtab[dhashpos] = tcc;
-		}
-	}
-	newdopchunks = NULL;
-	printf("unlock ndoplock\n");
-	if (pthread_mutex_unlock(&ndoplock)<0) {
-		printf("unlock error: %u\n",errno);
-	}
-/* show all */
-	now = monotonic_seconds();
-	for (dhashpos=0 ; dhashpos<DHASHSIZE ; dhashpos++) {
-		for (cc=dophashtab[dhashpos]; cc ; cc=cc->next) {
-			c = hdd_chunk_find(cc->chunkid);
-			if (c==NULL) {	// no chunk - delete entry
-				printf("id: %"PRIu64" - chunk doesn't exist\n",cc->chunkid);
-			} else if (c->crcrefcount>0) {	// io in progress - skip entry
-				printf("id: %"PRIu64" - chunk in use (refcount:%u)\n",cc->chunkid,c->crcrefcount);
-				hdd_chunk_release(c);
-			} else {
-#ifdef PRESERVE_BLOCK
-				double fdsec,crcsec,blocksec;
-				fdsec = c->opento;
-				crcsec = c->crcto;
-				blocksec = c->blockto;
-				if (fdsec>0.0) {
-					fdsec -= now;
-				}
-				if (crcsec>0.0) {
-					crcsec -= now;
-				}
-				if (blocksec>0.0) {
-					blocksec -= now;
-				}
-				printf("id: %"PRIu64" - fd:%d (delay:%.3lfs) crc:%p (delay:%.3lfs) block:%p,blockno:%u (delay:%.3lfs)\n",cc->chunkid,c->fd,fdsec,(void*)(c->crc),crcsec,c->block,c->blockno,blocksec);
-#else /* PRESERVE_BLOCK */
-				double fdsec,crcsec;
-				fdsec = c->opento;
-				crcsec = c->crcto;
-				if (fdsec>0.0) {
-					fdsec -= now;
-				}
-				if (crcsec>0.0) {
-					crcsec -= now;
-				}
-				printf("id: %"PRIu64" - fd:%d (delay:%.3lfs) crc:%p (delay:%.3lfs)\n",cc->chunkid,c->fd,fdsec,(void*)(c->crc),crcsec);
-#endif /* PRESERVE_BLOCK */
-				hdd_chunk_release(c);
-			}
-		}
-	}
-	printf("unlock doplock\n");
-	if (pthread_mutex_unlock(&doplock)<0) {
-		printf("unlock error: %u\n",errno);
-	}
-}
-#endif
-
 void hdd_delayed_ops() {
 	dopchunk **ccp,*cc,*tcc;
 	uint32_t dhashpos;
+	uint8_t dofsync;
 	chunk *c;
 	uint64_t ts,te;
 	char fname[PATH_MAX];
@@ -2442,6 +2360,9 @@ void hdd_delayed_ops() {
 
 //	printf("delayed ops: before lock\n");
 	zassert(pthread_mutex_lock(&doplock));
+	dofsync = DoFsyncBeforeClose;
+	zassert(pthread_mutex_unlock(&doplock));
+
 	zassert(pthread_mutex_lock(&ndoplock));
 //	printf("delayed ops: after lock\n");
 /* append new chunks */
@@ -2483,7 +2404,7 @@ void hdd_delayed_ops() {
 				ccp = &(cc->next);
 			} else {
 				double now;
-				if (c->fd>=0 && c->fsyncneeded && DoFsyncBeforeClose) {
+				if (c->fd>=0 && c->fsyncneeded && dofsync) {
 					ts = monotonic_nseconds();
 #ifdef F_FULLFSYNC
 					if (fcntl(c->fd,F_FULLFSYNC)<0) {
@@ -2560,7 +2481,6 @@ void hdd_delayed_ops() {
 		}
 	}
 //	printf("delayed ops: after loop , before unlock\n");
-	zassert(pthread_mutex_unlock(&doplock));
 //	printf("delayed ops: after unlock\n");
 }
 
@@ -6024,7 +5944,6 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen) {
 	uint8_t mode;
 	time_t foldersmaxtime;
 
-	foldersmaxtime = 0;
 	fullname[plen] = '\0';
 	if (lstat(fullname,&sb)<0) {
 		return -1;

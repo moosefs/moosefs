@@ -1099,6 +1099,9 @@ int meta_loadall(void) {
 								mfs_syslog(LOG_NOTICE,"found metadata file with different id number - cleanup your working directory or use '-i' flag (might be dangerous without cleaning)");
 								closedir(dd);
 								meta_file_infos();
+								if (bestfname) {
+									free((char*)bestfname);
+								}
 								return -1;
 							}
 						}
@@ -1155,6 +1158,9 @@ int meta_loadall(void) {
 
 		if (bestver==0) {
 			mfs_syslog(LOG_ERR,"can't find valid metadata file");
+			if (bestfname) {
+				free((char*)bestfname);
+			}
 			return -1;
 		}
 		if (verboselevel>0) {

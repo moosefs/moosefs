@@ -1357,7 +1357,7 @@ int change_sc(const char *mfsmp,const char *scname,uint16_t chgmask,storage_clas
 
 int show_sc(const char *mfsmp,const char *scname) {
 	storage_class sc;
-
+	memset(&sc,0,sizeof(storage_class));
 	return change_sc(mfsmp,scname,0,&sc);
 }
 

@@ -48,6 +48,11 @@
 #  endif
 #endif
 
+#if defined(HAVE_SYS_UTSNAME_H)
+#  include <sys/utsname.h>
+#  define MFS_GET_KERNEL_VERSION 1
+#endif
+
 #include "fusecommon.h"
 
 #include <fuse.h>
@@ -897,6 +902,48 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	bprintf("master_trashlimit: %"PRIu32":%"PRIu32"\n",params_mintrashtime,params_maxtrashtime);
 	bprintf("master_disables: 0x%"PRIX32"\n",params_disables);
 	return leng;
+}
+
+uint32_t main_kernelversion(void) {
+#ifdef MFS_GET_KERNEL_VERSION
+	uint32_t maj,min;
+	const char *r;
+	struct utsname utsn;
+
+	maj = 0;
+	min = 0;
+	if (uname(&utsn)<0) {
+		fprintf(stderr,"uname error: %s\n",strerr(errno));
+		return 0;
+	}
+	r = utsn.release;
+	if (r==NULL) {
+		fprintf(stderr,"uname error: (release is NULL)\n");
+		return 0;
+	}
+	while (*r>='0' && *r<='9') {
+		maj *= 10;
+		maj += (*r)-'0';
+		r++;
+	}
+	if (*r=='.') {
+		r++;
+		while (*r>='0' && *r<='9') {
+			min *= 10;
+			min += (*r)-'0';
+			r++;
+		}
+	}
+	if (maj>0xFFFF) {
+		maj = 0xFFFF;
+	}
+	if (min>0xFFFF) {
+		min = 0xFFFF;
+	}
+	return maj * 0x10000 + min;
+#else
+	return 0;
+#endif
 }
 
 #if FUSE_VERSION >= 30

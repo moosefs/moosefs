@@ -24,6 +24,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added more error messages to bgsaver
   - (cs) added changing subfolder during internal rebalance (related to issue #326)
   - (master+cs) added optional logging of long function execution times
+  - (mount) turn off dentry invalidator for Linux kernels >= 4.19 (related to issue #357)
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

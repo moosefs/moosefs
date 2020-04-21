@@ -282,6 +282,9 @@ AC_CHECK_HEADERS([sys/sysctl.h])
 # optional out of memory killer header
 AC_CHECK_HEADERS([linux/oom.h])
 
+# optional uname header
+AC_CHECK_HEADERS([sys/utsname.h])
+
 # glibc tuning
 AC_CHECK_HEADERS([malloc.h])
 AC_CHECK_FUNCS([mallopt])

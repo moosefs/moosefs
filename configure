@@ -16336,6 +16336,20 @@ fi
 done
 
 
+# optional uname header
+for ac_header in sys/utsname.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "sys/utsname.h" "ac_cv_header_sys_utsname_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_utsname_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_SYS_UTSNAME_H 1
+_ACEOF
+
+fi
+
+done
+
+
 # glibc tuning
 for ac_header in malloc.h
 do :

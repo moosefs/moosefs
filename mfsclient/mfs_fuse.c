@@ -162,6 +162,10 @@ static uint8_t paramsattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x00, 0,
 #define IS_SPECIAL_INODE(ino) ((ino)>=MIN_SPECIAL_INODE)
 #define IS_SPECIAL_NAME(name) ((name)[0]=='.' && (strcmp(STATS_NAME,(name))==0 || strcmp(MASTERINFO_NAME,(name))==0 || strcmp(OPLOG_NAME,(name))==0 || strcmp(OPHISTORY_NAME,(name))==0 || strcmp(MOOSE_NAME,(name))==0 || strcmp(RANDOM_NAME,(name))==0 || strcmp(PARAMS_NAME,(name))==0))
 
+#ifdef DENTRY_INVALIDATOR
+static int dinval = 0;
+#endif
+
 // generators from: http://school.anhb.uwa.edu.au/personalpages/kwessen/shared/Marsaglia99.html (by George Marsaglia)
 
 /* random state */
@@ -1770,7 +1774,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 	e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((type==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
 #ifdef DENTRY_INVALIDATOR
-	if (type==TYPE_DIRECTORY) {
+	if (dinval && type==TYPE_DIRECTORY) {
 		dinval_add(parent,nleng,(const uint8_t *)name,inode);
 	}
 #endif
@@ -2524,7 +2528,9 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 		e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:direntry_cache_timeout;
 #ifdef DENTRY_INVALIDATOR
-		dinval_add(parent,nleng,(const uint8_t*)name,inode);
+		if (dinval) {
+			dinval_add(parent,nleng,(const uint8_t*)name,inode);
+		}
 #endif
 		mfs_attr_to_stat(inode,attr,&e.attr);
 		mfs_makeattrstr(attrstr,256,&e.attr);
@@ -2581,7 +2587,9 @@ void mfs_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
 		dcache_invalidate_attr(parent);
 		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
 #ifdef DENTRY_INVALIDATOR
-		dinval_remove(parent,nleng,(const uint8_t*)name);
+		if (dinval) {
+			dinval_remove(parent,nleng,(const uint8_t*)name);
+		}
 #endif
 		oplog_printf(&ctx,"rmdir (%lu,%s): OK",(unsigned long int)parent,name);
 		fuse_reply_err(req, 0);
@@ -2762,7 +2770,7 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 		}
 		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
 #ifdef DENTRY_INVALIDATOR
-		if (mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
+		if (dinval && mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
 			dinval_change(parent,nleng,(const uint8_t*)name,newparent,newnleng,(const uint8_t*)newname,inode);
 		}
 #endif
@@ -3256,7 +3264,7 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 				e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 				e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((type==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
 #ifdef DENTRY_INVALIDATOR
-				if (type==TYPE_DIRECTORY) {
+				if (dinval && type==TYPE_DIRECTORY) {
 					dinval_add(ino,nleng,(const uint8_t *)name,inode);
 				}
 #endif
@@ -5972,7 +5980,10 @@ void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout
 #ifdef FREEBSD_DELAYED_RELEASE
 	pthread_t th;
 #endif
+	uint32_t kver;
 	const char* sugid_clear_mode_strings[] = {SUGID_CLEAR_MODE_STRINGS};
+
+	kver = main_kernelversion();
 	debug_mode = debug_mode_in;
 	keep_cache = keep_cache_in;
 	direntry_cache_timeout = direntry_cache_timeout_in;
@@ -5996,17 +6007,28 @@ void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout
 	fdcache_init();
 	mfs_aclstorage_init();
 	if (debug_mode) {
+		fprintf(stderr,"kernel version: %u.%u\n",kver>>16,kver&0xFFFF);
 		fprintf(stderr,"cache parameters: file_keep_cache=%s direntry_cache_timeout=%.2lf entry_cache_timeout=%.2lf attr_cache_timeout=%.2lf xattr_cache_timeout_in=%.2lf (%s)\n",(keep_cache==1)?"always":(keep_cache==2)?"never":(keep_cache==3)?"direct":(keep_cache==4)?"fbsdauto":"auto",direntry_cache_timeout,entry_cache_timeout,attr_cache_timeout,xattr_cache_timeout_in,xattr_cache_on?"on":"off");
 		fprintf(stderr,"mkdir copy sgid=%d\nsugid clear mode=%s\n",mkdir_copy_sgid_in,(sugid_clear_mode_in<SUGID_CLEAR_MODE_OPTIONS)?sugid_clear_mode_strings[sugid_clear_mode_in]:"???");
 	}
 	mfs_statsptr_init();
 	mfs_prepare_params();
 #if defined(__linux__)
+	if (kver<MAKE_KERNEL_VERSION(4,19)) {
 #ifdef DENTRY_INVALIDATOR
-	dinval_init(direntry_cache_timeout);
+		dinval = 1;
+		if (debug_mode) {
+			fprintf(stderr,"turn on dentry invalidator\n");
+		}
+		dinval_init(direntry_cache_timeout);
 #else
-	fprintf(stderr,"your libfuse version is too old to properly fix the EBUSY bug\n");
+		fprintf(stderr,"your libfuse version is too old to properly fix the EBUSY bug\n");
 #endif
+	} else {
+#ifdef DENTRY_INVALIDATOR
+		dinval = 0;
+#endif
+	}
 #endif
 #ifdef FREEBSD_DELAYED_RELEASE
 	lwt_minthread_create(&th,1,finfo_delayed_release_cleanup_thread,NULL);

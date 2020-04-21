@@ -106,6 +106,7 @@
 
 typedef struct deentry {
 	void (*fun)(void);
+	char *fname;
 	struct deentry *next;
 } deentry;
 
@@ -114,6 +115,7 @@ static deentry *dehead=NULL;
 
 typedef struct weentry {
 	void (*fun)(void);
+	char *fname;
 	struct weentry *next;
 } weentry;
 
@@ -122,6 +124,7 @@ static weentry *wehead=NULL;
 
 typedef struct ceentry {
 	int (*fun)(void);
+	char *fname;
 	struct ceentry *next;
 } ceentry;
 
@@ -130,6 +133,7 @@ static ceentry *cehead=NULL;
 
 typedef struct rlentry {
 	void (*fun)(void);
+	char *fname;
 	struct rlentry *next;
 } rlentry;
 
@@ -138,6 +142,7 @@ static rlentry *rlhead=NULL;
 
 typedef struct inentry {
 	void (*fun)(void);
+	char *fname;
 	struct inentry *next;
 } inentry;
 
@@ -146,6 +151,7 @@ static inentry *inhead=NULL;
 
 typedef struct kaentry {
 	void (*fun)(void);
+	char *fname;
 	struct kaentry *next;
 } kaentry;
 
@@ -155,6 +161,8 @@ static kaentry *kahead=NULL;
 typedef struct pollentry {
 	void (*desc)(struct pollfd *,uint32_t *);
 	void (*serve)(struct pollfd *);
+	char *dname;
+	char *sname;
 	struct pollentry *next;
 } pollentry;
 
@@ -163,6 +171,7 @@ static pollentry *pollhead=NULL;
 
 typedef struct eloopentry {
 	void (*fun)(void);
+	char *fname;
 	struct eloopentry *next;
 } eloopentry;
 
@@ -172,6 +181,7 @@ static eloopentry *eloophead=NULL;
 typedef struct chldentry {
 	pid_t pid;
 	void (*fun)(int);
+	char *fname;
 	struct chldentry *next;
 } chldentry;
 
@@ -183,6 +193,7 @@ typedef struct timeentry {
 	uint64_t useconds;
 	uint64_t usecoffset;
 	void (*fun)(void);
+	char *fname;
 	struct timeentry *next;
 } timeentry;
 
@@ -199,81 +210,91 @@ static int signalpipe[2];
 
 /* interface */
 
-void main_destruct_register (void (*fun)(void)) {
+void main_destruct_register_fname (void (*fun)(void),const char *fname) {
 	deentry *aux=(deentry*)malloc(sizeof(deentry));
 	passert(aux);
 	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = dehead;
 	dehead = aux;
 }
 
-void main_canexit_register (int (*fun)(void)) {
+void main_canexit_register_fname (int (*fun)(void),const char *fname) {
 	ceentry *aux=(ceentry*)malloc(sizeof(ceentry));
 	passert(aux);
 	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = cehead;
 	cehead = aux;
 }
 
-void main_wantexit_register (void (*fun)(void)) {
+void main_wantexit_register_fname (void (*fun)(void),const char *fname) {
 	weentry *aux=(weentry*)malloc(sizeof(weentry));
 	passert(aux);
 	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = wehead;
 	wehead = aux;
 }
 
-void main_reload_register (void (*fun)(void)) {
+void main_reload_register_fname (void (*fun)(void),const char *fname) {
 	rlentry *aux=(rlentry*)malloc(sizeof(rlentry));
 	passert(aux);
 	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = rlhead;
 	rlhead = aux;
 }
 
-void main_info_register (void (*fun)(void)) {
+void main_info_register_fname (void (*fun)(void),const char *fname) {
 	inentry *aux=(inentry*)malloc(sizeof(inentry));
 	passert(aux);
 	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = inhead;
 	inhead = aux;
 }
 
-void main_keepalive_register (void (*fun)(void)) {
+void main_keepalive_register_fname (void (*fun)(void),const char *fname) {
 	kaentry *aux=(kaentry*)malloc(sizeof(kaentry));
 	passert(aux);
 	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = kahead;
 	kahead = aux;
 }
 
-void main_poll_register (void (*desc)(struct pollfd *,uint32_t *),void (*serve)(struct pollfd *)) {
+void main_poll_register_fname (void (*desc)(struct pollfd *,uint32_t *),void (*serve)(struct pollfd *),const char *dname,const char *sname) {
 	pollentry *aux=(pollentry*)malloc(sizeof(pollentry));
 	passert(aux);
 	aux->desc = desc;
 	aux->serve = serve;
+	aux->dname = strdup(dname);
+	aux->sname = strdup(sname);
 	aux->next = pollhead;
 	pollhead = aux;
 }
 
-void main_eachloop_register (void (*fun)(void)) {
+void main_eachloop_register_fname (void (*fun)(void),const char *fname) {
 	eloopentry *aux=(eloopentry*)malloc(sizeof(eloopentry));
 	passert(aux);
 	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = eloophead;
 	eloophead = aux;
 }
 
-void main_chld_register (pid_t pid,void (*fun)(int)) {
+void main_chld_register_fname (pid_t pid,void (*fun)(int),const char *fname) {
 	chldentry *aux=(chldentry*)malloc(sizeof(chldentry));
 	passert(aux);
-	aux->fun = fun;
 	aux->pid = pid;
+	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = chldhead;
 	chldhead = aux;
 }
 
-void* main_msectime_register (uint32_t mseconds,uint32_t offset,void (*fun)(void)) {
+void* main_msectime_register_fname (uint32_t mseconds,uint32_t offset,void (*fun)(void),const char *fname) {
 	timeentry *aux;
 	uint64_t useconds = UINT64_C(1000) * (uint64_t)mseconds;
 	uint64_t usecoffset = UINT64_C(1000) * (uint64_t)offset;
@@ -289,6 +310,7 @@ void* main_msectime_register (uint32_t mseconds,uint32_t offset,void (*fun)(void
 	aux->useconds = useconds;
 	aux->usecoffset = usecoffset;
 	aux->fun = fun;
+	aux->fname = strdup(fname);
 	aux->next = timehead;
 	timehead = aux;
 	return aux;
@@ -310,43 +332,12 @@ int main_msectime_change(void* x,uint32_t mseconds,uint32_t offset) {
 	return 0;
 }
 
-void* main_time_register (uint32_t seconds,uint32_t offset,void (*fun)(void)) {
-	return main_msectime_register(1000*seconds,1000*offset,fun);
-/*	timeentry *aux;
-	if (seconds==0 || offset>=seconds) {
-		return NULL;
-	}
-	aux = (timeentry*)malloc(sizeof(timeentry));
-	passert(aux);
-	aux->nextevent = (((now / seconds) * seconds) + offset);
-	while (aux->nextevent<now) {
-		aux->nextevent+=seconds;
-	}
-	aux->seconds = seconds;
-	aux->offset = offset;
-	aux->mode = mode;
-	aux->fun = fun;
-	aux->next = timehead;
-	timehead = aux;
-	return aux;
-*/
+void* main_time_register_fname (uint32_t seconds,uint32_t offset,void (*fun)(void),const char *fname) {
+	return main_msectime_register_fname(1000*seconds,1000*offset,fun,fname);
 }
 
 int main_time_change(void* x,uint32_t seconds,uint32_t offset) {
 	return main_msectime_change(x,1000*seconds,1000*offset);
-/*	timeentry *aux = (timeentry*)x;
-	if (seconds==0 || offset>=seconds) {
-		return -1;
-	}
-	aux->nextevent = ((now / seconds) * seconds) + offset;
-	while (aux->nextevent<now) {
-		aux->nextevent+=seconds;
-	}
-	aux->seconds = seconds;
-	aux->offset = offset;
-	aux->mode = mode;
-	return 0;
-*/
 }
 
 /* internal */
@@ -363,49 +354,64 @@ void free_all_registered_entries(void) {
 
 	for (de = dehead ; de ; de = den) {
 		den = de->next;
+		free(de->fname);
 		free(de);
 	}
 
 	for (ce = cehead ; ce ; ce = cen) {
 		cen = ce->next;
+		free(ce->fname);
 		free(ce);
 	}
 
 	for (we = wehead ; we ; we = wen) {
 		wen = we->next;
+		free(we->fname);
 		free(we);
 	}
 
 	for (re = rlhead ; re ; re = ren) {
 		ren = re->next;
+		free(re->fname);
 		free(re);
 	}
 
 	for (ie = inhead ; ie ; ie = ien) {
 		ien = ie->next;
+		free(ie->fname);
 		free(ie);
 	}
 
 	for (pe = pollhead ; pe ; pe = pen) {
 		pen = pe->next;
+		free(pe->dname);
+		free(pe->sname);
 		free(pe);
 	}
 
 	for (ee = eloophead ; ee ; ee = een) {
 		een = ee->next;
+		free(ee->fname);
 		free(ee);
 	}
 
 	for (te = timehead ; te ; te = ten) {
 		ten = te->next;
+		free(te->fname);
 		free(te);
 	}
 }
 
 int canexit(void) {
+	LOOP_VARS;
+	int r;
 	ceentry *aux;
-	for (aux = cehead ; aux!=NULL ; aux=aux->next ) {
-		if (aux->fun()==0) {
+
+	for (aux = cehead ; aux!=NULL ; aux=aux->next) {
+		LOOP_START;
+		r = aux->fun();
+		LOOP_END(aux->fname);
+		if (r==0) {
 			return 0;
 		}
 	}
@@ -436,13 +442,18 @@ uint64_t main_utime(void) {
 }
 
 static inline void destruct(void) {
+	LOOP_VARS;
 	deentry *deit;
+
 	for (deit = dehead ; deit!=NULL ; deit=deit->next ) {
+		LOOP_START;
 		deit->fun();
+		LOOP_END(deit->fname);
 	}
 }
 
 void main_keep_alive(void) {
+	LOOP_VARS;
 	uint64_t useclast;
 	struct timeval tv;
 	kaentry *kait;
@@ -469,11 +480,14 @@ void main_keep_alive(void) {
 	}
 
 	for (kait = kahead ; kait!=NULL ; kait=kait->next ) {
+		LOOP_START;
 		kait->fun();
+		LOOP_END(kait->fname);
 	}
 }
 
 void mainloop() {
+	LOOP_VARS;
 	uint64_t prevtime = 0;
 	uint64_t useclast;
 	struct timeval tv;
@@ -497,7 +511,9 @@ void mainloop() {
 		pdesc[0].events = POLLIN;
 		pdesc[0].revents = 0;
 		for (pollit = pollhead ; pollit != NULL ; pollit = pollit->next) {
+			LOOP_START;
 			pollit->desc(pdesc,&ndesc);
+			LOOP_END(pollit->dname);
 		}
 		i = poll(pdesc,ndesc,10);
 		gettimeofday(&tv,NULL);
@@ -555,11 +571,15 @@ void mainloop() {
 				}
 			}
 			for (pollit = pollhead ; pollit != NULL ; pollit = pollit->next) {
+				LOOP_START;
 				pollit->serve(pdesc);
+				LOOP_END(pollit->sname);
 			}
 		}
 		for (eloopit = eloophead ; eloopit != NULL ; eloopit = eloopit->next) {
+			LOOP_START;
 			eloopit->fun();
+			LOOP_END(eloopit->fname);
 		}
 		if (usecnow<prevtime) {
 			// time went backward !!! - recalculate "nextevent" time
@@ -587,7 +607,9 @@ void mainloop() {
 			if (usecnow >= timeit->nextevent) {
 				uint32_t eventcounter = 0;
 				while (usecnow >= timeit->nextevent && eventcounter<10) { // do not run more than 10 late entries
+					LOOP_START;
 					timeit->fun();
+					LOOP_END(timeit->fname);
 					timeit->nextevent += timeit->useconds;
 					eventcounter++;
 				}
@@ -600,7 +622,15 @@ void mainloop() {
 			}
 		}
 		prevtime = usecnow;
-		if (r==2) {
+		if (r==1) {
+			cfg_reload();
+			for (rlit = rlhead ; rlit!=NULL ; rlit=rlit->next ) {
+				LOOP_START;
+				rlit->fun();
+				LOOP_END(rlit->fname);
+			}
+			r = 0;
+		} else if (r==2) {
 			chldentry *chldit,**chldptr;
 			pid_t pid;
 			int status;
@@ -609,7 +639,9 @@ void mainloop() {
 				chldptr = &chldhead;
 				while ((chldit = *chldptr)) {
 					if (chldit->pid == pid) {
+						LOOP_START;
 						chldit->fun(status);
+						LOOP_END(chldit->fname);
 						*chldptr = chldit->next;
 						free(chldit);
 					} else {
@@ -618,33 +650,30 @@ void mainloop() {
 				}
 			}
 			r = 0;
-		}
-		if (t==0) {
-			if (r==1) {
-				cfg_reload();
-				for (rlit = rlhead ; rlit!=NULL ; rlit=rlit->next ) {
-					rlit->fun();
-				}
-				r = 0;
-			} else if (r==3) {
-				for (init = inhead ; init!=NULL ; init=init->next ) {
-					init->fun();
-				}
-				r = 0;
+		} else if (r==3) {
+			for (init = inhead ; init!=NULL ; init=init->next ) {
+				LOOP_START;
+				init->fun();
+				LOOP_END(init->fname);
 			}
+			r = 0;
 		}
 		if (t==1) {
 			for (weit = wehead ; weit!=NULL ; weit=weit->next ) {
+				LOOP_START;
 				weit->fun();
+				LOOP_END(weit->fname);
 			}
 			t = 2;
 		}
 		if (t==2) {
 			i = 1;
 			for (ceit = cehead ; ceit!=NULL && i ; ceit=ceit->next ) {
+				LOOP_START;
 				if (ceit->fun()==0) {
 					i=0;
 				}
+				LOOP_END(ceit->fname);
 			}
 			if (i) {
 				t = 3;

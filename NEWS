@@ -23,6 +23,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added topology grouping when new chunks are about to be created (prefer closer servers)
   - (master) added more error messages to bgsaver
   - (cs) added changing subfolder during internal rebalance (related to issue #326)
+  - (master+cs) added optional logging of long function execution times
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

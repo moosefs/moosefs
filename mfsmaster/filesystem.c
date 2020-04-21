@@ -5949,7 +5949,7 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t 
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t *prevchunkid,uint64_t *chunkid,uint64_t *length,uint8_t *opflag) {
+uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t *prevchunkid,uint64_t *chunkid,uint64_t *length,uint8_t *opflag,uint32_t clientip) {
 	int status;
 	uint32_t i;
 	uint64_t ochunkid,nchunkid,nlength,lengdiff;
@@ -6029,7 +6029,7 @@ uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint64_t
 	}
 	ochunkid = p->data.fdata.chunktab[indx];
 	*prevchunkid = ochunkid;
-	status = chunk_multi_modify((chunkopflags&CHUNKOPFLAG_CONTINUEOP)?1:0,&nchunkid,ochunkid,p->sclassid,opflag);
+	status = chunk_multi_modify((chunkopflags&CHUNKOPFLAG_CONTINUEOP)?1:0,&nchunkid,ochunkid,p->sclassid,opflag,clientip);
 	if (status!=MFS_STATUS_OK) {
 		return status;
 	}

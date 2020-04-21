@@ -107,6 +107,11 @@
 # 2 - try to find destination server in the same rack as one of the existing copies and then replicate chunk locally (in the same rack)
 # REPLICATIONS_RESPECT_TOPOLOGY = 0
 
+# whether new chunks should be recorded with respect to topology (default is 0)
+# 0 - do not respect topology
+# N (N>0) - first try to create new chunks on servers with topological distance LOWER than N from the client; if not possible, for example because of storage class, chunk servers being busy or lacking space, then try servers with distance greater or equal to N
+# CREATIONS_RESPECT_TOPOLOGY = 0
+
 # avoid using same ip/rack for different chunk copies
 # 0 - ignore ip and rackid (standard behaviour)
 # 1 - avoid storing more than one copy on chunkservers using same IP number

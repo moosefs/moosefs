@@ -281,6 +281,7 @@ static uint32_t MaxDelHardLimit;
 static double TmpMaxDelFrac;
 static uint32_t TmpMaxDel;
 static uint8_t ReplicationsRespectTopology;
+static uint32_t CreationsRespectTopology;
 static uint32_t LoopTimeMin;
 //static uint32_t HashSteps;
 static uint32_t HashCPTMax;
@@ -1075,7 +1076,8 @@ uint8_t chunk_delopchunk(uint16_t csid,uint64_t chunkid) {
 	return status;
 }
 
-static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t sclassid,uint8_t *olflag) {
+static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t sclassid,uint8_t *olflag,uint32_t clientip) {
+	uint16_t tmpcsids[MAXCSCOUNT];
 	int32_t *matching;
 	uint32_t **labelmasks;
 	uint8_t labelcnt;
@@ -1084,6 +1086,8 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 	uint16_t goodlabelscount;
 	uint16_t overloaded;
 	uint32_t i,j;
+	uint32_t dist;
+	uint16_t cpos,fpos;
 	int32_t x;
 
 	servcount = matocsserv_getservers_wrandom(csids,&overloaded);
@@ -1099,6 +1103,28 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 	} else {
 		*olflag = 0;
 	}
+
+	if (CreationsRespectTopology>0) {
+		cpos = 0;
+		fpos = MAXCSCOUNT;
+		for (i=0 ; i<servcount ; i++) {
+			dist = topology_distance(matocsserv_server_get_ip(cstab[csids[i]].ptr),clientip);
+			if (dist < CreationsRespectTopology) { // close
+				tmpcsids[cpos++] = csids[i];
+			} else { // far
+				tmpcsids[--fpos] = csids[i];
+			}
+		}
+		if (cpos!=0 && fpos!=MAXCSCOUNT) {
+			for (i=0 ; i<cpos ; i++) {
+				csids[i] = tmpcsids[i];
+			}
+			for (i=fpos,j=servcount-1 ; i<MAXCSCOUNT ; i++,j--) {
+				csids[j] = tmpcsids[i];
+			}
+		}
+	}
+
 	if (sclass_has_create_labels(sclassid)) {
 		labelcnt = sclass_get_create_labelmasks(sclassid,&labelmasks);
 
@@ -1606,7 +1632,7 @@ int chunk_read_check(uint32_t ts,uint64_t chunkid) {
 	return MFS_STATUS_OK;
 }
 
-int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t *opflag) {
+int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t *opflag,uint32_t clientip) {
 	uint16_t csids[MAXCSCOUNT];
 	static void **chosen = NULL;
 	static uint32_t chosenleng = 0;
@@ -1635,7 +1661,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 
 	if (ochunkid==0) {	// new chunk
 		if (mr==0) {
-			servcount = chunk_creation_servers(csids,sclassid,&overloaded);
+			servcount = chunk_creation_servers(csids,sclassid,&overloaded,clientip);
 			if (servcount==0) {
 				if (overloaded || csalldata==0) {
 					return MFS_ERROR_EAGAIN; // try again for ever
@@ -1841,12 +1867,12 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 	return MFS_STATUS_OK;
 }
 
-int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t *opflag) {
-	return chunk_univ_multi_modify(main_time(),0,continueop,nchunkid,ochunkid,sclassid,opflag);
+int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t *opflag,uint32_t clientip) {
+	return chunk_univ_multi_modify(main_time(),0,continueop,nchunkid,ochunkid,sclassid,opflag,clientip);
 }
 
 int chunk_mr_multi_modify(uint32_t ts,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t opflag) {
-	return chunk_univ_multi_modify(ts,1,0,nchunkid,ochunkid,sclassid,&opflag);
+	return chunk_univ_multi_modify(ts,1,0,nchunkid,ochunkid,sclassid,&opflag,0);
 }
 
 int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t sclassid) {
@@ -4673,6 +4699,7 @@ void chunk_load_cfg_common(void) {
 
 	ReplicationsDelayInit = cfg_getuint32("REPLICATIONS_DELAY_INIT",60);
 	ReplicationsRespectTopology = cfg_getuint8("REPLICATIONS_RESPECT_TOPOLOGY",0);
+	CreationsRespectTopology = cfg_getuint32("CREATIONS_RESPECT_TOPOLOGY",0);
 
 	if (cfg_isdefined("ACCEPTABLE_PERCENTAGE_DIFFERENCE")) {
 		AcceptableDifference = cfg_getdouble("ACCEPTABLE_PERCENTAGE_DIFFERENCE",1.0)/100.0; // 1%

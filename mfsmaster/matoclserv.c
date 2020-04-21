@@ -249,7 +249,7 @@ static inline int matoclserv_fuse_write_chunk_common(matoclserventry *eptr,uint3
 			status = MFS_ERROR_IO;
 		}
 	} else {
-		status = fs_writechunk(inode,indx,chunkopflags,&prevchunkid,&chunkid,&fleng,&opflag);
+		status = fs_writechunk(inode,indx,chunkopflags,&prevchunkid,&chunkid,&fleng,&opflag,eptr->peerip);
 	}
 	if (status!=MFS_STATUS_OK) {
 		if (status==MFS_ERROR_LOCKED || status==MFS_ERROR_CHUNKBUSY) {
@@ -2939,7 +2939,7 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			uint8_t opflag;
 			swchunks *swc;
 			/* create first chunk */
-			if (fs_writechunk(newinode,0,0,&prevchunkid,&chunkid,&fleng,&opflag)==MFS_STATUS_OK) {
+			if (fs_writechunk(newinode,0,0,&prevchunkid,&chunkid,&fleng,&opflag,eptr->peerip)==MFS_STATUS_OK) {
 				massert(prevchunkid==0,"chunk created after mknod - prevchunkid should be always zero");
 				if (opflag) {
 					i = CHUNKHASH(chunkid);

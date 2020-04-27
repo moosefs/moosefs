@@ -32,7 +32,7 @@ PORTFILES="Makefile pkg-descr pkg-plist files"
 VERSION=3.0.113
 RELEASE=1
 
-cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^DISTVERSION=.*$/DISTVERSION=		${VERSION}/" | sed "s/^DISTVERSIONSUFFIX=.*$/DISTVERSIONSUFFIX=		${RELEASE}/" | uniq > .tmp
+cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^DISTVERSION=.*$/DISTVERSION=		${VERSION}/" | sed "s/^DISTVERSIONSUFFIX=.*$/DISTVERSIONSUFFIX=	${RELEASE}/" | uniq > .tmp
 mv .tmp "${FILEBASEDIR}/files/Makefile.master"
 
 for portname in ${PORTNAMES}; do

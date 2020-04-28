@@ -76,6 +76,7 @@ void* main_time_register_fname (uint32_t seconds,uint32_t offset,void (*fun)(voi
 int main_msectime_change(void* x,uint32_t mseconds,uint32_t offset);
 int main_time_change(void *x,uint32_t seconds,uint32_t offset);
 void main_exit(void);
+uint32_t main_time_refresh(void);
 uint32_t main_time(void);
 uint64_t main_utime(void);
 void main_keep_alive(void);

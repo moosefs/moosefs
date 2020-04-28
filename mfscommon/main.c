@@ -418,6 +418,21 @@ int canexit(void) {
 	return 1;
 }
 
+uint32_t main_time_refresh(void) {
+	struct timeval tv;
+	uint32_t res;
+
+	gettimeofday(&tv,NULL);
+#ifdef USE_PTHREADS
+	zassert(pthread_mutex_lock(&nowlock));
+#endif
+	res = now = tv.tv_sec;
+#ifdef USE_PTHREADS
+	zassert(pthread_mutex_unlock(&nowlock));
+#endif
+	return res;
+}
+
 uint32_t main_time(void) {
 #ifdef USE_PTHREADS
 	uint32_t ret;

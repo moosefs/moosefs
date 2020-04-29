@@ -25,6 +25,8 @@ This file lists noteworthy changes in MooseFS.
   - (cs) added changing subfolder during internal rebalance (related to issue #326)
   - (master+cs) added optional logging of long function execution times
   - (mount) turn off dentry invalidator for Linux kernels >= 4.19 (related to issue #357)
+  - (master) changed condition that checks timestamp in changelogs (less prone to small clock differences)
+  - (cgi+cli) changed mark for removal state name UNKNOWN->PENDING (related to issue #359)
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

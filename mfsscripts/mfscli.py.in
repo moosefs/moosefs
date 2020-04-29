@@ -4238,7 +4238,7 @@ if "CS" in sectionset:
 						elif mfrstatus==2:
 							out.append("""		<td align="center"><a style="cursor:default" title="all disks marked for removal can be safely removed"><span class="OK">READY</span></a></td>""")
 						else:
-							out.append("""		<td align="center"><a style="cursor:default" title="wait for chunk loop finish to stabilize state">UNKNOWN</a></td>""")
+							out.append("""		<td align="center"><a style="cursor:default" title="wait for chunk loop finish to stabilize state">PENDING</a></td>""")
 					out.append("""		<td align="right">%u</td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td><td align="right"><span class="sortkey">%u </span><a style="cursor:default" title="%s B">%s</a></td>""" % (tdchunks,tdused,decimal_number(tdused),humanize_number(tdused,"&nbsp;"),tdtotal,decimal_number(tdtotal),humanize_number(tdtotal,"&nbsp;")))
 					if (tdtotal>0):
 						usedpercent = (tdused*100.0)/tdtotal
@@ -4297,7 +4297,7 @@ if "CS" in sectionset:
 						elif mfrstatus==2:
 							data.append(("READY",'4'))
 						else:
-							data.append("UNKNOWN")
+							data.append("PENDING")
 					data.extend([tdchunks,humanize_number(tdused," "),humanize_number(tdtotal," "),tdperc])
 					tab.append(*data)
 				else:
@@ -4343,7 +4343,7 @@ if "CS" in sectionset:
 						elif mfrstatus==2:
 							data.append("READY")
 						else:
-							data.append("UNKNOWN")
+							data.append("PENDING")
 					data.extend([tdchunks,tdused,tdtotal])
 					tab.append(*data)
 			if len(dservers)>0:

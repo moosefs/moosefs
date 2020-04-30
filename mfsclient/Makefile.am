@@ -39,6 +39,7 @@ mfsmount_SOURCES=\
 	chunkrwlock.c chunkrwlock.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
+	truncate.c truncate.h \
 	csdb.c csdb.h \
 	stats.c stats.h \
 	oplog.c oplog.h \
@@ -74,6 +75,7 @@ libmfsio_la_SOURCES=\
 	chunkrwlock.c chunkrwlock.h \
 	readdata.c readdata.h \
 	writedata.c writedata.h \
+	truncate.c truncate.h \
 	inoleng.c inoleng.h \
 	csdb.c csdb.h \
 	stats.c stats.h \

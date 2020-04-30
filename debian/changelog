@@ -1,6 +1,5 @@
 moosefs (3.0.113-1) unstable; urgency=medium
 
-  * (all) This is 'work in progress' version !!!
   * (master) changed condition that decides if master should wait for more
     chunks during I/O
   * (mount) delayed setting channel for fuse notifications (very rare segfault
@@ -33,8 +32,17 @@ moosefs (3.0.113-1) unstable; urgency=medium
   * (master+cs) added optional logging of long function execution times
   * (mount) turn off dentry invalidator for Linux kernels >= 4.19 (related to
     issue #357)
+  * (master) changed condition that checks timestamp in changelogs (less prone
+    to small clock differences)
+  * (cgi+cli) changed mark for removal state name UNKNOWN->PENDING (related to
+    issue #359)
+  * (client) decreased max IDLE time in writer module from 1s to 0.1s
+  * (client) update inode in dentry invalidator
+  * (tools) fixed mfscopyeattr,mfsseteattr and mfs*arch tools
+  * (master+client) added support for new eattrs:
+    immutable,appendonly,undeletable
 
- -- MooseFS Team <contact@moosefs.com>  Tue, 21 Apr 2020 11:00:00 +0200
+ -- MooseFS Team <contact@moosefs.com>  Thu, 30 Apr 2020 13:00:00 +0200
 
 moosefs (3.0.112-1) unstable; urgency=medium
 

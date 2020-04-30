@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.113-1 (WIP)
+* MooseFS 3.0.113-1 (2020-04-30)
 
   - (master) changed condition that decides if master should wait for more chunks during I/O
   - (mount) delayed setting channel for fuse notifications (very rare segfault in libfuse2 during init)
@@ -30,6 +30,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) decreased max IDLE time in writer module from 1s to 0.1s
   - (client) update inode in dentry invalidator
   - (tools) fixed mfscopyeattr,mfsseteattr and mfs*arch tools
+  - (master+client) added support for new eattrs: immutable,appendonly,undeletable
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

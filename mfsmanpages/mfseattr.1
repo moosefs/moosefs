@@ -35,6 +35,12 @@ from being cached in kernel.
 \fBnodatacache\fP This flag means, that data cache should be cleared every time a file is opened.
 .PP
 \fBsnapshot\fP This flag means that the object was created via a \fBmfsmakesnapshot\fP command
+.PP
+\fBundeletable\fP This flag prevents unlinking (admin only; not inherited)
+.PP
+\fBappendonly\fP Object with this flag can only be appended to, unlinking and other modifications are not allowed (admin only; not inherited)
+.PP
+\fBimmutable\fP This flag prevents any change to given object (admin only; not inherited)
 .SH GENERAL OPTIONS
 Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select

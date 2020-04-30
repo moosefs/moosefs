@@ -60,6 +60,7 @@
 #include "getgroups.h"
 #include "readdata.h"
 #include "writedata.h"
+#include "truncate.h"
 #include "massert.h"
 #include "strerr.h"
 #include "mfsalloc.h"
@@ -382,7 +383,7 @@ static void dirbuf_freeall(void) {
 
 /* FILE INODE DATA */
 
-enum {IO_RW,IO_RO};
+enum {IO_RW,IO_RO,IO_RA};
 
 typedef struct _lock_owner {
 #ifdef FLUSH_EXTRA_LOCKS
@@ -894,6 +895,9 @@ static int mfs_errorconv(int status) {
 		break;
 	case MFS_ERROR_NOTOPENED:
 		ret=EBADF;
+		break;
+	case MFS_ERROR_INDEXTOOBIG:
+		ret=EFBIG;
 		break;
 	default:
 		ret=EINVAL;
@@ -1429,6 +1433,8 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 	if (fdcache_find(&ctx,ino,NULL,&lflags)) {
 		if ((lflags & LOOKUP_RO_FILESYSTEM) && (mmode & MODE_MASK_W)) {
 			status = MFS_ERROR_EROFS;
+		} else if ((lflags & LOOKUP_IMMUTABLE) && (mmode & MODE_MASK_W)) {
+			status = MFS_ERROR_EPERM;
 		} else {
 			status = (lflags & (1<<(mmode&0x7)))?MFS_STATUS_OK:MFS_ERROR_EACCES;
 		}
@@ -1774,7 +1780,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 	e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((type==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
 #ifdef DENTRY_INVALIDATOR
-	if (dinval && type==TYPE_DIRECTORY) {
+	if (dinval && (mattr&MATTR_UNDELETABLE)==0 && type==TYPE_DIRECTORY) {
 		dinval_add(parent,nleng,(const uint8_t *)name,inode);
 	}
 #endif
@@ -2132,60 +2138,53 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 			fuse_reply_err(req, EFBIG);
 			return;
 		}
+		if (fi!=NULL) {
+			finfo *fileinfo;
+			fileinfo = finfo_get(fi->fh);
+			if (fi->fh==0 || fileinfo==NULL) {
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(EBADF));
+				fuse_reply_err(req,EBADF);
+				return;
+			}
+			zassert(pthread_mutex_lock(&(fileinfo->lock)));
+			if (fileinfo->inode!=ino) {
+				zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(EBADF));
+				fuse_reply_err(req,EBADF);
+				return;
+			}
+			if (fileinfo->mode!=IO_RW) { // forced appendonly should return EPERM not EACCES ?
+				zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(EACCES));
+				fuse_reply_err(req,EACCES);
+				return;
+			}
+			zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		}
 		write_data_flush_inode(ino);
 		if (full_permissions) {
-			uint32_t trycnt;
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-			trycnt = 0;
-			while (1) {
 #if defined(__FreeBSD__)
-				if (freebsd_workarounds) {
-					status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
-				} else {
+			if (freebsd_workarounds) {
+				status = do_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr,NULL);
+			} else {
 #endif
-				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr);
+			status = do_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,gids->gidcnt,gids->gidtab,stbuf->st_size,attr,NULL);
 #if defined(__FreeBSD__)
-				}
-#endif
-				if (status==MFS_STATUS_OK || status==MFS_ERROR_EROFS || status==MFS_ERROR_EACCES || status==MFS_ERROR_EPERM || status==MFS_ERROR_ENOENT || status==MFS_ERROR_QUOTA || status==MFS_ERROR_NOSPACE || status==MFS_ERROR_CHUNKLOST) {
-					break;
-				} else if (status!=MFS_ERROR_LOCKED) {
-					trycnt++;
-					if (trycnt>=30) {
-						break;
-					}
-					portable_usleep(1000+((trycnt<30)?((trycnt-1)*300000):10000000));
-				} else {
-					portable_usleep(10000);
-				}
 			}
+#endif
 			groups_rel(gids);
 		} else {
 			uint32_t gidtmp = ctx.gid;
-			uint32_t trycnt;
-			trycnt = 0;
-			while (1) {
 #if defined(__FreeBSD__)
-				if (freebsd_workarounds) {
-					status = fs_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
-				} else {
+			if (freebsd_workarounds) {
+				status = do_truncate(ino,(fi!=NULL)?(TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_TIMEFIX):TRUNCATE_FLAG_TIMEFIX,ctx.uid,1,&gidtmp,stbuf->st_size,attr,NULL);
+			} else {
 #endif
-				status = fs_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,1,&gidtmp,stbuf->st_size,attr);
+			status = do_truncate(ino,(fi!=NULL)?TRUNCATE_FLAG_OPENED:0,ctx.uid,1,&gidtmp,stbuf->st_size,attr,NULL);
 #if defined(__FreeBSD__)
-				}
-#endif
-				if (status==MFS_STATUS_OK || status==MFS_ERROR_EROFS || status==MFS_ERROR_EACCES || status==MFS_ERROR_EPERM || status==MFS_ERROR_ENOENT || status==MFS_ERROR_QUOTA || status==MFS_ERROR_NOSPACE || status==MFS_ERROR_CHUNKLOST) {
-					break;
-				} else if (status!=MFS_ERROR_LOCKED) {
-					trycnt++;
-					if (trycnt>=30) {
-						break;
-					}
-					portable_usleep(1000+((trycnt<30)?((trycnt-1)*300000):10000000));
-				} else {
-					portable_usleep(10000);
-				}
 			}
+#endif
 		}
 		status = mfs_errorconv(status);
 		// read_inode_ops(ino);
@@ -2528,7 +2527,7 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 		e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:direntry_cache_timeout;
 #ifdef DENTRY_INVALIDATOR
-		if (dinval) {
+		if (dinval && (mattr&MATTR_UNDELETABLE)==0) {
 			dinval_add(parent,nleng,(const uint8_t*)name,inode);
 		}
 #endif
@@ -2771,7 +2770,10 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
 #ifdef DENTRY_INVALIDATOR
 		if (dinval && mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
-			dinval_change(parent,nleng,(const uint8_t*)name,newparent,newnleng,(const uint8_t*)newname,inode);
+			dinval_remove(parent,nleng,(const uint8_t*)name);
+			if ((mfs_attr_get_mattr(attr)&MATTR_UNDELETABLE)==0) {
+				dinval_add(newparent,newnleng,(const uint8_t*)newname,inode);
+			}
 		}
 #endif
 		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): OK",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags);
@@ -3264,7 +3266,7 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 				e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 				e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((type==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
 #ifdef DENTRY_INVALIDATOR
-				if (dinval && type==TYPE_DIRECTORY) {
+				if (dinval && (mattr&MATTR_UNDELETABLE)==0 && type==TYPE_DIRECTORY) {
 					dinval_add(ino,nleng,(const uint8_t *)name,inode);
 				}
 #endif
@@ -3336,7 +3338,7 @@ void mfs_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	fuse_reply_err(req,0);
 }
 
-static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,uint8_t open_in_master) {
+static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,uint8_t open_in_master,uint8_t appendonly) {
 	finfo *fileinfo;
 	uint32_t findex;
 	double now;
@@ -3362,7 +3364,11 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 	if (accmode == O_RDONLY) {
 		fileinfo->mode = IO_RO;
 	} else { // with writeback cache enabled even in O_WRONLY accmode reading is allowed - hence only IO_RO and IO_RW !!!
-		fileinfo->mode = IO_RW;
+		if (appendonly) {
+			fileinfo->mode = IO_RA;
+		} else {
+			fileinfo->mode = IO_RW;
+		}
 	}
 	fileinfo->rdata = NULL;
 	fileinfo->wdata = NULL;
@@ -3405,6 +3411,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	struct fuse_ctx ctx;
 	groups *gids;
 	uint32_t findex;
+	uint8_t oflags;
 
 	ctx = *(fuse_req_ctx(req));
 	mfs_makemodestr(modestr,mode);
@@ -3441,11 +3448,11 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 #endif
 	if (full_permissions) {
 		gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-		status = fs_create(parent,nleng,(const uint8_t*)name,mode&07777,cumask,ctx.uid,gids->gidcnt,gids->gidtab,&inode,attr);
+		status = fs_create(parent,nleng,(const uint8_t*)name,mode&07777,cumask,ctx.uid,gids->gidcnt,gids->gidtab,&inode,attr,&oflags);
 		groups_rel(gids);
 	} else {
 		uint32_t gidtmp = ctx.gid;
-		status = fs_create(parent,nleng,(const uint8_t*)name,mode&07777,cumask,ctx.uid,1,&gidtmp,&inode,attr);
+		status = fs_create(parent,nleng,(const uint8_t*)name,mode&07777,cumask,ctx.uid,1,&gidtmp,&inode,attr,&oflags);
 	}
 	if (status!=MFS_ERROR_ENOTSUP) {
 #if defined(__APPLE__)
@@ -3469,15 +3476,15 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
 //		}
 	} else {
-		uint8_t oflags;
+		uint8_t flags;
 		uint32_t gidtmp = ctx.gid;
-		oflags = OPEN_AFTER_CREATE;
+		flags = OPEN_AFTER_CREATE;
 		if ((fi->flags & O_ACCMODE) == O_RDONLY) {
-			oflags |= OPEN_READ;
+			flags |= OPEN_READ;
 		} else if ((fi->flags & O_ACCMODE) == O_WRONLY) {
-			oflags |= OPEN_WRITE;
+			flags |= OPEN_WRITE;
 		} else if ((fi->flags & O_ACCMODE) == O_RDWR) {
-			oflags |= OPEN_READ | OPEN_WRITE;
+			flags |= OPEN_READ | OPEN_WRITE;
 		} else {
 			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(EINVAL));
 			fuse_reply_err(req, EINVAL);
@@ -3494,7 +3501,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
 //		}
-		status = fs_opencheck(inode,ctx.uid,1,&gidtmp,oflags,NULL);
+		status = fs_opencheck(inode,ctx.uid,1,&gidtmp,flags,attr,&oflags);
 		status = mfs_errorconv(status);
 		if (status!=0) {
 			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o) (open): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(status));
@@ -3504,9 +3511,20 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	}
 
 	mattr = mfs_attr_get_mattr(attr);
-	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,inode,0,1);
+	if (oflags==0) { // old masters compatibility
+		if (mattr&MATTR_DIRECTMODE) {
+			oflags |= OPEN_DIRECTMODE;
+		}
+		if (mattr&MATTR_ALLOWDATACACHE) {
+			oflags |= OPEN_KEEPCACHE;
+		}
+	}
+	if (fi->flags & O_APPEND) {
+		oflags |= OPEN_APPENDONLY;
+	}
+	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,inode,0,1,(oflags&OPEN_APPENDONLY)?1:0);
 	fi->fh = findex;
-	if ((mattr&MATTR_DIRECTMODE) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
+	if ((oflags&(OPEN_DIRECTMODE|OPEN_APPENDONLY)) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
 		fi->keep_cache = 0;
 		fi->direct_io = 1;
 	} else {
@@ -3515,12 +3533,12 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		} else if (keep_cache==2 || keep_cache>=3) {
 			fi->keep_cache=0;
 		} else {
-			fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
+			fi->keep_cache = (oflags&OPEN_KEEPCACHE)?1:0;
 		}
 		fi->direct_io = (keep_cache>=3)?1:0;
 	}
 	if (debug_mode) {
-		fprintf(stderr,"create (%lu) ok -> use %s io ; %s data cache\n",(unsigned long int)inode,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear");
+		fprintf(stderr,"create (%lu) ok -> use %s io ; %s data cache ; can %s\n",(unsigned long int)inode,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear",(oflags&OPEN_APPENDONLY)?"append only":"write randomly");
 	}
 //	if (fi->keep_cache==0) {
 //		chunksdatacache_clear_inode(inode,0);
@@ -3533,7 +3551,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:entry_cache_timeout;
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	mfs_makeattrstr(attrstr,256,&e.attr);
-	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s) (direct_io:%u,keep_cache:%u) [handle:%08"PRIX32"]",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,findex);
+	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s) (direct_io:%u,keep_cache:%u,append_mode:%u) [handle:%08"PRIX32"]",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,(oflags&OPEN_APPENDONLY)?1:0,findex);
 	fs_inc_acnt(inode);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
 		fs_dec_acnt(inode);
@@ -3543,7 +3561,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 }
 
 void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
-	uint8_t oflags,mmode,noatomictrunc;
+	uint8_t flags,oflags,mmode,noatomictrunc;
 	uint16_t lflags;
 	void *fdrec;
 	uint8_t attr[ATTR_RECORD_SIZE];
@@ -3668,23 +3686,23 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		return;
 	}
 */
-	oflags = 0;
+	flags = 0;
 	mmode = 0;
 	if ((fi->flags & O_ACCMODE) == O_RDONLY) {
-		oflags |= OPEN_READ;
+		flags |= OPEN_READ;
 		mmode = MODE_MASK_R;
 	} else if ((fi->flags & O_ACCMODE) == O_WRONLY) {
-		oflags |= OPEN_WRITE;
+		flags |= OPEN_WRITE;
 		mmode = MODE_MASK_W;
 	} else if ((fi->flags & O_ACCMODE) == O_RDWR) {
-		oflags |= OPEN_READ | OPEN_WRITE;
+		flags |= OPEN_READ | OPEN_WRITE;
 		mmode = MODE_MASK_R | MODE_MASK_W;
 	}
 	if (fi->flags & O_TRUNC) {
 		uint32_t mver = master_version();
 		noatomictrunc = (mver<VERSION2INT(3,0,113))?1:0;
-		oflags |= OPEN_TRUNCATE;
-		fdrec=NULL; // with trunc flag we have to communicate with master, so can't use fdcache
+		flags |= OPEN_TRUNCATE;
+		fdrec = NULL; // with trunc flag we have to communicate with master, so can't use fdcache
 	} else {
 		fdrec = fdcache_acquire(&ctx,ino,attr,&lflags);
 		noatomictrunc = 0;
@@ -3692,27 +3710,39 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	if (fdrec) {
 		if ((lflags & LOOKUP_RO_FILESYSTEM) && (mmode & MODE_MASK_W)) {
 			status = MFS_ERROR_EROFS;
+		} else if ((lflags & LOOKUP_IMMUTABLE) && (mmode & MODE_MASK_W)) {
+			status = MFS_ERROR_EPERM;
 		} else {
 			status = (lflags & (1<<(mmode&0x7)))?MFS_STATUS_OK:MFS_ERROR_EACCES;
 		}
 		if (status==MFS_STATUS_OK) {
 			fdcache_inject_chunkdata(fdrec);
+			oflags = 0;
+			if (lflags & LOOKUP_APPENDONLY) {
+				oflags |= OPEN_APPENDONLY;
+			}
+			if (lflags & LOOKUP_DIRECTMODE) {
+				oflags |= OPEN_DIRECTMODE;
+			}
+			if (lflags & LOOKUP_KEEPCACHE) {
+				oflags |= OPEN_KEEPCACHE;
+			}
 		} 
 		fdcache_release(fdrec);
 	} else {
 		write_data_flush_inode(ino); // update file attributes in master !!!
 		if (full_permissions) {
 			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,2); // allow group refresh again (see: getxattr for "com.apple.quarantine")
-			status = fs_opencheck(ino,ctx.uid,gids->gidcnt,gids->gidtab,oflags,attr);
+			status = fs_opencheck(ino,ctx.uid,gids->gidcnt,gids->gidtab,flags,attr,&oflags);
 			if (status==MFS_STATUS_OK && (fi->flags & O_TRUNC) && noatomictrunc) {
-				status = fs_truncate(ino,TRUNCATE_FLAG_OPENED,ctx.uid,gids->gidcnt,gids->gidtab,0,attr);
+				status = do_truncate(ino,TRUNCATE_FLAG_OPENED,ctx.uid,gids->gidcnt,gids->gidtab,0,attr,NULL);
 			}
 			groups_rel(gids);
 		} else {
 			uint32_t gidtmp = ctx.gid;
-			status = fs_opencheck(ino,ctx.uid,1,&gidtmp,oflags,attr);
+			status = fs_opencheck(ino,ctx.uid,1,&gidtmp,flags,attr,&oflags);
 			if (status==MFS_STATUS_OK && (fi->flags & O_TRUNC) && noatomictrunc) {
-				status = fs_truncate(ino,TRUNCATE_FLAG_OPENED,ctx.uid,1,&gidtmp,0,attr);
+				status = do_truncate(ino,TRUNCATE_FLAG_OPENED,ctx.uid,1,&gidtmp,0,attr,NULL);
 			}
 		}
 	}
@@ -3735,9 +3765,20 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 
 	mattr = mfs_attr_get_mattr(attr);
-	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,ino,mfs_attr_get_fleng(attr),(fdrec)?0:1);
+	if (oflags==0) { // old masters compatibility
+		if (mattr&MATTR_DIRECTMODE) {
+			oflags |= OPEN_DIRECTMODE;
+		}
+		if (mattr&MATTR_ALLOWDATACACHE) {
+			oflags |= OPEN_KEEPCACHE;
+		}
+	}
+	if (fi->flags & O_APPEND) {
+		oflags |= OPEN_APPENDONLY;
+	}
+	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,ino,mfs_attr_get_fleng(attr),(fdrec)?0:1,(oflags&OPEN_APPENDONLY)?1:0);
 	fi->fh = findex;
-	if ((mattr&MATTR_DIRECTMODE) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
+	if ((oflags&(OPEN_DIRECTMODE|OPEN_APPENDONLY)) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
 		fi->keep_cache = 0;
 		fi->direct_io = 1;
 	} else {
@@ -3746,17 +3787,17 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		} else if (keep_cache==2 || keep_cache>=3) {
 			fi->keep_cache=0;
 		} else {
-			fi->keep_cache = (mattr&MATTR_ALLOWDATACACHE)?1:0;
+			fi->keep_cache = (oflags&OPEN_KEEPCACHE)?1:0;
 		}
 		fi->direct_io = (keep_cache>=3)?1:0;
 	}
 	if (debug_mode) {
-		fprintf(stderr,"open (%lu) ok -> use %s io ; %s data cache\n",(unsigned long int)ino,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear");
+		fprintf(stderr,"open (%lu) ok -> use %s io ; %s data cache ; can %s\n",(unsigned long int)ino,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear",(oflags&OPEN_APPENDONLY)?"append only":"write randomly");
 	}
 //	if (fi->keep_cache==0) {
 //		chunksdatacache_clear_inode(ino,0);
 //	}
-	oplog_printf(&ctx,"open (%lu)%s: OK (direct_io:%u,keep_cache:%u) [handle:%08"PRIX32"]",(unsigned long int)ino,(fdrec)?" (using cached data from lookup)":"",(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,findex);
+	oplog_printf(&ctx,"open (%lu)%s: OK (direct_io:%u,keep_cache:%u,append_mode:%u) [handle:%08"PRIX32"]",(unsigned long int)ino,(fdrec)?" (using cached data from lookup)":"",(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,(oflags&OPEN_APPENDONLY)?1:0,findex);
 	fs_inc_acnt(ino);
 	if (fuse_reply_open(req, fi) == -ENOENT) {
 		mfs_removefileinfo(findex);
@@ -3766,9 +3807,9 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		finfo *fileinfo;
 		uint32_t gidtmp = 0;
 		if (fi->keep_cache==0) {
-			oflags |= OPEN_CACHE_CLEARED;
+			flags |= OPEN_CACHE_CLEARED;
 		}
-		fs_opencheck(ino,0,1,&gidtmp,oflags,attr); // just send "opencheck" to make sure that master knows that this file is open
+		fs_opencheck(ino,0,1,&gidtmp,flags,NULL,NULL); // just send "opencheck" to make sure that master knows that this file is open
 		fileinfo = finfo_get(fi->fh);
 		if (fileinfo!=NULL) {
 			zassert(pthread_mutex_lock(&(fileinfo->lock)));
@@ -4259,6 +4300,8 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, struct fuse_file_info *fi) {
 	finfo *fileinfo;
 	int err;
+	uint8_t appendonly;
+	off_t leng;
 	struct fuse_ctx ctx;
 
 	ctx = *(fuse_req_ctx(req));
@@ -4333,6 +4376,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		return;
 	}
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	appendonly = (fileinfo->mode==IO_RA)?1:0;
 	if (fileinfo->mode==IO_RO) {
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EACCES));
@@ -4350,16 +4394,41 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 #ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress++;
 #endif
-	if (fileinfo->wdata==NULL) {
-		fileinfo->wdata = write_data_new(ino,inoleng_getfleng(fileinfo->flengptr));
+	leng = inoleng_getfleng(fileinfo->flengptr);
+	err = 0;
+	if (appendonly) {
+		if (master_version()>=VERSION2INT(3,0,113)) {
+			uint8_t status;
+			uint64_t prevleng;
+			uint32_t gid = 0;
+			zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+			status = do_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE|TRUNCATE_FLAG_RESERVE,0,1,&gid,size,NULL,&prevleng);
+			zassert(pthread_mutex_lock(&(fileinfo->lock)));
+			if (status!=MFS_STATUS_OK) {
+				err = mfs_errorconv(status);
+			} else {
+				off = prevleng;
+			}
+		} else {
+			off = leng;
+			if (off+size>=MAX_FILE_SIZE) {
+				err = EFBIG;
+			}
+		}
+		leng = off + size;
 	}
-	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+	if (err==0) {
+		if (fileinfo->wdata==NULL) {
+			fileinfo->wdata = write_data_new(ino,leng);
+		}
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 
-	fs_mtime(ino);
-	err = write_data(fileinfo->wdata,off,size,(const uint8_t*)buf,(ctx.uid==0)?1:0);
-	fs_mtime(ino);
+		fs_mtime(ino);
+		err = write_data(fileinfo->wdata,off,size,(const uint8_t*)buf,(ctx.uid==0)?1:0);
+		fs_mtime(ino);
 
-	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+		zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	}
 	// rwlock_wrunlock begin
 	fileinfo->writing = 0;
 	zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
@@ -4405,7 +4474,7 @@ static inline int mfs_do_fsync(finfo *fileinfo) {
 	err = 0;
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	inode = fileinfo->inode;
-	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_RW)) {
+	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_RW || fileinfo->mode==IO_RA)) {
 		// rwlock_wrlock begin
 		fileinfo->writers_cnt++;
 		while (fileinfo->readers_cnt | fileinfo->writing) {
@@ -4497,7 +4566,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 #endif
 
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
-	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_RW)) {
+	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_RW || fileinfo->mode==IO_RA)) {
 		// rwlock_wrlock begin
 		fileinfo->writers_cnt++;
 		while (fileinfo->readers_cnt | fileinfo->writing) {
@@ -4516,7 +4585,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 //			fs_fsync_wait();
 		} else {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-			fs_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE,ctx.uid,gids->gidcnt,gids->gidtab,write_data_getmaxfleng(fileinfo->wdata),NULL);
+			do_truncate(ino,TRUNCATE_FLAG_OPENED|TRUNCATE_FLAG_UPDATE,ctx.uid,gids->gidcnt,gids->gidtab,write_data_getmaxfleng(fileinfo->wdata),NULL,NULL);
 			groups_rel(gids);
 			err = write_data_chunk_wait(fileinfo->wdata);
 		}

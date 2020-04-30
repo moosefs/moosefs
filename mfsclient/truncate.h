@@ -18,13 +18,11 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
-#ifndef _DENTRY_INVALIDATOR_H_
-#define _DENTRY_INVALIDATOR_H_
+#ifndef _TRUNCATE_H_
+#define _TRUNCATE_H_
 
 #include <inttypes.h>
 
-void dinval_add(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t inode);
-void dinval_remove(uint32_t parent,uint8_t nleng,const uint8_t *name);
-void dinval_init(double timeout);
+uint8_t do_truncate(uint32_t inode,uint8_t flags,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t attrlength,uint8_t attr[ATTR_RECORD_SIZE],uint64_t *prevlength);
 
 #endif

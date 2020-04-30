@@ -263,9 +263,15 @@
 #define LOOKUP_ACCESS_MODE_RX              0x0020
 #define LOOKUP_ACCESS_MODE_RW              0x0040
 #define LOOKUP_ACCESS_MODE_RWX             0x0080
-#define LOOKUP_ACCESS_BITS                 0x00FF
+#define LOOKUP_ACCESS_MODES_IO             0x00FC
+#define LOOKUP_ACCESS_MODES_RO             0xFF33
+#define LOOKUP_ACCESS_BITS                 0x38FF
 #define LOOKUP_CHUNK_ZERO_DATA             0x0100
 #define LOOKUP_RO_FILESYSTEM               0x0200
+#define LOOKUP_KEEPCACHE                   0x0400
+#define LOOKUP_IMMUTABLE                   0x0800
+#define LOOKUP_DIRECTMODE                  0x1000
+#define LOOKUP_APPENDONLY                  0x2000
 
 // combinations of MODE_MASK to LOOKUP_ACCESS_MODE
 #define MODE_TO_ACCMODE {0x01,0x03,0x05,0x0F,0x11,0x33,0x55,0xFF}
@@ -340,34 +346,46 @@
 
 // extraattr:
 
-#define EATTR_BITS                         5
+#define EATTR_BITS                         8
 
 #define EATTR_NOOWNER                      0x01
 #define EATTR_NOACACHE                     0x02
 #define EATTR_NOECACHE                     0x04
 #define EATTR_NODATACACHE                  0x08
 #define EATTR_SNAPSHOT                     0x10
+#define EATTR_UNDELETABLE                  0x20
+#define EATTR_APPENDONLY                   0x40
+#define EATTR_IMMUTABLE                    0x80
 
 #define EATTR_STRINGS \
 	"noowner", \
 	"noattrcache", \
 	"noentrycache", \
 	"nodatacache", \
-	"snapshot"
+	"snapshot", \
+	"undeletable", \
+	"appendonly", \
+	"immutable"
 
 #define EATTR_DESCRIPTIONS \
 	"every user (except root) sees object as his (her) own", \
 	"prevent standard object attributes from being stored in kernel cache", \
 	"prevent directory entries from being stored in kernel cache", \
 	"prevent file data from being kept in kernel cache", \
-	"node was created using makesnapshot command (or inside snapshot)"
+	"node was created using makesnapshot command (or inside snapshot)", \
+	"prevent unlinking", \
+	"only appending to file and adding new nodes to directory is allowed", \
+	"prevent any change to object"
 
 // mode attr / attribute flags
 #define MATTR_NOACACHE                     0x01
 #define MATTR_NOECACHE                     0x02
+/* MATTR_ALLOWDATACACHE is deprecated - moved to open/lookup flags */
 #define MATTR_ALLOWDATACACHE               0x04
 #define MATTR_NOXATTR                      0x08
+/* MATTR_DIRECTMODE is deprecated - moved to open/lookup flags */
 #define MATTR_DIRECTMODE                   0x10
+#define MATTR_UNDELETABLE                  0x20
 
 // quota:
 #define QUOTA_FLAG_SINODES                 0x01
@@ -403,6 +421,7 @@
 #define TRUNCATE_FLAG_OPENED               0x01
 #define TRUNCATE_FLAG_UPDATE               0x02
 #define TRUNCATE_FLAG_TIMEFIX              0x04
+#define TRUNCATE_FLAG_RESERVE              0x08
 
 // register sesflags:
 #define SESFLAG_READONLY                   0x01	// meaning is obvious
@@ -467,12 +486,17 @@
 #define HLSTATUS_REBALANCE                 3
 #define HLSTATUS_GRACEFUL                  4
 
-// flags: "flags" fileld in "CLTOMA_FUSE_OPEN"
+// "flags" fileld in "CLTOMA_FUSE_OPEN"
 #define OPEN_READ                          0x01
 #define OPEN_WRITE                         0x02
 #define OPEN_AFTER_CREATE                  0x04
 #define OPEN_TRUNCATE                      0x08
 #define OPEN_CACHE_CLEARED                 0x10
+
+// "flags" field in "MATOCL_FUSE_OPEN/MATOCL_FUSE_CREATE"
+#define OPEN_KEEPCACHE                     0x01
+#define OPEN_DIRECTMODE                    0x02
+#define OPEN_APPENDONLY                    0x04
 
 #define MFS_XATTR_CREATE_OR_REPLACE        0
 #define MFS_XATTR_CREATE_ONLY              1
@@ -1201,7 +1225,8 @@
 // 0x01AF
 #define MATOCL_FUSE_OPEN (PROTO_BASE+431)
 // msgid:32 status:8
-// msgid:32 attr:ATTR
+// msgid:32 attr:ATTR (version < 3.0.113)
+// msgid:32 flags:8 attr:ATTR (version >= 3.0.113)
 
 // 0x01B0
 #define CLTOMA_FUSE_READ_CHUNK (PROTO_BASE+432)
@@ -1395,8 +1420,8 @@
 // 0x01D1
 #define MATOCL_FUSE_TRUNCATE (PROTO_BASE+465)
 // msgid:32 status:8
-// msgid:32 attr:ATTR
-
+// msgid:32 attr:ATTR (version < 3.0.113)
+// msgid:32 prevsize:64 attr:ATTR (version >= 3.0.113)
 
 // 0x01D2
 #define CLTOMA_FUSE_REPAIR (PROTO_BASE+466)
@@ -1500,7 +1525,8 @@
 // 0x01E3
 #define MATOCL_FUSE_CREATE (PROTO_BASE+483)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:ATTR
+// msgid:32 inode:32 attr:ATTR (version < 3.0.112)
+// msgid:32 flags:8 inode:32 attr:ATTR (version >= 3.0.113)
 
 // 0x01E4
 #define CLTOMA_FUSE_PARENTS (PROTO_BASE+484)

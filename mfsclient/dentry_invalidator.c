@@ -184,12 +184,6 @@ void dinval_remove(uint32_t parent,uint8_t nleng,const uint8_t *name) {
 	pthread_mutex_unlock(&glock);
 }
 
-// (rename)
-void dinval_change(uint32_t oldparent,uint8_t oldnleng,const uint8_t *oldname,uint32_t newparent,uint8_t newnleng,const uint8_t *newname,uint32_t inode) {
-	dinval_remove(oldparent,oldnleng,oldname);
-	dinval_add(newparent,newnleng,newname,inode);
-}
-
 void* dinval_invalthread(void* arg) {
 	double timeout;
 	double now;

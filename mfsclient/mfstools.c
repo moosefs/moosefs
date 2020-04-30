@@ -1151,6 +1151,7 @@ int set_eattr(const char *fname,uint8_t eattr,uint8_t mode) {
 		return -1;
 	}
 	uid = getuid();
+	master_new_packet();
 	master_put32bit(inode);
 	master_put32bit(uid);
 	master_put8bit(eattr);
@@ -1195,6 +1196,7 @@ int archive_control(const char *fname,uint8_t archcmd) {
 		return -1;
 	}
 	uid = getuid();
+	master_new_packet();
 	master_put32bit(inode);
 	master_put8bit(archcmd);
 	if (archcmd!=ARCHCTL_GET) {

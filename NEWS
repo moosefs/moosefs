@@ -29,6 +29,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgi+cli) changed mark for removal state name UNKNOWN->PENDING (related to issue #359)
   - (client) decreased max IDLE time in writer module from 1s to 0.1s
   - (client) update inode in dentry invalidator
+  - (tools) fixed mfscopyeattr,mfsseteattr and mfs*arch tools
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

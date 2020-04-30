@@ -152,6 +152,7 @@ void dinval_add(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t inode
 	dielem = dinval_element_find(&hashhint,parent,nleng,name);
 	if (dielem) {
 		dinval_queue_detach(dielem);
+		dielem->inode = inode;
 		dinval_queue_attach(dielem);
 	} else {
 		dielem = malloc(sizeof(dinval_element));

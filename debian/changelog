@@ -6,7 +6,7 @@ moosefs (3.0.113-1) unstable; urgency=medium
     in libfuse2 during init)
   * (client+master) changed conditions for ancestor test in getattr (issue
     #350)
-  * (cs) added parameter for number of chunks to be send in single regiter
+  * (cs) added parameter for number of chunks to be send in single register
     packet
   * (cs) fixed reporting damaged chunks in testing function (issue #352)
   * (client) changed open test in setattr (related to issue #350)
@@ -41,8 +41,10 @@ moosefs (3.0.113-1) unstable; urgency=medium
   * (tools) fixed mfscopyeattr,mfsseteattr and mfs*arch tools
   * (master+client) added support for new eattrs:
     immutable,appendonly,undeletable
+  * (client) silenced "kern.proc.filedesc" syslog messages on FreeBSD (issue
+    #360)
 
- -- MooseFS Team <contact@moosefs.com>  Thu, 30 Apr 2020 13:00:00 +0200
+ -- MooseFS Team <contact@moosefs.com>  Mon, 04 May 2020 13:00:00 +0200
 
 moosefs (3.0.112-1) unstable; urgency=medium
 

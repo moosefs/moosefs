@@ -31,6 +31,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) update inode in dentry invalidator
   - (tools) fixed mfscopyeattr,mfsseteattr and mfs*arch tools
   - (master+client) added support for new eattrs: immutable,appendonly,undeletable
+  - (client) silenced "kern.proc.filedesc" syslog messages on FreeBSD (issue #360)
 
 * MooseFS 3.0.112-1 (2020-03-24)
 

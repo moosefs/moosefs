@@ -5035,9 +5035,9 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 				f->lastrefresh = monotonic_time;
 				*changed = 1;
 			}
-			if (f->balancemode==REBALANCE_FORCE_SRC) {
+			if (f->balancemode==REBALANCE_FORCE_SRC && f->chunkcount>0) {
 				abovecnt++;
-			} else if (f->balancemode==REBALANCE_FORCE_DST) {
+			} else if (f->balancemode==REBALANCE_FORCE_DST && f->wfrcount==0) {
 				belowcnt++;
 			} else {
 				avgcount++;
@@ -5078,7 +5078,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 				}
 			}
 		}
-	} else { // usage rebalance
+	} else { // usage rebalance (only servers without '<' and '>')
 		rebalancediff = REBALANCE_DIFF_MAX;
 		if (rebalance_is_on) {
 			rebalancediff /= 2.0;
@@ -5086,7 +5086,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 		avgusage = 0.0;
 		avgcount = 0;
 		for (f=folderhead ; f ; f=f->next) {
-			if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+			if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->balancemode==REBALANCE_STD && f->total>REBALANCE_TOTAL_MIN) {
 				usage = f->total-f->avail;
 				usage /= f->total;
 				avgusage += usage;
@@ -5100,7 +5100,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 			abovecnt = 0;
 			abovesum = 0;
 			for (f=folderhead ; f ; f=f->next) {
-				if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+				if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->balancemode==REBALANCE_STD && f->total>REBALANCE_TOTAL_MIN) {
 					usage = f->total-f->avail;
 					usage /= f->total;
 					if (usage < avgusage - rebalancediff) {
@@ -5114,7 +5114,7 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 			}
 			if (abovecnt>0 || belowcnt>0) {
 				for (f=folderhead ; f ; f=f->next) {
-					if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->total>REBALANCE_TOTAL_MIN) {
+					if (f->damaged==0 && f->toremove==REMOVING_NO && f->markforremoval==MFR_NO && f->scanstate==SCST_WORKING && f->balancemode==REBALANCE_STD && f->total>REBALANCE_TOTAL_MIN) {
 						usage = f->total-f->avail;
 						usage /= f->total;
 						if ((((usage < avgusage - rebalancediff) && belowcnt>0) || ((usage <= avgusage + rebalancediff) && belowcnt==0)) && usage<REBALANCE_DST_MAX_USAGE && f->wfrcount==0) {

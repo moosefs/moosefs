@@ -5624,7 +5624,7 @@ uint8_t fs_univ_snapshot(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_
 		}
 		fsnodes_keep_alive_begin();
 		if ((smode & SNAPSHOT_MODE_FORCE_REMOVAL)==0 && (sesflags&SESFLAG_METARESTORE)==0) {
-			if (dwd->eattr&EATTR_APPENDONLY) {
+			if (dwd->eattr&(EATTR_APPENDONLY|EATTR_IMMUTABLE)) {
 				return MFS_ERROR_EPERM;
 			}
 			status = fsnodes_remove_snapshot_test(e,&args);

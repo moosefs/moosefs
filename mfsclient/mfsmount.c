@@ -633,9 +633,18 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 	}
 }
 
+static uint8_t fuse_init_set = 0;
+static uint32_t fuse_proto_major = 0;
+static uint32_t fuse_proto_minor = 0;
+static uint32_t fuse_capable = 0;
+static uint32_t fuse_defaults = 0;
+static uint32_t fuse_want = 0;
+
 static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	int *piped = (int*)userdata;
 	char s;
+
+	fuse_defaults = conn->want;
 #if FUSE_VERSION >= 30
 
 //	conn->max_write - default should be set to maximum value, so we don't want to decrease it
@@ -773,6 +782,7 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	}
 #endif
 #endif /* FUSE2/3 */
+
 #if defined(__FreeBSD__)
 	if (conn->proto_major>7 || (conn->proto_major==7 && conn->proto_minor>=23)) { // This is "New" Fuse introduced in FBSD 12.1 with many fixes - we want to change our default behaviour
 		mfs_freebsd_workarounds(0);
@@ -780,6 +790,11 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 		mfs_freebsd_workarounds(1);
 	}
 #endif
+	fuse_proto_major = conn->proto_major;
+	fuse_proto_minor = conn->proto_minor;
+	fuse_capable = conn->capable;
+	fuse_want = conn->want;
+	fuse_init_set = 1;
 	if (piped[1]>=0) {
 		s=0;
 		if (write(piped[1],&s,1)!=1) {
@@ -901,6 +916,27 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	bprintf("master_goallimit: %"PRIu8":%"PRIu8"\n",params_mingoal,params_maxgoal);
 	bprintf("master_trashlimit: %"PRIu32":%"PRIu32"\n",params_mintrashtime,params_maxtrashtime);
 	bprintf("master_disables: 0x%"PRIX32"\n",params_disables);
+	{
+		uint32_t mver = master_version();
+		if (mver>0) {
+			bprintf("moosefs_master_version: %u.%u.%u%s\n",(mver>>16),(mver>>8)&0xFF,(mver>>1)&0x7F,(mver&1)?"-pro":"");
+		}
+	}
+	bprintf("moosefs_mount_version: %s\n",VERSSTR);
+	bprintf("moosefs_mount_build: %u\n",BUILDNO);
+	bprintf("compiled_with_fuse: %u.%u\n",((FUSE_VERSION)/10),((FUSE_VERSION)%10));
+#if HAVE_FUSE_VERSION
+	{
+		int libver = fuse_version();
+		bprintf("fuse_library_version: %"PRId32".%"PRId32"\n",libver/10,libver%10);
+	}
+#endif
+	if (fuse_init_set) {
+		bprintf("kernel_fuse_protocol: %"PRIu32".%"PRIu32"\n",fuse_proto_major,fuse_proto_minor);
+		bprintf("kernel_capability_mask: 0x%"PRIX32"\n",fuse_capable);
+		bprintf("kernel_defaults_mask: 0x%"PRIX32"\n",fuse_defaults);
+		bprintf("kernel_working_mask: 0x%"PRIX32"\n",fuse_want);
+	}
 	return leng;
 }
 

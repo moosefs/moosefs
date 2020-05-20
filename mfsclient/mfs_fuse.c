@@ -184,8 +184,11 @@ static uint32_t rndjcong=380116160;
 
 static pthread_mutex_t randomlock = PTHREAD_MUTEX_INITIALIZER;
 
-static char *params_buff;
-static uint32_t params_leng;
+#define AUXBUFFSIZE 10000
+static pthread_mutex_t paramslock = PTHREAD_MUTEX_INITIALIZER;
+static char *params_buff = NULL;
+static uint32_t params_leng = 0;
+static double params_time = 0.0;
 
 /* STATS INODE BUFFER */
 
@@ -1170,6 +1173,27 @@ static void mfs_attr_to_stat(uint32_t inode,const uint8_t attr[ATTR_RECORD_SIZE]
 	stbuf->st_nlink = attrnlink;
 }
 
+void mfs_prepare_params(void) {
+	double now;
+	now = monotonic_seconds();
+	pthread_mutex_lock(&paramslock);
+	if (params_buff!=NULL && params_time+10.0<now) {
+		free(params_buff);
+		params_buff = NULL;
+		params_leng = 0;
+		params_time = now;
+	}
+	if (params_buff==NULL) {
+		params_buff = malloc(AUXBUFFSIZE);
+		params_leng = main_snprint_parameters(params_buff,AUXBUFFSIZE);
+		if (params_leng<AUXBUFFSIZE) {
+			params_buff = mfsrealloc(params_buff,params_leng);
+		}
+		mfs_attr_set_fleng(paramsattr,params_leng);
+	}
+	pthread_mutex_unlock(&paramslock);
+}
+
 static inline void mfs_makemodestr(char modestr[11],uint16_t mode) {
 	uint32_t i;
 	strcpy(modestr,"?rwxrwxrwx");
@@ -1552,6 +1576,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			return ;
 		}
 		if (strcmp(name,PARAMS_NAME)==0) {
+			mfs_prepare_params();
 			memset(&e, 0, sizeof(e));
 			e.ino = PARAMS_INODE;
 			e.generation = 1;
@@ -6002,16 +6027,6 @@ void mfs_term(void) {
 	}
 }
 
-#define AUXBUFFSIZE 10000
-void mfs_prepare_params(void) {
-	params_buff = malloc(AUXBUFFSIZE);
-	params_leng = main_snprint_parameters(params_buff,AUXBUFFSIZE);
-	if (params_leng<AUXBUFFSIZE) {
-		params_buff = mfsrealloc(params_buff,params_leng);
-	}
-	mfs_attr_set_fleng(paramsattr,params_leng);
-}
-
 void mfs_setdisables(uint32_t disables) {
 	mfs_disables = disables;
 }
@@ -6081,7 +6096,6 @@ void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout
 		fprintf(stderr,"mkdir copy sgid=%d\nsugid clear mode=%s\n",mkdir_copy_sgid_in,(sugid_clear_mode_in<SUGID_CLEAR_MODE_OPTIONS)?sugid_clear_mode_strings[sugid_clear_mode_in]:"???");
 	}
 	mfs_statsptr_init();
-	mfs_prepare_params();
 #if defined(__linux__)
 	if (kver<MAKE_KERNEL_VERSION(4,19)) {
 #ifdef DENTRY_INVALIDATOR

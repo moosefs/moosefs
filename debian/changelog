@@ -1,3 +1,19 @@
+moosefs (3.0.114-1) unstable; urgency=medium
+
+  * (all) This is 'work in progress' version !!!
+  * (mount) fixed trunacting files open with O_APPEND flag (bug itntr. in
+    3.0.133, issue #368)
+  * (cs) added disk rebalance when all designated source disks are already
+    empty (issue #364)
+  * (mount) added additional info to '.params' file (versions of mfs,libfuse
+    itp.)
+  * (master+cs) added check against EACCES after lockf (according to Linux man
+    - such stupid error can be returned here - issue #369)
+  * (master) fixed access checks in snapshot
+  * (cgi+cli) removed using supervisor (only available in PRO version)
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 20 May 2020 15:00:00 +0200
+
 moosefs (3.0.113-1) unstable; urgency=medium
 
   * (master) changed condition that decides if master should wait for more

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.60)
-AC_INIT([MFS], [3.0.113], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [3.0.114], [bugs@moosefs.com], [moosefs])
 release=1
 buildno=$(cat buildno.txt)
 
@@ -95,6 +95,7 @@ if test "$GCC" = "yes"; then
 fi
 
 root_sbindir="xxx"
+fuse_lib_name="fuse"
 
 case $target_os in
   *linux*)
@@ -117,6 +118,7 @@ case $target_os in
   *darwin*)
 	fuse=maybe
 	bdev=no
+	fuse_lib_name="osxfuse"
 	# MacFUSE installs to different prefix than pkgconfig
 	if test -f /usr/local/lib/pkgconfig/fuse.pc ; then
 		PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
@@ -607,7 +609,8 @@ if test "$fuse" != "no" ; then
 	esac
 fi
 
-AC_CHECK_LIB([fuse], [fuse_version], [AC_DEFINE([HAVE_FUSE_VERSION],[1],[libfuse has function fuse_version])])
+AC_CHECK_LIB([$fuse_lib_name], [fuse_version], [AC_DEFINE([HAVE_FUSE_VERSION],[1],[libfuse has function fuse_version])])
+dnl AC_CHECK_LIB([osxfuse], [fuse_version], [AC_DEFINE([HAVE_FUSE_VERSION],[1],[libfuse has function fuse_version])])
 
 AM_CONDITIONAL([WITH_MOUNT], [test "$fuse" != "no" -a "$enable_mfsmount" != "no"])
 

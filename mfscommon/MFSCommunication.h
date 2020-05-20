@@ -1525,7 +1525,7 @@
 // 0x01E3
 #define MATOCL_FUSE_CREATE (PROTO_BASE+483)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:ATTR (version < 3.0.112)
+// msgid:32 inode:32 attr:ATTR (version < 3.0.113)
 // msgid:32 flags:8 inode:32 attr:ATTR (version >= 3.0.113)
 
 // 0x01E4

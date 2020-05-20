@@ -2153,7 +2153,7 @@ void mfs_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *stbuf, int to_set,
 				fuse_reply_err(req,EBADF);
 				return;
 			}
-			if (fileinfo->mode!=IO_RW) { // forced appendonly should return EPERM not EACCES ?
+			if (fileinfo->mode==IO_RO) {
 				zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 				oplog_printf(&ctx,"setattr (%lu,0x%X,[%s]) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,to_set,setattr_str,(uint32_t)(fi->fh),strerr(EACCES));
 				fuse_reply_err(req,EACCES);

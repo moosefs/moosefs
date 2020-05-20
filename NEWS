@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.114-1 (WIP)
+
+  - (mount) fixed trunacting files open with O_APPEND flag (bug itntr. in 3.0.133, issue #368)
+
 * MooseFS 3.0.113-1 (2020-05-04)
 
   - (master) changed condition that decides if master should wait for more chunks during I/O

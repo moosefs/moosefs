@@ -72,6 +72,12 @@
 #define USE_PIO 1
 #endif
 
+#ifdef EWOULDBLOCK
+#  define LOCK_ERRNO_ERROR (errno!=EACCES && errno!=EAGAIN && errno!=EWOULDBLOCK)
+#else
+#  define LOCK_ERRNO_ERROR (errno!=EACCES && errno!=EAGAIN)
+#endif
+
 #define DUPLICATES_DELETE_LIMIT 100
 
 /* usec's to wait after last rebalance before choosing disk for new chunk */
@@ -6712,7 +6718,7 @@ int hdd_parseline(char *hddcfgline) {
 			return -1;
 		}
 		if (lockneeded && lockf(lfd,F_TLOCK,0)<0) {
-			if (ERRNO_ERROR) {
+			if (LOCK_ERRNO_ERROR) {
 				mfs_arg_errlog(LOG_NOTICE,"hdd space manager: lockf '%s' error",lockfname);
 			} else {
 				mfs_arg_syslog(LOG_ERR,"hdd space manager: data folder '%s' already locked (used by another process)",pptr);

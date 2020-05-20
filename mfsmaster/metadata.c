@@ -77,6 +77,12 @@
 
 #define MAXIDHOLE 10000
 
+#ifdef EWOULDBLOCK
+#  define LOCK_ERRNO_ERROR (errno!=EACCES && errno!=EAGAIN && errno!=EWOULDBLOCK)
+#else
+#  define LOCK_ERRNO_ERROR (errno!=EACCES && errno!=EAGAIN)
+#endif
+
 static uint64_t metaversion;
 static uint64_t metaid;
 
@@ -684,7 +690,7 @@ int meta_storeall(int bg) {
 	mfd = open("metadata.mfs.back.tmp",O_RDWR);
 	if (mfd>=0) {
 		if (lockf(mfd,F_TEST,0)<0) {
-			if (ERRNO_ERROR) {
+			if (LOCK_ERRNO_ERROR) {
 				mfs_errlog(LOG_ERR,"metadata store lockf error");
 			} else {
 				syslog(LOG_ERR,"previous metadata save process hasn't finished yet - do not start another one");
@@ -745,7 +751,7 @@ int meta_storeall(int bg) {
 		if (i==0) { // store in background - lock file
 			mfd = bio_descriptor(fd);
 			if (lockf(mfd,F_TLOCK,0)<0) {
-				if (ERRNO_ERROR) {
+				if (LOCK_ERRNO_ERROR) {
 					mfs_errlog(LOG_ERR,"metadata store child - lockf error");
 				} else {
 					syslog(LOG_ERR,"metadata store child process - file is already locked !!!");

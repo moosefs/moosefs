@@ -5,6 +5,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) fixed trunacting files open with O_APPEND flag (bug itntr. in 3.0.133, issue #368)
   - (cs) added disk rebalance when all designated source disks are already empty (issue #364)
   - (mount) added additional info to '.params' file (versions of mfs,libfuse itp.)
+  - (master+cs) added check against EACCES after lockf (according to Linux man - such stupid error can be returned here - issue #369)
 
 * MooseFS 3.0.113-1 (2020-05-04)
 

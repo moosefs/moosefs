@@ -2441,8 +2441,6 @@ if leaderfound==0:
 			out.append("""			<span class="ERROR">Leader master server not found, but there is an elect, so make sure that all chnunkservers are running - elect should became a leader soon</span><br />""")
 			out.append("""		</td>""")
 			out.append("""	</tr>""")
-		elif followerfound:
-			out.append("""	<tr><td align="center"><span class="ERROR">Leader master server not found !!!</span><br /><button type="button" onclick="document.location.href='%s'">click here to try to resolve this problem</button></td></tr>""" % createlink({"MAsupervisor":"true"}))
 		else:
 			out.append("""	<tr>""")
 			out.append("""		<td align="center">""")

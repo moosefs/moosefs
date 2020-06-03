@@ -280,7 +280,7 @@ void print_number(const char *prefix,const char *suffix,uint64_t number,uint8_t 
 	}
 }
 
-int my_get_number(const char *str,uint64_t *ret,double max,uint8_t bytesflag) {
+int my_get_number(const char *str,uint64_t *ret,uint64_t max,uint8_t bytesflag) {
 	uint64_t val,frac,fracdiv;
 	double drval,mult;
 	int f;
@@ -360,10 +360,9 @@ int my_get_number(const char *str,uint64_t *ret,double max,uint8_t bytesflag) {
 		return -1;
 	}
 	drval = round(((double)frac/(double)fracdiv+(double)val)*mult);
-	if (drval>max) {
+	*ret = drval;
+	if (drval>max || ((*ret)==0 && drval>1.0)) { // when max==UINT64_MAX and drval==2^64 then drval>max is false because common type for uint64_t and double is double and we lost precision here - therefore the second condition
 		return -2;
-	} else {
-		*ret = drval;
 	}
 	return 1;
 }

@@ -11,6 +11,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) fixed deadlock condition on mutexes 'folderlock' and 'hashlock' (exists since 3.0.110)
   - (tools) fixed oveflow protection in number parsing function
   - (cs) fixed reporting to master duplicates with newer version
+  - (cs) changed job queue policy (some tasks are not limited now)
 
 * MooseFS 3.0.113-1 (2020-05-04)
 

@@ -154,6 +154,7 @@ typedef struct _jobpool {
 	uint32_t workers_avail;
 	uint32_t workers_total;
 	uint32_t workers_term_waiting;
+	uint32_t qlimit;
 	pthread_cond_t worker_term_cond;
 	pthread_mutex_t pipelock;
 	pthread_mutex_t jobslock;
@@ -407,7 +408,11 @@ void* job_worker(void *arg) {
 	}
 }
 
-static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callback)(uint8_t status,void *extra),void *extra,uint8_t errstatus,uint8_t returnonfull) {
+#define JOB_MODE_ALWAYS_DO 0
+#define JOB_MODE_LIMITED_RETURN 1
+#define JOB_MODE_LIMITED_QUEUE 2
+
+static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callback)(uint8_t status,void *extra),void *extra,uint8_t errstatus,uint8_t jobmode) {
 //	jobpool* jp = (jobpool*)jpool;
 /*
 	if (exiting) {
@@ -442,9 +447,8 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 		jptr->next = jp->jobhash[jhpos];
 		jp->jobhash[jhpos] = jptr;
 		zassert(pthread_mutex_unlock(&(jp->jobslock)));
-//		queue_put(jp->jobqueue,jobid,op,(uint8_t*)jptr,1);
-		if (queue_tryput(jp->jobqueue,jobid,op,(uint8_t*)jptr,1)<0) {
-			if (returnonfull) {
+		if (queue_elements(jp->jobqueue)>jp->qlimit && jobmode!=JOB_MODE_ALWAYS_DO) {
+			if (jobmode==JOB_MODE_LIMITED_RETURN) {
 				// remove this job from data structures
 				zassert(pthread_mutex_lock(&(jp->jobslock)));
 				jhandle = jp->jobhash+jhpos;
@@ -466,6 +470,8 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 			} else {
 				job_send_status(jp,jobid,errstatus);
 			}
+		} else {
+			queue_put(jp->jobqueue,jobid,op,(uint8_t*)jptr,1);
 		}
 		return jobid;
 //	}
@@ -489,10 +495,11 @@ void* job_pool_new(uint32_t jobs) {
 	jp->workers_avail = 0;
 	jp->workers_total = 0;
 	jp->workers_term_waiting = 0;
+	jp->qlimit = jobs;
 	zassert(pthread_cond_init(&(jp->worker_term_cond),NULL));
 	zassert(pthread_mutex_init(&(jp->pipelock),NULL));
 	zassert(pthread_mutex_init(&(jp->jobslock),NULL));
-	jp->jobqueue = queue_new(jobs);
+	jp->jobqueue = queue_new(0);
 //	syslog(LOG_WARNING,"new jobqueue: %p",jp->jobqueue);
 	jp->statusqueue = queue_new(0);
 	zassert(pthread_mutex_lock(&(jp->jobslock)));
@@ -620,7 +627,7 @@ void job_pool_delete(jobpool* jp) {
 
 uint32_t job_inval(void (*callback)(uint8_t status,void *extra),void *extra) {
 	jobpool* jp = globalpool;
-	return job_new(jp,OP_INVAL,NULL,callback,extra,MFS_ERROR_EINVAL,0);
+	return job_new(jp,OP_INVAL,NULL,callback,extra,MFS_ERROR_EINVAL,JOB_MODE_ALWAYS_DO);
 }
 
 /*
@@ -645,7 +652,7 @@ uint32_t job_chunkop(void (*callback)(uint8_t status,void *extra),void *extra,ui
 	args->copychunkid = copychunkid;
 	args->copyversion = copyversion;
 	args->length = length;
-	return job_new(jp,OP_CHUNKOP,args,callback,extra,MFS_ERROR_NOTDONE,0);
+	return job_new(jp,OP_CHUNKOP,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_ALWAYS_DO);
 }
 /*
 uint32_t job_open(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version) {
@@ -707,7 +714,7 @@ uint32_t job_serv_read(void (*callback)(uint8_t status,void *extra),void *extra,
 	args->sock = sock;
 	args->packet = packet;
 	args->length = length;
-	return job_new(jp,OP_SERV_READ,args,callback,extra,0,1);
+	return job_new(jp,OP_SERV_READ,args,callback,extra,0,JOB_MODE_LIMITED_RETURN);
 }
 
 uint32_t job_serv_write(void (*callback)(uint8_t status,void *extra),void *extra,int sock,const uint8_t *packet,uint32_t length) {
@@ -718,7 +725,7 @@ uint32_t job_serv_write(void (*callback)(uint8_t status,void *extra),void *extra
 	args->sock = sock;
 	args->packet = packet;
 	args->length = length;
-	return job_new(jp,OP_SERV_WRITE,args,callback,extra,0,1);
+	return job_new(jp,OP_SERV_WRITE,args,callback,extra,0,JOB_MODE_LIMITED_RETURN);
 }
 
 uint32_t job_replicate_raid(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint8_t srccnt,const uint32_t xormasks[4],const uint8_t *srcs) {
@@ -737,7 +744,7 @@ uint32_t job_replicate_raid(void (*callback)(uint8_t status,void *extra),void *e
 	args->xormasks[2] = xormasks[2];
 	args->xormasks[3] = xormasks[3];
 	memcpy(ptr,srcs,srccnt*18);
-	return job_new(jp,OP_REPLICATE,args,callback,extra,MFS_ERROR_NOTDONE,0);
+	return job_new(jp,OP_REPLICATE,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_LIMITED_QUEUE);
 }
 
 uint32_t job_replicate_simple(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint32_t ip,uint16_t port) {
@@ -759,7 +766,7 @@ uint32_t job_replicate_simple(void (*callback)(uint8_t status,void *extra),void 
 	put32bit(&ptr,version);
 	put32bit(&ptr,ip);
 	put16bit(&ptr,port);
-	return job_new(jp,OP_REPLICATE,args,callback,extra,MFS_ERROR_NOTDONE,0);
+	return job_new(jp,OP_REPLICATE,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_LIMITED_QUEUE);
 }
 
 uint32_t job_get_chunk_blocks(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint8_t *blocks) {
@@ -770,7 +777,7 @@ uint32_t job_get_chunk_blocks(void (*callback)(uint8_t status,void *extra),void 
 	args->chunkid = chunkid;
 	args->version = version;
 	args->pointer = blocks;
-	return job_new(jp,OP_GETBLOCKS,args,callback,extra,MFS_ERROR_NOTDONE,0);
+	return job_new(jp,OP_GETBLOCKS,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_LIMITED_QUEUE);
 }
 
 uint32_t job_get_chunk_checksum(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint8_t *checksum) {
@@ -781,7 +788,7 @@ uint32_t job_get_chunk_checksum(void (*callback)(uint8_t status,void *extra),voi
 	args->chunkid = chunkid;
 	args->version = version;
 	args->pointer = checksum;
-	return job_new(jp,OP_GETCHECKSUM,args,callback,extra,MFS_ERROR_NOTDONE,0);
+	return job_new(jp,OP_GETCHECKSUM,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_LIMITED_QUEUE);
 }
 
 uint32_t job_get_chunk_checksum_tab(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version,uint8_t *checksum_tab) {
@@ -792,7 +799,7 @@ uint32_t job_get_chunk_checksum_tab(void (*callback)(uint8_t status,void *extra)
 	args->chunkid = chunkid;
 	args->version = version;
 	args->pointer = checksum_tab;
-	return job_new(jp,OP_GETCHECKSUMTAB,args,callback,extra,MFS_ERROR_NOTDONE,0);
+	return job_new(jp,OP_GETCHECKSUMTAB,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_LIMITED_QUEUE);
 }
 
 uint32_t job_chunk_move(void (*callback)(uint8_t status,void *extra),void *extra,void *fsrc,void *fdst) {
@@ -802,7 +809,7 @@ uint32_t job_chunk_move(void (*callback)(uint8_t status,void *extra),void *extra
 	passert(args);
 	args->fsrc = fsrc;
 	args->fdst = fdst;
-	return job_new(jp,OP_CHUNKMOVE,args,callback,extra,MFS_ERROR_NOTDONE,0);
+	return job_new(jp,OP_CHUNKMOVE,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_LIMITED_QUEUE);
 }
 
 void job_desc(struct pollfd *pdesc,uint32_t *ndesc) {

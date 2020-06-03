@@ -61,6 +61,9 @@
 #define LOSTCHUNKLIMIT 25000
 // has to be less than MaxPacketSize on master side divided by 12
 #define NEWCHUNKLIMIT 25000
+// has to be less than MaxPacketSize on master side divided by 12
+#define CHANGEDCHUNKLIMIT 25000
+
 
 #define REPORT_LOAD_FREQ 5
 #define REPORT_SPACE_FREQ 1
@@ -773,7 +776,7 @@ void masterconn_check_hdd_reports(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint32_t errorcounter;
 	uint32_t chunkcounter;
-	uint8_t *buff;
+	uint8_t *buffl,*buffn,*buffd;
 
 	if (reconnectisneeded) {
 		masterconn_send_disconnect_command(); // closes connection
@@ -788,24 +791,32 @@ void masterconn_check_hdd_reports(void) {
 		}
 		chunkcounter = hdd_get_damaged_chunk_count();	// lock
 		if (chunkcounter) {
-			buff = masterconn_create_attached_packet(eptr,CSTOMA_CHUNK_DAMAGED,8*chunkcounter);
-			hdd_get_damaged_chunk_data(buff);	// unlock
+			buffd = masterconn_create_attached_packet(eptr,CSTOMA_CHUNK_DAMAGED,8*chunkcounter);
+			hdd_get_damaged_chunk_data(buffd);	// fill and unlock
 		} else {
-			hdd_get_damaged_chunk_data(NULL);
+			hdd_get_damaged_chunk_data(NULL); // just unlock
 		}
 		chunkcounter = hdd_get_lost_chunk_count(LOSTCHUNKLIMIT);	// lock
 		if (chunkcounter) {
-			buff = masterconn_create_attached_packet(eptr,CSTOMA_CHUNK_LOST,8*chunkcounter);
-			hdd_get_lost_chunk_data(buff,LOSTCHUNKLIMIT);	// unlock
+			buffl = masterconn_create_attached_packet(eptr,CSTOMA_CHUNK_LOST,8*chunkcounter);
+			hdd_get_lost_chunk_data(buffl,LOSTCHUNKLIMIT);	// fill and unlock
 		} else {
-			hdd_get_lost_chunk_data(NULL,0);
+			hdd_get_lost_chunk_data(NULL,0); // just unlock
 		}
 		chunkcounter = hdd_get_new_chunk_count(NEWCHUNKLIMIT);	// lock
 		if (chunkcounter) {
-			buff = masterconn_create_attached_packet(eptr,CSTOMA_CHUNK_NEW,12*chunkcounter);
-			hdd_get_new_chunk_data(buff,NEWCHUNKLIMIT);	// unlock
+			buffn = masterconn_create_attached_packet(eptr,CSTOMA_CHUNK_NEW,12*chunkcounter);
+			hdd_get_new_chunk_data(buffn,NEWCHUNKLIMIT);	// fill and unlock
 		} else {
-			hdd_get_new_chunk_data(NULL,0);
+			hdd_get_new_chunk_data(NULL,0); // just unlock
+		}
+		chunkcounter = hdd_get_changed_chunk_count(CHANGEDCHUNKLIMIT); // lock
+		if (chunkcounter) {
+			buffl = masterconn_create_attached_packet(eptr,CSTOMA_CHUNK_LOST,8*chunkcounter);
+			buffn = masterconn_create_attached_packet(eptr,CSTOMA_CHUNK_NEW,12*chunkcounter);
+			hdd_get_changed_chunk_data(buffl,buffn,CHANGEDCHUNKLIMIT); // fill and unlock
+		} else {
+			hdd_get_changed_chunk_data(NULL,NULL,0); // just unlock
 		}
 	}
 }

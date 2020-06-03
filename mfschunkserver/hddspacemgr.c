@@ -169,6 +169,9 @@ typedef struct newchunk {
 	struct newchunk *next;
 } newchunk;
 
+#define CHGCHUNKSBLOCKSIZE NEWCHUNKSBLOCKSIZE
+typedef newchunk chgchunk;
+
 typedef struct dopchunk {
 	uint64_t chunkid;
 	struct dopchunk *next;
@@ -370,6 +373,7 @@ static dopchunk *newdopchunks = NULL;
 static damagedchunk *damagedchunks = NULL;
 static lostchunk *lostchunks = NULL;
 static newchunk *newchunks = NULL;
+static chgchunk *chgchunks = NULL;
 static uint32_t errorcounter = 0;
 static uint8_t hddspacechanged = 0;
 static uint8_t global_rebalance_is_on = 0;
@@ -654,6 +658,66 @@ void hdd_get_new_chunk_data(uint8_t *buff,uint32_t limit) {
 				free(nc);
 			} else {
 				ncptr = &(nc->next);
+			}
+		}
+	}
+	zassert(pthread_mutex_unlock(&dclock));
+}
+
+void hdd_report_changed_chunk(uint64_t chunkid,uint32_t version) {
+	chgchunk *xc;
+	zassert(pthread_mutex_lock(&dclock));
+	if (chgchunks && chgchunks->chunksinblock<CHGCHUNKSBLOCKSIZE) {
+		chgchunks->chunkidblock[chgchunks->chunksinblock] = chunkid;
+		chgchunks->versionblock[chgchunks->chunksinblock] = version;
+		chgchunks->chunksinblock++;
+	} else {
+		xc = malloc(sizeof(newchunk));
+		passert(xc);
+		xc->chunkidblock[0] = chunkid;
+		xc->versionblock[0] = version;
+		xc->chunksinblock = 1;
+		xc->next = chgchunks;
+		chgchunks = xc;
+	}
+	zassert(pthread_mutex_unlock(&dclock));
+}
+
+uint32_t hdd_get_changed_chunk_count(uint32_t limit) {
+	chgchunk *xc;
+	uint32_t result;
+	zassert(pthread_mutex_lock(&dclock));
+	result = 0;
+	for (xc=chgchunks ; xc ; xc=xc->next) {
+		if (limit>xc->chunksinblock) {
+			limit -= xc->chunksinblock;
+			result += xc->chunksinblock;
+		}
+	}
+	return result;
+}
+
+void hdd_get_changed_chunk_data(uint8_t *buffl,uint8_t *buffn,uint32_t limit) {
+	chgchunk *xc,**xcptr;
+	uint64_t chunkid;
+	uint32_t version;
+	uint32_t i;
+	if (buffl && buffn) {
+		xcptr = &chgchunks;
+		while ((xc=*xcptr)) {
+			if (limit>xc->chunksinblock) {
+				for (i=0 ; i<xc->chunksinblock ; i++) {
+					chunkid = xc->chunkidblock[i];
+					version = xc->versionblock[i];
+					put64bit(&buffl,chunkid);
+					put64bit(&buffn,chunkid);
+					put32bit(&buffn,version);
+				}
+				limit -= xc->chunksinblock;
+				*xcptr = xc->next;
+				free(xc);
+			} else {
+				xcptr = &(xc->next);
 			}
 		}
 	}
@@ -5912,6 +5976,7 @@ static inline void hdd_add_chunk(folder *f,uint16_t pathid,uint64_t chunkid,uint
 			c->pathid = pathid;
 			hdd_add_chunk_to_test_chain(c,currf);
 			zassert(pthread_mutex_unlock(&testlock));
+			hdd_report_changed_chunk(c->chunkid,c->version|((f->markforremoval!=MFR_NO)?0x80000000:0));
 		}
 	} else {
 		c->pathid = pathid;
@@ -6341,6 +6406,7 @@ void hdd_term(void) {
 	cntcond *cc,*ccn;
 	lostchunk *lc,*lcn;
 	newchunk *nc,*ncn;
+	chgchunk *xc,*xcn;
 	damagedchunk *dmc,*dmcn;
 	waitforremoval *wfr;
 
@@ -6489,6 +6555,10 @@ void hdd_term(void) {
 			zassert(pthread_cond_destroy(&(cc->cond)));
 		}
 		free(cc);
+	}
+	for (xc=chgchunks ; xc ; xc=xcn) {
+		xcn = xc->next;
+		free(xc);
 	}
 	for (nc=newchunks ; nc ; nc=ncn) {
 		ncn = nc->next;

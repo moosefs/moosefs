@@ -10,6 +10,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgi+cli) removed using supervisor (only available in PRO version)
   - (cs) fixed deadlock condition on mutexes 'folderlock' and 'hashlock' (exists since 3.0.110)
   - (tools) fixed oveflow protection in number parsing function
+  - (cs) fixed reporting to master duplicates with newer version
 
 * MooseFS 3.0.113-1 (2020-05-04)
 

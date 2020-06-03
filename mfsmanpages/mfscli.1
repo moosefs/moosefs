@@ -3,7 +3,7 @@
 mfscli - CGI in TXT mode
 .SH SYNOPSIS
 \fBmfscli\fP [\fB-pn28\fP] [\fB-H\fP \fImaster_host\fP] [\fB-P\fP \fImaster_port\fP]
-[\fB-f\fP \fI0..3\fP] \fB-S(IN|IM|LI|IG|MU|IC|IL|CS|MB|HD|EX|MS|LD|LS|OF|AL|MO|QU|MC|CC)\fP
+[\fB-f\fP \fI0..3\fP] \fB-S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|RS|SC|OF|AL|MO|QU|MC|CC)\fP
 [\fB-s\fP \fIseparator\fP] [\fB-o\fP \fIorder_id\fP [\fB-r\fP]] [\fB-m\fP \fImode_id\fP]
 [\fB-i\fP \fIid\fP] [\fB-a\fP \fIcount\fP] [\fB-b\fP \fIchart_data_columns\fP] [\fB-c\fP \fIcount\fP] [\fB-d\fP \fIchart_data_columns\fP]
 .PP
@@ -100,6 +100,9 @@ show only chunks info (goal/copies matrices)
 \fB-SIL\fP
 show only loop info (with messages)
 .TP
+\fB-SMF\fP
+show only missing chunks/files (report from last full chunk loop)
+.TP
 \fB-SCS\fP
 show connected chunk servers
 .TP
@@ -116,13 +119,10 @@ show exports
 show active mounts
 .TP
 \fB-SRS\fP
-show resources (labels,open files,acquired locks)
+show resources (storage classes,open files,acquired locks)
 .TP
-\fB-SLD\fP
-show label descriptions
-.TP
-\fB-SLS\fP
-show label sets
+\fB-SSC\fP
+show storage classes info
 .TP
 \fB-SOF\fP
 show only open files

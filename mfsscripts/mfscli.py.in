@@ -374,7 +374,7 @@ else: # CLI mode
 			val=""
 		if opt=='-h':
 			print("usage:")
-			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|SC|OF|AL|MO|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-a count] [-b chart_data_columns] [-c count] [-d chart_data_columns]" % sys.argv[0])
+			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|RS|SC|OF|AL|MO|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-a count] [-b chart_data_columns] [-c count] [-d chart_data_columns]" % sys.argv[0])
 			print("\t%s [-hpn28] [-H master_host] [-P master_port] [-f 0..3] -C(RC/ip/port|BW/ip/port|M[01]/ip/port|RS/sessionid)" % sys.argv[0])
 			print("\t%s -v" % sys.argv[0])
 			print("\ncommon:\n")
@@ -2462,8 +2462,6 @@ if leaderfound==0:
 			print("""Can't find masters (resolve '%s') !!!""" % (masterhost))
 		elif electfound:
 			print("Leader master server not found, but there is an elect, so make sure that all chnunkservers are running - elect should became a leader soon")
-		elif followerfound:
-			print("Leader master server not found !!! - maybe you should run 'mfssupervisor -f -x -H %s -P %u'" % (masterhost,mastercontrolport))
 		else:
 			print("Working master servers not found !!! - maybe you are using wrong port number or wrong dns name")
 	if not cgimode:

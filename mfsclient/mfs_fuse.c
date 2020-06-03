@@ -158,6 +158,7 @@ static uint8_t randomattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x24, 0,
 #define PARAMS_INODE 0x7FFFFFF5
 // 0x0124 == 0b100100100 == 0400
 static uint8_t paramsattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x00, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0, 0};
+#define PARAMS_BUFFSIZE 10000
 
 #define MIN_SPECIAL_INODE 0x7FFFFFF0
 #define IS_SPECIAL_INODE(ino) ((ino)>=MIN_SPECIAL_INODE)
@@ -183,12 +184,6 @@ static uint32_t rndjcong=380116160;
 #define KISS ((MWC^CONG)+SHR3)
 
 static pthread_mutex_t randomlock = PTHREAD_MUTEX_INITIALIZER;
-
-#define AUXBUFFSIZE 10000
-static pthread_mutex_t paramslock = PTHREAD_MUTEX_INITIALIZER;
-static char *params_buff = NULL;
-static uint32_t params_leng = 0;
-static double params_time = 0.0;
 
 /* STATS INODE BUFFER */
 
@@ -1173,27 +1168,6 @@ static void mfs_attr_to_stat(uint32_t inode,const uint8_t attr[ATTR_RECORD_SIZE]
 	stbuf->st_nlink = attrnlink;
 }
 
-void mfs_prepare_params(void) {
-	double now;
-	now = monotonic_seconds();
-	pthread_mutex_lock(&paramslock);
-	if (params_buff!=NULL && params_time+10.0<now) {
-		free(params_buff);
-		params_buff = NULL;
-		params_leng = 0;
-		params_time = now;
-	}
-	if (params_buff==NULL) {
-		params_buff = malloc(AUXBUFFSIZE);
-		params_leng = main_snprint_parameters(params_buff,AUXBUFFSIZE);
-		if (params_leng<AUXBUFFSIZE) {
-			params_buff = mfsrealloc(params_buff,params_leng);
-		}
-		mfs_attr_set_fleng(paramsattr,params_leng);
-	}
-	pthread_mutex_unlock(&paramslock);
-}
-
 static inline void mfs_makemodestr(char modestr[11],uint16_t mode) {
 	uint32_t i;
 	strcpy(modestr,"?rwxrwxrwx");
@@ -1576,7 +1550,6 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 			return ;
 		}
 		if (strcmp(name,PARAMS_NAME)==0) {
-			mfs_prepare_params();
 			memset(&e, 0, sizeof(e));
 			e.ino = PARAMS_INODE;
 			e.generation = 1;
@@ -1932,6 +1905,9 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	} else {
 		mfs_stats_inc(OP_GETATTR);
 		if (fdcache_find(&ctx,ino,attr,NULL)) {
+			if (debug_mode) {
+				fprintf(stderr,"getattr: sending data from fdcache\n");
+			}
 			status = MFS_STATUS_OK;
 		} else {
 			status = fs_getattr(ino,(fi!=NULL || fs_isopen(ino))?1:0,ctx.uid,ctx.gid,attr);
@@ -3634,38 +3610,6 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_open(req, fi);
 		return;
 	}
-
-	if (ino==STATS_INODE) {
-		sinfo *statsinfo;
-		uint32_t sindex;
-		sindex = sinfo_new();
-		statsinfo = sinfo_get(sindex);
-		passert(statsinfo);
-//		statsinfo = malloc(sizeof(sinfo));
-//		if (statsinfo==NULL) {
-//			oplog_printf(&ctx,"open (%lu) (internal node: STATS): %s",(unsigned long int)ino,strerr(ENOMEM));
-//			fuse_reply_err(req,ENOMEM);
-//			return;
-//		}
-		pthread_mutex_lock(&(statsinfo->lock));		// make helgrind happy
-		stats_show_all(&(statsinfo->buff),&(statsinfo->leng));
-		statsinfo->reset = 0;
-		pthread_mutex_unlock(&(statsinfo->lock));	// make helgrind happy
-		fi->fh = sindex;
-		fi->direct_io = 1;
-		fi->keep_cache = 0;
-		oplog_printf(&ctx,"open (%lu) (internal node: STATS): OK (1,0)",(unsigned long int)ino);
-		fuse_reply_open(req, fi);
-		return;
-	}
-	if (ino==MOOSE_INODE || ino==RANDOM_INODE) {
-		fi->fh = 0;
-		fi->direct_io = 1;
-		fi->keep_cache = 0;
-		oplog_printf(&ctx,"open (%lu) (internal node: %s): OK (1,0)",(unsigned long int)ino,(ino==MOOSE_INODE)?"MOOSE":"RANDOM");
-		fuse_reply_open(req, fi);
-		return;
-	}
 	if (ino==PARAMS_INODE) {
 		if ((fi->flags & O_ACCMODE) != O_RDONLY) {
 			oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): %s",(unsigned long int)ino,strerr(EACCES));
@@ -3677,10 +3621,38 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 			fuse_reply_err(req,EPERM);
 			return;
 		}
+	}
+	if (ino==STATS_INODE || ino==PARAMS_INODE) {
+		sinfo *statsinfo;
+		uint32_t sindex;
+		sindex = sinfo_new();
+		statsinfo = sinfo_get(sindex);
+		passert(statsinfo);
+		pthread_mutex_lock(&(statsinfo->lock));		// make helgrind happy
+		if (ino==STATS_INODE) {
+			stats_show_all(&(statsinfo->buff),&(statsinfo->leng));
+		} else { // ino==PARAMS_INODE
+			statsinfo->buff = malloc(PARAMS_BUFFSIZE);
+			statsinfo->leng = main_snprint_parameters(statsinfo->buff,PARAMS_BUFFSIZE);
+		}
+		statsinfo->reset = 0;
+		pthread_mutex_unlock(&(statsinfo->lock));	// make helgrind happy
+		fi->fh = sindex;
+		fi->direct_io = 1;
+		fi->keep_cache = 0;
+		if (ino==STATS_INODE) {
+			oplog_printf(&ctx,"open (%lu) (internal node: STATS): OK (1,0)",(unsigned long int)ino);
+		} else {
+			oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): OK (1,0)",(unsigned long int)ino);
+		}
+		fuse_reply_open(req, fi);
+		return;
+	}
+	if (ino==MOOSE_INODE || ino==RANDOM_INODE) {
 		fi->fh = 0;
-		fi->direct_io = 0;
-		fi->keep_cache = 1;
-		oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): OK (1,0)",(unsigned long int)ino);
+		fi->direct_io = 1;
+		fi->keep_cache = 0;
+		oplog_printf(&ctx,"open (%lu) (internal node: %s): OK (1,0)",(unsigned long int)ino,(ino==MOOSE_INODE)?"MOOSE":"RANDOM");
 		fuse_reply_open(req, fi);
 		return;
 	}
@@ -4090,7 +4062,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		}
 		return;
 	}
-	if (ino==STATS_INODE) {
+	if (ino==STATS_INODE || ino==PARAMS_INODE) {
 		sinfo *statsinfo = (fi!=NULL)?sinfo_get(fi->fh):NULL;
 		if (statsinfo!=NULL) {
 			pthread_mutex_lock(&(statsinfo->lock));		// make helgrind happy
@@ -4110,18 +4082,6 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 			fuse_reply_buf(req,NULL,0);
 		}
 		return;
-	}
-	if (ino==PARAMS_INODE) {
-		if (off>=params_leng) {
-			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
-			fuse_reply_buf(req,NULL,0);
-		} else if ((uint64_t)(off+size)>(uint64_t)(params_leng)) {
-			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)(params_leng-off));
-			fuse_reply_buf(req,params_buff+off,params_leng-off);
-		} else {
-			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)size);
-			fuse_reply_buf(req,params_buff+off,size);
-		}
 	}
 	if (ino==RANDOM_INODE) {
 		uint8_t *rbptr;

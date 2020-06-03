@@ -734,13 +734,13 @@ void masterconn_heavyload(uint32_t load,uint8_t hlstatus) {
 			hltosend = hlstatus;
 			rebalance = hdd_is_rebalance_on();
 			if (rebalance&2) { // in high speed rebalance force 'overloaded' status
-				hltosend = 2;
+				hltosend = HLSTATUS_OVERLOADED;
 			}
-			if (hlstatus!=2 && (rebalance&1)) { // not overloaded and in low speed rebalance - send 'rebalance' status
-				hltosend = 3;
+			if (hlstatus!=HLSTATUS_OVERLOADED && (rebalance&1)) { // not overloaded and in low speed rebalance - send 'rebalance' status
+				hltosend = HLSTATUS_REBALANCE;
 			}
-			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==3) { // does master know about 'rebalance' status? if not then send 'overloaded'
-				hltosend = 2;
+			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==HLSTATUS_REBALANCE) { // does master know about 'rebalance' status? if not then send 'overloaded'
+				hltosend = HLSTATUS_OVERLOADED;
 			}
 			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);
 			put32bit(&buff,load);
@@ -822,13 +822,13 @@ void masterconn_reportload(void) {
 			hltosend = eptr->hlstatus;
 			rebalance = hdd_is_rebalance_on();
 			if (rebalance&2) { // in high speed rebalance force 'overloaded' status
-				hltosend = 2;
+				hltosend = HLSTATUS_OVERLOADED;
 			}
-			if (hltosend!=2 && (rebalance&1)) { // not overloaded and in low speed rebalance - send 'rebalance' status
-				hltosend = 3;
+			if (hltosend!=HLSTATUS_OVERLOADED && (rebalance&1)) { // not overloaded and in low speed rebalance - send 'rebalance' status
+				hltosend = HLSTATUS_REBALANCE;
 			}
-			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==3) { // does master know about 'rebalance' status? if not then send 'overloaded'
-				hltosend = 2;
+			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==HLSTATUS_REBALANCE) { // does master know about 'rebalance' status? if not then send 'overloaded'
+				hltosend = HLSTATUS_OVERLOADED;
 			}
 			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);
 			put32bit(&buff,load);

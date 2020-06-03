@@ -2,12 +2,13 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 3.0.114-1 (WIP)
 
-  - (mount) fixed trunacting files open with O_APPEND flag (bug itntr. in 3.0.133, issue #368)
+  - (mount) fixed trunacting files open with O_APPEND flag (bug itntr. in 3.0.113, issue #368)
   - (cs) added disk rebalance when all designated source disks are already empty (issue #364)
   - (mount) added additional info to '.params' file (versions of mfs,libfuse itp.)
   - (master+cs) added check against EACCES after lockf (according to Linux man - such stupid error can be returned here - issue #369)
   - (master) fixed access checks in snapshot
   - (cgi+cli) removed using supervisor (only available in PRO version)
+  - (cs) fixed deadlock condition on mutexes 'folderlock' and 'hashlock' (exists since 3.0.110)
 
 * MooseFS 3.0.113-1 (2020-05-04)
 

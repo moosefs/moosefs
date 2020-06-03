@@ -833,22 +833,22 @@ void job_serve(struct pollfd *pdesc) {
 
 void job_heavyload_test(void) {
 	jobpool* jp = globalpool;
-	uint8_t hlstatus = 0;
+	uint8_t hlstatus = HLSTATUS_DEFAULT;
 	uint32_t load = 0; // make stupid gcc happy
 
 	zassert(pthread_mutex_lock(&(jp->jobslock)));
 	if (jp->workers_total - jp->workers_avail > jp->workers_himark) {
-		hlstatus = 2;
+		hlstatus = HLSTATUS_OVERLOADED;
 	}
 	if (jp->workers_total - jp->workers_avail < jp->workers_lomark) {
-		hlstatus = 1;
+		hlstatus = HLSTATUS_OK;
 	}
 	if (hlstatus) {
 		load = (jp->workers_total - jp->workers_avail) + queue_elements(jp->jobqueue);
 	}
 	zassert(pthread_mutex_unlock(&(jp->jobslock)));
 
-	if (hlstatus) {
+	if (hlstatus!=HLSTATUS_DEFAULT) {
 		masterconn_heavyload(load,hlstatus);
 	}
 }

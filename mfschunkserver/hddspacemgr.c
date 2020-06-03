@@ -1108,7 +1108,7 @@ static inline void hdd_error_occured(chunk *c,int report_damaged) {
 	errno = errmem;
 }
 
-static inline int chunk_writecrc(chunk *c);
+static inline int chunk_writecrc(chunk *c,uint8_t emergency_mode);
 
 static inline void hdd_chunk_remove(chunk *c) {
 	chunk **cptr,*cp;
@@ -1120,7 +1120,7 @@ static inline void hdd_chunk_remove(chunk *c) {
 			if (cp->fd>=0) {
 				if (cp->crcchanged && cp->owner!=NULL) { // mainly pro forma
 					syslog(LOG_WARNING,"hdd_chunk_remove: CRC not flushed - writing now");
-					chunk_writecrc(cp);
+					chunk_writecrc(cp,0);
 				}
 				close(cp->fd);
 				hdd_open_files_handle(OF_AFTER_CLOSE);
@@ -1281,7 +1281,7 @@ static chunk* hdd_chunk_get(uint64_t chunkid,uint8_t cflag) {
 				if (c->fd>=0) {
 					if (c->crcchanged) { // mainly pro forma
 						syslog(LOG_WARNING,"hdd_chunk_get: CRC not flushed - writing now");
-						chunk_writecrc(c);
+						chunk_writecrc(c,1);
 					}
 					close(c->fd);
 					hdd_open_files_handle(OF_AFTER_CLOSE);
@@ -1852,7 +1852,7 @@ uint8_t hdd_senddata(folder *f,int rmflag) {
 						if (c->fd>=0) {
 							if (c->crcchanged) {
 								syslog(LOG_WARNING,"hdd_senddata: CRC not flushed - writing now");
-								chunk_writecrc(c);
+								chunk_writecrc(c,1);
 							}
 							close(c->fd);
 							hdd_open_files_handle(OF_AFTER_CLOSE);
@@ -2323,10 +2323,10 @@ static inline void chunk_freecrc(chunk *c) {
 	c->crc = NULL;
 }
 
-static inline int chunk_writecrc(chunk *c) {
+static inline int chunk_writecrc(chunk *c,uint8_t emergency_mode) {
 	int ret;
 	char fname[PATH_MAX];
-	if (c->owner!=NULL) {
+	if (c->owner!=NULL && emergency_mode==0) {
 		zassert(pthread_mutex_lock(&folderlock));
 		c->owner->needrefresh = 1;
 		zassert(pthread_mutex_unlock(&folderlock));
@@ -2447,7 +2447,7 @@ void hdd_delayed_ops() {
 				if (c->fd>=0 && c->opento<now) {
 					if (c->crcchanged && c->owner!=NULL) { // should never happened !!!
 						syslog(LOG_WARNING,"hdd_delayed_ops: CRC not flushed - writing now");
-						if (chunk_writecrc(c)!=MFS_STATUS_OK) {
+						if (chunk_writecrc(c,0)!=MFS_STATUS_OK) {
 							hdd_error_occured(c,1);	// uses and preserves errno !!!
 						} else {
 							c->crcchanged = 0;
@@ -2581,7 +2581,7 @@ static int hdd_io_end(chunk *c) {
 	int status;
 
 	if (c->crcchanged) {
-		status = chunk_writecrc(c);
+		status = chunk_writecrc(c,0);
 		c->crcchanged = 0;
 		if (status!=MFS_STATUS_OK) {
 			return status;
@@ -5265,10 +5265,10 @@ void* hdd_highspeed_rebalance_thread(void *arg) {
 			if (HSRebalanceLimit==0) {
 				rebalance_is_on = 0;
 #ifdef HAVE___SYNC_FETCH_AND_OP
-				__sync_fetch_and_and(&global_rebalance_is_on,~1);
+				__sync_fetch_and_and(&global_rebalance_is_on,~2);
 #else
 				zassert(pthread_mutex_lock(&dclock));
-				global_rebalance_is_on &= ~1;
+				global_rebalance_is_on &= ~2;
 				zassert(pthread_mutex_unlock(&dclock));
 #endif
 			}
@@ -5282,6 +5282,7 @@ void* hdd_highspeed_rebalance_thread(void *arg) {
 				zassert(pthread_mutex_lock(&termlock));
 				if (term) {
 					zassert(pthread_mutex_unlock(&termlock));
+					zassert(pthread_mutex_unlock(&folderlock));
 					return arg;
 				}
 				zassert(pthread_mutex_unlock(&termlock));
@@ -6418,7 +6419,7 @@ void hdd_term(void) {
 				if (c->fd>=0) {
 					if (c->crcchanged) {
 						syslog(LOG_WARNING,"hdd_term: CRC not flushed - writing now");
-						chunk_writecrc(c);
+						chunk_writecrc(c,0);
 					}
 					close(c->fd);
 					hdd_open_files_handle(OF_AFTER_CLOSE);

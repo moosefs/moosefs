@@ -395,7 +395,7 @@ void bgsaver_worker(void) {
 					uint32_t i;
 
 					status = 1;
-					if (logfd) {
+					if (logfd>=0) {
 						if (fsync(logfd)<0) {
 							mfs_errlog_silent(LOG_ERR,"background data writer - error syncing 'changelog.0.mfs'");
 							status = 0;

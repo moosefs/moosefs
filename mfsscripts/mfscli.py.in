@@ -2438,7 +2438,7 @@ if leaderfound==0:
 		elif electfound:
 			out.append("""	<tr>""")
 			out.append("""		<td align="center">""")
-			out.append("""			<span class="ERROR">Leader master server not found, but there is an elect, so make sure that all chnunkservers are running - elect should became a leader soon</span><br />""")
+			out.append("""			<span class="ERROR">Leader master server not found, but there is an elect, so make sure that all chunkservers are running - elect should became a leader soon</span><br />""")
 			out.append("""		</td>""")
 			out.append("""	</tr>""")
 		else:
@@ -2461,7 +2461,7 @@ if leaderfound==0:
 		if len(masterlist)==0:
 			print("""Can't find masters (resolve '%s') !!!""" % (masterhost))
 		elif electfound:
-			print("Leader master server not found, but there is an elect, so make sure that all chnunkservers are running - elect should became a leader soon")
+			print("Leader master server not found, but there is an elect, so make sure that all chunkservers are running - elect should became a leader soon")
 		else:
 			print("Working master servers not found !!! - maybe you are using wrong port number or wrong dns name")
 	if not cgimode:

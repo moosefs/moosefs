@@ -2406,7 +2406,7 @@ if cgimode:
 	print("""</table></td>""")
 	print("""<td class="FILLER" style="white-space:nowrap;">""")
 	print("""CGI version: %s ; python: %u.%u<br />""" % (VERSION,sys.version_info[0],sys.version_info[1]))
-	print("""date: %s""" % time.asctime(time.localtime(time.time())))
+	print("""date: %s""" % time.strftime("%Y-%m-%d %H:%M:%S %Z",time.localtime(time.time())))
 	print("""</td>""")
 	print("""</tr>""")
 	print("""</table>""")

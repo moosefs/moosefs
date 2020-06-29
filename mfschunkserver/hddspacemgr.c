@@ -1805,6 +1805,13 @@ static inline void hdd_folder_dump_chunkdb_begin(folder *f) {
 	uint8_t *wptr;
 
 	if (f->damaged || f->markforremoval==MFR_READONLY || f->wfrcount>0) { // do not store '.chunkdb'
+		if (f->damaged) {
+			syslog(LOG_WARNING,"disk %s is marked as 'damaged' - '.chunkdb' not written",f->path);
+		} else if (f->markforremoval==MFR_READONLY) {
+			syslog(LOG_WARNING,"disk %s is marked as 'read-only' - can't write '.chunkdb'",f->path);
+		} else {
+			syslog(LOG_WARNING,"disk %s has pending duplicates - can't use '.chunkdb' to avoid full scan",f->path);
+		}
 		f->dumpfd = -1;
 		return;
 	}
@@ -1868,6 +1875,7 @@ static inline void hdd_folder_dump_chunkdb_end(folder *f) {
 		rename(fname_src,fname_dst);
 		free(fname_src);
 		free(fname_dst);
+		syslog(LOG_NOTICE,"disk %s: '.chunkdb' has been written",f->path);
 	}
 }
 

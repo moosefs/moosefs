@@ -16,6 +16,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed syncing and closing negative file descriptor in bgsaver
   - (mount+master) fixed handling keepcache and direct flags (related to issue #374)
   - (cgi) changed time format (issue #197)
+  - (cs) added logging info when '.chunkdb' is not written to disk
 
 * MooseFS 3.0.113-1 (2020-05-04)
 

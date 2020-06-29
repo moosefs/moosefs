@@ -2008,8 +2008,14 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			if (filenode && (lflags&LOOKUP_ACCESS_MODES_IO)!=0) { // can be read and/or written
 				if (eptr->version>=VERSION2INT(3,0,113)) {
 					if ((lflags&LOOKUP_DIRECTMODE)==0) {
-						if (dcm_open(inode,sessions_get_id(eptr->sesdata))) {
+						if (dcm_open(newinode,sessions_get_id(eptr->sesdata))) {
 							lflags |= LOOKUP_KEEPCACHE;
+						} else { // just fix for old clients
+							if (sesflags&SESFLAG_ATTRBIT) {
+								attr[0]&=(0xFF^MATTR_ALLOWDATACACHE);
+							} else {
+								attr[1]&=(0xFF^(MATTR_ALLOWDATACACHE<<4));
+							}
 						}
 					}
 				} else {
@@ -2903,6 +2909,12 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 			if ((oflags&OPEN_DIRECTMODE)==0) {
 				if (dcm_open(inode,sessions_get_id(eptr->sesdata))) {
 					oflags |= OPEN_KEEPCACHE;
+				} else { // just fix for old clients
+					if (sesflags&SESFLAG_ATTRBIT) {
+						attr[0]&=(0xFF^MATTR_ALLOWDATACACHE);
+					} else {
+						attr[1]&=(0xFF^(MATTR_ALLOWDATACACHE<<4));
+					}
 				}
 			}
 			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_OPEN,(eptr->asize+5));
@@ -3023,9 +3035,16 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		of_openfile(sessions_get_id(eptr->sesdata),newinode);
 		if (eptr->version>=VERSION2INT(3,0,113)) {
 			if ((oflags&OPEN_DIRECTMODE)==0) {
-				if (dcm_open(inode,sessions_get_id(eptr->sesdata))) {
-					oflags |= OPEN_KEEPCACHE;
-				}
+// testing dcm_open doesn't make sense here - this is new inode
+//				if (dcm_open(newinode,sessions_get_id(eptr->sesdata))) {
+//					oflags |= OPEN_KEEPCACHE;
+//				} else { // just fix for old clients
+					if (sesflags&SESFLAG_ATTRBIT) {
+						attr[0]&=(0xFF^MATTR_ALLOWDATACACHE);
+					} else {
+						attr[1]&=(0xFF^(MATTR_ALLOWDATACACHE<<4));
+					}
+//				}
 			}
 			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CREATE,eptr->asize+9);
 			put32bit(&ptr,msgid);
@@ -3034,13 +3053,13 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			memcpy(ptr,attr,eptr->asize);
 		} else {
 			if ((sesflags&SESFLAG_ATTRBIT)==0 || (attr[0]&MATTR_DIRECTMODE)==0) {
-				if (dcm_open(newinode,sessions_get_id(eptr->sesdata))==0) {
+//				if (dcm_open(newinode,sessions_get_id(eptr->sesdata))==0) {
 					if (sesflags&SESFLAG_ATTRBIT) {
 						attr[0]&=(0xFF^MATTR_ALLOWDATACACHE);
 					} else {
 						attr[1]&=(0xFF^(MATTR_ALLOWDATACACHE<<4));
 					}
-				}
+//				}
 			}
 			ptr = matoclserv_createpacket(eptr,MATOCL_FUSE_CREATE,eptr->asize+8);
 			put32bit(&ptr,msgid);

@@ -3764,7 +3764,7 @@ uint8_t fs_create(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mod
 	} else if (i==1) {
 		ret = rptr[0];
 	} else if (i==(uint32_t)(4+asize)) {
-		*oflags = 0;
+		*oflags = 0xFF;
 		*inode = get32bit(&rptr);
 		copy_attr(rptr,attr,asize);
 		ret = MFS_STATUS_OK;
@@ -3825,7 +3825,7 @@ uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uin
 			memset(attr,0,ATTR_RECORD_SIZE);
 		}
 		if (oflags) {
-			*oflags = 0;
+			*oflags = 0xFF;
 		}
 		ret = rptr[0];
 	} else if (i==asize) {
@@ -3833,7 +3833,7 @@ uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uin
 			copy_attr(rptr,attr,asize);
 		}
 		if (oflags) {
-			*oflags = 0;
+			*oflags = 0xFF;
 		}
 		ret = MFS_STATUS_OK;
 	} else if (i==(uint32_t)(1+asize)) {

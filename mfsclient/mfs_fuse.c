@@ -3512,7 +3512,8 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	}
 
 	mattr = mfs_attr_get_mattr(attr);
-	if (oflags==0) { // old masters compatibility
+	if (oflags==0xFF) { // old masters compatibility
+		oflags = 0;
 		if (mattr&MATTR_DIRECTMODE) {
 			oflags |= OPEN_DIRECTMODE;
 		}
@@ -3762,7 +3763,8 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 
 	mattr = mfs_attr_get_mattr(attr);
-	if (oflags==0) { // old masters compatibility
+	if (oflags==0xFF) { // old masters compatibility
+		oflags = 0;
 		if (mattr&MATTR_DIRECTMODE) {
 			oflags |= OPEN_DIRECTMODE;
 		}

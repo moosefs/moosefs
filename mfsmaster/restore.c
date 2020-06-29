@@ -601,7 +601,7 @@ int do_freeinodes(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	return fs_mr_freeinodes(ts,freeinodes,sustainedinodes,inode_chksum);
 }
 
-int do_incversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+int do_incversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) { // depreciated - replaced by 'setversion'
 	uint64_t chunkid;
 	(void)ts;
 	EAT(ptr,filename,lv,'(');
@@ -610,6 +610,20 @@ int do_incversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	(void)ptr; // silence cppcheck warnings
 	return chunk_mr_increase_version(chunkid);
 }
+
+int do_setversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint64_t chunkid;
+	uint32_t version;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU64(chunkid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(version,ptr);
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return chunk_mr_set_version(chunkid,version);
+}
+
 
 int do_link(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,parent;
@@ -1566,7 +1580,7 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 			break;
 		case HASHCODE('I','N','C','V'):
 			if (strncmp(ptr,"INCVERSION",10)==0) {
-				return do_incversion(filename,lv,ts,ptr+10);
+				return do_incversion(filename,lv,ts,ptr+10); // deprecated -> SETVERSION
 			}
 			break;
 		case HASHCODE('L','E','N','G'):
@@ -1651,6 +1665,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 		case HASHCODE('S','E','T','T'):
 			if (strncmp(ptr,"SETTRASHTIME",12)==0) {
 				return do_settrashtime(filename,lv,ts,ptr+12);
+			}
+			break;
+		case HASHCODE('S','E','T','V'):
+			if (strncmp(ptr,"SETVERSION",10)==0) {
+				return do_setversion(filename,lv,ts,ptr+10);
 			}
 			break;
 		case HASHCODE('S','E','T','X'):

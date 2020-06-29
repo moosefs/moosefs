@@ -1220,7 +1220,7 @@ void chunk_emergency_increase_version(chunk *c) {
 		c->interrupted = 0;
 		c->operation = SET_VERSION;
 		c->version++;
-		changelog("%"PRIu32"|INCVERSION(%"PRIu64")",(uint32_t)main_time(),c->chunkid);
+		changelog("%"PRIu32"|SETVERSION(%"PRIu64",%"PRIu32")",(uint32_t)main_time(),c->chunkid,c->version);
 	} else {
 		matoclserv_chunk_status(c->chunkid,MFS_ERROR_CHUNKLOST);
 	}
@@ -1228,6 +1228,7 @@ void chunk_emergency_increase_version(chunk *c) {
 
 static inline int chunk_remove_disconnected_chunks(chunk *c) {
 	uint8_t opfinished,validcopies,disc;
+	uint8_t verfixed;
 	slist *s,**st;
 
 	if (discservers==NULL && discservers_next==NULL) {
@@ -1277,6 +1278,32 @@ static inline int chunk_remove_disconnected_chunks(chunk *c) {
 				validcopies=1;
 			}
 		}
+
+		if (opfinished && validcopies==0 && (c->operation==SET_VERSION || c->operation==TRUNCATE)) { // we know that version increase was just not completed, so all WVER chunks with version exactly one lower than chunk version are actually VALID copies
+			verfixed = 0;
+			for (s=c->slisthead ; s!=NULL ; s=s->next) {
+				if (s->version+1==c->version) {
+					if (s->valid==TDWVER) {
+						verfixed = 1;
+						s->valid = TDVALID;
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies);
+						c->allvalidcopies++;
+					} else if (s->valid==WVER) {
+						verfixed = 1;
+						s->valid = VALID;
+						chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+						c->allvalidcopies++;
+						c->regularvalidcopies++;
+					}
+				}
+				if (verfixed) {
+					c->version--;
+					changelog("%"PRIu32"|SETVERSION(%"PRIu64",%"PRIu32")",(uint32_t)main_time(),c->chunkid,c->version);
+				}
+			}
+			// we continue because we still want to return status not done to matoclserv module
+		}
+
 		if (opfinished) {
 			uint8_t nospace,status;
 			nospace = 1;
@@ -2923,7 +2950,8 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_t operation) {
 	chunk *c;
 	uint8_t opfinished,validcopies;
-	slist *s;
+	uint8_t verfixed;
+	slist *s,**st;
 
 	if (status==MFS_STATUS_OK) {
 		if (operation==CREATE) {
@@ -2966,9 +2994,11 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32" - got unexpected status (expected: %s ; got: %s)",chunkid,c->version,opstr[eop],opstr[sop]);
 	}
 
-	validcopies=0;
-	opfinished=1;
-	for (s=c->slisthead ; s ; s=s->next) {
+	validcopies = 0;
+	opfinished = 1;
+
+	st = &(c->slisthead);
+	while ((s=*st)!=NULL) {
 		if (s->csid == csid) {
 			if (status!=0) {
 				c->interrupted = 1;	// increase version after finish, just in case
@@ -2984,8 +3014,23 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 				if (c->writeinprogress && s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER) {
 					 matocsserv_write_counters(cstab[s->csid].ptr,0);
 				}
-				s->valid = INVALID;
-				s->version = 0;	// after unfinished operation can't be shure what version chunk has
+				if (status==MFS_ERROR_NOTDONE) { // special case - this operation was not even started, so we know exact result
+					if (c->operation==SET_VERSION || c->operation==TRUNCATE) { // chunk left not changed, but now it has wrong version
+						if (s->valid==TDBUSY || s->valid==TDVALID) {
+							s->valid = TDWVER;
+						} else {
+							s->valid = WVER;
+						}
+						s->version--;
+					} else if (c->operation==CREATE || c->operation==DUPLICATE || c->operation==DUPTRUNC) { // copy not created
+						*st = s->next;
+						slist_free(s);
+						continue;
+					}
+				} else {
+					s->valid = INVALID;
+					s->version = 0;	// after unfinished operation can't be shure what version chunk has
+				}
 			} else {
 				if (s->valid==TDBUSY || s->valid==TDVALID) {
 					s->valid=TDVALID;
@@ -3002,6 +3047,31 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 		if (s->valid==VALID || s->valid==TDVALID) {
 			validcopies=1;
 		}
+		st = &(s->next);
+	}
+	if (opfinished && validcopies==0 && (c->operation==SET_VERSION || c->operation==TRUNCATE)) { // we know that version increase was just not completed, so all WVER chunks with version exactly one lower than chunk version are actually VALID copies
+		verfixed = 0;
+		for (s=c->slisthead ; s!=NULL ; s=s->next) {
+			if (s->version+1==c->version) {
+				if (s->valid==TDWVER) {
+					verfixed = 1;
+					s->valid = TDVALID;
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies);
+					c->allvalidcopies++;
+				} else if (s->valid==WVER) {
+					verfixed = 1;
+					s->valid = VALID;
+					chunk_state_change(c->sclassid,c->sclassid,c->archflag,c->archflag,c->allvalidcopies,c->allvalidcopies+1,c->regularvalidcopies,c->regularvalidcopies+1);
+					c->allvalidcopies++;
+					c->regularvalidcopies++;
+				}
+			}
+			if (verfixed) {
+				c->version--;
+				changelog("%"PRIu32"|SETVERSION(%"PRIu64",%"PRIu32")",(uint32_t)main_time(),c->chunkid,c->version);
+			}
+		}
+		// we continue because we still want to return status not done to matoclserv module
 	}
 	if (opfinished) {
 		uint8_t nospace;

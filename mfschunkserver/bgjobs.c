@@ -154,7 +154,6 @@ typedef struct _jobpool {
 	uint32_t workers_avail;
 	uint32_t workers_total;
 	uint32_t workers_term_waiting;
-	uint32_t qlimit;
 	pthread_cond_t worker_term_cond;
 	pthread_mutex_t pipelock;
 	pthread_mutex_t jobslock;
@@ -427,6 +426,8 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 */
 		uint32_t jobid;
 		uint32_t jhpos;
+		uint32_t workers_busy;
+		uint32_t limit;
 		job **jhandle,*jptr;
 
 		jptr = malloc(sizeof(job));
@@ -446,8 +447,10 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 		jptr->jstate = JSTATE_ENABLED;
 		jptr->next = jp->jobhash[jhpos];
 		jp->jobhash[jhpos] = jptr;
+		workers_busy = jp->workers_total-jp->workers_avail;
+		limit = jp->workers_max;
 		zassert(pthread_mutex_unlock(&(jp->jobslock)));
-		if (queue_elements(jp->jobqueue)>jp->qlimit && jobmode!=JOB_MODE_ALWAYS_DO) {
+		if (queue_elements(jp->jobqueue)+workers_busy>limit && jobmode!=JOB_MODE_ALWAYS_DO) {
 			if (jobmode==JOB_MODE_LIMITED_RETURN) {
 				// remove this job from data structures
 				zassert(pthread_mutex_lock(&(jp->jobslock)));
@@ -479,7 +482,7 @@ static inline uint32_t job_new(jobpool *jp,uint32_t op,void *args,void (*callbac
 
 /* interface */
 
-void* job_pool_new(uint32_t jobs) {
+void* job_pool_new(void) {
 	int fd[2];
 	uint32_t i;
 	jobpool* jp;
@@ -495,7 +498,6 @@ void* job_pool_new(uint32_t jobs) {
 	jp->workers_avail = 0;
 	jp->workers_total = 0;
 	jp->workers_term_waiting = 0;
-	jp->qlimit = jobs;
 	zassert(pthread_cond_init(&(jp->worker_term_cond),NULL));
 	zassert(pthread_mutex_init(&(jp->pipelock),NULL));
 	zassert(pthread_mutex_init(&(jp->jobslock),NULL));
@@ -627,7 +629,7 @@ void job_pool_delete(jobpool* jp) {
 
 uint32_t job_inval(void (*callback)(uint8_t status,void *extra),void *extra) {
 	jobpool* jp = globalpool;
-	return job_new(jp,OP_INVAL,NULL,callback,extra,MFS_ERROR_EINVAL,JOB_MODE_ALWAYS_DO);
+	return job_new(jp,OP_INVAL,NULL,callback,extra,MFS_ERROR_EINVAL,JOB_MODE_LIMITED_QUEUE);
 }
 
 /*
@@ -652,7 +654,7 @@ uint32_t job_chunkop(void (*callback)(uint8_t status,void *extra),void *extra,ui
 	args->copychunkid = copychunkid;
 	args->copyversion = copyversion;
 	args->length = length;
-	return job_new(jp,OP_CHUNKOP,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_ALWAYS_DO);
+	return job_new(jp,OP_CHUNKOP,args,callback,extra,MFS_ERROR_NOTDONE,JOB_MODE_LIMITED_QUEUE);
 }
 /*
 uint32_t job_open(void (*callback)(uint8_t status,void *extra),void *extra,uint64_t chunkid,uint32_t version) {
@@ -888,7 +890,7 @@ void job_reload(void) {
 int job_init(void) {
 //	globalpool = (jobpool*)malloc(sizeof(jobpool));
 //	exiting = 0;
-	globalpool = job_pool_new(cfg_getuint32("WORKERS_QUEUE_LENGTH",250)); // deprecated option
+	globalpool = job_pool_new();
 
 	if (globalpool==NULL) {
 		return -1;

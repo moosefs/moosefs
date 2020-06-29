@@ -636,15 +636,19 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 static uint8_t fuse_init_set = 0;
 static uint32_t fuse_proto_major = 0;
 static uint32_t fuse_proto_minor = 0;
+#if FUSE_VERSION >= 28
 static uint32_t fuse_capable = 0;
 static uint32_t fuse_defaults = 0;
 static uint32_t fuse_want = 0;
+#endif
 
 static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	int *piped = (int*)userdata;
 	char s;
 
+#if FUSE_VERSION >= 28
 	fuse_defaults = conn->want;
+#endif
 #if FUSE_VERSION >= 30
 
 //	conn->max_write - default should be set to maximum value, so we don't want to decrease it
@@ -792,8 +796,10 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 #endif
 	fuse_proto_major = conn->proto_major;
 	fuse_proto_minor = conn->proto_minor;
+#if FUSE_VERSION >= 28
 	fuse_capable = conn->capable;
 	fuse_want = conn->want;
+#endif
 	fuse_init_set = 1;
 	if (piped[1]>=0) {
 		s=0;
@@ -933,9 +939,11 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 #endif
 	if (fuse_init_set) {
 		bprintf("kernel_fuse_protocol: %"PRIu32".%"PRIu32"\n",fuse_proto_major,fuse_proto_minor);
+#if FUSE_VERSION >= 28
 		bprintf("kernel_capability_mask: 0x%"PRIX32"\n",fuse_capable);
 		bprintf("kernel_defaults_mask: 0x%"PRIX32"\n",fuse_defaults);
 		bprintf("kernel_working_mask: 0x%"PRIX32"\n",fuse_want);
+#endif
 	}
 	return leng;
 }

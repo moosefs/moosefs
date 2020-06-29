@@ -17,6 +17,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount+master) fixed handling keepcache and direct flags (related to issue #374)
   - (cgi) changed time format (issue #197)
   - (cs) added logging info when '.chunkdb' is not written to disk
+  - (master) fixed alphabetical order of commands detected in changelog
 
 * MooseFS 3.0.113-1 (2020-05-04)
 

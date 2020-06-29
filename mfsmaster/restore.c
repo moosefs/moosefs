@@ -1539,14 +1539,14 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_chunkdel(filename,lv,ts,ptr+8);
 			}
 			break;
-		case HASHCODE('C','S','D','B'):
-			if (strncmp(ptr,"CSDBOP",6)==0) {
-				return do_csdbop(filename,lv,ts,ptr+6);
-			}
-			break;
 		case HASHCODE('C','S','A','D'):
 			if (strncmp(ptr,"CSADD",5)==0) {		// deprecated
 				return do_csadd(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('C','S','D','B'):
+			if (strncmp(ptr,"CSDBOP",6)==0) {
+				return do_csdbop(filename,lv,ts,ptr+6);
 			}
 			break;
 		case HASHCODE('C','S','D','E'):
@@ -1590,13 +1590,13 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 			break;
 		case HASHCODE('L','I','N','K'):
 			return do_link(filename,lv,ts,ptr+4);
+		case HASHCODE('M','O','V','E'):
+			return do_move(filename,lv,ts,ptr+4);
 		case HASHCODE('N','E','X','T'):
 			if (strncmp(ptr,"NEXTCHUNKID",11)==0) {
 				return do_nextchunkid(filename,lv,ts,ptr+11); // deprecated
 			}
 			break;
-		case HASHCODE('M','O','V','E'):
-			return do_move(filename,lv,ts,ptr+4);
 		case HASHCODE('P','O','S','I'):
 			if (strncmp(ptr,"POSIXLOCK",9)==0) {
 				return do_posixlock(filename,lv,ts,ptr+9);
@@ -1617,19 +1617,66 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_release(filename,lv,ts,ptr+7);
 			}
 			break;
-		case HASHCODE('R','E','P','A'):
-			if (strncmp(ptr,"REPAIR",6)==0) {
-				return do_repair(filename,lv,ts,ptr+6);
-			}
-			break;
 		case HASHCODE('R','E','N','U'):
 			if (strncmp(ptr,"RENUMERATEEDGES",15)==0) {
 				return do_renumedges(filename,lv,ts,ptr+15);
 			}
 			break;
+		case HASHCODE('R','E','P','A'):
+			if (strncmp(ptr,"REPAIR",6)==0) {
+				return do_repair(filename,lv,ts,ptr+6);
+			}
+			break;
 		case HASHCODE('R','O','L','L'):
 			if (strncmp(ptr,"ROLLBACK",8)==0) {
 				return do_rollback(filename,lv,ts,ptr+8);
+			}
+			break;
+		case HASHCODE('S','C','D','E'):
+			if (strncmp(ptr,"SCDEL",5)==0) {
+				return do_scdel(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('S','C','D','U'):
+			if (strncmp(ptr,"SCDUP",5)==0) {
+				return do_scdup(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('S','C','R','E'):
+			if (strncmp(ptr,"SCREN",5)==0) {
+				return do_scren(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('S','C','S','E'):
+			if (strncmp(ptr,"SCSET",5)==0) {
+				return do_scset(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('S','E','S','A'):
+			if (strncmp(ptr,"SESADD",6)==0) {
+				return do_sesadd(filename,lv,ts,ptr+6);
+			}
+			break;
+		case HASHCODE('S','E','S','C'):
+			if (strncmp(ptr,"SESCHANGED",10)==0) {
+				return do_seschanged(filename,lv,ts,ptr+10);
+			}
+			break;
+		case HASHCODE('S','E','S','D'):
+			if (strncmp(ptr,"SESDEL",6)==0) {
+				return do_sesdel(filename,lv,ts,ptr+6);
+			} else if (strncmp(ptr,"SESDISCONNECTED",15)==0) {
+				return do_sesdisconnected(filename,lv,ts,ptr+15);
+			}
+			break;
+		case HASHCODE('S','E','S','S'):
+			if (strncmp(ptr,"SESSION",7)==0) { // deprecated
+				return do_session(filename,lv,ts,ptr+7);
+			}
+			break;
+		case HASHCODE('S','E','T','A'):
+			if (strncmp(ptr,"SETACL",6)==0) {
+				return do_setacl(filename,lv,ts,ptr+6);
 			}
 			break;
 		case HASHCODE('S','E','T','E'):
@@ -1677,11 +1724,6 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_setxattr(filename,lv,ts,ptr+8);
 			}
 			break;
-		case HASHCODE('S','E','T','A'):
-			if (strncmp(ptr,"SETACL",6)==0) {
-				return do_setacl(filename,lv,ts,ptr+6);
-			}
-			break;
 		case HASHCODE('S','N','A','P'):
 			if (strncmp(ptr,"SNAPSHOT",8)==0) {
 				return do_snapshot(filename,lv,ts,ptr+8);
@@ -1692,61 +1734,19 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_symlink(filename,lv,ts,ptr+7);
 			}
 			break;
-		case HASHCODE('S','E','S','S'):
-			if (strncmp(ptr,"SESSION",7)==0) { // deprecated
-				return do_session(filename,lv,ts,ptr+7);
-			}
-			break;
-		case HASHCODE('S','E','S','A'):
-			if (strncmp(ptr,"SESADD",6)==0) {
-				return do_sesadd(filename,lv,ts,ptr+6);
-			}
-			break;
-		case HASHCODE('S','E','S','C'):
-			if (strncmp(ptr,"SESCHANGED",10)==0) {
-				return do_seschanged(filename,lv,ts,ptr+10);
-			}
-			break;
-		case HASHCODE('S','E','S','D'):
-			if (strncmp(ptr,"SESDEL",6)==0) {
-				return do_sesdel(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"SESDISCONNECTED",15)==0) {
-				return do_sesdisconnected(filename,lv,ts,ptr+15);
-			}
-			break;
-		case HASHCODE('S','C','D','E'):
-			if (strncmp(ptr,"SCDEL",5)==0) {
-				return do_scdel(filename,lv,ts,ptr+5);
-			}
-			break;
-		case HASHCODE('S','C','D','U'):
-			if (strncmp(ptr,"SCDUP",5)==0) {
-				return do_scdup(filename,lv,ts,ptr+5);
-			}
-			break;
-		case HASHCODE('S','C','R','E'):
-			if (strncmp(ptr,"SCREN",5)==0) {
-				return do_scren(filename,lv,ts,ptr+5);
-			}
-			break;
-		case HASHCODE('S','C','S','E'):
-			if (strncmp(ptr,"SCSET",5)==0) {
-				return do_scset(filename,lv,ts,ptr+5);
-			}
-			break;
 		case HASHCODE('T','R','U','N'):
 			if (strncmp(ptr,"TRUNC",5)==0) {
 				return do_trunc(filename,lv,ts,ptr+5);
 			}
 			break;
-		case HASHCODE('U','N','L','I'):
-			if (strncmp(ptr,"UNLINK",6)==0) {
-				return do_unlink(filename,lv,ts,ptr+6);
-			}
-			break;
 		case HASHCODE('U','N','D','E'):
 			if (strncmp(ptr,"UNDEL",5)==0) {
 				return do_undel(filename,lv,ts,ptr+5);
+			}
+			break;
+		case HASHCODE('U','N','L','I'):
+			if (strncmp(ptr,"UNLINK",6)==0) {
+				return do_unlink(filename,lv,ts,ptr+6);
 			}
 			break;
 		case HASHCODE('U','N','L','O'):

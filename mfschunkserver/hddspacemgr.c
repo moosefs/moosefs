@@ -1825,21 +1825,24 @@ static inline void hdd_folder_dump_chunkdb_begin(folder *f) {
 	if (f->dumpfd<0) {
 		mfs_arg_errlog(LOG_NOTICE,"%s: open error",fname);
 	}
-	free(fname);
 	if (f->dumpfd>=0) {
 		memcpy(hdr,"MFS CHUNKDB2",12);
 		wptr = hdr+12;
 		put16bit(&wptr,pleng);
 		if (write(f->dumpfd,hdr,14)!=14) {
+			mfs_arg_errlog(LOG_NOTICE,"%s: write error",fname);
 			close(f->dumpfd);
 			f->dumpfd = -1;
+			free(fname);
 			return;
 		}
 		if (write(f->dumpfd,f->path,pleng)!=(int32_t)pleng) {
+			mfs_arg_errlog(LOG_NOTICE,"%s: write error",fname);
 			close(f->dumpfd);
 			f->dumpfd = -1;
 		}
 	}
+	free(fname);
 }
 
 static inline void hdd_folder_dump_chunkdb_end(folder *f) {
@@ -1847,19 +1850,6 @@ static inline void hdd_folder_dump_chunkdb_end(folder *f) {
 		uint32_t pleng;
 		char *fname_src,*fname_dst;
 		uint8_t buff[18];
-
-		memset(buff,0,18);
-
-		if (write(f->dumpfd,buff,18)!=18) {
-			close(f->dumpfd);
-			f->dumpfd = -1;
-			return;
-		}
-
-		if (close(f->dumpfd)<0) {
-			f->dumpfd = -1;
-			return;
-		}
 
 		pleng = strlen(f->path);
 		fname_src = malloc(pleng+13);
@@ -1872,7 +1862,34 @@ static inline void hdd_folder_dump_chunkdb_end(folder *f) {
 		memcpy(fname_dst,f->path,pleng);
 		memcpy(fname_dst+pleng,".chunkdb",8);
 		fname_dst[pleng+8] = 0;
-		rename(fname_src,fname_dst);
+
+		memset(buff,0,18);
+
+		if (write(f->dumpfd,buff,18)!=18) {
+			mfs_arg_errlog(LOG_NOTICE,"%s: write error",fname_src);
+			free(fname_src);
+			free(fname_dst);
+			close(f->dumpfd);
+			f->dumpfd = -1;
+			return;
+		}
+
+		if (close(f->dumpfd)<0) {
+			mfs_arg_errlog(LOG_NOTICE,"%s: close error",fname_src);
+			free(fname_src);
+			free(fname_dst);
+			f->dumpfd = -1;
+			return;
+		}
+
+		f->dumpfd = -1;
+
+		if (rename(fname_src,fname_dst)<0) {
+			mfs_arg_errlog(LOG_NOTICE,"%s->%s: rename error",fname_src,fname_dst);
+			free(fname_src);
+			free(fname_dst);
+			return;
+		}
 		free(fname_src);
 		free(fname_dst);
 		syslog(LOG_NOTICE,"disk %s: '.chunkdb' has been written",f->path);
@@ -1895,6 +1912,16 @@ static inline void hdd_folder_dump_chunkdb_chunk(folder *f,chunk *c) {
 		}
 		put16bit(&wptr,c->pathid);
 		if (write(f->dumpfd,buff,18)!=18) {
+			uint32_t pleng;
+			char *fname;
+			pleng = strlen(f->path);
+			fname = malloc(pleng+13);
+			passert(fname);
+			memcpy(fname,f->path,pleng);
+			memcpy(fname+pleng,".tmp_chunkdb",12);
+			fname[pleng+12] = 0;
+			mfs_arg_errlog(LOG_NOTICE,"%s: write error",fname);
+			free(fname);
 			close(f->dumpfd);
 			f->dumpfd = -1;
 			return;

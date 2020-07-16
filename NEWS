@@ -21,6 +21,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) changed queue limit to max workers (limited dynamically)
   - (cs) fixed automatic chunkserver removal in master
   - (master) added meta version increment in chunks_set_version
+  - (cs) added error detection during writing '.chunkdb'
 
 * MooseFS 3.0.113-1 (2020-05-04)
 

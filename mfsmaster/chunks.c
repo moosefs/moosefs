@@ -2145,6 +2145,7 @@ int chunk_mr_set_version(uint64_t chunkid,uint32_t version) {
 		return MFS_ERROR_NOCHUNK;
 	}
 	c->version = version;
+	meta_version_inc();
 	return MFS_STATUS_OK;
 }
 

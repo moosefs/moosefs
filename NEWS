@@ -19,6 +19,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) added logging info when '.chunkdb' is not written to disk
   - (master) fixed alphabetical order of commands detected in changelog
   - (cs) changed queue limit to max workers (limited dynamically)
+  - (cs) fixed automatic chunkserver removal in master
 
 * MooseFS 3.0.113-1 (2020-05-04)
 

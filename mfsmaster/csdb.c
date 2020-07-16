@@ -291,6 +291,7 @@ void csdb_temporary_maintenance_mode(void *v_csptr) {
 void csdb_lost_connection(void *v_csptr) {
 	csdbentry *csptr = (csdbentry*)v_csptr;
 	if (csptr!=NULL) {
+		csptr->disconnection_time = main_time();
 		csptr->eptr = NULL;
 		disconnected_servers++;
 		if (csptr->maintenance) {
@@ -472,6 +473,8 @@ void csdb_remove_unused(void) {
 			cspptr = csdbhash + hash;
 			while ((csptr=*cspptr)) {
 				if (csptr->eptr==NULL && csptr->disconnection_time+SecondsToRemoveUnusedCS<now) {
+					uint32_t ip = csptr->ip;
+					uint16_t port = csptr->port;
 					if (csptr->csid>0) {
 						csdb_delid(csptr->csid);
 					}
@@ -482,10 +485,10 @@ void csdb_remove_unused(void) {
 						tmpremoved_servers--;
 					}
 					*cspptr = csptr->next;
+					free(csptr);
 					servers--;
 					disconnected_servers--;
-					changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_DEL,csptr->ip,csptr->port);
-					free(csptr);
+					changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_DEL,ip,port);
 				} else {
 					cspptr = &(csptr->next);
 				}

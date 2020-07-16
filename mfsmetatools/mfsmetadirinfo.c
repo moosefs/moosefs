@@ -26,6 +26,7 @@
 #include "datapack.h"
 #include "MFSCommunication.h"
 #include "liset64.h"
+#include "idstr.h"
 
 // #define DEBUG 1
 

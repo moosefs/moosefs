@@ -37,10 +37,6 @@
 #include "missinglog.h"
 #include "bgsaver.h"
 
-#define STR_AUX(x) #x
-#define STR(x) STR_AUX(x)
-const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
-
 #define MODULE_OPTIONS_GETOPT "iax"
 #define MODULE_OPTIONS_SWITCH \
 	case 'i': \

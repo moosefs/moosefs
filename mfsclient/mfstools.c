@@ -49,15 +49,12 @@
 #include "clocks.h"
 #include "md5.h"
 #include "MFSCommunication.h"
+#include "idstr.h"
 
 #include "mfstools_master.h"
 
 #define tcpread(s,b,l) tcptoread(s,b,l,20000)
 #define tcpwrite(s,b,l) tcptowrite(s,b,l,20000)
-
-#define STR_AUX(x) #x
-#define STR(x) STR_AUX(x)
-const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 
 #define FILEINFO_QUICK 0x01
 #define FILEINFO_CRC 0x02

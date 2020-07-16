@@ -55,6 +55,7 @@
 #include "mfsstrerr.h"
 #include "massert.h"
 #include "md5.h"
+#include "idstr.h"
 
 #include "mfsio.h"
 

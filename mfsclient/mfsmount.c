@@ -102,10 +102,10 @@
 #include "strerr.h"
 #include "crc.h"
 #include "processname.h"
+#include "idstr.h"
 
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
-const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
 
 #if defined(__APPLE__)
 #define DEFAULT_OPTIONS "allow_other,daemon_timeout=600,novncache"

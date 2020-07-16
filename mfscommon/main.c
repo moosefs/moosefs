@@ -82,6 +82,7 @@
 #define STR_AUX(x) #x
 #define STR(x) STR_AUX(x)
 
+#include "idstr.h"
 #include "main.h"
 #include "clocks.h"
 #include "sockets.h"

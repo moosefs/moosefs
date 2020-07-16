@@ -31,10 +31,7 @@
 
 #include "MFSCommunication.h"
 #include "datapack.h"
-
-#define STR_AUX(x) #x
-#define STR(x) STR_AUX(x)
-const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
+#include "idstr.h"
 
 #define MAX_INDEX 0x7FFFFFFF
 #define MAX_CHUNKS_PER_FILE (MAX_INDEX+1)

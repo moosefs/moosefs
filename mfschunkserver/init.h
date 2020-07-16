@@ -32,10 +32,6 @@
 #include "mainserv.h"
 #include "chartsdata.h"
 
-#define STR_AUX(x) #x
-#define STR(x) STR_AUX(x)
-const char id[]="@(#) version: " VERSSTR ", written by Jakub Kruszona-Zawadzki";
-
 #define MODULE_OPTIONS_GETOPT ""
 #define MODULE_OPTIONS_SWITCH
 #define MODULE_OPTIONS_SYNOPIS ""

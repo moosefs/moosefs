@@ -27,6 +27,7 @@
 #include "crc.h"
 #include "datapack.h"
 #include "MFSCommunication.h"
+#include "idstr.h"
 
 #define CHUNKCRCSIZE 4096
 

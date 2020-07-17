@@ -82,6 +82,7 @@ enum {
 #include "sizestr.h"
 #include "sockets.h"
 #include "processname.h"
+#include "idstr.h"
 
 #define READ_TOMS 1000
 #define WRITE_TOMS 1000

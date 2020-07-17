@@ -55,9 +55,13 @@ mfsmount_SOURCES=\
 	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/processname.c ../mfscommon/processname.h \
-	../mfscommon/datapack.h ../mfscommon/massert.h \
-	../mfscommon/mfsstrerr.h ../mfscommon/portable.h \
-	../mfscommon/buckets_mt.h ../mfscommon/mfsalloc.h \
+	../mfscommon/datapack.h \
+	../mfscommon/massert.h \
+	../mfscommon/mfsstrerr.h \
+	../mfscommon/portable.h \
+	../mfscommon/buckets_mt.h \
+	../mfscommon/mfsalloc.h \
+	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
 
 libmfsio_la_LIBADD=$(PTHREAD_LIBS)
@@ -89,9 +93,12 @@ libmfsio_la_SOURCES=\
 	../mfscommon/conncache.c ../mfscommon/conncache.h \
 	../mfscommon/lwthread.c ../mfscommon/lwthread.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
-	../mfscommon/datapack.h ../mfscommon/massert.h \
-	../mfscommon/mfsstrerr.h ../mfscommon/portable.h \
+	../mfscommon/datapack.h \
+	../mfscommon/massert.h \
+	../mfscommon/mfsstrerr.h \
+	../mfscommon/portable.h \
 	../mfscommon/mfsalloc.h \
+	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
 
 mfsbdev_LDADD=$(PTHREAD_LIBS) libmfsio.la
@@ -103,8 +110,11 @@ mfsbdev_SOURCES=\
 	../mfscommon/squeue.c ../mfscommon/squeue.h \
 	../mfscommon/workers.c ../mfscommon/workers.h \
 	../mfscommon/processname.c ../mfscommon/processname.h \
-	../mfscommon/datapack.h ../mfscommon/massert.h \
-	../mfscommon/sizestr.h ../mfscommon/portable.h \
+	../mfscommon/datapack.h \
+	../mfscommon/massert.h \
+	../mfscommon/sizestr.h \
+	../mfscommon/portable.h \
+	../mfscommon/idstr.h \
 	nbdmain.c
 
 mfstools_SOURCES=\
@@ -116,8 +126,10 @@ mfstools_SOURCES=\
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/md5.c ../mfscommon/md5.h \
 	../mfscommon/liset64.c ../mfscommon/liset64.h \
-	../mfscommon/datapack.h ../mfscommon/mfsstrerr.h \
+	../mfscommon/datapack.h \
+	../mfscommon/mfsstrerr.h \
 	../mfscommon/mfsalloc.h \
+	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
 
 mfstools_LDADD=$(MATH_LIBS)

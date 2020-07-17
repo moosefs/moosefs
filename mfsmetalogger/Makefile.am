@@ -14,8 +14,11 @@ mfsmetalogger_SOURCES= \
 	../mfscommon/crc.c ../mfscommon/crc.h \
 	../mfscommon/sockets.c ../mfscommon/sockets.h \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
-	../mfscommon/datapack.h ../mfscommon/massert.h \
-	../mfscommon/slogger.h ../mfscommon/mfsalloc.h \
+	../mfscommon/datapack.h \
+	../mfscommon/massert.h \
+	../mfscommon/slogger.h \
+	../mfscommon/mfsalloc.h \
+	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
 
 mfsmetalogger_CPPFLAGS=$(AM_CPPFLAGS) -DAPPNAME=mfsmetalogger

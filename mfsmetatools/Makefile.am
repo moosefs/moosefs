@@ -6,6 +6,7 @@ mfsmetadump_CFLAGS=
 mfsmetadump_SOURCES=\
 	mfsmetadump.c \
 	../mfscommon/datapack.h \
+	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
 
 mfsmetadirinfo_CFLAGS=
@@ -13,6 +14,7 @@ mfsmetadirinfo_SOURCES=\
 	mfsmetadirinfo.c \
 	../mfscommon/liset64.c ../mfscommon/liset64.h \
 	../mfscommon/datapack.h \
+	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
 
 distclean-local:distclean-am

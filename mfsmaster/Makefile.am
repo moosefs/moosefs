@@ -9,7 +9,8 @@ mfsstatsdump_SOURCES=\
 	../mfscommon/statsdump.c \
 	../mfscommon/strerr.c ../mfscommon/strerr.h \
 	../mfscommon/crc.c ../mfscommon/crc.h \
-	../mfscommon/charts.c ../mfscommon/charts.h
+	../mfscommon/charts.c ../mfscommon/charts.h \
+	../mfscommon/idstr.h
 
 mfsstatsdump_LDFLAGS=$(ZLIB_LIBS)
 
@@ -60,11 +61,17 @@ mfsmaster_SOURCES=\
 	../mfscommon/cuckoohash.c ../mfscommon/cuckoohash.h \
 	../mfscommon/dictionary.c ../mfscommon/dictionary.h \
 	../mfscommon/hash_begin.h ../mfscommon/hash_end.h \
-	../mfscommon/datapack.h ../mfscommon/massert.h \
-	../mfscommon/slogger.h ../mfscommon/mfsstrerr.h \
-	../mfscommon/hashfn.h ../mfscommon/median.h \
-	../mfscommon/buckets.h ../mfscommon/mfsalloc.h \
-	../mfscommon/glue.h ../mfscommon/sizestr.h \
+	../mfscommon/datapack.h \
+	../mfscommon/massert.h \
+	../mfscommon/slogger.h \
+	../mfscommon/mfsstrerr.h \
+	../mfscommon/hashfn.h \
+	../mfscommon/median.h \
+	../mfscommon/buckets.h \
+	../mfscommon/mfsalloc.h \
+	../mfscommon/glue.h \
+	../mfscommon/sizestr.h \
+	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
 
 

@@ -26,6 +26,7 @@
 #include <pcap.h>
 
 #include "MFSCommunication.h"
+#include "idstr.h"
 
 typedef struct _userdata {
 	uint8_t linktype;

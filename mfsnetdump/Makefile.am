@@ -7,6 +7,7 @@ mfsnetdump_LDADD=$(PCAP_LIBS)
 mfsnetdump_SOURCES=\
 	mfsnetdump.c \
 	commands.h \
+	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
 
 mfsnetdump.c: commands.h

@@ -33,6 +33,7 @@
 #include "charts.h"
 #include "strerr.h"
 #include "crc.h"
+#include "idstr.h"
 
 #include "chartsdefs.h"
 

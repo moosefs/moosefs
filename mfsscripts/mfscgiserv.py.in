@@ -580,6 +580,10 @@ if __name__=="__main__":
 		if pid>0:
 			posix.read(pipefd[0],1)
 			os._exit(0)
+		try:
+			os.chdir("/")
+		except OSError:
+			pass
 		os.setsid()
 		try:
 			pid = os.fork()

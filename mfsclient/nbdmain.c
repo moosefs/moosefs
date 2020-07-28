@@ -473,6 +473,9 @@ void make_daemon(void) {
 		waitpid(f,&status,0);
 		exit(0);
 	}
+	if (chdir("/")<0) {
+		syslog(LOG_NOTICE,"can't change working directory to '/': %s",strerror(errno));
+	}
 	setsid();
 	setpgid(0,getpid());
 	f = fork();

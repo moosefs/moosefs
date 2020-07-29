@@ -1,8 +1,7 @@
 moosefs (3.0.114-1) unstable; urgency=medium
 
-  * (all) This is 'work in progress' version !!!
   * (mount) fixed trunacting files open with O_APPEND flag (bug itntr. in
-    3.0.133, issue #368)
+    3.0.113, issue #368)
   * (cs) added disk rebalance when all designated source disks are already
     empty (issue #364)
   * (mount) added additional info to '.params' file (versions of mfs,libfuse
@@ -11,8 +10,26 @@ moosefs (3.0.114-1) unstable; urgency=medium
     - such stupid error can be returned here - issue #369)
   * (master) fixed access checks in snapshot
   * (cgi+cli) removed using supervisor (only available in PRO version)
+  * (cs) fixed deadlock condition on mutexes 'folderlock' and 'hashlock'
+    (exists since 3.0.110)
+  * (tools) fixed oveflow protection in number parsing function
+  * (cs) fixed reporting to master duplicates with newer version
+  * (cs) changed job queue policy (some tasks are not limited now)
+  * (master) fixed reaction to status NOTDONE received from chunkservers
+  * (master) fixed syncing and closing negative file descriptor in bgsaver
+  * (mount+master) fixed handling keepcache and direct flags (related to issue
+    #374)
+  * (cgi) changed time format (issue #197)
+  * (cs) added logging info when '.chunkdb' is not written to disk
+  * (master) fixed alphabetical order of commands detected in changelog
+  * (cs) changed queue limit to max workers (limited dynamically)
+  * (cs) fixed automatic chunkserver removal in master
+  * (master) added meta version increment in chunks_set_version
+  * (cs) added error detection during writing '.chunkdb'
+  * (all) added build id to 'what' strings
+  * (nbd+cgiserv) added chdir("/")
 
- -- MooseFS Team <contact@moosefs.com>  Wed, 20 May 2020 15:00:00 +0200
+ -- MooseFS Team <contact@moosefs.com>  Mon, 27 Jul 2020 13:00:00 +0200
 
 moosefs (3.0.113-1) unstable; urgency=medium
 

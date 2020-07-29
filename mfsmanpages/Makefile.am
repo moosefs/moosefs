@@ -55,9 +55,6 @@ if BUILD_NETDUMP
 man_MANS+=$(netdump_mans)
 endif
 
-if BUILD_SUPERVISOR
-man_MANS+=$(supervisor_mans)
-endif
 
 if INSTALL_CGISERV
 man_MANS+=$(cgiserv_mans)

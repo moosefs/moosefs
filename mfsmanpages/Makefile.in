@@ -96,9 +96,8 @@ target_triplet = @target@
 @BUILD_CLIENT_TRUE@@WITH_BDEV_TRUE@am__append_6 = $(bdev_mans)
 @BUILD_METALOGGER_TRUE@am__append_7 = $(metalogger_mans)
 @BUILD_NETDUMP_TRUE@am__append_8 = $(netdump_mans)
-@BUILD_SUPERVISOR_TRUE@am__append_9 = $(supervisor_mans)
-@INSTALL_CGISERV_TRUE@am__append_10 = $(cgiserv_mans)
-@INSTALL_CLI_TRUE@am__append_11 = $(cli_mans)
+@INSTALL_CGISERV_TRUE@am__append_9 = $(cgiserv_mans)
+@INSTALL_CLI_TRUE@am__append_10 = $(cli_mans)
 subdir = mfsmanpages
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_compile_flag.m4 \
@@ -353,7 +352,7 @@ EXTRA_DIST = $(all_mans)
 man_MANS = $(am__append_1) $(am__append_2) $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6) \
 	$(am__append_7) $(am__append_8) $(am__append_9) \
-	$(am__append_10) $(am__append_11)
+	$(am__append_10)
 all: all-am
 
 .SUFFIXES:

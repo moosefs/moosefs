@@ -47,11 +47,11 @@ There is a separate MooseFS Client for Microsoft Windows available, built on top
 ## Getting started
 You can install MooseFS using your favourite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download):
 
-* Ubuntu 16 / 18
+* Ubuntu 16 / 18 / 20
 * Debian 8 / 9 / 10
 * RHEL / CentOS 7 / 8
 * FreeBSD 11 / 12
-* macOS 10.9-10.14
+* macOS 10.11+
 * Raspbian 8 / 9 – Raspberry Pi 3
 
 Packages for Ubuntu 14 and CentOS 6 are also available, but no longer supported.

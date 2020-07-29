@@ -6,21 +6,32 @@ mfsmetadump - dump MooseFS metadata info in human readable format
 .SH DESCRIPTION
 \fBmfsmetadump\fP dumps MooseFS metadata info in human readable format. 
 Output consists of several sections with different types of information. Every section consist
-of header data - rows starting with hash (#) sign - and content data (may be empty). If option
-\fB-s\fP is specified then only given section of the file will be dumped. If option \fB-d\fP is
-specified then all non-printable characters (codes < 32 and > 126) are replaced with '.' (it was
+of header data - rows starting with hash (#) sign - and content data (may be empty). 
+.SH OPTIONS
+.PP
+\fB-d\fP - replace all non-printable characters (codes < 32 and > 126) with '.' (it was
 default behaviour in version < 3.0.110).
-.SH FILE HEADER
-.TP 20
-header
-MooseFS version
-.TP
-version
-metadata file version
-.TP
-fileid
-metadata file id
-.SH SECTION HEADER
+.PP
+\fB-s\fP - dump only specified section of the file. Possible sections:
+.nf
+.ta +0.5i
+	HEAD - header info
+	SESS - client sessions
+	LABS - labels (not used)
+	SCLA - storage classes
+	NODE - tree nodes (i-nodes)
+	EDGE - tree edges (file names)
+	FREE - free nodes (deleted i-nodes)
+	QUOT - quota definitions
+	XATR - xattr data
+	PACL - posix acl data
+	OPEN - open files
+	FLCK - flock data
+	PLCK - posix locks (lockf,ioctl) data
+	CSDB - active chunkservers
+	CHNK - chunks
+.fi
+.SH SECTION HEADER (precedes each section except HEAD)
 .TP 20
 section header 
 section header (section type + version)
@@ -33,316 +44,240 @@ name of section
 .TP
 version
 hexadecimal representation of section version
-.SH SESS SECTION
+.SH FILE HEADER (HEAD)
+.TP 20
+header
+MooseFS version
+.TP
+version
+metadata file version
+.TP
+fileid
+metadata file id
+.SH SESSIONS SECTION (SESS)
 .TP 20
 nextsessionid
 first free session id
 .TP
 statscount
 number of stats remembered in each session
-.TP 10
+.TP 20
 SESSION
 line describing a single session
-.RS
-.IP s
-session id
-.IP p
-IP address
-.IP r
-root inode number
-.IP f
-session flags
-.IP g
-mingoal and maxgoal
-.IP t
-mintrashtime and maxtrashtime
-.IP m
-maproot uid,gid and mapall uid,gid
-.IP d
-disconnection time (optional)
-.IP c
-current hour stats data
-.IP l
-last hour stats data
-.IP i
-session name (usually local mount point)
-.RE
-.SH LABELS SECTION
+.nf
+.ta +1i
+s	session id
+e	exports checksum
+p	IP address
+r	root inode number
+f	session flags
+u	umask
+g	min and max goal (redundancy level)
+t	min and max trash retention
+m	maproot uid,gid and mapall uid,gid
+x	disabled operations
+d	disconnection time (optional)
+c	current hour stats data
+l	last hour stats data
+i	session name (usually local mount point)
+.fi
+.SH STORAGE CLASS SECTION (SCLA), formerly LABELS SECTION (LABS)
 .TP 20
-section header 
-section header (section type + version)
-.TP
-length
-length of section
-.TP
-section type
-name of section (always LABS for labels)
-.TP
-version
-hexadecimal representation of section version
-.TP 10
 LABELDESC
-line with label description
-.RS
-.IP l
-label letter
-.IP n
-label description
-.RE
-.TP 10
-LABELSET line with one labels set used in system
-.RS
-.IP #
-labelset number
-.IP m
-creation mode
-.IP d
-arch delay
-.IP c
-create labels
-.IP k
-keep labels
-.IP a
-archive labels
-.RE
-.SH NODES SECTION
+line with label description (existed only in LABS)
+.nf
+.ta +1i
+l	label letter
+n	label description
+.fi
+.TP 20
+SCLASS
+(formerly LABELSET) line with storage class used in system
+.nf
+.ta +1i
+#	storage class id
+x	admin only
+m	mode
+d	arch delay
+c	create labels
+k	keep labels
+a	archive labels
+n	name
+.fi
+.SH NODES SECTION (NODE)
 .TP 20
 maxinode
 maximum inode number used by system
 .TP
 hashelements
 number of inodes in hash tabble
-.TP 10
+.TP 20
 NODE 
 line with node (inode) description
-.RS
-.IP k
-node type (-,D,S,F,B,C,L,T,R)
-.RS
-.IP -
-file
-.IP D
-directory
-.IP S
-socket
-.IP F
-fifo
-.IP B
-block device
-.IP C
-character device
-.IP L
-symbolic link
-.IP T
-trash file
-.IP R
-sustained file (removed open file)
-.RE
-.IP i
-inode number
-.IP #
-labelset number (10+) or goal (1-9)
-.IP e
-flags
-.IP m
-mode
-.IP u
-uid
-.IP g
-gid
-.IP a,m,c
-atime, mtime and ctime timestamps
-.IP t
-trashtime
-.IP d
-rdevhi,rdevlo (only block and character devices)
-.IP p
-path (only symbolic links)
-.IP l
-file length (only files)
-.IP c
-chunk list (only files)
-.IP r
-sessions that have this file open (only files)
-.SH EDGES SECTION
+.nf
+.ta +1i +1i
+k	node type (-,D,S,F,B,C,L,T,R)
+	-	file
+	D	directory
+	S	socket
+	F	fifo
+	B	block device
+	C	character device
+	L	symbolic link
+	T	trash file
+	R	sustained file (removed open file)
+i	inode number
+#	storage class id
+e	flags (extra mfs attributes)
+w	windows attributes
+m	mode
+u	uid
+g	gid
+a,m,c	atime, mtime, ctime
+t	trash retention
+d	rdevhi,rdevlo (only block and character devices)
+p	path (only symbolic links)
+l	file length (only files)
+c	chunk list (only files)
+r	sessions that have this file open (only files)
+.fi
+.SH EDGES SECTION (EDGE)
 .TP 20
 nextedgeid
 next available edge id (descending)
-.TP 10
+.TP 20
 EDGE
 line with edge description
-.RS
-.IP p
-parent inode number
-.IP c
-child inode number
-.IP i
-edge id
-.IP n
-edge name
-.RE
-.SH FREE SECTION
+.nf
+.ta +1i
+p	parent inode number
+c	child inode number
+i	edge id
+n	edge name
+.fi
+.SH FREE NODES SECTION (FREE)
 .TP 20
 free nodes
 number of free (reusable) nodes
-.TP 10
+.TP 20
 FREEID
 line with free inode description
-.RS
-.IP i
-inode number
-.IP f
-deletion timestamp
-.RE
-.SH QUOTA SECTION
+.nf
+.ta +1i
+i	inode number
+f	deletion timestamp
+.fi
+.SH QUOTA SECTION (QUOT)
 .TP 20
 quota nodes
 number of nodes with quota
-.TP 10
+.TP 20
 QUOTA
 line with quota description
-.RS
-.IP i
-inode number
-.IP g
-grace period
-.IP e
-exceeded
-.IP f
-flags
-.IP s
-soft quota exceeded timestamp
-.IP si
-soft inode quota
-.IP hi
-hard inode quota
-.IP sl
-soft length quota
-.IP hl
-hard length quota
-.IP ss
-soft size quota
-.IP hs
-hard size quota
-.IP sr
-soft real size quota
-.IP hr
-hard real size quota
-.RE
-.SH XATR SECTION
-.TP 10
+.nf
+.ta +1i
+i	inode number
+g	grace period
+e	exceeded
+f	flags
+s	soft quota exceeded timestamp
+si	soft inode quota
+hi	hard inode quota
+sl	soft length quota
+hl	hard length quota
+ss	soft size quota
+hs	hard size quota
+sr	soft real size quota
+hr	hard real size quota
+.fi
+.SH XATTR SECTION (XATR)
+.TP 20
 XATTR
 line with xattr description
-.RS
-.IP i
-inode number
-.IP n
-xattr name
-.IP v
-xattr value
-.RE
-.SH POSIX ACL SECTION
-.TP 10
+.nf
+.ta +1i
+i	inode number
+n	xattr name
+v	xattr value
+.fi
+.SH POSIX ACL SECTION (PACL)
+.TP 20
 POSIXACL
 line with acl description
-.RS
-.IP i
-inode number
-.IP t
-acl type
-.IP u
-user (file owner) permissions
-.IP g
-group permissions
-.IP o
-other permissions
-.IP m
-permission mask
-.IP n
-named permissions - list of objects:
-.RS
-.IP u(\fIU\fp):\fIP\fP
-permissions \fIP\fP for user with uid \fIU\fP
-.IP g(\fIG\fp):\fIP\fP
-permissions \fIP\fP for group with gid \fIG\fP
-.RE
-.RE
-.SH OPEN SECTION
-.TP 10
+.nf
+.ta +1i
+i	inode number
+t	acl type
+u	user (file owner) permissions
+g	group permissions
+o	other permissions
+m	permission mask
+n	named permissions - list of objects:
+u(U):P	permissions \fIP\fP for user with uid \fIU\fP
+g(G):P	permissions \fIP\fP for group with gid \fIG\fP
+.fi
+.SH OPEN FILES SECTION (OPEN)
+.TP 20
 OPENFILE
 line with open file description
-.RS
-.IP s
-session id
-.IP i
-inode number
-.RE
-.SH FLOCK SECTION
-.TP 10
+.nf
+.ta +1i
+s	session id
+i	inode number
+.fi
+.SH FLOCK LOCK SECTION (FLCK)
+.TP 20
 FLOCK
 line with flock-lock description
-.RS
-.IP i
-inode number
-.IP s
-session id
-.IP o
-lock owner (FUSE lock owner)
-.IP t
-lock type ('R' - shared lock, 'W' - exclusive lock)
-.RE
-.SH POSIX LOCK SECTION
-.TP 10
+.nf
+.ta +1i
+i	inode number
+s	session id
+o	lock owner (FUSE lock owner)
+t	lock type ('R' - shared lock, 'W' - exclusive lock)
+.fi
+.SH POSIX LOCK SECTION (PLCK)
+.TP 20
 POSIXLOCK
 line with posix-lock description
-.RS
-.IP i
-inode number
-.IP s
-session id
-.IP o
-lock owner (FUSE lock owner)
-.IP p
-local process id (owner pid)
-.IP r
-lock range in format <\fISTART\fP,\fIEND\fP)
-.IP t
-lock type ('R' - shared lock, 'W' - exclusive lock)
-.RE
-.SH CHUNKSERVERS SECTION
+.nf
+.ta +1i
+i	inode number
+s	session id
+o	lock owner (FUSE lock owner)
+p	local process id (owner pid)
+r	lock range in format <\fISTART\fP,\fIEND\fP)
+t	lock type ('R' - shared lock, 'W' - exclusive lock)
+.fi
+.SH CHUNKSERVERS SECTION (CSDB)
 .TP 20
 chunk servers
 number of chunkservers
-.TP 10
+.TP 20
 CHUNCKSERVER
 line with chunk server description
-.RS
-.IP i
-server ip
-.IP p
-server port
-.IP #
-server id
-.IP m
-maintenance mode
-.RE
-.SH CHUNKS SECTION
+.nf
+.ta +1i
+i	server ip
+p	server port
+#	server id
+m	maintenance mode
+t	maintenance timeout timestamp
+.fi
+.SH CHUNKS SECTION (CHNK)
 .TP 20
 nextchunkid
 first available chunk number
-.TP 10
+.TP 20
 CHUNK
 line with chunk description
-.RS
-.IP i
-chunk number
-.IP v
-chunk version
-.IP t
-"locked to" timestamp
-.IP a
-archive flag
-.RE
+.nf
+.ta +1i
+i	chunk number
+v	chunk version
+t	"locked to" timestamp
+a	archive flag
+.fi
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

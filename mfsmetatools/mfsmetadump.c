@@ -1476,9 +1476,9 @@ void usage(const char *appname) {
 	printf("\tQUOT - quota definitions\n");
 	printf("\tXATR - xattr data\n");
 	printf("\tPACL - posix acl data\n");
+	printf("\tOPEN - open files\n");
 	printf("\tFLCK - flock data\n");
 	printf("\tPLCK - posix locks (lockf,ioctl) data\n");
-	printf("\tOPEN - open files\n");
 	printf("\tCSDB - active chunkservers\n");
 	printf("\tCHNK - chunks\n");
 	exit(1);

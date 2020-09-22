@@ -4,6 +4,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (cs) fixed chunk locking issues in chunkserver (lock timeout, missing release etc.)
   - (all) changed to hex all chunkid logged to syslog (only in changelog it is left in decimal format)
+  - (cs) changed port number from hex to dec in replicator module
 
 * MooseFS 3.0.114-1 (2020-07-27)
 

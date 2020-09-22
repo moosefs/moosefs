@@ -1250,7 +1250,7 @@ static void hdd_chunk_release(chunk *c) {
 	if (c->state==CH_LOCKED) {
 		c->state = CH_AVAIL;
 		if (c->ccond) {
-//			printf("wake up one thread waiting for AVAIL chunk: %"PRIu64" on ccond:%p\n",c->chunkid,c->ccond);
+//			printf("wake up one thread waiting for AVAIL chunk: %016"PRIX64" on ccond:%p\n",c->chunkid,c->ccond);
 //			printbacktrace();
 			zassert(pthread_cond_signal(&(c->ccond->cond)));
 		}
@@ -1466,7 +1466,7 @@ static int hdd_chunk_get(uint64_t chunkid,chunk **cptr,uint8_t cflag) {
 					syslog(LOG_WARNING,"hdd_chunk_get: serious internal data structure inconsistency - can't remove chunk %016"PRIX64,chunkid);
 				}
 			} else {	// there are waiting threads - wake them up
-//				printf("wake up one thread waiting for DELETED chunk: %"PRIu64" on ccond:%p\n",c->chunkid,c->ccond);
+//				printf("wake up one thread waiting for DELETED chunk: %016"PRIX64" on ccond:%p\n",c->chunkid,c->ccond);
 //				printbacktrace();
 				zassert(pthread_cond_signal(&(c->ccond->cond)));
 				zassert(pthread_mutex_unlock(&hashlock));
@@ -1486,7 +1486,7 @@ static int hdd_chunk_get(uint64_t chunkid,chunk **cptr,uint8_t cflag) {
 				c->ccond = cc;
 			}
 			c->ccond->wcnt++;
-//			printf("wait for %s chunk: %"PRIu64" on ccond:%p\n",(c->state==CH_LOCKED)?"LOCKED":"TOBEDELETED",c->chunkid,c->ccond);
+//			printf("wait for %s chunk: %016"PRIX64" on ccond:%p\n",(c->state==CH_LOCKED)?"LOCKED":"TOBEDELETED",c->chunkid,c->ccond);
 //			printbacktrace();
 			if (hdd_timed_wait(&(c->ccond->cond),&hashlock,LOCKED_CHUNK_WAIT_USECS)!=0) { // do not wait for chunk too long
 				syslog(LOG_WARNING,"hdd_chunk_get: chunk %016"PRIX64" locked too long - giving up",chunkid);
@@ -1494,7 +1494,7 @@ static int hdd_chunk_get(uint64_t chunkid,chunk **cptr,uint8_t cflag) {
 				return 2;
 			}
 //			zassert(pthread_cond_wait(&(c->ccond->cond),&hashlock));
-//			printf("%s chunk: %"PRIu64" woke up on ccond:%p\n",(c->state==CH_LOCKED)?"LOCKED":(c->state==CH_DELETED)?"DELETED":(c->state==CH_AVAIL)?"AVAIL":"TOBEDELETED",c->chunkid,c->ccond);
+//			printf("%s chunk: %016"PRIX64" woke up on ccond:%p\n",(c->state==CH_LOCKED)?"LOCKED":(c->state==CH_DELETED)?"DELETED":(c->state==CH_AVAIL)?"AVAIL":"TOBEDELETED",c->chunkid,c->ccond);
 			c->ccond->wcnt--;
 			if (c->ccond->wcnt==0) {
 				c->ccond = NULL;
@@ -1517,7 +1517,7 @@ static void hdd_chunk_delete(chunk *c) {
 	zassert(pthread_mutex_lock(&hashlock));
 	if (c->ccond) {
 		c->state = CH_DELETED;
-//		printf("wake up one thread waiting for DELETED chunk: %"PRIu64" ccond:%p\n",c->chunkid,c->ccond);
+//		printf("wake up one thread waiting for DELETED chunk: %016"PRIX64" ccond:%p\n",c->chunkid,c->ccond);
 //		printbacktrace();
 		zassert(pthread_cond_signal(&(c->ccond->cond)));
 		zassert(pthread_mutex_unlock(&hashlock));
@@ -2580,7 +2580,7 @@ void hdd_test_show_chunks(void) {
 	zassert(pthread_mutex_lock(&hashlock));
 	for (hashpos=0 ; hashpos<HASHSIZE ; hashpos++) {
 		for (c=hashtab[hashpos] ; c ; c=c->next) {
-			printf("chunk id:%"PRIu64" version:%"PRIu32" state:%u\n",c->chunkid,c->version,c->state);
+			printf("chunk id:%"PRIu64" version:%"PRIu32" (%016"PRIX64"_%08"PRIX32") state:%u\n",c->chunkid,c->version,c->chunkid,c->version,c->state);
 		}
 	}
 	zassert(pthread_mutex_unlock(&hashlock));
@@ -2729,7 +2729,7 @@ static int hdd_io_begin(chunk *c,int mode) {
 
 //	sassert(c->state==CH_LOCKED);
 
-//	syslog(LOG_NOTICE,"chunk: %"PRIu64" - before io",c->chunkid);
+//	syslog(LOG_NOTICE,"chunk: %016"PRIX64" - before io",c->chunkid);
 	hdd_chunk_testmove(c);
 	if (c->crcrefcount==0) {
 		hdd_generate_filename(fname,c);

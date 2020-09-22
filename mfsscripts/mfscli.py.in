@@ -4846,7 +4846,7 @@ if "HD" in sectionset:
 				else:
 					if cgimode:
 						errtimetuple = time.localtime(errtime)
-						lerror = '<a style="cursor:default" title="%s on chunk: %u">%s</a>' % (time.strftime("%Y-%m-%d %H:%M:%S",errtimetuple),errchunkid,time.strftime("%Y-%m-%d %H:%M",errtimetuple))
+						lerror = '<a style="cursor:default" title="%s on chunk: %016X">%s</a>' % (time.strftime("%Y-%m-%d %H:%M:%S",errtimetuple),errchunkid,time.strftime("%Y-%m-%d %H:%M",errtimetuple))
 					elif ttymode:
 						errtimetuple = time.localtime(errtime)
 						lerror = time.strftime("%Y-%m-%d %H:%M",errtimetuple)

@@ -703,7 +703,7 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 // use blocks
 	err = ioctl(nbdcp->nbdfd, NBD_SET_BLKSIZE, 4096);
 	if (err<0) {
-		nbd_start_err_msg("error setting block device bock size (%s): %s",nbdcp->nbddevice,strerror(errno));
+		nbd_start_err_msg("error setting block device block size (%s): %s",nbdcp->nbddevice,strerror(errno));
 		goto err5;
 	}
 	err = ioctl(nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, nbdcp->fsize / 4096);

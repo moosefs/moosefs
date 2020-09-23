@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) changed to hex all chunkid logged to syslog (only in changelog it is left in decimal format)
   - (cs) changed port number from hex to dec in replicator module
   - (mount) added printing open/create mode to the oplog
+  - (mount) fixed opening file after using lookup cache
 
 * MooseFS 3.0.114-1 (2020-07-27)
 

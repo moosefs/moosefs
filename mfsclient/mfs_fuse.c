@@ -3913,11 +3913,15 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fi->fh = 0;
 	} else if (fdrec) {
 		finfo *fileinfo;
-		uint32_t gidtmp = 0;
+		uint32_t gidtmp = ctx.gid;
 		if (fi->keep_cache==0) {
 			flags |= OPEN_CACHE_CLEARED;
 		}
-		fs_opencheck(ino,0,1,&gidtmp,flags,NULL,NULL); // just send "opencheck" to make sure that master knows that this file is open
+		status = fs_opencheck(ino,ctx.uid,1,&gidtmp,flags|OPEN_AFTER_CREATE,NULL,NULL); // just send "opencheck" to make sure that master knows that this file is open, AFTER_CREATE means 'ignore permissions' here
+		if (status!=MFS_STATUS_OK) {
+			status = mfs_errorconv(status);
+			oplog_printf(&ctx,"open (%lu,%s) (do actual open): %s",(unsigned long int)ino,flagsstr,strerr(status));
+		}
 		fileinfo = finfo_get(fi->fh);
 		if (fileinfo!=NULL) {
 			zassert(pthread_mutex_lock(&(fileinfo->lock)));

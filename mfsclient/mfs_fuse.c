@@ -3399,6 +3399,102 @@ static void mfs_removefileinfo(uint32_t findex) {
 	}
 }
 
+void mfs_make_oflags_string(char *buf,uint32_t size,uint32_t flags) {
+	uint32_t leng;
+#define add_flag(f) if (flags&f) { \
+		if (leng<size) { \
+			leng += snprintf(buf+leng,size-leng,"|" #f); \
+		} \
+	}
+	if ((flags&O_ACCMODE)==O_RDWR) {
+		leng = snprintf(buf,size,"O_RDWR");
+	} else if ((flags&O_ACCMODE)==O_RDONLY) {
+		leng = snprintf(buf,size,"O_RDONLY");
+	} else if ((flags&O_ACCMODE)==O_WRONLY) {
+		leng = snprintf(buf,size,"O_WRONLY");
+	} else {
+		leng = snprintf(buf,size,"O_NONE");
+	}
+#ifdef O_NONBLOCK
+	add_flag(O_NONBLOCK);
+#endif
+#ifdef O_APPEND
+	add_flag(O_APPEND);
+#endif
+#ifdef O_CREAT
+	add_flag(O_CREAT);
+#endif
+#ifdef O_TRUNC
+	add_flag(O_TRUNC);
+#endif
+#ifdef O_EXCL
+	add_flag(O_EXCL);
+#endif
+#ifdef O_SHLOCK
+	add_flag(O_SHLOCK);
+#endif
+#ifdef O_EXLOCK
+	add_flag(O_EXLOCK);
+#endif
+#ifdef O_NOFOLLOW
+	add_flag(O_NOFOLLOW);
+#endif
+#ifdef O_SYMLINK
+	add_flag(O_SYMLINK);
+#endif
+#ifdef O_EVTONLY
+	add_flag(O_EVTONLY);
+#endif
+#ifdef O_CLOEXEC
+	add_flag(O_CLOEXEC);
+#endif
+#ifdef O_ASYNC
+	add_flag(O_ASYNC);
+#endif
+#ifdef O_DIRECT
+	add_flag(O_DIRECT);
+#endif
+#ifdef O_DIRECTORY
+	add_flag(O_DIRECTORY);
+#endif
+#ifdef O_DSYNC
+	add_flag(O_DSYNC);
+#else
+#  ifdef O_SYNC
+	add_flag(O_SYNC);
+#  endif
+#endif
+#ifdef O_LARGEFILE
+	add_flag(O_LARGEFILE);
+#endif
+#ifdef O_NOATIME
+	add_flag(O_NOATIME);
+#endif
+#ifdef O_NOCTTY
+	add_flag(O_NOCTTY);
+#endif
+#ifdef O_NDELAY
+#  ifdef O_NONBLOCK
+#    if O_NDELAY != O_NONBLOCK
+	add_flag(O_NDELAY);
+#    endif
+#  else
+	add_flag(O_NDELAY);
+#  endif
+#endif
+#ifdef O_PATH
+	add_flag(O_PATH);
+#endif
+#ifdef O_TMPFILE
+	add_flag(O_SYNC);
+#endif
+	if (leng<size) {
+		buf[leng]='\0';
+	} else {
+		buf[size-1]='\0';
+	}
+}
+
 void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode, struct fuse_file_info *fi) {
 	struct fuse_entry_param e;
 	uint32_t inode;
@@ -3413,31 +3509,33 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	groups *gids;
 	uint32_t findex;
 	uint8_t oflags;
+	char flagsstr[512];
 
 	ctx = *(fuse_req_ctx(req));
+	mfs_make_oflags_string(flagsstr,512,fi->flags);
 	mfs_makemodestr(modestr,mode);
 	mfs_stats_inc(OP_CREATE);
 	if (debug_mode) {
 #ifdef FUSE_CAP_DONT_MASK
 		char umaskstr[11];
 		mfs_makemodestr(umaskstr,ctx.umask);
-		oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o/%s:0%04o)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,umaskstr+1,(unsigned int)(ctx.umask));
-		fprintf(stderr,"create (%lu,%s,-%s:0%04o/%s:0%04o)\n",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,umaskstr+1,(unsigned int)(ctx.umask));
+		oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o/%s:0%04o)",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,umaskstr+1,(unsigned int)(ctx.umask));
+		fprintf(stderr,"create (%lu,%s,%s,-%s:0%04o/%s:0%04o)\n",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,umaskstr+1,(unsigned int)(ctx.umask));
 #else
-		oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o)",(unsigned long int)parent,name,modestr+1,(unsigned int)mode);
-		fprintf(stderr,"create (%lu,%s,-%s:0%04o)\n",(unsigned long int)parent,name,modestr+1,(unsigned int)mode);
+		oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o)",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode);
+		fprintf(stderr,"create (%lu,%s,%s,-%s:0%04o)\n",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode);
 #endif
 	}
 	if (parent==FUSE_ROOT_ID) {
 		if (IS_SPECIAL_NAME(name)) {
-			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(EACCES));
+			oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o): %s",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,strerr(EACCES));
 			fuse_reply_err(req,EACCES);
 			return;
 		}
 	}
 	nleng = strlen(name);
 	if (nleng>MFS_NAME_MAX) {
-		oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(ENAMETOOLONG));
+		oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o): %s",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,strerr(ENAMETOOLONG));
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
@@ -3464,7 +3562,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 #endif
 		status = mfs_errorconv(status);
 		if (status!=0) {
-			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(status));
+			oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o): %s",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,strerr(status));
 			fuse_reply_err(req, status);
 			return;
 		}
@@ -3487,14 +3585,14 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		} else if ((fi->flags & O_ACCMODE) == O_RDWR) {
 			flags |= OPEN_READ | OPEN_WRITE;
 		} else {
-			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(EINVAL));
+			oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o): %s",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,strerr(EINVAL));
 			fuse_reply_err(req, EINVAL);
 			return;
 		}
 		status = fs_mknod(parent,nleng,(const uint8_t*)name,TYPE_FILE,mode&07777,cumask,ctx.uid,1,&gidtmp,0,&inode,attr);
 		status = mfs_errorconv(status);
 		if (status!=0) {
-			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o) (mknod): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(status));
+			oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o) (mknod): %s",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,strerr(status));
 			fuse_reply_err(req, status);
 			return;
 		}
@@ -3505,7 +3603,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		status = fs_opencheck(inode,ctx.uid,1,&gidtmp,flags,attr,&oflags);
 		status = mfs_errorconv(status);
 		if (status!=0) {
-			oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o) (open): %s",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,strerr(status));
+			oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o) (open): %s",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,strerr(status));
 			fuse_reply_err(req, status);
 			return;
 		}
@@ -3540,7 +3638,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 		fi->direct_io = (keep_cache>=3)?1:0;
 	}
 	if (debug_mode) {
-		fprintf(stderr,"create (%lu) ok -> use %s io ; %s data cache ; can %s\n",(unsigned long int)inode,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear",(oflags&OPEN_APPENDONLY)?"append only":"write randomly");
+		fprintf(stderr,"create (%lu,%s) ok -> use %s io ; %s data cache ; can %s\n",(unsigned long int)inode,flagsstr,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear",(oflags&OPEN_APPENDONLY)?"append only":"write randomly");
 	}
 //	if (fi->keep_cache==0) {
 //		chunksdatacache_clear_inode(inode,0);
@@ -3553,7 +3651,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:entry_cache_timeout;
 	mfs_attr_to_stat(inode,attr,&e.attr);
 	mfs_makeattrstr(attrstr,256,&e.attr);
-	oplog_printf(&ctx,"create (%lu,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s) (direct_io:%u,keep_cache:%u,append_mode:%u) [handle:%08"PRIX32"]",(unsigned long int)parent,name,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,(oflags&OPEN_APPENDONLY)?1:0,findex);
+	oplog_printf(&ctx,"create (%lu,%s,%s,-%s:0%04o): OK (%.1lf,%lu,%.1lf,%s) (direct_io:%u,keep_cache:%u,append_mode:%u) [handle:%08"PRIX32"]",(unsigned long int)parent,name,flagsstr,modestr+1,(unsigned int)mode,e.entry_timeout,(unsigned long int)e.ino,e.attr_timeout,attrstr,(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,(oflags&OPEN_APPENDONLY)?1:0,findex);
 	fs_inc_acnt(inode);
 	if (fuse_reply_create(req, &e, fi) == -ENOENT) {
 		fs_dec_acnt(inode);
@@ -3572,12 +3670,22 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	struct fuse_ctx ctx;
 	groups *gids;
 	uint32_t findex;
+	char flagsstr[512];
+
+// extra fi->flags on Linux:
+//    O_NONBLOCK (0x00000800 / 00004000)
+//    O_DSYNC    (0x00001000 / 00010000)
+//    O_ASYNC    (0x00002000 / 00020000)
+//    O_LARGEFILE(0x00008000 / 00100000) - always set
+//    O_NOATIME  (0x00040000 / 01000000)
+//    __O_SYNC   (0x00100000 / 04000000)
 
 	ctx = *(fuse_req_ctx(req));
+	mfs_make_oflags_string(flagsstr,512,fi->flags);
 	mfs_stats_inc(OP_OPEN);
 	if (debug_mode) {
-		oplog_printf(&ctx,"open (%lu) ...",(unsigned long int)ino);
-		fprintf(stderr,"open (%lu)\n",(unsigned long int)ino);
+		oplog_printf(&ctx,"open (%lu,%s) ...",(unsigned long int)ino,flagsstr);
+		fprintf(stderr,"open (%lu,%s)\n",(unsigned long int)ino,flagsstr);
 	}
 //	if (ino==MASTER_INODE) {
 //		minfo *masterinfo;
@@ -3600,25 +3708,25 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 //	}
 	if (ino==MASTERINFO_INODE) {
 		if ((fi->flags & O_ACCMODE) != O_RDONLY) {
-			oplog_printf(&ctx,"open (%lu) (internal node: MASTERINFO): %s",(unsigned long int)ino,strerr(EACCES));
+			oplog_printf(&ctx,"open (%lu,%s) (internal node: MASTERINFO): %s",(unsigned long int)ino,flagsstr,strerr(EACCES));
 			fuse_reply_err(req,EACCES);
 			return;
 		}
 		fi->fh = 0;
 		fi->direct_io = 0;
 		fi->keep_cache = 0;
-		oplog_printf(&ctx,"open (%lu) (internal node: MASTERINFO): OK (0,1)",(unsigned long int)ino);
+		oplog_printf(&ctx,"open (%lu,%s) (internal node: MASTERINFO): OK (0,1)",(unsigned long int)ino,flagsstr);
 		fuse_reply_open(req, fi);
 		return;
 	}
 	if (ino==PARAMS_INODE) {
 		if ((fi->flags & O_ACCMODE) != O_RDONLY) {
-			oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): %s",(unsigned long int)ino,strerr(EACCES));
+			oplog_printf(&ctx,"open (%lu,%s) (internal node: PARAMS): %s",(unsigned long int)ino,flagsstr,strerr(EACCES));
 			fuse_reply_err(req,EACCES);
 			return;
 		}
 		if (ctx.uid != 0) {
-			oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): %s",(unsigned long int)ino,strerr(EPERM));
+			oplog_printf(&ctx,"open (%lu,%s) (internal node: PARAMS): %s",(unsigned long int)ino,flagsstr,strerr(EPERM));
 			fuse_reply_err(req,EPERM);
 			return;
 		}
@@ -3642,9 +3750,9 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fi->direct_io = 1;
 		fi->keep_cache = 0;
 		if (ino==STATS_INODE) {
-			oplog_printf(&ctx,"open (%lu) (internal node: STATS): OK (1,0)",(unsigned long int)ino);
+			oplog_printf(&ctx,"open (%lu,%s) (internal node: STATS): OK (1,0)",(unsigned long int)ino,flagsstr);
 		} else {
-			oplog_printf(&ctx,"open (%lu) (internal node: PARAMS): OK (1,0)",(unsigned long int)ino);
+			oplog_printf(&ctx,"open (%lu,%s) (internal node: PARAMS): OK (1,0)",(unsigned long int)ino,flagsstr);
 		}
 		fuse_reply_open(req, fi);
 		return;
@@ -3653,25 +3761,25 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fi->fh = 0;
 		fi->direct_io = 1;
 		fi->keep_cache = 0;
-		oplog_printf(&ctx,"open (%lu) (internal node: %s): OK (1,0)",(unsigned long int)ino,(ino==MOOSE_INODE)?"MOOSE":"RANDOM");
+		oplog_printf(&ctx,"open (%lu,%s) (internal node: %s): OK (1,0)",(unsigned long int)ino,flagsstr,(ino==MOOSE_INODE)?"MOOSE":"RANDOM");
 		fuse_reply_open(req, fi);
 		return;
 	}
 	if (ino==OPLOG_INODE || ino==OPHISTORY_INODE) {
 		if ((fi->flags & O_ACCMODE) != O_RDONLY) {
-			oplog_printf(&ctx,"open (%lu) (internal node: %s): %s",(unsigned long int)ino,(ino==OPLOG_INODE)?"OPLOG":"OPHISTORY",strerr(EACCES));
+			oplog_printf(&ctx,"open (%lu,%s) (internal node: %s): %s",(unsigned long int)ino,flagsstr,(ino==OPLOG_INODE)?"OPLOG":"OPHISTORY",strerr(EACCES));
 			fuse_reply_err(req,EACCES);
 			return;
 		}
 		if (ctx.uid != 0) {
-			oplog_printf(&ctx,"open (%lu) (internal node: %s): %s",(unsigned long int)ino,(ino==OPLOG_INODE)?"OPLOG":"OPHISTORY",strerr(EPERM));
+			oplog_printf(&ctx,"open (%lu,%s) (internal node: %s): %s",(unsigned long int)ino,flagsstr,(ino==OPLOG_INODE)?"OPLOG":"OPHISTORY",strerr(EPERM));
 			fuse_reply_err(req,EPERM);
 			return;
 		}
 		fi->fh = oplog_newhandle((ino==OPHISTORY_INODE)?1:0);
 		fi->direct_io = 1;
 		fi->keep_cache = 0;
-		oplog_printf(&ctx,"open (%lu) (internal node: %s): OK (1,0)",(unsigned long int)ino,(ino==OPLOG_INODE)?"OPLOG":"OPHISTORY");
+		oplog_printf(&ctx,"open (%lu,%s) (internal node: %s): OK (1,0)",(unsigned long int)ino,flagsstr,(ino==OPLOG_INODE)?"OPLOG":"OPHISTORY");
 		fuse_reply_open(req, fi);
 		return;
 	}
@@ -3684,17 +3792,18 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		return;
 	}
 */
-	flags = 0;
-	mmode = 0;
 	if ((fi->flags & O_ACCMODE) == O_RDONLY) {
-		flags |= OPEN_READ;
+		flags = OPEN_READ;
 		mmode = MODE_MASK_R;
 	} else if ((fi->flags & O_ACCMODE) == O_WRONLY) {
-		flags |= OPEN_WRITE;
+		flags = OPEN_WRITE;
 		mmode = MODE_MASK_W;
 	} else if ((fi->flags & O_ACCMODE) == O_RDWR) {
-		flags |= OPEN_READ | OPEN_WRITE;
+		flags = OPEN_READ | OPEN_WRITE;
 		mmode = MODE_MASK_R | MODE_MASK_W;
+	} else {
+		flags = 0;
+		mmode = 0;
 	}
 	if (fi->flags & O_TRUNC) {
 		uint32_t mver = master_version();
@@ -3748,7 +3857,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	status = mfs_errorconv(status);
 
 	if (status!=0) {
-		oplog_printf(&ctx,"open (%lu)%s: %s",(unsigned long int)ino,(fdrec)?" (using cached data from lookup)":"",strerr(status));
+		oplog_printf(&ctx,"open (%lu,%s)%s: %s",(unsigned long int)ino,flagsstr,(fdrec)?" (using cached data from lookup)":"",strerr(status));
 		fuse_reply_err(req, status);
 		return ;
 	}
@@ -3791,12 +3900,12 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fi->direct_io = (keep_cache>=3)?1:0;
 	}
 	if (debug_mode) {
-		fprintf(stderr,"open (%lu) ok -> use %s io ; %s data cache ; can %s\n",(unsigned long int)ino,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear",(oflags&OPEN_APPENDONLY)?"append only":"write randomly");
+		fprintf(stderr,"open (%lu,%s) ok -> use %s io ; %s data cache ; can %s\n",(unsigned long int)ino,flagsstr,(fi->direct_io)?"direct":"cached",(fi->keep_cache)?"keep":"clear",(oflags&OPEN_APPENDONLY)?"append only":"write randomly");
 	}
 //	if (fi->keep_cache==0) {
 //		chunksdatacache_clear_inode(ino,0);
 //	}
-	oplog_printf(&ctx,"open (%lu)%s: OK (direct_io:%u,keep_cache:%u,append_mode:%u) [handle:%08"PRIX32"]",(unsigned long int)ino,(fdrec)?" (using cached data from lookup)":"",(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,(oflags&OPEN_APPENDONLY)?1:0,findex);
+	oplog_printf(&ctx,"open (%lu,%s)%s: OK (direct_io:%u,keep_cache:%u,append_mode:%u) [handle:%08"PRIX32"]",(unsigned long int)ino,flagsstr,(fdrec)?" (using cached data from lookup)":"",(unsigned int)fi->direct_io,(unsigned int)fi->keep_cache,(oflags&OPEN_APPENDONLY)?1:0,findex);
 	fs_inc_acnt(ino);
 	if (fuse_reply_open(req, fi) == -ENOENT) {
 		mfs_removefileinfo(findex);

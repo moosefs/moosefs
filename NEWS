@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.115-1 (WIP)
+* MooseFS 3.0.115-1 (2020-09-28)
 
   - (cs) fixed chunk locking issues in chunkserver (lock timeout, missing release etc.)
   - (all) changed to hex all chunkid logged to syslog (only in changelog it is left in decimal format)

@@ -1,3 +1,15 @@
+moosefs (3.0.115-1) unstable; urgency=medium
+
+  * (cs) fixed chunk locking issues in chunkserver (lock timeout, missing
+    release etc.)
+  * (all) changed to hex all chunkid logged to syslog (only in changelog it is
+    left in decimal format)
+  * (cs) changed port number from hex to dec in replicator module
+  * (mount) added printing open/create mode to the oplog
+  * (mount) fixed opening file after using lookup cache
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 28 Sep 2020 13:00:00 +0200
+
 moosefs (3.0.114-1) unstable; urgency=medium
 
   * (mount) fixed trunacting files open with O_APPEND flag (bug itntr. in

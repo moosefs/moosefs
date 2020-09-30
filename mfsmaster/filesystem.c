@@ -8069,9 +8069,24 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 			nl=0;
 		}
 		mfs_arg_syslog(LOG_ERR,"loading edge: %"PRIu32"->%"PRIu32" error: empty name",parent_id,child_id);
-		return -1;
-	}
-	if (parent_id==0 && nleng>MFS_PATH_MAX) {
+		if (ignoreflag==0) {
+			fprintf(stderr,"use option '-i' to generate name replacement\n");
+			return -1;
+		} else {
+			char tmpname[20];
+			uint8_t len;
+			len = snprintf(tmpname,20,"(empty %"PRIu32")",child_id);
+			if (len>20) {
+				len=20;
+			}
+			e = fsedge_malloc(len);
+			passert(e);
+			memcpy((uint8_t*)(e->name),tmpname,len);
+			e->nleng = len;
+			fprintf(stderr,"loading edge: %"PRIu32"->%"PRIu32" empty filename replaced by %s\n",parent_id,child_id,changelog_escape_name(e->nleng,e->name));
+			syslog(LOG_ERR,"loading edge: %"PRIu32"->%"PRIu32" empty filename replaced by %s",parent_id,child_id,changelog_escape_name(e->nleng,e->name));
+		}
+	} else if (parent_id==0 && nleng>MFS_PATH_MAX) {
 		mfs_arg_syslog(LOG_WARNING,"loading edge: %"PRIu32"->%"PRIu32" error: name too long (%"PRIu16") -> truncate",parent_id,child_id,nleng);
 		e = fsedge_malloc(MFS_PATH_MAX);
 		passert(e);
@@ -8088,16 +8103,18 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 		passert(e);
 		e->nleng = nleng;
 	}
-	if (bio_read(fd,(uint8_t*)(e->name),e->nleng)!=e->nleng) {
-		int err = errno;
-		if (nl) {
-			fputc('\n',stderr);
-			nl=0;
+	if (nleng>0) {
+		if (bio_read(fd,(uint8_t*)(e->name),e->nleng)!=e->nleng) {
+			int err = errno;
+			if (nl) {
+				fputc('\n',stderr);
+				nl=0;
+			}
+			errno = err;
+			mfs_errlog(LOG_ERR,"loading edge: read error");
+			fsedge_free(e,nleng);
+			return -1;
 		}
-		errno = err;
-		mfs_errlog(LOG_ERR,"loading edge: read error");
-		fsedge_free(e,nleng);
-		return -1;
 	}
 	e->child = fsnodes_node_find(child_id);
 	if (e->child==NULL) {

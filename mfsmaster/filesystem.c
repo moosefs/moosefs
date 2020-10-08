@@ -8083,8 +8083,8 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 			passert(e);
 			memcpy((uint8_t*)(e->name),tmpname,len);
 			e->nleng = len;
-			fprintf(stderr,"loading edge: %"PRIu32"->%"PRIu32" empty filename replaced by %s\n",parent_id,child_id,changelog_escape_name(e->nleng,e->name));
-			syslog(LOG_ERR,"loading edge: %"PRIu32"->%"PRIu32" empty filename replaced by %s",parent_id,child_id,changelog_escape_name(e->nleng,e->name));
+			fprintf(stderr,"loading edge: %"PRIu32"->%"PRIu32" empty filename replaced by '(empty %"PRIu32")'\n",parent_id,child_id,child_id);
+			syslog(LOG_ERR,"loading edge: %"PRIu32"->%"PRIu32" empty filename replaced by '(empty %"PRIu32")'",parent_id,child_id,child_id);
 		}
 	} else if (parent_id==0 && nleng>MFS_PATH_MAX) {
 		mfs_arg_syslog(LOG_WARNING,"loading edge: %"PRIu32"->%"PRIu32" error: name too long (%"PRIu16") -> truncate",parent_id,child_id,nleng);

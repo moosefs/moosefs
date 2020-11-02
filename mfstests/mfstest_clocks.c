@@ -42,10 +42,11 @@ uint64_t wallclock_utime(void) {
 }
 
 int main(void) {
-	double st,en;
-	uint64_t stusec,enusec;
-	uint64_t stnsec,ennsec;
-	uint64_t wcstusec,wcenusec;
+	double st,en,secsum;
+	uint64_t stusec,enusec,usecsum;
+	uint64_t stnsec,ennsec,nsecsum;
+	uint64_t wcstusec,wcenusec,wcusecsum;
+	int i;
 
 	if (strcmp(monotonic_method(),"time")==0) {
 		printf("testing classic 'time(NULL)' clock doesn't make sense\n");
@@ -57,29 +58,35 @@ int main(void) {
 	mfstest_start(monotonic_clocks);
 
 	printf("used method: %s\n",monotonic_method());
-	st = monotonic_seconds();
-	stusec = monotonic_useconds();
-	stnsec = monotonic_nseconds();
-	wcstusec = wallclock_utime();
-	portable_usleep(10000);
-	en = monotonic_seconds();
-	enusec = monotonic_useconds();
-	ennsec = monotonic_nseconds();
-	wcenusec = wallclock_utime();
-	en -= st;
-	enusec -= stusec;
-	ennsec -= stnsec;
-	wcenusec -= wcstusec;
-	printf("second: %.6lf ; %"PRIu64" ; %"PRIu64" ; %"PRIu64"\n",en,enusec,ennsec,wcenusec);
+	secsum = 0.0;
+	usecsum = 0;
+	nsecsum = 0;
+	wcusecsum = 0;
+	for (i=0 ; i<10 ; i++) {
+		st = monotonic_seconds();
+		stusec = monotonic_useconds();
+		stnsec = monotonic_nseconds();
+		wcstusec = wallclock_utime();
+		portable_usleep(10000);
+		en = monotonic_seconds();
+		enusec = monotonic_useconds();
+		ennsec = monotonic_nseconds();
+		wcenusec = wallclock_utime();
+		secsum += en-st;
+		usecsum += enusec-stusec;
+		nsecsum += ennsec-stnsec;
+		wcusecsum += wcenusec-wcstusec;
+	}
+	printf("second: %.6lf ; %"PRIu64" ; %"PRIu64" ; %"PRIu64"\n",secsum,usecsum,nsecsum,wcusecsum);
 
-	mfstest_assert_double_ge(en,0.01);
-	mfstest_assert_uint64_ge(enusec,10000);
-	mfstest_assert_uint64_ge(ennsec,10000000);
-	mfstest_assert_uint64_ge(wcenusec,10000);
-	mfstest_assert_double_lt(en,0.02);
-	mfstest_assert_uint64_lt(enusec,20000);
-	mfstest_assert_uint64_lt(ennsec,20000000);
-	mfstest_assert_uint64_lt(wcenusec,20000);
+	mfstest_assert_double_ge(secsum,0.1);
+	mfstest_assert_uint64_ge(usecsum,100000);
+	mfstest_assert_uint64_ge(nsecsum,100000000);
+	mfstest_assert_uint64_ge(wcusecsum,100000);
+	mfstest_assert_double_lt(secsum,0.25);
+	mfstest_assert_uint64_lt(usecsum,250000);
+	mfstest_assert_uint64_lt(nsecsum,250000000);
+	mfstest_assert_uint64_lt(wcusecsum,250000);
 
 	mfstest_end();
 	mfstest_return();

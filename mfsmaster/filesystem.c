@@ -2606,8 +2606,8 @@ static inline uint32_t fsnodes_getdetached(fsedge *start,uint8_t *dbuff) {
 	return result;
 }
 
-static inline uint32_t fsnodes_readdirsize(fsnode *p,fsedge *e,uint32_t maxentries,uint64_t nedgeid,uint8_t attrmode) {
-	uint32_t result = 0;
+static inline uint64_t fsnodes_readdirsize(fsnode *p,fsedge *e,uint32_t maxentries,uint64_t nedgeid,uint8_t attrmode) {
+	uint64_t result = 0;
 	uint8_t attrsize = (attrmode==0)?1:(attrmode==1)?35:ATTR_RECORD_SIZE;
 	while (maxentries>0 && nedgeid<EDGEID_MAX) {
 		if (nedgeid==0) {
@@ -5881,6 +5881,7 @@ uint8_t fs_mr_append_slice(uint32_t ts,uint32_t inode,uint32_t inode_src,uint32_
 }
 
 uint8_t fs_readdir_size(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t flags,uint32_t maxentries,uint64_t nedgeid,void **dnode,void **dedge,uint32_t *dbuffsize,uint8_t attrmode) {
+	uint64_t r;
 	fsnode *p;
 	fsedge *e;
 	*dnode = NULL;
@@ -5919,7 +5920,11 @@ uint8_t fs_readdir_size(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint3
 	}
 	*dnode = p;
 	*dedge = e;
-	*dbuffsize = fsnodes_readdirsize(p,e,maxentries,nedgeid,(flags&GETDIR_FLAG_WITHATTR)?attrmode:0);
+	r = fsnodes_readdirsize(p,e,maxentries,nedgeid,(flags&GETDIR_FLAG_WITHATTR)?attrmode:0);
+	if (r>=UINT64_C(0xFFFF0000)) {
+		return MFS_ERROR_ERANGE;
+	}
+	*dbuffsize = r;
 	return MFS_STATUS_OK;
 }
 

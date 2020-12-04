@@ -804,7 +804,7 @@ void matocsserv_getservers_test(uint16_t *stdcscnt,uint16_t stdcsids[MAXCSCOUNT]
 			totalcnt++;
 			if ((eptr->totalspace - eptr->usedspace)>(MFSCHUNKSIZE*(1U+eptr->writecounter*10U))) { // server have enough space
 				if (eptr->hlstatus!=HLSTATUS_OVERLOADED) { // server is not overloaded ?
-					if ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK) || csdb_server_is_being_maintained(eptr->csptr)) {
+					if ((eptr->hlstatus!=HLSTATUS_DEFAULT && eptr->hlstatus!=HLSTATUS_OK && eptr->hlstatus!=HLSTATUS_REBALANCE) || csdb_server_is_being_maintained(eptr->csptr)) {
 						gracecnt++;
 						stdcsids[MAXCSCOUNT-gracecnt] = eptr->csid;
 					} else {
@@ -905,7 +905,7 @@ void matocsserv_get_server_groups(uint16_t csids[MAXCSCOUNT],double replimit,uin
 					csstate=CSSTATE_NO_SPACE;
 				} else if (eptr->wrepcounter+a>=replimit) {
 					csstate=CSSTATE_LIMIT_REACHED;
-				} else if (!((eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK) && csdb_server_is_being_maintained(eptr->csptr)==0)) {
+				} else if (!((eptr->hlstatus==HLSTATUS_DEFAULT || eptr->hlstatus==HLSTATUS_OK || eptr->hlstatus==HLSTATUS_REBALANCE) && csdb_server_is_being_maintained(eptr->csptr)==0)) {
 					csstate=CSSTATE_OVERLOADED;
 				} else {
 					csstate=CSSTATE_OK;

@@ -4,6 +4,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (check) making clock test less prone to sinlge failure
   - (master) added protection against listing too big directory
+  - (master) servers in 'rebalance' state are now allowed to be used in replication
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

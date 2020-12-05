@@ -2,7 +2,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 3.0.116-1 (WIP)
 
-  - (check) making clock test less prone to sinlge failure
+  - (check) making clock test less prone to single failure
   - (master) added protection against listing too big directory
   - (master) servers in 'rebalance' state are now allowed to be used in replication
 

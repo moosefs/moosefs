@@ -125,7 +125,6 @@ typedef struct masterconn {
 	uint8_t masteraddrvalid;
 	uint8_t registerstate;
 	uint8_t new_register_mode;
-	uint8_t hlstatus;
 
 	uint8_t gotrndblob;
 	uint8_t rndblob[32];
@@ -726,33 +725,6 @@ void masterconn_send_disconnect_command(void) {
 	}
 }
 
-void masterconn_heavyload(uint32_t load,uint8_t hlstatus) {
-	masterconn *eptr = masterconnsingleton;
-	uint8_t *buff;
-	uint8_t hltosend;
-	uint8_t rebalance;
-
-	if (eptr->registerstate==REGISTERED && eptr->mode==DATA && eptr->masterversion>=VERSION2INT(3,0,7)) {
-		if (hlstatus != eptr->hlstatus) {
-			hltosend = hlstatus;
-			rebalance = hdd_is_rebalance_on();
-			if (rebalance&2) { // in high speed rebalance force 'overloaded' status
-				hltosend = HLSTATUS_OVERLOADED;
-			}
-			if (hlstatus!=HLSTATUS_OVERLOADED && (rebalance&1)) { // not overloaded and in low speed rebalance - send 'rebalance' status
-				hltosend = HLSTATUS_REBALANCE;
-			}
-			if (eptr->masterversion<VERSION2INT(3,0,62) && hltosend==HLSTATUS_REBALANCE) { // does master know about 'rebalance' status? if not then send 'overloaded'
-				hltosend = HLSTATUS_OVERLOADED;
-			}
-			buff = masterconn_create_attached_packet(eptr,CSTOMA_CURRENT_LOAD,5);
-			put32bit(&buff,load);
-			put8bit(&buff,hltosend);
-			eptr->hlstatus = hlstatus;
-		}
-	}
-}
-
 void masterconn_check_hdd_space(void) {
 	masterconn *eptr = masterconnsingleton;
 	uint8_t *buff;
@@ -828,9 +800,8 @@ void masterconn_reportload(void) {
 	uint8_t rebalance;
 	uint8_t *buff;
 	if (eptr->mode==DATA && eptr->masterversion>=VERSION2INT(1,6,28) && eptr->registerstate==REGISTERED) {
-		load = job_getload();
+		job_get_load_and_hlstatus(&load,&hltosend);
 		if (eptr->masterversion>=VERSION2INT(3,0,7)) {
-			hltosend = eptr->hlstatus;
 			rebalance = hdd_is_rebalance_on();
 			if (rebalance&2) { // in high speed rebalance force 'overloaded' status
 				hltosend = HLSTATUS_OVERLOADED;
@@ -1272,7 +1243,6 @@ void masterconn_connected(masterconn *eptr) {
 	eptr->outputtail = &(eptr->outputhead);
 	eptr->conncnt++;
 	eptr->masterversion = 0;
-	eptr->hlstatus = 0;
 	eptr->gotrndblob = 0;
 	memset(eptr->rndblob,0,32);
 	eptr->registerstate = UNREGISTERED;
@@ -1885,7 +1855,6 @@ int masterconn_init(void) {
 	eptr->masteraddrvalid = 0;
 	eptr->new_register_mode = 3;
 	eptr->masterversion = 0;
-	eptr->hlstatus = 0;
 	eptr->mode = FREE;
 	eptr->pdescpos = -1;
 	eptr->conncnt = 0;

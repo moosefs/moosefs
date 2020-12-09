@@ -24,7 +24,7 @@
 #include <inttypes.h>
 
 void job_stats(uint32_t *maxjobscnt);
-uint32_t job_getload(void);
+void job_get_load_and_hlstatus(uint32_t *load,uint8_t *hlstatus);
 
 void job_pool_disable_job(uint32_t jobid);
 void job_pool_change_callback(uint32_t jobid,void (*callback)(uint8_t status,void *extra),void *extra);

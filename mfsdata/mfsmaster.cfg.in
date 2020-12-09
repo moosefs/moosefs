@@ -98,7 +98,7 @@
 # CHUNKSERVER WORKING OPTIONS                 #
 ###############################################
 
-# initial delay in seconds before starting replications (default is 60)
+# initial delay in seconds before starting replications (default is 60). The delay is counted from the moment the master has started accepting client connections.
 # REPLICATIONS_DELAY_INIT = 60
 
 # whether to make undergoal replications respect topology (default is 0)

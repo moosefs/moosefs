@@ -171,17 +171,12 @@ typedef struct _worker {
 static jobpool* globalpool = NULL;
 
 static uint32_t stats_maxjobscnt = 0;
-static uint32_t last_maxjobscnt = 0;
 
 // static uint8_t exiting;
 
 void job_stats(uint32_t *maxjobscnt) {
-	*maxjobscnt = last_maxjobscnt = stats_maxjobscnt;
+	*maxjobscnt = stats_maxjobscnt;
 	stats_maxjobscnt = 0;
-}
-
-uint32_t job_getload(void) {
-	return last_maxjobscnt;
 }
 
 static inline void job_send_status(jobpool *jp,uint32_t jobid,uint8_t status) {
@@ -514,7 +509,7 @@ void* job_pool_new(void) {
 	return jp;
 }
 
-uint32_t job_pool_jobs_count(void) {
+static uint32_t job_pool_jobs_count(void) {
 	jobpool* jp = globalpool;
 	uint32_t res;
 	zassert(pthread_mutex_lock(&(jp->jobslock)));
@@ -840,25 +835,31 @@ void job_serve(struct pollfd *pdesc) {
 	}
 }
 
+// can be only HLSTATUS_OK or HLSTATUS_OVERLOADED
+static uint8_t current_hlstatus = HLSTATUS_OK;
+
+void job_get_load_and_hlstatus(uint32_t *load,uint8_t *hlstatus) {
+	*load = job_pool_jobs_count();
+	*hlstatus = current_hlstatus;
+}
+
 void job_heavyload_test(void) {
 	jobpool* jp = globalpool;
-	uint8_t hlstatus = HLSTATUS_DEFAULT;
-	uint32_t load = 0; // make stupid gcc happy
+	uint8_t hlstatus;
 
 	zassert(pthread_mutex_lock(&(jp->jobslock)));
+	hlstatus = HLSTATUS_DEFAULT;
 	if (jp->workers_total - jp->workers_avail > jp->workers_himark) {
 		hlstatus = HLSTATUS_OVERLOADED;
 	}
 	if (jp->workers_total - jp->workers_avail < jp->workers_lomark) {
 		hlstatus = HLSTATUS_OK;
 	}
-	if (hlstatus) {
-		load = (jp->workers_total - jp->workers_avail) + queue_elements(jp->jobqueue);
-	}
 	zassert(pthread_mutex_unlock(&(jp->jobslock)));
 
-	if (hlstatus!=HLSTATUS_DEFAULT) {
-		masterconn_heavyload(load,hlstatus);
+	if (hlstatus!=HLSTATUS_DEFAULT && hlstatus!=current_hlstatus) {
+		current_hlstatus = hlstatus;
+		masterconn_reportload();
 	}
 }
 

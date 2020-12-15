@@ -3,3 +3,9 @@ contact_links:
   - name: GitHub Community Discussions
     url: https://github.com/moosefs/moosefs/discussions
     about: Please, use the Discussions tool to ask questions, discuss ideas and for any other issues that are not a bug report or a definite feature request.
+  - name: MooseFS Documentation
+    url: https://moosefs.com/support/#documentation
+    about: Documentation, support status and best practices.
+  - name: MooseFS Pro
+    url: https://moosefs.com/?source=GitHub#contact
+    about: Get professional support or switch to MooseFS Pro.

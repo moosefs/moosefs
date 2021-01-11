@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added protection against listing too big directory
   - (master) servers in 'rebalance' state are now allowed to be used in replication
   - (cs) changed handling 'load+hlstatus' packet
+  - (mount) added symlink cache timeout
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

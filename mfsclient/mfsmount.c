@@ -236,6 +236,7 @@ struct mfsopts {
 	double entrycacheto;
 	double direntrycacheto;
 	double negentrycacheto;
+	double symlinkcacheto;
 	double groupscacheto;
 	double fsyncmintime;
 	int fsyncbeforeclose;
@@ -324,6 +325,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfsentrycacheto=%lf", entrycacheto, 0),
 	MFS_OPT("mfsdirentrycacheto=%lf", direntrycacheto, 0),
 	MFS_OPT("mfsnegentrycacheto=%lf", negentrycacheto, 0),
+	MFS_OPT("mfssymlinkcacheto=%lf", symlinkcacheto, 0),
 	MFS_OPT("mfsgroupscacheto=%lf", groupscacheto, 0),
 //	MFS_OPT("mfsaclsupport", xattraclsupport, 1),
 	MFS_OPT("mfsfsyncmintime=%lf", fsyncmintime, 0),
@@ -411,6 +413,7 @@ static void usage(const char *progname) {
 	fprintf(fd,"    -o mfsentrycacheto=SEC      set file entry cache timeout in seconds (default: 0.0)\n");
 	fprintf(fd,"    -o mfsdirentrycacheto=SEC   set directory entry cache timeout in seconds (default: 1.0)\n");
 	fprintf(fd,"    -o mfsnegentrycacheto=SEC   set negative entry cache timeout in seconds (default: 0.0)\n");
+	fprintf(fd,"    -o mfssymlinkcacheto=SEC    set symbolic link cache timeout in seconds (default: 300.0)\n");
 	fprintf(fd,"    -o mfsgroupscacheto=SEC     set supplementary groups cache timeout in seconds (default: 300.0)\n");
 	fprintf(fd,"    -o mfsrlimitnofile=N        on startup mfsmount tries to change number of descriptors it can simultaneously open (default: 100000)\n");
 	fprintf(fd,"    -o mfsnice=N                on startup mfsmount tries to change his 'nice' value (default: -19)\n");
@@ -896,6 +899,7 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	NUMOPT("mfsentrycacheto",".3lf",entrycacheto);
 	NUMOPT("mfsdirentrycacheto",".3lf",direntrycacheto);
 	NUMOPT("mfsnegentrycacheto",".3lf",negentrycacheto);
+	NUMOPT("mfssymlinkcacheto",".3lf",symlinkcacheto);
 	NUMOPT("mfsgroupscacheto",".3lf",groupscacheto);
 	NUMOPT("mfsfsyncmintime",".3lf",fsyncmintime);
 	BOOLOPT("mfsfsyncbeforeclose",fsyncbeforeclose);
@@ -1206,7 +1210,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	conncache_init(200);
 	chunkrwlock_init();
 	chunksdatacache_init();
-	symlink_cache_init();
+	symlink_cache_init(mfsopts.symlinkcacheto);
 	negentry_cache_init(mfsopts.negentrycacheto);
 //	dir_cache_init();
 	fs_init_threads(mfsopts.ioretries,mfsopts.timeout);
@@ -1721,6 +1725,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.entrycacheto = 0.0;
 	mfsopts.direntrycacheto = 1.0;
 	mfsopts.negentrycacheto = 0.0;
+	mfsopts.symlinkcacheto = 300.0;
 	mfsopts.groupscacheto = 300.0;
 	mfsopts.fsyncbeforeclose = 0;
 	mfsopts.fsyncmintime = 0.0;
@@ -1974,6 +1979,7 @@ int main(int argc, char *argv[]) {
 	TIMEOUT_CLAMP(mfsopts.entrycacheto,"entry",86400.0);
 	TIMEOUT_CLAMP(mfsopts.direntrycacheto,"directory entry",86400.0);
 	TIMEOUT_CLAMP(mfsopts.negentrycacheto,"non existing entry",86400.0);
+	TIMEOUT_CLAMP(mfsopts.symlinkcacheto,"symbolic link",86400.0);
 	TIMEOUT_CLAMP(mfsopts.groupscacheto,"auxiliary groups",86400.0);
 
 	if (csorder_init(mfsopts.preferedlabels)<0) {

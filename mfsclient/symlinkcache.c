@@ -51,6 +51,7 @@ typedef struct _hashbucket {
 static const uint32_t primes[HASH_FUNCTIONS] = {1072573589U,3465827623U,2848548977U,748191707U};
 static hashbucket *symlinkhash = NULL;
 static pthread_mutex_t slcachelock = PTHREAD_MUTEX_INITIALIZER;
+static double timeout;
 
 enum {
 	INSERTS = 0,
@@ -142,7 +143,7 @@ uint8_t* symlink_cache_search(uint32_t inode) {
 		hb = symlinkhash + ((inode*primes[h])%HASH_BUCKETS);
 		for (i=0 ; i<HASH_BUCKET_SIZE ; i++) {
 			if (hb->inode[i]==inode) {
-				if (hb->time[i]+MFS_INODE_REUSE_DELAY<t) {
+				if (hb->time[i]+timeout<t) {
 					if (hb->path[i]) {
 						free(hb->path[i]);
 						hb->path[i]=NULL;
@@ -166,7 +167,7 @@ uint8_t* symlink_cache_search(uint32_t inode) {
 	return NULL;
 }
 
-void symlink_cache_init(void) {
+void symlink_cache_init(double to) {
 	hashbucket *hb;
 	uint8_t i;
 	uint32_t hi;
@@ -181,6 +182,7 @@ void symlink_cache_init(void) {
 			hb->path[i] = NULL;
 		}
 	}
+	timeout = to;
 	symlink_cache_statsptr_init();
 }
 

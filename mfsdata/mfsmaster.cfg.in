@@ -213,3 +213,7 @@
 # Define limit for number of hardlinks allowed for one object.
 # Minimum value is 8 (required by POSIX) and maximum value is 65000 (same as in ext4 on Linux). Default value is 32767.
 # MAX_ALLOWED_HARD_LINKS = 32767
+
+# Delay time in seconds after which inodes of deleted objects will be reused. BE AWARE if you change this value below 86400 (1 day) you MUST ensure that this value is higher than any of the following timeouts in all clients:
+# mfsattrcacheto,mfsxattrcacheto,mfsentrycacheto,mfsdirentrycacheto,mfsnegentrycacheto,mfssymlinkcacheto
+# INODE_REUSE_DELAY = 86400

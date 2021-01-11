@@ -178,7 +178,7 @@ Refer to [installation guides](https://moosefs.com/support/#documentation) for m
 
 
 ## Copyright
-Copyright (c) 2008-2020 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (c) 2008-2021 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

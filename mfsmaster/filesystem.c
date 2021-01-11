@@ -136,6 +136,7 @@ static quotanode *quotahead;
 static uint32_t QuotaDefaultGracePeriod;
 static uint16_t MaxAllowedHardLinks;
 static uint8_t AtimeMode;
+static uint32_t InodeReuseDelay;
 
 typedef struct _fsnode {
 	uint32_t inode;
@@ -833,7 +834,7 @@ void fsnodes_free_id(uint32_t inode,uint32_t ts) {
 	freelastts = ts;
 }
 
-uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint32_t sustainedinodes,uint32_t inode_chksum) {
+uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t inodereusedelay,uint32_t freeinodes,uint32_t sustainedinodes,uint32_t inode_chksum) {
 	uint32_t si,fi,pos,mask;
 	uint32_t ics;
 	freenode *n,*an;
@@ -847,7 +848,7 @@ uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint
 	if (ts<freelastts) {
 		fsnodes_free_fixts(ts);
 	}
-	while (n && n->ftime+MFS_INODE_REUSE_DELAY<ts) {
+	while (n && n->ftime+inodereusedelay<ts) {
 		ics ^= n->inode;
 		if (((sesflags&SESFLAG_METARESTORE)==0 || sustainedinodes>0) && of_isfileopen(n->inode)) {
 			si++;
@@ -883,7 +884,7 @@ uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint
 	}
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		if (fi>0 || si>0) {
-			changelog("%"PRIu32"|FREEINODES():%"PRIu32",%"PRIu32",%"PRIu32,ts,fi,si,ics);
+			changelog("%"PRIu32"|FREEINODES(%"PRIu32"):%"PRIu32",%"PRIu32",%"PRIu32,ts,inodereusedelay,fi,si,ics);
 		}
 	} else {
 		if (freeinodes!=fi || sustainedinodes!=si || (inode_chksum!=0 && inode_chksum!=ics)) {
@@ -896,11 +897,11 @@ uint8_t fs_univ_freeinodes(uint32_t ts,uint8_t sesflags,uint32_t freeinodes,uint
 }
 
 void fsnodes_freeinodes(void) {
-	fs_univ_freeinodes(main_time(),0,0,0,0);
+	fs_univ_freeinodes(main_time(),0,InodeReuseDelay,0,0,0);
 }
 
-uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t freeinodes,uint32_t sustainedinodes,uint32_t inode_chksum) {
-	return fs_univ_freeinodes(ts,SESFLAG_METARESTORE,freeinodes,sustainedinodes,inode_chksum);
+uint8_t fs_mr_freeinodes(uint32_t ts,uint32_t inodereusedelay,uint32_t freeinodes,uint32_t sustainedinodes,uint32_t inode_chksum) {
+	return fs_univ_freeinodes(ts,SESFLAG_METARESTORE,inodereusedelay,freeinodes,sustainedinodes,inode_chksum);
 }
 
 void fsnodes_init_freebitmask (void) {
@@ -9175,7 +9176,6 @@ void fs_cs_disconnected(void) {
 
 
 void fs_reload(void) {
-	uint32_t mlink;
 	if (cfg_isdefined("QUOTA_TIME_LIMIT") && !cfg_isdefined("QUOTA_DEFAULT_GRACE_PERIOD")) {
 		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_TIME_LIMIT",7*86400); // deprecated option
 	} else {
@@ -9186,16 +9186,24 @@ void fs_reload(void) {
 		syslog(LOG_NOTICE,"unrecognized value for ATIME_MODE - using defaults");
 		AtimeMode = 0;
 	}
-	mlink = cfg_getuint32("MAX_ALLOWED_HARD_LINKS",32767);
-	if (mlink<8) {
-		syslog(LOG_NOTICE,"MAX_ALLOWED_HARD_LINKS is less than 8 - less that minimum number of hard links requierd by POSIX - setting to 8");
-		mlink = 8;
+	MaxAllowedHardLinks = cfg_getuint32("MAX_ALLOWED_HARD_LINKS",32767);
+	if (MaxAllowedHardLinks<8) {
+		syslog(LOG_NOTICE,"MAX_ALLOWED_HARD_LINKS is lower than 8 - less that minimum number of hard links requierd by POSIX - setting to 8");
+		MaxAllowedHardLinks = 8;
 	}
-	if (mlink>65000) {
-		syslog(LOG_NOTICE,"MAX_ALLOWED_HARD_LINKS is greater than 65000 - setting to 65000");
-		mlink = 65000;
+	if (MaxAllowedHardLinks>65000) {
+		syslog(LOG_NOTICE,"MAX_ALLOWED_HARD_LINKS is higher than 65000 - setting to 65000");
+		MaxAllowedHardLinks = 65000;
 	}
-	MaxAllowedHardLinks = mlink;
+	InodeReuseDelay = cfg_getuint32("INODE_REUSE_DELAY",86400);
+	if (InodeReuseDelay<300) {
+		syslog(LOG_NOTICE,"INODE_REUSE_DELAY is lower than 300 - setting to 300");
+		InodeReuseDelay = 300;
+	}
+	if (InodeReuseDelay>3000000) {
+		syslog(LOG_NOTICE,"INODE_REUSE_DELAY is higher than 3000000 - setting to 3000000");
+		InodeReuseDelay = 3000000;
+	}
 }
 
 int fs_strinit(void) {

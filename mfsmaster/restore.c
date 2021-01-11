@@ -581,7 +581,13 @@ int do_flock(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 
 int do_freeinodes(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t sustainedinodes,freeinodes,inode_chksum;
+	uint32_t inodereusedelay;
 	EAT(ptr,filename,lv,'(');
+	if (*ptr==')') {
+		inodereusedelay = 86400;
+	} else {
+		GETU32(inodereusedelay,ptr);
+	}
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(freeinodes,ptr);
@@ -598,7 +604,7 @@ int do_freeinodes(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 		inode_chksum = 0;
 	}
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_freeinodes(ts,freeinodes,sustainedinodes,inode_chksum);
+	return fs_mr_freeinodes(ts,inodereusedelay,freeinodes,sustainedinodes,inode_chksum);
 }
 
 int do_incversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) { // depreciated - replaced by 'setversion'

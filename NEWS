@@ -8,6 +8,7 @@ This file lists noteworthy changes in MooseFS.
   - (cs) changed handling 'load+hlstatus' packet
   - (mount) added symlink cache timeout
   - (master) added option to define inode reuse delay
+  - (cgi+cli) fixed division by zero when scount is zero (no chunkservers - issue #412)
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

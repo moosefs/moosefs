@@ -397,18 +397,15 @@ typedef struct _finfo {
 	uint8_t mode;
 	uint8_t uselocks;
 	uint8_t valid;
-	uint8_t writing;
 	uint8_t open_waiting;
 	uint8_t open_in_master;
-	uint32_t readers_cnt;
-	uint32_t writers_cnt;
+	int open_status;
 	void *rdata;
 	void *wdata;
 	double create;
 	finfo_lock_owner *posix_lo_head;
 	finfo_lock_owner *flock_lo_head;
 	pthread_mutex_t lock;
-	pthread_cond_t rwcond;
 	pthread_cond_t opencond;
 	uint32_t findex;
 	uint32_t next,*prev;
@@ -512,7 +509,6 @@ static uint32_t finfo_new(uint32_t inode) {
 		passert(fileinfo);
 		memset(fileinfo,0,sizeof(finfo));
 		zassert(pthread_mutex_init(&(fileinfo->lock),NULL));
-		zassert(pthread_cond_init(&(fileinfo->rwcond),NULL));
 		zassert(pthread_cond_init(&(fileinfo->opencond),NULL));
 		fileinfo->rdata = NULL;
 		fileinfo->wdata = NULL;
@@ -597,7 +593,6 @@ static void finfo_freeall(void) {
 			finfo_free_resources(fileinfo);
 			zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 			zassert(pthread_mutex_destroy(&(fileinfo->lock)));
-			zassert(pthread_cond_destroy(&(fileinfo->rwcond)));
 			zassert(pthread_cond_destroy(&(fileinfo->opencond)));
 			free(fileinfo);
 		}
@@ -3359,9 +3354,6 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 #endif
 	fileinfo->posix_lo_head = NULL;
 	fileinfo->flock_lo_head = NULL;
-	fileinfo->readers_cnt = 0;
-	fileinfo->writers_cnt = 0;
-	fileinfo->writing = 0;
 	if (accmode == O_RDONLY) {
 		fileinfo->mode = IO_RO;
 	} else { // with writeback cache enabled even in O_WRONLY accmode reading is allowed - hence only IO_RO and IO_RW !!!
@@ -3381,6 +3373,7 @@ static uint32_t mfs_newfileinfo(uint8_t accmode,uint32_t inode,uint64_t fleng,ui
 #endif
 	fileinfo->open_waiting = 0;
 	fileinfo->open_in_master = open_in_master;
+	fileinfo->open_status = 0;
 	pthread_mutex_unlock(&(fileinfo->lock)); // make helgrind happy
 	return findex;
 }
@@ -3925,6 +3918,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fileinfo = finfo_get(fi->fh);
 		if (fileinfo!=NULL) {
 			zassert(pthread_mutex_lock(&(fileinfo->lock)));
+			fileinfo->open_status = status;
 			fileinfo->open_in_master = 1;
 			if (fileinfo->open_waiting) {
 				zassert(pthread_cond_broadcast(&(fileinfo->opencond)));
@@ -4008,11 +4002,12 @@ void mfs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		uint32_t lock_owner_flock_cnt;
 		uint32_t indx;
 
+		inoleng_io_wait(fileinfo->flengptr);
 		zassert(pthread_mutex_lock(&(fileinfo->lock)));
 		// rwlock_wait_for_unlock:
-		while (fileinfo->writing | fileinfo->writers_cnt | fileinfo->readers_cnt) {
-			zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
-		}
+//		while (fileinfo->writing | fileinfo->writers_cnt | fileinfo->readers_cnt) {
+//			zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
+//		}
 #ifdef HAVE___SYNC_OP_AND_FETCH
 		uselocks = __sync_or_and_fetch(&(fileinfo->uselocks),0);
 #else
@@ -4138,6 +4133,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	uint32_t iovcnt;
 	void *buffptr;
 	int err;
+	uint8_t oim,oerr;
 	struct fuse_ctx ctx;
 
 	ctx = *(fuse_req_ctx(req));
@@ -4330,12 +4326,13 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		fuse_reply_err(req,EFBIG);
 		return;
 	}
+	inoleng_read_start(fileinfo->flengptr);
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	// rwlock_rdlock begin
-	while (fileinfo->writing | fileinfo->writers_cnt) {
-		zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
-	}
-	fileinfo->readers_cnt++;
+//	while (fileinfo->writing | fileinfo->writers_cnt) {
+//		zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
+//	}
+//	fileinfo->readers_cnt++;
 	// rwlock_rdlock_end
 #ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress++;
@@ -4359,6 +4356,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	if (fileinfo->rdata == NULL) {
 		fileinfo->rdata = read_data_new(ino,inoleng_getfleng(fileinfo->flengptr));
 	}
+	oim = fileinfo->open_in_master;
 	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 
 	write_data_flush_inode(ino);
@@ -4367,7 +4365,27 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	err = read_data(fileinfo->rdata,off,&ssize,&buffptr,&iov,&iovcnt);
 	fs_atime(ino);
 
-	if (err!=0) {
+	oerr = 0;
+	if (oim==0) {
+		zassert(pthread_mutex_lock(&(fileinfo->lock)));
+
+		// wait for full open
+		while (fileinfo->open_in_master==0) {
+			fileinfo->open_waiting++;
+			zassert(pthread_cond_wait(&(fileinfo->opencond),&(fileinfo->lock)));
+			fileinfo->open_waiting--;
+		}
+
+		if (fileinfo->open_status!=0) {
+			err = fileinfo->open_status;
+			oerr = 1;
+		}
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+	}
+	if (oerr) {
+		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"] (this is open error): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
+		fuse_reply_err(req,err);
+	} else if (err!=0) {
 		if (debug_mode) {
 			fprintf(stderr,"IO error occurred while reading inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
@@ -4383,12 +4401,13 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	}
 //	read_data_freebuff(fileinfo->rdata);
 	read_data_free_buff(fileinfo->rdata,buffptr,iov);
+	inoleng_read_end(fileinfo->flengptr);
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	// rwlock_rdunlock begin
-	fileinfo->readers_cnt--;
-	if (fileinfo->readers_cnt==0) {
-		zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
-	}
+//	fileinfo->readers_cnt--;
+//	if (fileinfo->readers_cnt==0) {
+//		zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
+//	}
 	// rwlock_rdunlock_end
 #ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress--;
@@ -4476,6 +4495,21 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		return;
 	}
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+
+	while (fileinfo->open_in_master==0) {
+		fileinfo->open_waiting++;
+		zassert(pthread_cond_wait(&(fileinfo->opencond),&(fileinfo->lock)));
+		fileinfo->open_waiting--;
+	}
+
+	if (fileinfo->open_status!=0) {
+		err = fileinfo->open_status;
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"] (this is open error): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
+		fuse_reply_err(req,err);
+		return;
+	}
+
 	appendonly = (fileinfo->mode==IO_RA)?1:0;
 	if (fileinfo->mode==IO_RO) {
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
@@ -4483,13 +4517,16 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		fuse_reply_err(req,EACCES);
 		return;
 	}
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+	inoleng_write_start(fileinfo->flengptr);
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	// rwlock_wrlock begin
-	fileinfo->writers_cnt++;
-	while (fileinfo->readers_cnt | fileinfo->writing) {
-		zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
-	}
-	fileinfo->writers_cnt--;
-	fileinfo->writing = 1;
+//	fileinfo->writers_cnt++;
+//	while (fileinfo->readers_cnt | fileinfo->writing) {
+//		zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
+//	}
+//	fileinfo->writers_cnt--;
+//	fileinfo->writing = 1;
 	// rwlock_wrlock end
 #ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress++;
@@ -4530,8 +4567,8 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	}
 	// rwlock_wrunlock begin
-	fileinfo->writing = 0;
-	zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
+//	fileinfo->writing = 0;
+//	zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
 	// wrlock_wrunlock end
 #ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress--;
@@ -4566,22 +4603,24 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		fdcache_invalidate(ino);
 		fuse_reply_write(req,size);
 	}
+	inoleng_write_end(fileinfo->flengptr);
 }
 
 static inline int mfs_do_fsync(finfo *fileinfo) {
 	uint32_t inode;
 	int err;
 	err = 0;
+	inoleng_write_start(fileinfo->flengptr);
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	inode = fileinfo->inode;
 	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_RW || fileinfo->mode==IO_RA)) {
 		// rwlock_wrlock begin
-		fileinfo->writers_cnt++;
-		while (fileinfo->readers_cnt | fileinfo->writing) {
-			zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
-		}
-		fileinfo->writers_cnt--;
-		fileinfo->writing = 1;
+//		fileinfo->writers_cnt++;
+//		while (fileinfo->readers_cnt | fileinfo->writing) {
+//			zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
+//		}
+//		fileinfo->writers_cnt--;
+//		fileinfo->writing = 1;
 		// rwlock_wrlock end
 #ifdef FREEBSD_DELAYED_RELEASE
 		fileinfo->ops_in_progress++;
@@ -4592,8 +4631,8 @@ static inline int mfs_do_fsync(finfo *fileinfo) {
 
 		zassert(pthread_mutex_lock(&(fileinfo->lock)));
 		// rwlock_wrunlock begin
-		fileinfo->writing = 0;
-		zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
+//		fileinfo->writing = 0;
+//		zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
 		// rwlock_wrunlock end
 #ifdef FREEBSD_DELAYED_RELEASE
 		fileinfo->ops_in_progress--;
@@ -4607,6 +4646,7 @@ static inline int mfs_do_fsync(finfo *fileinfo) {
 		fdcache_invalidate(inode);
 		dcache_invalidate_attr(inode);
 	}
+	inoleng_write_end(fileinfo->flengptr);
 	return err;
 }
 
@@ -4665,15 +4705,16 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 #endif
 
+	inoleng_write_start(fileinfo->flengptr);
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	if (fileinfo->wdata!=NULL && (fileinfo->mode==IO_RW || fileinfo->mode==IO_RA)) {
 		// rwlock_wrlock begin
-		fileinfo->writers_cnt++;
-		while (fileinfo->readers_cnt | fileinfo->writing) {
-			zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
-		}
-		fileinfo->writers_cnt--;
-		fileinfo->writing = 1;
+//		fileinfo->writers_cnt++;
+//		while (fileinfo->readers_cnt | fileinfo->writing) {
+//			zassert(pthread_cond_wait(&(fileinfo->rwcond),&(fileinfo->lock)));
+//		}
+//		fileinfo->writers_cnt--;
+//		fileinfo->writing = 1;
 		// rwlock_wrlock end
 #ifdef FREEBSD_DELAYED_RELEASE
 		fileinfo->ops_in_progress++;
@@ -4691,8 +4732,8 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		}
 		zassert(pthread_mutex_lock(&(fileinfo->lock)));
 		// rwlock_wrunlock begin
-		fileinfo->writing = 0;
-		zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
+//		fileinfo->writing = 0;
+//		zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
 		// rwlock_wrunlock end
 #ifdef FREEBSD_DELAYED_RELEASE
 		fileinfo->ops_in_progress--;
@@ -4769,6 +4810,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		dcache_invalidate_attr(ino);
 		oplog_printf(&ctx,"flush (%lu) [handle:%08"PRIX32",uselocks:%u,lock_owner:%016"PRIX64"]: OK",(unsigned long int)ino,(uint32_t)(fi->fh),uselocks,(uint64_t)(fi->lock_owner));
 	}
+	inoleng_write_end(fileinfo->flengptr);
 	fuse_reply_err(req,err);
 }
 
@@ -4969,6 +5011,8 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 		return;
 	}
 
+	owner = fi->lock_owner;
+
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 
 	// wait for full open
@@ -4978,7 +5022,14 @@ void mfs_flock (fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, int o
 		fileinfo->open_waiting--;
 	}
 
-	owner = fi->lock_owner;
+	if (fileinfo->open_status!=0) {
+		status = fileinfo->open_status;
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		oplog_printf(&ctx,"flock (-,%lu,%016"PRIX64",%s) [handle:%08"PRIX32"] (this is open error): %s",(unsigned long int)ino,owner,lock_mode_str,(uint32_t)(fi->fh),strerr(status));
+		fuse_reply_err(req,status);
+		return;
+	}
+
 
 	// track all locks to unlock them on release
 	if (lock_mode!=FLOCK_UNLOCK) {
@@ -5321,6 +5372,12 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 	}
 
 	owner = fi->lock_owner;
+	start = lock->l_start;
+	if (lock->l_len==0) {
+		end = UINT64_MAX;
+	} else {
+		end = start + lock->l_len;
+	}
 
 	zassert(pthread_mutex_lock(&(fileinfo->lock)));
 
@@ -5329,6 +5386,14 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 		fileinfo->open_waiting++;
 		zassert(pthread_cond_wait(&(fileinfo->opencond),&(fileinfo->lock)));
 		fileinfo->open_waiting--;
+	}
+
+	if (fileinfo->open_status!=0) {
+		status = fileinfo->open_status;
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		oplog_printf(&ctx,"%s (inode:%lu owner:%016"PRIX64" start:%"PRIu64" end:%"PRIu64" type:%c) [handle:%08"PRIX32"] (this is open error): %s",cmdname,(unsigned long int)ino,owner,start,end,ctype,(uint32_t)(fi->fh),strerr(status));
+		fuse_reply_err(req,status);
+		return;
 	}
 
 	// track all locks to unlock them on release
@@ -5357,12 +5422,6 @@ void mfs_setlk(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, struct
 
 	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 
-	start = lock->l_start;
-	if (lock->l_len==0) {
-		end = UINT64_MAX;
-	} else {
-		end = start + lock->l_len;
-	}
 	pid = ctx.pid;
 #ifdef HAVE___SYNC_OP_AND_FETCH
 	do {

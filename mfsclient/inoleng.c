@@ -66,6 +66,13 @@ typedef struct _ileng {
 #define USE_LOCK 1
 	pthread_mutex_t lock;
 #endif
+	// rwlock
+	uint8_t writing;
+	uint32_t readers_cnt;
+	uint32_t writers_cnt;
+	pthread_mutex_t rwlock;
+	pthread_cond_t rwcond;
+	//
 	struct _ileng *next;
 } ileng;
 
@@ -107,6 +114,11 @@ void* inoleng_acquire(uint32_t inode) {
 	zassert(pthread_mutex_init(&(ilptr->lock),NULL));
 #endif
 #endif
+	ilptr->writing = 0;
+	ilptr->writers_cnt = 0;
+	ilptr->readers_cnt = 0;
+	zassert(pthread_mutex_init(&(ilptr->rwlock),NULL));
+	zassert(pthread_cond_init(&(ilptr->rwcond),NULL));
 	ilptr->next = inolenghashtab[h];
 	inolenghashtab[h] = ilptr;
 	zassert(pthread_mutex_unlock(hashlock+h));
@@ -146,6 +158,8 @@ void inoleng_release(void *ptr) {
 #ifdef USE_LOCK
 					zassert(pthread_mutex_destroy(&(ilptr->lock)));
 #endif
+					zassert(pthread_mutex_destroy(&(ilptr->rwlock)));
+					zassert(pthread_cond_destroy(&(ilptr->rwcond)));
 					ileng_free(ilptr);
 				} else {
 					ilpptr = &(ilptr->next);
@@ -220,6 +234,60 @@ void inoleng_update_fleng(uint32_t inode,uint64_t fleng) {
 		}
 	}
 	zassert(pthread_mutex_unlock(hashlock+h));
+}
+
+void inoleng_write_start(void *ptr) {
+	ileng *il = (ileng*)ptr;
+
+	zassert(pthread_mutex_lock(&(il->rwlock)));
+	il->writers_cnt++;
+	while (il->readers_cnt | il->writing) {
+		zassert(pthread_cond_wait(&(il->rwcond),&(il->rwlock)));
+	}
+	il->writers_cnt--;
+	il->writing = 1;
+	zassert(pthread_mutex_unlock(&(il->rwlock)));
+}
+
+void inoleng_write_end(void *ptr) {
+	ileng *il = (ileng*)ptr;
+
+	zassert(pthread_mutex_lock(&(il->rwlock)));
+	il->writing = 0;
+	zassert(pthread_cond_broadcast(&(il->rwcond)));
+	zassert(pthread_mutex_unlock(&(il->rwlock)));
+}
+
+void inoleng_read_start(void *ptr) {
+	ileng *il = (ileng*)ptr;
+
+	zassert(pthread_mutex_lock(&(il->rwlock)));
+	while (il->writing | il->writers_cnt) {
+		zassert(pthread_cond_wait(&(il->rwcond),&(il->rwlock)));
+	}
+	il->readers_cnt++;
+	zassert(pthread_mutex_unlock(&(il->rwlock)));
+}
+
+void inoleng_read_end(void *ptr) {
+	ileng *il = (ileng*)ptr;
+
+	zassert(pthread_mutex_lock(&(il->rwlock)));
+	il->readers_cnt--;
+	if (il->readers_cnt==0) {
+		zassert(pthread_cond_broadcast(&(il->rwcond)));
+	}
+	zassert(pthread_mutex_unlock(&(il->rwlock)));
+}
+
+void inoleng_io_wait(void *ptr) {
+	ileng *il = (ileng*)ptr;
+
+	zassert(pthread_mutex_lock(&(il->rwlock)));
+	while (il->readers_cnt | il->writers_cnt | il->writing) {
+		zassert(pthread_cond_wait(&(il->rwcond),&(il->rwlock)));
+	}
+	zassert(pthread_mutex_unlock(&(il->rwlock)));
 }
 
 void inoleng_term(void) {

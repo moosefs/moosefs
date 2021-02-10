@@ -4859,7 +4859,7 @@ if "HD" in sectionset:
 				if cgimode:
 					out.append("""	<tr>""")
 					out.append("""		<td align="right"></td>""")
-					out.append("""		<td align="left"><span class="hddaddrname_vis0"><span class="sortkey">%s </span>%s</span><span class="hddaddrname_vis1">%s</span></td>""" % (sortippath,ippath,hostpath))
+					out.append("""		<td align="left"><span class="hddaddrname_vis0"><span class="sortkey">%s </span>%s</span><span class="hddaddrname_vis1">%s</span></td>""" % (htmlentities(sortippath),htmlentities(ippath),htmlentities(hostpath)))
 					out.append("""		<td align="right">%u</td><td align="right"><span class="sortkey">%u </span>%s</td><td align="right">%s</td>""" % (chunkscnt,errtime,lerror,status))
 					validdata = [1,1,1]
 					for i in range(3):
@@ -5216,7 +5216,7 @@ if "EX" in sectionset:
 				out.append("""		<td align="right"></td>""")
 				out.append("""		<td align="center"><span class="sortkey">%s </span>%s</td>""" % (sortipfrom,ipfrom))
 				out.append("""		<td align="center"><span class="sortkey">%s </span>%s</td>""" % (sortipto,ipto))
-				out.append("""		<td align="left">%s</td>""" % (".&nbsp;(META)" if meta else path))
+				out.append("""		<td align="left">%s</td>""" % (".&nbsp;(META)" if meta else htmlentities(path)))
 				out.append("""		<td align="center"><span class="sortkey">%s </span>%s</td>""" % (sortver,strver))
 				out.append("""		<td align="center">%s</td>""" % ("-" if meta else "yes" if exportflags&1 else "no"))
 				out.append("""		<td align="center">%s</td>""" % ("yes" if exportflags&2 else "no"))
@@ -5542,12 +5542,12 @@ if "MS" in sectionset and leaderfound:
 				out.append("""		<td align="center">%u</td>""" % sessionid)
 				out.append("""		<td align="left">%s</td>""" % host)
 				out.append("""		<td align="center"><span class="sortkey">%s </span>%s</td>""" % (sortipnum,ipnum))
-				out.append("""		<td align="left">%s</td>""" % info)
+				out.append("""		<td align="left">%s</td>""" % htmlentities(info))
 				if masterconn.version_at_least(1,7,8):
 					out.append("""		<td align="center">%u</td>""" % openfiles)
 					out.append("""		<td align="center">%u</td>""" % nsocks)
 				out.append("""		<td align="center"><span class="sortkey">%s </span><span class="%s">%s</span></td>""" % (sortver,verclass,strver))
-				out.append("""		<td align="left">%s</td>""" % (".&nbsp;(META)" if meta else path))
+				out.append("""		<td align="left">%s</td>""" % (".&nbsp;(META)" if meta else htmlentities(path)))
 				out.append("""		<td align="center">%s</td>""" % ("ro" if sesflags&1 else "rw"))
 				out.append("""		<td align="center">%s</td>""" % ("no" if sesflags&2 else "yes"))
 				out.append("""		<td align="center">%s</td>""" % ("-" if meta else "yes" if sesflags&4 else "no"))
@@ -5800,7 +5800,7 @@ if "MO" in sectionset and leaderfound:
 				out.append("""		<td align="right"></td>""")
 				out.append("""		<td align="left">%s</td>""" % host)
 				out.append("""		<td align="center"><span class="sortkey">%s</span>%s</td>""" % (sortipnum,ipnum))
-				out.append("""		<td align="left">%s</td>""" % info)
+				out.append("""		<td align="left">%s</td>""" % htmlentities(info))
 				for st in range(16):
 					out.append("""		<td align="right">""")
 					out.append("""			<span class="opshour_vis0"><a style="cursor:default" title="current:%u last:%u">%u</a></span>""" % (stats_c[st],stats_l[st],stats_l[st]))
@@ -6020,7 +6020,7 @@ if "RS" in sectionset and leaderfound:
 					zerocolor = (0,0,128)
 					out.append("""	<tr>""")
 					out.append("""		<td align="right">%u</td>""" % sclassid)
-					out.append("""		<td align="right">%s</td>""" % sclassname)
+					out.append("""		<td align="right">%s</td>""" % htmlentities(sclassname))
 					out.append("""		<td align="right">%s</td>""" % ("YES" if admin_only else "NO"))
 					out.append("""		<td align="center">%s</td>""" % ("LOOSE" if mode==0 else "STD" if mode==1 else "STRICT"))
 					out.append("""		<td align="right">%u</td>""" % files)
@@ -6251,9 +6251,9 @@ if "RS" in sectionset and leaderfound:
 						out.append("""		<td align="center">%u</td>""" % sessionid)
 						out.append("""		<td align="left">%s</td>""" % host)
 						out.append("""		<td align="center"><span class="sortkey">%s </span>%s</td>""" % (sortipnum,ipnum))
-						out.append("""		<td align="left">%s</td>""" % info)
+						out.append("""		<td align="left">%s</td>""" % htmlentities(info))
 						out.append("""		<td align="center">%u</td>""" % inode)
-						out.append("""		<td align="left">%s</td>""" % path)
+						out.append("""		<td align="left">%s</td>""" % htmlentities(path))
 						out.append("""	</tr>""")
 				else:
 					if len(paths)==0:
@@ -6377,7 +6377,7 @@ if "RS" in sectionset and leaderfound:
 					out.append("""		<td align="center">%u</td>""" % sessionid)
 					out.append("""		<td align="left">%s</td>""" % host)
 					out.append("""		<td align="center"><span class="sortkey">%s </span>%s</td>""" % (sortipnum,ipnum))
-					out.append("""		<td align="left">%s</td>""" % info)
+					out.append("""		<td align="left">%s</td>""" % htmlentities(info))
 					out.append("""		<td align="center">%s</td>""" % locktype)
 					out.append("""		<td align="right">%u</td>""" % owner)
 					if pid==0 and start==0 and end==0:
@@ -6606,7 +6606,7 @@ if "QU" in sectionset:
 				if cgimode:
 					out.append("""	<tr>""")
 					out.append("""		<td align="right"></td>""")
-					out.append("""		<td align="left">%s</td>""" % path)
+					out.append("""		<td align="left">%s</td>""" % htmlentities(path))
 	#				out.append("""		<td align="center">%s</td>""" % ("yes" if exceeded else "no"))
 					if graceperiod>0:
 						out.append("""		<td align="center"><span class="sortkey">%u </span><a style="cursor:default" title="%s">%s</a></td>""" % (graceperiod,timeduration_to_fullstr(graceperiod),timeduration_to_shortstr(graceperiod)))

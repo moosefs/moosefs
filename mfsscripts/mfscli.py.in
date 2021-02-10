@@ -7072,11 +7072,7 @@ if "MC" in sectionset:
 	}
 	function ma_change_type(id,no) {
 		var o;
-		o = document.getElementById("ma_cell_"+id+"_"+ma_chartid[id]);
-		o.className="REL";
 		ma_chartid[id]=no;
-		o = document.getElementById("ma_cell_"+id+"_"+ma_chartid[id]);
-		o.className="PR";
 		o = document.getElementById("ma_desc"+id);
 		o.innerHTML = ma_idesc[no];
 		ma_refresh();
@@ -7111,7 +7107,7 @@ if "MC" in sectionset:
 					out.append("""	</tr>""")
 				out.append("""</table>""")
 
-				out.append("""<table class="FR" cellspacing="0" cellpadding="0">""")
+				out.append("""<form action="#"><table class="FR" cellspacing="0" cellpadding="0">""")
 				out.append("""	<tr>""")
 				out.append("""		<th class="RANGEBAR"><a href="javascript:ma_change_down(0);">short range</a></th>""")
 				out.append("""		<th class="RANGEBAR"><a href="javascript:ma_change_down(1);">medium range</a></th>""")
@@ -7129,20 +7125,15 @@ if "MC" in sectionset:
 					out.append("""		</td>""")
 					out.append("""	</tr>""")
 					out.append("""	<tr>""")
-					out.append("""		<td colspan="4">""")
-					out.append("""			<table class="BOTMENU" cellspacing="0">""")
-					out.append("""				<tr>""")
-					no=0
-					cl="PR"
+					out.append("""		<th colspan="4">""")
+					out.append("""			<select name="machart%u" size="1" onchange="ma_change_type(%u,this.options[this.selectedIndex].value)">""" % (i,i))
+					no = 0
 					for id,name,desc in charts:
-						out.append("""					<td align="center" id="ma_cell_%u_%u" class="%s"><a href="javascript:ma_change_type(%u,%u);" title="%s">%s</a></td>""" % (i,no,cl,i,no,desc,name))
-						cl="REL"
-						no+=1
-					out.append("""				</tr>""")
-					out.append("""			</table>""")
-					out.append("""		</td>""")
+						out.append("""				<option value="%u">%s</option>""" % (no,desc))
+						no += 1
+					out.append("""		</th>""")
 					out.append("""	</tr>""")
-				out.append("""</table>""")
+				out.append("""</table></form>""")
 			elif len(mchtmp)==1 and len(MCdata)>0:
 				chid = 0
 				for id,name,desc in charts:
@@ -7563,11 +7554,7 @@ if "CC" in sectionset:
 	}
 	function cs_change_type(id,no) {
 		var o;
-		o = document.getElementById("cs_cell_"+id+"_"+cs_chartid[id]);
-		o.className="REL";
 		cs_chartid[id]=no;
-		o = document.getElementById("cs_cell_"+id+"_"+cs_chartid[id]);
-		o.className="PR";
 		o = document.getElementById("cs_desc"+id);
 		o.innerHTML = cs_idesc[no];
 		cs_refresh();
@@ -7602,7 +7589,7 @@ if "CC" in sectionset:
 					out.append("""	</tr>""")
 				out.append("""</table>""")
 
-				out.append("""<table class="FR" cellspacing="0" cellpadding="0">""")
+				out.append("""<form action="#"><table class="FR" cellspacing="0" cellpadding="0">""")
 				out.append("""	<tr>""")
 				out.append("""		<th class="RANGEBAR"><a href="javascript:cs_change_down(0);">short range</a></th>""")
 				out.append("""		<th class="RANGEBAR"><a href="javascript:cs_change_down(1);">medium range</a></th>""")
@@ -7620,20 +7607,15 @@ if "CC" in sectionset:
 					out.append("""		</td>""")
 					out.append("""	</tr>""")
 					out.append("""	<tr>""")
-					out.append("""		<td colspan="4">""")
-					out.append("""			<table class="BOTMENU" cellspacing="0">""")
-					out.append("""				<tr>""")
+					out.append("""		<th colspan="4">""")
+					out.append("""			<select name="cschart%u" size="1" onchange="cs_change_type(%u,this.options[this.selectedIndex].value)">""" % (i,i))
 					no=0
-					cl="PR"
 					for id,name,desc in charts:
-						out.append("""					<td align="center" id="cs_cell_%u_%u" class="%s"><a href="javascript:cs_change_type(%u,%u);" title="%s">%s</a></td>""" % (i,no,cl,i,no,desc,name))
-						cl="REL"
+						out.append("""				<option value="%u">%s</option>""" % (no,desc))
 						no+=1
-					out.append("""				</tr>""")
-					out.append("""			</table>""")
-					out.append("""		</td>""")
+					out.append("""		</th>""")
 					out.append("""	</tr>""")
-				out.append("""</table>""")
+				out.append("""</table></form>""")
 			elif len(cchtmp)==1 and len(CCdata)>0:
 				chid = 0
 				for id,name,desc in charts:

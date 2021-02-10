@@ -12,6 +12,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) added inode virtual length for append mode
   - (mount) moved rwlock from descriptor to inode (fixes append issues)
   - (cgi) changed method of charts selection in charts comparision
+  - (cgi) added message to function that handles exceptions
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

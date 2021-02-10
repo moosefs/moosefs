@@ -98,6 +98,7 @@ import traceback
 import os
 import subprocess
 import codecs
+import json
 
 cgimode = 1 if 'GATEWAY_INTERFACE' in os.environ else 0
 
@@ -1354,12 +1355,15 @@ def labelmasks_to_str(labelmasks):
 		r.append(labelmask_to_str(labelmask))
 	return "+".join(r)
 
+
 def print_exception():
 	exc_type, exc_value, exc_traceback = sys.exc_info()
 	try:
 		if cgimode:
 			print("""<table class="FR" cellspacing="0">""")
-			print("""<tr><td align="left"><pre>""")
+			print("""<tr><th>Oops!</th></tr>""")
+			print("""<tr><td align="left"><b>An error has occured. Check your MooseFS configuration and network connections. If you decide to seek support because of this error, please include the following traceback:</b>""")
+			print("""<pre>""")
 			print(traceback.format_exc().strip())
 			print("""</pre></td></tr>""")
 			print("""</table>""")
@@ -2438,7 +2442,7 @@ if leaderfound==0:
 		elif electfound:
 			out.append("""	<tr>""")
 			out.append("""		<td align="center">""")
-			out.append("""			<span class="ERROR">Leader master server not found, but there is an elect, so make sure that all chunkservers are running - elect should became a leader soon</span><br />""")
+			out.append("""			<span class="ERROR">Leader master server not found, but there is an elect, so make sure that all chunkservers are running - elect should become a leader soon</span><br />""")
 			out.append("""		</td>""")
 			out.append("""	</tr>""")
 		else:
@@ -2461,7 +2465,7 @@ if leaderfound==0:
 		if len(masterlist)==0:
 			print("""Can't find masters (resolve '%s') !!!""" % (masterhost))
 		elif electfound:
-			print("Leader master server not found, but there is an elect, so make sure that all chunkservers are running - elect should became a leader soon")
+			print("Leader master server not found, but there is an elect, so make sure that all chunkservers are running - elect should become a leader soon")
 		else:
 			print("Working master servers not found !!! - maybe you are using wrong port number or wrong dns name")
 	if not cgimode:

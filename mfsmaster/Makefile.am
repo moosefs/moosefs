@@ -23,6 +23,7 @@ mfsmaster_SOURCES=\
 	changelog.c changelog.h \
 	chunks.c chunks.h \
 	filesystem.c filesystem.h \
+	appendres.c appendres.h \
 	xattr.c xattr.h \
 	posixacl.c posixacl.h \
 	flocklocks.c flocklocks.h \

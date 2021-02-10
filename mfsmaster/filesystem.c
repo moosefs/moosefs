@@ -52,6 +52,7 @@
 #include "csdb.h"
 #include "chunks.h"
 #include "filesystem.h"
+#include "appendres.h"
 #include "openfiles.h"
 #include "xattr.h"
 #include "posixacl.h"
@@ -4698,10 +4699,15 @@ uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 		return MFS_STATUS_OK;
 	}
 	if (flags & TRUNCATE_FLAG_RESERVE) { // this is not real truncate - this is part of write
-		if (length + p->data.fdata.length < length) {
+		uint64_t vleng;
+		vleng = appendres_getvleng(inode);
+		if (vleng < p->data.fdata.length) {
+			vleng = p->data.fdata.length;
+		}
+		if (length + vleng < length) {
 			return MFS_ERROR_INDEXTOOBIG;
 		}
-		length += p->data.fdata.length;
+		length += vleng;
 	} else {
 		if (disflags&1) { // truncate (decrease file size) not allowed in session
 			if (length<p->data.fdata.length) {
@@ -4747,7 +4753,7 @@ uint8_t fs_try_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint
 			return MFS_ERROR_QUOTA;
 		}
 	}
-	if (length!=p->data.fdata.length) {
+	if ((flags & TRUNCATE_FLAG_RESERVE)==0 && length!=p->data.fdata.length) {
 		if (length&MFSCHUNKMASK) {
 			*indx = (length>>MFSCHUNKBITS);
 			if (*indx<p->data.fdata.chunks) {
@@ -4822,25 +4828,34 @@ uint8_t fs_do_setlength(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 	if (fsnodes_node_find_ext(rootinode,sesflags,&inode,NULL,&p,flags & TRUNCATE_FLAG_OPENED)==0) {
 		return MFS_ERROR_ENOENT;
 	}
-	*prevlength = p->data.fdata.length;
 	if (flags & TRUNCATE_FLAG_RESERVE) {
-		length += p->data.fdata.length;
-	}
-	if (flags & TRUNCATE_FLAG_UPDATE) {
-		if (length>p->data.fdata.length) {
-			fsnodes_setlength(p,length);
-			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",0)",ts,inode,p->data.fdata.length);
+		uint64_t vleng;
+		vleng = appendres_getvleng(inode);
+		if (vleng < p->data.fdata.length) {
+			vleng = p->data.fdata.length;
 		}
+		*prevlength = vleng;
+		length += vleng;
+		appendres_setvleng(inode,length);
 	} else {
-		if (length==p->data.fdata.length && (flags&TRUNCATE_FLAG_TIMEFIX)) {
-			chtime = 0;
+		*prevlength = p->data.fdata.length;
+		if (flags & TRUNCATE_FLAG_UPDATE) {
+			if (length>p->data.fdata.length) {
+				fsnodes_setlength(p,length);
+				changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",0)",ts,inode,p->data.fdata.length);
+			}
+		} else {
+			if (length==p->data.fdata.length && (flags&TRUNCATE_FLAG_TIMEFIX)) {
+				chtime = 0;
+			}
+			fsnodes_setlength(p,length);
+			changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",%"PRIu8")",ts,inode,p->data.fdata.length,chtime);
+			if (chtime) {
+				p->ctime = p->mtime = ts;
+			}
+			stats_setattr++;
 		}
-		fsnodes_setlength(p,length);
-		changelog("%"PRIu32"|LENGTH(%"PRIu32",%"PRIu64",%"PRIu8")",ts,inode,p->data.fdata.length,chtime);
-		if (chtime) {
-			p->ctime = p->mtime = ts;
-		}
-		stats_setattr++;
+		appendres_clear(inode);
 	}
 	fsnodes_fill_attr(p,NULL,uid,gid,auid,agid,sesflags,attr,1);
 	return MFS_STATUS_OK;
@@ -6009,6 +6024,7 @@ uint8_t fs_opencheck(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 				return MFS_ERROR_EACCES;
 			}
 			fsnodes_setlength(p,0);
+			appendres_clear(inode);
 			changelog("%"PRIu32"|LENGTH(%"PRIu32",0,1)",ts,inode);
 			p->ctime = p->mtime = ts;
 		}
@@ -6321,6 +6337,7 @@ uint8_t fs_writeend(uint32_t inode,uint64_t length,uint64_t chunkid,uint8_t chun
 			if (flenghaschanged!=NULL) {
 				*flenghaschanged = 1;
 			}
+			appendres_setrleng(inode,length);
 		}
 //		{
 //			uint32_t i;
@@ -7982,6 +7999,7 @@ void fs_cleanup(void) {
 	filenodes=0;
 	maxnodeid=0;
 	hashelements=0;
+	appendres_cleanall();
 }
 
 static inline void fs_storeedge(fsedge *e,bio *fd) {
@@ -9081,7 +9099,7 @@ int fs_loadquota(bio *fd,uint8_t mver,int ignoreflag) {
 			if (ignoreflag) {
 				ptr+=(rsize-4);
 			} else {
-				fprintf(stderr,"use option '-i' to remove this quota definition");
+				fprintf(stderr,"use option '-i' to remove this quota definition\n");
 				return -1;
 			}
 		} else {
@@ -9232,6 +9250,7 @@ int fs_strinit(void) {
 	fsedge_init();
 	symlink_init();
 	chunktab_init();
+	appendres_init();
 	test_start_time = main_time()+900;
 	fs_reload();
 	snapshot_inodehash = chash_new();

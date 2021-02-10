@@ -112,13 +112,13 @@ am_mfsmaster_OBJECTS = mfsmaster-itree.$(OBJEXT) \
 	mfsmaster-topology.$(OBJEXT) mfsmaster-exports.$(OBJEXT) \
 	mfsmaster-bio.$(OBJEXT) mfsmaster-changelog.$(OBJEXT) \
 	mfsmaster-chunks.$(OBJEXT) mfsmaster-filesystem.$(OBJEXT) \
-	mfsmaster-xattr.$(OBJEXT) mfsmaster-posixacl.$(OBJEXT) \
-	mfsmaster-flocklocks.$(OBJEXT) mfsmaster-posixlocks.$(OBJEXT) \
-	mfsmaster-openfiles.$(OBJEXT) mfsmaster-csdb.$(OBJEXT) \
-	mfsmaster-iptosesid.$(OBJEXT) mfsmaster-storageclass.$(OBJEXT) \
-	mfsmaster-sessions.$(OBJEXT) mfsmaster-metadata.$(OBJEXT) \
-	mfsmaster-restore.$(OBJEXT) mfsmaster-merger.$(OBJEXT) \
-	mfsmaster-missinglog.$(OBJEXT) \
+	mfsmaster-appendres.$(OBJEXT) mfsmaster-xattr.$(OBJEXT) \
+	mfsmaster-posixacl.$(OBJEXT) mfsmaster-flocklocks.$(OBJEXT) \
+	mfsmaster-posixlocks.$(OBJEXT) mfsmaster-openfiles.$(OBJEXT) \
+	mfsmaster-csdb.$(OBJEXT) mfsmaster-iptosesid.$(OBJEXT) \
+	mfsmaster-storageclass.$(OBJEXT) mfsmaster-sessions.$(OBJEXT) \
+	mfsmaster-metadata.$(OBJEXT) mfsmaster-restore.$(OBJEXT) \
+	mfsmaster-merger.$(OBJEXT) mfsmaster-missinglog.$(OBJEXT) \
 	mfsmaster-sharedpointer.$(OBJEXT) \
 	mfsmaster-matocsserv.$(OBJEXT) mfsmaster-matoclserv.$(OBJEXT) \
 	mfsmaster-matomlserv.$(OBJEXT) \
@@ -218,6 +218,7 @@ am__depfiles_remade = ../mfscommon/$(DEPDIR)/charts.Po \
 	../mfscommon/$(DEPDIR)/mfsmaster-strerr.Po \
 	../mfscommon/$(DEPDIR)/statsdump.Po \
 	../mfscommon/$(DEPDIR)/strerr.Po \
+	./$(DEPDIR)/mfsmaster-appendres.Po \
 	./$(DEPDIR)/mfsmaster-bgsaver.Po ./$(DEPDIR)/mfsmaster-bio.Po \
 	./$(DEPDIR)/mfsmaster-changelog.Po \
 	./$(DEPDIR)/mfsmaster-chartsdata.Po \
@@ -467,6 +468,7 @@ mfsmaster_SOURCES = \
 	changelog.c changelog.h \
 	chunks.c chunks.h \
 	filesystem.c filesystem.h \
+	appendres.c appendres.h \
 	xattr.c xattr.h \
 	posixacl.c posixacl.h \
 	flocklocks.c flocklocks.h \
@@ -727,6 +729,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfsmaster-strerr.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/statsdump.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/strerr.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-appendres.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-bgsaver.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-bio.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmaster-changelog.Po@am__quote@ # am--include-marker
@@ -882,6 +885,20 @@ mfsmaster-filesystem.obj: filesystem.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='filesystem.c' object='mfsmaster-filesystem.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mfsmaster-filesystem.obj `if test -f 'filesystem.c'; then $(CYGPATH_W) 'filesystem.c'; else $(CYGPATH_W) '$(srcdir)/filesystem.c'; fi`
+
+mfsmaster-appendres.o: appendres.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mfsmaster-appendres.o -MD -MP -MF $(DEPDIR)/mfsmaster-appendres.Tpo -c -o mfsmaster-appendres.o `test -f 'appendres.c' || echo '$(srcdir)/'`appendres.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-appendres.Tpo $(DEPDIR)/mfsmaster-appendres.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='appendres.c' object='mfsmaster-appendres.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mfsmaster-appendres.o `test -f 'appendres.c' || echo '$(srcdir)/'`appendres.c
+
+mfsmaster-appendres.obj: appendres.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mfsmaster-appendres.obj -MD -MP -MF $(DEPDIR)/mfsmaster-appendres.Tpo -c -o mfsmaster-appendres.obj `if test -f 'appendres.c'; then $(CYGPATH_W) 'appendres.c'; else $(CYGPATH_W) '$(srcdir)/appendres.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmaster-appendres.Tpo $(DEPDIR)/mfsmaster-appendres.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='appendres.c' object='mfsmaster-appendres.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o mfsmaster-appendres.obj `if test -f 'appendres.c'; then $(CYGPATH_W) 'appendres.c'; else $(CYGPATH_W) '$(srcdir)/appendres.c'; fi`
 
 mfsmaster-xattr.o: xattr.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmaster_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT mfsmaster-xattr.o -MD -MP -MF $(DEPDIR)/mfsmaster-xattr.Tpo -c -o mfsmaster-xattr.o `test -f 'xattr.c' || echo '$(srcdir)/'`xattr.c
@@ -1528,6 +1545,7 @@ distclean: distclean-am
 	-rm -f ../mfscommon/$(DEPDIR)/mfsmaster-strerr.Po
 	-rm -f ../mfscommon/$(DEPDIR)/statsdump.Po
 	-rm -f ../mfscommon/$(DEPDIR)/strerr.Po
+	-rm -f ./$(DEPDIR)/mfsmaster-appendres.Po
 	-rm -f ./$(DEPDIR)/mfsmaster-bgsaver.Po
 	-rm -f ./$(DEPDIR)/mfsmaster-bio.Po
 	-rm -f ./$(DEPDIR)/mfsmaster-changelog.Po
@@ -1619,6 +1637,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ../mfscommon/$(DEPDIR)/mfsmaster-strerr.Po
 	-rm -f ../mfscommon/$(DEPDIR)/statsdump.Po
 	-rm -f ../mfscommon/$(DEPDIR)/strerr.Po
+	-rm -f ./$(DEPDIR)/mfsmaster-appendres.Po
 	-rm -f ./$(DEPDIR)/mfsmaster-bgsaver.Po
 	-rm -f ./$(DEPDIR)/mfsmaster-bio.Po
 	-rm -f ./$(DEPDIR)/mfsmaster-changelog.Po

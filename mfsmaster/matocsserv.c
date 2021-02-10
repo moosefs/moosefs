@@ -151,6 +151,7 @@ static int lsock;
 static int32_t lsockpdescpos;
 
 static uint64_t gtotalspace = 0;
+static uint64_t gusedspace = 0;
 static uint64_t gavailspace = 0;
 static uint64_t gfreespace = 0;
 
@@ -1056,6 +1057,7 @@ void matocsserv_calculate_space(void) {
 	}
 
 	gtotalspace = tspace;
+	gusedspace = uspace;
 	gfreespace = tspace-uspace;
 	if (rspace > gfreespace) {
 		gavailspace = 0;

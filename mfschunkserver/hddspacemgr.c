@@ -6209,6 +6209,7 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen) {
 	uint16_t hdrsize;
 	uint16_t subf;
 	uint8_t mode;
+	uint8_t rsize;
 	time_t foldersmaxtime;
 
 	fullname[plen] = '\0';
@@ -6277,8 +6278,10 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen) {
 	}
 	if (rptr[11]=='1') {
 		mode = 1;
+		rsize = 16;
 	} else {
 		mode = 2;
+		rsize = 18;
 	}
 	rptr+=12;
 
@@ -6296,7 +6299,7 @@ static inline int hdd_folder_fastscan(folder *f,char *fullname,uint16_t plen) {
 	hdrsize = OLDHDRSIZE;
 	pathid = 0xFFFF;
 
-	while (rptr+16<=endbuff) {
+	while (rptr+rsize<=endbuff) {
 		chunkid = get64bit(&rptr);
 		version = get32bit(&rptr);
 		blocks = get16bit(&rptr);

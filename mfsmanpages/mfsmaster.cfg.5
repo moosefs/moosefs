@@ -210,6 +210,10 @@ Set amount of space reserved for superuser (default is 0 = do not reserve space 
 .TP
 .B MAX_ALLOWED_HARD_LINKS
 Define limit for number of hardlinks allowed for one object (default is 32767; possible values are from 8 to 65000)
+.TP
+.B INODE_REUSE_DELAY
+Delay time in seconds after which inodes of deleted objects will be reused. BE AWARE if you change this value below 86400 (1 day) you MUST ensure that this value is higher than any of the following timeouts in all clients:
+\fBmfsattrcacheto\fP, \fBmfsxattrcacheto\fP, \fBmfsentrycacheto\fP, \fBmfsdirentrycacheto\fP, \fBmfsnegentrycacheto\fP, \fBmfssymlinkcacheto\fP. (default is 86400; possible values are from 300 to 3000000)
 .SH NOTES
 .PP
 Chunks in master are tested in a loop. Speed (or frequency) is regulated by two

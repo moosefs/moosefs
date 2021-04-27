@@ -3982,13 +3982,13 @@ if "IN" in sectionset:
 								missingcount += 1
 				else:
 					if len(paths)==0:
-						dline = [" * unknown path * (deleted file)",inode,indx,chunkid]
+						dline = [" * unknown path * (deleted file)",inode,indx,"%016X" % chunkid]
 						if mode==1:
 							dline.append(mtypestr)
 						tab.append(*dline)
 					else:
 						for path in paths:
-							dline = [path,inode,indx,chunkid]
+							dline = [path,inode,indx,"%016X" % chunkid]
 							if mode==1:
 								dline.append(mtypestr)
 							tab.append(*dline)

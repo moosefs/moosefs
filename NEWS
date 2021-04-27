@@ -16,6 +16,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgi) added using htmlentities function for various strings
   - (mount) removed old osxfuse patch (doesn't work with current osxfuse and is no longer needed)
   - (master) fixed default paths for exports.cfg and topology.cfg
+  - (master) fixed restore mode (missing cache initialization - issue #432)
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

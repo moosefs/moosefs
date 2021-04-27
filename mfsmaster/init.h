@@ -73,6 +73,7 @@ struct {
 },LateRunTab[]={
 	{(runfn)0,"****"}
 },RestoreRunTab[]={
+	{dcm_init,"data cache manager"}, // has to be before 'fs_init' and 'matoclserv_init'
 	{meta_restore,"metadata restore"},
 	{(runfn)0,"****"}
 };

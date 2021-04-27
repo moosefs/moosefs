@@ -18,11 +18,12 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
-#if defined(__APPLE__)
-# if ! defined(__DARWIN_64_BIT_INO_T) && ! defined(_DARWIN_USE_64_BIT_INODE)
-#  define __DARWIN_64_BIT_INO_T 0
-# endif
-#endif
+// patch for old osxfuse
+//#if defined(__APPLE__)
+//# if ! defined(__DARWIN_64_BIT_INO_T) && ! defined(_DARWIN_USE_64_BIT_INODE)
+//#  define __DARWIN_64_BIT_INO_T 0
+//# endif
+//#endif
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"

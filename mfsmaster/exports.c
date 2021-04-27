@@ -1199,7 +1199,7 @@ void exports_loadexports(void) {
 			} else {
 				syslog(LOG_WARNING,"mfsexports configuration file (%s) not found - no exports !!!",ExportsFileName);
 			}
-			fprintf(stderr,"mfsexports configuration file (%s) not found - please create one (you can copy %s.dist to get a base configuration)\n",ExportsFileName,ExportsFileName);
+			fprintf(stderr,"mfsexports configuration file (%s) not found - please create one (you can copy %s.sample to get a base configuration)\n",ExportsFileName,ExportsFileName);
 		} else {
 			if (exports_records) {
 				mfs_arg_errlog(LOG_WARNING,"can't open mfsexports configuration file (%s) - exports not changed, error",ExportsFileName);
@@ -1262,10 +1262,14 @@ void exports_reload(void) {
 		ExportsFileName = strdup(ETC_PATH "/mfs/mfsexports.cfg");
 		passert(ExportsFileName);
 		if ((fd = open(ExportsFileName,O_RDONLY))<0 && errno==ENOENT) {
-			free(ExportsFileName);
-			ExportsFileName = strdup(ETC_PATH "/mfsexports.cfg");
-			if ((fd = open(ExportsFileName,O_RDONLY))>=0) {
+			char *tmpname;
+			tmpname = strdup(ETC_PATH "/mfsexports.cfg");
+			if ((fd = open(tmpname,O_RDONLY))>=0) {
+				free(ExportsFileName);
+				ExportsFileName = tmpname;
 				mfs_syslog(LOG_WARNING,"default sysconf path has changed - please move mfsexports.cfg from "ETC_PATH"/ to "ETC_PATH"/mfs/");
+			} else {
+				free(tmpname);
 			}
 		}
 		if (fd>=0) {

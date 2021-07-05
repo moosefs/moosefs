@@ -185,6 +185,16 @@ if cgimode:
 				c.append("%s=%s" % (k,urlescape(v)))
 		return "mfs.cgi?%s" % ("&amp;".join(c))
 
+	def createjslink(update):
+		c = []
+		for k in fields:
+			if k not in update:
+				c.append("%s=%s" % (k,urlescape(fields.getvalue(k))))
+		for k,v in update.items():
+			if v!="":
+				c.append("%s=%s" % (k,urlescape(v)))
+		return "mfs.cgi?%s" % ("&".join(c))
+
 	def createorderlink(prefix,columnid):
 		ordername = "%sorder" % prefix
 		revname = "%srev" % prefix
@@ -1362,7 +1372,7 @@ def print_exception():
 		if cgimode:
 			print("""<table class="FR" cellspacing="0">""")
 			print("""<tr><th>Oops!</th></tr>""")
-			print("""<tr><td align="left"><b>An error has occured. Check your MooseFS configuration and network connections. If you decide to seek support because of this error, please include the following traceback:</b>""")
+			print("""<tr><td align="left"><b>An error has occurred. Check your MooseFS configuration and network connections. If you decide to seek support because of this error, please include the following traceback:</b>""")
 			print("""<pre>""")
 			print(traceback.format_exc().strip())
 			print("""</pre></td></tr>""")
@@ -2073,7 +2083,7 @@ if cgimode:
 								cmd_success = 1
 			except Exception:
 				tracedata = traceback.format_exc()
-		url = createlink({"CSremove":""})
+		url = createjslink({"CSremove":""})
 	elif "CSbacktowork" in fields:
 		cmd_success = 0
 		tracedata = ""
@@ -2090,7 +2100,7 @@ if cgimode:
 							cmd_success = 1
 			except Exception:
 				tracedata = traceback.format_exc()
-		url = createlink({"CSbacktowork":""})
+		url = createjslink({"CSbacktowork":""})
 	elif "CSmaintenanceon" in fields:
 		cmd_success = 0
 		tracedata = ""
@@ -2107,7 +2117,7 @@ if cgimode:
 							cmd_success = 1
 			except Exception:
 				tracedata = traceback.format_exc()
-		url = createlink({"CSmaintenanceon":""})
+		url = createjslink({"CSmaintenanceon":""})
 	elif "CSmaintenanceoff" in fields:
 		cmd_success = 0
 		tracedata = ""
@@ -2124,7 +2134,7 @@ if cgimode:
 							cmd_success = 1
 			except Exception:
 				tracedata = traceback.format_exc()
-		url = createlink({"CSmaintenanceoff":""})
+		url = createjslink({"CSmaintenanceoff":""})
 	elif "MSremove" in fields:
 		cmd_success = 0
 		tracedata = ""
@@ -2137,17 +2147,17 @@ if cgimode:
 					cmd_success = 1
 			except Exception:
 				tracedata = traceback.format_exc()
-		url = createlink({"MSremove":""})
+		url = createjslink({"MSremove":""})
 	if cmd_success==1:
 		print("Status: 302 Found")
-		print("Location: %s" % url.replace("&amp;","&"))
+		print("Location: %s" % url)
 		print("Content-Type: text/html; charset=UTF-8")
 		print("")
 		print("""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">""")
 		print("""<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">""")
 		print("""<head>""")
 		print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
-		print("""<meta http-equiv="Refresh" content="0; url=%s" />""" % url)
+		print("""<meta http-equiv="Refresh" content="0; url=%s" />""" % url.replace('&','&amp;'))
 		print("""<title>MFS Info (%s)</title>""" % (htmlentities(mastername)))
 		print("""<link rel="stylesheet" href="mfs.css" type="text/css" />""")
 		print("""</head>""")
@@ -2163,7 +2173,7 @@ if cgimode:
 		print("""<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">""")
 		print("""<head>""")
 		print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
-		print("""<meta http-equiv="Refresh" content="5; url=%s" />""" % url)
+		print("""<meta http-equiv="Refresh" content="5; url=%s" />""" % url.replace('&','&amp;'))
 		print("""<title>MFS Info (%s)</title>""" % (htmlentities(mastername)))
 		print("""<link rel="stylesheet" href="mfs.css" type="text/css" />""")
 		print("""</head>""")
@@ -6165,7 +6175,7 @@ if "RS" in sectionset and leaderfound:
 				sessionsdata[ses.sessionid]=(ses.host,ses.sortip,ses.strip,ses.info,ses.openfiles)
 			if cgimode:
 				out = []
-				out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Show open files for: <select name="server" size="1" onchange="document.location.href='%s&amp;OFsessionid='+this.options[this.selectedIndex].value">""" % createlink({"OFsessionid":""}))
+				out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Show open files for: <select name="server" size="1" onchange="document.location.href='%s&OFsessionid='+this.options[this.selectedIndex].value">""" % createjslink({"OFsessionid":""}))
 				if OFsessionid==0:
 					out.append("""<option value="0" selected="selected"> select session</option>""")
 				sessions = list(sessionsdata.keys())
@@ -6283,7 +6293,7 @@ if "RS" in sectionset and leaderfound:
 					ALinode = 0
 				out = []
 				if len(inodes)>0:
-					out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Show acquired locks for: <select name="server" size="1" onchange="document.location.href='%s&amp;ALinode='+this.options[this.selectedIndex].value">""" % createlink({"ALinode":""}))
+					out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Show acquired locks for: <select name="server" size="1" onchange="document.location.href='%s&ALinode='+this.options[this.selectedIndex].value">""" % createjslink({"ALinode":""}))
 					if ALinode==0:
 						out.append("""<option value="0" selected="selected"> select inode</option>""")
 					inodeslist = list(inodes)
@@ -6940,7 +6950,7 @@ if "MC" in sectionset:
 			mixedservers = 0
 			if len(masterlistver)>0:
 				masterlistver.sort()
-				out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Select: <select name="server" size="1" onchange="document.location.href='%s&amp;MCdata='+this.options[this.selectedIndex].value">""" % createlink({"MCdata":""}))
+				out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Select: <select name="server" size="1" onchange="document.location.href='%s&MCdata='+this.options[this.selectedIndex].value">""" % createjslink({"MCdata":""}))
 				entrystr = []
 				entrydesc = {}
 				for id,oname,desc in charts:
@@ -7011,9 +7021,9 @@ if "MC" in sectionset:
 				if (ma_nc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+ma_host+"&port="+ma_port+"&id="+id+"&width="+width+"&height="+height+"&antycache="+minutes;
 				} else {
-					url = "chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+ma_host+"&port="+ma_port+"&id="+id+"&antycache="+minutes;
 				}
 				if (typeof(element.ma_url)=="undefined" || element.ma_url!=url) {
 					element.ma_url = url;
@@ -7031,9 +7041,9 @@ if "MC" in sectionset:
 				if (ma_nc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+ma_host+"&port="+ma_port+"&id="+id+"&width="+width+"&height="+height+"&antycache="+minutes;
 				} else {
-					url = "chart.cgi?host="+ma_host+"&amp;port="+ma_port+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+ma_host+"&port="+ma_port+"&id="+id+"&antycache="+minutes;
 				}
 				if (typeof(element.ma_url)=="undefined" || element.ma_url!=url) {
 					element.ma_url = url;
@@ -7179,9 +7189,9 @@ if "MC" in sectionset:
 				if (manc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+vhost+"&port="+vport+"&id="+id+"&width="+width+"&height="+height+"&antycache="+minutes;
 				} else {
-					url = "chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+vhost+"&port="+vport+"&id="+id+"&antycache="+minutes;
 				}
 				if (typeof(element.ma_url)=="undefined" || element.ma_url!=url) {
 					element.ma_url = url;
@@ -7421,7 +7431,7 @@ if "CC" in sectionset:
 			mixedservers = 0
 			if len(hostlist)>0:
 				hostlist.sort()
-				out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Select: <select name="server" size="1" onchange="document.location.href='%s&amp;CCdata='+this.options[this.selectedIndex].value">""" % createlink({"CCdata":""}))
+				out.append("""<form action="#"><table class="FR" cellspacing="0"><tr><th>Select: <select name="server" size="1" onchange="document.location.href='%s&CCdata='+this.options[this.selectedIndex].value">""" % createjslink({"CCdata":""}))
 				entrystr = []
 				entrydesc = {}
 				for id,oname,desc in charts:
@@ -7493,9 +7503,9 @@ if "CC" in sectionset:
 				if (cs_nc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+cs_host+"&port="+cs_port+"&id="+id+"&width="+width+"&height="+height+"&antycache="+minutes;
 				} else {
-					url = "chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+cs_host+"&port="+cs_port+"&id="+id+"&antycache="+minutes;
 				}
 				if (typeof(element.cs_url)=="undefined" || element.cs_url!=url) {
 					element.cs_url = url;
@@ -7513,9 +7523,9 @@ if "CC" in sectionset:
 				if (cs_nc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+cs_host+"&port="+cs_port+"&id="+id+"&width="+width+"&height="+height+"&antycache="+minutes;
 				} else {
-					url = "chart.cgi?host="+cs_host+"&amp;port="+cs_port+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+cs_host+"&port="+cs_port+"&id="+id+"&antycache="+minutes;
 				}
 				if (typeof(element.cs_url)=="undefined" || element.cs_url!=url) {
 					element.cs_url = url;
@@ -7663,9 +7673,9 @@ if "CC" in sectionset:
 				if (csnc) {
 					var width = element.scrollWidth;
 					var height = element.scrollHeight;
-					url = "chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;width="+width+"&amp;height="+height+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+vhost+"&port="+vport+"&id="+id+"&width="+width+"&height="+height+"&antycache="+minutes;
 				} else {
-					url = "chart.cgi?host="+vhost+"&amp;port="+vport+"&amp;id="+id+"&amp;antycache="+minutes;
+					url = "chart.cgi?host="+vhost+"&port="+vport+"&id="+id+"&antycache="+minutes;
 				}
 				if (typeof(element.cs_url)=="undefined" || element.cs_url!=url) {
 					element.cs_url = url;

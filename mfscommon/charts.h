@@ -116,7 +116,7 @@ typedef struct _estatdef {
 	CHARTS_DEFS_END \
 };
 
-// enchanced data charts (up to 3 counters on one chart represented by three colors)
+// enhanced data charts (up to 3 counters on one chart represented by three colors)
 // c1_def - light
 // c2_def - medium
 // c3_def - dark

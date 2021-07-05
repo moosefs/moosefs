@@ -753,7 +753,7 @@ void* write_worker(void *arg) {
 // MFS_ERROR_EPERM - internal error (wrong inode - can't be repaired)
 // MFS_ERROR_INDEXTOOBIG - requested file position is too big
 // MFS_ERROR_CHUNKLOST - according to master chunk is definitelly lost (all chunkservers are connected and chunk is not there)
-// MFS_ERROR_QUOTA - disk quota exceeded (quit immediatelly - no retry)
+// MFS_ERROR_QUOTA - disk quota exceeded (quit immediately - no retry)
 // MFS_ERROR_NOSPACE - no space on disk
 // MFS_ERROR_IO (for future use)
 // MFS_ERROR_NOCHUNKSERVERS - can't create new chunk - no space available, but maybe only temporarily

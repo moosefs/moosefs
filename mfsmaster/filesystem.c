@@ -5592,7 +5592,7 @@ uint8_t fs_mr_link(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint32_t n
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_univ_snapshot(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t inode_src,uint32_t parent_dst,uint16_t nleng_dst,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t smode,uint16_t cumask,uint32_t inodecheck,uint32_t removed,uint32_t same,uint32_t exisiting,uint32_t hardlinks,uint32_t new) {
+uint8_t fs_univ_snapshot(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t inode_src,uint32_t parent_dst,uint16_t nleng_dst,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t smode,uint16_t cumask,uint32_t inodecheck,uint32_t removed,uint32_t same,uint32_t existing,uint32_t hardlinks,uint32_t new) {
 	statsrecord ssr;
 	uint32_t common_inodes;
 	uint64_t common_length;
@@ -5728,8 +5728,8 @@ uint8_t fs_univ_snapshot(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_
 	if ((sesflags&SESFLAG_METARESTORE)==0) {
 		changelog("%"PRIu32"|SNAPSHOT(%"PRIu32",%"PRIu32",%s,%"PRIu8",%"PRIu8",%"PRIu32",%s,%"PRIu16"):%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32,ts,inode_src,parent_dst,changelog_escape_name(nleng_dst,name_dst),smode,sesflags,uid,changelog_generate_gids(gids,gid),cumask,args.inode_chksum,args.removed_object,args.same_file,args.existing_object,args.new_hardlink,args.new_object);
 	} else {
-		if ((inodecheck|removed|same|exisiting|hardlinks|new)!=0 && (inodecheck!=args.inode_chksum || removed!=args.removed_object || same!=args.same_file || exisiting!=args.existing_object || hardlinks!=args.new_hardlink || new!=args.new_object)) {
-			syslog(LOG_WARNING,"SNAPSHOT data mismatch: my:(%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32") != expected:(%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32")",args.inode_chksum,args.removed_object,args.same_file,args.existing_object,args.new_hardlink,args.new_object,inodecheck,removed,same,exisiting,hardlinks,new);
+		if ((inodecheck|removed|same|existing|hardlinks|new)!=0 && (inodecheck!=args.inode_chksum || removed!=args.removed_object || same!=args.same_file || existing!=args.existing_object || hardlinks!=args.new_hardlink || new!=args.new_object)) {
+			syslog(LOG_WARNING,"SNAPSHOT data mismatch: my:(%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32") != expected:(%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32",%"PRIu32")",args.inode_chksum,args.removed_object,args.same_file,args.existing_object,args.new_hardlink,args.new_object,inodecheck,removed,same,existing,hardlinks,new);
 			return MFS_ERROR_MISMATCH;
 		}
 		meta_version_inc();
@@ -5741,8 +5741,8 @@ uint8_t fs_snapshot(uint32_t rootinode,uint8_t sesflags,uint32_t inode_src,uint3
 	return fs_univ_snapshot(main_time(),rootinode,sesflags,inode_src,parent_dst,nleng_dst,name_dst,uid,gids,gid,smode,cumask,0,0,0,0,0,0);
 }
 
-uint8_t fs_mr_snapshot(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint16_t nleng_dst,uint8_t *name_dst,uint8_t smode,uint8_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t cumask,uint32_t inodecheck,uint32_t removed,uint32_t same,uint32_t exisiting,uint32_t hardlinks,uint32_t new) {
-	return fs_univ_snapshot(ts,0,sesflags|SESFLAG_METARESTORE,inode_src,parent_dst,nleng_dst,name_dst,uid,gids,gid,smode,cumask,inodecheck,removed,same,exisiting,hardlinks,new);
+uint8_t fs_mr_snapshot(uint32_t ts,uint32_t inode_src,uint32_t parent_dst,uint16_t nleng_dst,uint8_t *name_dst,uint8_t smode,uint8_t sesflags,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t cumask,uint32_t inodecheck,uint32_t removed,uint32_t same,uint32_t existing,uint32_t hardlinks,uint32_t new) {
+	return fs_univ_snapshot(ts,0,sesflags|SESFLAG_METARESTORE,inode_src,parent_dst,nleng_dst,name_dst,uid,gids,gid,smode,cumask,inodecheck,removed,same,existing,hardlinks,new);
 }
 
 uint8_t fs_univ_append_slice(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint8_t flags,uint32_t inode,uint32_t inode_src,uint32_t slice_from,uint32_t slice_to,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *fleng) {
@@ -9206,7 +9206,7 @@ void fs_reload(void) {
 	}
 	MaxAllowedHardLinks = cfg_getuint32("MAX_ALLOWED_HARD_LINKS",32767);
 	if (MaxAllowedHardLinks<8) {
-		syslog(LOG_NOTICE,"MAX_ALLOWED_HARD_LINKS is lower than 8 - less that minimum number of hard links requierd by POSIX - setting to 8");
+		syslog(LOG_NOTICE,"MAX_ALLOWED_HARD_LINKS is lower than 8 - less than minimum number of hard links required by POSIX - setting to 8");
 		MaxAllowedHardLinks = 8;
 	}
 	if (MaxAllowedHardLinks>65000) {

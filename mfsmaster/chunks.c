@@ -2192,7 +2192,7 @@ uint8_t chunk_get_version_and_csdata(uint8_t mode,uint64_t chunkid,uint32_t cuip
 	for (s=c->slisthead ;s ; s=s->next) {
 		if (s->valid!=INVALID && s->valid!=DEL && s->valid!=WVER && s->valid!=TDWVER && cstab[s->csid].valid) {
 			if (cnt<100 && matocsserv_get_csdata(cstab[s->csid].ptr,&(lstab[cnt].ip),&(lstab[cnt].port),&(lstab[cnt].csver),&(lstab[cnt].labelmask))==0) {
-				lstab[cnt].dist = topology_distance(lstab[cnt].ip,cuip);	// in the future prepare more sofisticated distance function
+				lstab[cnt].dist = topology_distance(lstab[cnt].ip,cuip);	// in the future prepare more sophisticated distance function
 				lstab[cnt].rnd = rndu32();
 				cnt++;
 			}
@@ -2852,7 +2852,7 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 	}
 	if (c->operation==REPLICATE) { // high priority replication
 		fix = 0;
-		if (status!=0) { // chunk hasn't been replicated (error occured) - simply remove it from copies
+		if (status!=0) { // chunk hasn't been replicated (error occurred) - simply remove it from copies
 			st = &(c->slisthead);
 			while (*st) {
 				s = *st;
@@ -2892,7 +2892,7 @@ void chunk_got_replicate_status(uint16_t csid,uint64_t chunkid,uint32_t version,
 							matocsserv_write_counters(cstab[s->csid].ptr,0);
 						}
 						s->valid = INVALID;
-						s->version = 0;	// after unfinished operation can't be shure what version chunk has
+						s->version = 0;	// after unfinished operation can't be sure what version chunk has
 					} else {
 						if (s->valid == BUSY || s->valid == VALID) {
 							s->valid = VALID;
@@ -3030,7 +3030,7 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 					}
 				} else {
 					s->valid = INVALID;
-					s->version = 0;	// after unfinished operation can't be shure what version chunk has
+					s->version = 0;	// after unfinished operation can't be sure what version chunk has
 				}
 			} else {
 				if (s->valid==TDBUSY || s->valid==TDVALID) {
@@ -3669,7 +3669,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 						bc--;
 					}
 					s->valid = INVALID;
-					s->version = 0;	// after unfinished operation can't be shure what version chunk has
+					s->version = 0;	// after unfinished operation can't be sure what version chunk has
 					chunk_delopchunk(s->csid,c->chunkid);
 					ivc++;
 				}
@@ -4010,7 +4010,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							if (sclass_mode==SCLASS_MODE_STRICT) {
 								canbefixed = 0;
 							} else { // all other modes - labels matched to 'no space' servers only can be replicated anywhere
-								for (j=maxlimited ; j<dstservcnt ; j++) { // check all possibe destination servers
+								for (j=maxlimited ; j<dstservcnt ; j++) { // check all possible destination servers
 									if (matching[j+labelcnt]<0) { // matched to label? - if not then we can use it
 //										syslog(LOG_NOTICE,"replicate to first available server (STD MODE and LOOSE MODE)");
 										if (chunk_undergoal_replicate(c, servers[j], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {
@@ -4023,7 +4023,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 							if (sclass_mode==SCLASS_MODE_STRICT) {
 								canbefixed = 0;
 							} else if (sclass_mode==SCLASS_MODE_LOOSE) { // in loose mode labels matched only to overloaded servers
-								for (j=maxlimited ; j<dstservcnt ; j++) { // check all possibe destination servers
+								for (j=maxlimited ; j<dstservcnt ; j++) { // check all possible destination servers
 									if (matching[j+labelcnt]<0) { // matched to label? - if not then we can use it
 //										syslog(LOG_NOTICE,"replicate to first available server (LOOSE MODE)");
 										if (chunk_undergoal_replicate(c, servers[j], now, lclass, prilevel, &inforec, rgvc, rgtdc)>=0) {

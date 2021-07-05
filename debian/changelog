@@ -25,7 +25,7 @@ moosefs (3.0.114-1) unstable; urgency=medium
   * (cgi+cli) removed using supervisor (only available in PRO version)
   * (cs) fixed deadlock condition on mutexes 'folderlock' and 'hashlock'
     (exists since 3.0.110)
-  * (tools) fixed oveflow protection in number parsing function
+  * (tools) fixed overflow protection in number parsing function
   * (cs) fixed reporting to master duplicates with newer version
   * (cs) changed job queue policy (some tasks are not limited now)
   * (master) fixed reaction to status NOTDONE received from chunkservers
@@ -100,7 +100,7 @@ moosefs (3.0.112-1) unstable; urgency=medium
   * (all) added support for disabling individual filesystem commands in exports
   * (client) added handling read/write/readdir disables on client side (better
     error messages)
-  * (client) added session paramaters to '.params' file
+  * (client) added session parameters to '.params' file
   * (tools) fixed packet reallocation error
   * (master) changed syslog message for locked chunks
   * (client) added dentry invalidator (needed in Linux with kernel < 4.19 -
@@ -115,7 +115,7 @@ moosefs (3.0.112-1) unstable; urgency=medium
   * (all) added support for STRICT and LOOSE mode in KEEP and ARCHIVE
   * (master) fixed segfault during appending chunks of file with positive
     length and no chunks
-  * (metadump) fixed bugs introduced in verson 3.0.106
+  * (metadump) fixed bugs introduced in version 3.0.106
   * (master) added protection between neverending desyncing between newer
     LEADER and older FOLLOWER (HA only)
   * (master) fixed slices with 'to' set to 0 in mfsappendchunks
@@ -135,8 +135,8 @@ moosefs (3.0.110-1) unstable; urgency=medium
 
   * (cs) fixed bug that may lead to creating much more chunks in one subfolder
     (issues #319,#326)
-  * (cs) added option for controling subdirectory selection algorithm for newly
-    created chunks (issues #319,#326)
+  * (cs) added option for controlling subdirectory selection algorithm for
+    newly created chunks (issues #319,#326)
   * (cs) prevent potential dumping deleted chunks to 'chunk.db'
   * (client) added options for setting behaviour when master returns
     unavailable chunks or no space status (issue #322)
@@ -152,7 +152,7 @@ moosefs (3.0.110-1) unstable; urgency=medium
   * (cs) never use open chunk as a chunk duplicate that needs to be deleted
   * (cs) never use disk with pending duplicates as destination disk during
     internal rebalace (issue #327)
-  * (cs) fixed condidtion in internal rebalance procedure (issue #327)
+  * (cs) fixed condition in internal rebalance procedure (issue #327)
   * (cs) added option for setting duplicates retention time in hours (issue
     #333)
   * (cs) fixed memory leak in removing disk with duplicates
@@ -200,7 +200,7 @@ moosefs (3.0.107-1) unstable; urgency=medium
   * (mount) fixed deadlock in readdata.c (closes issue #306)
   * (mount+master) fixed few small issues related to POSIX compliance (checked
     by pjd)
-  * (all) changed prefered C standard from C99 to C11 and added tests for
+  * (all) changed preferred C standard from C99 to C11 and added tests for
     atomics
   * (mount) move read/write structures initialization from open to read/write
   * (mount,mfsio) added new inode->fleng map
@@ -221,7 +221,7 @@ moosefs (3.0.106-1) unstable; urgency=medium
   * (all) changed chunk replication and deletion charts into two color charts
     (successful/unsuccessful - issue #273)
   * (all) added new charts with number of chunk creations and interna changes
-    (also successful and unsuccesful)
+    (also successful and unsuccessful)
   * (master) added ignoring chunk with id zero sent from chunkserver
   * (metadump) added option for dumping parts of metadata
   * (master) added more logs to background data write subprocess (connected
@@ -241,7 +241,7 @@ moosefs (3.0.106-1) unstable; urgency=medium
     without running daemon)
   * (master) take write replication counters into account in server ordering
     for new chunk creations
-  * (master) changed calcualting replication limits in chunk rebalance
+  * (master) changed calculating replication limits in chunk rebalance
     procedure (using actual usage difference)
 
  -- MooseFS Team <contact@moosefs.com>  Tue, 27 Aug 2019 13:00:00 +0200
@@ -287,7 +287,7 @@ moosefs (3.0.104-1) unstable; urgency=medium
   * (master) better handling chunks with pending high-priority jobs
   * (master) long loop detection (log info whenever time between polls is
     longer than 1 second)
-  * (master) fixed condition that checks if thare are all chunkservers and all
+  * (master) fixed condition that checks if there are all chunkservers and all
     chunks available (and using it for detecting ENOSPC condition - issue #201)
   * (mount) added '.params' pseudofile with mfsmount working parameters (such
     as cache sizes,timeouts etc.)

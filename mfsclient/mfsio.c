@@ -656,7 +656,7 @@ int mfs_mknod(const char *path, mode_t mode, dev_t dev) {
 		return -1;
 	}
 	mfs_get_credentials(&cr);
-	last_umask = umask(last_umask); // This is potentail race-condition, but there is no portable way to obtain umask atomically. Last umask is remembered to minimize probability of changing umask here.
+	last_umask = umask(last_umask); // This is potential race-condition, but there is no portable way to obtain umask atomically. Last umask is remembered to minimize probability of changing umask here.
 	umask(last_umask);
 	if (S_ISFIFO(mode)) {
 		type = TYPE_FIFO;
@@ -712,7 +712,7 @@ int mfs_mkdir(const char *path, mode_t mode) {
 		return -1;
 	}
 	mfs_get_credentials(&cr);
-	last_umask = umask(last_umask); // This is potentail race-condition, but there is no portable way to obtain umask atomically. Last umask is remembered to minimize probability of changing umask here.
+	last_umask = umask(last_umask); // This is potential race-condition, but there is no portable way to obtain umask atomically. Last umask is remembered to minimize probability of changing umask here.
 	umask(last_umask);
 	status = fs_mkdir(parent,nleng,(const uint8_t*)name,mode,last_umask,cr.uid,cr.gidcnt,cr.gidtab,mkdir_copy_sgid,&inode,attr);
 	if (status!=MFS_STATUS_OK) {

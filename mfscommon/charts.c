@@ -165,7 +165,7 @@ static uint8_t png_header[] = {
 	137, 80, 78, 71, 13, 10, 26, 10,                                                                  // signature
 
 	0, 0, 0, 13, 'I', 'H', 'D', 'R',                                                                  // IHDR chunk
-	0, 0, 0, 0, 0, 0, 0, 0,                                                                           // widht and height (big endian)
+	0, 0, 0, 0, 0, 0, 0, 0,                                                                           // width and height (big endian)
 	8, 3, 0, 0, 0,                                                                                    // 8bits, indexed color mode, default compression, default filters, no interlace
 	'C', 'R', 'C', '#',                                                                               // CRC32 placeholder
 

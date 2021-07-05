@@ -370,7 +370,7 @@ static inline termval* expr_eval(node *a) {
 		memcpy(t->labelmasks,t1->labelmasks,sizeof(uint32_t)*t1->cnt);
 		memcpy(t->labelmasks+t1->cnt,t2->labelmasks,sizeof(uint32_t)*t2->cnt);
 	} else {
-		if (t) { /* satisify cppcheck */
+		if (t) { /* satisfy cppcheck */
 			free(t);
 		}
 		return NULL;

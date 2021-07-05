@@ -6943,7 +6943,7 @@ int hdd_parseline(char *hddcfgline) {
 	if (mainmetaid>0) {
 		metaid = mainmetaid;
 	} else {
-		metaid = masterconn_gethddmetaid(); // metaid not verified with mater? - use metaid from previous hard disks
+		metaid = masterconn_gethddmetaid(); // metaid not verified with master? - use metaid from previous hard disks
 	}
 	metaidfname = (char*)malloc(l+8);
 	passert(metaidfname);

@@ -1197,7 +1197,7 @@ int do_setacl(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 
 int do_snapshot(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,parent,smode,sesflags,uid,gids,umask;
-	uint32_t inodecheck,removed,same,exisiting,hardlinks,new;
+	uint32_t inodecheck,removed,same,existing,hardlinks,new;
 	static uint8_t *gidstr = NULL;
 	static uint32_t gidstrsize = 0;
 	static uint32_t *gid = NULL;
@@ -1255,7 +1255,7 @@ int do_snapshot(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 			EAT(ptr,filename,lv,',');
 			GETU32(same,ptr);
 			EAT(ptr,filename,lv,',');
-			GETU32(exisiting,ptr);
+			GETU32(existing,ptr);
 			EAT(ptr,filename,lv,',');
 			GETU32(hardlinks,ptr);
 			EAT(ptr,filename,lv,',');
@@ -1264,12 +1264,12 @@ int do_snapshot(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 			inodecheck=0;
 			removed=0;
 			same=0;
-			exisiting=0;
+			existing=0;
 			hardlinks=0;
 			new=0;
 		}
 		(void)ptr; // silence cppcheck warnings
-		return fs_mr_snapshot(ts,inode,parent,strlen((char*)name),name,smode,sesflags,uid,gids,gidtab,umask,inodecheck,removed,same,exisiting,hardlinks,new);
+		return fs_mr_snapshot(ts,inode,parent,strlen((char*)name),name,smode,sesflags,uid,gids,gidtab,umask,inodecheck,removed,same,existing,hardlinks,new);
 	} else {
 		GETU32(umask,ptr);
 		EAT(ptr,filename,lv,')');

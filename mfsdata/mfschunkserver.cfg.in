@@ -50,7 +50,7 @@
 # percent of total work time the chunkserver is allowed to spend on hdd space rebalancing
 # HDD_REBALANCE_UTILIZATION = 20
 
-# maximum simultaneous writes in high speed disk rebalance (0 means use standard rebalance)
+# maximum simultaneous writes per disk in high speed disk rebalance (0 means use standard rebalance)
 # HDD_HIGH_SPEED_REBALANCE_LIMIT = 0
 
 # How many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged
@@ -63,7 +63,7 @@
 # enables/disables sparsification (skip zeros) during write
 # HDD_SPARSIFY_ON_WRITE = 1
 
-# how many chunks should be created in one directory before moving to the next one (higher values are better with most OSes cacheing algorithms, low values lead to more even chunk distribution, default is 10000 which works best in most cases)
+# how many chunks should be created in one directory before moving to the next one (higher values are better with most OSes caching algorithms, low values lead to more even chunk distribution, default is 10000 which works best in most cases)
 # HDD_RR_CHUNK_COUNT = 10000
 
 # how many hours duplicate chunks should be kept before deleting

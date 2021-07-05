@@ -5843,7 +5843,7 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 		return;
 	}
 	(void)position;
-	if (xattr_cache_on) { // check chache before getting groups
+	if (xattr_cache_on) { // check cache before getting groups
 		xattr_value_release = xattr_cache_get(ino,ctx.uid,ctx.gid,nleng,(const uint8_t*)name,&buff,&leng,&status);
 	} else {
 		xattr_value_release = NULL;

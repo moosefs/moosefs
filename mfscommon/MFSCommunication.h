@@ -1168,7 +1168,7 @@
 // 0x01A5
 #define MATOCL_FUSE_UNLINK (PROTO_BASE+421)
 // msgid:32 status:8
-// since 3.0.107 (after succesful remove):
+// since 3.0.107 (after successful remove):
 // msgid:32 inode:32
 
 // 0x01A6
@@ -1179,7 +1179,7 @@
 // 0x01A7
 #define MATOCL_FUSE_RMDIR (PROTO_BASE+423)
 // msgid:32 status:8
-// since 3.0.107 (after succesful remove):
+// since 3.0.107 (after successful remove):
 // msgid:32 inode:32
 
 // 0x01A8

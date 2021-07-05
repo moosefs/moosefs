@@ -1,4 +1,4 @@
-.TH mfschunkserver.cfg "5" "October 2020" "MooseFS 3.0.115-1" "This is part of MooseFS"
+.TH mfschunkserver.cfg "5" "July 2021" "MooseFS 3.0.116-1" "This is part of MooseFS"
 .SH NAME
 mfschunkserver.cfg \- main configuration file for \fBmfschunkserver\fP
 .SH DESCRIPTION
@@ -67,7 +67,7 @@ examples: 0.5GB, .5G, 2.56GiB, 1256M etc.
 percent of total work time the chunkserver is allowed to spend on hdd space rebalancing; default is 20
 .TP
 .B HDD_HIGH_SPEED_REBALANCE_LIMIT
-maximum simultaneous writes in high speed disk rebalance (0 means use standard rebalance; default is 0)
+maximum simultaneous writes per disk in high speed disk rebalance (0 means use standard rebalance; default is 0)
 .TP
 .BR HDD_ERROR_TOLERANCE_COUNT ", " HDD_ERROR_TOLERANCE_PERIOD
 how many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged; defaults are 2 and 600
@@ -79,7 +79,7 @@ enables/disables fsync before chunk closing; default is 0 (off)
 enables/disables sparsification (skip leading and trailing zeroz) during writing new block; default is 1 (on)
 .TP
 .B HDD_RR_CHUNK_COUNT
-how many chunks should be created in one directory before moving to the next one; higher values are better with most OSes cacheing algorithms, low values lead to more even chunk distribution; default is 10000 which works best in most cases
+how many chunks should be created in one directory before moving to the next one; higher values are better with most OSes caching algorithms, low values lead to more even chunk distribution; default is 10000 which works best in most cases
 .TP
 .B HDD_KEEP_DUPLICATES_HOURS
 how many hours duplicate chunks should be kept before deleting (default is 168 - one week); changign this value and reloading will reset the counter
@@ -91,7 +91,7 @@ when set to one chunkserver will not abort start even when incorrect entries are
 maximum number of active workers and maximum number of idle workers; defaults are 250 and 40
 .TP
 .B LABELS
-labels string defined as a set of letters (case insensitive) separated by colon or semicolon; default is empty - no labels
+labels string defined as a set of letters (case insensitive) separated by coma or semicolon; default is empty - no labels
 .TP
 .B BIND_HOST
 local address to use for master connections; default is *, i.e. default local address
@@ -126,7 +126,7 @@ IP address to listen on for client (mount) connections (\fB*\fP means any)
 .B CSSERV_LISTEN_PORT
 port to listen on for client (mount) connections (default is 9422)
 .SH COPYRIGHT
-Copyright (C) 2020 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (C) 2021 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
 
 This file is part of MooseFS.
 

@@ -20,6 +20,7 @@ This file lists noteworthy changes in MooseFS.
   - (mount) added parents of CWD's to 'sustained' inodes
   - (all) fixed spelling
   - (master) fixed handling copy sgid for directories on follower and during restore from changelog
+  - (master) fixed changelog order between unlock and close file or session
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

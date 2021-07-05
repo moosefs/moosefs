@@ -986,9 +986,9 @@ void sessions_check(void) {
 		sesdata = sessionshashtab + hpos;
 		while ((asesdata=*sesdata)) {
 			if (asesdata->nsocks==0 && (asesdata->closed || asesdata->disconnected+SessionSustainTime<now)) {
-				changelog("%"PRIu32"|SESDEL(%"PRIu32")",main_time(),asesdata->sessionid);
 				syslog(LOG_NOTICE,"remove session: %u",asesdata->sessionid);
 				sessions_clean_session(asesdata);
+				changelog("%"PRIu32"|SESDEL(%"PRIu32")",main_time(),asesdata->sessionid);
 				*sesdata = asesdata->next;
 				free(asesdata);
 			} else {
@@ -1007,9 +1007,9 @@ uint8_t sessions_force_remove(uint32_t sessionid) {
 	while ((asesdata=*sesdata)) {
 		if (asesdata->sessionid==sessionid) {
 			if (asesdata->nsocks==0) {
-				changelog("%"PRIu32"|SESDEL(%"PRIu32")",main_time(),asesdata->sessionid);
 				syslog(LOG_NOTICE,"remove session: %u",asesdata->sessionid);
 				sessions_clean_session(asesdata);
+				changelog("%"PRIu32"|SESDEL(%"PRIu32")",main_time(),asesdata->sessionid);
 				*sesdata = asesdata->next;
 				free(asesdata);
 				return MFS_STATUS_OK;

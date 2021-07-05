@@ -149,6 +149,7 @@ void of_sync(uint32_t sessionid,uint32_t *inodes,uint32_t inodecnt) {
 	int32_t ipos;
 	uint32_t i;
 	uint32_t shashpos = OF_SESSION_HASH(sessionid);
+	uint32_t inode;
 
 	if (inodecnt > bitmasksize*32 || bitmask == NULL) {
 		if (bitmask) {
@@ -173,8 +174,9 @@ void of_sync(uint32_t sessionid,uint32_t *inodes,uint32_t inodecnt) {
 			ipos = of_bisearch(ofr->inode,inodes,inodecnt);
 //			syslog(LOG_NOTICE,"sync: search for %"PRIu32" -> pos: %"PRId32,ofr->inode,ipos);
 			if (ipos<0) { // close
-				changelog("%"PRIu32"|RELEASE(%"PRIu32",%"PRIu32")",main_time(),ofr->sessionid,ofr->inode);
+				inode = ofr->inode;
 				of_delnode(ofr);
+				changelog("%"PRIu32"|RELEASE(%"PRIu32",%"PRIu32")",main_time(),sessionid,inode);
 			} else {
 				bitmask[ipos>>5] |= (1U<<(ipos&0x1F));
 			}

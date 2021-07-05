@@ -5213,7 +5213,7 @@ uint8_t fs_univ_create(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 				(*oflags) |= OPEN_APPENDONLY;
 			}
 		}
-		changelog("%"PRIu32"|CREATE(%"PRIu32",%s,%"PRIu8",%"PRIu16",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32"):%"PRIu32,ts,parent,changelog_escape_name(nleng,name),type,mode,cumask,uid,gid[0],rdev,p->inode);
+		changelog("%"PRIu32"|CREATE(%"PRIu32",%s,%"PRIu8",%"PRIu16",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32"):%"PRIu32,ts,parent,changelog_escape_name(nleng,name),type,(uint16_t)(p->mode),cumask,p->uid,p->gid,rdev,p->inode);
 	} else {
 		meta_version_inc();
 	}

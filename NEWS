@@ -19,6 +19,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed restore mode (missing cache initialization - issue #432)
   - (mount) added parents of CWD's to 'sustained' inodes
   - (all) fixed spelling
+  - (master) fixed handling copy sgid for directories on follower and during restore from changelog
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

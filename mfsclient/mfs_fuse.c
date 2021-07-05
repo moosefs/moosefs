@@ -70,6 +70,7 @@
 
 #include "mfsmount.h"
 #include "sustained_stats.h"
+#include "sustained_parents.h"
 #include "chunksdatacache.h"
 #include "dirattrcache.h"
 #include "symlinkcache.h"
@@ -1766,6 +1767,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 	}
 	if (type==TYPE_DIRECTORY) {
 		sstats_set(inode,attr,1);
+		sparents_add(inode,parent,direntry_cache_timeout+60);
 	}
 	memset(&e, 0, sizeof(e));
 	e.ino = inode;
@@ -2512,6 +2514,7 @@ void mfs_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode)
 		fuse_reply_err(req, status);
 	} else {
 		sstats_set(inode,attr,1);
+		sparents_add(inode,parent,direntry_cache_timeout+60);
 		negentry_cache_remove(parent,nleng,(const uint8_t*)name);
 //		if (newdircache) {
 //			dir_cache_link(parent,nleng,(const uint8_t*)name,inode,attr);
@@ -2754,6 +2757,9 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags,strerr(status));
 		fuse_reply_err(req, status);
 	} else {
+		if (mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
+			sparents_add(inode,newparent,direntry_cache_timeout+60);
+		}
 		negentry_cache_insert(parent,nleng,(const uint8_t*)name);
 		negentry_cache_remove(newparent,newnleng,(const uint8_t*)newname);
 //		if (newdircache) {

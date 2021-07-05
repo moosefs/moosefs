@@ -85,6 +85,7 @@
 #include "mastercomm.h"
 #include "masterproxy.h"
 #include "csorder.h"
+#include "sustained_parents.h"
 #include "sustained_inodes.h"
 #include "sustained_stats.h"
 #include "symlinkcache.h"
@@ -1327,6 +1328,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		}
 	}
 
+	sparents_init();
 #if FUSE_VERSION >= 30
 	sinodes_init(cmdopts->mountpoint);
 #else /* FUSE2 */
@@ -1370,6 +1372,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 
 	sstats_term();
 	sinodes_term();
+	sparents_term();
 
 	fuse_remove_signal_handlers(se);
 #if FUSE_VERSION >= 30

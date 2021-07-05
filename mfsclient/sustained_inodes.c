@@ -38,6 +38,7 @@
 #ifdef RINODES_DEBUG
 #include <stdio.h>
 #else
+#include "sustained_parents.h"
 #include "portable.h"
 #include "mastercomm.h"
 #include "lwthread.h"
@@ -56,6 +57,7 @@ static uint8_t term;
 
 typedef struct _sinodes_ino {
 	uint32_t inode;
+	uint32_t parent;
 	struct _sinodes_ino *next;
 } sinodes_ino;
 
@@ -88,11 +90,16 @@ static inline void sinodes_open(uint32_t inode) {
 
 void sinodes_process_inode(uint32_t inode) {
 	sinodes_ino *ril,**rilp;
+	uint32_t parent;
 	rilp = &currentlist;
 	while ((ril = *rilp)) {
 		if (inode > ril->inode) {
 			rilp = &(ril->next);
 		} else if (inode == ril->inode) {
+			parent = sparents_get(inode);
+			if (parent!=0) {
+				ril->parent = parent;
+			}
 			return;
 		} else {
 			break;
@@ -100,6 +107,7 @@ void sinodes_process_inode(uint32_t inode) {
 	}
 	ril = malloc(sizeof(sinodes_ino));
 	ril->inode = inode;
+	ril->parent = sparents_get(inode);
 	ril->next = *rilp;
 	*rilp = ril;
 }
@@ -112,12 +120,30 @@ void sinodes_end(void) {
 
 	while (rill!=NULL || ricl!=NULL) {
 		if (ricl==NULL || (rill!=NULL && rill->inode < ricl->inode)) {
+			if (rill->parent!=0) {
+				sinodes_close(rill->parent);
+			}
 			sinodes_close(rill->inode);
 			rill = rill->next;
 		} else if (rill==NULL || rill->inode > ricl->inode) {
 			sinodes_open(ricl->inode);
+			if (ricl->parent!=0) {
+				sinodes_open(ricl->parent);
+			}
 			ricl = ricl->next;
 		} else {
+			if (rill->parent != ricl->parent) {
+				if (rill->parent!=0) {
+					if (ricl->parent==0) {
+						ricl->parent = rill->parent;
+					} else {
+						sinodes_close(rill->parent);
+					}
+				}
+				if (ricl->parent!=0) {
+					sinodes_open(ricl->parent);
+				}
+			}
 			rill = rill->next;
 			ricl = ricl->next;
 		}

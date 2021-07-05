@@ -24,6 +24,7 @@ mfsmount_SOURCES=\
 	xattrcache.c xattrcache.h \
 	fdcache.c fdcache.h \
 	dentry_invalidator.c dentry_invalidator.h \
+	sustained_parents.c sustained_parents.h \
 	sustained_inodes.c sustained_inodes.h \
 	sustained_stats.c sustained_stats.h \
 	inoleng.c inoleng.h \

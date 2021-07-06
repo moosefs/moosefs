@@ -1,0 +1,7 @@
+language: c
+before_install:
+  - sudo pip install cpp-coveralls
+script:
+  - make tests
+after_success:
+  - coveralls --verbose --exclude include --exclude tests --exclude CLinkedListQueue

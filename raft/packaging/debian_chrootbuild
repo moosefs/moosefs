@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -uex
+
+# shellcheck disable=SC2153
+IFS=\| read -r -a distro_base_local_repos <<< "$DISTRO_BASE_LOCAL_REPOS"
+
+# shellcheck disable=SC2086
+sudo pbuilder create                                                                                                                                                           \
+    --extrapackages "gnupg ca-certificates"                                                                                                                                    \
+    --othermirror                                                                                                                                                              \
+    "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ $VERSION_CODENAME universe|deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ $VERSION_CODENAME-updates main universe" \
+    $DISTRO_ID_OPT
+
+repo_args=""
+for repo in $DISTRO_BASE_PR_REPOS $PR_REPOS; do
+    branch="master"
+    build_number="lastSuccessfulBuild"
+    if [[ $repo = *@* ]]; then
+        branch="${repo#*@}"
+        repo="${repo%@*}"
+        if [[ $branch = *:* ]]; then
+            build_number="${branch#*:}"
+            branch="${branch%:*}"
+        fi
+    fi
+    repo_args="$repo_args|deb [trusted=yes] ${JENKINS_URL:-https://build.hpdd.intel.com/}job/daos-stack/job/$repo/job/$branch/$build_number/artifact/artifacts/$DISTRO/ ./"
+done
+for repo in $JOB_REPOS "${distro_base_local_repos[@]}"; do
+    repo_args="$repo_args|deb ${repo} $VERSION_CODENAME main"
+done
+echo "$repo_args"
+if [ "$repo_args" = "|" ]; then
+    repo_args=""
+else
+    #repo_args="--othermirror"${repo_args#|}\""
+    repo_args="${repo_args#|}"
+fi
+cd "$DEB_TOP"
+# shellcheck disable=SC2086
+sudo pbuilder update --override-config $DISTRO_ID_OPT ${repo_args:+--othermirror "$repo_args"}
+# fail the build if the *.symbols file(s) need updating
+sudo DPKG_GENSYMBOLS_CHECK_LEVEL="${DPKG_GENSYMBOLS_CHECK_LEVEL:-4}" pbuilder build "$DEB_DSC"

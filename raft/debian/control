@@ -1,0 +1,35 @@
+Source: raft
+Priority: optional
+Maintainer: daos-stack <daos@daos.groups.io>
+Build-Depends: debhelper (>= 11)
+Standards-Version: 4.1.3
+Section: libs
+Homepage: https://github.com/willemt/raft
+Vcs-Browser: https://github.com/willemt/raft
+Vcs-Git: https://github.com/willemt/raft.git
+
+Package: libraft-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libraft0 (= ${binary:Version}), ${misc:Depends}
+Description: C implementation of the Raft consensus protocol
+ Raft is a consensus algorithm that is designed to be easy to understand.
+ It's equivalent to Paxos in fault-tolerance and performance. The difference
+ is that it's decomposed into relatively independent subproblems, and it
+ cleanly addresses all major pieces needed for practical systems.
+ .
+ This package is needed to compile programs against raft.
+ It contains the header files and links needed for compiling.
+
+Package: libraft0
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: C implementation of the Raft consensus protocol
+ Raft is a consensus algorithm that is designed to be easy to understand.
+ It's equivalent to Paxos in fault-tolerance and performance. The difference
+ is that it's decomposed into relatively independent subproblems, and it
+ cleanly addresses all major pieces needed for practical systems.
+ .
+ This package contains the shared libraries.

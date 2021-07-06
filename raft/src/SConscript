@@ -1,0 +1,19 @@
+Import('env')
+env = env.Clone()
+env.AppendUnique(CPPPATH = ['../include'])
+topdir = env.Dir("#").abspath
+builddir = env.Dir('.').abspath
+libraft = env.Command('libraft.a', '', 'make -C src/rdb/raft/ BUILDDIR=%s GCOV_CCFLAGS= static' % builddir)
+test_main = env.Command('tests_main', libraft, 'make -C src/rdb/raft/ BUILDDIR=%s GCOV_CCFLAGS= tests_main' % builddir)
+# even though these are AlwaysBuild() they are still inexpensive as the
+# make to build them will bail out if they don't actually need rebuilding
+AlwaysBuild(libraft)
+AlwaysBuild(test_main)
+
+def CleanAction(env, action):
+    if env.GetOption('clean'):
+        env.Execute(action)
+
+env.AddMethod(CleanAction, 'CleanAction')
+
+env.CleanAction(Action(['make -C %s/src/rdb/raft/ BUILDDIR=%s clean' % (topdir, builddir)]))

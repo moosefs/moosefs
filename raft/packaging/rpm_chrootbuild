@@ -1,0 +1,57 @@
+#!/bin/bash
+
+set -uex
+
+# shellcheck disable=SC2153
+IFS=\| read -r -a distro_base_local_repos <<< "$DISTRO_BASE_LOCAL_REPOS"
+repo_adds=()
+repo_dels=()
+
+if [ -n "$REPOSITORY_URL" ] && [ -n "$DISTRO_REPOS" ]; then
+    repo_dels+=("--disablerepo=\*")
+fi
+
+: "${WORKSPACE:=$PWD}"
+mock_config_dir="$WORKSPACE/mock"
+original_cfg_file="/etc/mock/${CHROOT_NAME}.cfg"
+cfg_file="$mock_config_dir/${CHROOT_NAME}_daos.cfg"
+mkdir -p "$mock_config_dir"
+ln -sf /etc/mock/templates "$mock_config_dir/"
+ln -sf /etc/mock/logging.ini "$mock_config_dir/"
+
+cp "$original_cfg_file" "$cfg_file"
+
+echo -e "config_opts['yum.conf'] += \"\"\"\n" >> "$cfg_file"
+for repo in $DISTRO_BASE_PR_REPOS $PR_REPOS; do
+    branch="master"
+    build_number="lastSuccessfulBuild"
+    if [[ $repo = *@* ]]; then
+        branch="${repo#*@}"
+        repo="${repo%@*}"
+        if [[ $branch = *:* ]]; then
+            build_number="${branch#*:}"
+            branch="${branch%:*}"
+        fi
+    fi
+    repo_adds+=("--enablerepo $repo:$branch:$build_number")
+    echo -e "[$repo:$branch:$build_number]\n\
+name=$repo:$branch:$build_number\n\
+baseurl=${JENKINS_URL:-https://build.hpdd.intel.com/}job/daos-stack/job/$repo/job/$branch/$build_number/artifact/artifacts/$DISTRO/\n\
+enabled=1\n\
+gpgcheck=False\n" >> "$cfg_file"
+done
+for repo in $JOB_REPOS "${distro_base_local_repos[@]}"; do
+    repo_name=${repo##*://}
+    repo_name=${repo_name//\//_}
+    repo_adds+=("--enablerepo $repo_name")
+    echo -e "[${repo_name//@/_}]\n\
+name=${repo_name}\n\
+baseurl=${repo}\n\
+enabled=1\n" >> "$cfg_file"
+done
+echo "\"\"\"" >> "$cfg_file"
+
+# shellcheck disable=SC2086
+eval mock --configdir "$mock_config_dir" -r "${CHROOT_NAME}_daos" \
+     "${repo_dels[*]}" "${repo_adds[*]}" \
+     $MOCK_OPTIONS $RPM_BUILD_OPTIONS "$TARGET"

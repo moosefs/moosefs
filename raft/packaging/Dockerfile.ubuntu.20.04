@@ -1,0 +1,39 @@
+#
+# Copyright 2019-2020, Intel Corporation
+#
+# 'recipe' for Docker to build an Debian package
+#
+# Pull base image
+FROM ubuntu:20.04
+MAINTAINER daos-stack <daos@daos.groups.io>
+
+# use same UID as host and default value of 1000 if not specified
+ARG UID=1000
+ARG REPO_URL=""
+ARG REPO_UBUNTU_20_04=""
+
+# Install basic tools
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            autoconf bash curl debhelper dh-make dpkg-dev doxygen gcc   \
+            git git-buildpackage locales make patch pbuilder rpm wget   \
+            ca-certificates scons python3-distutils pkg-config          \
+            python3-dev python3-distro
+
+# rpmdevtools
+RUN echo "deb [trusted=yes] ${REPO_URL}${REPO_UBUNTU_20_04} focal main" > /etc/apt/sources.list.d/daos-stack-ubuntu-stable-local.list
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            rpmdevtools
+
+# Add build user (to keep chrootbuild happy)
+ENV USER build
+RUN useradd -u $UID -ms /bin/bash $USER
+
+# need to run the build command as root, as it needs to chroot
+RUN if ! grep "^#includedir /etc/sudoers.d" /etc/sudoers; then                          \
+        echo "#includedir /etc/sudoers.d" >> /etc/sudoers;                              \
+    fi;                                                                                 \
+    echo "Defaults env_keep += \"DPKG_GENSYMBOLS_CHECK_LEVEL\"" > /etc/sudoers.d/build; \
+    echo "build ALL=(ALL) NOPASSWD: /usr/sbin/pbuilder" >> /etc/sudoers.d/build;        \
+    chmod 0440 /etc/sudoers.d/build;                                                    \
+    visudo -c;                                                                          \
+    sudo -l -U build

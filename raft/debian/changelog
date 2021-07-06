@@ -1,0 +1,57 @@
+raft (0.8.0-1) unstable; urgency=medium
+
+  [ Li Wei ]
+  * Add Pre-Vote
+
+ -- Li Wei <wei.g.li@intel.com>  Mon, May 31 2021 17:25:00 +0800
+
+raft (0.7.3-1) unstable; urgency=medium
+
+  [ Li Wei ]
+  * Fix disruptions from removed replicas
+
+ -- Li Wei <wei.g.li@intel.com>  Wed, Feb 24 2021 11:53:00 +0800
+
+raft (0.7.2-1) unstable; urgency=medium
+
+  [ Kenneth Cain ]
+  * Fix more Coverity issues in test_server
+
+ -- Kenneth Cain <kenneth.c.cain@intel.com>  Tue, Feb 09 2021 15:20:00 +0800
+
+raft (0.7.1-1) unstable; urgency=medium
+
+  [ Li Wei ]
+  * Fix Coverity issues
+
+ -- Li Wei <wei.g.li@intel.com>  Wed, Dec 02 2020 11:30:00 +0800
+
+raft (0.7.0-1) unstable; urgency=medium
+
+  [ Li Wei ]
+  * Use 63-bit log indices and terms
+
+ -- Li Wei <wei.g.li@intel.com>  Tue, Nov 10 2020 10:12:37 +0800
+
+raft (0.6.0-1) unstable; urgency=medium
+
+  [ Brian J. Murrell ]
+  * Update to 0.6.0
+
+ -- Brian J. Murrell <brian.murrell@intel.com>  Tue, 25 Aug 2020 15:31:48 -0400
+
+raft (0.5.0-2) unstable; urgency=medium
+
+  [ John Malmberg ]
+  * Packaging changes
+  * Experimental build for daos-stack project
+
+ -- John Malmberg <john.e.malmberg@intel.com>  Mon, 07 Oct 2019 14:43:00 +0000
+
+raft (0.5.0-1) unstable; urgency=medium
+
+  [ John Malmberg ]
+  * Upstream release
+  * Experimental build for daos-stack project
+
+ -- John Malmberg <john.e.malmberg@intel.com>  Wed, 03 Jul 2019 19:59:53 +0000

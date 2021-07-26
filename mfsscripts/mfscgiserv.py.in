@@ -435,7 +435,7 @@ class HTTP(ClientHandler):
 
 	def redirect_resp(self,redirurl):
 		"""Return redirect message"""
-		resp_line = "%s 301 Moved Permanently\r\nLocation: %s\r\n" % (self.protocol,redirurl)
+		resp_line = "%s 301 Moved Permanently\r\nLocation: %s\r\n\r\n" % (self.protocol,redirurl)
 		if sys.version>='3':
 			resp_line = resp_line.encode('ascii')
 		self.close_when_done = True

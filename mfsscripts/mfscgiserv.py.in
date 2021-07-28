@@ -444,7 +444,7 @@ class HTTP(ClientHandler):
 
 	def err_resp(self,code,msg):
 		"""Return an error message"""
-		resp_line = "%s %s %s\r\n" %(self.protocol,code,msg)
+		resp_line = "%s %s %s\r\n\r\n" %(self.protocol,code,msg)
 		if sys.version>='3':
 			resp_line = resp_line.encode('ascii')
 		self.close_when_done = True

@@ -1,3 +1,36 @@
+moosefs (3.0.116-1) unstable; urgency=medium
+
+  * (check) making clock test less prone to single failure
+  * (master) added protection against listing too big directory
+  * (master) servers in 'rebalance' state are now allowed to be used in
+    replication
+  * (cs) changed handling 'load+hlstatus' packet
+  * (mount) added symlink cache timeout
+  * (master) added option to define inode reuse delay
+  * (cgi+cli) fixed division by zero when scount is zero (no chunkservers -
+    issue #412)
+  * (master) added inode virtual length for append mode
+  * (mount) moved rwlock from descriptor to inode (fixes append issues)
+  * (cgi) changed method of charts selection in charts comparison
+  * (cgi) added message to function that handles exceptions
+  * (cgi) added using htmlentities function for various strings
+  * (mount) removed old osxfuse patch (doesn't work with current osxfuse and is
+    no longer needed)
+  * (master) fixed default paths for exports.cfg and topology.cfg
+  * (master) fixed restore mode (missing cache initialization - issue #432)
+  * (mount) added parents of CWD's to 'sustained' inodes (workaround for
+    FreeBSD problem - issue #362)
+  * (all) fixed spelling
+  * (master) fixed handling copy sgid for directories on follower and during
+    restore from changelog
+  * (master) fixed changelog order between unlock and close file or session
+  * (cgi) fixed using '&amp;' in javascript URLs (issue #439)
+  * (cgiserv) fixed error/redirect responses (pull request by Eronana)
+  * (master+cs) fixed overflows in cgi charts
+  * (cs) fixed crc data in info packets (*_CHUNK_CHECKSUM,*_CHUNK_CHECKSUM_TAB)
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 10 Aug 2021 13:00:00 +0200
+
 moosefs (3.0.115-1) unstable; urgency=medium
 
   * (cs) fixed chunk locking issues in chunkserver (lock timeout, missing

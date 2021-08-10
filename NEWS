@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.116-1 (2021-07-05)
+* MooseFS 3.0.116-1 (2021-08-10)
 
   - (check) making clock test less prone to single failure
   - (master) added protection against listing too big directory
@@ -17,11 +17,13 @@ This file lists noteworthy changes in MooseFS.
   - (mount) removed old osxfuse patch (doesn't work with current osxfuse and is no longer needed)
   - (master) fixed default paths for exports.cfg and topology.cfg
   - (master) fixed restore mode (missing cache initialization - issue #432)
-  - (mount) added parents of CWD's to 'sustained' inodes
+  - (mount) added parents of CWD's to 'sustained' inodes (workaround for FreeBSD problem - issue #362)
   - (all) fixed spelling
   - (master) fixed handling copy sgid for directories on follower and during restore from changelog
   - (master) fixed changelog order between unlock and close file or session
   - (cgi) fixed using '&amp;' in javascript URLs (issue #439)
+  - (cgiserv) fixed error/redirect responses (pull request by Eronana)
+  - (master+cs) fixed overflows in cgi charts
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

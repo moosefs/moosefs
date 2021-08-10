@@ -524,8 +524,8 @@ uint32_t getmonleng(uint32_t year,uint32_t month) {
 	case 2:
 		if (year%4) return 28;
 		if (year%100) return 29;
-		if (year%400) return 29;
-		return 28;
+		if (year%400) return 28;
+		return 29;
 	}
 	return 0;
 }
@@ -1693,12 +1693,24 @@ void charts_makechart(uint32_t type,uint32_t range,uint32_t width,uint32_t heigh
 				chart[(MAXXSIZE)*(j+YPOS)+(i+XPOS)] = ((j+i)%3)?COLOR_BKG:COLOR_NODATA; //(((j+i)&3)&&((j+2+LENG-i)&3))?COLOR_BKG:COLOR_DATA1;
 			}
 		} else {
-			c1d *= height;
-			c1d /= dmax;
-			c2d *= height;
-			c2d /= dmax;
-			c3d *= height;
-			c3d /= dmax;
+			if (c1d>281474976710656ULL) { // arithmetic overflow protection
+				c1d /= 65536;
+				c2d /= 65536;
+				c3d /= 65536;
+				c1d *= height;
+				c1d /= (dmax/65536);
+				c2d *= height;
+				c2d /= (dmax/65536);
+				c3d *= height;
+				c3d /= (dmax/65536);
+			} else {
+				c1d *= height;
+				c1d /= dmax;
+				c2d *= height;
+				c2d /= dmax;
+				c3d *= height;
+				c3d /= dmax;
+			}
 
 			j=0;
 			while (height>=c1d+j) {

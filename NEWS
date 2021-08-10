@@ -24,6 +24,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgi) fixed using '&amp;' in javascript URLs (issue #439)
   - (cgiserv) fixed error/redirect responses (pull request by Eronana)
   - (master+cs) fixed overflows in cgi charts
+  - (cs) fixed crc data in info packets (*_CHUNK_CHECKSUM,*_CHUNK_CHECKSUM_TAB)
 
 * MooseFS 3.0.115-1 (2020-10-08)
 

@@ -3490,6 +3490,7 @@ int hdd_get_checksum(uint64_t chunkid,uint32_t version,uint8_t *checksum_buff) {
 	int status;
 	uint32_t i;
 	uint32_t chksum;
+	const uint8_t *rptr;
 	chunk *c;
 	if (hdd_chunk_find(chunkid,&c)==2) {
 		return MFS_ERROR_NOTDONE;
@@ -3508,9 +3509,10 @@ int hdd_get_checksum(uint64_t chunkid,uint32_t version,uint8_t *checksum_buff) {
 		return status;
 	}
 	chksum = 1;
-	for (i=0 ; i<MFSBLOCKSINCHUNK ; i++) {
+	rptr = c->crc;
+	for (i=0 ; i<CHUNKCRCSIZE ; i+=4) {
 		chksum *= 426265243;
-		chksum ^= c->crc[i];
+		chksum ^= get32bit(&rptr);
 	}
 	put32bit(&checksum_buff,chksum);
 	status = hdd_io_end(c);
@@ -3525,7 +3527,6 @@ int hdd_get_checksum(uint64_t chunkid,uint32_t version,uint8_t *checksum_buff) {
 
 int hdd_get_checksum_tab(uint64_t chunkid,uint32_t version,uint8_t *checksum_tab) {
 	int status;
-	uint32_t i;
 	chunk *c;
 	if (hdd_chunk_find(chunkid,&c)==2) {
 		return MFS_ERROR_NOTDONE;
@@ -3543,9 +3544,7 @@ int hdd_get_checksum_tab(uint64_t chunkid,uint32_t version,uint8_t *checksum_tab
 		hdd_chunk_release(c);
 		return status;
 	}
-	for (i=0 ; i<MFSBLOCKSINCHUNK ; i++) {
-		put32bit(&checksum_tab,c->crc[i]);
-	}
+	memcpy(checksum_tab,c->crc,CHUNKCRCSIZE);
 	status = hdd_io_end(c);
 	if (status!=MFS_STATUS_OK) {
 		hdd_error_occured(c,1);	// uses and preserves errno !!!

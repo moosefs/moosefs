@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 3.0.117-1 (WIP)
+
+  - (master) fixed handling abnormal operation status (issue #456)
+
 * MooseFS 3.0.116-1 (2021-08-10)
 
   - (check) making clock test less prone to single failure

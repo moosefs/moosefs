@@ -53,6 +53,7 @@
 #include "filesystem.h"
 #include "datapack.h"
 #include "massert.h"
+#include "mfsstrerr.h"
 #include "hashfn.h"
 #include "buckets.h"
 #include "clocks.h"
@@ -1296,10 +1297,10 @@ static inline int chunk_remove_disconnected_chunks(chunk *c) {
 						c->regularvalidcopies++;
 					}
 				}
-				if (verfixed) {
-					c->version--;
-					changelog("%"PRIu32"|SETVERSION(%"PRIu64",%"PRIu32")",(uint32_t)main_time(),c->chunkid,c->version);
-				}
+			}
+			if (verfixed) {
+				c->version--;
+				changelog("%"PRIu32"|SETVERSION(%"PRIu64",%"PRIu32")",(uint32_t)main_time(),c->chunkid,c->version);
 			}
 			// we continue because we still want to return status not done to matoclserv module
 		}
@@ -3029,6 +3030,7 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 						continue;
 					}
 				} else {
+					c->interrupted = 1;	// increase version after finish, just in case
 					s->valid = INVALID;
 					s->version = 0;	// after unfinished operation can't be sure what version chunk has
 				}
@@ -3067,10 +3069,10 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 					c->regularvalidcopies++;
 				}
 			}
-			if (verfixed) {
-				c->version--;
-				changelog("%"PRIu32"|SETVERSION(%"PRIu64",%"PRIu32")",(uint32_t)main_time(),c->chunkid,c->version);
-			}
+		}
+		if (verfixed) {
+			c->version--;
+			changelog("%"PRIu32"|SETVERSION(%"PRIu64",%"PRIu32")",(uint32_t)main_time(),c->chunkid,c->version);
 		}
 		// we continue because we still want to return status not done to matoclserv module
 	}
@@ -3096,38 +3098,83 @@ void chunk_operation_status(uint64_t chunkid,uint8_t status,uint16_t csid,uint8_
 				}
 			}
 		} else {
+			c->operation = NONE;
 			if (nospace) {
 				matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOSPACE);
 			} else {
 				matoclserv_chunk_status(c->chunkid,MFS_ERROR_NOTDONE);
 			}
-			c->operation = NONE;
 		}
 	}
 }
 
+/*
+void chunk_op_sanity_check(uint16_t csid,uint64_t chunkid,uint8_t status,const char *str) {
+	chunk *c;
+	slist *s;
+	uint8_t b,l;
+
+	c = chunk_find(chunkid);
+	if (c==NULL) {
+		syslog(LOG_NOTICE,"%s status %s from %u - chunk %016"PRIX64" doesn't exist",str,mfsstrerr(status),csid,chunkid);
+		return;
+	}
+	b = 0;
+	for (s=c->slisthead ; s!=NULL ; s=s->next) {
+		if (s->valid==BUSY || s->valid==TDBUSY) {
+			b = 1;
+		}
+	}
+	l = 0;
+	if (c->operation==NONE && b==1) {
+		syslog(LOG_NOTICE,"%s status %s from %u - chunk %016"PRIX64" has not expected busy copies",str,mfsstrerr(status),csid,chunkid);
+		l = 1;
+	} else if (c->operation!=NONE && b==0) {
+		syslog(LOG_NOTICE,"%s status %s from %u - chunk %016"PRIX64" in the middle of operation %s that doesn't have busy copies",str,mfsstrerr(status),csid,chunkid,opstr[c->operation]);
+		l = 1;
+	}
+	if (l) {
+		for (s=c->slisthead ; s!=NULL ; s=s->next) {
+			syslog(LOG_NOTICE,"copy on %u - state: %s",s->csid,validstr[s->valid]);
+		}
+	}
+}
+*/
+
 void chunk_got_chunkop_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
+//	chunk_op_sanity_check(csid,chunkid,status,"before chunop");
 	chunk_operation_status(chunkid,status,csid,NONE);
+//	chunk_op_sanity_check(csid,chunkid,status,"after chunkop");
 }
 
 void chunk_got_create_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
+//	chunk_op_sanity_check(csid,chunkid,status,"before create");
 	chunk_operation_status(chunkid,status,csid,CREATE);
+//	chunk_op_sanity_check(csid,chunkid,status,"after create");
 }
 
 void chunk_got_duplicate_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
+//	chunk_op_sanity_check(csid,chunkid,status,"before duplicate");
 	chunk_operation_status(chunkid,status,csid,DUPLICATE);
+//	chunk_op_sanity_check(csid,chunkid,status,"after duplicate");
 }
 
 void chunk_got_setversion_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
+//	chunk_op_sanity_check(csid,chunkid,status,"before set_version");
 	chunk_operation_status(chunkid,status,csid,SET_VERSION);
+//	chunk_op_sanity_check(csid,chunkid,status,"after set_version");
 }
 
 void chunk_got_truncate_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
+//	chunk_op_sanity_check(csid,chunkid,status,"before truncate");
 	chunk_operation_status(chunkid,status,csid,TRUNCATE);
+//	chunk_op_sanity_check(csid,chunkid,status,"after truncate");
 }
 
 void chunk_got_duptrunc_status(uint16_t csid,uint64_t chunkid,uint8_t status) {
+//	chunk_op_sanity_check(csid,chunkid,status,"before dup_trunc");
 	chunk_operation_status(chunkid,status,csid,DUPTRUNC);
+//	chunk_op_sanity_check(csid,chunkid,status,"after dup_trunc");
 }
 
 uint8_t chunk_no_more_pending_jobs(void) {
@@ -3494,7 +3541,7 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 		c->regularvalidcopies = vc+bc;
 	}
 	if (tdb+bc==0 && c->operation!=NONE) {
-		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk in middle of operation %s, but no chunk server is busy - finish operation",c->chunkid,c->version,opstr[c->operation]);
+		syslog(LOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32": chunk in the middle of operation %s, but no chunk server is busy - finish operation",c->chunkid,c->version,opstr[c->operation]);
 		c->operation = NONE;
 	}
 	goal = sclass_get_keeparch_goal(c->sclassid,c->archflag);

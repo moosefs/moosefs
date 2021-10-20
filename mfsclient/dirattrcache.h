@@ -32,6 +32,6 @@ uint8_t dcache_lookup(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,c
 uint8_t dcache_getattr(const struct fuse_ctx *ctx,uint32_t inode,uint8_t attr[ATTR_RECORD_SIZE]);
 void dcache_setattr(uint32_t inode,const uint8_t attr[ATTR_RECORD_SIZE]);
 void dcache_invalidate_attr(uint32_t inode);
-void dcache_invalidate_name(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name);
+void dcache_invalidate_name(uint32_t parent,uint8_t nleng,const uint8_t *name);
 
 #endif

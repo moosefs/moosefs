@@ -2448,7 +2448,7 @@ void mfs_unlink(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //		}
 		fdcache_invalidate(inode);
 		dcache_invalidate_attr(parent);
-		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
+		dcache_invalidate_name(parent,nleng,(const uint8_t*)name);
 		oplog_printf(&ctx,"unlink (%lu,%s): OK",(unsigned long int)parent,name);
 		fuse_reply_err(req, 0);
 	}
@@ -2584,7 +2584,7 @@ void mfs_rmdir(fuse_req_t req, fuse_ino_t parent, const char *name) {
 //			dir_cache_unlink(parent,nleng,(const uint8_t*)name);
 //		}
 		dcache_invalidate_attr(parent);
-		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
+		dcache_invalidate_name(parent,nleng,(const uint8_t*)name);
 #ifdef DENTRY_INVALIDATOR
 		if (dinval) {
 			dinval_remove(parent,nleng,(const uint8_t*)name);
@@ -2770,7 +2770,7 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 		if (newparent!=parent) {
 			dcache_invalidate_attr(newparent);
 		}
-		dcache_invalidate_name(&ctx,parent,nleng,(const uint8_t*)name);
+		dcache_invalidate_name(parent,nleng,(const uint8_t*)name);
 #ifdef DENTRY_INVALIDATOR
 		if (dinval && mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
 			dinval_remove(parent,nleng,(const uint8_t*)name);

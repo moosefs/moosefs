@@ -357,11 +357,11 @@ void dcache_invalidate_attr(uint32_t inode) {
 	zassert(pthread_mutex_unlock(&glock));
 }
 
-void dcache_invalidate_name(const struct fuse_ctx *ctx,uint32_t parent,uint8_t nleng,const uint8_t *name) {
+void dcache_invalidate_name(uint32_t parent,uint8_t nleng,const uint8_t *name) {
 	dircache *d;
 	zassert(pthread_mutex_lock(&glock));
 	for (d=head ; d ; d=d->next) {
-		if (parent==d->parent && ctx->pid==d->ctx.pid && ctx->uid==d->ctx.uid && ctx->gid==d->ctx.gid) {
+		if (parent==d->parent) {
 			dcache_namehash_invalidate(d,nleng,name);
 		}
 	}

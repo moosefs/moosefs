@@ -4,6 +4,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (master) fixed handling abnormal operation status (issue #456)
   - (master+cs) added error message when a config file can't be loaded (issue #457)
+  - (client) fixed invalidating directory cache after 'unlink','rmdir' and 'rename'
 
 * MooseFS 3.0.116-1 (2021-08-10)
 

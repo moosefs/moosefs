@@ -7197,7 +7197,7 @@ int hdd_folders_reinit(void) {
 		hddfname = strdup(ETC_PATH "/mfs/mfshdd.cfg");
 		passert(hddfname);
 		fd = fopen(hddfname,"r");
-		if (!fd) {
+		if (!fd && errno==ENOENT) {
 			free(hddfname);
 			hddfname = strdup(ETC_PATH "/mfshdd.cfg");
 			fd = fopen(hddfname,"r");
@@ -7211,6 +7211,11 @@ int hdd_folders_reinit(void) {
 	}
 
 	if (!fd) {
+		if (errno==ENOENT) {
+			mfs_arg_syslog(LOG_WARNING,"hdd space configuration file (%s) not found",hddfname);
+		} else {
+			mfs_arg_errlog(LOG_WARNING,"can't open hdd space configuration file (%s), error",hddfname);
+		}
 		free(hddfname);
 		return -1;
 	}

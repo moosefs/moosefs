@@ -492,7 +492,11 @@ static void mfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse
 	fd = fopen(filename,"r");
 	if (fd==NULL) {
 		if (optional==0) {
-			fprintf(stderr,"can't open cfg file: %s\n",filename);
+			if (errno==ENOENT) {
+				fprintf(stderr,"cfg file (%s) doesn't exist\n",filename);
+			} else {
+				fprintf(stderr,"can't open cfg file (%s), error: %s\n",filename,strerr(errno));
+			}
 			abort();
 		}
 		return;
@@ -611,7 +615,7 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 			fuse_opt_add_arg(&helpargs,outargs->argv[0]);
 			fuse_opt_add_arg(&helpargs,"--version");
 			fuse_parse_cmdline(&helpargs,NULL,NULL,NULL);
-			fuse_mount(NULL,&helpargs);
+			fuse_mount("",&helpargs);
 		}
 #endif
 		exit(0);

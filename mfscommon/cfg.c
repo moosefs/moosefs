@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 #ifdef WIN32
 #include "portable.h"
 #else
@@ -33,6 +34,7 @@
 
 #include "cfg.h"
 #include "massert.h"
+#include "strerr.h"
 #ifdef WIN32
 #include <stdarg.h>
 static inline void mfs_arg_syslog(uint8_t level,const char *format,...) {
@@ -66,7 +68,11 @@ int cfg_reload (void) {
 
 	fd = fopen(cfgfname,"r");
 	if (fd==NULL) {
-		mfs_arg_syslog(LOG_ERR,"cannot load config file: %s",cfgfname);
+		if (errno==ENOENT) {
+			mfs_arg_syslog(LOG_ERR,"main config file (%s) not found",cfgfname);
+		} else {
+			mfs_arg_syslog(LOG_ERR,"can't load main config file (%s), error: %s",cfgfname,strerr(errno));
+		}
 		return 0;
 	}
 	while (paramhead!=NULL) {

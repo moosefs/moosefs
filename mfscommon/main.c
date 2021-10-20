@@ -1402,14 +1402,6 @@ int main(int argc,char **argv) {
 		mfs_syslog(LOG_WARNING,"default sysconf path has changed - please move " STR(APPNAME) ".cfg from "ETC_PATH"/ to "ETC_PATH"/mfs/");
 	}
 
-	if (runmode==RM_START || runmode==RM_RESTART || runmode==RM_TRY_RESTART) {
-		if (rundaemon) {
-			makedaemon();
-		} else {
-			set_signal_handlers(0);
-		}
-	}
-
 	if (cfg_load(cfgfile,logundefined)==0) {
 		if (userconfig) {
 			if (rundaemon) {
@@ -1422,6 +1414,14 @@ int main(int argc,char **argv) {
 		fprintf(stderr,"can't load config file: %s - using defaults\n",cfgfile);
 	}
 	free(cfgfile);
+
+	if (runmode==RM_START || runmode==RM_RESTART || runmode==RM_TRY_RESTART) {
+		if (rundaemon) {
+			makedaemon();
+		} else {
+			set_signal_handlers(0);
+		}
+	}
 
 	processname_init(argc_back,argv_back); // prepare everything for 'processname_set'
 

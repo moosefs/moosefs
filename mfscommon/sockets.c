@@ -794,6 +794,12 @@ int tcpgetpeer(int sock,uint32_t *ip,uint16_t *port) {
 	socklen_t leng;
 	leng=sizeof(sa);
 	if (getpeername(sock,(struct sockaddr *)&sa,&leng)<0) {
+		if (ip!=(void *)0) {
+			*ip = 0;
+		}
+		if (port!=(void *)0) {
+			*port = 0;
+		}
 		return -1;
 	}
 	if (ip!=(void *)0) {
@@ -810,6 +816,12 @@ int tcpgetmyaddr(int sock,uint32_t *ip,uint16_t *port) {
 	socklen_t leng;
 	leng=sizeof(sa);
 	if (getsockname(sock,(struct sockaddr *)&sa,&leng)<0) {
+		if (ip!=(void *)0) {
+			*ip = 0;
+		}
+		if (port!=(void *)0) {
+			*port = 0;
+		}
 		return -1;
 	}
 	if (ip!=(void *)0) {

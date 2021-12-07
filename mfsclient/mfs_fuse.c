@@ -2663,6 +2663,7 @@ void mfs_readlink(fuse_req_t req, fuse_ino_t ino) {
 	const uint8_t *cpath;
 	struct fuse_ctx ctx;
 
+	cpath = NULL;
 	ctx = *(fuse_req_ctx(req));
 	if (debug_mode) {
 		oplog_printf(&ctx,"readlink (%lu) ...",(unsigned long int)ino);
@@ -5531,6 +5532,14 @@ int mfs_getfacl(fuse_req_t req,fuse_ino_t ino,/*uint8_t opened,uint32_t uid,uint
 	(void)req;
 	*buff = NULL;
 	*leng = 0;
+
+	userperm = 0;
+	groupperm = 0;
+	otherperm = 0;
+	maskperm = 0;
+	namedusers = 0;
+	namedgroups = 0;
+
 	status = fs_getfacl(ino,/*opened,uid,gids,gid,*/aclxattr,&userperm,&groupperm,&otherperm,&maskperm,&namedusers,&namedgroups,&namedacls,&namedaclssize);
 
 	if (status!=MFS_STATUS_OK) {

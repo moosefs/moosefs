@@ -3402,6 +3402,8 @@ void chunk_do_jobs(chunk *c,uint16_t scount,uint16_t fullservers,uint32_t now,ui
 	uint8_t debug;
 #endif
 
+	labelmasks = NULL;
+
 	if (servers==NULL) {
 		servers = malloc(sizeof(uint16_t)*MAXCSCOUNT);
 		passert(servers);

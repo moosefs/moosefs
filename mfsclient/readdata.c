@@ -671,6 +671,10 @@ void* read_worker(void *arg) {
 
 		chunkrwlock_rlock(inode,chindx);
 
+		mfleng = 0;
+		chunkid = 0;
+		version = 0;
+		csdataver = 0;
 		csdatasize = 1024; // pipebuff here is used as a temporary data buffer
 		if (master_version()>=VERSION2INT(3,0,74) && chunksdatacache_find(inode,chindx,&chunkid,&version,&csdataver,pipebuff,&csdatasize)) {
 			rdstatus = MFS_STATUS_OK;

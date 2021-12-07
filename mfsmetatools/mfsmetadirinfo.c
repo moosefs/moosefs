@@ -549,10 +549,10 @@ int calc_dirinfos(FILE *fd) {
 	dirinfostate *dis;
 
 	fseeko(fd,8+16,SEEK_SET);
-	edge.offset = 0;
-	node.offset = 0;
-	scla.offset = 0;
-	chnk.offset = 0;
+	memset(&edge,0,sizeof(metasection));
+	memset(&node,0,sizeof(metasection));
+	memset(&scla,0,sizeof(metasection));
+	memset(&chnk,0,sizeof(metasection));
 
 	// find metadata file sections
 	while (1) {

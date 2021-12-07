@@ -742,6 +742,10 @@ void* write_worker(void *arg) {
 		min_offset = 0;
 		max_offset = 0;
 
+		version = 0;
+		chunkid = 0;
+		csdataver = 0;
+
 		// syslog(LOG_NOTICE,"file: %"PRIu32", index: %"PRIu16" - debug1",inode,chindx);
 		// get chunk data from master
 //		start = monotonic_seconds();

@@ -71,6 +71,8 @@
 // force disconnection X seconds after term signal
 #define FORCE_DISCONNECTION_TO 5.0
 
+#define MYSIZE(s,f,a) ((offsetof(s,f)+(a)<sizeof(s))?sizeof(s):(offsetof(s,f)+(a)))
+
 // mode
 enum {FREE,CONNECTING,DATA,KILL,CLOSE};
 
@@ -1116,7 +1118,7 @@ void masterconn_get_chunk_blocks(masterconn *eptr,const uint8_t *data,uint32_t l
 		eptr->mode = KILL;
 		return;
 	}
-	ij = malloc(offsetof(idlejob,buff)+2);
+	ij = malloc(MYSIZE(idlejob,buff,2));
 	ij->op = IJ_GET_CHUNK_BLOCKS;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);
@@ -1135,7 +1137,7 @@ void masterconn_get_chunk_checksum(masterconn *eptr,const uint8_t *data,uint32_t
 		eptr->mode = KILL;
 		return;
 	}
-	ij = malloc(offsetof(idlejob,buff)+4);
+	ij = malloc(MYSIZE(idlejob,buff,4));
 	ij->op = IJ_GET_CHUNK_CHECKSUM;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);
@@ -1154,7 +1156,7 @@ void masterconn_get_chunk_checksum_tab(masterconn *eptr,const uint8_t *data,uint
 		eptr->mode = KILL;
 		return;
 	}
-	ij = malloc(offsetof(idlejob,buff)+4*MFSBLOCKSINCHUNK);
+	ij = malloc(MYSIZE(idlejob,buff,4*MFSBLOCKSINCHUNK));
 	ij->op = IJ_GET_CHUNK_CHECKSUM_TAB;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);

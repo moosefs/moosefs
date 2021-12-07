@@ -443,6 +443,8 @@ static inline int matoclserv_fuse_truncate_common(matoclserventry *eptr,uint32_t
 	uint64_t chunkid;
 //	uint8_t locked;
 
+	chunkid = 0;
+
 	status = MFS_STATUS_OK;
 	disables = sessions_get_disables(eptr->sesdata);
 	if (flags & (TRUNCATE_FLAG_RESERVE|TRUNCATE_FLAG_UPDATE)) { // part of write - not actual truncate
@@ -3881,6 +3883,7 @@ void matoclserv_fuse_getxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	}
 	opened = 0; // makes gcc happy
 	gid = NULL; // makes gcc happy
+	uid = 0;
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
 	if (eptr->version<VERSION2INT(2,0,0)) {
@@ -4323,6 +4326,14 @@ void matoclserv_fuse_quotacontrol(matoclserventry *eptr,const uint8_t *data,uint
 		hrealsize = get64bit(&data);
 		del=0;
 	} else {
+		sinodes = 0;
+		slength = 0;
+		ssize = 0;
+		srealsize = 0;
+		hinodes = 0;
+		hlength = 0;
+		hsize = 0;
+		hrealsize = 0;
 		del=1;
 	}
 	if (flags && sessions_is_root_remapped(eptr->sesdata)) {

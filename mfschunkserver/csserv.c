@@ -52,6 +52,8 @@
 
 #define MaxPacketSize CSTOCS_MAXPACKETSIZE
 
+#define MYSIZE(s,f,a) ((offsetof(s,f)+(a)<sizeof(s))?sizeof(s):(offsetof(s,f)+(a)))
+
 //csserventry.mode
 enum {HEADER,DATA};
 
@@ -332,7 +334,7 @@ void csserv_get_chunk_blocks(csserventry *eptr,const uint8_t *data,uint32_t leng
 		eptr->state = CLOSE;
 		return;
 	}
-	ij = malloc(offsetof(idlejob,buff)+2);
+	ij = malloc(MYSIZE(idlejob,buff,2));
 	ij->op = IJ_GET_CHUNK_BLOCKS;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);
@@ -351,7 +353,7 @@ void csserv_get_chunk_checksum(csserventry *eptr,const uint8_t *data,uint32_t le
 		eptr->state = CLOSE;
 		return;
 	}
-	ij = malloc(offsetof(idlejob,buff)+4);
+	ij = malloc(MYSIZE(idlejob,buff,4));
 	ij->op = IJ_GET_CHUNK_CHECKSUM;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);
@@ -370,7 +372,7 @@ void csserv_get_chunk_checksum_tab(csserventry *eptr,const uint8_t *data,uint32_
 		eptr->state = CLOSE;
 		return;
 	}
-	ij = malloc(offsetof(idlejob,buff)+4096);
+	ij = malloc(MYSIZE(idlejob,buff,4096));
 	ij->op = IJ_GET_CHUNK_CHECKSUM_TAB;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);

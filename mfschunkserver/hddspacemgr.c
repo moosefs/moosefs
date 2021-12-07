@@ -1490,6 +1490,10 @@ static int hdd_chunk_get(uint64_t chunkid,chunk **cptr,uint8_t cflag) {
 //			printbacktrace();
 			if (hdd_timed_wait(&(c->ccond->cond),&hashlock,LOCKED_CHUNK_WAIT_USECS)!=0) { // do not wait for chunk too long
 				syslog(LOG_WARNING,"hdd_chunk_get: chunk %016"PRIX64" locked too long - giving up",chunkid);
+				c->ccond->wcnt--;
+				if (c->ccond->wcnt==0) {
+					c->ccond = NULL;
+				}
 				zassert(pthread_mutex_unlock(&hashlock));
 				return 2;
 			}

@@ -6099,7 +6099,10 @@ if "RS" in sectionset and leaderfound:
 						out.append("""		<td align="center"><span class="ERROR">NO</span></td>""")
 					labelsarr = []
 					for labelstr,mscount in arch_labellist:
-						msperc = (1.0 * mscount) / scount
+						if scount==0:
+							msperc = 0;
+						else:
+							msperc = (1.0 * mscount) / scount
 						perccolor = (int(zerocolor[0]+(allcolor[0]-zerocolor[0])*msperc),int(zerocolor[1]+(allcolor[1]-zerocolor[1])*msperc),int(zerocolor[2]+(allcolor[2]-zerocolor[2])*msperc))
 						color = "#%02X%02X%02X" % perccolor
 						labelsarr.append("""<span style="color:%s"><a style="cursor:default" title="%u/%u servers">%s</a></span>""" % (color,mscount,scount,labelstr))

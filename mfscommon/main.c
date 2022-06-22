@@ -1666,7 +1666,7 @@ int main(int argc,char **argv) {
 		}
 		ch=1;
 	}
-	mfs_syslog(LOG_NOTICE,"exititng ...");
+	mfs_syslog(LOG_NOTICE,"exiting ...");
 	destruct();
 	free_all_registered_entries();
 	signal_cleanup();

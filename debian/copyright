@@ -3,7 +3,7 @@ Upstream-Name: MooseFS
 Source: http://ppa.moosefs.com/src
 
 Files: *
-Copyright: Copyright 2005-2016 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright: Copyright 2005-2022 Jakub Kruszona-Zawadzki, Tappest sp. z o.o.
 License: GPL-2
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public
@@ -26,7 +26,7 @@ License: GPL-2
  `/usr/share/common-licenses/GPL-2'.
 
 Files: debian/*
-Copyright: Copyright 2008 Jakub Bogusz, Copyright 2009-2016 Jakub Kruszona-Zawadzki
+Copyright: Copyright 2008 Jakub Bogusz, Copyright 2009-2022 Jakub Kruszona-Zawadzki
 License: GPL-2+
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public

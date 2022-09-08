@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2021 Jakub Kruszona-Zawadzki, Core Technology Sp. z o.o.
+Copyright (C) 2022 Jakub Kruszona-Zawadzki, Tappest sp. z o.o.
 
 This file is part of MooseFS.
 

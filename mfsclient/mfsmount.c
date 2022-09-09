@@ -605,7 +605,7 @@ static int mfs_opt_proc_stage2(void *data, const char *arg, int key, struct fuse
 		mfsopts.nostdmountoptions = 1;
 		return 0;
 	case KEY_VERSION:
-		fprintf(stderr, "MFS version %s\n",VERSSTR);
+		fprintf(stderr, "MFS version: %s ; build: %s\n",VERSSTR,STR(BUILDNO));
 #if FUSE_VERSION >= 30
 		fuse_lowlevel_version();
 #else

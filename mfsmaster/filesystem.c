@@ -8008,8 +8008,7 @@ void fs_cleanup(void) {
 	appendres_cleanall();
 }
 
-static inline void fs_storeedge(fsedge *e,bio *fd) {
-	uint8_t uedgebuff[4+4+8+2+65535];
+static inline void fs_storeedge(fsedge *e,bio *fd,uint8_t *uedgebuff) {
 	uint8_t *ptr;
 	if (e==NULL) {	// last edge
 		memset(uedgebuff,0,4+4+8+2);
@@ -8342,8 +8341,7 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 	return 0;
 }
 
-static inline void fs_storenode(fsnode *f,bio *fd) {
-	uint8_t unodebuff[1+4+1+1+1+2+4+4+4+4+4+2+8+4+2+8*65536+4*65536+4];
+static inline void fs_storenode(fsnode *f,bio *fd,uint8_t *unodebuff) {
 	uint8_t *ptr,*chptr;
 	uint32_t i,indx,ch;
 
@@ -8439,8 +8437,7 @@ static inline void fs_storenode(fsnode *f,bio *fd) {
 	}
 }
 
-static inline int fs_loadnode(bio *fd,uint8_t mver) {
-	uint8_t unodebuff[4+1+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4];
+static inline int fs_loadnode(bio *fd,uint8_t mver,uint8_t *unodebuff) {
 	const uint8_t *ptr,*chptr;
 	uint8_t type;
 	uint32_t trashseconds;
@@ -8719,6 +8716,7 @@ static inline int fs_loadnode(bio *fd,uint8_t mver) {
 
 uint8_t fs_storenodes(bio *fd) {
 	uint32_t i;
+	uint8_t *auxbuff;
 	uint8_t hdr[8];
 	uint8_t *ptr;
 	fsnode *p;
@@ -8733,34 +8731,37 @@ uint8_t fs_storenodes(bio *fd) {
 		return 0xFF;
 	}
 
+	auxbuff = malloc(1+4+1+1+1+2+4+4+4+4+4+2+8+4+2+8*65536+4*65536+4);
 	for (i=0 ; i<noderehashpos ; i++) {
 		for (p=nodehashtab[i>>HASHTAB_LOBITS][i&HASHTAB_MASK] ; p && bio_error(fd)==0 ; p=p->next) {
-			fs_storenode(p,fd);
+			fs_storenode(p,fd,auxbuff);
 		}
 	}
-	fs_storenode(NULL,fd);	// end marker
+	free(auxbuff);
+	fs_storenode(NULL,fd,NULL);	// end marker
 	return 0;
 }
 
-static inline void fs_storeedgelist(fsedge *e,bio *fd) {
+static inline void fs_storeedgelist(fsedge *e,bio *fd,uint8_t *auxbuff) {
 	while (e && bio_error(fd)==0) {
-		fs_storeedge(e,fd);
+		fs_storeedge(e,fd,auxbuff);
 		e=e->nextchild;
 	}
 }
 
-static inline void fs_storeedges_rec(fsnode *f,bio *fd) {
+static inline void fs_storeedges_rec(fsnode *f,bio *fd,uint8_t *auxbuff) {
 	fsedge *e;
-	fs_storeedgelist(f->data.ddata.children,fd);
+	fs_storeedgelist(f->data.ddata.children,fd,auxbuff);
 	for (e=f->data.ddata.children ; e && bio_error(fd)==0 ; e=e->nextchild) {
 		if (e->child->type==TYPE_DIRECTORY) {
-			fs_storeedges_rec(e->child,fd);
+			fs_storeedges_rec(e->child,fd,auxbuff);
 		}
 	}
 }
 
 uint8_t fs_storeedges(bio *fd) {
 	uint32_t bid;
+	uint8_t *auxbuff;
 	uint8_t hdr[8];
 	uint8_t *ptr;
 
@@ -8774,14 +8775,18 @@ uint8_t fs_storeedges(bio *fd) {
 		return 0xFF;
 	}
 
-	fs_storeedges_rec(root,fd);
+	auxbuff = malloc(4+4+8+2+65535);
+	fs_storeedges_rec(root,fd,auxbuff);
 	for (bid=0 ; bid<TRASH_BUCKETS ; bid++) {
-		fs_storeedgelist(trash[bid],fd);
+		fs_storeedgelist(trash[bid],fd,auxbuff);
 	}
 	for (bid=0 ; bid<SUSTAINED_BUCKETS ; bid++) {
-		fs_storeedgelist(sustained[bid],fd);
+		fs_storeedgelist(sustained[bid],fd,auxbuff);
 	}
-	fs_storeedge(NULL,fd);	// end marker
+
+	fs_storeedge(NULL,fd,auxbuff);	// end marker
+	free(auxbuff);
+
 	return 0;
 }
 
@@ -8834,21 +8839,25 @@ int fs_checknodes(int ignoreflag) {
 
 int fs_importnodes(bio *fd,uint32_t mni) {
 	int s;
+	uint8_t *auxbuff;
 	maxnodeid = mni;
 	hashelements = 1;
 
 	fsnodes_init_freebitmask();
 
-	fs_loadnode(NULL,0);
+	auxbuff = malloc(4+1+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4);
+	fs_loadnode(NULL,0,NULL);
 	do {
-		s = fs_loadnode(fd,0x10);
+		s = fs_loadnode(fd,0x10,auxbuff);
 	} while (s==0);
+	free(auxbuff);
 
 	return (s<0)?-1:0;
 }
 
 int fs_loadnodes(bio *fd,uint8_t mver) {
 	int s;
+	uint8_t *auxbuff;
 	uint8_t hdr[8];
 	const uint8_t *ptr;
 
@@ -8869,10 +8878,12 @@ int fs_loadnodes(bio *fd,uint8_t mver) {
 	}
 	fsnodes_init_freebitmask();
 
-	fs_loadnode(NULL,0);
+	auxbuff = malloc(4+1+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4);
+	fs_loadnode(NULL,0,NULL);
 	do {
-		s = fs_loadnode(fd,mver);
+		s = fs_loadnode(fd,mver,auxbuff);
 	} while (s==0);
+	free(auxbuff);
 
 	return (s<0)?-1:0;
 }

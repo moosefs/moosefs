@@ -10,6 +10,7 @@ This file lists noteworthy changes in MooseFS.
   - (cgi+cli) fixed division by zero when scount is zero in arch mode (no chunkservers - issue #412)
   - (client) fixed freeing atime/mtime data structure
   - (client) added displaying build number
+  - (master) silenced more wrong compiler warnings
 
 * MooseFS 3.0.116-1 (2021-08-10)
 

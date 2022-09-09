@@ -3976,6 +3976,7 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 		return;
 	}
 	opened = 0; // makes gcc happy
+	uid = 0; // makes gcc happy
 	gid = NULL; // makes gcc happy
 	msgid = get32bit(&data);
 	inode = get32bit(&data);
@@ -4326,6 +4327,7 @@ void matoclserv_fuse_quotacontrol(matoclserventry *eptr,const uint8_t *data,uint
 		hrealsize = get64bit(&data);
 		del=0;
 	} else {
+		graceperiod = 0; // makes gcc happy
 		sinodes = 0;
 		slength = 0;
 		ssize = 0;

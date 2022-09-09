@@ -2676,7 +2676,7 @@ void fs_term(void) {
 	for (i=0 ; i<AMTIME_HASH_SIZE ; i++) {
 		for (amf = amtime_hash[i] ; amf ; amf = amfn) {
 			amfn = amf->next;
-			free(amfn);
+			free(amf);
 		}
 	}
 	if (fd>=0) {

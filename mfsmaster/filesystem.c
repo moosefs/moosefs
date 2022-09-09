@@ -4580,6 +4580,7 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 	if (!fsnodes_access_ext(wd,uid,gids,gid,MODE_MASK_X,sesflags)) {
 		return MFS_ERROR_EACCES;
 	}
+	p = NULL;
 	if (name[0]=='.') {
 		if (nleng==1) {	// self
 			if (parent==rootinode) {
@@ -4587,14 +4588,12 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 			} else {
 				*inode = wd->inode;
 			}
-			fsnodes_fill_attr(wd,wd,uid,gid[0],auid,agid,sesflags,attr,1);
-			stats_lookup++;
-			return MFS_STATUS_OK;
+			p = wd;
 		}
 		if (nleng==2 && name[1]=='.') {	// parent
 			if (parent==rootinode) {
 				*inode = MFS_ROOT_ID;
-				fsnodes_fill_attr(wd,wd,uid,gid[0],auid,agid,sesflags,attr,1);
+				p = wd;
 			} else {
 				if (wd->parents) {
 					if (wd->parents->parent->inode==rootinode) {
@@ -4602,29 +4601,29 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 					} else {
 						*inode = wd->parents->parent->inode;
 					}
-					fsnodes_fill_attr(wd->parents->parent,wd,uid,gid[0],auid,agid,sesflags,attr,1);
+					p = wd->parents->parent;
 				} else {
 					*inode=MFS_ROOT_ID; // rn->inode;
-					fsnodes_fill_attr(rn,wd,uid,gid[0],auid,agid,sesflags,attr,1);
+					p = rn;
 				}
 			}
-			stats_lookup++;
-			return MFS_STATUS_OK;
 		}
 	}
-	if (fsnodes_namecheck(nleng,name)<0) {
-		return MFS_ERROR_EINVAL;
-	}
-	e = fsnodes_lookup(wd,nleng,name);
-	if (!e) {
-		if (wd->eattr&EATTR_NOECACHE) {
-			return MFS_ERROR_ENOENT_NOCACHE;
-		} else {
-			return MFS_ERROR_ENOENT;
+	if (p==NULL) {
+		if (fsnodes_namecheck(nleng,name)<0) {
+			return MFS_ERROR_EINVAL;
 		}
+		e = fsnodes_lookup(wd,nleng,name);
+		if (!e) {
+			if (wd->eattr&EATTR_NOECACHE) {
+				return MFS_ERROR_ENOENT_NOCACHE;
+			} else {
+				return MFS_ERROR_ENOENT;
+			}
+		}
+		p = e->child;
+		*inode = p->inode;
 	}
-	p = e->child;
-	*inode = p->inode;
 	if (filenode) {
 		*filenode = (p->type==TYPE_FILE || p->type==TYPE_TRASH || p->type==TYPE_SUSTAINED)?1:0;
 	}

@@ -12,6 +12,7 @@ This file lists noteworthy changes in MooseFS.
   - (client) added displaying build number
   - (master) silenced more wrong compiler warnings
   - (nbd) added option to ignore locks (issue #353)
+  - (master) fixed file mode in changelog (problem with mask when parent has default acl's)
 
 * MooseFS 3.0.116-1 (2021-08-10)
 

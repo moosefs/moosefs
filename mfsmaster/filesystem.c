@@ -5164,6 +5164,7 @@ uint8_t fs_mr_symlink(uint32_t ts,uint32_t parent,uint32_t nleng,const uint8_t *
 
 uint8_t fs_univ_create(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint8_t type,uint16_t mode,uint16_t cumask,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint32_t rdev,uint8_t copysgid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE],uint8_t *oflags) {
 	fsnode *wd,*p;
+	uint16_t chlogmode;
 	*inode = 0;
 	if (attr) {
 		memset(attr,0,ATTR_RECORD_SIZE);
@@ -5213,7 +5214,12 @@ uint8_t fs_univ_create(uint32_t ts,uint32_t rootinode,uint8_t sesflags,uint32_t 
 				(*oflags) |= OPEN_APPENDONLY;
 			}
 		}
-		changelog("%"PRIu32"|CREATE(%"PRIu32",%s,%"PRIu8",%"PRIu16",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32"):%"PRIu32,ts,parent,changelog_escape_name(nleng,name),type,(uint16_t)(p->mode),cumask,p->uid,p->gid,rdev,p->inode);
+		chlogmode = mode;
+		if (copysgid && type==TYPE_DIRECTORY) {
+			chlogmode &= 0xFBFF;
+			chlogmode |= (p->mode & 0x0400);
+		}
+		changelog("%"PRIu32"|CREATE(%"PRIu32",%s,%"PRIu8",%"PRIu16",%"PRIu16",%"PRIu32",%"PRIu32",%"PRIu32"):%"PRIu32,ts,parent,changelog_escape_name(nleng,name),type,chlogmode,cumask,p->uid,p->gid,rdev,p->inode);
 	} else {
 		meta_version_inc();
 	}

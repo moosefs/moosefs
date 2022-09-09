@@ -3799,17 +3799,15 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 				dstnode->mode = srcnode->mode;
 				dstnode->uid = srcnode->uid;
 				dstnode->gid = srcnode->gid;
-				dstnode->atime = srcnode->atime;
-				dstnode->mtime = srcnode->mtime;
-				dstnode->ctime = args->ts;
+				dstnode->ctime = srcnode->ctime;
 			} else {
 				dstnode->mode = srcnode->mode & 0x3FF; // clear suid/sgid
 				dstnode->uid = args->uid;
 				dstnode->gid = args->gid[0];
-				dstnode->atime = srcnode->atime;
-				dstnode->mtime = srcnode->mtime;
 				dstnode->ctime = args->ts;
 			}
+			dstnode->atime = srcnode->atime;
+			dstnode->mtime = srcnode->mtime;
 		}
 		dstnode->eattr |= EATTR_SNAPSHOT;
 	} else { // new element
@@ -3849,8 +3847,6 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 				if (args->uid!=0 && args->uid!=srcnode->uid) {
 					dstnode->mode &= 0x3FF; // clear suid+sgid
 				}
-				dstnode->atime = srcnode->atime;
-				dstnode->mtime = srcnode->mtime;
 				if (srcnode->xattrflag) {
 					dstnode->xattrflag = xattr_copy(srcnode->inode,dstnode->inode);
 				}
@@ -3899,6 +3895,11 @@ static inline void fsnodes_snapshot(fsnode *srcnode,fsnode *parentnode,uint32_t 
 				fsnodes_add_sub_stats(parentnode,&nsr,&psr);
 			} else if (srcnode->type==TYPE_BLOCKDEV || srcnode->type==TYPE_CHARDEV) {
 				dstnode->data.devdata.rdev = srcnode->data.devdata.rdev;
+			}
+			if ((args->smode&SNAPSHOT_MODE_CPLIKE_ATTR)==0) {
+				dstnode->atime = srcnode->atime;
+				dstnode->mtime = srcnode->mtime;
+				dstnode->ctime = srcnode->ctime;
 			}
 			dstnode->eattr |= EATTR_SNAPSHOT;
 		}

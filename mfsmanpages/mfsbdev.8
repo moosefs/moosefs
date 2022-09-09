@@ -20,6 +20,7 @@ mfsbdev \- \fBMooseFS\fP block device daemon/management tool
 [\fB-n\fP \fIlinkname\fP]
 [\fB-s\fP \fIbdevsize\fP]
 [\fB-r\fP]
+[\fB-i\fP]
 .PP
 .B mfsbdev unmap
 [\fB-l\fP \fIlinksocket\fP]
@@ -102,10 +103,14 @@ of the file the block device is mapped to
 .B -r
 - maps block device as readonly (allows multiple mappings of the same file)
 .PP
+.B -i
+- ignore locks; one file may be mapped to more than one block device, each map operation will try 
+to obtain the appropriate lock (shared for ro, exclusive for rw) but will succed even if 
+the lock is not obtained
+.PP
 .B -t
 - forces the list command to display information in a format ready to use with
 map (m parameter) or unmap (u parameter) command
-
 .SH EXAMPLES
 .PP
 .B mfsbdev start

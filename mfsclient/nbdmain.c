@@ -136,6 +136,7 @@ MFSNBD_RESIZE:
 */
 
 #define FLAG_READONLY 1
+#define FLAG_IGNORELOCK 2
 
 typedef struct nbdcommon {
 	char *linkname;
@@ -673,8 +674,10 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	}
 
 	if (mfs_flock(nbdcp->mfsfd,lmode|LOCK_NB)<0) {
-		nbd_start_err_msg("MFS file %s is locked (likely mapped elsewhere)",nbdcp->mfsfile);
-		goto err4;
+		if ((nbdcp->flags & FLAG_IGNORELOCK) == 0) {
+			nbd_start_err_msg("MFS file %s is locked (likely mapped elsewhere)",nbdcp->mfsfile);
+			goto err4;
+		}
 	}
 
 	if (nbdcp->fsize==0) {
@@ -1661,7 +1664,7 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 	flags = 0;
 	res = 1;
 
-	while ((ch = getopt(argc, argv, "l:f:d:n:s:r?")) != -1) {
+	while ((ch = getopt(argc, argv, "l:f:d:n:s:ri?")) != -1) {
 		switch (ch) {
 			case 'l':
 				if (lsockname!=NULL) {
@@ -1696,6 +1699,9 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 				break;
 			case 'r':
 				flags |= FLAG_READONLY;
+				break;
+			case 'i':
+				flags |= FLAG_IGNORELOCK;
 				break;
 			case 'h':
 			default:
@@ -2386,10 +2392,13 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 				if (flags & FLAG_READONLY) {
 					printf(" -r");
 				}
+				if (flags & FLAG_IGNORELOCK) {
+					printf(" -i");
+				}
 			}
 			printf("\n");
 		} else {
-			printf("file: %s ; device: %s ; link: %s ; size: %"PRIu64" (%.3lfGiB) ; rwmode: %s\n",(path==NULL)?"":path,(device==NULL)?"":device,(linkname==NULL)?"":linkname,size,size/(1024.0*1024.0*1024.0),(flags & FLAG_READONLY)?"ro":"rw");
+			printf("file: %s ; device: %s ; link: %s ; size: %"PRIu64" (%.3lfGiB) ; rwmode: %s ; ignore_locks:%s\n",(path==NULL)?"":path,(device==NULL)?"":device,(linkname==NULL)?"":linkname,size,size/(1024.0*1024.0*1024.0),(flags & FLAG_READONLY)?"ro":"rw",(flags & FLAG_IGNORELOCK)?"yes":"no");
 		}
 		if (path!=NULL) {
 			free(path);

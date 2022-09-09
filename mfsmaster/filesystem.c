@@ -9215,7 +9215,7 @@ void fs_reload(void) {
 	} else {
 		QuotaDefaultGracePeriod = cfg_getuint32("QUOTA_DEFAULT_GRACE_PERIOD",604800);
 	}
-	AtimeMode = cfg_getuint8("ATIME_MODE",0);
+	AtimeMode = cfg_getuint8("ATIME_MODE",2);
 	if (AtimeMode>ATIME_NEVER) {
 		syslog(LOG_NOTICE,"unrecognized value for ATIME_MODE - using defaults");
 		AtimeMode = 0;

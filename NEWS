@@ -15,6 +15,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed file mode in changelog (problem with mask when parent has default acl's)
   - (master) reduced function stack frame usage (slow down due to use -fstack-clash-protection by some OS'es)
   - (master) fixed handling '..' and '.' in fs_lookup (issue #473)
+  - (all) using SIGUSR1 instead of SIGINFO even on system where SIGINFO is defined
 
 * MooseFS 3.0.116-1 (2021-08-10)
 

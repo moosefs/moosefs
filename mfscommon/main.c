@@ -1055,10 +1055,12 @@ uint8_t wdlock(uint8_t runmode,uint32_t timeout) {
 			return 0;
 		}
 		if (runmode==RM_INFO) {
-#ifdef SIGINFO
+#if defined(SIGUSR1)
+			if (kill(ownerpid,SIGUSR1)<0) {
+#elif defined(SIGINFO)
 			if (kill(ownerpid,SIGINFO)<0) {
 #else
-			if (kill(ownerpid,SIGUSR1)<0) {
+			if (1) {
 #endif
 				mfs_errlog(LOG_WARNING,"can't send info signal to lock owner");
 				return 1;

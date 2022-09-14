@@ -201,7 +201,8 @@ void sinodes_pid_inodes(pid_t pid) {
 #elif defined(__FreeBSD__)
 	struct kinfo_file *kif;
 	uint8_t *p;
-	size_t len, olen;
+	size_t len;
+	int i;
 	int name[4];
 	int error;
 
@@ -211,17 +212,18 @@ void sinodes_pid_inodes(pid_t pid) {
 	name[2] = KERN_PROC_FILEDESC;
 	name[3] = pid;
 	p = NULL;
-	if (sysctl(name, 4, NULL, &len, NULL, 0)<0) {
-		if (errno!=ESRCH && errno!=EBUSY) {
-			mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
-		}
-		return;
-	}
-	if (len==0) {
-		return;
-	}
+	i = 0;
 	do {
-		len += len / 10;
+		if (sysctl(name, 4, NULL, &len, NULL, 0)<0) {
+			if (errno!=ESRCH && errno!=EBUSY) {
+				mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
+			}
+			return;
+		}
+		if (len==0) {
+			return;
+		}
+		len += len / 2;
 		if (p!=NULL) {
 			free(p);
 		}
@@ -229,9 +231,9 @@ void sinodes_pid_inodes(pid_t pid) {
 		if (p == NULL) {
 			return;
 		}
-		olen = len;
 		error = sysctl(name, 4, p, &len, NULL, 0);
-	} while (error < 0 && errno == ENOMEM && olen == len);
+		i++;
+	} while (error < 0 && errno == ENOMEM && i < 10);
 	if (error<0) {
 		if (errno!=ESRCH && errno!=EBUSY) {
 			mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");

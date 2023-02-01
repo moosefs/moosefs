@@ -1,6 +1,6 @@
 This file lists noteworthy changes in MooseFS.
 
-* MooseFS 3.0.117-1 (WIP)
+* MooseFS 3.0.117-1 (2023-02-01)
 
   - (master) fixed handling abnormal operation status (issue #456)
   - (master+cs) added error message when a config file can't be loaded (issue #457)

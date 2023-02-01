@@ -3,7 +3,7 @@ Upstream-Name: MooseFS
 Source: http://ppa.moosefs.com/src
 
 Files: *
-Copyright: Copyright 2005-2022 Jakub Kruszona-Zawadzki, Tappest sp. z o.o.
+Copyright: Copyright 2005-2023 Jakub Kruszona-Zawadzki, Saglabs SA
 License: GPL-2
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public

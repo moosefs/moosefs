@@ -201,7 +201,7 @@
 #  2 - Modify atime only when it is lower than ctime or mtime and when current time is higher than ctime or mtime respectively, also modify atime when current atime is older than 24h. Do it for all objects during access (like "relatime" option in Linux).
 #  3 - Same as above but only in case of files. In case of folders and symlinks do not modify atime.
 #  4 - Never modify atime during access (like "noatime" option).
-# ATIME_MODE = 0
+# ATIME_MODE = 2
 
 # Define amount of space reserved for superuser only (default is 0)
 #  #B or #    - amount defined in bytes (you can use metric prefixes - SI and IEC binary prefixes)

@@ -38,7 +38,6 @@ MooseFS can be installed on any POSIX compliant operating system including vario
 * OpenSUSE
 * FreeBSD
 * macOS
-* Raspbian – Raspberry Pi 3
 
 MooseFS Linux Client uses [FUSE](https://github.com/libfuse/libfuse). MooseFS macOS Client uses [FUSE for macOS](https://github.com/osxfuse/osxfuse).
 
@@ -47,12 +46,13 @@ There is a separate MooseFS Client for Microsoft Windows available, built on top
 ## Getting started
 You can install MooseFS using your favourite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download):
 
-* Ubuntu 16 / 18 / 20
-* Debian 8 / 9 / 10
-* RHEL / CentOS 7 / 8
-* FreeBSD 11 / 12
+* Ubuntu 16 / 18 / 20 / 22
+* Debian 8 / 9 / 10 / 11
+* RHEL / CentOS 7 / 8 / 9
+* FreeBSD 11 / 12 / 13
 * macOS 10.11+
-* Raspbian 8 / 9 – Raspberry Pi 3
+* Ubuntu 20 / 22 – Raspberry Pi
+* Debian 10 / 11 – Raspberry Pi
 
 Packages for Ubuntu 14 and CentOS 6 are also available, but no longer supported.
 
@@ -173,12 +173,12 @@ Refer to [installation guides](https://moosefs.com/support/#documentation) for m
 * (Old) Sourceforge project site: http://sourceforge.net/projects/moosefs
 
 ## Contact us
-* Reporting bugs: [GitHub issue](https://github.com/moosefs/moosefs/issues) or [support@moosefs.pro](mailto:support@moosefs.pro)
-* General: [contact@moosefs.pro](mailto:contact@moosefs.pro)
+* Reporting bugs: [GitHub issue](https://github.com/moosefs/moosefs/issues) or [support@moosefs.com](mailto:support@moosefs.com)
+* General: [contact@moosefs.com](mailto:contact@moosefs.com)
 
 
 ## Copyright
-Copyright (c) 2008-2022 Jakub Kruszona-Zawadzki, Tappest sp. z o.o.
+Copyright (c) 2008-2023 Jakub Kruszona-Zawadzki, Saglabs SA
 
 This file is part of MooseFS.
 

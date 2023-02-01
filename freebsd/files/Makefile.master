@@ -1,5 +1,4 @@
 # Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
-# $FreeBSD$
 
 PORTNAME=		moosefs3
 DISTVERSION=		0.0.0
@@ -10,7 +9,7 @@ MASTER_SITES=		http://ppa.moosefs.com/src/
 PKGNAMESUFFIX?=		-master
 DISTNAME=		moosefs-${DISTVERSION}-${DISTVERSIONSUFFIX}
 
-MAINTAINER=		freebsd@moosefs.pro
+MAINTAINER=		freebsd@moosefs.com
 COMMENT?=		Fault-tolerant distributed filesystem
 
 LICENSE=		GPLv2

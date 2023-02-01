@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022 Jakub Kruszona-Zawadzki, Tappest sp. z o.o.
+Copyright (C) 2023 Jakub Kruszona-Zawadzki, Saglabs SA
 
 This file is part of MooseFS.
 

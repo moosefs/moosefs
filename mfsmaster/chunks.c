@@ -1086,7 +1086,7 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 	uint16_t servcount;
 	uint16_t goodlabelscount;
 	uint16_t overloaded;
-	uint32_t i,j;
+	int32_t i,j;
 	uint32_t dist;
 	uint16_t cpos,fpos;
 	int32_t x;
@@ -1171,11 +1171,11 @@ static inline uint16_t chunk_creation_servers(uint16_t csids[MAXCSCOUNT],uint8_t
 		// setting servers in proper order
 		i = 0;
 		j = servcount-1;
-		while (i<j) {
-			while (i<j && matching[labelcnt+i]>=0) {
+		while (i<=j) {
+			while (i<=j && matching[labelcnt+i]>=0) {
 				i++;
 			}
-			while (i<j && matching[labelcnt+j]<0) {
+			while (i<=j && matching[labelcnt+j]<0) {
 				j--;
 			}
 			if (i<j) {
@@ -3223,7 +3223,7 @@ static inline uint8_t chunk_mindist(uint16_t csid,uint32_t ip[255],uint8_t ipcnt
 
 // first servers in the same rack (server id), then other (yes, same rack is better than same physical server, so order is 1 and then 0 or 2)
 static inline void chunk_rack_sort(uint16_t servers[MAXCSCOUNT],uint16_t servcount,uint32_t ip[255],uint8_t ipcnt) {
-	uint16_t i,j;
+	int16_t i,j;
 	uint16_t csid;
 	uint8_t mindist;
 
@@ -3232,15 +3232,15 @@ static inline void chunk_rack_sort(uint16_t servers[MAXCSCOUNT],uint16_t servcou
 	}
 	i = 0;
 	j = servcount-1;
-	while (i<j) {
-		while (i<j) {
+	while (i<=j) {
+		while (i<=j) {
 			mindist = chunk_mindist(servers[i],ip,ipcnt);
 			if (mindist!=TOPOLOGY_DIST_SAME_RACKID) {
 				break;
 			}
 			i++;
 		}
-		while (i<j) {
+		while (i<=j) {
 			mindist = chunk_mindist(servers[j],ip,ipcnt);
 			if (mindist==TOPOLOGY_DIST_SAME_RACKID) {
 				break;

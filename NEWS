@@ -19,6 +19,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) changed default ATIME_MODE to 2 (issue #478)
   - (master) fixed atime/mtime/ctime preservation during snapshot (in HA environement upgrade may cause one time desync ; issue #489)
   - (client) fixed race condition between client and kernel in retrieving open file list (FreeBSD only)
+  - (master) fixed bug in sorting chunkservers during selection for chunk creation (issue #481)
 
 * MooseFS 3.0.116-1 (2021-08-10)
 

@@ -1815,30 +1815,30 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 				return;
 			}
 			if (AuthCode) {
-					if (rversion==50) {
-						syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:BEGIN) - authorization needed - packet version too old");
-						eptr->mode=KILL;
-						return;
-					} else { // rversion==60
-						if (length==55) { // no authorization data
-							uint8_t *p;
-							p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,33);
-							put8bit(&p,3);
-							for (i=0 ; i<32 ; i++) {
-								eptr->passwordrnd[i] = rndu8();
-							}
-							memcpy(p,eptr->passwordrnd,32);
-							return;
-						} else { // length==71
-							if (matocsserv_check_password(eptr->passwordrnd,data)==0) {
-								syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:BEGIN) - access denied - check password");
-								eptr->mode = KILL;
-								return;
-							}
-							data+=16;
+				if (rversion==50) {
+					syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 5:BEGIN) - authorization needed - packet version too old");
+					eptr->mode=KILL;
+					return;
+				} else { // rversion==60
+					if (length==55) { // no authorization data
+						uint8_t *p;
+						p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,33);
+						put8bit(&p,3);
+						for (i=0 ; i<32 ; i++) {
+							eptr->passwordrnd[i] = rndu8();
 						}
+						memcpy(p,eptr->passwordrnd,32);
+						return;
+					} else { // length==71
+						if (matocsserv_check_password(eptr->passwordrnd,data)==0) {
+							syslog(LOG_NOTICE,"CSTOMA_REGISTER (ver 6:BEGIN) - access denied - check password");
+							eptr->mode = KILL;
+							return;
+						}
+						data+=16;
 					}
 				}
+			}
 			eptr->version = get32bit(&data);
 			eptr->servip = get32bit(&data);
 			eptr->servport = get16bit(&data);
@@ -1867,50 +1867,50 @@ void matocsserv_register(matocsserventry *eptr,const uint8_t *data,uint32_t leng
 				eptr->todelchunkscount = get32bit(&data);
 			}
 			if (eptr->servip==0) {
-					tcpgetpeer(eptr->sock,&(eptr->servip),NULL);
-				}
-				eptr->servip = matocsserv_remap_ip(eptr->servip);
-				if (eptr->servstrip) {
-					free(eptr->servstrip);
-				}
-				eptr->servstrip = matocsserv_makestrip(eptr->servip);
-				if (((eptr->servip)&0xFF000000) == 0x7F000000) {
-					syslog(LOG_NOTICE,"chunkserver connected using localhost (IP: %s) - you cannot use localhost for communication between chunkserver and master", eptr->servstrip);
-					eptr->mode=KILL;
-					return;
-				}
+				tcpgetpeer(eptr->sock,&(eptr->servip),NULL);
+			}
+			eptr->servip = matocsserv_remap_ip(eptr->servip);
+			if (eptr->servstrip) {
+				free(eptr->servstrip);
+			}
+			eptr->servstrip = matocsserv_makestrip(eptr->servip);
+			if (((eptr->servip)&0xFF000000) == 0x7F000000) {
+				syslog(LOG_NOTICE,"chunkserver connected using localhost (IP: %s) - you cannot use localhost for communication between chunkserver and master", eptr->servstrip);
+				eptr->mode=KILL;
+				return;
+			}
 			if ((eptr->csptr=csdb_new_connection(eptr->servip,eptr->servport,csid,eptr))==NULL) {
-					syslog(LOG_WARNING,"can't accept chunkserver (ip: %s / port: %"PRIu16")",eptr->servstrip,eptr->servport);
-					eptr->mode=KILL;
-					return;
-				}
+				syslog(LOG_WARNING,"can't accept chunkserver (ip: %s / port: %"PRIu16")",eptr->servstrip,eptr->servport);
+				eptr->mode=KILL;
+				return;
+			}
 			if (rversion==50) {
-					syslog(LOG_NOTICE,"chunkserver register begin (packet version: 5) - ip: %s / port: %"PRIu16,eptr->servstrip,eptr->servport);
+				syslog(LOG_NOTICE,"chunkserver register begin (packet version: 5) - ip: %s / port: %"PRIu16,eptr->servstrip,eptr->servport);
+			} else {
+				us = (double)(eptr->usedspace)/(double)(1024*1024*1024);
+				ts = (double)(eptr->totalspace)/(double)(1024*1024*1024);
+				syslog(LOG_NOTICE,"chunkserver register begin (packet version: 6) - ip: %s / port: %"PRIu16", usedspace: %"PRIu64" (%.2lf GiB), totalspace: %"PRIu64" (%.2lf GiB)",eptr->servstrip,eptr->servport,eptr->usedspace,us,eptr->totalspace,ts);
+			}
+			if (eptr->version>=VERSION2INT(1,6,28)) { // if chunkserver version >= 1.6.28 then send back my version
+				uint8_t *p;
+				if (rversion==50) {
+					p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,5);
+					put8bit(&p,0);
+					put32bit(&p,VERSHEX);
 				} else {
-					us = (double)(eptr->usedspace)/(double)(1024*1024*1024);
-					ts = (double)(eptr->totalspace)/(double)(1024*1024*1024);
-					syslog(LOG_NOTICE,"chunkserver register begin (packet version: 6) - ip: %s / port: %"PRIu16", usedspace: %"PRIu64" (%.2lf GiB), totalspace: %"PRIu64" (%.2lf GiB)",eptr->servstrip,eptr->servport,eptr->usedspace,us,eptr->totalspace,ts);
-				}
-				if (eptr->version>=VERSION2INT(1,6,28)) { // if chunkserver version >= 1.6.28 then send back my version
-					uint8_t *p;
-					if (rversion==50) {
-						p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,5);
-						put8bit(&p,0);
-						put32bit(&p,VERSHEX);
-					} else {
-						uint8_t mode;
+					uint8_t mode;
 					mode = (eptr->version >= VERSION2INT(2,0,33))?1:0;
-							p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,mode?17:9);
-							put8bit(&p,0);
-							put32bit(&p,VERSHEX);
-							put16bit(&p,eptr->timeout);
-							put16bit(&p,csdb_get_csid(eptr->csptr));
-							if (mode) {
-								put64bit(&p,meta_get_id());
-							}
+					p = matocsserv_createpacket(eptr,MATOCS_MASTER_ACK,mode?17:9);
+					put8bit(&p,0);
+					put32bit(&p,VERSHEX);
+					put16bit(&p,eptr->timeout);
+					put16bit(&p,csdb_get_csid(eptr->csptr));
+					if (mode) {
+						put64bit(&p,meta_get_id());
+					}
 				}
-				}
-				eptr->csid = chunk_server_connected(eptr);
+			}
+			eptr->csid = chunk_server_connected(eptr);
 			return;
 		} else if (rversion==51 || rversion==61) {
 			if (((length-1)%12)!=0) {

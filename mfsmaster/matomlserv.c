@@ -447,16 +447,16 @@ void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t leng
 			req_minversion = get64bit(&data);
 			chlog_minversion = changelog_get_minversion();
 			if (chlog_minversion>0 && chlog_minversion<=req_minversion) {
-						n = changelog_get_old_changes(req_minversion,matomlserv_send_old_change,eptr,OLD_CHANGES_GROUP_COUNT);
-						if (n<OLD_CHANGES_GROUP_COUNT) {
-							eptr->logstate = SYNC;
-						} else {
-							eptr->next_log_version = req_minversion+n;
-							eptr->logstate = DELAYED;
-						}
-					} else {
-						eptr->logstate = SYNC; // desync
-					}
+				n = changelog_get_old_changes(req_minversion,matomlserv_send_old_change,eptr,OLD_CHANGES_GROUP_COUNT);
+				if (n<OLD_CHANGES_GROUP_COUNT) {
+					eptr->logstate = SYNC;
+				} else {
+					eptr->next_log_version = req_minversion+n;
+					eptr->logstate = DELAYED;
+				}
+			} else {
+				eptr->logstate = SYNC; // desync
+			}
 		} else if (rversion==3 || rversion==4) { // just ignore PRO components
 			eptr->mode = KILL;
 			return;

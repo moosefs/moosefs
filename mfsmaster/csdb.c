@@ -111,27 +111,27 @@ void csdb_self_check(void) {
 	s = 0;
 	trs = 0;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
-			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
-				if ((csptr->maintenance==2 && csptr->eptr!=NULL) || (csptr->maintenance!=0 && csptr->maintenance_timeout>0 && now>csptr->maintenance_timeout)) {
-					if (csptr->eptr==NULL) {
-						disconnected_servers_in_maintenance--;
-					}
-					csptr->maintenance = 0;
-					csptr->maintenance_timeout = 0;
-					changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_MAINTENANCEOFF,csptr->ip,csptr->port);
-				}
-				s++;
-				if (csptr->tmpremoved) {
-					trs++;
-				}
+		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
+			if ((csptr->maintenance==2 && csptr->eptr!=NULL) || (csptr->maintenance!=0 && csptr->maintenance_timeout>0 && now>csptr->maintenance_timeout)) {
 				if (csptr->eptr==NULL) {
-					ds++;
-					if (csptr->maintenance) {
-						dsm++;
-					}
+					disconnected_servers_in_maintenance--;
+				}
+				csptr->maintenance = 0;
+				csptr->maintenance_timeout = 0;
+				changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_MAINTENANCEOFF,csptr->ip,csptr->port);
+			}
+			s++;
+			if (csptr->tmpremoved) {
+				trs++;
+			}
+			if (csptr->eptr==NULL) {
+				ds++;
+				if (csptr->maintenance) {
+					dsm++;
 				}
 			}
 		}
+	}
 	if (s!=servers) {
 		syslog(LOG_WARNING,"csdb: servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",servers,s);
 		servers = s;
@@ -204,7 +204,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 		if (csptr->ip == ip && csptr->port == port) {
 			if (csptr->eptr!=NULL) {
 				syslog(LOG_NOTICE,"csdb: found cs using ip:port (%s:%"PRIu16",%"PRIu16"), but server is still connected",strip,port,csid);
-					return NULL;
+				return NULL;
 			}
 			csptr->eptr = eptr;
 			disconnected_servers--;
@@ -220,21 +220,21 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 	}
 	if (csidptr && csidptr->eptr==NULL) { // ip+port not found, but found csid - change ip+port
 		csdb_makestrip(strtmpip,csidptr->ip);
-			syslog(LOG_NOTICE,"csdb: found cs using csid (%s:%"PRIu16",%"PRIu16") - previous ip:port (%s:%"PRIu16")",strip,port,csid,strtmpip,csidptr->port);
-			hashid = CSDBHASHFN(csidptr->ip,csidptr->port);
-			cspptr = csdbhash + hashid;
-			while ((csptr=*cspptr)) {
-				if (csptr == csidptr) {
-					*cspptr = csptr->next;
-					csptr->next = csdbhash[hash];
-					csdbhash[hash] = csptr;
-					break;
-				} else {
-					cspptr = &(csptr->next);
-				}
+		syslog(LOG_NOTICE,"csdb: found cs using csid (%s:%"PRIu16",%"PRIu16") - previous ip:port (%s:%"PRIu16")",strip,port,csid,strtmpip,csidptr->port);
+		hashid = CSDBHASHFN(csidptr->ip,csidptr->port);
+		cspptr = csdbhash + hashid;
+		while ((csptr=*cspptr)) {
+			if (csptr == csidptr) {
+				*cspptr = csptr->next;
+				csptr->next = csdbhash[hash];
+				csdbhash[hash] = csptr;
+				break;
+			} else {
+				cspptr = &(csptr->next);
 			}
-			csidptr->ip = ip;
-			csidptr->port = port;
+		}
+		csidptr->ip = ip;
+		csidptr->port = port;
 			changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",%"PRIu16")",main_time(),CSDB_OP_NEWIPPORT,ip,port,csidptr->csid);
 		csidptr->eptr = eptr;
 		disconnected_servers--;
@@ -278,14 +278,14 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 void csdb_temporary_maintenance_mode(void *v_csptr) {
 	csdbentry *csptr = (csdbentry*)v_csptr;
 	if (csptr!=NULL && csptr->eptr!=NULL && csptr->maintenance==0) {
-			csptr->maintenance = 2;
-			if (TempMaintenanceModeTimeout>0) {
-				csptr->maintenance_timeout = main_time() + TempMaintenanceModeTimeout;
-			} else {
-				csptr->maintenance_timeout = 0;
-			}
-			changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",%"PRIu32")",main_time(),CSDB_OP_MAINTENANCETMP,csptr->ip,csptr->port,csptr->maintenance_timeout);
+		csptr->maintenance = 2;
+		if (TempMaintenanceModeTimeout>0) {
+			csptr->maintenance_timeout = main_time() + TempMaintenanceModeTimeout;
+		} else {
+			csptr->maintenance_timeout = 0;
 		}
+		changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",%"PRIu32")",main_time(),CSDB_OP_MAINTENANCETMP,csptr->ip,csptr->port,csptr->maintenance_timeout);
+	}
 }
 
 void csdb_lost_connection(void *v_csptr) {

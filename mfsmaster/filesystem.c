@@ -1514,9 +1514,9 @@ void fsnodes_check_all_quotas(void) {
 	quotanode *qn;
 	uint32_t now;
 	now = main_time();
-		for (qn = quotahead ; qn ; qn=qn->next) {
-			fsnodes_check_quotanode(qn,now);
-		}
+	for (qn = quotahead ; qn ; qn=qn->next) {
+		fsnodes_check_quotanode(qn,now);
+	}
 }
 
 static inline uint8_t fsnodes_test_quota_noparents(fsnode *node,uint32_t inodes,uint64_t length,uint64_t size,uint64_t realsize) {
@@ -9047,23 +9047,23 @@ uint8_t fs_storequota(bio *fd) {
 	}
 	for (qn = quotahead ; qn ; qn=qn->next) {
 		ptr=wbuff;
-			put32bit(&ptr,qn->node->inode);
-			put32bit(&ptr,qn->graceperiod);
-			put8bit(&ptr,qn->exceeded);
-			put8bit(&ptr,qn->flags);
-			put32bit(&ptr,qn->stimestamp);
-			put32bit(&ptr,qn->sinodes);
-			put32bit(&ptr,qn->hinodes);
-			put64bit(&ptr,qn->slength);
-			put64bit(&ptr,qn->hlength);
-			put64bit(&ptr,qn->ssize);
-			put64bit(&ptr,qn->hsize);
-			put64bit(&ptr,qn->srealsize);
-			put64bit(&ptr,qn->hrealsize);
-			if (bio_write(fd,wbuff,70)!=70) {
-				syslog(LOG_NOTICE,"write error");
-				return 0xFF;
-			}
+		put32bit(&ptr,qn->node->inode);
+		put32bit(&ptr,qn->graceperiod);
+		put8bit(&ptr,qn->exceeded);
+		put8bit(&ptr,qn->flags);
+		put32bit(&ptr,qn->stimestamp);
+		put32bit(&ptr,qn->sinodes);
+		put32bit(&ptr,qn->hinodes);
+		put64bit(&ptr,qn->slength);
+		put64bit(&ptr,qn->hlength);
+		put64bit(&ptr,qn->ssize);
+		put64bit(&ptr,qn->hsize);
+		put64bit(&ptr,qn->srealsize);
+		put64bit(&ptr,qn->hrealsize);
+		if (bio_write(fd,wbuff,70)!=70) {
+			syslog(LOG_NOTICE,"write error");
+			return 0xFF;
+		}
 	}
 	return 0;
 }

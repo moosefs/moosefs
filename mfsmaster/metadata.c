@@ -824,11 +824,11 @@ int meta_storeall(int bg) {
 void meta_dostoreall(void) {
 	changelog_rotate();
 	if (((main_time() / 3600) % MetaSaveFreq) == 0) {
-			if (meta_storeall(1)<=0) {
-				syslog(LOG_ERR,"can't store metadata - exiting");
-				main_exit();
-			}
+		if (meta_storeall(1)<=0) {
+			syslog(LOG_ERR,"can't store metadata - exiting");
+			main_exit();
 		}
+	}
 }
 
 void meta_cleanup(void) {
@@ -1506,10 +1506,10 @@ int meta_init(void) {
 		return -1;
 	}
 	fprintf(stderr,"loading metadata ...\n");
-		if (meta_loadall()<0) {
-			return -1;
-		}
-		fprintf(stderr,"metadata file has been loaded\n");
+	if (meta_loadall()<0) {
+		return -1;
+	}
+	fprintf(stderr,"metadata file has been loaded\n");
 	meta_reload();
 	main_reload_register(meta_reload);
 	main_time_register(3600,0,meta_dostoreall);

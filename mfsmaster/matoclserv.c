@@ -5677,9 +5677,9 @@ void matoclserv_desc(struct pollfd *pdesc,uint32_t *ndesc) {
 	matoclserventry *eptr;
 
 	pdesc[pos].fd = lsock;
-		pdesc[pos].events = POLLIN;
-		lsockpdescpos = pos;
-		pos++;
+	pdesc[pos].events = POLLIN;
+	lsockpdescpos = pos;
+	pos++;
 //		FD_SET(lsock,rset);
 //		max = lsock;
 	for (eptr=matoclservhead ; eptr ; eptr=eptr->next) {

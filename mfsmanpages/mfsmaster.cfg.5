@@ -47,7 +47,7 @@ alternate location/name of \fBmfsexports.cfg\fP file
 alternate location/name of \fBmfstopology.cfg\fP file
 .TP
 .B LICENCE_FILENAME
-alternate location/name of \fBmfslicence.bin\fP file (pro version only)
+(pro only) alternate location/name of \fBmfslicence.bin\fP file
 .TP
 .B BACK_LOGS
 number of metadata change log files (default is 50)
@@ -56,10 +56,10 @@ number of metadata change log files (default is 50)
 how often (in hours) master will store metadata (default is 1)
 .TP
 .B METADATA_DOWNLOAD_FREQ
-how often (in hours) leader will download metadata from followers (pro version only ; default is 24)
+(pro only) how often (in hours) leader will download metadata from followers (default is 24)
 .TP
 .B METADATA_DOWNLOAD_LIMIT
-metadata downloading limit in mebibytes per second (pro version only ; 0 means no limit, default is 50 - 50MiB/s = ~52.4MB/s)
+(pro only) metadata downloading limit in mebibytes per second (0 means no limit, default is 50 - 50MiB/s = ~52.4MB/s)
 .TP
 .B BACK_META_KEEP_PREVIOUS
 number of previous metadata files to be kept (default is 1)
@@ -88,16 +88,16 @@ IP address to listen on for metalogger, masters and supervisors connections (* m
 port to listen on for metalogger, masters and supervisors connections
 .TP
 .B MASTER_HOST
-MooseFS master host, IP is allowed only in single-master installations (pro version only ; default is mfsmaster)
+(pro only) MooseFS master host, IP is allowed only in single-master installations (default is mfsmaster)
 .TP
 .B MASTER_RECONNECTION_DELAY
-delay in seconds before next try to reconnect to master-leader if not connected (pro version only ; default is 5)
+(pro only) delay in seconds before next try to reconnect to master-leader if not connected (default is 5)
 .TP
 .B MASTER_TIMEOUT
-timeout in seconds for master-leader connections (pro version only ; default is 10)
+(pro only) timeout in seconds for master-leader connections (default is 10)
 .TP
 .B BIND_HOST
-local address to use for connecting with master-leader (pro version only ; default is *, i.e. default local address)
+(pro only) local address to use for connecting with master-leader (default is *, i.e. default local address)
 .TP
 .B MATOCS_LISTEN_HOST
 IP address to listen on for chunkserver connections (\fB*\fP means any)

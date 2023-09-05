@@ -28,6 +28,7 @@ body {
 	padding:0px 10px 10px;
 	color:#000;
 	text-align:center;
+	image-rendering: pixelated;
 }
 
 * html #container {

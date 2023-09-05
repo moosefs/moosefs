@@ -127,12 +127,40 @@ if cgimode:
 		import urllib.parse as xurllib
 	except ImportError:
 		import urllib as xurllib
-	import cgi
-	import cgitb
 
-	cgitb.enable()
+	if sys.version_info[0]<3 or ( sys.version_info[0]==3 and sys.version_info[1]<11):
+		import cgi
+		import cgitb
 
-	fields = cgi.FieldStorage()
+		cgitb.enable()
+
+		fields = cgi.FieldStorage()
+	else:
+		class FieldStorage:
+			def __init__(self):
+				self.data = {}
+				for k,v in xurllib.parse_qsl(os.environ["QUERY_STRING"]):
+					if k in self.data:
+						if type(self.data[k])==str:
+							x = self.data[k]
+							self.data[k] = [x]
+						self.data[k].append(v)
+					else:
+						self.data[k] = v
+			def __repr__(self):
+				return repr(self.data)
+			def __str__(self):
+				return str(self.data)
+			def __contains__(self,key):
+				return key in self.data
+			def __iter__(self):
+				return iter(self.data.keys())
+			def getvalue(self,key):
+				if key in self.data:
+					return self.data[key]
+				return None
+
+		fields = FieldStorage()
 
 	try:
 		if "masterhost" in fields:

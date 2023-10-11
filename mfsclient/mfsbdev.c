@@ -827,6 +827,7 @@ void nbd_stop(nbdcommon *nbdcp) {
 	if (err<0) {
 		syslog(LOG_NOTICE,"can't remove nbd device symlink %s->%s: %s",nbdcp->linkname,nbdcp->nbddevice,strerror(errno));
 	}
+	close(nbdcp->nbdfd);
 }
 
 void nbd_free(nbdcommon *nbdcp) {

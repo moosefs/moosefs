@@ -173,7 +173,7 @@ am_mfsbdev_OBJECTS = ../mfscommon/mfsbdev-lwthread.$(OBJEXT) \
 	../mfscommon/mfsbdev-squeue.$(OBJEXT) \
 	../mfscommon/mfsbdev-workers.$(OBJEXT) \
 	../mfscommon/mfsbdev-processname.$(OBJEXT) \
-	mfsbdev-nbdmain.$(OBJEXT)
+	mfsbdev-mfsbdev.$(OBJEXT)
 mfsbdev_OBJECTS = $(am_mfsbdev_OBJECTS)
 mfsbdev_DEPENDENCIES = $(am__DEPENDENCIES_1) libmfsio.la
 mfsbdev_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
@@ -276,7 +276,7 @@ am__depfiles_remade = ../mfscommon/$(DEPDIR)/clocks.Po \
 	./$(DEPDIR)/libmfsio_la-stats.Plo \
 	./$(DEPDIR)/libmfsio_la-truncate.Plo \
 	./$(DEPDIR)/libmfsio_la-writedata.Plo \
-	./$(DEPDIR)/mfsbdev-nbdmain.Po \
+	./$(DEPDIR)/mfsbdev-mfsbdev.Po \
 	./$(DEPDIR)/mfsmount-chunkrwlock.Po \
 	./$(DEPDIR)/mfsmount-chunksdatacache.Po \
 	./$(DEPDIR)/mfsmount-csdb.Po ./$(DEPDIR)/mfsmount-csorder.Po \
@@ -621,7 +621,7 @@ mfsbdev_SOURCES = \
 	../mfscommon/sizestr.h \
 	../mfscommon/portable.h \
 	../mfscommon/idstr.h \
-	nbdmain.c
+	mfsbdev.c
 
 mfstools_SOURCES = \
 	mfstools.c \
@@ -953,7 +953,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-stats.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-truncate.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libmfsio_la-writedata.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsbdev-nbdmain.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsbdev-mfsbdev.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunkrwlock.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-chunksdatacache.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csdb.Po@am__quote@ # am--include-marker
@@ -1246,19 +1246,19 @@ libmfsio_la-mfsio.lo: mfsio.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o ../mfscommon/mfsbdev-processname.obj `if test -f '../mfscommon/processname.c'; then $(CYGPATH_W) '../mfscommon/processname.c'; else $(CYGPATH_W) '$(srcdir)/../mfscommon/processname.c'; fi`
 
-mfsbdev-nbdmain.o: nbdmain.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT mfsbdev-nbdmain.o -MD -MP -MF $(DEPDIR)/mfsbdev-nbdmain.Tpo -c -o mfsbdev-nbdmain.o `test -f 'nbdmain.c' || echo '$(srcdir)/'`nbdmain.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsbdev-nbdmain.Tpo $(DEPDIR)/mfsbdev-nbdmain.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='nbdmain.c' object='mfsbdev-nbdmain.o' libtool=no @AMDEPBACKSLASH@
+mfsbdev-mfsbdev.o: mfsbdev.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT mfsbdev-mfsbdev.o -MD -MP -MF $(DEPDIR)/mfsbdev-mfsbdev.Tpo -c -o mfsbdev-mfsbdev.o `test -f 'mfsbdev.c' || echo '$(srcdir)/'`mfsbdev.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsbdev-mfsbdev.Tpo $(DEPDIR)/mfsbdev-mfsbdev.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfsbdev.c' object='mfsbdev-mfsbdev.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o mfsbdev-nbdmain.o `test -f 'nbdmain.c' || echo '$(srcdir)/'`nbdmain.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o mfsbdev-mfsbdev.o `test -f 'mfsbdev.c' || echo '$(srcdir)/'`mfsbdev.c
 
-mfsbdev-nbdmain.obj: nbdmain.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT mfsbdev-nbdmain.obj -MD -MP -MF $(DEPDIR)/mfsbdev-nbdmain.Tpo -c -o mfsbdev-nbdmain.obj `if test -f 'nbdmain.c'; then $(CYGPATH_W) 'nbdmain.c'; else $(CYGPATH_W) '$(srcdir)/nbdmain.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsbdev-nbdmain.Tpo $(DEPDIR)/mfsbdev-nbdmain.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='nbdmain.c' object='mfsbdev-nbdmain.obj' libtool=no @AMDEPBACKSLASH@
+mfsbdev-mfsbdev.obj: mfsbdev.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -MT mfsbdev-mfsbdev.obj -MD -MP -MF $(DEPDIR)/mfsbdev-mfsbdev.Tpo -c -o mfsbdev-mfsbdev.obj `if test -f 'mfsbdev.c'; then $(CYGPATH_W) 'mfsbdev.c'; else $(CYGPATH_W) '$(srcdir)/mfsbdev.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsbdev-mfsbdev.Tpo $(DEPDIR)/mfsbdev-mfsbdev.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mfsbdev.c' object='mfsbdev-mfsbdev.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o mfsbdev-nbdmain.obj `if test -f 'nbdmain.c'; then $(CYGPATH_W) 'nbdmain.c'; else $(CYGPATH_W) '$(srcdir)/nbdmain.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsbdev_CPPFLAGS) $(CPPFLAGS) $(mfsbdev_CFLAGS) $(CFLAGS) -c -o mfsbdev-mfsbdev.obj `if test -f 'mfsbdev.c'; then $(CYGPATH_W) 'mfsbdev.c'; else $(CYGPATH_W) '$(srcdir)/mfsbdev.c'; fi`
 
 mfsmount-labelparser.o: labelparser.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-labelparser.o -MD -MP -MF $(DEPDIR)/mfsmount-labelparser.Tpo -c -o mfsmount-labelparser.o `test -f 'labelparser.c' || echo '$(srcdir)/'`labelparser.c
@@ -1997,7 +1997,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/libmfsio_la-stats.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-truncate.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-writedata.Plo
-	-rm -f ./$(DEPDIR)/mfsbdev-nbdmain.Po
+	-rm -f ./$(DEPDIR)/mfsbdev-mfsbdev.Po
 	-rm -f ./$(DEPDIR)/mfsmount-chunkrwlock.Po
 	-rm -f ./$(DEPDIR)/mfsmount-chunksdatacache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-csdb.Po
@@ -2119,7 +2119,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/libmfsio_la-stats.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-truncate.Plo
 	-rm -f ./$(DEPDIR)/libmfsio_la-writedata.Plo
-	-rm -f ./$(DEPDIR)/mfsbdev-nbdmain.Po
+	-rm -f ./$(DEPDIR)/mfsbdev-mfsbdev.Po
 	-rm -f ./$(DEPDIR)/mfsmount-chunkrwlock.Po
 	-rm -f ./$(DEPDIR)/mfsmount-chunksdatacache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-csdb.Po

@@ -116,7 +116,7 @@ mfsbdev_SOURCES=\
 	../mfscommon/sizestr.h \
 	../mfscommon/portable.h \
 	../mfscommon/idstr.h \
-	nbdmain.c
+	mfsbdev.c
 
 mfstools_SOURCES=\
 	mfstools.c \

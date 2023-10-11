@@ -10,7 +10,7 @@ Package: moosefs-master
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, adduser
 Description: MooseFS master (metadata) server
- This package will install MooseFS component responsible 
+ This package will install MooseFS component responsible
  for keeping metadata and also managinng whole cluster.
 
 Package: moosefs-metalogger

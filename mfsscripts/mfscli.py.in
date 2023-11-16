@@ -165,6 +165,7 @@ if cgimode:
 	try:
 		if "masterhost" in fields:
 			masterhost = fields.getvalue("masterhost")
+			masterhost = masterhost.replace('"','').replace('<','').replace('>','').replace("'",'').replace('&','').replace('%','')
 		else:
 			masterhost = '@DEFAULT_MASTERNAME@'
 	except Exception:
@@ -2470,7 +2471,7 @@ if leaderfound==0:
 			out.append("""		<td align="center">""")
 			out.append("""			<span class="ERROR">Can't find masters (resolve given name) !!!</span><br />""")
 			out.append("""			<form method="GET">""")
-			out.append("""				Input your DNS master name: <input type="text" name="masterhost" value="%s" size="100">""" % (masterhost))
+			out.append("""				Input your DNS master name: <input type="text" name="masterhost" value="%s" size="100">""" % htmlentities(masterhost))
 			for i in createinputs(["masterhost"]):
 				out.append("""				%s""" % (i))
 			out.append("""				<input type="submit" value="Try it !!!">""")
@@ -2488,7 +2489,7 @@ if leaderfound==0:
 			out.append("""		<td align="center">""")
 			out.append("""			<span class="ERROR">Can't find working masters !!!</span><br />""")
 			out.append("""			<form method="GET">""")
-			out.append("""				Input your DNS master name: <input type="text" name="masterhost" value="%s" size="100"><br />""" % (masterhost))
+			out.append("""				Input your DNS master name: <input type="text" name="masterhost" value="%s" size="100"><br />""" % htmlentities(masterhost))
 			out.append("""				Input your master-client port number: <input type="text" name="masterport" value="%u" size="5"><br />""" % (masterport))
 			out.append("""				Input your master-control port number: <input type="text" name="mastercontrolport" value="%u" size="5"><br />""" % (mastercontrolport))
 			for i in createinputs(["masterhost","masterport","mastercontrolport"]):

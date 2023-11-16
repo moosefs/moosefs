@@ -2,6 +2,7 @@ moosefs (3.0.118-1) unstable; urgency=medium
 
   * (scripts) added simple class that replaces deprecated cgi and cgitb
   * (bdev) fixed unmap protocol
+  * (cgi) added protections against javascript injection
 
  -- MooseFS Team <contact@moosefs.com>  Mon, 09 Oct 2023 13:00:00 +0200
 

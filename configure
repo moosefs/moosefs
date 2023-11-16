@@ -2889,7 +2889,7 @@ as_fn_append ac_func_c_list " vfork HAVE_VFORK"
 ac_aux_files="ltmain.sh compile ar-lib missing install-sh config.guess config.sub"
 
 # Locations in which to look for auxiliary files.
-ac_aux_dir_candidates="${srcdir}${PATH_SEPARATOR}${srcdir}/..${PATH_SEPARATOR}${srcdir}/../.."
+ac_aux_dir_candidates="${srcdir}/build-aux"
 
 # Search for a directory containing all of the required auxiliary files,
 # $ac_aux_files, from the $PATH-style list $ac_aux_dir_candidates.
@@ -3053,6 +3053,8 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 release=1
 buildno=$(cat buildno.txt)
+
+
 
 ac_config_headers="$ac_config_headers config.h"
 
@@ -14195,6 +14197,7 @@ case $target_os in
   *linux*)
 	fuse=maybe
 	bdev=maybe
+	okpoll=yes
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DDEFAULT_SUGID_CLEAR_MODE_EXT"
 	# Check whether exec_prefix=/usr:
 	eval root_sbindir="${sbindir}"
@@ -14207,11 +14210,13 @@ case $target_os in
 	# OpenSolaris has fuse available and is still identified as "solaris"
 	fuse=maybe
 	bdev=no
+	okpoll=yes
 	CPPFLAGS="$CPPFLAGS -D__EXTENSIONS__ -D_POSIX_PTHREAD_SEMANTICS -DDEFAULT_SUGID_CLEAR_MODE_OSX"
 	;;
   *darwin*)
 	fuse=maybe
 	bdev=no
+	okpoll=maybe
 	fuse_lib_name="osxfuse"
 	# MacFUSE installs to different prefix than pkgconfig
 	if test -f /usr/local/lib/pkgconfig/fuse.pc ; then
@@ -14223,11 +14228,13 @@ case $target_os in
   *bsd*)
 	fuse=maybe
 	bdev=no
+	okpoll=yes
 	CPPFLAGS="$CPPFLAGS -DDEFAULT_SUGID_CLEAR_MODE_BSD"
 	;;
   *)
 	fuse=no
 	bdev=no
+	okpoll=maybe
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 	;;
 esac
@@ -17439,14 +17446,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for __builtin_bswap16" >&5
 printf %s "checking for __builtin_bswap16... " >&6; }
-if test "$cross_compiling" = yes
-then :
-  { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else $as_nop
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <inttypes.h>
 int
@@ -17457,7 +17457,7 @@ uint16_t x = __builtin_bswap16(0x1234)
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_run "$LINENO"
+if ac_fn_c_try_link "$LINENO"
 then :
 
 	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
@@ -17475,21 +17475,12 @@ printf "%s\n" "#define BSWAP16(x) ((((x)<<8)&0xFF00) | (((x)>>8)&0xFF))" >>confd
 
 
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
 
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for __builtin_bswap32" >&5
 printf %s "checking for __builtin_bswap32... " >&6; }
-if test "$cross_compiling" = yes
-then :
-  { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else $as_nop
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <inttypes.h>
 int
@@ -17500,7 +17491,7 @@ uint32_t x = __builtin_bswap32(0x12345678)
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_run "$LINENO"
+if ac_fn_c_try_link "$LINENO"
 then :
 
 	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
@@ -17518,21 +17509,12 @@ printf "%s\n" "#define BSWAP32(x) ((((x)<<24)&0xFF000000) | (((x)<<8)&0xFF0000) 
 
 
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
 
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for __builtin_bswap64" >&5
 printf %s "checking for __builtin_bswap64... " >&6; }
-if test "$cross_compiling" = yes
-then :
-  { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else $as_nop
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <inttypes.h>
 int
@@ -17543,7 +17525,7 @@ uint64_t x = __builtin_bswap64(0x123456789ABCDEF0)
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_run "$LINENO"
+if ac_fn_c_try_link "$LINENO"
 then :
 
 	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
@@ -17561,14 +17543,12 @@ printf "%s\n" "#define BSWAP64(x) ((((x)<<56)&0xFF00000000000000) | (((x)<<40)&0
 
 
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
 
 
 # Check for Mac OS X's broken poll
-if test "$ac_cv_func_poll" = "yes"; then
+if test "$okpoll" = "maybe" -a "$ac_cv_func_poll" = "yes"; then
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if poll works on devices" >&5
 printf %s "checking if poll works on devices... " >&6; }
 if test "$cross_compiling" = yes
@@ -18184,7 +18164,7 @@ fi
 
 
 if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then
-	for ac_prog in python3 python2 python python3.7 python3.6 python3.5 python3.4 python2.7
+	for ac_prog in python3 python2 python python3.13 pytnon3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4 python2.7
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
 set dummy $ac_prog; ac_word=$2
@@ -18325,7 +18305,6 @@ else
   BUILD_CHUNKSERVER_TRUE='#'
   BUILD_CHUNKSERVER_FALSE=
 fi
-
 
 
 pcap=no

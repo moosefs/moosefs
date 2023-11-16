@@ -161,9 +161,16 @@ am__define_uniq_tagged_files = \
 DIST_SUBDIRS = mfstests mfsdata mfsmanpages mfsmaster mfsmetatools \
 	mfsmetalogger mfssupervisor mfschunkserver mfsclient \
 	mfsscripts mfsnetdump systemd
-am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in COPYING \
-	INSTALL NEWS README ar-lib compile config.guess config.sub \
-	install-sh ltmain.sh missing
+am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in \
+	$(top_srcdir)/build-aux/ar-lib $(top_srcdir)/build-aux/compile \
+	$(top_srcdir)/build-aux/config.guess \
+	$(top_srcdir)/build-aux/config.sub \
+	$(top_srcdir)/build-aux/install-sh \
+	$(top_srcdir)/build-aux/ltmain.sh \
+	$(top_srcdir)/build-aux/missing COPYING INSTALL NEWS README \
+	build-aux/ar-lib build-aux/compile build-aux/config.guess \
+	build-aux/config.sub build-aux/install-sh build-aux/ltmain.sh \
+	build-aux/missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -390,7 +397,7 @@ RELEASE = @release@
 BUILDNO = @buildno@
 ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = mfstests mfsdata mfsmanpages $(MASTERDIR) $(METALOGGERDIR) $(SUPERVISORDIR) $(CHUNKSERVERDIR) $(CLIENTDIR) $(SCRIPTSDIR) $(NETDUMPDIR) $(SYSTEMDDIR)
-EXTRA_DIST = m4/ax_pthread.m4 m4/ax_check_compile_flag.m4 debian rpm macosx freebsd debian_sysv_to_systemd.sh linux_build.sh macosx_build.sh freebsd_build.sh sanitize_build.sh README.md buildno.txt
+EXTRA_DIST = m4/ax_pthread.m4 m4/ax_check_compile_flag.m4 debian rpm macosx freebsd debian_sysv_to_systemd.sh cross_enable.sh linux_build.sh macosx_build.sh freebsd_build.sh sanitize_build.sh README.md buildno.txt
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 

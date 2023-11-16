@@ -1,10 +1,12 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.60)
+AC_PREREQ(2.63)
 AC_INIT([MFS], [3.0.118], [bugs@moosefs.com], [moosefs])
 release=1
 buildno=$(cat buildno.txt)
+
+AC_CONFIG_AUX_DIR([build-aux])
 
 dnl AC_CONFIG_SRCDIR([MFSCommunication.h])
 AC_CONFIG_HEADER([config.h])
@@ -101,6 +103,7 @@ case $target_os in
   *linux*)
 	fuse=maybe
 	bdev=maybe
+	okpoll=yes
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -DDEFAULT_SUGID_CLEAR_MODE_EXT"
 	# Check whether exec_prefix=/usr:
 	eval root_sbindir="${sbindir}"
@@ -113,11 +116,13 @@ case $target_os in
 	# OpenSolaris has fuse available and is still identified as "solaris"
 	fuse=maybe
 	bdev=no
+	okpoll=yes
 	CPPFLAGS="$CPPFLAGS -D__EXTENSIONS__ -D_POSIX_PTHREAD_SEMANTICS -DDEFAULT_SUGID_CLEAR_MODE_OSX"
 	;;
   *darwin*)
 	fuse=maybe
 	bdev=no
+	okpoll=maybe
 	fuse_lib_name="osxfuse"
 	# MacFUSE installs to different prefix than pkgconfig
 	if test -f /usr/local/lib/pkgconfig/fuse.pc ; then
@@ -129,11 +134,13 @@ case $target_os in
   *bsd*)
 	fuse=maybe
 	bdev=no
+	okpoll=yes
 	CPPFLAGS="$CPPFLAGS -DDEFAULT_SUGID_CLEAR_MODE_BSD"
 	;;
   *)
 	fuse=no
 	bdev=no
+	okpoll=maybe
 	CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE"
 	;;
 esac
@@ -306,7 +313,7 @@ dnl AC_CHECK_FUNCS([fopencookie funopen])
 AC_LANG([C])
 
 AC_MSG_CHECKING([for __builtin_bswap16])
-AC_RUN_IFELSE(
+AC_LINK_IFELSE(
 	[AC_LANG_PROGRAM([#include <inttypes.h>],[uint16_t x = __builtin_bswap16(0x1234)])],
 	[
 	AC_MSG_RESULT(yes)
@@ -317,7 +324,7 @@ AC_RUN_IFELSE(
 	])
 
 AC_MSG_CHECKING([for __builtin_bswap32])
-AC_RUN_IFELSE(
+AC_LINK_IFELSE(
 	[AC_LANG_PROGRAM([#include <inttypes.h>],[uint32_t x = __builtin_bswap32(0x12345678)])],
 	[
 	AC_MSG_RESULT(yes)
@@ -328,7 +335,7 @@ AC_RUN_IFELSE(
 	])
 
 AC_MSG_CHECKING([for __builtin_bswap64])
-AC_RUN_IFELSE(
+AC_LINK_IFELSE(
 	[AC_LANG_PROGRAM([#include <inttypes.h>],[uint64_t x = __builtin_bswap64(0x123456789ABCDEF0)])],
 	[
 	AC_MSG_RESULT(yes)
@@ -339,26 +346,26 @@ AC_RUN_IFELSE(
 	])
 
 
-# Check for Mac OS X's broken poll 
-if test "$ac_cv_func_poll" = "yes"; then 
-AC_MSG_CHECKING([if poll works on devices]) 
+# Check for Mac OS X's broken poll
+if test "$okpoll" = "maybe" -a "$ac_cv_func_poll" = "yes"; then
+AC_MSG_CHECKING([if poll works on devices])
 AC_RUN_IFELSE(
 	[AC_LANG_PROGRAM([[
-#include <stdlib.h> 
-#include <fcntl.h> 
+#include <stdlib.h>
+#include <fcntl.h>
 #include <poll.h>
 ]],[[
-int main(void) { 
-	struct pollfd fds[1]; 
-	int fd; 
-	fd = open("/dev/null", 1); 
-	fds[0].fd = fd; 
-	fds[0].events = POLLIN; 
-	fds[0].revents = 0; 
-	if (poll(fds, 1, 0) < 0 || (fds[0].revents & POLLNVAL) != 0) { 
-		exit(1); /* Does not work for devices -- fail */ 
-	} 
-		exit(0); 
+int main(void) {
+	struct pollfd fds[1];
+	int fd;
+	fd = open("/dev/null", 1);
+	fds[0].fd = fd;
+	fds[0].events = POLLIN;
+	fds[0].revents = 0;
+	if (poll(fds, 1, 0) < 0 || (fds[0].revents & POLLNVAL) != 0) {
+		exit(1); /* Does not work for devices -- fail */
+	}
+		exit(0);
 	}
 ]])],[ac_have_working_poll=yes],[ac_have_working_poll=no])
 if test "$ac_have_working_poll" = "no" ; then
@@ -510,7 +517,7 @@ AC_ARG_WITH([systemdsystemunitdir],
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 
 if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then
-	AC_CHECK_PROGS(PYTHON, [python3 python2 python python3.7 python3.6 python3.5 python3.4 python2.7], [na])
+	AC_CHECK_PROGS(PYTHON, [python3 python2 python python3.13 pytnon3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4 python2.7], [na])
 	if test "$PYTHON" = na; then
 		PYTHON="python"
 		AC_MSG_RESULT([Python binary not found !!! - using default in shebangs])
@@ -537,7 +544,6 @@ AM_CONDITIONAL([BUILD_MASTER], [test "$enable_mfsmaster" != "no"])
 AM_CONDITIONAL([BUILD_METALOGGER], [test "$enable_mfsmetalogger" != "no"])
 AM_CONDITIONAL([BUILD_SUPERVISOR], [test "$enable_mfssupervisor" != "no"])
 AM_CONDITIONAL([BUILD_CHUNKSERVER], [test "$enable_mfschunkserver" != "no"])
-
 
 pcap=no
 AC_CHECK_LIB([pcap],[pcap_lib_version],[ AC_CHECK_HEADERS([pcap.h],[pcap=yes]) ])
@@ -581,7 +587,7 @@ if test "$fuse" = "no"; then
 		else
 			AC_MSG_ERROR([mfsmount build was forced, but pkg-config not installed])
 		fi
-	else 
+	else
 		if test "$enable_mfsmount" != "no"; then
 			if test -n "$PKG_CONFIG"; then
 				echo "******************************** mfsmount disabled ********************************"

@@ -82,7 +82,7 @@ enables/disables sparsification (skip leading and trailing zeros) during writing
 how many chunks should be created in one directory before moving to the next one; higher values are better with most OSes caching algorithms, low values lead to more even chunk distribution; default is 10000 which works best in most cases
 .TP
 .B HDD_KEEP_DUPLICATES_HOURS
-how many hours duplicate chunks should be kept before deleting (default is 168 - one week); changign this value and reloading will reset the counter
+how many hours duplicate chunks should be kept before deleting (default is 168 - one week); changing this value and reloading will reset the counter
 .TP
 .B ALLOW_STARTING_WITH_INVALID_DISKS
 when set to one chunkserver will not abort start even when incorrect entries are found in 'mfshdd.cfg' file; default is 0 (do not start with invalid entries)

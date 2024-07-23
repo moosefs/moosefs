@@ -48,6 +48,10 @@ for portname in ${PORTNAMES}; do
 		if [ -d "${FILEBASEDIR}/files/${portfile}.${portname}" ]; then
 			cp -R "${FILEBASEDIR}/files/${portfile}.${portname}" "${portdir}/${portfile}"
 		fi
+		if [ `uname -r | cut -d '.' -f1` -ge 14 -a "x${portfile}" == "xpkg-plist" ]; then
+			cat "${portdir}/${portfile}" | sed 's/^man\(.*\)$/share\/man\1/' > .tmp
+			mv .tmp "${portdir}/${portfile}"
+		fi
 	done
 	if [ "x${portname}" == "xmaster" ]; then
 		make -C ${portdir} makesum

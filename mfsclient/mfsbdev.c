@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Jakub Kruszona-Zawadzki, Saglabs SA
+ * Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
  * 
  * This file is part of MooseFS.
  * 
@@ -341,7 +341,8 @@ void* receive_thread(void *arg) {
 		if (cmd==NBD_CMD_WRITE || cmd==NBD_CMD_READ) {
 			r = (nbdrequest*)malloc(offsetof(nbdrequest,data)+length);
 		} else {
-			r = (nbdrequest*)malloc(offsetof(nbdrequest,data));
+			// r = (nbdrequest*)malloc(offsetof(nbdrequest,data)); <- this is how this line should look like, but compilers "know" better than programmers how to create good code nowadays
+			r = (nbdrequest*)malloc(sizeof(nbdrequest)); // seriously - dynamic field in data structure is too hard to grasp for you (compiler makers) ???
 		}
 		passert(r);
 		r->nbdcp = nbdcp;

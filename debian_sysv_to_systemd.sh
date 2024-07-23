@@ -5,13 +5,29 @@ mv debian/control_systemd debian/control
 
 rm -f debian/*.init debian/*.default
 
-cat debian/rules | sed 's/dh_installinit/cp systemd\/*.service debian\
-	dh_installinit\
-	dh_systemd_start --no-start --no-restart-on-upgrade/' > debian/rules_systemd
-mv debian/rules_systemd debian/rules
+#cat debian/rules | sed 's/dh_installinit/cp systemd\/*.service debian\
+#	dh_installinit\
+#	dh_systemd_start --no-start --no-restart-on-upgrade/' > debian/rules_systemd
+#mv debian/rules_systemd debian/rules
+
+#echo "
+#override_dh_installsystemd:
+#	dh_installsystemd --no-start --no-restart-on-upgrade
+#"
+
+echo "
+override_dh_systemd_start:
+	dh_systemd_start --no-start --no-restart-on-upgrade
+" >> debian/rules
 
 cp debian/systemd_extra/* debian/
 
-echo "lib/systemd/system/moosefs-master@.service" >> debian/moosefs-master.install
-echo "lib/systemd/system/moosefs-chunkserver@.service" >> debian/moosefs-chunkserver.install
-echo "lib/systemd/system/moosefs-metalogger@.service" >> debian/moosefs-metalogger.install
+systemdunitdir=`pkg-config --variable=systemdsystemunitdir systemd`
+
+echo "${systemdunitdir}/moosefs-master@.service" >> debian/moosefs-master.install
+echo "${systemdunitdir}/moosefs-chunkserver@.service" >> debian/moosefs-chunkserver.install
+echo "${systemdunitdir}/moosefs-metalogger@.service" >> debian/moosefs-metalogger.install
+echo "${systemdunitdir}/moosefs-cgiserv.service" >> debian/moosefs-cgiserv.install
+echo "${systemdunitdir}/moosefs-master.service" >> debian/moosefs-master.install
+echo "${systemdunitdir}/moosefs-chunkserver.service" >> debian/moosefs-chunkserver.install
+echo "${systemdunitdir}/moosefs-metalogger.service" >> debian/moosefs-metalogger.install

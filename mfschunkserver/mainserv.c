@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Jakub Kruszona-Zawadzki, Saglabs SA
+ * Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
  * 
  * This file is part of MooseFS.
  * 
@@ -22,7 +22,7 @@
 #include "config.h"
 #endif
 
-#define MMAP_ALLOC 1
+// #define MMAP_ALLOC 1
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -797,15 +797,21 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 				pthread_mutex_lock(&(wrdata.lock));
 				if (writeid==0) {
 					// add new element to wrdata.head
+//#ifdef MMAP_ALLOC
+//					wrjob = mmap(NULL,offsetof(write_job,data),PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
+//#else
+//					wrjob = malloc(offsetof(write_job,data));
+//#endif
 #ifdef MMAP_ALLOC
-					wrjob = mmap(NULL,offsetof(write_job,data),PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
+					wrjob = mmap(NULL,sizeof(write_job),PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
 #else
-					wrjob = malloc(offsetof(write_job,data));
+					wrjob = malloc(sizeof(write_job));
 #endif
 					passert(wrjob);
 					wrjob->chunkid = chunkid;
 					wrjob->writeid = 0;
-					wrjob->structsize = offsetof(write_job,data);
+//					wrjob->structsize = offsetof(write_job,data);
+					wrjob->structsize = sizeof(write_job);
 					wrjob->ack = 3;
 					wrjob->hddstatus = MFS_STATUS_OK;
 					wrjob->netstatus = status;

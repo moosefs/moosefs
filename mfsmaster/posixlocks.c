@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Jakub Kruszona-Zawadzki, Saglabs SA
+ * Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
  * 
  * This file is part of MooseFS.
  * 
@@ -654,6 +654,9 @@ uint8_t posix_lock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,ch
 		return MFS_ERROR_MISMATCH;
 	}
 	posix_lock_do_apply_lock(il,sessionid,owner,type,start,end,pid);
+	if (il->active==NULL && il->waiting_head==NULL) {
+		posix_lock_inode_remove(il->inode);
+	}
 	meta_version_inc();
 	return MFS_STATUS_OK;
 }

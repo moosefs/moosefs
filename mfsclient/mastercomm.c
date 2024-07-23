@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Jakub Kruszona-Zawadzki, Saglabs SA
+ * Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
  * 
  * This file is part of MooseFS.
  * 
@@ -4237,6 +4237,7 @@ uint8_t fs_gettrashpath(uint32_t inode,const uint8_t **path) {
 	}
 	put32bit(&wptr,inode);
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_GETTRASHPATH,&i);
+	*path = NULL;
 	if (rptr==NULL) {
 		ret = MFS_ERROR_IO;
 	} else if (i==1) {

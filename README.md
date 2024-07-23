@@ -46,15 +46,15 @@ There is a separate MooseFS Client for Microsoft Windows available, built on top
 ## Getting started
 You can install MooseFS using your favourite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download):
 
-* Ubuntu 16 / 18 / 20 / 22
-* Debian 8 / 9 / 10 / 11
+* Ubuntu 16 / 18 / 20 / 22 / 24
+* Debian 9 / 10 / 11 / 12 / 13
 * RHEL / CentOS 7 / 8 / 9
-* FreeBSD 11 / 12 / 13
-* macOS 10.11+
+* FreeBSD 11 / 12 / 13 / 14
+* macOS 10.12+
 * Ubuntu 20 / 22 – Raspberry Pi
-* Debian 10 / 11 – Raspberry Pi
+* Debian 11 / 12 – Raspberry Pi
 
-Packages for Ubuntu 14 and CentOS 6 are also available, but no longer supported.
+Packages for CentOS 6 are also available, but no longer supported.
 
 Minimal set of packages, which are needed to run MooseFS:
 
@@ -170,7 +170,7 @@ Refer to [installation guides](https://moosefs.com/support/#documentation) for m
 * Date of the first public release: 2008-05-30
 * The project web site: https://moosefs.com
 * Installation and using MooseFS: https://moosefs.com/support
-* (Old) Sourceforge project site: http://sourceforge.net/projects/moosefs
+* (Old) Sourceforge project site: https://sourceforge.net/projects/moosefs
 
 ## Contact us
 * Reporting bugs: [GitHub issue](https://github.com/moosefs/moosefs/issues) or [support@moosefs.com](mailto:support@moosefs.com)
@@ -178,7 +178,7 @@ Refer to [installation guides](https://moosefs.com/support/#documentation) for m
 
 
 ## Copyright
-Copyright (c) 2008-2023 Jakub Kruszona-Zawadzki, Saglabs SA
+Copyright (c) 2008-2024 Jakub Kruszona-Zawadzki, Saglabs SA
 
 This file is part of MooseFS.
 

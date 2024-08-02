@@ -1,5 +1,5 @@
 chunkserver_mans=mfschunkserver.8 mfschunktool.8 mfscsstatsdump.8 mfschunkserver.cfg.5 mfshdd.cfg.5
-master_mans=mfsmaster.8 mfsmetarestore.8 mfsstatsdump.8 mfsmetadump.8 mfsmetadirinfo.8 mfsmaster.cfg.5 mfsexports.cfg.5 mfstopology.cfg.5
+master_mans=mfsmaster.8 mfsmetarestore.8 mfsstatsdump.8 mfsmetadump.8 mfsmetadirinfo.8 mfsmaster.cfg.5 mfsexports.cfg.5 mfstopology.cfg.5 moosefs.7
 cli_mans=mfscli.1
 cgiserv_mans=mfscgiserv.8
 metalogger_mans=mfsmetalogger.8 mfsmetalogger.cfg.5

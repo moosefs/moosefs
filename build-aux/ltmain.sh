@@ -2,7 +2,7 @@
 ## DO NOT EDIT - This file generated from ./build-aux/ltmain.in
 ##               by inline-source v2019-02-19.15
 
-# libtool (GNU libtool) 2.5.0.1-38c1-dirty
+# libtool (GNU libtool) 2.5.0.14-9a4a-dirty
 # Provide generalized library-building support services.
 # Written by Gordon Matzigkeit <gord@gnu.ai.mit.edu>, 1996
 
@@ -31,8 +31,8 @@
 
 PROGRAM=libtool
 PACKAGE=libtool
-VERSION=2.5.0.1-38c1-dirty
-package_revision=2.5.0.1
+VERSION=2.5.0.14-9a4a-dirty
+package_revision=2.5.0.14
 
 
 ## ------ ##
@@ -2215,7 +2215,7 @@ func_version ()
 # End:
 
 # Set a version string.
-scriptversion='(GNU libtool) 2.5.0.1-38c1-dirty'
+scriptversion='(GNU libtool) 2.5.0.14-9a4a-dirty'
 
 
 # func_echo ARG...
@@ -2306,7 +2306,7 @@ include the following information:
        compiler:       $LTCC
        compiler flags: $LTCFLAGS
        linker:         $LD (gnu? $with_gnu_ld)
-       version:        $progname (GNU libtool) 2.5.0.1-38c1-dirty
+       version:        $progname (GNU libtool) 2.5.0.14-9a4a-dirty
        automake:       `($AUTOMAKE --version) 2>/dev/null |$SED 1q`
        autoconf:       `($AUTOCONF --version) 2>/dev/null |$SED 1q`
 
@@ -7564,6 +7564,8 @@ func_mode_link ()
       # -static-libsan       Link with static sanitizer runtimes (Clang)
       # -no-canonical-prefixes Do not expand any symbolic links
       # -fuse-ld=*           Linker select flags for GCC
+      # -static-*            direct GCC to link specific libraries statically
+      # -fcilkplus           Cilk Plus language extension features for C/C++
       # -rtlib=*             select c runtime lib with clang
       # --unwindlib=*        select unwinder library with clang
       # -f{file|debug|macro|profile}-prefix-map=* needed for lto linking
@@ -7576,7 +7578,7 @@ func_mode_link ()
       -specs=*|-fsanitize=*|-fno-sanitize*|-shared-libsan|-static-libsan| \
       -ffile-prefix-map=*|-fdebug-prefix-map=*|-fmacro-prefix-map=*|-fprofile-prefix-map=*| \
       -fdiagnostics-color*|-frecord-gcc-switches| \
-      -fuse-ld=*|-Wa,*|-Werror|-Werror=*)
+      -fuse-ld=*|-static-*|-fcilkplus|-Wa,*|-Werror|-Werror=*)
         func_quote_arg pretty "$arg"
 	arg=$func_quote_arg_result
         func_append compile_command " $arg"
@@ -8641,7 +8643,7 @@ func_mode_link ()
 	       test no = "$hardcode_direct_absolute"; then
 	      add=$libdir/$linklib
 	    elif test yes = "$hardcode_minus_L"; then
-	      add_dir=-L$libdir
+	      add_dir=-L$lt_sysroot$libdir
 	      add=-l$name
 	    elif test yes = "$hardcode_shlibpath_var"; then
 	      case :$finalize_shlibpath: in
@@ -8658,7 +8660,7 @@ func_mode_link ()
 	      fi
 	    else
 	      # We cannot seem to hardcode it, guess we'll fake it.
-	      add_dir=-L$libdir
+	      add_dir=-L$lt_sysroot$libdir
 	      # Try looking first in the location we're being installed to.
 	      if test -n "$inst_prefix_dir"; then
 		case $libdir in

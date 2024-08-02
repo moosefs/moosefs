@@ -1,0 +1,121 @@
+.TH moosefs "7" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.SH NAME
+MooseFS \- fault tolerant, highly reliable, near indefinitely scalable, fast distributed file system in User Space
+
+.SH DESCRIPTION
+.PP
+MooseFS is a fault tolerant, distributed file system. It spreads data over several physical locations (servers), which are visible to user as one resource. For standard file operations MooseFS acts as any other Unix-like filesystem:
+.TP
+-
+hierarchical structure (directory tree)
+.TP 
+-
+stores POSIX file attributes (permissions, last access and modification times)
+.TP
+-
+supports special files (block and character devices, pipes and sockets)
+.TP
+-
+supports symbolic links (file names pointing to target files, not necessarily on MooseFS) and hard links (different names of files that refer to the same data on MooseFS)
+.TP
+-
+supports ACLs
+.TP
+-
+supports file locks across all connected client processes
+.TP
+-
+access to the file system can be limited based on IP address and/or password
+.PP
+Distinctive features of MooseFS are:
+.TP
+-
+high reliability (several copies of the data can be stored on separate physical machines)
+.TP
+-
+capacity is dynamically expandable by adding new computers/disks
+.TP
+-
+deleted files are retained for a configurable period of time (a file system level ”trash bin”) 
+.TP
+-
+coherent snapshots of files, even while the file is being written/accessed
+.PP
+MooseFS consists of 4 key components:
+.TP
+Master Servers
+in MooseFS CE one machine, in MooseFS Pro any number of machines running the \fBmfsmaster\fP binary, which is managing the whole filesystem, storing metadata for every file (information on size, attributes and file location(s), including all information about non-regular files, i.e. directories, sockets, pipes and devices)
+.TP
+Chunk Servers
+any number of commodity servers running the \fBmfschunkserver\fP binary, which is storing files’ data and synchronizing it among themselves (if a certain file is supposed to exist in more than one copy).
+.TP
+Metalogger Servers
+any number of servers running the \fBmfsmetalogger\fP binary, all of which store metadata changelogs and periodically download main metadata file
+.TP
+Client Processes
+machines running the \fBmfsmount\fP processes, that access the files stored on MooseFS file system and expose them via a regular mount point inside a client's machine local directory tree
+.PP
+Additionally, a number of tools can be installed to aid in using the system:
+.TP
+CGI
+a web based statistic and diagnostic tool (\fBmfscli.cgi\fP, comes with its own simple HTTP server, \fBcgiserv\fP, but can be used with any standard HTTP server supporting cgi instead)
+.TP
+CLI
+command line statistic and diagnostic tool \fBmfscli\fP
+.TP
+Block device
+Linux only special client process \fBmfsbdev\fP that maps single MooseFS files into block devices
+.TP
+TOOLS
+various command line administrative tools
+
+.SH ARCHITECTURE
+.PP
+From the user’s point of view, MooseFS behaves like a regular, POSIX compliant file system with almost indefinitely expandable capacity. 
+To achieve this, the system was designed as a distributed network file system, where different processes run on different machines, perform specific tasks to assure proper performance of the whole file system.
+Master Sever stores metadata information about files and manages the whole file system. In case of MooseFS Pro installation, with several Master Servers, only one of them (in the role of Leader) manages the system at any given time, the others (Followers) just keep up, ready to pick up the Leader role at any time. The managing Master Server has following tasks: it stores all the metadata of the file system (information about files and directories), it answers the requests of client (mount) processes when they want to perform any operation on the file system, it monitors the state of Chunk Servers and stored data, sending replication or deletion requests to Chunk Servers when needed.
+.PP
+Metadata is stored in the memory of the Master Server and simultaneously saved on a local disk (as a periodically updated binary file and immediately updated incremental logs). The main binary file as well as the logs are synchronized to the Metaloggers (if present) and to spare Master Servers in MooseFS Pro version.
+Chunk Servers store actual file data. All data on the filesystem is divided into chunks (hence the name of the servers that keep them) of maximum size of 64 MiB. The chunks are kept in several copies on different servers according to appropriate policies to ensure safety of the data. Chunk Servers communicate with client processes (on client’s request, as directed by the master) to write or read file data. The chunks themselves are stored as regular files on local hard drive or drives.
+.PP
+All file operations on a client computer that has mounted a MooseFS instance are exactly the same as they would be with any other file system. The operating system’s kernel transfers all file operations to the FUSE module, which communicates with the \fBmfsmount\fP process. The \fBmfsmount\fP process communicates through the network subsequently with the managing server and data servers. This entire process is fully transparent to the user.
+.PP
+At any point in time new Chunk Servers can be added to the system to expand the total available space. Also, new hard drives can be added to existing Chunk Servers. The Master Server will add the ”new” space to the filesystem automatically. Thus, the system’s data capacity can be expanded almost indefinitely, as long as the Master Server is able to store all the relevant metadata information.
+The Master Server will ensure that all the available physical disk space is used in as balanced manner as possible.
+.PP
+In such a big system hardware failures will occur. MooseFS will automatically react in case of hard drive failure or whole Chunk Server failure. The safety of the data is ensured by storing it in several copies, according to defined storage policies. After a failure the Master Server will start replication of the still existing copies in accordance with endangered file’s storage policy, to restore its required safety redundancy level as soon as possible.
+.PP
+Failures of a client machine (that runs the \fBmfsmount\fP process) will have no influence on the coherence of the file system or on the other clients’ operations. In the worst case scenario the data that has not yet been sent from the failed client computer to the Master Server and/or Chunk Servers may be lost.
+
+.SH SUPPORTED PLATFORMS
+
+\fBmfsmount\fP is based on the FUSE mechanism (Filesystem in USErspace), so MooseFS client is available on every Operating System with a working FUSE implementation.
+
+The Master Server, Metalogger and Chunk Servers can be run on any POSIX compliant OS on most major processor types and architectures. 32-bit processors will work too, but beware of RAM handicap and the consequences of it. Use of 64-bit versions of operating systems is highly recommended.
+
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfschunkserver (8),
+.BR mfsmetalogger (8),
+.BR mfsmount (8),
+.BR mfsbdev (8)

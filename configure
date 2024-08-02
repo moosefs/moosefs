@@ -6008,8 +6008,8 @@ esac
 
 
 
-macro_version='2.5.0.1-38c1-dirty'
-macro_revision='2.5.0.1'
+macro_version='2.5.0.14-9a4a-dirty'
+macro_revision='2.5.0.14'
 
 
 
@@ -7090,7 +7090,7 @@ do
   esac
     for ac_exec_ext in '' $ac_executable_extensions; do
   if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
-    ac_cv_prog_FILECMD=":"
+    ac_cv_prog_FILECMD="file"
     printf "%s\n" "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
     break 2
   fi
@@ -7098,6 +7098,7 @@ done
   done
 IFS=$as_save_IFS
 
+  test -z "$ac_cv_prog_FILECMD" && ac_cv_prog_FILECMD=":"
 fi ;;
 esac
 fi

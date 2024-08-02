@@ -309,6 +309,7 @@ exit 0
 %{_mandir}/man5/mfsexports.cfg.5*
 %{_mandir}/man5/mfstopology.cfg.5*
 %{_mandir}/man5/mfsmaster.cfg.5*
+%{_mandir}/man7/moosefs.7*
 %{_mandir}/man8/mfsmaster.8*
 %{_mandir}/man8/mfsmetarestore.8*
 %{_mandir}/man8/mfsmetadump.8*

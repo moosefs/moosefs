@@ -9,6 +9,7 @@ sbin/mfsstatsdump
 man/man5/mfsexports.cfg.5.gz
 man/man5/mfsmaster.cfg.5.gz
 man/man5/mfstopology.cfg.5.gz
+man/man7/moosefs.7.gz
 man/man8/mfsmaster.8.gz
 man/man8/mfsmetarestore.8.gz
 man/man8/mfsmetadump.8.gz

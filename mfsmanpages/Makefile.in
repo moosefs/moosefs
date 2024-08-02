@@ -160,8 +160,9 @@ am__uninstall_files_from_dir = { \
   }
 man1dir = $(mandir)/man1
 am__installdirs = "$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man5dir)" \
-	"$(DESTDIR)$(man8dir)"
+	"$(DESTDIR)$(man7dir)" "$(DESTDIR)$(man8dir)"
 man5dir = $(mandir)/man5
+man7dir = $(mandir)/man7
 man8dir = $(mandir)/man8
 NROFF = nroff
 MANS = $(man_MANS)
@@ -330,7 +331,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 chunkserver_mans = mfschunkserver.8 mfschunktool.8 mfscsstatsdump.8 mfschunkserver.cfg.5 mfshdd.cfg.5
-master_mans = mfsmaster.8 mfsmetarestore.8 mfsstatsdump.8 mfsmetadump.8 mfsmetadirinfo.8 mfsmaster.cfg.5 mfsexports.cfg.5 mfstopology.cfg.5
+master_mans = mfsmaster.8 mfsmetarestore.8 mfsstatsdump.8 mfsmetadump.8 mfsmetadirinfo.8 mfsmaster.cfg.5 mfsexports.cfg.5 mfstopology.cfg.5 moosefs.7
 cli_mans = mfscli.1
 cgiserv_mans = mfscgiserv.8
 metalogger_mans = mfsmetalogger.8 mfsmetalogger.cfg.5
@@ -481,6 +482,49 @@ uninstall-man5:
 	} | sed -e 's,.*/,,;h;s,.*\.,,;s,^[^5][0-9a-z]*$$,5,;x' \
 	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,'`; \
 	dir='$(DESTDIR)$(man5dir)'; $(am__uninstall_files_from_dir)
+install-man7: $(man_MANS)
+	@$(NORMAL_INSTALL)
+	@list1=''; \
+	list2='$(man_MANS)'; \
+	test -n "$(man7dir)" \
+	  && test -n "`echo $$list1$$list2`" \
+	  || exit 0; \
+	echo " $(MKDIR_P) '$(DESTDIR)$(man7dir)'"; \
+	$(MKDIR_P) "$(DESTDIR)$(man7dir)" || exit 1; \
+	{ for i in $$list1; do echo "$$i"; done;  \
+	if test -n "$$list2"; then \
+	  for i in $$list2; do echo "$$i"; done \
+	    | sed -n '/\.7[a-z]*$$/p'; \
+	fi; \
+	} | while read p; do \
+	  if test -f $$p; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; echo "$$p"; \
+	done | \
+	sed -e 'n;s,.*/,,;p;h;s,.*\.,,;s,^[^7][0-9a-z]*$$,7,;x' \
+	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,' | \
+	sed 'N;N;s,\n, ,g' | { \
+	list=; while read file base inst; do \
+	  if test "$$base" = "$$inst"; then list="$$list $$file"; else \
+	    echo " $(INSTALL_DATA) '$$file' '$(DESTDIR)$(man7dir)/$$inst'"; \
+	    $(INSTALL_DATA) "$$file" "$(DESTDIR)$(man7dir)/$$inst" || exit $$?; \
+	  fi; \
+	done; \
+	for i in $$list; do echo "$$i"; done | $(am__base_list) | \
+	while read files; do \
+	  test -z "$$files" || { \
+	    echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(man7dir)'"; \
+	    $(INSTALL_DATA) $$files "$(DESTDIR)$(man7dir)" || exit $$?; }; \
+	done; }
+
+uninstall-man7:
+	@$(NORMAL_UNINSTALL)
+	@list=''; test -n "$(man7dir)" || exit 0; \
+	files=`{ for i in $$list; do echo "$$i"; done; \
+	l2='$(man_MANS)'; for i in $$l2; do echo "$$i"; done | \
+	  sed -n '/\.7[a-z]*$$/p'; \
+	} | sed -e 's,.*/,,;h;s,.*\.,,;s,^[^7][0-9a-z]*$$,7,;x' \
+	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,'`; \
+	dir='$(DESTDIR)$(man7dir)'; $(am__uninstall_files_from_dir)
 install-man8: $(man_MANS)
 	@$(NORMAL_INSTALL)
 	@list1=''; \
@@ -567,7 +611,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(MANS)
 installdirs:
-	for dir in "$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man5dir)" "$(DESTDIR)$(man8dir)"; do \
+	for dir in "$(DESTDIR)$(man1dir)" "$(DESTDIR)$(man5dir)" "$(DESTDIR)$(man7dir)" "$(DESTDIR)$(man8dir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -636,7 +680,7 @@ install-info: install-info-am
 
 install-info-am:
 
-install-man: install-man1 install-man5 install-man8
+install-man: install-man1 install-man5 install-man7 install-man8
 
 install-pdf: install-pdf-am
 
@@ -666,7 +710,8 @@ ps-am:
 
 uninstall-am: uninstall-man
 
-uninstall-man: uninstall-man1 uninstall-man5 uninstall-man8
+uninstall-man: uninstall-man1 uninstall-man5 uninstall-man7 \
+	uninstall-man8
 
 .MAKE: install-am install-strip
 
@@ -676,13 +721,13 @@ uninstall-man: uninstall-man1 uninstall-man5 uninstall-man8
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am install-man \
-	install-man1 install-man5 install-man8 install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
-	uninstall-am uninstall-man uninstall-man1 uninstall-man5 \
-	uninstall-man8
+	install-man1 install-man5 install-man7 install-man8 \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags-am uninstall uninstall-am uninstall-man uninstall-man1 \
+	uninstall-man5 uninstall-man7 uninstall-man8
 
 .PRECIOUS: Makefile
 

@@ -8216,7 +8216,7 @@ AC_SUBST([DLLTOOL])
 # ----------------
 # Check for a file(cmd) program that can be used to detect file type and magic
 m4_defun([_LT_DECL_FILECMD],
-[AC_CHECK_PROG([FILECMD], [file], [:])
+[AC_CHECK_PROG([FILECMD], [file], [file], [:])
 _LT_DECL([], [FILECMD], [1], [A file(cmd) program that detects file types])
 ])# _LD_DECL_FILECMD
 

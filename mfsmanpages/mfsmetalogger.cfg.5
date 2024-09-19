@@ -1,4 +1,4 @@
-.TH mfsmetalogger.cfg "5" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsmetalogger.cfg "5" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsmetalogger.cfg \- configuration file for \fBmfsmetalogger\fP
 .SH DESCRIPTION
@@ -11,11 +11,8 @@ Syntax is:
 .IB OPTION " = " VALUE
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
-.SH OPTIONS
-Configuration options:
-.TP
-.B DATA_PATH
-where to store metadata files
+.SH STARTUP OPTIONS
+Changes in this section require process restart.
 .TP
 .B WORKING_USER
 user to run daemon as
@@ -30,13 +27,21 @@ name of process to place in syslog messages (default is mfsmetalogger)
 whether to perform mlockall() to avoid swapping out mfsmetalogger process (default is 0, i.e. no)
 .TP
 .B LIMIT_GLIBC_MALLOC_ARENAS
-limit malloc arenas to given value - prevents server from using huge amount of virtual memory (Linux onty, default is 4)
+limit malloc arenas to given value - prevents server from using huge amount of virtual memory (Linux only, default is 4)
 .TP
 .B DISABLE_OOM_KILLER
 disable out of memory killer (Linux only, default is 1)
 .TP
 .B NICE_LEVEL
 nice level to run daemon with (default is -19 if possible; note: process must be started as root to increase priority)
+.TP
+.B FILE_UMASK
+set default umask for group and others; user has always 0; default is 027 - block write for group and block all for others
+.TP
+.B DATA_PATH
+where to store metadata files
+.SH RUNTIME OPTIONS
+Changes in this section require only process reload.
 .TP
 .B BACK_LOGS
 number of metadata change log files (default is 50)
@@ -47,6 +52,17 @@ number of previous metadata files to be kept (default is 3)
 .B META_DOWNLOAD_FREQ
 metadata download frequency in hours (default is 24, at most \fBBACK_LOGS\fP/2)
 .TP
+.B SYSLOG_MIN_LEVEL
+minimum level of messages that will be reported by matalogger; levels in order of importance: ERROR, WARNING, NOTICE, INFO, DEBUG (default is INFO)
+.TP
+.B SYSLOG_ELEVATE_TO
+reported messages of level lower than set by this option will be elevated to this level (i.e. if \fBSYSLOG_MIN_LEVEL\fP is set to DEBUG and \fBSYSLOG_ELEVATE_TO\fP is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE ; default is NOTICE)
+.SH MASTER CONNECTION OPTIONS
+Changes in this section require only process reload.
+.TP
+.B MASTER_RECONNECTION_DELAY
+delay in seconds before trying to reconnect to master after disconnection (default is 5)
+.TP
 .B BIND_HOST
 local address to use for master connections; default is *, i.e. default local address
 .TP
@@ -54,10 +70,7 @@ local address to use for master connections; default is *, i.e. default local ad
 address of MooseFS master host to connect with (default is mfsmaster)
 .TP
 .B MASTER_PORT
-number of MooseFS master port to connect with (default is 9420)
-.TP
-.B MASTER_RECONNECTION_DELAY
-delay in seconds before trying to reconnect to master after disconnection (default is 5)
+number of MooseFS master port to connect with (default is 9419)
 .TP
 .B MASTER_TIMEOUT
 timeout (in seconds) for master connections (default is 10)

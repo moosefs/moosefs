@@ -1,6 +1,6 @@
 # Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
 
-PORTNAME=		moosefs3
+PORTNAME=		moosefs4
 DISTVERSION=		0.0.0
 DISTVERSIONSUFFIX=	0
 PORTREVISION=		0
@@ -19,6 +19,7 @@ GNU_CONFIGURE=		yes
 WRKSRC=			${WRKDIR}/moosefs-${PORTVERSION}
 PLIST=			${.CURDIR}/pkg-plist
 DESCR=			${.CURDIR}/pkg-descr
+STRIP=
 
 MFS_COMPONENT?=		master
 MFS_USER=		mfs
@@ -33,6 +34,7 @@ CONFIGURE_ARGS+=	--localstatedir=${MFS_WORKDIR} \
 			--with-default-group=${MFS_GROUP}
 
 CONFLICTS=		moosefs2-${MFS_COMPONENT}-*
+CONFLICTS+=		moosefs3-${MFS_COMPONENT}-*
 
 .if ${MFS_COMPONENT} == cgi
 MFS_CGIDIR=		${PREFIX}/share/mfscgi
@@ -52,7 +54,7 @@ PKGMESSAGE=		${WRKDIR}/pkg-message-cgiserv
 PLIST_SUB+=		MFS_WORKDIR="${MFS_WORKDIR}"
 CONFIGURE_ARGS+=	--enable-mfscgiserv \
 			--with-mfscgiserv-dir=${MFS_CGISERVDIR}
-RUN_DEPENDS=		moosefs3-cgi>0:sysutils/moosefs3-cgi
+RUN_DEPENDS=		moosefs4-cgi>0:sysutils/moosefs4-cgi
 .else
 CONFIGURE_ARGS+=	--disable-mfscgiserv
 .endif
@@ -107,6 +109,5 @@ CONFIGURE_ARGS+=	--enable-mfsnetdump
 .else
 CONFIGURE_ARGS+=	--disable-mfsnetdump
 .endif
-
 
 .include <bsd.port.mk>

@@ -27,6 +27,7 @@ typedef struct _bio bio;
 
 enum {BIO_READ,BIO_WRITE};
 
+bio* bio_null_open(uint8_t direction);
 bio* bio_file_open(const char *fname,uint8_t direction,uint32_t buffersize);
 bio* bio_socket_open(int socket,uint8_t direction,uint32_t buffersize,uint32_t msecto);
 uint64_t bio_file_position(bio *b);
@@ -36,9 +37,13 @@ int64_t bio_read(bio *b,void *dst,uint64_t len);
 int64_t bio_write(bio *b,const void *src,uint64_t len);
 int8_t bio_seek(bio *b,int64_t offset,int whence);
 void bio_skip(bio *b,uint64_t len);
+void bio_shutdown(bio *b);
+void bio_wait(bio *b);
 uint8_t bio_eof(bio *b);
 uint8_t bio_error(bio *b);
+int bio_lasterrno(bio *b);
 int bio_descriptor(bio *b);
+void bio_sync(bio *b);
 void bio_close(bio *b);
 
 

@@ -1,4 +1,4 @@
-.TH mfschunkserver.cfg "5" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfschunkserver.cfg "5" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfschunkserver.cfg \- main configuration file for \fBmfschunkserver\fP
 .SH DESCRIPTION
@@ -11,8 +11,8 @@ Syntax is:
 .IB OPTION " = " VALUE
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
-.SH OPTIONS
-Configuration options:
+.SH STARTUP OPTIONS 
+Changes in this section require process restart.
 .TP
 .B WORKING_USER
 user to run daemon as
@@ -27,7 +27,7 @@ name of process to place in syslog messages; default is mfschunkserver
 whether to perform mlockall() to avoid swapping out mfschunkserver process; default is 0, i.e. no
 .TP
 .B LIMIT_GLIBC_MALLOC_ARENAS
-limit malloc arenas to given value - prevents server from using huge amount of virtual memory (Linux onty, default is 4)
+limit malloc arenas to given value - prevents server from using huge amount of virtual memory (Linux only, default is 4)
 .TP
 .B DISABLE_OOM_KILLER
 disable out of memory killer (Linux only, default is 1)
@@ -41,22 +41,25 @@ set default umask for group and others (user has always 0); default is 027 - blo
 .B DATA_PATH
 where to store daemon lock file
 .TP
+.B ALLOW_STARTING_WITH_INVALID_DISKS
+when set to one chunkserver will not abort start even when incorrect entries are found in 'mfshdd.cfg' file; default is 0 (do not start with invalid entries)
+.TP
+.B CAN_USE_MMAP
+using mmap for allocation can slightly reduce ram usage and give a silight performance boost, but on certain architectures/kernels can lead to problems - especially on architectures with more than one physical CPU; default is 0
+.SH RUNTIME OPTIONS 
+Changes in this section require only process reload.
+.TP
 .B HDD_CONF_FILENAME
 alternate location/name of \fBmfshdd.cfg\fP file
-.TP
-.B HDD_TEST_FREQ
-This option is deprecated. Please define \fBHDD_TEST_SPEED\fP instead. If \fBHDD_TEST_SPEED\fP is not defined then system will try to use \fBHDD_TEST_FREQ\fP but will convert it to \fBHDD_TEST_SPEED\fP using formula:
-\fBHDD_TEST_SPEED = 10 / HDD_TEST_FREQ\fP
 .TP
 .B HDD_TEST_SPEED
 Speed of background chunk tests in MB/s per disk (formally entry defined in \fBmfshdd.cfg\fP). Value can be given as a decimal number; default is 1.0
 .TP
 .B HDD_MIN_TEST_INTERVAL
-prevents from testing chunk integrity when last I/O (including test) was performed less than HDD_MIN_TEST_INTERVAL seconds ago; default is 86400
+prevents from testing chunk integrity when last I/O (including test) was performed less than HDD_MIN_TEST_INTERVAL ago; default is 1 day; for value formatting see TIME
 .TP
 .B HDD_FADVISE_MIN_TIME
-If possible use posix_fadvise(POSIX_DONTNEED) after each chunk test (but only if last I/O operation was performed more than HDD_FADVISE_MIN_TIME seconds ago). Using zero will always perform posix_fadvise (flush cache) and using negative value will never flush cache after tests. This setting is valid only for system
-s that support posix_fadivise; default value is 86400
+If possible use posix_fadvise(POSIX_DONTNEED) after each chunk test (but only if last I/O operation was performed more than HDD_FADVISE_MIN_TIME ago). Using zero will always perform posix_fadvise (flush cache) and using negative value will never flush cache after tests. This setting is valid only for systems that support posix_fadivise; default is 1 day; for value formatting see TIME
 .TP
 .B HDD_LEAVE_SPACE_DEFAULT
 how much space should be left unused on each hard drive; 
@@ -76,19 +79,24 @@ how many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a
 enables/disables fsync before chunk closing; default is 0 (off)
 .TP
 .B HDD_SPARSIFY_ON_WRITE
-enables/disables sparsification (skip leading and trailing zeros) during writing new block; default is 1 (on)
+enables/disables sparsification (skip leading and trailing zeroz) during writing new block; default is 1 (on)
 .TP
 .B HDD_RR_CHUNK_COUNT
 how many chunks should be created in one directory before moving to the next one; higher values are better with most OSes caching algorithms, low values lead to more even chunk distribution; default is 10000 which works best in most cases
 .TP
 .B HDD_KEEP_DUPLICATES_HOURS
-how many hours duplicate chunks should be kept before deleting (default is 168 - one week); changign this value and reloading will reset the counter
-.TP
-.B ALLOW_STARTING_WITH_INVALID_DISKS
-when set to one chunkserver will not abort start even when incorrect entries are found in 'mfshdd.cfg' file; default is 0 (do not start with invalid entries)
+how many hours duplicate chunks should be kept before deleting (default is one week); changing this value and reloading will reset the counter; for value formatting see TIME
 .TP
 .BR WORKERS_MAX ", " WORKERS_MAX_IDLE
 maximum number of active workers and maximum number of idle workers; defaults are 250 and 40
+.TP
+.B SYSLOG_MIN_LEVEL
+minimum level of messages that will be reported by chunkserver; levels in order of importance: ERROR, WARNING, NOTICE, INFO, DEBUG (default is INFO)
+.TP
+.B SYSLOG_ELEVATE_TO
+reported messages of level lower than set by this option will be elevated to this level (i.e. if \fBSYSLOG_MIN_LEVEL\fP is set to DEBUG and \fBSYSLOG_ELEVATE_TO\fP is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE ; default is NOTICE)
+.SH MASTER CONNECTION OPTIONS
+Changes in this section require only process reload.
 .TP
 .B LABELS
 labels string defined as a set of letters (case insensitive) separated by coma or semicolon; default is empty - no labels
@@ -114,17 +122,34 @@ delay in seconds before trying to reconnect to master after disconnection (defau
 .B AUTH_CODE
 authentication string (used only when master requires authorization)
 .TP
-.B BIND_HOST
-local address to use for connecting with master (default is \fB*\fP, i.e. default local address)
-.TP
 .B CHUNKS_PER_REGISTER_PACKET
-maximum number of chunks system will try to put in a single register message (default is 10000, limits 1000-100000)
+maximum number of chunks system will try to put in a single register message (default is 1000, limits 100-10000)
+.SH CLIENTS CONNECTION OPTIONS
+Changes in this section require only process reload.
 .TP
 .B CSSERV_LISTEN_HOST
 IP address to listen on for client (mount) connections (\fB*\fP means any)
 .TP
 .B CSSERV_LISTEN_PORT
 port to listen on for client (mount) connections (default is 9422)
+.SH TIME
+.PP
+For config variables that define time without requiring a single, specific unit, time can be defined as a number of seconds (integer) or a time period in one of two possible formats:
+.PP
+first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
+.PP
+second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
+o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+.PP
+Notice! For variable \fBHDD_KEEP_DUPLICATES_HOURS\fP only h,d and w time units are accepted and a value without a time unit is treated as hours; fractions are rounded to full hours.
+.PP
+Examples:
+.PP
+1.5h is the same as 1h30m, is the same as 90m, is the same as 5400s, is the same as 5400
+.PP
+2.5d is the same as 2d12h, is the same as 60h; 1d36h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
+.PP
+1.03m is the same as 62s (61.8 seconds will be rounded up to 62)
 .SH COPYRIGHT
 Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
 

@@ -27,12 +27,15 @@
 #    define HAVE_MACH_ABSOLUTE_TIME 1
 #    define HAVE_MACH_TIMEBASE_INFO 1
 #  endif
-#  if defined(__linux__) || defined(__FreeBSD__) || defined(WIN32)
+#  if defined(__linux__) || defined(__FreeBSD__)
 #    define HAVE_CLOCK_GETTIME 1
 #  endif
 #  if defined(__posix__)
 #    define HAVE_SYS_TIME_H 1
 #    define HAVE_GETTIMEOFDAY 1
+#  endif
+#  if defined(WIN32)
+#    define HAVE_WINDOWS_H 1
 #  endif
 #endif
 
@@ -45,27 +48,31 @@
 #  include <mach/mach.h>
 #  include <mach/mach_time.h>
 #endif
+#if defined(HAVE_WINDOWS_H)
+#  include <windows.h>
+#endif
 
 #include <inttypes.h>
 
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
-double monotonic_seconds() {
+
+double monotonic_seconds(void) {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC,&ts);
 	return ts.tv_sec + (ts.tv_nsec * 0.000000001);
 }
 
-uint64_t monotonic_nseconds() {
+uint64_t monotonic_nseconds(void) {
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC,&ts);
 	return (uint64_t)(ts.tv_sec)*UINT64_C(1000000000)+(uint64_t)(ts.tv_nsec);
 }
 
-uint64_t monotonic_useconds() {
+uint64_t monotonic_useconds(void) {
 	return monotonic_nseconds()/1000;
 }
 
-const char* monotonic_method() {
+const char* monotonic_method(void) {
 	return "clock_gettime";
 }
 
@@ -82,7 +89,8 @@ uint32_t monotonic_speed(void) {
 }
 
 #elif defined(HAVE_MACH_ABSOLUTE_TIME) && defined(HAVE_MACH_TIMEBASE_INFO)
-double monotonic_seconds() {
+
+double monotonic_seconds(void) {
 	uint64_t c;
 	static double coef = 0.0;
 
@@ -97,7 +105,7 @@ double monotonic_seconds() {
 	return c * coef;
 }
 
-uint64_t monotonic_nseconds() {
+uint64_t monotonic_nseconds(void) {
 	uint64_t c;
 	static uint8_t i = 0;
 	static mach_timebase_info_data_t sti;
@@ -110,11 +118,11 @@ uint64_t monotonic_nseconds() {
 	return c * sti.numer / sti.denom;
 }
 
-uint64_t monotonic_useconds() {
+uint64_t monotonic_useconds(void) {
 	return monotonic_nseconds()/1000;
 }
 
-const char* monotonic_method() {
+const char* monotonic_method(void) {
 	(void)monotonic_seconds(); // init static variables
 	(void)monotonic_nseconds(); // init static variables
 	return "mach_absolute_time";
@@ -131,24 +139,56 @@ uint32_t monotonic_speed(void) {
 	} while (en < st);
 	return i;
 }
+
+#elif defined(WIN32)
+
+double monotonic_seconds(void) {
+	return (double)GetTickCount64() / 1000.0;
+}
+
+uint64_t monotonic_useconds(void) {
+	return GetTickCount64() * 1000;
+}
+
+uint64_t monotonic_nseconds(void) {
+	return monotonic_useconds() * 1000;
+}
+
+const char* monotonic_method(void) {
+	return "GetTickCount64";
+}
+
+uint32_t monotonic_speed(void) {
+	uint32_t i;
+	uint64_t st, en;
+	i = 0;
+	st = monotonic_useconds() + 10000;
+	do {
+		en = monotonic_useconds();
+		i++;
+	} while (en < st);
+	return i;
+}
+
 #elif defined(HAVE_GETTIMEOFDAY)
-double monotonic_seconds() {
+
+double monotonic_seconds(void) {
 	struct timeval tv;
 	gettimeofday(&tv,NULL);
 	return tv.tv_sec + (tv.tv_usec * 0.000001);
 }
 
-uint64_t monotonic_useconds() {
+uint64_t monotonic_useconds(void) {
 	struct timeval tv;
 	gettimeofday(&tv,NULL);
 	return (uint64_t)(tv.tv_sec)*UINT64_C(1000000)+(uint64_t)(tv.tv_usec);
 }
 
-uint64_t monotonic_nseconds() {
+uint64_t monotonic_nseconds(void) {
 	return monotonic_useconds()*1000;
 }
 
-const char* monotonic_method() {
+const char* monotonic_method(void) {
 	return "gettimeofday";
 }
 
@@ -163,6 +203,7 @@ uint32_t monotonic_speed(void) {
 	} while (en < st);
 	return i;
 }
+
 #else
 #error "Can't find valid time function"
 #endif

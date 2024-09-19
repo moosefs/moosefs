@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <netinet/in.h>
@@ -46,7 +45,7 @@
 #include "crc.h"
 #include "cfg.h"
 #include "main.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "massert.h"
 #include "sockets.h"
 #include "clocks.h"
@@ -88,6 +87,7 @@ typedef struct masterconn {
 	uint32_t bindip;
 	uint32_t masterip;
 	uint16_t masterport;
+	uint16_t timeout;
 	uint8_t masteraddrvalid;
 
 	uint8_t downloadretrycnt;
@@ -236,7 +236,7 @@ void masterconn_sendregister(masterconn *eptr) {
 		put16bit(&buff,VERSMAJ);
 		put8bit(&buff,VERSMID);
 		put8bit(&buff,VERSMIN);
-		put16bit(&buff,Timeout);
+		put16bit(&buff,eptr->timeout);
 		put64bit(&buff,lastlogversion+1);
 	} else {
 		buff = masterconn_createpacket(eptr,ANTOMA_REGISTER,1+4+2);
@@ -244,7 +244,35 @@ void masterconn_sendregister(masterconn *eptr) {
 		put16bit(&buff,VERSMAJ);
 		put8bit(&buff,VERSMID);
 		put8bit(&buff,VERSMIN);
-		put16bit(&buff,Timeout);
+		put16bit(&buff,eptr->timeout);
+	}
+}
+
+void masterconn_master_ack(masterconn *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t acktype;
+
+	if (length!=5) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_MASTER_ACK - wrong size (%"PRIu32"/5)",length);
+		eptr->mode = KILL;
+		return;
+	}
+
+	acktype = get8bit(&data);
+
+	if (acktype>=2) {
+		eptr->mode = KILL;
+	}
+}
+
+void masterconn_force_timeout(masterconn *eptr,const uint8_t *data,uint32_t length) {
+	if (length!=2) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_FORCE_TIMEOUT - wrong size (%"PRIu32"/2)",length);
+		eptr->mode = KILL;
+		return;
+	}
+	eptr->timeout = get16bit(&data);
+	if (eptr->timeout<10) {
+		eptr->timeout = 10;
 	}
 }
 
@@ -270,17 +298,17 @@ void masterconn_metachanges_log(masterconn *eptr,const uint8_t *data,uint32_t le
 		return;
 	}
 	if (length<10) {
-		syslog(LOG_NOTICE,"MATOAN_METACHANGES_LOG - wrong size (%"PRIu32"/9+data)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_METACHANGES_LOG - wrong size (%"PRIu32"/9+data)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	if (data[0]!=0xFF) {
-		syslog(LOG_NOTICE,"MATOAN_METACHANGES_LOG - wrong packet");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_METACHANGES_LOG - wrong packet");
 		eptr->mode = KILL;
 		return;
 	}
 	if (data[length-1]!='\0') {
-		syslog(LOG_NOTICE,"MATOAN_METACHANGES_LOG - invalid string");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_METACHANGES_LOG - invalid string");
 		eptr->mode = KILL;
 		return;
 	}
@@ -289,7 +317,7 @@ void masterconn_metachanges_log(masterconn *eptr,const uint8_t *data,uint32_t le
 	version = get64bit(&data);
 
 	if (lastlogversion>0 && version!=lastlogversion+1) {
-		syslog(LOG_WARNING, "some changes lost: [%"PRIu64"-%"PRIu64"], download metadata again",lastlogversion,version-1);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING, "some changes lost: [%"PRIu64"-%"PRIu64"], download metadata again",lastlogversion,version-1);
 		if (eptr->logfd!=NULL) {
 			fclose(eptr->logfd);
 			eptr->logfd=NULL;
@@ -311,7 +339,7 @@ void masterconn_metachanges_log(masterconn *eptr,const uint8_t *data,uint32_t le
 		fprintf(eptr->logfd,"%"PRIu64": %s\n",version,data);
 		lastlogversion = version;
 	} else {
-		syslog(LOG_NOTICE,"lost MFS change %"PRIu64": %s",version,data);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"lost MFS change %"PRIu64": %s",version,data);
 	}
 }
 
@@ -327,7 +355,7 @@ int masterconn_download_end(masterconn *eptr) {
 	masterconn_createpacket(eptr,ANTOMA_DOWNLOAD_END,0);
 	if (eptr->metafd>=0) {
 		if (close(eptr->metafd)<0) {
-			mfs_errlog_silent(LOG_NOTICE,"error closing metafile");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error closing metafile");
 			eptr->metafd=-1;
 			return -1;
 		}
@@ -338,9 +366,9 @@ int masterconn_download_end(masterconn *eptr) {
 
 void masterconn_download_init(masterconn *eptr,uint8_t filenum) {
 	uint8_t *ptr;
-//	syslog(LOG_NOTICE,"download_init %d",filenum);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"download_init %d",filenum);
 	if (eptr->mode==DATA && eptr->downloading==0) {
-//		syslog(LOG_NOTICE,"sending packet");
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"sending packet");
 		ptr = masterconn_createpacket(eptr,ANTOMA_DOWNLOAD_START,1);
 		put8bit(&ptr,filenum);
 		eptr->downloading=filenum;
@@ -359,11 +387,11 @@ int masterconn_metadata_check(char *name) {
 	uint64_t metaversion,metaid;
 	fd = open(name,O_RDONLY);
 	if (fd<0) {
-		syslog(LOG_WARNING,"can't open downloaded metadata");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't open downloaded metadata");
 		return -1;
 	}
 	if (read(fd,chkbuff,8)!=8) {
-		syslog(LOG_WARNING,"can't read downloaded metadata");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't read downloaded metadata");
 		close(fd);
 		return -1;
 	}
@@ -379,30 +407,30 @@ int masterconn_metadata_check(char *name) {
 			memcpy(eofmark,"[MFS EOF MARKER]",16);
 			if (fver>=0x20) {
 				if (read(fd,chkbuff,16)!=16) {
-					syslog(LOG_WARNING,"can't read downloaded metadata");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't read downloaded metadata");
 					close(fd);
 					return -1;
 				}
 				rptr = (uint8_t*)chkbuff;
 				metaversion = get64bit(&rptr);
 				metaid = get64bit(&rptr);
-				syslog(LOG_NOTICE,"meta data version: %"PRIu64", meta data id: 0x%016"PRIX64,metaversion,metaid);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"meta data version: %"PRIu64", meta data id: 0x%016"PRIX64,metaversion,metaid);
 			}
 		}
 	} else {
-		syslog(LOG_WARNING,"bad metadata file format");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"bad metadata file format");
 		close(fd);
 		return -1;
 	}
 	lseek(fd,-16,SEEK_END);
 	if (read(fd,chkbuff,16)!=16) {
-		syslog(LOG_WARNING,"can't read downloaded metadata");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't read downloaded metadata");
 		close(fd);
 		return -1;
 	}
 	close(fd);
 	if (memcmp(chkbuff,eofmark,16)!=0) {
-		syslog(LOG_WARNING,"truncated metadata file !!!");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"truncated metadata file !!!");
 		return -1;
 	}
 	return 0;
@@ -421,7 +449,7 @@ void masterconn_download_next(masterconn *eptr) {
 		if (dltime<=0) {
 			dltime=1;
 		}
-		syslog(LOG_NOTICE,"%s downloaded %"PRIu64"B/%"PRIu64".%06"PRIu32"s (%.3lf MB/s)",(filenum==1)?"metadata":(filenum==11)?"changelog_0":(filenum==12)?"changelog_1":"???",eptr->filesize,dltime/1000000,(uint32_t)(dltime%1000000),(double)(eptr->filesize)/(double)(dltime));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"%s downloaded %"PRIu64"B/%"PRIu64".%06"PRIu32"s (%.3lf MB/s)",(filenum==1)?"metadata":(filenum==11)?"changelog_0":(filenum==12)?"changelog_1":"???",eptr->filesize,dltime/1000000,(uint32_t)(dltime%1000000),(double)(eptr->filesize)/(double)(dltime));
 		if (filenum==1) {
 			if (masterconn_metadata_check("metadata_ml.tmp")==0) {
 				if (BackMetaCopies>0) {
@@ -435,7 +463,7 @@ void masterconn_download_next(masterconn *eptr) {
 					rename("metadata_ml.mfs.back","metadata_ml.mfs.back.1");
 				}
 				if (rename("metadata_ml.tmp","metadata_ml.mfs.back")<0) {
-					syslog(LOG_NOTICE,"can't rename downloaded metadata - do it manually before next download");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't rename downloaded metadata - do it manually before next download");
 				}
 			}
 			if (eptr->oldmode==0) {
@@ -443,12 +471,12 @@ void masterconn_download_next(masterconn *eptr) {
 			}
 		} else if (filenum==11) {
 			if (rename("changelog_ml.tmp","changelog_ml_back.0.mfs")<0) {
-				syslog(LOG_NOTICE,"can't rename downloaded changelog - do it manually before next download");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't rename downloaded changelog - do it manually before next download");
 			}
 			masterconn_download_init(eptr,12);
 		} else if (filenum==12) {
 			if (rename("changelog_ml.tmp","changelog_ml_back.1.mfs")<0) {
-				syslog(LOG_NOTICE,"can't rename downloaded changelog - do it manually before next download");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't rename downloaded changelog - do it manually before next download");
 			}
 		}
 	} else {	// send request for next data packet
@@ -464,14 +492,14 @@ void masterconn_download_next(masterconn *eptr) {
 
 void masterconn_download_info(masterconn *eptr,const uint8_t *data,uint32_t length) {
 	if (length!=1 && length!=8) {
-		syslog(LOG_NOTICE,"MATOAN_DOWNLOAD_INFO - wrong size (%"PRIu32"/1|8)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_DOWNLOAD_INFO - wrong size (%"PRIu32"/1|8)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	passert(data);
 	if (length==1) {
 		eptr->downloading = 0;
-		syslog(LOG_NOTICE,"download start error");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"download start error");
 		return;
 	}
 	eptr->filesize = get64bit(&data);
@@ -483,12 +511,12 @@ void masterconn_download_info(masterconn *eptr,const uint8_t *data,uint32_t leng
 	} else if (eptr->downloading==11 || eptr->downloading==12) {
 		eptr->metafd = open("changelog_ml.tmp",O_WRONLY | O_TRUNC | O_CREAT,0666);
 	} else {
-		syslog(LOG_NOTICE,"unexpected MATOAN_DOWNLOAD_INFO packet");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"unexpected MATOAN_DOWNLOAD_INFO packet");
 		eptr->mode = KILL;
 		return;
 	}
 	if (eptr->metafd<0) {
-		mfs_errlog_silent(LOG_NOTICE,"error opening metafile");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error opening metafile");
 		masterconn_download_end(eptr);
 		return;
 	}
@@ -501,12 +529,12 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 	uint32_t crc;
 	ssize_t ret;
 	if (eptr->metafd<0) {
-		syslog(LOG_NOTICE,"MATOAN_DOWNLOAD_DATA - file not opened");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_DOWNLOAD_DATA - file not opened");
 		eptr->mode = KILL;
 		return;
 	}
 	if (length<16) {
-		syslog(LOG_NOTICE,"MATOAN_DOWNLOAD_DATA - wrong size (%"PRIu32"/16+data)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_DOWNLOAD_DATA - wrong size (%"PRIu32"/16+data)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -515,17 +543,17 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 	leng = get32bit(&data);
 	crc = get32bit(&data);
 	if (leng+16!=length) {
-		syslog(LOG_NOTICE,"MATOAN_DOWNLOAD_DATA - wrong size (%"PRIu32"/16+%"PRIu32")",length,leng);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_DOWNLOAD_DATA - wrong size (%"PRIu32"/16+%"PRIu32")",length,leng);
 		eptr->mode = KILL;
 		return;
 	}
 	if (offset!=eptr->dloffset) {
-		syslog(LOG_NOTICE,"MATOAN_DOWNLOAD_DATA - unexpected file offset (%"PRIu64"/%"PRIu64")",offset,eptr->dloffset);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_DOWNLOAD_DATA - unexpected file offset (%"PRIu64"/%"PRIu64")",offset,eptr->dloffset);
 		eptr->mode = KILL;
 		return;
 	}
 	if (offset+leng>eptr->filesize) {
-		syslog(LOG_NOTICE,"MATOAN_DOWNLOAD_DATA - unexpected file size (%"PRIu64"/%"PRIu64")",offset+leng,eptr->filesize);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOAN_DOWNLOAD_DATA - unexpected file size (%"PRIu64"/%"PRIu64")",offset+leng,eptr->filesize);
 		eptr->mode = KILL;
 		return;
 	}
@@ -536,7 +564,7 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 	ret = write(eptr->metafd,data,leng);
 #endif /* HAVE_PWRITE */
 	if (ret!=(ssize_t)leng) {
-		mfs_errlog_silent(LOG_NOTICE,"error writing metafile");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error writing metafile");
 		if (eptr->downloadretrycnt>=5) {
 			masterconn_download_end(eptr);
 		} else {
@@ -546,7 +574,7 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 		return;
 	}
 	if (crc!=mycrc32(0,data,leng)) {
-		syslog(LOG_NOTICE,"metafile data crc error");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"metafile data crc error");
 		if (eptr->downloadretrycnt>=5) {
 			masterconn_download_end(eptr);
 		} else {
@@ -556,7 +584,7 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 		return;
 	}
 	if (fsync(eptr->metafd)<0) {
-		mfs_errlog_silent(LOG_NOTICE,"error syncing metafile");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error syncing metafile");
 		if (eptr->downloadretrycnt>=5) {
 			masterconn_download_end(eptr);
 		} else {
@@ -572,7 +600,7 @@ void masterconn_download_data(masterconn *eptr,const uint8_t *data,uint32_t leng
 
 void masterconn_beforeclose(masterconn *eptr) {
 	if (eptr->downloading==11 || eptr->downloading==12) {	// old (version less than 1.6.18) master patch
-		syslog(LOG_WARNING,"old master detected - please upgrade your master server and then restart metalogger");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"old master detected - please upgrade your master server and then restart metalogger");
 		eptr->oldmode=1;
 	}
 	if (eptr->metafd>=0) {
@@ -598,6 +626,12 @@ void masterconn_gotpacket(masterconn *eptr,uint32_t type,const uint8_t *data,uin
 		case MATOAN_METACHANGES_LOG:
 			masterconn_metachanges_log(eptr,data,length);
 			break;
+		case ANTOAN_FORCE_TIMEOUT:
+			masterconn_force_timeout(eptr,data,length);
+			break;
+		case MATOAN_MASTER_ACK:
+			masterconn_master_ack(eptr,data,length);
+			break;
 		case MATOAN_DOWNLOAD_INFO:
 			masterconn_download_info(eptr,data,length);
 			break;
@@ -605,7 +639,7 @@ void masterconn_gotpacket(masterconn *eptr,uint32_t type,const uint8_t *data,uin
 			masterconn_download_data(eptr,data,length);
 			break;
 		default:
-			syslog(LOG_NOTICE,"got unknown message (type:%"PRIu32")",type);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"got unknown message (type:%"PRIu32")",type);
 			eptr->mode = KILL;
 	}
 }
@@ -626,6 +660,7 @@ void masterconn_connected(masterconn *eptr) {
 	eptr->inputtail = &(eptr->inputhead);
 	eptr->outputhead = NULL;
 	eptr->outputtail = &(eptr->outputhead);
+	eptr->timeout = Timeout;
 
 	masterconn_sendregister(eptr);
 	if (lastlogversion==0) {
@@ -647,24 +682,24 @@ int masterconn_initconnect(masterconn *eptr) {
 			eptr->masterport = mport;
 			eptr->masteraddrvalid = 1;
 		} else {
-			mfs_arg_syslog(LOG_WARNING,"can't resolve master host/port (%s:%s)",MasterHost,MasterPort);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"can't resolve master host/port (%s:%s)",MasterHost,MasterPort);
 			return -1;
 		}
 	}
 	eptr->sock=tcpsocket();
 	if (eptr->sock<0) {
-		mfs_errlog(LOG_WARNING,"create socket, error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"create socket, error");
 		return -1;
 	}
 	if (tcpnonblock(eptr->sock)<0) {
-		mfs_errlog(LOG_WARNING,"set nonblock, error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"set nonblock, error");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		return -1;
 	}
 	if (eptr->bindip>0) {
 		if (tcpnumbind(eptr->sock,eptr->bindip,0)<0) {
-			mfs_errlog(LOG_WARNING,"can't bind socket to given ip");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"can't bind socket to given ip");
 			tcpclose(eptr->sock);
 			eptr->sock = -1;
 			return -1;
@@ -672,25 +707,25 @@ int masterconn_initconnect(masterconn *eptr) {
 	}
 	status = tcpnumconnect(eptr->sock,eptr->masterip,eptr->masterport);
 	if (status<0) {
-		mfs_errlog(LOG_WARNING,"connect failed, error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"connect failed, error");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		eptr->masteraddrvalid = 0;
 		return -1;
 	}
 	if (status==0) {
-		syslog(LOG_NOTICE,"connected to Master immediately");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"connected to Master immediately");
 		masterconn_connected(eptr);
 	} else {
 		eptr->mode = CONNECTING;
 		eptr->conntime = monotonic_seconds();
-		syslog(LOG_NOTICE,"connecting ...");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"connecting ...");
 	}
 	return 0;
 }
 
 void masterconn_connecttimeout(masterconn *eptr) {
-	syslog(LOG_WARNING,"connection timed out");
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"connection timed out");
 	tcpclose(eptr->sock);
 	eptr->sock = -1;
 	eptr->mode = FREE;
@@ -702,13 +737,13 @@ void masterconn_connecttest(masterconn *eptr) {
 
 	status = tcpgetstatus(eptr->sock);
 	if (status) {
-		mfs_errlog_silent(LOG_WARNING,"connection failed, error");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"connection failed, error");
 		tcpclose(eptr->sock);
 		eptr->sock = -1;
 		eptr->mode = FREE;
 		eptr->masteraddrvalid = 0;
 	} else {
-		syslog(LOG_NOTICE,"connected to Master");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"connected to Master");
 		masterconn_connected(eptr);
 	}
 }
@@ -790,7 +825,7 @@ void masterconn_read(masterconn *eptr,double now) {
 			leng = get32bit(&ptr);
 
 			if (leng>MaxPacketSize) {
-				syslog(LOG_WARNING,"Master packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,type);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"Master packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,type);
 				eptr->input_end = 1;
 				return;
 			}
@@ -819,10 +854,10 @@ void masterconn_read(masterconn *eptr,double now) {
 	}
 
 	if (hup) {
-		syslog(LOG_NOTICE,"connection was reset by Master");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"connection was reset by Master");
 		eptr->input_end = 1;
 	} else if (err) {
-		mfs_errlog_silent(LOG_NOTICE,"read from Master error");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"read from Master error");
 		eptr->input_end = 1;
 	}
 }
@@ -871,7 +906,7 @@ void masterconn_write(masterconn *eptr,double now) {
 		i = writev(eptr->sock,iovtab,iovdata);
 		if (i<0) {
 			if (ERRNO_ERROR) {
-				mfs_errlog_silent(LOG_NOTICE,"write to Master error");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"write to Master error");
 				eptr->mode = KILL;
 			}
 			return;
@@ -909,7 +944,7 @@ void masterconn_write(masterconn *eptr,double now) {
 		i=write(eptr->sock,opack->startptr,opack->bytesleft);
 		if (i<0) {
 			if (ERRNO_ERROR) {
-				mfs_errlog_silent(LOG_NOTICE,"write to Master error");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"write to Master error");
 				eptr->mode = KILL;
 			}
 			return;
@@ -1005,7 +1040,7 @@ void masterconn_serve(struct pollfd *pdesc) {
 			}
 			masterconn_parse(eptr);
 		}
-		if (eptr->mode==DATA && eptr->lastwrite+(Timeout/3.0)<now && eptr->outputhead==NULL) {
+		if (eptr->mode==DATA && eptr->lastwrite+1.0<now && eptr->outputhead==NULL) {
 			masterconn_createpacket(eptr,ANTOAN_NOP,0);
 		}
 		if (eptr->pdescpos>=0) {
@@ -1013,7 +1048,7 @@ void masterconn_serve(struct pollfd *pdesc) {
 				masterconn_write(eptr,now);
 			}
 		}
-		if (eptr->mode==DATA && eptr->lastread+Timeout<now) {
+		if (eptr->mode==DATA && eptr->lastread+eptr->timeout<now) {
 			eptr->mode = KILL;
 		}
 	}
@@ -1025,6 +1060,50 @@ void masterconn_reconnect(void) {
 	if (eptr->mode==FREE) {
 		masterconn_initconnect(eptr);
 	}
+}
+
+const char* masterconn_socketmode(uint8_t mode) {
+	switch (mode) {
+		case FREE:
+			return "NOT CONNECTED";
+		case CONNECTING:
+			return "CONNECTING IN PROGRESS";
+		case DATA:
+			return "CONNECTED";
+		case KILL:
+			return "DISCONNECTING";
+	}
+	return "???";
+}
+
+void masterconn_info(FILE *fd) {
+	masterconn *eptr = masterconnsingleton;
+	char stripport[STRIPPORTSIZE];
+	char strip[STRIPSIZE];
+	uint64_t dltime;
+
+	fprintf(fd,"[master connection]\n");
+	fprintf(fd,"master address is valid: %u\n",eptr->masteraddrvalid);
+	fprintf(fd,"working timeout: %u\n",eptr->timeout);
+
+	univmakestrip(strip,eptr->bindip);
+	fprintf(fd,"socket bind ip: %s\n",strip);
+
+	univmakestripport(stripport,eptr->masterip,eptr->masterport);
+	fprintf(fd,"resolved ip:port number: %s\n",stripport);
+	fprintf(fd,"socket mode: %s\n",masterconn_socketmode(eptr->mode));
+	if (eptr->downloading==1) {
+		fprintf(fd,"downloading metadata in progress\n");
+	} else if (eptr->downloading==11 || eptr->downloading==12) {
+		fprintf(fd,"downloading last changelogs in progress\n");
+	}
+	if (eptr->downloading>0) {
+		dltime = monotonic_useconds()-eptr->dlstartuts;
+		fprintf(fd,"downloading progress: %"PRIu64"/%"PRIu64"\n",eptr->dloffset,eptr->filesize);
+		fprintf(fd,"downloading try counter: %u\n",eptr->downloadretrycnt);
+		fprintf(fd,"downloading time: %"PRIu64".%06us",dltime/1000000,(uint32_t)(dltime%1000000));
+	}
+	fprintf(fd,"\n");
 }
 
 void masterconn_term(void) {
@@ -1150,6 +1229,7 @@ int masterconn_init(void) {
 	eptr->logfd = NULL;
 	eptr->metafd = -1;
 	eptr->oldmode = 0;
+	eptr->timeout = Timeout;
 
 	masterconn_findlastlogversion();
 	if (masterconn_initconnect(eptr)<0) {
@@ -1161,5 +1241,6 @@ int masterconn_init(void) {
 	main_poll_register(masterconn_desc,masterconn_serve);
 	main_reload_register(masterconn_reload);
 	main_time_register(1,0,masterconn_metachanges_flush);
+	main_info_register(masterconn_info);
 	return 0;
 }

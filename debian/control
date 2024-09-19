@@ -2,7 +2,7 @@ Source: moosefs
 Section: admin
 Priority: extra
 Maintainer: MooseFS Team <contact@moosefs.com>
-Build-Depends: debhelper (>= 7.0.15), autotools-dev, libc6-dev, libfuse-dev (>= 2.6) | libfuse3-dev (>=3.4), pkg-config, zlib1g-dev, libpcap0.8-dev, python (>= 2.5) | python3
+Build-Depends: debhelper (>= 9.0), autotools-dev, libc6-dev, libfuse-dev (>= 2.6) | libfuse3-dev (>=3.4), pkg-config, zlib1g-dev, libpcap0.8-dev, python (>= 2.5) | python3
 Standards-Version: 3.7.3
 Homepage: http://moosefs.com/
 
@@ -19,7 +19,6 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, adduser
 Description: MooseFS metalogger server
  This package will install MooseFS component responsible
  for keeping backup of metadata (downloaded from master).
-
 
 Package: moosefs-chunkserver
 Architecture: any
@@ -69,12 +68,3 @@ Description: MooseFS network packet dump utility
  This package will install MooseFS monitoring tool
  This is simple netdump utility which can interpret
  MooseFS network traffic and show it in colorful form.
-
-Package: moosefs-dbg
-Architecture: any
-Section: debug
-Priority: extra
-Depends: ${misc:Depends}
-Description: MooseFS debug binaries
- This package will install MooseFS debug symbols for
- all MooseFS binaries available in other packages.

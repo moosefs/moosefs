@@ -1,15 +1,15 @@
-.TH mfscli "1" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfscli "1" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfscli - CGI in TXT mode
 .SH SYNOPSIS
-\fBmfscli\fP [\fB-pn28\fP] [\fB-H\fP \fImaster_host\fP] [\fB-P\fP \fImaster_port\fP]
-[\fB-f\fP \fI0..3\fP] \fB-S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|RS|SC|OF|AL|MO|QU|MC|CC)\fP
+\fBmfscli\fP [\fB-jpn28\fP] [\fB-H\fP \fImaster_host\fP] [\fB-P\fP \fImaster_port\fP]
+[\fB-f\fP \fI0..3\fP] \fB-S(IN|IM|LI|IG|MU|IC|IL|MF|CS|MB|HD|EX|MS|RS|SC|PA|OF|AL|MO|QU|MC|CC)\fP
 [\fB-s\fP \fIseparator\fP] [\fB-o\fP \fIorder_id\fP [\fB-r\fP]] [\fB-m\fP \fImode_id\fP]
-[\fB-i\fP \fIid\fP] [\fB-a\fP \fIcount\fP] [\fB-b\fP \fIchart_data_columns\fP] [\fB-c\fP \fIcount\fP] [\fB-d\fP \fIchart_data_columns\fP]
+[\fB-i\fP \fIid\fP] [\fB-a\fP \fImaster_data_count\fP] [\fB-b\fP \fImaster_data_desc\fP] [\fB-c\fP \fIchunkserver_data_count\fP] [\fB-d\fP \fIchunkserver_data_desc\fP]
 .PP
 \fBmfscli\fP [\fB-pn28\fP] [\fB-H\fP \fImaster_host\fP] [\fB-P\fP \fImaster_port\fP]
 [\fB-f\fP \fI0..3\fP]
-\fB-C\fP(\fBRC/\fP\fIip\fP\fB/\fP\fIport\fP|\fBBW/\fP\fIip\fP\fB/\fP\fIport\fP|\fBM[01]/\fP\fIip\fP\fB/\fP\fIport\fP|\fBRS/\fP\fIsessionid\fP)
+\fB-C\fP(\fBRC/\fP\fIip\fP\fB/\fP\fIport\fP|\fBBW/\fP\fIip\fP\fB/\fP\fIport\fP|\fBM[01]/\fP\fIip\fP\fB/\fP\fIport\fP|\fBRS/\fP\fIsessionid\fP|\fBTR/\fP\fIip\fP\fB/\fP\fIport\fP)
 .PP
 \fBmfscli\fP \fB-h\fP
 .SH DESCRIPTION
@@ -18,7 +18,10 @@ in CGI (except for graphs) can be obtained via CLI using different "monitoring o
 .SH OPTIONS
 .TP
 \fB-h\fP
-print help message
+print help message and exit
+.TP
+\fB-j\fP
+print result in JSON format
 .TP
 \fB-p\fP
 force plain text format on tty devices
@@ -66,17 +69,17 @@ show data specified by 'mode id' (depends on data set)
 \fB-i\fP \fIid\fP
 sessionid for \fB-SOF\fP or inode for \fB-SAL\fP
 .TP
-\fB-a\fP \fIcount\fP
-how many chart entries should be shown for master
+\fB-a\fP \fImaster_data_count\fP
+how many chart entries should be shown for master (-SMC)
 .TP
-\fB-b\fP \fIchart_data_columns\fP
-define chart columns for master; prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice
+\fB-b\fP \fImaster_data_desc\fP
+define chart columns for master; prefix with '+' for raw data, (pro only) prefix with 'ip:[port:]' for server choice (by default leader master will be used); use 'all' as a chart name for all available charts
 .TP
-\fB-c\fP \fIcount\fP
+\fB-c\fP \fIchunkserver_data_count\fP
 how many chart entries should be shown for chunkserver
 .TP
-\fB-d\fP \fIchart_data_columns\fP
-define chart columns for chunkserver; prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice
+\fB-d\fP \fIchunkserver_data_desc\fP
+define chart columns for chunkserver; prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice (by default all servers will be used); use 'all' as a chart name for all available charts
 .SH MONITORING OPTIONS
 .TP
 \fB-SIN\fP
@@ -86,10 +89,10 @@ show full master info
 show only masters states
 .TP
 \fB-SLI\fP
-show only licence info
+(pro only) show only licence info
 .TP
 \fB-SIG\fP
-show only general master (leader) info
+show only general master (in pro version: leader) info
 .TP
 \fB-SMU\fP
 show only master memory usage
@@ -119,10 +122,13 @@ show exports
 show active mounts
 .TP
 \fB-SRS\fP
-show resources (storage classes,open files,acquired locks)
+show resources (storage classes,patterns,open files,acquired locks)
 .TP
 \fB-SSC\fP
 show storage classes info
+.TP
+\fB-SPA\fP
+show patterns override data
 .TP
 \fB-SOF\fP
 show only open files
@@ -149,11 +155,11 @@ User cpu usage
 scpu
 System cpu usage
 .TP
-delete
-Number of chunk deletions
+delete,del
+Number of chunk deletion attempts
 .TP
-replicate
-Number of chunk replications
+replicate,rep,repl
+Number of chunk replication attempts
 .TP
 statfs
 Number of statfs operations
@@ -197,13 +203,13 @@ Number of readdir operations
 open
 Number of open operations
 .TP
-read
-Number of read operations
+readchunk
+Number of chunk_read operations
 .TP
-write
-Number of write operations
+writechunk
+Number of chunk_write operations
 .TP
-memoryrss
+memoryrss,memrss,rmem,mem
 Resident memory usage
 .TP
 prcvd
@@ -218,8 +224,134 @@ Received bytes
 bsent
 Sent bytes
 .TP
-memoryvirt
+memoryvirt,memvirt,vmem
 Virtual memory usage
+.TP
+usedspace
+RAW disk space usage
+.TP
+totalspace
+RAW disk space connected
+.TP
+create
+Number of chunk creation attempts
+.TP
+change
+Number of chunk internal operation attempts
+.TP
+delete_ok
+Number of successful chunk deletions
+.TP
+delete_err
+Number of unsuccessful chunk deletions
+.TP
+replicate_ok
+Number of successful chunk replications
+.TP
+replicate_err
+Number of unsuccessful chunk replications
+.TP
+create_ok
+Number of successful chunk creations
+.TP
+create_err
+Number of unsuccessful chunk creations
+.TP
+change_ok
+Number of successful chunk internal operations
+.TP
+change_err
+Number of unsuccessful chunk internal operations
+.TP
+split_ok
+Number of successful chunk split operations
+.TP
+split_err
+Number of unsuccessful chunk split operations
+.TP
+fileobjects
+Number of file objects
+.TP
+metaobjects
+Number of non-file objects (directories,symlinks,etc.)
+.TP
+chunksec8
+Total number of chunks stored in EC8 format
+.TP
+chunksec4
+Total number of chunks stored in EC4 format
+.TP
+chunkscopy
+Total number of chunks stored in COPY format
+.TP
+chregdanger
+Number of endangered chunks (mark for removal excluded)
+.TP
+chregunder
+Number of undergoal chunks (mark for removal excluded)
+.TP
+challdanger
+Number of endangered chunks (mark for removal included)
+.TP
+challunder
+Number of undergoal chunks (mark for removal included)
+.TP
+bytesread
+Average number of bytes read per second by all clients
+.TP
+byteswrite
+Average number of bytes written per second by all clients
+.TP
+read
+Number of read operations
+.TP
+write
+Number of write operations
+.TP
+fsync
+Number of fsync operations
+.TP
+lock
+Number of lock operations
+.TP
+snapshot
+Number of snapshot operations
+.TP
+truncate
+Number of truncate operations
+.TP
+getxattr
+Number of getxattr operations
+.TP
+setxattr
+Number of setxattr operations
+.TP
+getfacl
+Number of getfacl operations
+.TP
+setfacl
+Number of setfacl operations
+.TP
+fcreate
+Number of file create operations
+.TP
+meta
+Number of extra metadata operations (sclass,trashretention,eattr etc.)
+.TP
+delay
+(pro only) Master max delay in seconds
+.TP
+servers
+Number of all registered chunk servers (both connected and disconnected)
+.TP
+mdservers
+Number of disconnected chunk servers that are in maintenance mode
+.TP
+dservers
+Number of disconnected chunk servers that are not in maintenance mode
+.TP
+udiff
+Difference in space usage percent between the most and least used chunk server
 .TP
 cpu
 Total cpu usage (scpu + ucpu)
@@ -227,7 +359,7 @@ Total cpu usage (scpu + ucpu)
 .TP 14
 ucpu
 User cpu usage
-.TP 
+.TP
 scpu
 System cpu usage
 .TP
@@ -251,7 +383,7 @@ Data sent by csserv
 .TP
 hdrbytesr
 Bytes read (headers)
-.TP 
+.TP
 hdrbytesw
 Bytes written (headers)
 .TP
@@ -304,7 +436,7 @@ truncate
 Truncate ops
 .TP
 duptrunc
-Duplicate+truncate ops
+Duptrunc (duplicate+truncate) ops
 .TP
 test
 Test chunk ops
@@ -312,11 +444,59 @@ Test chunk ops
 load
 Server load
 .TP
-memoryrss
+memoryrss,memrss,rmem,mem
 Resident memory usage
 .TP
-memoryvirt
+memoryvirt,memvirt,vmem
 Virtual memory usage
+.TP
+movels
+Low speed move ops
+.TP
+movehs
+High speed move ops
+.TP
+split
+Split ops
+.TP
+usedspace
+Used HDD space in bytes (mark for removal excluded)
+.TP
+totalspace
+Total HDD space in bytes (mark for removal excluded)
+.TP
+chunkcount
+Number of stored chunks (mark for removal excluded)
+.TP
+tdusedspace
+Used HDD space in bytes on disks marked for removal
+.TP
+tdtotalspace
+Total HDD space in bytes on disks marked for removal
+.TP
+tdchunkcount
+Number of chunks stored on disks marked for removal
+.TP
+copychunks
+Number of chunks stored in copy format (all disks)
+.TP
+ec4chunks
+Number of chunk parts stored in EC4 format (all disks)
+.TP
+ec8chunks
+Number of chunk parts stored in EC8 format (all disks)
+.TP
+hddok
+Number of valid folders (hard drives)
+.TP
+hddmfr
+Number of folders (hard drives) that are marked for removal
+.TP
+hdddmg
+Number of folders (hard drives) that are marked as damaged
+.TP
+udiff
+Difference in usage percent between the most and least used disk
 .TP
 cpu
 Total cpu usage (scpu + ucpu)
@@ -324,6 +504,9 @@ Total cpu usage (scpu + ucpu)
 .TP
 \fB-CRC/\fP\fIip\fP\fB/\fP\fIport\fP
 remove selected chunkserver from list of active chunkservers
+.TP
+\fB-CTR/\fP\fIip\fP\fB/\fP\fIport\fP
+temporarily remove selected chunkserver from list of active chunkservers (master elect only)
 .TP
 \fB-CBW/\fP\fIip\fP\fB/\fP\fIport\fP
 send selected chunkserver back to work state (from grace state)
@@ -351,8 +534,12 @@ number of chunk deletions and number of chunk replications during last ten minut
 .IP "\fBmfscli -SCC -c 15 -d 192.168.1.10:9422:cpu,192.168.1.11:9422:cpu\fP"
 shows cpu usage of chunkservers located on machines with IP 192.168.1.10 and 192.168.1.11
 during last fifteen minutes
-.IP "\fBmfscli -SCC -d $(mfscli -SCS -p -s ',' | grep '^chunk' | awk -F ',' 'BEGIN {s=""""} {printf ""%s%s:%s:mem"",s,$2,$3 ; s="",""}')\fP
-shows resident memory usage of all connected chunkservers
+.IP "\fBmfscli -SCC -d $(mfscli -SCS -p -s ',' | grep '^chunk' | awk -F ',' 'BEGIN {s=""""} {printf ""%s%s:%s:mem"",s,$2,$3 ; s="",""}')\fP"
+shows resident memory usage of all connected chunkservers (old mfscli - before version 4.32.2)
+.IP "\fBmfscli -SCC -d mem\fP"
+shows resident memory usage of all connected chunkservers (current mfscli)
+.IP "\fBmfscli -SIN -j\fP"
+prints basic infos in JSON format
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

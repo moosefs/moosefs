@@ -32,13 +32,15 @@
 #include "bio.h"
 #include "changelog.h"
 #include "datapack.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "hashfn.h"
 #include "massert.h"
 #include "matocsserv.h"
 #include "cfg.h"
 #include "main.h"
 #include "metadata.h"
+#include "multilan.h"
+#include "sockets.h"
 
 #define CSDB_OP_ADD 0
 #define CSDB_OP_DEL 1
@@ -70,7 +72,6 @@ typedef struct csdbentry {
 	uint32_t maintenance_timeout;
 	uint32_t disconnection_time;
 	uint8_t maintenance;
-	uint8_t tmpremoved;
 //	uint8_t fastreplication;
 	void *eptr;
 	struct csdbentry *next;
@@ -82,7 +83,6 @@ static uint32_t nextid;
 static uint32_t disconnected_servers;
 static uint32_t disconnected_servers_in_maintenance;
 static uint32_t servers;
-static uint32_t tmpremoved_servers;
 // static uint32_t disconnecttime;
 static uint32_t loadsum;
 
@@ -102,14 +102,13 @@ void csdb_disconnect_check(void) {
 void csdb_self_check(void) {
 	uint32_t hash,now;
 	csdbentry *csptr;
-	uint32_t ds,dsm,s,trs;
+	uint32_t ds,dsm,s;
 
 	now = main_time();
 
 	ds = 0;
 	dsm = 0;
 	s = 0;
-	trs = 0;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 			if ((csptr->maintenance==2 && csptr->eptr!=NULL) || (csptr->maintenance!=0 && csptr->maintenance_timeout>0 && now>csptr->maintenance_timeout)) {
@@ -121,9 +120,6 @@ void csdb_self_check(void) {
 				changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_MAINTENANCEOFF,csptr->ip,csptr->port);
 			}
 			s++;
-			if (csptr->tmpremoved) {
-				trs++;
-			}
 			if (csptr->eptr==NULL) {
 				ds++;
 				if (csptr->maintenance) {
@@ -133,20 +129,16 @@ void csdb_self_check(void) {
 		}
 	}
 	if (s!=servers) {
-		syslog(LOG_WARNING,"csdb: servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",servers,s);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"csdb: servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",servers,s);
 		servers = s;
 	}
 	if (ds!=disconnected_servers) {
-		syslog(LOG_WARNING,"csdb: disconnected servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",disconnected_servers,ds);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"csdb: disconnected servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",disconnected_servers,ds);
 		disconnected_servers = ds;
 	}
 	if (dsm!=disconnected_servers_in_maintenance) {
-		syslog(LOG_WARNING,"csdb: disconnected and being maintained servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",disconnected_servers_in_maintenance,dsm);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"csdb: disconnected and being maintained servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",disconnected_servers_in_maintenance,dsm);
 		disconnected_servers_in_maintenance = dsm;
-	}
-	if (trs!=tmpremoved_servers) {
-		syslog(LOG_WARNING,"csdb: temporary removed servers counter mismatch - fixing (%"PRIu32"->%"PRIu32")",tmpremoved_servers,trs);
-		tmpremoved_servers = trs;
 	}
 //	csdb_disconnect_check();
 }
@@ -165,18 +157,13 @@ void csdb_delid(uint16_t csid) {
 	}
 }
 
-static inline void csdb_makestrip(char strip[16],uint32_t ip) {
-	snprintf(strip,16,"%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8,(uint8_t)(ip>>24),(uint8_t)(ip>>16),(uint8_t)(ip>>8),(uint8_t)ip);
-	strip[15]=0;
-}
-
 void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 	uint32_t hash,hashid;
 	csdbentry *csptr,**cspptr,*csidptr;
-	char strip[16];
-	char strtmpip[16];
+	char strip[STRIPSIZE];
+	char strtmpip[STRIPSIZE];
 
-	csdb_makestrip(strip,ip);
+	univmakestrip(strip,ip);
 	if (csid>0) {
 		csidptr = csdbtab[csid];
 	} else {
@@ -184,7 +171,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 	}
 	if (csidptr && csidptr->ip == ip && csidptr->port == port) { // fast find using csid
 		if (csidptr->eptr!=NULL) {
-			syslog(LOG_NOTICE,"csdb: found cs using ip:port and csid (%s:%"PRIu16",%"PRIu16"), but server is still connected",strip,port,csid);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"csdb: found cs using ip:port and csid (%s:%"PRIu16",%"PRIu16"), but server is still connected",strip,port,csid);
 			return NULL;
 		}
 		csidptr->eptr = eptr;
@@ -192,18 +179,14 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 		if (csidptr->maintenance) {
 			disconnected_servers_in_maintenance--;
 		}
-		if (csidptr->tmpremoved) {
-			csidptr->tmpremoved = 0;
-			tmpremoved_servers--;
-		}
-		syslog(LOG_NOTICE,"csdb: found cs using ip:port and csid (%s:%"PRIu16",%"PRIu16")",strip,port,csid);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"csdb: found cs using ip:port and csid (%s:%"PRIu16",%"PRIu16")",strip,port,csid);
 		return csidptr;
 	}
 	hash = CSDBHASHFN(ip,port);
 	for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) { // slow find using (ip+port)
 		if (csptr->ip == ip && csptr->port == port) {
 			if (csptr->eptr!=NULL) {
-				syslog(LOG_NOTICE,"csdb: found cs using ip:port (%s:%"PRIu16",%"PRIu16"), but server is still connected",strip,port,csid);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"csdb: found cs using ip:port (%s:%"PRIu16",%"PRIu16"), but server is still connected",strip,port,csid);
 				return NULL;
 			}
 			csptr->eptr = eptr;
@@ -211,16 +194,12 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 			if (csptr->maintenance) {
 				disconnected_servers_in_maintenance--;
 			}
-			if (csptr->tmpremoved) {
-				csptr->tmpremoved = 0;
-				tmpremoved_servers--;
-			}
 			return csptr;
 		}
 	}
 	if (csidptr && csidptr->eptr==NULL) { // ip+port not found, but found csid - change ip+port
-		csdb_makestrip(strtmpip,csidptr->ip);
-		syslog(LOG_NOTICE,"csdb: found cs using csid (%s:%"PRIu16",%"PRIu16") - previous ip:port (%s:%"PRIu16")",strip,port,csid,strtmpip,csidptr->port);
+		univmakestrip(strtmpip,csidptr->ip);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"csdb: found cs using csid (%s:%"PRIu16",%"PRIu16") - previous ip:port (%s:%"PRIu16")",strip,port,csid,strtmpip,csidptr->port);
 		hashid = CSDBHASHFN(csidptr->ip,csidptr->port);
 		cspptr = csdbhash + hashid;
 		while ((csptr=*cspptr)) {
@@ -241,13 +220,9 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 		if (csidptr->maintenance) {
 			disconnected_servers_in_maintenance--;
 		}
-		if (csidptr->tmpremoved) {
-			csidptr->tmpremoved = 0;
-			tmpremoved_servers--;
-		}
 		return csidptr;
 	}
-	syslog(LOG_NOTICE,"csdb: server not found (%s:%"PRIu16",%"PRIu16"), add it to database",strip,port,csid);
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"csdb: server not found (%s:%"PRIu16",%"PRIu16"), add it to database",strip,port,csid);
 	csptr = malloc(sizeof(csdbentry));
 	passert(csptr);
 	csptr->ip = ip;
@@ -263,7 +238,6 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 	csptr->heavyloadts = 0;
 	csptr->maintenance_timeout = 0;
 	csptr->maintenance = 0;
-	csptr->tmpremoved = 0;
 	csptr->disconnection_time = main_time();
 //	csptr->fastreplication = 1;
 	csptr->load = 0;
@@ -304,7 +278,7 @@ void csdb_lost_connection(void *v_csptr) {
 void csdb_server_load(void *v_csptr,uint32_t load) {
 	csdbentry *csptr = (csdbentry*)v_csptr;
 	double loadavg;
-	char strip[16];
+	char strip[STRIPSIZE];
 	loadsum -= csptr->load;
 	if (servers>1) {
 		loadavg = loadsum / (servers-1);
@@ -314,8 +288,8 @@ void csdb_server_load(void *v_csptr,uint32_t load) {
 	csptr->load = load;
 	loadsum += load;
 	if (load>HeavyLoadThreshold && load>loadavg*HeavyLoadRatioThreshold) { // cs is in 'heavy load state'
-		csdb_makestrip(strip,csptr->ip);
-		syslog(LOG_NOTICE,"Heavy load server detected (%s:%u); load: %"PRIu32" ; threshold: %"PRIu32" ; loadavg (without this server): %.2lf ; ratio_threshold: %.2lf",strip,csptr->port,csptr->load,HeavyLoadThreshold,loadavg,HeavyLoadRatioThreshold);
+		univmakestrip(strip,csptr->ip);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"Heavy load server detected (%s:%u); load: %"PRIu32" ; threshold: %"PRIu32" ; loadavg (without this server): %.2lf ; ratio_threshold: %.2lf",strip,csptr->port,csptr->load,HeavyLoadThreshold,loadavg,HeavyLoadRatioThreshold);
 		csptr->heavyloadts = main_time();
 	}
 }
@@ -323,13 +297,13 @@ void csdb_server_load(void *v_csptr,uint32_t load) {
 
 uint16_t csdb_get_csid(void *v_csptr) {
 	csdbentry *csptr = (csdbentry*)v_csptr;
-	char strip[16];
+	char strip[STRIPSIZE];
 	if (csptr->csid==0) {
 		csptr->csid = csdb_newid();
 		csdbtab[csptr->csid] = csptr;
 		changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",%"PRIu16")",main_time(),CSDB_OP_NEWID,csptr->ip,csptr->port,csptr->csid);
-		csdb_makestrip(strip,csptr->ip);
-		syslog(LOG_NOTICE,"csdb: generate new server id for (%s:%"PRIu16"): %"PRIu16,strip,csptr->port,csptr->csid);
+		univmakestrip(strip,csptr->ip);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"csdb: generate new server id for (%s:%"PRIu16"): %"PRIu16,strip,csptr->port,csptr->csid);
 	}
 	return csptr->csid;
 }
@@ -344,90 +318,96 @@ uint8_t csdb_server_is_being_maintained(void *v_csptr) {
 	return csptr->maintenance;
 }
 
-uint32_t csdb_servlist_size(void) {
+
+uint32_t csdb_servlist_data(uint8_t mode,uint8_t *ptr,uint32_t clientip) {
 	uint32_t hash;
+	uint32_t now = main_time();
+	uint32_t gracetime,maintenance_timeout;
+	uint8_t *p;
 	csdbentry *csptr;
 	uint32_t i;
+	uint32_t recsize;
+
+	recsize = (mode==0)?73:77;
 	i=0;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
-			if (csptr->tmpremoved==0) {
-				i++;
-			}
-		}
-	}
-	return i*(4+4+2+2+8+8+4+8+8+4+4+4+4+4+1);
-}
-
-void csdb_servlist_data(uint8_t *ptr) {
-	uint32_t hash;
-	uint32_t now = main_time();
-	uint32_t gracetime;
-	uint8_t *p;
-	csdbentry *csptr;
-	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
-		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
-			if (csptr->tmpremoved) {
-				continue;
-			}
-			if (csptr->heavyloadts+HeavyLoadGracePeriod>now) {
-				gracetime = csptr->heavyloadts+HeavyLoadGracePeriod-now; // seconds to be turned back to work
-			} else {
-				gracetime = 0; // Server is working properly and never was in heavy load state
-			}
-			p = ptr;
-			if (csptr->eptr) {
-				uint32_t version,chunkscount,tdchunkscount,errorcounter,load,labelmask;
-				uint64_t usedspace,totalspace,tdusedspace,tdtotalspace;
-				uint8_t hlstatus,mfrstatus;
-				matocsserv_getservdata(csptr->eptr,&version,&usedspace,&totalspace,&chunkscount,&tdusedspace,&tdtotalspace,&tdchunkscount,&errorcounter,&load,&hlstatus,&labelmask,&mfrstatus);
-				if (hlstatus==HLSTATUS_OK) {
-					gracetime = 0;
-				} else if (hlstatus==HLSTATUS_OVERLOADED) {
-					gracetime = 0xC0000000;
-				} else if (hlstatus==HLSTATUS_REBALANCE) {
-					gracetime = 0x80000000;
+			if (ptr!=NULL) {
+				if (csptr->heavyloadts+HeavyLoadGracePeriod>now) {
+					gracetime = csptr->heavyloadts+HeavyLoadGracePeriod-now; // seconds to be turned back to work
+				} else {
+					gracetime = 0; // Server is working properly and never was in heavy load state
 				}
-				put32bit(&ptr,version&0xFFFFFF);
-				put32bit(&ptr,csptr->ip);
-				put16bit(&ptr,csptr->port);
-				put16bit(&ptr,csptr->csid);
-				put64bit(&ptr,usedspace);
-				put64bit(&ptr,totalspace);
-				put32bit(&ptr,chunkscount);
-				put64bit(&ptr,tdusedspace);
-				put64bit(&ptr,tdtotalspace);
-				put32bit(&ptr,tdchunkscount);
-				put32bit(&ptr,errorcounter);
-				put32bit(&ptr,load);
-				put32bit(&ptr,gracetime);
-				put32bit(&ptr,labelmask);
-				put8bit(&ptr,mfrstatus);
-			} else {
-				put32bit(&ptr,0x01000000);
-				put32bit(&ptr,csptr->ip);
-				put16bit(&ptr,csptr->port);
-				put16bit(&ptr,csptr->csid);
-				put64bit(&ptr,0);
-				put64bit(&ptr,0);
-				put32bit(&ptr,0);
-				put64bit(&ptr,0);
-				put64bit(&ptr,0);
-				put32bit(&ptr,0);
-				put32bit(&ptr,0);
-				put32bit(&ptr,0);
-				put32bit(&ptr,gracetime);
-				put32bit(&ptr,0);
-				put8bit(&ptr,0);
+				if (csptr->maintenance_timeout>=now) {
+					maintenance_timeout = csptr->maintenance_timeout - now;
+				} else if (csptr->maintenance_timeout>0) {
+					maintenance_timeout = 0;
+				} else {
+					maintenance_timeout = 0xFFFFFFFF;
+				}
+				p = ptr;
+				if (csptr->eptr) {
+					uint32_t version,chunkscount,tdchunkscount,errorcounter,load,labelmask;
+					uint64_t usedspace,totalspace,tdusedspace,tdtotalspace;
+					uint8_t hlstatus,mfrstatus;
+					matocsserv_getservdata(csptr->eptr,&version,&usedspace,&totalspace,&chunkscount,&tdusedspace,&tdtotalspace,&tdchunkscount,&errorcounter,&load,&hlstatus,&labelmask,&mfrstatus);
+					if (hlstatus==HLSTATUS_OK) {
+						gracetime = 0;
+					} else if (hlstatus==HLSTATUS_OVERLOADED) {
+						gracetime = 0xC0000000;
+					} else if (hlstatus==HLSTATUS_LSREBALANCE) {
+						gracetime = 0x80000000;
+					} else if (hlstatus==HLSTATUS_HSREBALANCE) {
+						gracetime = 0x40000000;
+					}
+					put32bit(&ptr,version&0xFFFFFF);
+					put32bit(&ptr,csptr->ip);
+					put32bit(&ptr,multilan_map(csptr->ip,clientip));
+					put16bit(&ptr,csptr->port);
+					put16bit(&ptr,csptr->csid);
+					put64bit(&ptr,usedspace);
+					put64bit(&ptr,totalspace);
+					put32bit(&ptr,chunkscount);
+					put64bit(&ptr,tdusedspace);
+					put64bit(&ptr,tdtotalspace);
+					put32bit(&ptr,tdchunkscount);
+					put32bit(&ptr,errorcounter);
+					put32bit(&ptr,load);
+					put32bit(&ptr,gracetime);
+					put32bit(&ptr,labelmask);
+					put8bit(&ptr,mfrstatus);
+				} else {
+					put32bit(&ptr,0x01000000);
+					put32bit(&ptr,csptr->ip);
+					put32bit(&ptr,multilan_map(csptr->ip,clientip));
+					put16bit(&ptr,csptr->port);
+					put16bit(&ptr,csptr->csid);
+					put64bit(&ptr,0);
+					put64bit(&ptr,0);
+					put32bit(&ptr,0);
+					put64bit(&ptr,0);
+					put64bit(&ptr,0);
+					put32bit(&ptr,0);
+					put32bit(&ptr,0);
+					put32bit(&ptr,0);
+					put32bit(&ptr,gracetime);
+					put32bit(&ptr,0);
+					put8bit(&ptr,0);
+				}
+				if (mode>0) {
+					put32bit(&ptr,maintenance_timeout);
+				}
+				if (csptr->maintenance) {
+					*p |= 2;
+				}
+				if (csptr->maintenance==2) {
+					*p |= 4;
+				}
 			}
-			if (csptr->maintenance) {
-				*p |= 2;
-			}
-			if (csptr->maintenance==2) {
-				*p |= 4;
-			}
+			i++;
 		}
 	}
+	return i*recsize;
 }
 
 uint8_t csdb_remove_server(uint32_t ip,uint16_t port) {
@@ -446,9 +426,6 @@ uint8_t csdb_remove_server(uint32_t ip,uint16_t port) {
 			}
 			if (csptr->maintenance) {
 				disconnected_servers_in_maintenance--;
-			}
-			if (csptr->tmpremoved) {
-				tmpremoved_servers--;
 			}
 			*cspptr = csptr->next;
 			free(csptr);
@@ -480,9 +457,6 @@ void csdb_remove_unused(void) {
 					}
 					if (csptr->maintenance) {
 						disconnected_servers_in_maintenance--;
-					}
-					if (csptr->tmpremoved) {
-						tmpremoved_servers--;
 					}
 					*cspptr = csptr->next;
 					free(csptr);
@@ -521,7 +495,6 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 			csptr->heavyloadts = 0;
 			csptr->maintenance_timeout = 0;
 			csptr->maintenance = 0;
-			csptr->tmpremoved = 0;
 			csptr->disconnection_time = main_time();
 //			csptr->fastreplication = 1;
 			csptr->load = 0;
@@ -545,9 +518,6 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 					}
 					if (csptr->maintenance) {
 						disconnected_servers_in_maintenance--;
-					}
-					if (csptr->tmpremoved) {
-						tmpremoved_servers--;
 					}
 					*cspptr = csptr->next;
 					free(csptr);
@@ -777,16 +747,24 @@ uint8_t csdb_find(uint32_t ip,uint16_t port,uint16_t csid) {
 }
 */
 
+void csdb_get_server_counters(uint32_t *servers_ptr,uint32_t *disconnected_servers_ptr,uint32_t *disconnected_servers_in_maintenance_ptr) {
+	if (servers_ptr!=NULL) {
+		*servers_ptr = servers;
+	}
+	if (disconnected_servers_ptr!=NULL) {
+		*disconnected_servers_ptr = disconnected_servers;
+	}
+	if (disconnected_servers_in_maintenance_ptr!=NULL) {
+		*disconnected_servers_in_maintenance_ptr = disconnected_servers_in_maintenance;
+	}
+}
+
 uint8_t csdb_have_all_servers(void) {
 	return (disconnected_servers>0)?0:1;
 }
 
-uint8_t csdb_have_more_than_half_servers(void) {
-	return ((servers-tmpremoved_servers==0)||((disconnected_servers-tmpremoved_servers)<(((servers-tmpremoved_servers)+1)/2)))?1:0;
-}
-
-uint8_t csdb_replicate_undergoals(void) {
-	return (disconnected_servers>0 && disconnected_servers==disconnected_servers_in_maintenance)?0:1;
+uint8_t csdb_stop_chunk_jobs(void) {
+	return (disconnected_servers>0 && disconnected_servers==disconnected_servers_in_maintenance)?1:0;
 }
 
 int csdb_compare(const void *a,const void *b) {
@@ -808,32 +786,30 @@ uint16_t csdb_sort_servers(void) {
 	csdbentry **stab,*csptr;
 	uint32_t i,hash;
 
-	stab = malloc(sizeof(csdbentry*)*(servers-tmpremoved_servers));
+	stab = malloc(sizeof(csdbentry*)*(servers));
 	i = 0;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
-			if (csptr->tmpremoved==0) {
-				if (i<servers-tmpremoved_servers) {
-					stab[i] = csptr;
-					i++;
-				} else {
-					syslog(LOG_WARNING,"internal error: wrong chunk servers count !!!");
-					csptr->number = 0;
-				}
+			if (i<servers) {
+				stab[i] = csptr;
+				i++;
+			} else {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"internal error: wrong chunk servers count !!!");
+				csptr->number = 0;
 			}
 		}
 	}
-	qsort(stab,servers-tmpremoved_servers,sizeof(csdbentry*),csdb_compare);
-	for (i=0 ; i<(servers-tmpremoved_servers) ; i++) {
+	qsort(stab,servers,sizeof(csdbentry*),csdb_compare);
+	for (i=0 ; i<(servers) ; i++) {
 		stab[i]->number = i+1;
 	}
 	free(stab);
 
-	return servers-tmpremoved_servers;
+	return servers;
 }
 
 uint16_t csdb_servers_count(void) {
-	return servers-tmpremoved_servers;
+	return servers;
 }
 
 uint16_t csdb_getnumber(void *v_csptr) {
@@ -862,7 +838,6 @@ uint8_t csdb_store(bio *fd) {
 	ptr = wbuff;
 	put32bit(&ptr,l);
 	if (bio_write(fd,wbuff,4)!=4) {
-		syslog(LOG_NOTICE,"write error");
 		return 0xFF;
 	}
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
@@ -875,7 +850,6 @@ uint8_t csdb_store(bio *fd) {
 			put32bit(&ptr,csptr->maintenance_timeout);
 //			put8bit(&ptr,csptr->fastreplication);
 			if (bio_write(fd,wbuff,13)!=13) {
-				syslog(LOG_NOTICE,"write error");
 				return 0xFF;
 			}
 		}
@@ -902,7 +876,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 			// nl=0;
 		}
 		errno = err;
-		mfs_errlog(LOG_ERR,"loading chunkservers: read error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"loading chunkservers: read error");
 		return -1;
 	}
 	ptr=rbuff;
@@ -924,7 +898,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 				// nl=0;
 			}
 			errno = err;
-			mfs_errlog(LOG_ERR,"loading chunkservers: read error");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"loading chunkservers: read error");
 			return -1;
 		}
 		ptr = rbuff;
@@ -952,8 +926,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 					fputc('\n',stderr);
 					nl=0;
 				}
-				fprintf(stderr,"repeated chunkserver entry (ip:%"PRIu32",port:%"PRIu16")\n",ip,port);
-				syslog(LOG_ERR,"repeated chunkserver entry (ip:%"PRIu32",port:%"PRIu16")",ip,port);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"repeated chunkserver entry (ip:%"PRIu32",port:%"PRIu16")",ip,port);
 				if (ignoreflag==0) {
 					fprintf(stderr,"use '-i' option to remove this chunkserver definition");
 					return -1;
@@ -967,8 +940,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 					fputc('\n',stderr);
 					nl=0;
 				}
-				fprintf(stderr,"repeated chunkserver entry (csid:%"PRIu16")\n",csid);
-				syslog(LOG_ERR,"repeated chunkserver entry (csid:%"PRIu16")",csid);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"repeated chunkserver entry (csid:%"PRIu16")",csid);
 				if (ignoreflag==0) {
 					fprintf(stderr,"use '-i' option to remove this chunkserver definition");
 					return -1;
@@ -989,7 +961,6 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		csptr->eptr = NULL;
 		csptr->maintenance = maintenance;
 		csptr->maintenance_timeout = maintenance_timeout;
-		csptr->tmpremoved = 0;
 		csptr->disconnection_time = main_time();
 //		csptr->fastreplication = fastreplication;
 		csptr->next = csdbhash[hash];
@@ -1023,26 +994,23 @@ void csdb_cleanup(void) {
 	nextid = 1;
 	disconnected_servers = 0;
 	disconnected_servers_in_maintenance = 0;
-	tmpremoved_servers = 0;
 	servers = 0;
 }
-
 /*
 uint32_t csdb_getdisconnecttime(void) {
 	return disconnecttime;
 }
 */
-
 void csdb_reload(void) {
 	uint32_t dtr;
 	HeavyLoadGracePeriod = cfg_getuint32("CS_HEAVY_LOAD_GRACE_PERIOD",900);
 	HeavyLoadThreshold = cfg_getuint32("CS_HEAVY_LOAD_THRESHOLD",150);
 	HeavyLoadRatioThreshold = cfg_getdouble("CS_HEAVY_LOAD_RATIO_THRESHOLD",3.0);
-	MaintenanceModeTimeout = cfg_getuint32("CS_MAINTENANCE_MODE_TIMEOUT",0);
-	TempMaintenanceModeTimeout = cfg_getuint32("CS_TEMP_MAINTENANCE_MODE_TIMEOUT",1800);
+	MaintenanceModeTimeout = cfg_getsperiod("CS_MAINTENANCE_MODE_TIMEOUT","0");
+	TempMaintenanceModeTimeout = cfg_getsperiod("CS_TEMP_MAINTENANCE_MODE_TIMEOUT","30m");
 	dtr = cfg_getuint32("CS_DAYS_TO_REMOVE_UNUSED",7);
 	if (dtr>365) {
-		syslog(LOG_WARNING,"CS_DAYS_TO_REMOVE_UNUSED - value is too big (max=365) - use zero for infinite value");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CS_DAYS_TO_REMOVE_UNUSED - value is too big (max=365) - use zero for infinite value");
 		dtr = 0;
 	}
 	SecondsToRemoveUnusedCS = dtr * 86400;
@@ -1063,7 +1031,6 @@ int csdb_init(void) {
 	disconnected_servers = 0;
 	disconnected_servers_in_maintenance = 0;
 	servers = 0;
-	tmpremoved_servers = 0;
 //	disconnecttime = 0;
 	loadsum = 0;
 	main_reload_register(csdb_reload);

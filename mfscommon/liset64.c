@@ -34,7 +34,7 @@ static liset *settab = NULL;
 static int settabsize = 0;
 static int settabffree = 0;
 
-int liset_new() {
+int liset_new(void) {
 	int i;
 	for (i=0 ; i<settabffree ; i++) {
 		if (settab[i].valid==0) {

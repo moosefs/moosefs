@@ -25,7 +25,7 @@
 
 typedef uint64_t hash_key_t;
 
-void* chash_new();
+void* chash_new(void);
 void* chash_find(void *h,hash_key_t x);
 void chash_delete(void *h,hash_key_t x);
 void chash_add(void *h,hash_key_t x,void *v);

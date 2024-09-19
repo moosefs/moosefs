@@ -24,15 +24,17 @@
 #include <inttypes.h>
 
 
-
 uint32_t matomlserv_mloglist_size(void);
 void matomlserv_mloglist_data(uint8_t *ptr);
 
+uint64_t matomlserv_get_min_version(void);
+
 void matomlserv_broadcast_logstring(uint64_t version,uint8_t *logstr,uint32_t logstrsize);
-void matomlserv_broadcast_logrotate();
+void matomlserv_broadcast_logrotate(void);
 int matomlserv_no_more_pending_jobs(void);
 void matomlserv_disconnect_all(void);
 uint16_t matomlserv_getport(void);
+const char* matomlserv_getportstr(void);
 void matomlserv_close_lsock(void);
 int matomlserv_init(void);
 

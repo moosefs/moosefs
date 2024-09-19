@@ -24,7 +24,6 @@
 
 #include <stdio.h>
 #include <stdarg.h>
-#include <syslog.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -36,9 +35,10 @@
 #include "massert.h"
 #include "bgsaver.h"
 #include "main.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "matomlserv.h"
 #include "cfg.h"
+#include "clocks.h"
 
 #define MAXLOGLINESIZE 200000U
 #define MAXLOGNUMBER 1000U
@@ -57,6 +57,7 @@ typedef struct old_changes_entry {
 typedef struct old_changes_block {
 	old_changes_entry old_changes_block [OLD_CHANGES_BLOCK_SIZE];
 	uint32_t entries;
+	uint32_t size;
 	uint32_t mintimestamp;
 	uint64_t minversion;
 	struct old_changes_block *next;
@@ -65,7 +66,10 @@ typedef struct old_changes_block {
 static old_changes_block *old_changes_head=NULL;
 static old_changes_block *old_changes_current=NULL;
 
-static uint16_t ChangelogSecondsToRemember;
+static uint64_t old_changes_total_size = 0;
+
+static uint32_t ChangelogSecondsToRemember;
+static uint64_t ChangeLogMaxSize;
 
 static uint8_t ChangelogSaveMode;
 
@@ -79,6 +83,22 @@ static inline void changelog_old_changes_free_block(old_changes_block *oc) {
 		free(oc->old_changes_block[i].data);
 	}
 	free(oc);
+}
+
+static void changelog_old_changes_free(uint32_t ts) {
+	old_changes_block *oc;
+	uint64_t minversion_to_keep,mv1,mv2;
+
+	mv1 = meta_chlog_keep_version();
+	mv2 = matomlserv_get_min_version();
+	minversion_to_keep = (mv1<mv2)?mv1:mv2;
+
+	while (old_changes_head && old_changes_head->next && (old_changes_head->next->minversion<minversion_to_keep && (old_changes_head->next->mintimestamp+ChangelogSecondsToRemember<ts || old_changes_total_size>ChangeLogMaxSize))) {
+		oc = old_changes_head->next;
+		old_changes_total_size -= old_changes_head->size;
+		changelog_old_changes_free_block(old_changes_head);
+		old_changes_head = oc;
+	}
 }
 
 static inline void changelog_store_logstring(uint64_t version,uint8_t *logstr,uint32_t logstrsize) {
@@ -102,6 +122,7 @@ static inline void changelog_store_logstring(uint64_t version,uint8_t *logstr,ui
 		passert(oc);
 		ts = main_time();
 		oc->entries = 0;
+		oc->size = 0;
 		oc->minversion = version;
 		oc->mintimestamp = ts;
 		oc->next = NULL;
@@ -111,11 +132,7 @@ static inline void changelog_store_logstring(uint64_t version,uint8_t *logstr,ui
 			old_changes_current->next = oc;
 			old_changes_current = oc;
 		}
-		while (old_changes_head && old_changes_head->next && old_changes_head->next->mintimestamp+ChangelogSecondsToRemember<ts) {
-			oc = old_changes_head->next;
-			changelog_old_changes_free_block(old_changes_head);
-			old_changes_head = oc;
-		}
+		changelog_old_changes_free(ts);
 	}
 	oc = old_changes_current;
 	oce = oc->old_changes_block + oc->entries;
@@ -125,6 +142,8 @@ static inline void changelog_store_logstring(uint64_t version,uint8_t *logstr,ui
 	passert(oce->data);
 	memcpy(oce->data,logstr,logstrsize);
 	oc->entries++;
+	oc->size += logstrsize+sizeof(old_changes_entry);
+	old_changes_total_size += logstrsize+sizeof(old_changes_entry);
 }
 
 uint32_t changelog_get_old_changes(uint64_t version,void (*sendfn)(void *,uint64_t,uint8_t *,uint32_t),void *userdata,uint32_t limit) {
@@ -162,7 +181,7 @@ uint64_t changelog_get_minversion(void) {
 	return old_changes_head->minversion;
 }
 
-void changelog_rotate() {
+void changelog_rotate(uint8_t broadcast) {
 	if (ChangelogSaveMode==0) {
 		bgsaver_rotatelog();
 	} else {
@@ -185,7 +204,9 @@ void changelog_rotate() {
 			unlink("changelog.0.mfs");
 		}
 	}
-	matomlserv_broadcast_logrotate();
+	if (broadcast) {
+		matomlserv_broadcast_logrotate();
+	}
 }
 
 void changelog_mr(uint64_t version,const char *data) {
@@ -195,7 +216,7 @@ void changelog_mr(uint64_t version,const char *data) {
 		if (currentfd==NULL) {
 			currentfd = fopen("changelog.0.mfs","a");
 			if (!currentfd) {
-				syslog(LOG_NOTICE,"lost MFS change %"PRIu64": %s",version,data);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"lost MFS change %"PRIu64": %s",version,data);
 			}
 		}
 
@@ -213,8 +234,8 @@ void changelog(const char *format,...) {
 	static char printbuff[MAXLOGLINESIZE];
 	va_list ap;
 	uint32_t leng;
+	uint64_t version;
 
-	uint64_t version = meta_version_inc();
 
 	va_start(ap,format);
 	leng = vsnprintf(printbuff,MAXLOGLINESIZE,format,ap);
@@ -225,6 +246,9 @@ void changelog(const char *format,...) {
 	} else {
 		leng++;
 	}
+
+
+	version = meta_version_inc();
 
 	changelog_mr(version,printbuff);
 	changelog_store_logstring(version,(uint8_t*)printbuff,leng);
@@ -301,19 +325,31 @@ char* changelog_escape_name(uint32_t nleng,const uint8_t *name) {
 
 
 void changelog_reload(void) {
+	uint16_t changelog_preserve_mb;
 	BackLogsNumber = cfg_getuint32("BACK_LOGS",50);
 	if (BackLogsNumber>MAXLOGNUMBER) {
-		mfs_syslog(LOG_WARNING,"BACK_LOGS value too big !!!");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"BACK_LOGS value too big !!!");
 		BackLogsNumber = MAXLOGNUMBER;
 	}
-	ChangelogSecondsToRemember = cfg_getuint16("CHANGELOG_PRESERVE_SECONDS",1800);
-	if (ChangelogSecondsToRemember>15000) {
-		mfs_arg_syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 15000 seconds",ChangelogSecondsToRemember);
-		ChangelogSecondsToRemember=15000;
+	ChangelogSecondsToRemember = cfg_getuint16("CHANGELOG_PRESERVE_SECONDS",5000);
+	if (ChangelogSecondsToRemember>100000) {
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 100000 seconds",ChangelogSecondsToRemember);
+		ChangelogSecondsToRemember=100000;
 	}
+	changelog_preserve_mb = cfg_getuint16("CHANGELOG_PRESERVE_MB",500);
+	if (changelog_preserve_mb<100) {
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"Size of change logs in MB too low (%"PRIu16") - increasing to 100MB",changelog_preserve_mb);
+		changelog_preserve_mb=100;
+	}
+	if (changelog_preserve_mb>10000) {
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"Size of change logs in MB too big (%"PRIu16") - decreasing to 10000MB (10GB)",changelog_preserve_mb);
+		changelog_preserve_mb=10000;
+	}
+	ChangeLogMaxSize = changelog_preserve_mb;
+	ChangeLogMaxSize *= (1024*1024);
 	ChangelogSaveMode = cfg_getuint8("CHANGELOG_SAVE_MODE",0);
 	if (ChangelogSaveMode>2) {
-		mfs_syslog(LOG_WARNING,"CHANGELOG_SAVE_MODE - wrong value - using 0 (write in background)");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"CHANGELOG_SAVE_MODE - wrong value - using 0 (write in background)");
 		ChangelogSaveMode = 0;
 	}
 }

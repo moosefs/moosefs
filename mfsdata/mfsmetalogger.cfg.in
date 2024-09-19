@@ -1,6 +1,6 @@
-###############################################
-# RUNTIME OPTIONS                             #
-###############################################
+######################################################################
+# STARTUP OPTIONS - changes in this section require process restart. #
+######################################################################
 
 # user to run daemon as (default is @DEFAULT_USER@)
 # WORKING_USER = @DEFAULT_USER@
@@ -29,18 +29,28 @@
 # where to store daemon lock file (default is @DATA_PATH@)
 # DATA_PATH = @DATA_PATH@
 
+##########################################################################
+# RUNTIME OPTIONS - changes in this section require only process reload. #
+##########################################################################
+
 # number of metadata change log files (default is 50)
 # BACK_LOGS = 50
 
 # number of previous metadata files to be kept (default is 3)
 # BACK_META_KEEP_PREVIOUS = 3
 
-# metadata download frequency in hours (default is 24, should be at least BACK_LOGS/2)
+# metadata download frequency in hours (default is 24, should be at most BACK_LOGS/2)
 # META_DOWNLOAD_FREQ = 24
 
-###############################################
-# MASTER CONNECTION OPTIONS                   #
-###############################################
+# minimum level of messages that will be reported by metalogger; levels in order of importance: ERROR, WARNING, NOTICE, INFO, DEBUG
+# SYSLOG_MIN_LEVEL = INFO
+
+# reported messages of level lower than set here will be elevated to this level (i.e. if SYSLOG_MIN_LEVEL is set to DEBUG and SYSLOG_ELEVATE_TO is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE)
+# SYSLOG_ELEVATE_TO = NOTICE
+
+####################################################################################
+# MASTER CONNECTION OPTIONS - changes in this section require only process reload. #
+####################################################################################
 
 # delay in seconds before next try to reconnect to master if not connected (default is 5)
 # MASTER_RECONNECTION_DELAY = 5

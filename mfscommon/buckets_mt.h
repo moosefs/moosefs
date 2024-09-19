@@ -21,15 +21,6 @@
 #ifndef _BUCKETS_MT_H_
 #define _BUCKETS_MT_H_
 
-#ifdef BUCKETS_MT_MMAP_ALLOC
-#include <sys/mman.h>
-#define BUCKETS_MT_ALLOC(size) mmap(NULL,size,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0)
-#define BUCKETS_MT_FREE(p,size) munmap(p,size)
-#else
-#define BUCKETS_MT_ALLOC(size) malloc(size)
-#define BUCKETS_MT_FREE(p,size) free(p)
-#endif
-
 #include <pthread.h>
 #include <inttypes.h>
 
@@ -49,7 +40,7 @@ static inline void allocator_name##_free_all(void) { \
 	pthread_mutex_lock(&allocator_name##_lock); \
 	for (srb = allocator_name##_buckets_head ; srb ; srb = nsrb) { \
 		nsrb = srb->next; \
-		BUCKETS_MT_FREE(srb,sizeof(allocator_name##_bucket)); \
+		free(srb); \
 	} \
 	allocator_name##_buckets_head = NULL; \
 	allocator_name##_free_head = NULL; \
@@ -57,7 +48,7 @@ static inline void allocator_name##_free_all(void) { \
 	allocator_name##_used = 0; \
 	pthread_mutex_unlock(&allocator_name##_lock); \
 } \
-static inline element_type* allocator_name##_malloc() { \
+static inline element_type* allocator_name##_malloc(void) { \
 	allocator_name##_bucket *srb; \
 	element_type *ret; \
 	pthread_mutex_lock(&allocator_name##_lock); \
@@ -69,7 +60,7 @@ static inline element_type* allocator_name##_malloc() { \
 		return ret; \
 	} \
 	if (allocator_name##_buckets_head==NULL || allocator_name##_buckets_head->firstfree==(bucket_size)) { \
-		srb = (allocator_name##_bucket*)BUCKETS_MT_ALLOC(sizeof(allocator_name##_bucket)); \
+		srb = (allocator_name##_bucket*)malloc(sizeof(allocator_name##_bucket)); \
 		passert(srb); \
 		srb->next = allocator_name##_buckets_head; \
 		srb->firstfree = 0; \

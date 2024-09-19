@@ -1,0 +1,101 @@
+.TH mfsmetasearch "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
+.SH NAME
+mfsmetasearch - uses MooseFS metadata to find specific files
+.SH SYNOPSIS
+\fBmfsmetasearch\fP [\fB\-f\fP \fBJ\fP|\fBC\fP|\fBC\fP \fIx\fP] [\fB\-o\fP \fIoutput_file\fP] [\fB\-e\fP \fIexpr\fP | \fB\-c\fP \fIchunkid_file\fP] \fImetadata_file\fP
+.SH DESCRIPTION
+\fBmfsmetasearch\fP is a tool that finds files and other objects in MooseFS's 
+metadata that either match the provided expression (if \fB-e\fP option is used) or contain one or more of the chunk numbers 
+listed in hexadecimal format in the provided file (if \fB-c\fP option is used).
+.SH OPTIONS
+.TP
+\fB\-f\fP
+switch the default TXT output format to JSON (\fBJ\fP) or CSV (\fBC\fP); for CSV, if only \fBC\fP is specified, default
+separator will be used (comma), if second character is specified, this character will be used as 
+the separator in CSV data
+.TP
+\fB\-o\fP
+write output to \fIoutput_file\fP instead of stdout
+.TP
+\fB\-e\fP
+expression \fIexpr\fP that a file or object must match to be listed in output
+.TP
+\fB\-c\fP
+file \fIchunkid_file\fP containing chunk ids, only files containing one of these chunks will 
+be listed in output; chunks ids must be listed in hexadecimal format, 
+only last 56 bits of read values will be considered chunk ids, meaning bits denoting EC parts 
+don't have to be stripped in this case
+.TP
+\fBmetadata_file\fP
+path to metadata.mfs file
+.SH EXPRESSIONS
+The expression can consist of a number of symbols, values and operators. A symbol is a property of a file, 
+a value is the value of that property for a particular file and operators build the entire expression to 
+indicate if a certain property should match, be different etc.
+.PP
+Symbols and values:
+.nf
+.ta +1.5i
+inode		inode number (value: numeric)
+type			inode type (constants list: file,directory,symlink,fifo,blockdev,chardev,socket,trash,sustained)
+eattr		extra attributes bit mask (bit constants list: noowner,noattrcache,noentrycache,nodatacache,snapshot,undeletable,appendonly,immutable)
+sclass		number of storage class (value: numeric; class numbers can be checked via CGI or CLI)
+uid			user id (value: numeric)
+gid			group id (value: numeric)
+mode			access mode bit mask (bit constants list: sticky,sgid,suid,ur,uw,ux,gr,gw,gx,or,ow,ox)
+umode		access mode for uid bit mask (bit constants list: read,write,execute)
+gmode		access mode for gid bit mask (bit constants list: read,write,execute)
+omode		access mode for others bit mask (bit constants list: read,write,execute)
+atime		access time (value: numeric - unix timestamp in seconds)
+mtime		modify time (value: numeric - unix timestamp in seconds)
+ctime		change time (value: numeric - unix timestamp in seconds)
+tretention	trash retention in hours (value: numeric)
+length		file length (value: numeric; zero for other objects)
+major		major id (value: numeric; for blockdev and chardev only)
+minor		minor id (value: numeric; for blockdev and chardev only)
+chunkid		chunk's numerical id (value: numeric; expression will be tested for all file chunks and accepted if one of them is true)
+.fi
+.PP
+Accepted operators (C-style): - + * / % >> << < <= > >= == != ~ & ^ | ! && ^^ || ?:
+.SH EXAMPLES
+.TP
+.B mfsmetasearch -e 'length<4096' /var/lib/mfs/metadata.mfs.back
+this will show all files shorter than 4096 bytes (having size smaller than 4096 bytes) and all objects other than files
+.TP
+.B mfsmetasearch -e 'type==file && length<4096' /var/lib/mfs/metadata.mfs.back
+this will show all files shorter than 4096 bytes (having size smaller than 4096 bytes)
+.TP
+.B mfsmetasearch -e 'umode&execute && gmode&execute && !(omode&execute)' /var/lib/mfs/metadata.mfs.back
+this will show all inodes that have the execute bit set for both user and group, but not others
+.TP
+.B mfsmetasearch -e 'chunkid==101020 || chunkid==0xFF77AA || chunkid==01234 || chunkid==0b1010101' /var/lib/mfs/metadata.mfs.back
+this will show all files that contain chunk with decimal id 101020 or chunk with hex id FF77AA or chunk with octal id 1234 or chunk with binary id 1010101 
+.TP
+.B mfsmetasearch -e 'sclass==11' /var/lib/mfs/metadata.mfs.back
+this will show all objects that have storage class set to the class with number 11
+.TP
+.B mfsmetasearch -c /tmp/mychunkids.txt /var/lib/mfs/metadata.mfs.back
+this will show all files, that contain one of the chunks listed in text file /tmp/mychunkids.txt
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfsmetadump (8)

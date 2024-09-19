@@ -24,7 +24,6 @@
 
 #include <sys/stat.h>
 #include <inttypes.h>
-#include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -82,7 +81,7 @@ void sstats_activate(uint32_t inode) {
 		}
 	}
 	if (isc==NULL) {
-		syslog(LOG_WARNING,"no sustained stats for node: %"PRIu32" - using defaults",inode);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"no sustained stats for node: %"PRIu32" - using defaults",inode);
 		isc = malloc(sizeof(inode_stats));
 		passert(isc);
 		isc->inode = inode;
@@ -113,7 +112,7 @@ void sstats_deactivate(uint32_t inode) {
 		}
 	}
 	if (isc==NULL) {
-		syslog(LOG_WARNING,"no sustained stats for node: %"PRIu32" - ignored",inode);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"no sustained stats for node: %"PRIu32" - ignored",inode);
 	}
 	zassert(pthread_mutex_unlock(locktab+hash));
 	return;
@@ -141,7 +140,7 @@ int sstats_get(uint32_t inode,uint8_t attr[35],uint8_t forceok) {
 		}
 	}
 	if (forceok) {
-		syslog(LOG_WARNING,"no sustained stats for node: %"PRIu32" - using defaults",inode);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"no sustained stats for node: %"PRIu32" - using defaults",inode);
 		isc = malloc(sizeof(inode_stats));
 		passert(isc);
 		isc->inode = inode;

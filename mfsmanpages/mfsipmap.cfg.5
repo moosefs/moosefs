@@ -1,0 +1,96 @@
+.TH mfsipmap.cfg "5" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
+.SH NAME
+mfsipmap.cfg \- MooseFS chunkserver IP mappings
+.SH DESCRIPTION
+The file \fBmfsipmap.cfg\fP contains MooseFS chunk server IPs mapping lists. 
+.SH SYNTAX
+General file format: the content is one or more different LAN remappings. Each LAN remapping consists of first the list of client IPs that will have the chunk server's IPs remapped and then the chunk server's remmapings themselves. Proper file is build like this: client IP list - mapping list - client IP list - mapping list etc.
+.PP
+Clients' IPs can be defined as classes in two formats: IP/MASK or IP/BITS:
+.br
+\fBn.n.n.n/m.m.m.m\fP
+.br
+\fBn.n.n.n/b\fP
+.br
+Class definitions can use shortened IP, for example \fBa.b.c.0/24\fP is the same as \fBa.b.c/24\fP, and \fBa.b.0.0/255.255.0.0\fP is the same as \fBa.b/255.255.0.0\fP.
+.PP
+Clients' IPs can also be defined as ranges in format IP - IP:
+.br
+\fBf.f.f.f-t.t.t.t\fP
+.PP
+And lasty, clients' IPs can be defined as single IPs, one IP per line:
+.br
+\fBn.n.n.n\fP
+.br
+\fBx.x.x.x\fP
+.PP
+Chunk server's IP mappings are always defined in one format IP:IP:
+.br
+\fBn.n.n.n:r.r.r.r\fP
+.br
+If a client's IP is defined in the list directly preceeding this mapping, the chunkserver with IP on the left side of the mapping will be presented to this client with the IP on the right side of the mapping.
+.PP
+Lines starting with \fB#\fP character are ignored as comments.
+.SH NOTES
+.PP
+This file allows to define LAN mappings in cases where there is no common scheme of numbering in LANs, i.e. where the same servers have different IP suffixes in each LAN. If machines have common suffixes, use \fBMULTILAN_BITS\fP and \fBMULTILAN_CLASSES\fP options from mfsmaster.cfg file instead.
+.SH EXAMPLES
+.PP
+File content:
+.PP
+\fB192.168.1/24\fP
+.br
+\fB192.168.2.1-192.168.2.24\fP
+.br
+\fB192.168.3.20\fP
+.PP
+\fB10.10.10.3:10.20.30.7\fP
+.br
+\fB10.10.10.4:10.20.33.19\fP
+.PP
+Behaviour:
+.PP
+Any client having IP starting with \fB192.168.1\fP, starting with \fB192.168.2\fP and ending in \fB1\fP to \fB24\fP, or with IP \fB192.168.3.20\fP, if it wants to communicate with chunkserver with IP \fB10.10.10.3\fP, will instead do so using IP \fB10.20.30.7\fP, with chunkserver with IP \fB10.10.10.4\fP it will use IP \fB10.20.33.19\fP.
+.PP
+File content:
+.PP
+\fB192.168.1/24\fP
+.PP
+\fB10.10.10.3:10.20.30.7\fP
+.br
+\fB10.10.10.4:10.20.33.19\fP
+.PP
+\fB192.168.2.1-192.168.2.24\fP
+.PP
+\fB10.10.10.3:10.20.38.8\fP
+.br
+\fB10.10.10.5:10.20.38.37\fP
+.PP
+Behaviour:
+.PP
+Any client having IP starting with \fB192.168.1\fP, if it wants to communicate with chunkserver with IP \fB10.10.10.3\fP, will instead do so using IP \fB10.20.30.7\fP, with chunkserver with IP \fB10.10.10.4\fP it will use IP \fB10.20.33.1\fP.
+Any client having IP starting with \fB192.168.2\fP and ending in \fB1\fP to \fB24\fP, if it wants to communicate with chunkserver with IP \fB10.10.10.3\fP, will instead do so using IP \fB10.20.38.8\fP, with chunkserver with IP \fB10.10.10.5\fP it will use IP \fB10.20.38.37\fP.
+Notice, that the same chunkserver (with IP \fB10.10.10.3\fP) will be presented to clients from different IP lists with different remapped IP.
+.PP
+Note: empty lines between sections are not necessary, they are used in the above examples only for ease of reading.
+.SH COPYRIGHT
+Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmaster (8),
+.BR mfsmaster.cfg (5)

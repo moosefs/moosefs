@@ -28,7 +28,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <syslog.h>
 #include <errno.h>
 
 #include "charts.h"
@@ -54,13 +53,17 @@ void chartsdata_refresh(void) {
 	uint64_t data[CHARTS];
 	uint64_t bin,bout;
 	uint32_t i,opr,opw,dbr,dbw,dopr,dopw,movl,movh,repl;
-	uint32_t op_cr,op_de,op_ve,op_du,op_tr,op_dt,op_te;
+	uint32_t op_cr,op_de,op_ve,op_du,op_tr,op_dt,op_te,op_sp;
 	uint32_t jobs;
 	uint64_t scpu,ucpu;
 	uint64_t rss,virt;
+	uint64_t uspace,tspace,tduspace,tdtspace;
+	uint32_t chcount,tdchcount;
+	uint32_t copychunks,ec4chunks,ec8chunks;
+	uint32_t hddok,hddmfr,hdddmg,usagediff;
 
 	for (i=0 ; i<CHARTS ; i++) {
-		data[i]=CHARTS_NODATA;
+		data[i] = CHARTS_NODATA;
 	}
 
 	cpu_used(&scpu,&ucpu);
@@ -77,35 +80,51 @@ void chartsdata_refresh(void) {
 
 	masterconn_stats(data+CHARTS_MASTERIN,data+CHARTS_MASTEROUT);
 	job_stats(&jobs);
-	data[CHARTS_LOAD]=jobs;
+	data[CHARTS_LOAD] = jobs;
 	csserv_stats(data+CHARTS_CSSERVIN,data+CHARTS_CSSERVOUT);
 	mainserv_stats(&bin,&bout,&opr,&opw);
-	data[CHARTS_CSSERVIN]+=bin;
-	data[CHARTS_CSSERVOUT]+=bout;
-	data[CHARTS_HLOPR]=opr;
-	data[CHARTS_HLOPW]=opw;
+	data[CHARTS_CSSERVIN] += bin;
+	data[CHARTS_CSSERVOUT] += bout;
+	data[CHARTS_HLOPR] = opr;
+	data[CHARTS_HLOPW] = opw;
 	hdd_stats(&bin,&bout,&opr,&opw,&dbr,&dbw,&dopr,&dopw,&movl,&movh,data+CHARTS_RTIME,data+CHARTS_WTIME);
-	data[CHARTS_HDRBYTESR]=bin;
-	data[CHARTS_HDRBYTESW]=bout;
-	data[CHARTS_HDRLLOPR]=opr;
-	data[CHARTS_HDRLLOPW]=opw;
-	data[CHARTS_DATABYTESR]=dbr;
-	data[CHARTS_DATABYTESW]=dbw;
-	data[CHARTS_DATALLOPR]=dopr;
-	data[CHARTS_DATALLOPW]=dopw;
-	data[CHARTS_MOVELS]=movl;
-	data[CHARTS_MOVEHS]=movh;
+	data[CHARTS_HDRBYTESR] = bin;
+	data[CHARTS_HDRBYTESW] = bout;
+	data[CHARTS_HDRLLOPR] = opr;
+	data[CHARTS_HDRLLOPW] = opw;
+	data[CHARTS_DATABYTESR] = dbr;
+	data[CHARTS_DATABYTESW] = dbw;
+	data[CHARTS_DATALLOPR] = dopr;
+	data[CHARTS_DATALLOPW] = dopw;
+	data[CHARTS_MOVELS] = movl;
+	data[CHARTS_MOVEHS] = movh;
 	replicator_stats(data+CHARTS_CSREPIN,data+CHARTS_CSREPOUT,&repl);
-	data[CHARTS_REPL]=repl;
-	hdd_op_stats(&op_cr,&op_de,&op_ve,&op_du,&op_tr,&op_dt,&op_te);
-	data[CHARTS_CREATE]=op_cr;
-	data[CHARTS_DELETE]=op_de;
-	data[CHARTS_VERSION]=op_ve;
-	data[CHARTS_DUPLICATE]=op_du;
-	data[CHARTS_TRUNCATE]=op_tr;
-	data[CHARTS_DUPTRUNC]=op_dt;
-	data[CHARTS_TEST]=op_te;
-	data[CHARTS_CHANGE]=op_ve+op_du+op_tr+op_dt;
+	data[CHARTS_REPL] = repl;
+	hdd_op_stats(&op_cr,&op_de,&op_ve,&op_du,&op_tr,&op_dt,&op_te,&op_sp);
+	data[CHARTS_CREATE] = op_cr;
+	data[CHARTS_DELETE] = op_de;
+	data[CHARTS_VERSION] = op_ve;
+	data[CHARTS_DUPLICATE] = op_du;
+	data[CHARTS_TRUNCATE] = op_tr;
+	data[CHARTS_DUPTRUNC] = op_dt;
+	data[CHARTS_TEST] = op_te;
+	data[CHARTS_SPLIT] = op_sp;
+	data[CHARTS_CHANGE] = op_ve+op_du+op_tr+op_dt+op_sp;
+	hdd_get_space(&uspace,&tspace,&chcount,&tduspace,&tdtspace,&tdchcount);
+	data[CHARTS_USPACE] = uspace;
+	data[CHARTS_TSPACE] = tspace;
+	data[CHARTS_CHCOUNT] = chcount;
+	data[CHARTS_TDUSPACE] = tduspace;
+	data[CHARTS_TDTSPACE] = tdtspace;
+	data[CHARTS_TDCHCOUNT] = tdchcount;
+	hdd_get_chart_data(&copychunks,&ec4chunks,&ec8chunks,&hddok,&hddmfr,&hdddmg,&usagediff);
+	data[CHARTS_COPYCHUNKS] = copychunks;
+	data[CHARTS_EC4CHUNKS] = ec4chunks;
+	data[CHARTS_EC8CHUNKS] = ec8chunks;
+	data[CHARTS_HDD_OK] = hddok;
+	data[CHARTS_HDD_MFR] = hddmfr;
+	data[CHARTS_HDD_DMG] = hdddmg;
+	data[CHARTS_USAGE_DIFF] = usagediff;
 
 	charts_add(data,main_time()-60);
 }

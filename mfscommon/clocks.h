@@ -23,10 +23,10 @@
 
 #include <inttypes.h>
 
-double monotonic_seconds();
-uint64_t monotonic_useconds();
-uint64_t monotonic_nseconds();
-const char* monotonic_method();
-uint32_t monotonic_speed();
+double monotonic_seconds(void);
+uint64_t monotonic_useconds(void);
+uint64_t monotonic_nseconds(void);
+const char* monotonic_method(void);
+uint32_t monotonic_speed(void);
 
 #endif

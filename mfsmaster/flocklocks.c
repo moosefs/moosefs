@@ -22,6 +22,7 @@
 #include "config.h"
 #endif
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
 
@@ -31,10 +32,11 @@
 #include "openfiles.h"
 #include "metadata.h"
 #include "main.h"
+#include "cfg.h"
 #include "changelog.h"
 #include "datapack.h"
 #include "bio.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "massert.h"
 
 #define MODE_CORRECT 0
@@ -55,6 +57,7 @@ typedef struct _instance {
 
 typedef struct _lock {
 	uint64_t owner;
+	void *connptr;
 	uint32_t sessionid;
 	uint8_t state;
 	uint8_t ltype;
@@ -78,46 +81,48 @@ static inodelocks **inodehash;
 
 static uint8_t FlocksMode;
 
+static uint8_t DebugInfo;
+
 #if 0
 static inline void flock_dump(void) {
 	uint32_t h;
 	inodelocks *il;
 	lock *l,**lptr;
 	instance *i;
-	syslog(LOG_NOTICE,"flock dump:");
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"flock dump:");
 	for (h=0 ; h<FLOCK_INODE_HASHSIZE ; h++) {
 		for (il = inodehash[h] ; il ; il=il->next) {
-			syslog(LOG_NOTICE,"  inode: %"PRIu32" (active:%s,waiting:%s)",il->inode,il->active?"yes":"no",il->waiting_head?"yes":"no");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"  inode: %"PRIu32" (active:%s,waiting:%s)",il->inode,il->active?"yes":"no",il->waiting_head?"yes":"no");
 			lptr = &(il->active);
 			while ((l=*lptr)) {
-				syslog(LOG_NOTICE,"    active lock: session:%"PRIu32",owner:%"PRIu64",type:%s",l->sessionid,l->owner,l->ltype==LTYPE_READER?"R":"W");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"    active lock: session:%"PRIu32",owner:%"PRIu64",type:%s",l->sessionid,l->owner,l->ltype==LTYPE_READER?"R":"W");
 				if (l->state!=STATE_ACTIVE) {
-					syslog(LOG_WARNING,"      wrong state !!!");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"      wrong state !!!");
 				}
 				if (l->prev != lptr) {
-					syslog(LOG_WARNING,"      wrong prev pointer !!!");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"      wrong prev pointer !!!");
 				}
 				if (l->lock_instances) {
-					syslog(LOG_WARNING,"      active lock with waiting processes !!!");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"      active lock with waiting processes !!!");
 				}
 				lptr = &(l->next);
 			}
 			lptr = &(il->waiting_head);
 			while ((l=*lptr)) {
-				syslog(LOG_NOTICE,"    waiting lock: session:%"PRIu32",owner:%"PRIu64",type:%s",l->sessionid,l->owner,l->ltype==LTYPE_READER?"R":"W");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"    waiting lock: session:%"PRIu32",owner:%"PRIu64",type:%s",l->sessionid,l->owner,l->ltype==LTYPE_READER?"R":"W");
 				if (l->state!=STATE_WAITING) {
-					syslog(LOG_WARNING,"      wrong state !!!");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"      wrong state !!!");
 				}
 				if (l->prev != lptr) {
-					syslog(LOG_WARNING,"      wrong prev pointer !!!");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"      wrong prev pointer !!!");
 				}
 				for (i = l->lock_instances ; i ; i=i->next) {
-					syslog(LOG_NOTICE,"      waiting process reqid: %"PRIu32,i->reqid);
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"      waiting process reqid: %"PRIu32,i->reqid);
 				}
 				lptr = &(l->next);
 			}
 			if (il->waiting_tail != lptr) {
-				syslog(LOG_WARNING,"    wrong tail pointer !!!");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"    wrong tail pointer !!!");
 			}
 		}
 	}
@@ -207,7 +212,7 @@ static inline void flock_lock_wake_up_one(lock *l,uint32_t reqid,uint8_t status)
 	iptr = &(l->lock_instances);
 	while ((i=*iptr)) {
 		if (i->reqid==reqid) {
-			matoclserv_fuse_flock_wake_up(l->sessionid,i->msgid,status);
+			matoclserv_fuse_flock_wake_up(l->connptr,i->msgid,status);
 			*iptr = i->next;
 			free(i);
 		} else {
@@ -221,7 +226,7 @@ static inline void flock_lock_wake_up_all(lock *l,uint8_t status) {
 	i = l->lock_instances;
 	while (i) {
 		ni = i->next;
-		matoclserv_fuse_flock_wake_up(l->sessionid,i->msgid,status);
+		matoclserv_fuse_flock_wake_up(l->connptr,i->msgid,status);
 		free(i);
 		i = ni;
 	}
@@ -292,10 +297,11 @@ static inline uint8_t flock_check(inodelocks *il,uint8_t ltype) {
 	return 0;
 }
 
-static inline uint8_t flock_lock_new(inodelocks *il,uint8_t ltype,uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint64_t owner) {
+static inline uint8_t flock_lock_new(inodelocks *il,uint8_t ltype,void *connptr,uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint64_t owner) {
 	lock *l;
 	l = malloc(sizeof(lock));
 	l->owner = owner;
+	l->connptr = connptr;
 	l->sessionid = sessionid;
 	l->state = STATE_ACTIVE;
 	l->ltype = ltype;
@@ -360,13 +366,38 @@ static inline void flock_lock_unlock(inodelocks *il,lock *l) {
 	}
 }
 
-uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t inode,uint64_t owner,uint8_t op) {
+void flock_disconnected(void *connptr) {
+	uint32_t h;
+	inodelocks *il;
+	lock *l,*nl;
+	instance *i,*ni;
+	for (h=0 ; h<FLOCK_INODE_HASHSIZE ; h++) {
+		for (il = inodehash[h] ; il!=NULL ; il=il->next) {
+			l = il->waiting_head;
+			while (l!=NULL) {
+				nl = l->next;
+				if (l->connptr==connptr) {
+					i = l->lock_instances;
+					while (i) {
+						ni = i->next;
+						free(i);
+						i = ni;
+					}
+					free(l);
+				}
+				l = nl;
+			}
+		}
+	}
+}
+
+uint8_t flock_locks_cmd(void *connptr,uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t inode,uint64_t owner,uint8_t op) {
 	inodelocks *il;
 	lock *l,*nl;
 	uint8_t ltype;
 
 //	flock_dump();
-//	syslog(LOG_NOTICE,"flock op: sessionid:%"PRIu32",msgid:%"PRIu32",reqid:%"PRIu32",inode:%"PRIu32",owner:%"PRIu64",op:%u",sessionid,msgid,reqid,inode,owner,op);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"flock op: sessionid:%"PRIu32",msgid:%"PRIu32",reqid:%"PRIu32",inode:%"PRIu32",owner:%"PRIu64",op:%u",sessionid,msgid,reqid,inode,owner,op);
 
 	if (op!=FLOCK_INTERRUPT && op!=FLOCK_RELEASE) {
 		if (of_checknode(sessionid,inode)==0) {
@@ -384,7 +415,7 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 		l = il->waiting_head;
 		while (l) {
 			nl = l->next;
-			if (l->sessionid==sessionid && l->owner==owner) {
+			if (l->connptr==connptr && l->sessionid==sessionid && l->owner==owner) {
 				flock_lock_wake_up_one(l,reqid,MFS_ERROR_EINTR);
 				if (l->lock_instances==NULL) { // remove
 					flock_lock_remove(l);
@@ -415,7 +446,7 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 					return MFS_STATUS_OK;
 				} else { // l->ltype==LTYPE_WRITER
 					flock_lock_unlock(il,l);
-					return flock_lock_new(il,LTYPE_READER,sessionid,msgid,reqid,owner);
+					return flock_lock_new(il,LTYPE_READER,connptr,sessionid,msgid,reqid,owner);
 				}
 			} else if (op==FLOCK_TRY_EXCLUSIVE) {
 				if (l->ltype==LTYPE_WRITER) {
@@ -432,14 +463,14 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 					return MFS_STATUS_OK;
 				} else { // l->ltype==LTYPE_READER
 					flock_lock_unlock(il,l);
-					return flock_lock_new(il,LTYPE_WRITER,sessionid,msgid,reqid,owner);
+					return flock_lock_new(il,LTYPE_WRITER,connptr,sessionid,msgid,reqid,owner);
 				}
 			}
 			return MFS_ERROR_EINVAL;
 		}	
 	}
 	for (l=il->waiting_head ; l ; l=l->next) {
-		if (l->sessionid==sessionid && l->owner==owner) {
+		if (l->connptr==connptr && l->sessionid==sessionid && l->owner==owner) {
 			if (op==FLOCK_RELEASE) {
 				flock_lock_wake_up_all(l,MFS_ERROR_ECANCELED);
 				flock_lock_remove(l);
@@ -489,7 +520,7 @@ uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_
 			return MFS_ERROR_EAGAIN;
 		}
 	}
-	return flock_lock_new(il,ltype,sessionid,msgid,reqid,owner);
+	return flock_lock_new(il,ltype,connptr,sessionid,msgid,reqid,owner);
 }
 
 void flock_file_closed(uint32_t sessionid,uint32_t inode) {
@@ -696,10 +727,10 @@ int flock_load(bio *fd,uint8_t mver,uint8_t ignoreflag) {
 		}
 		if (of_checknode(sessionid,inode)==0) {
 			if (ignoreflag) {
-				mfs_syslog(LOG_ERR,"loading flock_locks: lock on closed file !!! (ignoring)");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading flock_locks: lock on closed file !!! (ignoring)");
 				continue;
 			} else {
-				mfs_syslog(LOG_ERR,"loading flock_locks: lock on closed file !!!");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading flock_locks: lock on closed file !!!");
 				return -1;
 			}
 		}
@@ -710,10 +741,10 @@ int flock_load(bio *fd,uint8_t mver,uint8_t ignoreflag) {
 		}
 		if (il->active!=NULL && (il->active->ltype==LTYPE_WRITER || ltype==LTYPE_WRITER)) {
 			if (ignoreflag) {
-				mfs_syslog(LOG_ERR,"loading flock_locks: wrong lock !!! (ignoring)");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading flock_locks: wrong lock !!! (ignoring)");
 				continue;
 			} else {
-				mfs_syslog(LOG_ERR,"loading flock_locks: wrong lock !!!");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading flock_locks: wrong lock !!!");
 				return -1;
 			}
 		}
@@ -761,12 +792,51 @@ void flock_cleanup(void) {
 	}
 }
 
+void flock_info(FILE *fd) {
+	uint32_t h,j;
+	inodelocks *il;
+	lock *l;
+	instance *i;
+	const char *lname;
+
+	if (DebugInfo) {
+		fprintf(fd,"[flock locks]\n");
+		for (h=0 ; h<FLOCK_INODE_HASHSIZE ; h++) {
+			for (il = inodehash[h] ; il!=NULL ; il=il->next) {
+				fprintf(fd,"- inode: %u\n",il->inode);
+				for (j=0 ; j<2 ; j++) {
+					l = j?il->active:il->waiting_head;
+					lname = j?"active":"waiting";
+					if (l!=NULL) {
+						for ( ; l!=NULL ; l=l->next) {
+							fprintf(fd,"  - %s_lock: owner: %"PRIu64", sessionid: %"PRIu32", state: %c, type: %c\n",lname,l->owner,l->sessionid,(l->state==STATE_ACTIVE)?'A':(l->state==STATE_WAITING)?'W':'?',(l->ltype==LTYPE_READER)?'R':(l->ltype==LTYPE_WRITER)?'W':'?');
+							for (i = l->lock_instances ; i!=NULL ; i=i->next) {
+								fprintf(fd,"    - instance: msgid: %"PRIu32", reqid: %"PRIu32"\n",i->msgid,i->reqid);
+							}
+						}
+					}
+				}
+			}
+		}
+		fprintf(fd,"\n");
+	}
+}
+
+void flock_reload(void) {
+	DebugInfo = cfg_getuint8("EXTRA_DEBUG_INFO",0); // debug option
+
+	FlocksMode = cfg_getuint8("FLOCK_MODE",MODE_CORRECT); // debug option
+	// 0 - CORRECT , 1 - LINUX , 2 - BSD
+}
+
 int flock_init(void) {
 	uint32_t i;
 	inodehash = malloc(sizeof(inodelocks*)*FLOCK_INODE_HASHSIZE);
 	for (i=0 ; i<FLOCK_INODE_HASHSIZE ; i++) {
 		inodehash[i] = NULL;
 	}
-	FlocksMode = 0;
+	flock_reload();
+	main_reload_register(flock_reload);
+	main_info_register(flock_info);
 	return 0;
 }

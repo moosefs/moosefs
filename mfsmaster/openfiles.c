@@ -60,7 +60,7 @@ static inline void of_newnode(uint32_t sessionid,uint32_t inode) {
 	uint32_t shashpos = OF_SESSION_HASH(sessionid);
 	uint32_t ihashpos = OF_INODE_HASH(inode);
 
-//	syslog(LOG_NOTICE,"new node: sessionid: %"PRIu32", inode: %"PRIu32" , shashpos: %"PRIu32" , ihashpos: %"PRIu32,sessionid,inode,shashpos,ihashpos);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"new node: sessionid: %"PRIu32", inode: %"PRIu32" , shashpos: %"PRIu32" , ihashpos: %"PRIu32,sessionid,inode,shashpos,ihashpos);
 
 	ofr = (ofrelation*)malloc(sizeof(ofrelation));
 	ofr->sessionid = sessionid;
@@ -82,7 +82,7 @@ static inline void of_newnode(uint32_t sessionid,uint32_t inode) {
 }
 
 static inline void of_delnode(ofrelation *ofr) {
-//	syslog(LOG_NOTICE,"del node: sessionid: %"PRIu32", inode: %"PRIu32,ofr->sessionid,ofr->inode);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"del node: sessionid: %"PRIu32", inode: %"PRIu32,ofr->sessionid,ofr->inode);
 	flock_file_closed(ofr->sessionid,ofr->inode);
 	posix_lock_file_closed(ofr->sessionid,ofr->inode);
 	*(ofr->iprev) = ofr->inext;
@@ -165,14 +165,14 @@ void of_sync(uint32_t sessionid,uint32_t *inodes,uint32_t inodecnt) {
 	qsort(inodes,inodecnt,sizeof(uint32_t),of_inodecmp);
 
 //	for (i=0 ; i<inodecnt ; i++) {
-//		syslog(LOG_NOTICE,"sync: inodes[%"PRIu32"]=%"PRIu32,i,inodes[i]);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"sync: inodes[%"PRIu32"]=%"PRIu32,i,inodes[i]);
 //	}
 
 	for (ofr = sessionhash[shashpos] ; ofr ; ofr = nofr) {
 		nofr = ofr->snext;
 		if (ofr->sessionid==sessionid) {
 			ipos = of_bisearch(ofr->inode,inodes,inodecnt);
-//			syslog(LOG_NOTICE,"sync: search for %"PRIu32" -> pos: %"PRId32,ofr->inode,ipos);
+//			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"sync: search for %"PRIu32" -> pos: %"PRId32,ofr->inode,ipos);
 			if (ipos<0) { // close
 				inode = ofr->inode;
 				of_delnode(ofr);
@@ -184,7 +184,7 @@ void of_sync(uint32_t sessionid,uint32_t *inodes,uint32_t inodecnt) {
 	}
 
 //	for (i=0 ; i<bitmasksize ; i++) {
-//		syslog(LOG_NOTICE,"sync: bitmask[%"PRIu32"]=%"PRIX32,i,bitmask[i]);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"sync: bitmask[%"PRIu32"]=%"PRIX32,i,bitmask[i]);
 //	}
 
 	for (i=0 ; i<inodecnt ; i++) {
@@ -213,6 +213,28 @@ void of_session_removed(uint32_t sessionid) {
 			of_delnode(ofr);
 		}
 	}
+}
+
+uint32_t of_sessions_info_for_inode(uint32_t inode,uint8_t *dbuff) {
+	ofrelation *ofr;
+	uint32_t ihashpos = OF_INODE_HASH(inode);
+	uint32_t sescount;
+
+	sescount = 0;
+	for (ofr = inodehash[ihashpos] ; ofr ; ofr = ofr->inext) {
+		if (ofr->inode==inode) {
+			sescount++;
+		}
+	}
+	if (dbuff!=NULL) {
+		put32bit(&dbuff,sescount);
+		for (ofr = inodehash[ihashpos] ; ofr ; ofr = ofr->inext) {
+			if (ofr->inode==inode) {
+				put32bit(&dbuff,ofr->sessionid);
+			}
+		}
+	}
+	return 4 + 4 * sescount;
 }
 
 uint8_t of_isfileopen(uint32_t inode) {

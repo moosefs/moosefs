@@ -1,22 +1,22 @@
-.TH mfsquota "1" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsquota "1" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsquota \- \fBMooseFS\fP quota management tools
 .SH SYNOPSIS
 .B mfsgetquota
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] 
+[\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] 
 \fIDIRECTORY\fP...
 .PP
 .B mfssetquota
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-p\fP \fIgrace_period\fP] [\fB-i\fP|\fB-I\fP \fIinodes\fP] 
-[\fB-l\fP|\fB-L\fP \fIlength\fP] [\fB-s\fP|\fB-S\fP \fIsize\fP] [\fB-r\fP|\fB-R\fP \fIrealsize\fP]
+[\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-p\fP \fIgrace_period\fP|\fB-P\fP] [\fB-iI\fP \fIinodes\fP] 
+[\fB-lL\fP \fIlength\fP] [\fB-sS\fP \fIsize\fP] [\fB-rR\fP \fIrealsize\fP]
 \fIDIRECTORY\fP...
 .PP
 .B mfsdelquota
-[\fB-a\fP|\fB-A\fP|\fB-i\fP|\fB-I\fP|\fB-l\fP|\fB-L\fP|\fB-s\fP|\fB-S\fP|\fB-r\fP|\fB-R\fP]
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fB-f\fP \fIDIRECTORY\fP...
+[\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] 
+[\fB-a\fP|\fB-ilsr\fP] [\fB-A\fP|\fB-ILSR\fP] \fIDIRECTORY\fP...
 .PP
 .B mfscopyquota
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_DIRECTORY\fP \fIDESTINATION_DIRECTORY\fP
+[\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_DIRECTORY\fP \fIDESTINATION_DIRECTORY\fP
 .SH DESCRIPTION
 These tools are used to check, define and delete quotas. Quota is set on a directory. It can be set in one
 of 4 ways: for number of inodes inside the directory (total sum of the
@@ -25,16 +25,37 @@ subtree's inodes) with \fB-i\fP, \fB-I\fP options, for sum of (logical) file len
 for sum of chunk sizes (not considering goals) with \fB-s\fP, \fB-S\fP options and for physical
 hdd space (more or less chunk sizes multiplied by goal of each chunk) with \fB-r\fP, \fB-R\fP options.
 Small letters set soft quota, capital letters set hard quota. \fB-a\fP and \fB-A\fP options in
-\fBmfsdelquota\fP mean all kinds of quota. Quota behaviour is described below.
-For soft quota grace period can be defined using \fB-p\fP option. When grace period is not given then
-default value will be used (option defined in mfsmaster.cfg or seven days if it's not defined there).
+\fBmfsdelquota\fP mean all kinds of quota. Quota behaviour (soft/hard) is described below.
+For soft quota grace period can be defined using \fB-p\fP option or \fB-P\fP option. Option \fB-p\fP requires an explicit parameter in "time format" (see TIME), with minimum unit being seconds. Option \fB-P\fP will use the default grace period defined in mfsmaster.cfg.
+When neither \fB-p\fP nor \fB-P\fP options are given, the behaviour of \fBmfssetquota\fP depends on if there was already a quota defined on a given directory. If yes, then old grace period value will be retained. If no, then the command will behave as if \fB-P\fP was used.
 .PP
 Quota is always set on a directory. Hard quota cannot be exceeded anytime.
 Soft quota can be exceeded for a specified period of time. Once a quota is exceeded in a
 directory, user must go below the quota during the grace period. If not, the soft 
 quota for this particular directory starts to behave like a hard quota.
+.PP
+Notice! \fBmfscopyquota\fP will copy all existing quotas from \fISOURCE_DIRECTORY\fP to \fIDESTINATION_DIRECTORY\fP, not
+but will not delete any quotas in \fIDESTINATION_DIRECTORY\fP. That means all quotas already existing in \fIDESTINATION_DIRECTORY\fP prior to the copying operation and
+not replaced by the copying operation will still exist afterwards. For example: if \fISOURCE_DIRECTORY\fP has an inode quota set and
+\fIDESTINATION_DIRECTORY\fP has a file length quota set, afterwards \fIDESTINATION_DIRECTORY\fP will have both quotas set.
+.SH TIME
+.PP
+For variables that define time without requiring a single, specific unit, time can be defined as a number of seconds or hours (integer), depending on minimum unit for the variable, or as a time period in one of two possible formats:
+.PP
+first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of minimum unit will be rounded
+.PP
+second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
+o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+.PP
+If a minimum unit of a variable is larger than seconds, units below the minimum one will not be accepted. For example, a variable that has hours as a minimum unit will not accept s and m units.
+.PP
+Examples:
+.PP
+1.5d is the same as 1d12h, is the same as 36h
+.PP
+2.5w is the same as 2w3d12h, is the same as 420h; 2w84h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
 .SH GENERAL OPTIONS
-Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
+Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
 uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
@@ -46,6 +67,41 @@ The same can be achieved by setting
 or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
 \fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
 numbers and SI prefixes). The default is to print just exact numbers.
+.PP
+Option \fB-?\fP displays short usage message.
+.SH EXAMPLES
+.PP
+All examples assume that MooseFS client is mounted in /mnt/mfs directory.
+.PP
+mfssetquota -p 24h -i 10000 /mnt/mfs/users/bob
+.br
+Sets a soft quota for the number of inodes in /users/bob directory on MooseFS. Once 10000 objects are created in the tree under /users/bob, grace period countdown of 24 hours will start. Since there is no hard quota defined, there is no limit to how many additional inodes can be created during those 24 hours, but once that time has passed, no new inode creation attempt will be successful. To erase the quota constraints (grace period countdown and/or full hard quota lock) enough inodes must be deleted from /users/bob to go below the 10000 limit.
+.PP
+mfssetquota -p 24h -i 10000 -I 20000 /mnt/mfs/users/bob
+.br
+Sets a soft and a hard quota for the number of inodes in /users/bob directory on MooseFS. Once 10000 objects are created in the tree under /users/bob, grace period countdown of 24 hours will start. If, during that period, additional objects are created up to the total number of 20000, hard quota will immediately "kick in", even if the grace period for soft quota has not yet elapsed. Once that happens, no new inode creation attempts will be successful. To erase the quota constraints (grace period countdown and/or full hard quota lock) enough inodes must be deleted from /users/bob to go below the 10000 limit.
+.PP
+mfssetquota -l 2GiB /mnt/mfs/users/bob
+.br
+If there was never any previous quota on /users/bob directory, this directory will now have a soft quota of total files lenght (sum of files' lengths) in the whole subtree set to 2 GiB. Since this is a new quota and no -p and -P options were explicitely specified, -P will be assumed and default grace period from mfsmaster.cfg will be used.
+.br
+If there was already a previous quota on /users/bob directory, let's say like the one in the first example, then this directory will have both soft quota for number of inodes and soft quota for total files lenght set and the grace period will be the one set with the previous command (so 24 hours in this example).
+.PP
+mfssetquota -p 3d /mnt/mfs/users/bob
+.br
+If /users/bob has any soft quotas set, grace period of these quotas will now be 3 days (72 hours). If not, this command will be ignored.
+.PP
+mfssetquota -P /mnt/mfs/users/bob
+.br
+If /users/bob has any soft quotas set, grace period of these quotas will now be whatever is defined in mfsmaster.cfg. If not, this command will be ignored.
+.PP
+mfsdelquota -i /mnt/mfs/users/bob
+.br
+Soft quota for the number of inodes in /users/bob directory will be deleted. If there was also a hard quota or any other kind of quota (legnth, size, etc), those will remain unchanged.
+.PP
+mfsdelquota -a -A /mnt/mfs/users/bob
+.br
+Deletes all possible quotas (all soft and all hard) from /users/bob
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

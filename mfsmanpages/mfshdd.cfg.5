@@ -1,4 +1,4 @@
-.TH mfshdd.cfg "5" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfshdd.cfg "5" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfshdd.cfg \- list of MooseFS storage directories for \fBmfschunkserver\fP
 .SH DESCRIPTION
@@ -8,7 +8,7 @@ used for MooseFS storage.
 .PP
 Syntax is:
 .TP
-[\fB*\fP|\fB<\fP|\fB>\fP|\fB~\fP]\fIPATH\fP [\fISPACE LIMIT\fP]
+[\fB*\fP|\fB<\fP|\fB>\fP|\fB~\fP]\fIPATH\fP [\fISPACE OPTIONS\fP]
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
 .PP
@@ -22,15 +22,86 @@ means that all data from this hard drive should be moved to other local hard dri
 .IP \fB>\fP
 means that all data from other local hard drives should be moved to this hard drive
 .IP \fB~\fP
-means that significant (more than 10% in less than minute) change of total blocks count will not mark this drive as damaged (useful for compressed filesystems)
+means that significant (more than 10% in less than a minute) change of total blocks count will not mark this drive as damaged (useful for compressed filesystems)
 .RE
 .PP
 \fIPATH\fP is path to the mounting point of storage directory, usually a single hard drive.
 .PP
-\fISPACE LIMIT\fP is optional space limit, that allows to set one of two values: 
-how much space should be left unused on this device or how much space is to be used on this device.
-Definition format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B?, positive value means 
-how much space to use, negative value means how much space should be left unused.
+\fISPACE OPTIONS\fP allow to define limits in used space and alter disk usage reporting. A \fISPACE OPTION\fP can be:
+.IP
+a positive space limit, indicating a space limit deifinition (i.e. only this amount of space on the indicated path should be used for chunk storage)
+.IP
+a negative space limit, indicating a reserved space definition (i.e. at least this amount of space should always be left free on the indicated path)
+.IP
+an equals '=' sign, optionally followed by a space limit indicator
+.PP
+Space limit can be either a defined amount of space (format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B?) or a percent of total device size.
+.PP
+An equals sign indicates, that a disk is "shared" with another process 
+(either another chunk server process or an unrelated process) and the amount of space used on the 
+disk is not necessarily indicative of the amount of space used by chunks. Additionaly, an indicator of a space limit can be defined. 
+Percent says how many percent of the available disk space should be considered as available for the chunkserver. 
+Size says how much exact space should be considered available for the chunkserver. If the percent or space are negative,
+then we define the unavailable amount of space instead.
+.PP
+The presence or absence of \fISPACE OPTION\fP changes the way chunk server calculates available 
+and used space on a given path.
+.PP
+Let's define 3 base values:
+.br
+total_hdd - total device size, as returned by statvfs
+.br
+avail_hdd - total available space, as returned by statvfs
+.br
+calc_size - used space (sum of chunk's disk usage)
+.PP
+When there is no \fISPACE OPTION\fP defined then total and available space are reported as follows:
+.PP
+- reported total = total_hdd
+.br
+- reported avail = avail_hdd 
+.PP
+Otherwise available space is calculated using formulas:
+.PP
+1. With constant reserved space (negative space limit -X)
+.br
+- reported avail = total_hdd - X - calc_size (or zero if X + calc_size > total_hdd)
+.PP
+2. With perecent of reserved space (negative space limit -X%)
+.br
+- reported avail = total_hdd - total_hdd*X/100 - calc_size (or zero if total_hdd*X/100 + calc_size > total_hdd)
+.PP
+3. With constant space limit (positive space limit X)
+.br
+- reported avail = X - calc_size (or zero if calc_size > X)
+.PP
+4. With percent space limit (positive space limit X%)
+.br
+- reported avail = total_hdd*X/100 - calc_size (or zero if calc_size > total_hdd*X/100)
+.PP
+5. With shared space indicator (= sign)
+.br
+- reported avail = avail_hdd
+.PP
+6. With shared space indicator and space indicator (=X)
+.br
+- reported avail = X (or avail_hdd if avail_hdd < X)
+.PP
+7. With shared space indicator and percent indicator (=X%)
+.br
+- reported avail = avail_hdd*X/100
+.PP
+8. With shared space indicator and negative space indicator (=-X)
+.br
+- reported avail = avail_hdd - X (or 0, if X>avail_hdd)
+.PP
+9. With shared space indicator and negative percent indicator (=-X%)
+.br
+- reported avail = avail_hdd - avail_hdd*X/100
+.PP
+In all those cases total space is calculated as:
+.br
+- reported total = reported avail + calc_size
 .SH COPYRIGHT
 Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
 

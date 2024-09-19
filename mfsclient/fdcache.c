@@ -22,8 +22,6 @@
 #include "config.h"
 #endif
 
-#define BUCKETS_MT_MMAP_ALLOC 1
-
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>

@@ -23,12 +23,13 @@
 
 #include <inttypes.h>
 
-void matoclserv_stats(uint64_t stats[5]);
+void matoclserv_stats(uint64_t stats[10]);
+uint32_t matoclserv_get_min_cl_version(void);
 
 void matoclserv_chunk_unlocked(uint64_t chunkid,void *cptr);
 void matoclserv_chunk_status(uint64_t chunkid,uint8_t status);
-void matoclserv_fuse_flock_wake_up(uint32_t sessionid,uint32_t msgid,uint8_t status);
-void matoclserv_fuse_posix_lock_wake_up(uint32_t sessionid,uint32_t msgid,uint8_t status);
+void matoclserv_fuse_flock_wake_up(void *veptr,uint32_t msgid,uint8_t status);
+void matoclserv_fuse_posix_lock_wake_up(void *veptr,uint32_t msgid,uint8_t status);
 void matoclserv_fuse_invalidate_chunk_cache(void);
 int matoclserv_no_more_pending_jobs(void);
 void matoclserv_disconnect_all(void);

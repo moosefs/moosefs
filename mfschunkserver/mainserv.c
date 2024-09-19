@@ -22,13 +22,10 @@
 #include "config.h"
 #endif
 
-// #define MMAP_ALLOC 1
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <syslog.h>
 #ifdef HAVE_POLL_H
 # include <poll.h>
 #else
@@ -38,8 +35,9 @@
 #include <pthread.h>
 
 #include "MFSCommunication.h"
+#include "cfg.h"
 #include "sockets.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "datapack.h"
 #include "massert.h"
 #include "charts.h"
@@ -52,7 +50,7 @@
 #ifdef USE_CONNCACHE
 #include "conncache.h"
 #endif
-#ifdef MMAP_ALLOC
+#ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>
 #endif
 
@@ -61,7 +59,7 @@
 
 #define SERV_TIMEOUT 5000
 
-#define READ_NOPS_INTERVAL 1000000
+#define NOPS_INTERVAL 1000000
 
 #define SMALL_PACKET_SIZE 12
 
@@ -69,6 +67,30 @@
 #define CONNECT_TIMEOUT(cnt) (((cnt)%2)?(300*(1<<((cnt)>>1))):(200*(1<<((cnt)>>1))))
 
 static uint32_t MaxPacketSize = CSTOCS_MAXPACKETSIZE;
+
+#ifdef HAVE_MMAP
+static uint8_t CanUseMmap = 0;
+
+#define myalloc(ptr,size) if (CanUseMmap) { \
+	ptr = mmap(NULL,size,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0); \
+	passert(ptr); \
+} else { \
+	ptr = malloc(size); \
+	passert(ptr); \
+}
+
+#define myunalloc(ptr,size) if (CanUseMmap) { \
+	munmap(ptr,size); \
+} else { \
+	free(ptr); \
+}
+#else
+#define myalloc(ptr,size) { \
+	ptr = malloc(size); \
+	passert(ptr); \
+}
+#define myunalloc(ptr,size) free(size)
+#endif
 
 // stats_X
 #ifndef HAVE___SYNC_FETCH_AND_OP
@@ -122,7 +144,7 @@ static inline void mainserv_bytesout(uint64_t bytes) {
 
 static inline int32_t mainserv_toread(int sock,uint8_t *ptr,uint32_t leng,uint32_t timeout) {
 	int32_t r;
-	r = tcptoread(sock,ptr,leng,timeout);
+	r = tcptoread(sock,ptr,leng,timeout,timeout*30);
 	if (r>0) {
 		mainserv_bytesin(r);
 	}
@@ -131,7 +153,7 @@ static inline int32_t mainserv_toread(int sock,uint8_t *ptr,uint32_t leng,uint32
 
 static inline int32_t mainserv_towrite(int sock,const uint8_t *ptr,uint32_t leng,uint32_t timeout) {
 	int32_t r;
-	r = tcptowrite(sock,ptr,leng,timeout);
+	r = tcptowrite(sock,ptr,leng,timeout,timeout*30);
 	if (r>0) {
 		mainserv_bytesout(r);
 	}
@@ -140,7 +162,7 @@ static inline int32_t mainserv_towrite(int sock,const uint8_t *ptr,uint32_t leng
 
 static inline int32_t mainserv_toforward(int sock1,int sock2,uint8_t *ptr,uint32_t leng,uint32_t rskip,uint32_t wskip,uint32_t timeout) {
 	int32_t r;
-	r = tcptoforward(sock1,sock2,ptr,leng,rskip,wskip,timeout);
+	r = tcptoforward(sock1,sock2,ptr,leng,rskip,wskip,timeout,timeout*30);
 	if (r>0) {
 		if ((uint32_t)r>rskip) {
 			mainserv_bytesin(r-rskip);
@@ -162,10 +184,19 @@ uint8_t* mainserv_create_packet(uint8_t **wptr,uint32_t cmd,uint32_t leng) {
 	return ptr;
 }
 
-uint8_t mainserv_send_and_free(int sock,uint8_t *ptr,uint32_t pleng) {
+uint8_t mainserv_send_and_free(const char *packetname,int sock,uint8_t *ptr,uint32_t pleng) {
 	uint8_t r;
+	uint8_t d;
 	r = (mainserv_towrite(sock,ptr,pleng+8,SERV_TIMEOUT)!=(int32_t)(pleng+8))?0:1;
+	d = (errno==EPIPE || errno==ECONNRESET)?1:0;
 	free(ptr);
+	if (r==0) {
+		if (d) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"send_and_free: 'send(%s)' disconnected",packetname);
+		} else {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"send_and_free: 'send(%s)' timed out",packetname);
+		}
+	}
 	return r;
 }
 
@@ -173,100 +204,106 @@ int mainserv_connect(uint32_t fwdip,uint16_t fwdport,uint32_t timeout) {
 	int fwdsock;
 	fwdsock = tcpsocket();
 	if (fwdsock<0) {
-		mfs_errlog(LOG_WARNING,"create socket, error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"create socket, error");
 		return -1;
 	}
 	if (tcpnonblock(fwdsock)<0) {
-		mfs_errlog(LOG_WARNING,"set nonblock, error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"set nonblock, error");
 		tcpclose(fwdsock);
 		return -1;
 	}
 	if (tcpnumtoconnect(fwdsock,fwdip,fwdport,timeout)<0) {
-		mfs_arg_errlog(LOG_WARNING,"connect to %u.%u.%u.%u:%u failed, error",(fwdip>>24)&0xFF,(fwdip>>16)&0xFF,(fwdip>>8)&0xFF,fwdip&0xFF,fwdport);
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"connect to %u.%u.%u.%u:%u failed, error",(fwdip>>24)&0xFF,(fwdip>>16)&0xFF,(fwdip>>8)&0xFF,fwdip&0xFF,fwdport);
 		tcpclose(fwdsock);
 		return -1;
 	}
 	if (tcpnodelay(fwdsock)<0) {
-		mfs_errlog(LOG_WARNING,"can't set TCP_NODELAY, error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_NOTICE,"can't set TCP_NODELAY, error");
 	}
 	return fwdsock;
 }
 
-typedef struct read_nops {
+typedef struct sock_nops {
 	int sock;
 	uint8_t error;
 	uint64_t monotonic_utime;
 	uint32_t bytesleft;
-	struct read_nops *next,**prev;
-} read_nops;
+	struct sock_nops *next,**prev;
+} sock_nops;
 
-static read_nops *read_nops_head,**read_nops_tail;
-static pthread_mutex_t read_nops_lock;
-static uint8_t read_nop_buff[8];
+static sock_nops *sock_nops_head,**sock_nops_tail;
+static pthread_mutex_t sock_nops_lock;
+static uint8_t sock_nop_buff[8];
 
-static inline void mainserv_read_nop_append(read_nops* rn) {
-	rn->next = NULL;
-	rn->prev = read_nops_tail;
-	*(read_nops_tail) = rn;
-	read_nops_tail = &(rn->next);
-	rn->monotonic_utime = monotonic_useconds();
-}
-
-static inline void mainserv_read_nop_remove(read_nops* rn) {
-	if (rn->next) {
-		rn->next->prev = rn->prev;
-	} else {
-		read_nops_tail = rn->prev;
+static inline void mainserv_sock_nop_append(sock_nops* sn) {
+	if (sn->prev==NULL) {
+		sn->next = NULL;
+		sn->prev = sock_nops_tail;
+		*(sock_nops_tail) = sn;
+		sock_nops_tail = &(sn->next);
+		sn->monotonic_utime = monotonic_useconds();
 	}
-	*(rn->prev) = rn->next;
 }
 
-void* mainserv_read_nop_sender(void* arg) {
+static inline void mainserv_sock_nop_remove(sock_nops* sn) {
+	if (sn->prev!=NULL) {
+		if (sn->next) {
+			sn->next->prev = sn->prev;
+		} else {
+			sock_nops_tail = sn->prev;
+		}
+		*(sn->prev) = sn->next;
+		sn->next = NULL;
+		sn->prev = NULL;
+	}
+}
+
+void* mainserv_sock_nop_sender(void* arg) {
 	uint64_t monotonic_utime;
 	uint64_t sleep_utime;
 	uint8_t *wptr;
 	int32_t i;
-	read_nops* rn;
+	sock_nops* sn;
 
-	wptr = read_nop_buff;
+	wptr = sock_nop_buff;
 	put32bit(&wptr,ANTOAN_NOP);
 	put32bit(&wptr,0);
 
 	do {
-		zassert(pthread_mutex_lock(&read_nops_lock));
-		if (read_nops_head==NULL) {
-			sleep_utime = READ_NOPS_INTERVAL;
+		zassert(pthread_mutex_lock(&sock_nops_lock));
+		if (sock_nops_head==NULL) {
+			sleep_utime = NOPS_INTERVAL;
 		} else {
 			monotonic_utime = monotonic_useconds();
-			while (read_nops_head->monotonic_utime + READ_NOPS_INTERVAL <= monotonic_utime) {
-				if (read_nops_head->error==0) {
-					if (read_nops_head->bytesleft) {
-						i = write(read_nops_head->sock,read_nop_buff+(8-read_nops_head->bytesleft),read_nops_head->bytesleft);
+			while (sock_nops_head->monotonic_utime + NOPS_INTERVAL <= monotonic_utime) {
+				if (sock_nops_head->error==0) {
+					if (sock_nops_head->bytesleft) {
+						i = write(sock_nops_head->sock,sock_nop_buff+(8-sock_nops_head->bytesleft),sock_nops_head->bytesleft);
 					} else {
-						read_nops_head->bytesleft = 8;
-						i = write(read_nops_head->sock,read_nop_buff,8);
+						sock_nops_head->bytesleft = 8;
+						i = write(sock_nops_head->sock,sock_nop_buff,8);
 					}
 					if (i<0) {
 						if (ERRNO_ERROR) {
-							read_nops_head->error = 1;
-							read_nops_head->bytesleft = 0;
+							sock_nops_head->error = 1;
+							sock_nops_head->bytesleft = 0;
 						}
 					}
 					if (i>0) {
-						read_nops_head->bytesleft -= i;
+						sock_nops_head->bytesleft -= i;
 					}
 				}
-				rn = read_nops_head;
-				mainserv_read_nop_remove(rn);
-				mainserv_read_nop_append(rn);
+				sn = sock_nops_head;
+				mainserv_sock_nop_remove(sn);
+				mainserv_sock_nop_append(sn);
 			}
-			if (monotonic_utime - read_nops_head->monotonic_utime < READ_NOPS_INTERVAL) {
-				sleep_utime = READ_NOPS_INTERVAL - (monotonic_utime - read_nops_head->monotonic_utime);
+			if (monotonic_utime - sock_nops_head->monotonic_utime < NOPS_INTERVAL) {
+				sleep_utime = NOPS_INTERVAL - (monotonic_utime - sock_nops_head->monotonic_utime);
 			} else {
 				sleep_utime = 0;
 			}
 		}
-		zassert(pthread_mutex_unlock(&read_nops_lock));
+		zassert(pthread_mutex_unlock(&sock_nops_lock));
 		if (sleep_utime>0) {
 			portable_usleep(sleep_utime);
 		}
@@ -274,16 +311,31 @@ void* mainserv_read_nop_sender(void* arg) {
 	return arg;
 }
 
-static inline void mainserv_read_nop_add(read_nops* rn) {
-	zassert(pthread_mutex_lock(&read_nops_lock));
-	mainserv_read_nop_append(rn);
-	zassert(pthread_mutex_unlock(&read_nops_lock));
+static inline void mainserv_sock_nop_init(sock_nops *sn,int sock) {
+	sn->sock = sock;
+	sn->error = 0;
+	sn->bytesleft = 0;
+	sn->next = NULL;
+	sn->prev = NULL;
 }
 
-static inline void mainserv_read_nop_del(read_nops* rn) {
-	zassert(pthread_mutex_lock(&read_nops_lock));
-	mainserv_read_nop_remove(rn);
-	zassert(pthread_mutex_unlock(&read_nops_lock));
+static inline void mainserv_sock_nop_add(sock_nops* sn) {
+	zassert(pthread_mutex_lock(&sock_nops_lock));
+	mainserv_sock_nop_append(sn);
+	zassert(pthread_mutex_unlock(&sock_nops_lock));
+}
+
+static inline void mainserv_sock_nop_del(sock_nops* sn) {
+	zassert(pthread_mutex_lock(&sock_nops_lock));
+	mainserv_sock_nop_remove(sn);
+	zassert(pthread_mutex_unlock(&sock_nops_lock));
+	if (sn->bytesleft>0 && sn->bytesleft<8) {
+		if (mainserv_towrite(sn->sock,sock_nop_buff+(8-sn->bytesleft),sn->bytesleft,SERV_TIMEOUT)!=(int32_t)sn->bytesleft) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"nop_tail: 'send(nop)' timed out");
+			sn->error = 1;
+		}
+	}
+	sn->bytesleft = 0;
 }
 
 uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
@@ -303,18 +355,16 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 	const uint8_t *rptr;
 	uint8_t hdr[8];
 	uint32_t cmd,leng;
-	read_nops rn;
+	sock_nops sn;
 
 	if (length!=20 && length!=21) {
-		syslog(LOG_NOTICE,"CLTOCS_READ - wrong size (%"PRIu32"/20|21)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_READ - wrong size (%"PRIu32"/20|21)",length);
 		return 0;
 	}
 	if (length==21) {
 		protover = get8bit(&data);
 		if (protover) {
-			rn.sock = sock;
-			rn.error = 0;
-			rn.bytesleft = 0;
+			mainserv_sock_nop_init(&sn,sock);
 		}
 	} else {
 		protover = 0;
@@ -327,49 +377,52 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 		packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 		put64bit(&wptr,chunkid);
 		put8bit(&wptr,MFS_STATUS_OK);	// no bytes to read - just return MFS_STATUS_OK
-		return mainserv_send_and_free(sock,packet,8+1);
+		return mainserv_send_and_free("read status",sock,packet,8+1);
 	}
 	if (size>MFSCHUNKSIZE) {
 		packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 		put64bit(&wptr,chunkid);
 		put8bit(&wptr,MFS_ERROR_WRONGSIZE);
-		return mainserv_send_and_free(sock,packet,8+1);
+		return mainserv_send_and_free("read status",sock,packet,8+1);
 	}
 	if (offset>=MFSCHUNKSIZE || offset+size>MFSCHUNKSIZE) {
 		packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 		put64bit(&wptr,chunkid);
 		put8bit(&wptr,MFS_ERROR_WRONGOFFSET);
-		return mainserv_send_and_free(sock,packet,8+1);
+		return mainserv_send_and_free("read status",sock,packet,8+1);
 	}
 	if (protover) {
-		mainserv_read_nop_add(&rn);
+		mainserv_sock_nop_add(&sn);
 	}
 	status = hdd_open(chunkid,version);
 	if (protover) {
-		mainserv_read_nop_del(&rn);
-		if (rn.error) {
+		mainserv_sock_nop_del(&sn);
+		if (sn.error) {
 			if (status==MFS_STATUS_OK) {
-				hdd_close(chunkid);
+				hdd_close(chunkid,0);
 			}
 			return 0;
 		}
-		if (rn.bytesleft>0) {
-			if (mainserv_towrite(sock,read_nop_buff+(8-rn.bytesleft),rn.bytesleft,SERV_TIMEOUT)!=(int32_t)rn.bytesleft) {
-				if (status==MFS_STATUS_OK) {
-					hdd_close(chunkid);
-				}
-				return 0;
-			}
-		}
-		rn.bytesleft=0;
 	}
 	if (status!=MFS_STATUS_OK) {
 		packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 		put64bit(&wptr,chunkid);
 		put8bit(&wptr,status);
-		return mainserv_send_and_free(sock,packet,8+1);
+		return mainserv_send_and_free("read status",sock,packet,8+1);
+	}
+	if (protover) {
+		mainserv_sock_nop_add(&sn);
 	}
 	hdd_precache_data(chunkid,offset,size);
+	if (protover) {
+		mainserv_sock_nop_del(&sn);
+		if (sn.error) {
+			if (status==MFS_STATUS_OK) {
+				hdd_close(chunkid,0);
+			}
+			return 0;
+		}
+	}
 	rcvd = 0;
 	while (size>0) {
 		blocknum = (offset)>>MFSBLOCKBITS;
@@ -385,30 +438,23 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 		put16bit(&wptr,blockoffset);
 		put32bit(&wptr,blocksize);
 		if (protover) {
-			mainserv_read_nop_add(&rn);
+			mainserv_sock_nop_add(&sn);
 		}
 		status = hdd_read(chunkid,version,blocknum,wptr+4,blockoffset,blocksize,wptr);
 		if (protover) {
-			mainserv_read_nop_del(&rn);
-			if (rn.error) {
-				hdd_close(chunkid);
+			mainserv_sock_nop_del(&sn);
+			if (sn.error) {
+				hdd_close(chunkid,0);
 				return 0;
 			}
-			if (rn.bytesleft>0) {
-				if (mainserv_towrite(sock,read_nop_buff+(8-rn.bytesleft),rn.bytesleft,SERV_TIMEOUT)!=(int32_t)rn.bytesleft) {
-					hdd_close(chunkid);
-					return 0;
-				}
-			}
-			rn.bytesleft=0;
 		}
 		if (status!=MFS_STATUS_OK) {
 			free(packet);
-			hdd_close(chunkid);
+			hdd_close(chunkid,0);
 			packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 			put64bit(&wptr,chunkid);
 			put8bit(&wptr,status);
-			ret = mainserv_send_and_free(sock,packet,8+1);
+			ret = mainserv_send_and_free("read status",sock,packet,8+1);
 #ifdef HAVE___SYNC_FETCH_AND_OP
 			__sync_fetch_and_add(&stats_hlopr,1);
 #else
@@ -418,8 +464,8 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 #endif
 			return ret;
 		}
-		if (mainserv_send_and_free(sock,packet,8+2+2+4+4+blocksize)==0) {
-			hdd_close(chunkid);
+		if (mainserv_send_and_free("read data",sock,packet,8+2+2+4+4+blocksize)==0) {
+			hdd_close(chunkid,0);
 			return 0;
 		}
 		offset += blocksize;
@@ -427,11 +473,11 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 		i = read(sock,hdr+rcvd,(8-rcvd));
 		if (i<0) { // error or nothing to read
 			if (ERRNO_ERROR) {
-				hdd_close(chunkid);
+				hdd_close(chunkid,0);
 				return 0;
 			}
 		} else if (i==0) { // hup
-			hdd_close(chunkid);
+			hdd_close(chunkid,0);
 			return 0;
 		} else {
 			rcvd += i;
@@ -442,17 +488,17 @@ uint8_t mainserv_read(int sock,const uint8_t *data,uint32_t length) {
 				if (cmd==ANTOAN_NOP && leng==0) { // received nop
 					rcvd=0;
 				} else { // received garbage
-					hdd_close(chunkid);
+					hdd_close(chunkid,0);
 					return 0;
 				}
 			}
 		}
 	}
-	hdd_close(chunkid);
+	hdd_close(chunkid,0);
 	packet = mainserv_create_packet(&wptr,CSTOCL_READ_STATUS,8+1);
 	put64bit(&wptr,chunkid);
 	put8bit(&wptr,MFS_STATUS_OK);	// no bytes to read - just return MFS_STATUS_OK
-	ret = mainserv_send_and_free(sock,packet,8+1);
+	ret = mainserv_send_and_free("read status",sock,packet,8+1);
 #ifdef HAVE___SYNC_FETCH_AND_OP
 	__sync_fetch_and_add(&stats_hlopr,1);
 #else
@@ -497,27 +543,27 @@ void* mainserv_write_thread(void* arg) {
 	uint32_t gversion;
 	uint8_t status;
 	while (1) {
-		pthread_mutex_lock(&(wrdata->lock));
+		zassert(pthread_mutex_lock(&(wrdata->lock)));
 		while (wrdata->hddhead==NULL && wrdata->term==0) {
 			wrdata->condwaiting=1;
-			pthread_cond_wait(&(wrdata->cond),&(wrdata->lock));
+			zassert(pthread_cond_wait(&(wrdata->cond),&(wrdata->lock)));
 		}
 		if (wrdata->term) {
-			pthread_mutex_unlock(&(wrdata->lock));
+			zassert(pthread_mutex_unlock(&(wrdata->lock)));
 			return NULL;
 		}
 		wrjob = wrdata->hddhead;
 		gchunkid = wrdata->chunkid;
 		gversion = wrdata->version;
-		pthread_mutex_unlock(&(wrdata->lock));
+		zassert(pthread_mutex_unlock(&(wrdata->lock)));
 		status = hdd_write(gchunkid,gversion,wrjob->blocknum,wrjob->buff,wrjob->offset,wrjob->size,wrjob->crcptr);
-		pthread_mutex_lock(&(wrdata->lock));
+		zassert(pthread_mutex_lock(&(wrdata->lock)));
 		wrjob->hddstatus = status;
 		wrjob->ack |= 1;
 		wrdata->hddhead = wrjob->next;
-		pthread_mutex_unlock(&(wrdata->lock));
+		zassert(pthread_mutex_unlock(&(wrdata->lock)));
 		if (write(wrdata->pipe[1],"*",1)!=1) {
-			mfs_errlog(LOG_WARNING,"pipe write error");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"pipe write error");
 		}
 		if (status!=MFS_STATUS_OK) {
 			break;
@@ -526,7 +572,7 @@ void* mainserv_write_thread(void* arg) {
 	return NULL;
 }
 
-uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gversion) {
+uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gversion,uint8_t protover,sock_nops *sn,sock_nops *fsn) {
 	pthread_t wrthread;
 	write_xchg wrdata;
 	write_job *wrjob;
@@ -541,9 +587,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 	uint32_t writeid;
 	uint8_t status;
 	uint8_t gotlast;
-	double lastnopsent;
 
-	lastnopsent = 0.0;
 	wrdata.chunkid = gchunkid;
 	wrdata.version = gversion;
 	if (pipe(wrdata.pipe)<0) {
@@ -559,58 +603,64 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 	wrdata.tail = &(wrdata.head);
 	wrdata.hddhead = NULL;
 	wrdata.nethead = NULL;
-	pthread_mutex_init(&(wrdata.lock),NULL);
-	pthread_cond_init(&(wrdata.cond),NULL);
+	zassert(pthread_mutex_init(&(wrdata.lock),NULL));
+	zassert(pthread_cond_init(&(wrdata.cond),NULL));
 	wrdata.condwaiting = 0;
 	wrdata.term = 0;
 	lwt_minthread_create(&wrthread,0,mainserv_write_thread,&wrdata);
 
+	wrjob = NULL;
 	pdataleng = 4096;
-#ifdef MMAP_ALLOC
-	pdata = mmap(NULL,pdataleng,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-	pdata = malloc(pdataleng);
-#endif
-	passert(pdata);
+	myalloc(pdata,pdataleng);
 	gotlast = 0;
 
 	while (1) {
 		if (poll(pfd,3,SERV_TIMEOUT)<0) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_middle: 'poll' timed out");
 			break;
+		}
+		if (pfd[0].revents & POLLERR) {
+			tcpgetstatus(pfd[0].fd);
+			mfs_log(MFSLOG_ERRNO_SYSLOG,MFSLOG_WARNING,"write_middle: 'poll(prev)' returned POLLERR");
+		}
+		if (pfd[1].revents & POLLERR) {
+			tcpgetstatus(pfd[1].fd);
+			mfs_log(MFSLOG_ERRNO_SYSLOG,MFSLOG_WARNING,"write_middle: 'poll(next)' returned POLLERR");
+		}
+		if (pfd[2].revents & POLLERR) {
+			tcpgetstatus(pfd[2].fd);
+			mfs_log(MFSLOG_ERRNO_SYSLOG,MFSLOG_WARNING,"write_middle: 'poll(pipe)' returned POLLERR");
 		}
 		if ((pfd[0].revents & POLLERR) || (pfd[1].revents & POLLERR) || (pfd[2].revents & POLLERR)) {
 			break;
 		}
 		if (((pfd[0].revents & (POLLIN|POLLHUP))==POLLHUP) || ((pfd[1].revents & (POLLIN|POLLHUP))==POLLHUP) || ((pfd[2].revents & (POLLIN|POLLHUP))==POLLHUP)) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_middle: 'poll' returned POLLHUP");
 			break;
 		}
 		if (pfd[0].revents & POLLIN) {
 			if (mainserv_toread(sock,hdr,8,SERV_TIMEOUT)!=8) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_middle: 'receive(header prev)' timed out");
 				break;
 			}
 			rptr = hdr;
 			cmd = get32bit(&rptr);
 			leng = get32bit(&rptr);
+			if (protover) {
+				mainserv_sock_nop_del(fsn);
+			}
 			if (cmd==CLTOCS_WRITE_DATA) {
 				if (leng>0) {
 					if (leng > MaxPacketSize) {
-						syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
 						break;
 					}
-#ifdef MMAP_ALLOC
-					wrjob = mmap(NULL,offsetof(write_job,data)+leng+8,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-					wrjob = malloc(offsetof(write_job,data)+leng+8);
-#endif
-					passert(wrjob);
+					myalloc(wrjob,offsetof(write_job,data)+leng+8);
 					wrjob->structsize = offsetof(write_job,data)+leng+8;
 					memcpy(wrjob->data,hdr,8);
 					if (mainserv_toforward(sock,fwdsock,wrjob->data,leng+8,8,0,SERV_TIMEOUT)!=(int32_t)(leng+8)) {
-#ifdef MMAP_ALLOC
-						munmap(wrjob,wrjob->structsize);
-#else
-						free(wrjob);
-#endif
+						myunalloc(wrjob,wrjob->structsize);
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_middle: 'forward(write data)' timed out");
 						break;
 					}
 				} else {
@@ -619,29 +669,26 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			} else {
 				if (leng>0) {
 					if (leng > SMALL_PACKET_SIZE) {
-						syslog(LOG_WARNING,"packet too long (%"PRIu32"/12) ; command:%"PRIu32,leng,cmd);
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"packet too long (%"PRIu32"/12) ; command:%"PRIu32,leng,cmd);
 						break;
 					}
 					if (mainserv_toforward(sock,fwdsock,hdr,leng+8,8,0,SERV_TIMEOUT)!=(int32_t)(leng+8)) {
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_middle: 'forward(%s)' timed out",(cmd==CLTOCS_WRITE_FINISH)?"write finish":(cmd==ANTOAN_NOP)?"nop":"???");
 						break;
 					}
 				} else {
 					if (mainserv_towrite(fwdsock,hdr,8,SERV_TIMEOUT)!=8) {
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_middle: 'send(%s)' timed out",(cmd==CLTOCS_WRITE_FINISH)?"write finish":(cmd==ANTOAN_NOP)?"nop":"???");
 						break;
 					}
 				}
 			}
-			if (cmd==ANTOAN_NOP) {
-				double now = monotonic_seconds();
-				if (lastnopsent + 0.5 < now) {
-					if (mainserv_towrite(sock,hdr,8,SERV_TIMEOUT)!=8) {
-						break;
-					}
-					lastnopsent = now;
-				}
-			} else if (cmd==CLTOCS_WRITE_FINISH) {
+			if (protover) {
+				mainserv_sock_nop_add(fsn);
+			}
+			if (cmd==CLTOCS_WRITE_FINISH) {
 				if (leng<12) {
-					syslog(LOG_NOTICE,"CLTOCS_WRITE_FINISH - wrong size (%"PRIu32"/12)",leng);
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE_FINISH - wrong size (%"PRIu32"/12)",leng);
 					break;
 				}
 				rptr = hdr+8;
@@ -650,7 +697,10 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 					put64bit(&wptr,gchunkid);
 					put32bit(&wptr,0);
 					put8bit(&wptr,MFS_ERROR_WRONGCHUNKID);
-					mainserv_send_and_free(sock,packet,8+4+1);
+					if (protover) {
+						mainserv_sock_nop_del(sn);
+					}
+					mainserv_send_and_free("write status",sock,packet,8+4+1);
 					break;
 				}
 				if (gversion!=get32bit(&rptr)) {
@@ -658,7 +708,10 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 					put64bit(&wptr,gchunkid);
 					put32bit(&wptr,0);
 					put8bit(&wptr,MFS_ERROR_WRONGCHUNKID);
-					mainserv_send_and_free(sock,packet,8+4+1);
+					if (protover) {
+						mainserv_sock_nop_del(sn);
+					}
+					mainserv_send_and_free("write status",sock,packet,8+4+1);
 					break;
 				}
 				gotlast = (wrdata.head==NULL)?2:1;
@@ -667,12 +720,8 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 //				uint32_t crc;
 //				const uint8_t *crcptr;
 				if (leng<8+4+2+2+4+4) {
-					syslog(LOG_NOTICE,"CLTOCS_WRITE_DATA - wrong size (%"PRIu32"/24+size)",leng);
-#ifdef MMAP_ALLOC
-					munmap(wrjob,wrjob->structsize);
-#else
-					free(wrjob);
-#endif
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE_DATA - wrong size (%"PRIu32"/24+size)",leng);
+					myunalloc(wrjob,wrjob->structsize);
 					break;
 				}
 				rptr = wrjob->data+8;
@@ -684,12 +733,8 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 //				crcptr = rptr;
 //				crc = get32bit(&crcptr);
 				if (leng!=8+4+2+2+4+4+wrjob->size) {
-					syslog(LOG_NOTICE,"CLTOCS_WRITE_DATA - wrong size (%"PRIu32"/24+%"PRIu32")",leng,wrjob->size);
-#ifdef MMAP_ALLOC
-					munmap(wrjob,wrjob->structsize);
-#else
-					free(wrjob);
-#endif
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE_DATA - wrong size (%"PRIu32"/24+%"PRIu32")",leng,wrjob->size);
+					myunalloc(wrjob,wrjob->structsize);
 					break;
 				}
 				if (gchunkid!=wrjob->chunkid) {
@@ -697,17 +742,16 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 					put64bit(&wptr,gchunkid);
 					put32bit(&wptr,0);
 					put8bit(&wptr,MFS_ERROR_WRONGCHUNKID);
-					mainserv_send_and_free(sock,packet,8+4+1);
-#ifdef MMAP_ALLOC
-					munmap(wrjob,wrjob->structsize);
-#else
-					free(wrjob);
-#endif
+					if (protover) {
+						mainserv_sock_nop_del(sn);
+					}
+					mainserv_send_and_free("write status",sock,packet,8+4+1);
+					myunalloc(wrjob,wrjob->structsize);
 					break;
 				}
-//				syslog(LOG_NOTICE,"chunkid: %016"PRIX64", version: %08"PRIX32", blocknum: %"PRIu16", offset: %"PRIu16", size: %"PRIu32", crc: %08"PRIX32":%08"PRIX32,gchunkid,gversion,wrjob->blocknum,wrjob->offset,wrjob->size,crc,mycrc32(0,rptr+4,wrjob->size));
+//				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"chunkid: %016"PRIX64", version: %08"PRIX32", blocknum: %"PRIu16", offset: %"PRIu16", size: %"PRIu32", crc: %08"PRIX32":%08"PRIX32,gchunkid,gversion,wrjob->blocknum,wrjob->offset,wrjob->size,crc,mycrc32(0,rptr+4,wrjob->size));
 /*
-				syslog(LOG_NOTICE,"chunkid: %016X, version: %08X, blocknum: %"PRIu16", offset: %"PRIu16", size: %"PRIu32", crc: %08"PRIX32":%08"PRIX32,chunkid,version,blocknum,offset,size,crc,mycrc32(0,rptr+4,size));
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"chunkid: %016X, version: %08X, blocknum: %"PRIu16", offset: %"PRIu16", size: %"PRIu32", crc: %08"PRIX32":%08"PRIX32,chunkid,version,blocknum,offset,size,crc,mycrc32(0,rptr+4,size));
 				if (crc!=mycrc32(0,rptr+4,size)) {
 					uint32_t xxx,sl;
 					char buff[200];
@@ -718,13 +762,13 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 						sl += snprintf(buff+sl,200-sl,"%02X",rptr[xxx+4]);
 						if ((xxx&0x3F)==0x1F) {
 							buff[sl]=0;
-							syslog(LOG_NOTICE,"hexdump: %s",buff);
+							mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"hexdump: %s",buff);
 							sl=0;
 						}
 					}
 					if (sl>0) {
 						buff[sl]=0;
-						syslog(LOG_NOTICE,"hexdump: %s",buff);
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"hexdump: %s",buff);
 					}
 				}
 */
@@ -734,7 +778,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 				wrjob->hddstatus = 0xFF;
 				wrjob->netstatus = 0xFF;
 				wrjob->next = NULL;
-				pthread_mutex_lock(&(wrdata.lock));
+				zassert(pthread_mutex_lock(&(wrdata.lock)));
 				*(wrdata.tail) = wrjob;
 				wrdata.tail = &(wrjob->next);
 				if (wrdata.hddhead==NULL) {
@@ -744,17 +788,18 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 					wrdata.nethead = wrjob;
 				}
 				if (wrdata.condwaiting) {
-					pthread_cond_signal(&(wrdata.cond));
+					zassert(pthread_cond_signal(&(wrdata.cond)));
 					wrdata.condwaiting=0;
 				}
-				pthread_mutex_unlock(&(wrdata.lock));
-			} else {
-				syslog(LOG_WARNING,"received unrecognized packet !!!");
+				zassert(pthread_mutex_unlock(&(wrdata.lock)));
+			} else if (cmd!=ANTOAN_NOP) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"received unrecognized packet !!!");
 				break;
 			}
 		}
 		if (pfd[1].revents & POLLIN) {
 			if (mainserv_toread(fwdsock,pdata,8,SERV_TIMEOUT)!=8) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_middle: 'receive(header next)' timed out");
 				break;
 			}
 			rptr = pdata;
@@ -762,56 +807,39 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			leng = get32bit(&rptr);
 			if (leng>0) {
 				if (leng > MaxPacketSize) {
-					syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
 					break;
 				}
 				if (pdataleng<leng) {
 					if (pdata) {
-#ifdef MMAP_ALLOC
-						munmap(pdata,pdataleng);
-#else
-						free(pdata);
-#endif
+						myunalloc(pdata,pdataleng);
 					}
 					pdataleng = leng;
-#ifdef MMAP_ALLOC
-					pdata = mmap(NULL,pdataleng,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-					pdata = malloc(pdataleng);
-#endif
-					passert(pdata);
+					myalloc(pdata,pdataleng);
 				}
 				if (mainserv_toread(fwdsock,pdata,leng,SERV_TIMEOUT)!=(int32_t)leng) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_middle: 'receive(%s)' timed out",(cmd==CSTOCL_WRITE_STATUS)?"write status":(cmd==ANTOAN_NOP)?"nop":"???");
 					break;
 				}
 			}
 			if (cmd==CSTOCL_WRITE_STATUS) {
 				if (leng!=8+4+1) {
-					syslog(LOG_NOTICE,"CSTOCL_WRITE_STATUS - wrong size (%"PRIu32"/13)",leng);
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CSTOCL_WRITE_STATUS - wrong size (%"PRIu32"/13)",leng);
 					break;
 				}
 				rptr = pdata;
 				chunkid = get64bit(&rptr);
 				writeid = get32bit(&rptr);
 				status = get8bit(&rptr);
-				pthread_mutex_lock(&(wrdata.lock));
+				zassert(pthread_mutex_lock(&(wrdata.lock)));
 				if (writeid==0) {
 					// add new element to wrdata.head
-//#ifdef MMAP_ALLOC
-//					wrjob = mmap(NULL,offsetof(write_job,data),PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-//#else
-//					wrjob = malloc(offsetof(write_job,data));
-//#endif
-#ifdef MMAP_ALLOC
-					wrjob = mmap(NULL,sizeof(write_job),PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-					wrjob = malloc(sizeof(write_job));
-#endif
-					passert(wrjob);
+					// myalloc(wrjob,offsetof(write_job,data)); <- this is correct version of this code, but compiler makers "know" better how to make code.
+					// wrjob->structsize = offsetof(write_job,data);
+					myalloc(wrjob,sizeof(write_job));
+					wrjob->structsize = sizeof(write_job);
 					wrjob->chunkid = chunkid;
 					wrjob->writeid = 0;
-//					wrjob->structsize = offsetof(write_job,data);
-					wrjob->structsize = sizeof(write_job);
 					wrjob->ack = 3;
 					wrjob->hddstatus = MFS_STATUS_OK;
 					wrjob->netstatus = status;
@@ -823,35 +851,35 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 				} else {
 					wrjob = wrdata.nethead;
 					if (wrjob==NULL) {
-						pthread_mutex_unlock(&(wrdata.lock));
+						zassert(pthread_mutex_unlock(&(wrdata.lock)));
 						break;
 					}
 					if (chunkid!=wrjob->chunkid) {	// wrong chunkid
-						pthread_mutex_unlock(&(wrdata.lock));
+						zassert(pthread_mutex_unlock(&(wrdata.lock)));
 						break;
 					}
 					if (writeid!=wrjob->writeid) {	// wrong writeid
-						pthread_mutex_unlock(&(wrdata.lock));
+						zassert(pthread_mutex_unlock(&(wrdata.lock)));
 						break;
 					}
 					wrjob->netstatus = status;
 					wrjob->ack|=2;
 					wrdata.nethead = wrjob->next;
 				}
-				pthread_mutex_unlock(&(wrdata.lock));
+				zassert(pthread_mutex_unlock(&(wrdata.lock)));
 			}
 		}
 		if (pfd[2].revents & POLLIN) {
 			if (read(wrdata.pipe[0],&status,1)!=1) {
-				mfs_errlog(LOG_WARNING,"read pipe error");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"read pipe error");
 			}
 		}
 		status = MFS_STATUS_OK;
 		while (status==MFS_STATUS_OK) {
 			uint8_t exitloop;
-			pthread_mutex_lock(&(wrdata.lock));
+			zassert(pthread_mutex_lock(&(wrdata.lock)));
 			if (wrdata.head==NULL) {
-				pthread_mutex_unlock(&(wrdata.lock));
+				zassert(pthread_mutex_unlock(&(wrdata.lock)));
 				break;
 			}
 			exitloop = 1;
@@ -865,7 +893,7 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 				exitloop = 0;
 			}
 			if (exitloop) {
-				pthread_mutex_unlock(&(wrdata.lock));
+				zassert(pthread_mutex_unlock(&(wrdata.lock)));
 				break;
 			}
 			chunkid = wrjob->chunkid;
@@ -874,19 +902,24 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			if (wrdata.head==NULL) {
 				wrdata.tail = &(wrdata.head);
 			}
-#ifdef MMAP_ALLOC
-			munmap(wrjob,wrjob->structsize);
-#else
-			free(wrjob);
-#endif
-			pthread_mutex_unlock(&(wrdata.lock));
+			myunalloc(wrjob,wrjob->structsize);
+			zassert(pthread_mutex_unlock(&(wrdata.lock)));
 			packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 			put64bit(&wptr,chunkid);
 			put32bit(&wptr,writeid);
 			put8bit(&wptr,status);
-			if (mainserv_send_and_free(sock,packet,8+4+1)==0) {
+			if (protover) {
+				mainserv_sock_nop_del(sn);
+			}
+			if (mainserv_send_and_free("write status",sock,packet,8+4+1)==0) {
 				status = MFS_ERROR_DISCONNECTED; // any error
 			}
+			if (protover) {
+				mainserv_sock_nop_add(sn);
+			}
+		}
+		if (sn->error || fsn->error) {
+			status = MFS_ERROR_DISCONNECTED; // any error
 		}
 		if (status!=MFS_STATUS_OK) {
 			break;
@@ -896,47 +929,42 @@ uint8_t mainserv_write_middle(int sock,int fwdsock,uint64_t gchunkid,uint32_t gv
 			put64bit(&wptr,gchunkid);
 			put32bit(&wptr,0);
 			put8bit(&wptr,MFS_ERROR_DISCONNECTED);
-			mainserv_send_and_free(sock,packet,8+4+1);
+			if (protover) {
+				mainserv_sock_nop_del(sn);
+			}
+			mainserv_send_and_free("write status",sock,packet,8+4+1);
 			break;
 		}
 		if (pfd[0].revents & POLLHUP) {
 			break;
 		}
 	}
-	pthread_mutex_lock(&(wrdata.lock));
+	zassert(pthread_mutex_lock(&(wrdata.lock)));
 	wrdata.term = 1;
 	if (wrdata.condwaiting) {
-		pthread_cond_signal(&(wrdata.cond));
+		zassert(pthread_cond_signal(&(wrdata.cond)));
 		wrdata.condwaiting=0;
 	}
-	pthread_mutex_unlock(&(wrdata.lock));
-	pthread_join(wrthread,NULL);
-	pthread_mutex_destroy(&(wrdata.lock));
-	pthread_cond_destroy(&(wrdata.cond));
+	zassert(pthread_mutex_unlock(&(wrdata.lock)));
+	zassert(pthread_join(wrthread,NULL));
+	zassert(pthread_mutex_destroy(&(wrdata.lock)));
+	zassert(pthread_cond_destroy(&(wrdata.cond)));
 	while ((wrjob=wrdata.head)) {
 		wrdata.head = wrjob->next;
 //		if (wrdata.head==NULL) {
 //			wrdata.tail = &(wrdata.head);
 //		}
-#ifdef MMAP_ALLOC
-		munmap(wrjob,wrjob->structsize);
-#else
-		free(wrjob);
-#endif
+		myunalloc(wrjob,wrjob->structsize);
 	}
 	if (pdata) {
-#ifdef MMAP_ALLOC
-		munmap(pdata,pdataleng);
-#else
-		free(pdata);
-#endif
+		myunalloc(pdata,pdataleng);
 	}
 	close(wrdata.pipe[0]);
 	close(wrdata.pipe[1]);
 	return gotlast;
 }
 
-uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
+uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion,uint8_t protover,sock_nops *sn) {
 	uint8_t *packet,*wptr;
 	const uint8_t *rptr;
 	uint8_t *pdata;
@@ -950,29 +978,24 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 	uint16_t offset;
 	uint8_t rstat;
 	uint8_t status;
-	double lastnopsent;
 
-	lastnopsent = 0.0;
 	status = 0; // make gcc happy
 	writeid = 0;
 	packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
 	put64bit(&wptr,gchunkid);
 	put32bit(&wptr,0);
 	put8bit(&wptr,MFS_STATUS_OK);
-	if (mainserv_send_and_free(sock,packet,8+4+1)==0) {
+	if (mainserv_send_and_free("write status",sock,packet,8+4+1)==0) {
 		return 0;
 	}
+
 	pdataleng = 65536+4096;
-#ifdef MMAP_ALLOC
-	pdata = mmap(NULL,pdataleng,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-	pdata = malloc(pdataleng);
-#endif
-	passert(pdata);
+	myalloc(pdata,pdataleng);
 	rstat = 0;
 
 	while (1) {
 		if (mainserv_toread(sock,pdata,8,SERV_TIMEOUT)!=8) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_last: 'receive(header prev)' timed out");
 			break;
 		}
 		rptr = pdata;
@@ -980,28 +1003,20 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 		leng = get32bit(&rptr);
 		if (leng>0) {
 			if (leng > MaxPacketSize) {
-				syslog(LOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MaxPacketSize,cmd);
 				break;
 			}
 			if (pdataleng<leng+8) {
 				if (pdata) {
-#ifdef MMAP_ALLOC
-					munmap(pdata,pdataleng);
-#else
-					free(pdata);
-#endif
+					myunalloc(pdata,pdataleng);
 				}
 				pdataleng = leng+8;
 				pdataleng += 0xFFF;
 				pdataleng &= ~0xFFF;
-#ifdef MMAP_ALLOC
-				pdata = mmap(NULL,pdataleng,PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE,-1,0);
-#else
-				pdata = malloc(pdataleng);
-#endif
-				passert(pdata);
+				myalloc(pdata,pdataleng);
 			}
 			if (mainserv_toread(sock,pdata+8,leng,SERV_TIMEOUT)!=(int32_t)leng) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"write_last: 'receive(%s)' timed out",(cmd==CLTOCS_WRITE_FINISH)?"write finish":(cmd==CLTOCS_WRITE_DATA)?"write data":(cmd==ANTOAN_NOP)?"nop":"???");
 				break;
 			}
 		}
@@ -1018,20 +1033,11 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 			status = MFS_STATUS_OK;
 			break;
 		}
-		if (cmd==ANTOAN_NOP) {
-			double now = monotonic_seconds();
-			if (lastnopsent + 0.5 < now) {
-				if (mainserv_towrite(sock,pdata,8,SERV_TIMEOUT)!=8) {
-					break;
-				}
-				lastnopsent = now;
-			}
-		}
 		if (cmd==CLTOCS_WRITE_DATA) {
 //			uint32_t crc;
 //			const uint8_t *crcptr;
 			if (leng<8+4+2+2+4+4) {
-				syslog(LOG_NOTICE,"CLTOCS_WRITE_DATA - wrong size (%"PRIu32"/24+size)",leng);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE_DATA - wrong size (%"PRIu32"/24+size)",leng);
 				break;
 			}
 			rptr = pdata+8;
@@ -1043,7 +1049,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 //				crcptr = rptr;
 //				crc = get32bit(&crcptr);
 			if (leng!=8+4+2+2+4+4+size) {
-				syslog(LOG_NOTICE,"CLTOCS_WRITE_DATA - wrong size (%"PRIu32"/24+%"PRIu32")",leng,size);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE_DATA - wrong size (%"PRIu32"/24+%"PRIu32")",leng,size);
 				break;
 			}
 			if (gchunkid!=chunkid) {
@@ -1052,7 +1058,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 				break;
 			}
 /*
-			syslog(LOG_NOTICE,"chunkid: %016X, version: %08X, blocknum: %"PRIu16", offset: %"PRIu16", size: %"PRIu32", crc: %08"PRIX32":%08"PRIX32,chunkid,version,blocknum,offset,size,crc,mycrc32(0,rptr+4,size));
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"chunkid: %016X, version: %08X, blocknum: %"PRIu16", offset: %"PRIu16", size: %"PRIu32", crc: %08"PRIX32":%08"PRIX32,chunkid,version,blocknum,offset,size,crc,mycrc32(0,rptr+4,size));
 			if (crc!=mycrc32(0,rptr+4,size)) {
 				uint32_t xxx,sl;
 				char buff[200];
@@ -1063,19 +1069,19 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 					sl += snprintf(buff+sl,200-sl,"%02X",rptr[xxx+4]);
 					if ((xxx&0x3F)==0x1F) {
 						buff[sl]=0;
-						syslog(LOG_NOTICE,"hexdump: %s",buff);
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"hexdump: %s",buff);
 						sl=0;
 					}
 				}
 				if (sl>0) {
 					buff[sl]=0;
-					syslog(LOG_NOTICE,"hexdump: %s",buff);
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"hexdump: %s",buff);
 				}
 			}
 */
 			status = hdd_write(gchunkid,gversion,blocknum,rptr+4,offset,size,rptr);
 			if (status!=MFS_STATUS_OK) {
-//				syslog(LOG_NOTICE,"hdd_write error: %s",mfsstrerr(status));
+//				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"hdd_write error: %s",mfsstrerr(status));
 				rstat = 1;
 				break;
 			}
@@ -1083,17 +1089,19 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 			put64bit(&wptr,chunkid);
 			put32bit(&wptr,writeid);
 			put8bit(&wptr,MFS_STATUS_OK);
-			if (mainserv_send_and_free(sock,packet,8+4+1)==0) {
+			if (protover) {
+				mainserv_sock_nop_del(sn);
+			}
+			if (mainserv_send_and_free("write status",sock,packet,8+4+1)==0) {
 				break;
+			}
+			if (protover) {
+				mainserv_sock_nop_add(sn);
 			}
 		}
 	}
 	if (pdata) {
-#ifdef MMAP_ALLOC
-		munmap(pdata,pdataleng);
-#else
-		free(pdata);
-#endif
+		myunalloc(pdata,pdataleng);
 	}
 	if (rstat>0) {
 		if (status==MFS_STATUS_OK) {
@@ -1103,7 +1111,10 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 			put64bit(&wptr,gchunkid);
 			put32bit(&wptr,writeid);
 			put8bit(&wptr,status);
-			return mainserv_send_and_free(sock,packet,8+4+1);
+			if (protover) {
+				mainserv_sock_nop_del(sn);
+			}
+			return mainserv_send_and_free("write status",sock,packet,8+4+1);
 		}
 	} else {
 		return 0;
@@ -1112,6 +1123,7 @@ uint8_t mainserv_write_last(int sock,uint64_t gchunkid,uint32_t gversion) {
 
 uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 	uint8_t *packet,*wptr;
+
 	uint8_t status;
 	int fwdsock;
 	uint32_t fwdip;
@@ -1121,21 +1133,25 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 	uint32_t gversion;
 	uint32_t i;
 	uint8_t ret;
+	sock_nops sn,fsn;
 
 	fwdport = 0; // make old compilers happy
 	fwdip = 0; // make old compilers happy
 	if (length&1) {
 		if (length<13 || ((length-13)%6)!=0) {
-			syslog(LOG_NOTICE,"CLTOCS_WRITE - wrong size (%"PRIu32"/13+N*6)",length);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE - wrong size (%"PRIu32"/13+N*6)",length);
 			return 0;
 		}
 		protover = get8bit(&data);
 	} else {
 		if (length<12 || ((length-12)%6)!=0) {
-			syslog(LOG_NOTICE,"CLTOCS_WRITE - wrong size (%"PRIu32"/12+N*6)",length);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE - wrong size (%"PRIu32"/12+N*6)",length);
 			return 0;
 		}
 		protover = 0;
+	}
+	if (protover) {
+		mainserv_sock_nop_init(&sn,sock);
 	}
 	gchunkid = get64bit(&data);
 	gversion = get32bit(&data);
@@ -1143,6 +1159,9 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 		fwdip = get32bit(&data);
 		fwdport = get16bit(&data);
 		fwdsock = -1;
+		if (protover) {
+			mainserv_sock_nop_add(&sn);
+		}
 		for (i=0 ; i<CONNECT_RETRIES && fwdsock<0 ; i++) {
 #ifdef USE_CONNCACHE
 			if (i==0) {
@@ -1166,7 +1185,7 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 				} else {
 					memcpy(wptr,data,length-12-6);
 				}
-				if (mainserv_send_and_free(fwdsock,packet,length-6)) {
+				if (mainserv_send_and_free("write init",fwdsock,packet,length-6)) {
 					break;
 				}
 				tcpclose(fwdsock);
@@ -1178,22 +1197,19 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 			put64bit(&wptr,gchunkid);
 			put32bit(&wptr,0);
 			put8bit(&wptr,MFS_ERROR_CANTCONNECT);
-			return mainserv_send_and_free(sock,packet,8+4+1);
+			if (protover) {
+				mainserv_sock_nop_del(&sn);
+			}
+			return mainserv_send_and_free("write status",sock,packet,8+4+1);
 		}
-//		packet = mainserv_create_packet(&wptr,CLTOCS_WRITE,length-6);
-//		put64bit(&wptr,gchunkid);
-//		put32bit(&wptr,gversion);
-//		memcpy(wptr,data,length-12-6);
-//		if (mainserv_send_and_free(fwdsock,packet,length-6)==0) {
-//			tcpclose(fwdsock);
-//			packet = mainserv_create_packet(&wptr,CSTOCL_WRITE_STATUS,8+4+1);
-//			put64bit(&wptr,gchunkid);
-//			put32bit(&wptr,0);
-//			put8bit(&wptr,MFS_ERROR_CANTCONNECT);
-//			return mainserv_send_and_free(sock,packet,8+4+1);
-//		}
 	} else { // last in chain
 		fwdsock=-1;
+	}
+	if (protover) {
+		if (fwdsock>=0) {
+			mainserv_sock_nop_init(&fsn,fwdsock);
+			mainserv_sock_nop_add(&fsn);
+		}
 	}
 	status = hdd_open(gchunkid,gversion);
 	if (status!=MFS_STATUS_OK) {
@@ -1204,10 +1220,19 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 		put64bit(&wptr,gchunkid);
 		put32bit(&wptr,0);
 		put8bit(&wptr,status);
-		return mainserv_send_and_free(sock,packet,8+4+1);
+		if (protover) {
+			mainserv_sock_nop_del(&sn);
+			if (fwdsock>=0) {
+				mainserv_sock_nop_del(&fsn);
+			}
+		}
+		return mainserv_send_and_free("write status",sock,packet,8+4+1);
 	}
 	if (fwdsock>=0) {
-		ret = mainserv_write_middle(sock,fwdsock,gchunkid,gversion);
+		ret = mainserv_write_middle(sock,fwdsock,gchunkid,gversion,protover,&sn,&fsn);
+		if (protover) {
+			mainserv_sock_nop_del(&fsn);
+		}
 #ifdef USE_CONNCACHE
 		if (ret<2 || protover==0) {
 			tcpclose(fwdsock);
@@ -1218,9 +1243,12 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 		tcpclose(fwdsock);
 #endif
 	} else {
-		ret = mainserv_write_last(sock,gchunkid,gversion);
+		ret = mainserv_write_last(sock,gchunkid,gversion,protover,&sn);
 	}
-	hdd_close(gchunkid);
+	hdd_close(gchunkid,0); // TODO: add flag to control fsync here
+	if (protover) {
+		mainserv_sock_nop_del(&sn);
+	}
 #ifdef HAVE___SYNC_FETCH_AND_OP
 	__sync_fetch_and_add(&stats_hlopw,1);
 #else
@@ -1238,16 +1266,23 @@ void mainserv_term(void) {
 
 int mainserv_init(void) {
 	pthread_t rnthread;
+#ifdef HAVE_MMAP
+	CanUseMmap = cfg_getuint8("CAN_USE_MMAP",0);
+#else
+	if (cfg_getuint8("CAN_USE_MMAP",0)!=0) {
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"mmap is not supported in your OS - ignoring CAN_USE_MMAP option");
+	}
+#endif
 	if (conncache_init(250)<0) {
 		return -1;
 	}
 	main_destruct_register(mainserv_term);
-	read_nops_head = NULL;
-	read_nops_tail = &read_nops_head;
-	if (pthread_mutex_init(&read_nops_lock,NULL)<0) {
+	sock_nops_head = NULL;
+	sock_nops_tail = &sock_nops_head;
+	if (pthread_mutex_init(&sock_nops_lock,NULL)<0) {
 		return -1;
 	}
-	if (lwt_minthread_create(&rnthread,1,mainserv_read_nop_sender,NULL)<0) {
+	if (lwt_minthread_create(&rnthread,1,mainserv_sock_nop_sender,NULL)<0) {
 		return -1;
 	}
 	return 1;

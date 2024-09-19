@@ -1,21 +1,15 @@
-.TH mfstrashtime "1" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfstrashtime "1" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
-mfstrashtime \- \fBMooseFS\fP trash time (retention) management tools
+mfstrashtime \- DEPRECATED \fBMooseFS\fP trash time management tools (use mfstrashretention tools instead)
 .SH SYNOPSIS
 .B mfsgettrashtime
-[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
+[\fB-?\fP] [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
 .PP
 .B mfssettrashtime
-[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISECONDS\fP[\fB+\fP|\fB-\fP] \fIOBJECT\fP...
+[\fB-?\fP] [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISECONDS\fP[\fB+\fP|\fB-\fP] \fIOBJECT\fP...
 .PP
 .B mfscopytrashtime
-[\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
-.PP
-.B mfsrgettrashtime
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
-.PP
-.B mfsrsettrashtime
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISECONDS\fP[\fB+\fP|\fB-\fP] \fIOBJECT\fP...
+[\fB-?\fP] [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
 .SH DESCRIPTION
 These tools operate on object's
 \fItrashtime\fP value, i.e. the number of seconds the file is preserved in
@@ -37,14 +31,11 @@ recursive mode.
 These tools can be used on any file, directory or deleted (\fItrash\fP) file.
 .PP
 \fBmfscopytrashtime\fP tool can be used to copy \fItrashtime\fP value from one object to another.
-.PP
-\fBmfsrgettrashtime\fP and \fBmfsrsettrashtime\fP are deprecated aliases for
-\fBmfsgettrashtime -r\fP and \fBmfssettrashtime -r\fP respectively.
 .SH PRECISION
 Since version 3.0 of MooseFS \fItrashtime\fP is stored in the system as number of \fBhours\fP
 the file is preserved in \fItrash\fP directory. Given value in seconds is rounded up to hours.
 .SH GENERAL OPTIONS
-Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
+Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
 uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
@@ -56,14 +47,13 @@ The same can be achieved by setting
 or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
 \fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
 numbers and SI prefixes). The default is to print just exact numbers.
+.PP
+Option \fB-?\fP displays short usage message.
 .SH INHERITANCE
-When new object is created in MooseFS, attributes such as storage class, trashtime and extra
-attributes are inherited from parent directory. So if you set i.e. "noowner"
-attribute and storage class to "important" in a directory then every new object created in
-this directory will have storage class set to "important" and "noowner" flag set. A newly created
-object inherits always the current set of its parent's attributes. Changing a
-directory attribute does not affect its already created children. To change
-an attribute for a directory and all of its children use \fB-r\fP option.
+When a new object is created in MooseFS, trashtime is inherited from the parent directory. A newly created
+object inherits always the current value of its parent's trashtime. Changing a
+directory's trashtime does not affect its already created children. To change
+trashtime for a directory and all of its children use \fB-r\fP option.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT
@@ -86,4 +76,5 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmount (8),
+.BR mfstrashretention (1),
 .BR mfstools (1)

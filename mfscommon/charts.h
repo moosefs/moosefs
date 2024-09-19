@@ -137,7 +137,7 @@ uint64_t charts_get (uint32_t chartnumber,uint32_t count);
 uint32_t charts_monotonic_data (uint8_t *buff);
 uint32_t charts_getmaxleng(void);
 void charts_getdata(double *data,uint32_t *timestamp,uint32_t *rsec,uint32_t number);
-uint32_t charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries);
+uint32_t charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries,uint8_t multimode);
 uint32_t charts_make_png(uint32_t chartid,uint32_t chartwidth,uint32_t chartheight);
 void charts_get_png(uint8_t *buff);
 

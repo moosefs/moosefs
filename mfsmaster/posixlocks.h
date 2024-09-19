@@ -24,9 +24,10 @@
 #include <inttypes.h>
 #include "bio.h"
 
-uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t inode,uint64_t owner,uint8_t op,uint8_t *ltype,uint64_t *start,uint64_t *end,uint32_t *pid);
+uint8_t posix_lock_cmd(void *connptr,uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t inode,uint64_t owner,uint8_t op,uint8_t *ltype,uint64_t *start,uint64_t *end,uint32_t *pid);
 void posix_lock_file_closed(uint32_t sessionid,uint32_t inode);
 uint32_t posix_lock_list(uint32_t inode,uint8_t *buff);
+void posix_lock_disconnected(void *connptr);
 
 uint8_t posix_lock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,char cmd,uint64_t start,uint64_t end,uint32_t pid);
 

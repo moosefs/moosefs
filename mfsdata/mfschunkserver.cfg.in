@@ -1,6 +1,6 @@
-###############################################
-# RUNTIME OPTIONS                             #
-###############################################
+######################################################################
+# STARTUP OPTIONS - changes in this section require process restart. #
+######################################################################
 
 # user to run daemon as (default is @DEFAULT_USER@)
 # WORKING_USER = @DEFAULT_USER@
@@ -29,18 +29,34 @@
 # where to store daemon lock file (default is @DATA_PATH@)
 # DATA_PATH = @DATA_PATH@
 
-# alternate location/name of mfshdd.cfg file (default is @ETC_PATH@/mfs/mfshdd.cfg)
+# when set to one chunkserver will not abort start even when incorrect entries are found in 'mfshdd.cfg' file
+# ALLOW_STARTING_WITH_INVALID_DISKS = 0
+
+# using mmap for allocation can slightly reduce ram usage and give a silight performance boost, but on certain architectures/kernels can lead to problems
+# CAN_USE_MMAP = 0
+
+##########################################################################
+# RUNTIME OPTIONS - changes in this section require only process reload. #
+##########################################################################
+
+# alternate location/name of mfshdd.cfg file (default is @ETC_PATH@/mfs/mfshdd.cfg); this file will be re-read on each process reload, regardless if the path was changed
 # HDD_CONF_FILENAME = @ETC_PATH@/mfs/mfshdd.cfg
 
-# Speed of background chunk tests in MB/s per disk (formally entry defined in mfshdd.cfg). Value can be given as a decimal number (default is 1.0)
-# Deprecates: HDD_TEST_FREQ (if HDD_TEST_SPEED is not defined, but there is redefined HDD_TEST_FREQ, then HDD_TEST_SPEED = 10 / HDD_TEST_FREQ)
+# speed of background chunk tests in MB/s per disk (formally entry defined in mfshdd.cfg). Value can be given as a decimal number (default is 1.0)
+# deprecates: HDD_TEST_FREQ (if HDD_TEST_SPEED is not defined, but there is redefined HDD_TEST_FREQ, then HDD_TEST_SPEED = 10 / HDD_TEST_FREQ)
 # HDD_TEST_SPEED = 1.0
 
-# Do not test chunk integrity when last I/O (including test) was performed less than HDD_MIN_TEST_INTERVAL seconds ago.
-# HDD_MIN_TEST_INTERVAL = 86400
+# do not test a chunk's integrity when last I/O (including test) on this chunk was performed less than HDD_MIN_TEST_INTERVAL ago (default is 1 day)
+# time can be defined as a number of seconds (integer) or a time period in one of two possible formats: 
+# first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
+# second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+# HDD_MIN_TEST_INTERVAL = 1d
 
-# If possible use posix_fadvise(POSIX_DONTNEED) after each chunk test (but only if last I/O operation was performed more than HDD_FADVISE_MIN_TIME seconds ago). Using zero will always perform posix_fadvise (flush cache) and using negative value will never flush cache after tests. This setting is valid only for systems that support posix_fadivise.
-# HDD_FADVISE_MIN_TIME = 86400
+# if possible, use posix_fadvise(POSIX_DONTNEED) after each chunk test (but only if last I/O operation was performed more than HDD_FADVISE_MIN_TIME ago; default is 1 day). Using zero will always perform posix_fadvise (flush cache) and using negative value will never flush cache after tests. This setting is valid only for systems that support posix_fadivise.
+# time can be defined as a number of seconds (integer) or a time period in one of two possible formats: 
+# first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
+# second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+# HDD_FADVISE_MIN_TIME = 1d
 
 # how much space should be left unused on each hard drive (default: 256MiB)
 # number format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B?
@@ -53,7 +69,7 @@
 # maximum simultaneous writes per disk in high speed disk rebalance (0 means use standard rebalance)
 # HDD_HIGH_SPEED_REBALANCE_LIMIT = 0
 
-# How many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged
+# how many i/o errors (COUNT) to tolerate in given amount of seconds (PERIOD) on a single hard drive; if the number of errors exceeds this setting, the offending hard drive will be marked as damaged
 # HDD_ERROR_TOLERANCE_COUNT = 2
 # HDD_ERROR_TOLERANCE_PERIOD = 600
 
@@ -66,19 +82,25 @@
 # how many chunks should be created in one directory before moving to the next one (higher values are better with most OSes caching algorithms, low values lead to more even chunk distribution, default is 10000 which works best in most cases)
 # HDD_RR_CHUNK_COUNT = 10000
 
-# how many hours duplicate chunks should be kept before deleting
-# HDD_KEEP_DUPLICATES_HOURS = 168
-
-# when set to one chunkserver will not abort start even when incorrect entries are found in 'mfshdd.cfg' file
-# ALLOW_STARTING_WITH_INVALID_DISKS = 0
+# how long duplicate chunks should be kept before deleting (default is 1 week)
+# time can be defined as a number of hours (integer) or a time period in one of two possible formats: 
+# first format: #.#T where T is one of: h-hours, d-days or w-weeks; fractions of hours will be rounded to full hours
+# second format: #w#d#h, any number of definitions can be ommited, but the remaining definitions must be in order (so #w#h is still a valid definition, but #h#w is not); ranges: h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h d will be unlimited)
+# HDD_KEEP_DUPLICATES_HOURS = 1w
 
 # Maximum number of active workers and maximum number of idle workers
 # WORKERS_MAX = 250
 # WORKERS_MAX_IDLE = 40
 
-###############################################
-# MASTER CONNECTION OPTIONS                   #
-###############################################
+# minimum level of messages that will be reported by chunkserver; levels in order of importance: ERROR, WARNING, NOTICE, INFO, DEBUG
+# SYSLOG_MIN_LEVEL = INFO
+
+# reported messages of level lower than set here will be elevated to this level (i.e. if SYSLOG_MIN_LEVEL is set to DEBUG and SYSLOG_ELEVATE_TO is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE)
+# SYSLOG_ELEVATE_TO = NOTICE
+
+####################################################################################
+# MASTER CONNECTION OPTIONS - changes in this section require only process reload. #
+####################################################################################
 
 # labels string (default is empty - no labels); labels should be defined as a set of letters (case insensitive) separated by ',' or ';'
 # LABELS = 
@@ -92,7 +114,6 @@
 # MooseFS master command port (default is @DEFAULT_MASTER_CS_PORT@)
 # MASTER_PORT = @DEFAULT_MASTER_CS_PORT@
 
-
 # timeout in seconds for master connections. Value >0 forces given timeout, but when value is 0 then CS asks master for timeout (default is 0 - ask master)
 # MASTER_TIMEOUT = 0
 
@@ -102,12 +123,12 @@
 # authentication string (used only when master requires authorization)
 # AUTH_CODE = mfspassword
 
-# maximum number of chunks system will try to put in a single register message (default is 10000, limits 1000-100000)
-# CHUNKS_PER_REGISTER_PACKET = 10000
+# maximum number of chunks system will try to put in a single register message (default is 1000, limits 100-10000)
+# CHUNKS_PER_REGISTER_PACKET = 1000
 
-###############################################
-# CLIENTS CONNECTION OPTIONS                  #
-###############################################
+#####################################################################################
+# CLIENTS CONNECTION OPTIONS - changes in this section require only process reload. #
+#####################################################################################
 
 # IP address to listen for client (mount) connections (* means any)
 # CSSERV_LISTEN_HOST = *

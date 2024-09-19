@@ -4,14 +4,19 @@ cgiservdir = $(CGISERVDIR)
 
 if INSTALL_CGI
 nodist_cgibin_SCRIPTS = \
-	chart.cgi
+	chart.cgi \
+	chartdata.cgi
 
 cgidata_DATA = \
 	err.gif \
 	index.html \
-	logomini.png \
+	logo.svg \
+	logopro.svg \
 	favicon.ico \
+	cgiscripts.js \
 	acidtab.js \
+	acidchart.js \
+	mfsgraph.py \
 	mfs.css
 
 install-exec-hook: mfscli
@@ -21,7 +26,7 @@ install-exec-hook: mfscli
 	$(INSTALL_SCRIPT) mfscli $(DESTDIR)$(cgibindir)/mfs.cgi
 endif
 
-EXTRA_DIST = mfscli.py.in chart.cgi.in mfscgiserv.py.in index.html.in err.gif logomini.png favicon.ico acidtab.js mfs.css
+EXTRA_DIST = mfscli.py.in mfsgraph.py chart.cgi.in chartdata.cgi.in mfscgiserv.py.in index.html.in err.gif logo.svg logopro.svg favicon.ico cgiscripts.js acidtab.js acidchart.js mfs.css
 
 if INSTALL_CLI
 nodist_bin_SCRIPTS = \

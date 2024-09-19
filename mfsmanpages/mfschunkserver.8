@@ -1,10 +1,13 @@
-.TH mfschunkserver "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfschunkserver "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
-mfschunkserver \- start, restart or stop Moose File System chunkserver process
+mfschunkserver \- start, restart or stop MooseFS chunkserver process
 .SH SYNOPSIS
 .B mfschunkserver
-[\fB\-c\fP \fICFGFILE\fP] [\fB\-u\fP]
+[\fB\-c\fP \fICFGFILE\fP]
 [\fB\-f\fP]
+[\fB\-d\fP]
+[\fB\-u\fP]
+[\fB\-n\fP]
 [\fB\-t\fP \fILOCKTIMEOUT\fP]
 [\fIACTION\fP]
 .PP
@@ -13,7 +16,7 @@ mfschunkserver \- start, restart or stop Moose File System chunkserver process
 .B mfschunkserver \-h
 .SH DESCRIPTION
 .PP
-\fBmfschunkserver\fP is the data server of Moose File System. 
+\fBmfschunkserver\fP is the data server of MooseFS. 
 .SH OPTIONS
 .TP
 \fB\-v\fP
@@ -26,22 +29,41 @@ print usage information and exit
 specify alternative path of configuration file (default is
 \fBmfschunkserver.cfg\fP in system configuration directory)
 .TP
+\fB\-f\fP
+run in foreground, don't daemonize
+.TP
+\fB\-d\fP
+run with dangerous options (names: DANGEROUS_*)
+.TP
 \fB\-u\fP
 log undefined configuration values (when default is assumed)
 .TP
-\fB\-f\fP
-run in foreground, don't daemonize
+\fB\-n\fP
+do not attempt to increase limit of core dump size
 .TP
 \fB\-t\fP \fILOCKTIMEOUT\fP
 how long to wait for lockfile (in seconds; default is 60 seconds)
 .TP
 \fIACTION\fP
-is the one of \fBstart\fP, \fBstop\fP, \fBrestart\fP, \fBreload\fP, \fBtest\fP or \fBkill\fP. Default action is
-\fBrestart\fP. The \fBtest\fP action will yield one of two responses:
-"mfschunkserver pid: PID" or "mfschunkserver is not running". The \fBkill\fP
-action will send a SIGKILL to the currently running chunkserver 
-process. SIGHUP or \fBreload\fP action forces \fBmfschunkserver\fP 
-to reload all configuration files.
+tells chunkserver to perform one of the following actions:
+.RS 
+.IP start 9
+Start chunkserver process if the process is not already running, otherwise display error message.
+.IP stop 
+Stop chunkserver process if the process is running, otherwise display error message.
+.IP restart 
+(default action) If the chunkserver process is running, restart it, if it's not running, start it. 
+.IP reload
+Send a signal to chunkserver process to reload config files.
+.IP info
+Send a singal to chunkserver process to dump debug information file in working directory.
+.IP test
+Displays "mfschunkserver pid: PID" if the chunkserver is running (and return 0) or  "mfschunkserver is not running" otherwise (and return 1).
+.IP kill
+Send termination signal to chunkserver process.
+.IP restore
+Not implemented.
+.RE
 .SH FILES
 .TP
 \fBmfschunkserver.cfg\fP

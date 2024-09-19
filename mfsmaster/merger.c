@@ -23,7 +23,7 @@
 #include <string.h>
 #include <inttypes.h>
 
-#include "slogger.h"
+#include "mfslog.h"
 #include "sharedpointer.h"
 #include "restore.h"
 #include "clocks.h"
@@ -34,6 +34,7 @@ typedef struct _hentry {
 	FILE *fd;
 	void *shfilename;
 	char *buff;
+	size_t bsize;
 	char *ptr;
 	int64_t nextid;
 } hentry;
@@ -88,7 +89,7 @@ void merger_heap_sort_up(void) {
 
 
 void merger_nextentry(uint32_t pos) {
-	if (fgets(heap[pos].buff,BSIZE,heap[pos].fd)) {
+	if (getline(&(heap[pos].buff),&(heap[pos].bsize),heap[pos].fd)!=-1) {
 		int64_t nextid = strtoll(heap[pos].buff,&(heap[pos].ptr),10);
 		if (heap[pos].ptr[0]==':' && heap[pos].ptr[1]==' ') {
 			heap[pos].ptr += 2;
@@ -96,7 +97,7 @@ void merger_nextentry(uint32_t pos) {
 		if (heap[pos].nextid<0 || (nextid>heap[pos].nextid && nextid<heap[pos].nextid+maxidhole)) {
 			heap[pos].nextid = nextid;
 		} else {
-			mfs_arg_syslog(LOG_WARNING,"found garbage at the end of file: %s (last correct id: %"PRIu64")\n",(char*)shp_get(heap[pos].shfilename),heap[pos].nextid);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"found garbage at the end of file: %s (last correct id: %"PRIu64")\n",(char*)shp_get(heap[pos].shfilename),heap[pos].nextid);
 			heap[pos].nextid = INT64_C(-1);
 		}
 	} else {
@@ -121,13 +122,15 @@ void merger_new_entry(const char *filename) {
 	if ((heap[heapsize].fd = fopen(filename,"r"))!=NULL) {
 		heap[heapsize].shfilename = shp_new(strdup(filename),free);
 		heap[heapsize].buff = malloc(BSIZE);
+		heap[heapsize].bsize = BSIZE;
 		heap[heapsize].ptr = NULL;
 		heap[heapsize].nextid = INT64_C(-1);
 		merger_nextentry(heapsize);
 	} else {
-		mfs_arg_syslog(LOG_WARNING,"can't open changelog file: %s\n",filename);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"can't open changelog file: %s\n",filename);
 		heap[heapsize].shfilename = NULL;
 		heap[heapsize].buff = NULL;
+		heap[heapsize].bsize = 0;
 		heap[heapsize].ptr = NULL;
 		heap[heapsize].nextid = INT64_C(-1);
 	}

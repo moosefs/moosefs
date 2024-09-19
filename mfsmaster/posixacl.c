@@ -23,12 +23,13 @@
 #endif
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 
 #include "MFSCommunication.h"
 #include "datapack.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "massert.h"
 #include "filesystem.h"
 
@@ -69,6 +70,10 @@ static inline uint32_t GLUE_FN_NAME_PREFIX(_hash)(HASH_ARGS_TYPE_LIST) {
 
 static inline uint32_t GLUE_FN_NAME_PREFIX(_ehash)(ENTRY_TYPE *e) {
 	return GLUE_FN_NAME_PREFIX(_hash)(e->inode,e->acltype);
+}
+
+static inline void GLUE_FN_NAME_PREFIX(_print)(ENTRY_TYPE *e) {
+	printf("(inode: %" PRIu32 ",acltype: %" PRIu8 ",userperm: %" PRIu16 ",groupperm: %" PRIu16 ",otherperm: %" PRIu16 ",mask: %" PRIu16 ",namedusers: %" PRIu16 ",namedgroups: %" PRIu16 ")",e->inode,e->acltype,e->userperm,e->groupperm,e->otherperm,e->mask,e->namedusers,e->namedgroups);
 }
 
 #include "hash_begin.h"
@@ -285,7 +290,7 @@ void posix_acl_set(uint32_t inode,uint8_t acltype,uint16_t userperm,uint16_t gro
 	}
 	acn->namedusers = namedusers;
 	acn->namedgroups = namedgroups;
-//	syslog(LOG_NOTICE,"acls: %u ; acltab: %p ; aclblob: %p",acls,acn->acltab,aclblob);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"acls: %u ; acltab: %p ; aclblob: %p",acls,acn->acltab,aclblob);
 	for (i=0 ; i<acls ; i++) {
 		acn->acltab[i].id = get32bit(&aclblob);
 		acn->acltab[i].perm = get16bit(&aclblob);
@@ -321,6 +326,68 @@ void posix_acl_get_data(void *aclnode,uint16_t *userperm,uint16_t *groupperm,uin
 		put32bit(&aclblob,acn->acltab[i].id);
 		put16bit(&aclblob,acn->acltab[i].perm);
 	}
+}
+
+uint32_t posix_acl_getall(uint32_t inode,uint8_t acltype,uint8_t *dbuff) {
+	acl_node *acn;
+	uint16_t i,acls;
+
+	acn = GLUE_FN_NAME_PREFIX(_find)(inode,acltype);
+
+	if (acn==NULL) {
+		return 0;
+	} else {
+		acls = acn->namedusers+acn->namedgroups;
+		if (dbuff!=NULL) {
+			put16bit(&dbuff,acn->userperm);
+			put16bit(&dbuff,acn->groupperm);
+			put16bit(&dbuff,acn->otherperm);
+			put16bit(&dbuff,acn->mask);
+			put16bit(&dbuff,acn->namedusers);
+			put16bit(&dbuff,acn->namedgroups);
+			for (i=0 ; i<acls ; i++) {
+				put32bit(&dbuff,acn->acltab[i].id);
+				put16bit(&dbuff,acn->acltab[i].perm);
+			}
+		}
+		return acls*6U + 12U;
+	}
+}
+
+uint8_t posix_acl_check(uint32_t inode,uint8_t acltype,uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t mask,uint16_t namedusers,uint16_t namedgroups,const uint8_t *aclblob) {
+	acl_node *acn;
+	uint16_t i,j;
+	uint16_t checkcnt;
+	uint32_t id;
+	uint16_t perm;
+
+	acn = GLUE_FN_NAME_PREFIX(_find)(inode,acltype);
+	if (acn==NULL) {
+		return 0;
+	}
+	if (userperm!=acn->userperm || groupperm!=acn->groupperm || otherperm!=acn->otherperm || mask!=acn->mask || namedusers!=acn->namedusers || namedgroups!=acn->namedgroups) {
+		return 0;
+	}
+	checkcnt = 0;
+	for (i=0 ; i<namedusers ; i++) {
+		id = get32bit(&aclblob);
+		perm = get16bit(&aclblob);
+		for (j=0 ; j<namedusers ; j++) {
+			if (acn->acltab[j].id==id && acn->acltab[j].perm==perm) {
+				checkcnt++;
+			}
+		}
+	}
+	for (i=0 ; i<namedgroups ; i++) {
+		id = get32bit(&aclblob);
+		perm = get16bit(&aclblob);
+		for (j=namedusers ; j<namedusers+namedgroups ; j++) {
+			if (acn->acltab[j].id==id && acn->acltab[j].perm==perm) {
+				checkcnt++;
+			}
+		}
+	}
+	return (checkcnt!=(namedusers+namedgroups))?0:1;
 }
 
 uint8_t posix_acl_copy(uint32_t srcinode,uint32_t dstinode,uint8_t acltype) {
@@ -403,7 +470,6 @@ uint8_t posix_acl_store(bio *fd) {
 					put16bit(&ptr,acn->namedusers);
 					put16bit(&ptr,acn->namedgroups);
 					if (bio_write(fd,hdrbuff,4+1+2*6)!=(4+1+2*6)) {
-						syslog(LOG_NOTICE,"write error");
 						return 0xFF;
 					}
 					accnt = 0;
@@ -412,7 +478,6 @@ uint8_t posix_acl_store(bio *fd) {
 					while (accnt<acn->namedusers+acn->namedgroups) {
 						if (acbcnt==100) {
 							if (bio_write(fd,aclbuff,6*100)!=(6*100)) {
-								syslog(LOG_NOTICE,"write error");
 								return 0xFF;
 							}
 							acbcnt = 0;
@@ -425,7 +490,6 @@ uint8_t posix_acl_store(bio *fd) {
 					}
 					if (acbcnt>0) {
 						if (bio_write(fd,aclbuff,6*acbcnt)!=(6*acbcnt)) {
-							syslog(LOG_NOTICE,"write error");
 							return 0xFF;
 						}
 					}
@@ -435,7 +499,6 @@ uint8_t posix_acl_store(bio *fd) {
 	}
 	memset(hdrbuff,0,4+1+2*6);
 	if (bio_write(fd,hdrbuff,4+1+2*6)!=(4+1+2*6)) {
-		syslog(LOG_NOTICE,"write error");
 		return 0xFF;
 	}
 	return 0;
@@ -465,7 +528,7 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 				// nl=0;
 			}
 			errno = err;
-			mfs_errlog(LOG_ERR,"loading posix_acl: read error");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"loading posix_acl: read error");
 			return -1;
 		}
 		ptr = hdrbuff;
@@ -490,11 +553,12 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 				fputc('\n',stderr);
 				nl=0;
 			}
-			mfs_syslog(LOG_ERR,"loading posix_acl: wrong acl type");
 			if (ignoreflag) {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading posix_acl: wrong acl type - ignoring");
 				bio_skip(fd,6*acls);
 				continue;
 			} else {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading posix_acl: wrong acl type");
 				return -1;
 			}
 		}
@@ -504,11 +568,12 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 				fputc('\n',stderr);
 				nl=0;
 			}
-			mfs_syslog(LOG_ERR,"loading posix_acl: repeated acl");
 			if (ignoreflag) {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading posix_acl: repeated acl - ignoring");
 				bio_skip(fd,6*acls);
 				continue;
 			} else {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading posix_acl: repeated acl");
 				return -1;
 			}
 		}
@@ -522,7 +587,7 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 			mask = 7;
 			otherperm &= 0xFFF8;
 			otherperm |= mode&7;
-			mfs_arg_syslog(LOG_WARNING,"emergency set ACL mask for inode %"PRIu32" to 'rwx'",inode);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"emergency set ACL mask for inode %"PRIu32" to 'rwx'",inode);
 		}
 		acn->userperm = userperm;
 		acn->groupperm = groupperm;
@@ -555,7 +620,7 @@ int posix_acl_load(bio *fd,uint8_t mver,int ignoreflag) {
 					}
 					free(acn);
 					errno = err;
-					mfs_errlog(LOG_ERR,"loading posix_acl: read error");
+					mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"loading posix_acl: read error");
 					return -1;
 				}
 				ptr = aclbuff;

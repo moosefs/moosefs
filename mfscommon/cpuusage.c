@@ -61,7 +61,6 @@
 
 #include <stdlib.h>
 #include <inttypes.h>
-// #include <syslog.h>
 
 #if defined(HAVE_SETITIMER)
 static struct itimerval it_set;
@@ -158,7 +157,7 @@ void cpu_used (uint64_t *scpu,uint64_t *ucpu) {
 	usertime = 0;
 #endif
 
-//	syslog(LOG_NOTICE,"rdiff1: %"PRIu64,rdiff);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"rdiff1: %"PRIu64,rdiff);
 #if defined(HAVE_SETITIMER)
 /* method 1 - use itimers - usually worse */
         setitimer(ITIMER_REAL,&it_set,&rc);                // real time
@@ -204,8 +203,8 @@ void cpu_used (uint64_t *scpu,uint64_t *ucpu) {
 	systime = pcusec;
 #endif
 
-//	syslog(LOG_NOTICE,"rdiff2: %"PRIu64,rdiff);
-//	syslog(LOG_NOTICE,"usertime1: %"PRIu64",systime1: %"PRIu64,usertime,systime);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"rdiff2: %"PRIu64,rdiff);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"usertime1: %"PRIu64",systime1: %"PRIu64,usertime,systime);
 
 #if defined(HAVE_GETRUSAGE)
 /* method 2 - use getrusage - usually better (if both are available, overwrites data set by itimer method) */
@@ -230,7 +229,7 @@ void cpu_used (uint64_t *scpu,uint64_t *ucpu) {
 	}
 #endif
 
-//	syslog(LOG_NOTICE,"usertime2: %"PRIu64",systime2: %"PRIu64,usertime,systime);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"usertime2: %"PRIu64",systime2: %"PRIu64,usertime,systime);
 
 	if (rdiff>0) {
 		*scpu = (systime*UINT64_C(1000000000)) / rdiff;
@@ -240,5 +239,5 @@ void cpu_used (uint64_t *scpu,uint64_t *ucpu) {
 		*ucpu = 0;
 	}
 
-//	syslog(LOG_NOTICE,"scpu: %"PRIu32",ucpu: %"PRIu32,*scpu,*ucpu);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"scpu: %"PRIu32",ucpu: %"PRIu32,*scpu,*ucpu);
 }

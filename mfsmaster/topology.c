@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <errno.h>
 #include <inttypes.h>
 
@@ -35,9 +34,10 @@
 
 #include "main.h"
 #include "cfg.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "massert.h"
 #include "mfsalloc.h"
+#include "hashfn.h"
 
 static void *racktree;
 static char *TopologyFileName;
@@ -60,14 +60,8 @@ static rackhashentry** rackidtab = NULL;
 static uint32_t rackidtabsize = 0;
 static uint32_t rackidnext = 0;
 
-static inline uint32_t topology_rackname_hash(char *rackname) {
-	uint8_t p;
-	uint32_t result = 55821;
-	while ((p=*rackname)!=0) {
-		rackname++;
-		result = result*33+p;
-	}
-	return result;
+static inline uint32_t topology_rackname_hash(const char *rackname) {
+	return hashstr_poly(rackname,0);
 }
 
 static inline uint32_t topology_get_next_free_rackid(void) {
@@ -417,15 +411,13 @@ int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,ui
 		p++;
 	}
 	if (*p==0) {
-		mfs_arg_syslog(LOG_WARNING,"mfstopology: incomplete definition in line: %"PRIu32,lineno);
-		fprintf(stderr,"mfstopology: incomplete definition in line: %"PRIu32"\n",lineno);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfstopology: incomplete definition in line: %"PRIu32,lineno);
 		return -1;
 	}
 	*p=0;
 	p++;
 	if (topology_parsenet(net,fip,tip)<0) {
-		mfs_arg_syslog(LOG_WARNING,"mfstopology: incorrect ip/network definition in line: %"PRIu32,lineno);
-		fprintf(stderr,"mfstopology: incorrect ip/network definition in line: %"PRIu32"\n",lineno);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfstopology: incorrect ip/network definition in line: %"PRIu32,lineno);
 		return -1;
 	}
 
@@ -434,8 +426,7 @@ int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,ui
 	}
 
 	if (*p==0 || *p=='#') {
-		mfs_arg_syslog(LOG_WARNING,"mfstopology: incorrect rack id in line: %"PRIu32,lineno);
-		fprintf(stderr,"mfstopology: incorrect rack id in line: %"PRIu32"\n",lineno);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfstopology: incorrect rack id in line: %"PRIu32,lineno);
 		return -1;
 	}
 
@@ -455,8 +446,7 @@ int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,ui
 	}
 
 	if (*p && *p!='#') {
-		mfs_arg_syslog(LOG_WARNING,"mfstopology: garbage found at the end of line: %"PRIu32,lineno);
-		fprintf(stderr,"mfstopology: garbage found at the end of line: %"PRIu32"\n",lineno);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfstopology: garbage found at the end of line: %"PRIu32,lineno);
 		return -1;
 	}
 	return 0;
@@ -464,7 +454,8 @@ int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,ui
 
 void topology_load(void) {
 	FILE *fd;
-	char linebuff[10000];
+	char *linebuff;
+	size_t lbsize;
 	uint32_t s,lineno;
 	uint32_t fip,tip,rid;
 	void *newtree;
@@ -473,16 +464,15 @@ void topology_load(void) {
 	if (fd==NULL) {
 		if (errno==ENOENT) {
 			if (racktree) {
-				syslog(LOG_WARNING,"mfstopology configuration file (%s) not found - network topology not changed",TopologyFileName);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"mfstopology configuration file (%s) not found - network topology not changed",TopologyFileName);
 			} else {
-				syslog(LOG_WARNING,"mfstopology configuration file (%s) not found - network topology not defined",TopologyFileName);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"mfstopology configuration file (%s) not found - network topology not defined",TopologyFileName);
 			}
-			fprintf(stderr,"mfstopology configuration file (%s) not found - using defaults\n",TopologyFileName);
 		} else {
 			if (racktree) {
-				mfs_arg_errlog(LOG_WARNING,"can't open mfstopology configuration file (%s) - network topology not changed, error",TopologyFileName);
+				mfs_log(MFSLOG_ERRNO_SYSLOG,MFSLOG_WARNING,"can't open mfstopology configuration file (%s) - network topology not changed, error",TopologyFileName);
 			} else {
-				mfs_arg_errlog(LOG_WARNING,"can't open mfstopology configuration file (%s) - network topology not defined, error",TopologyFileName);
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"can't open mfstopology configuration file (%s) - network topology not defined, error",TopologyFileName);
 			}
 		}
 		return;
@@ -491,8 +481,9 @@ void topology_load(void) {
 	topology_rackname_stash();
 	newtree = NULL;
 	lineno = 1;
-	while (fgets(linebuff,10000,fd)) {
-		linebuff[9999]=0;
+	lbsize = 10000;
+	linebuff = malloc(lbsize);
+	while (getline(&linebuff,&lbsize,fd)!=-1) {
 		s=strlen(linebuff);
 		while (s>0 && (linebuff[s-1]=='\r' || linebuff[s-1]=='\n' || linebuff[s-1]=='\t' || linebuff[s-1]==' ')) {
 			s--;
@@ -509,16 +500,16 @@ void topology_load(void) {
 		}
 		lineno++;
 	}
+	free(linebuff);
 	if (ferror(fd)) {
 		fclose(fd);
 		if (racktree) {
-			syslog(LOG_WARNING,"error reading mfstopology file - network topology not changed");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"error reading mfstopology file - network topology not changed");
 		} else {
-			syslog(LOG_WARNING,"error reading mfstopology file - network topology not defined");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error reading mfstopology file - network topology not defined");
 		}
 		itree_freeall(newtree);
 		topology_rackname_restore();
-		fprintf(stderr,"error reading mfstopology file - network topology not defined (using defaults)\n");
 		return;
 	}
 	fclose(fd);
@@ -528,7 +519,7 @@ void topology_load(void) {
 	if (racktree) {
 		racktree = itree_rebalance(racktree);
 	}
-	mfs_syslog(LOG_NOTICE,"topology file has been loaded");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"topology file has been loaded");
 }
 
 //int topology_init(void) {
@@ -553,7 +544,7 @@ void topology_reload(void) {
 			if ((fd = open(tmpname,O_RDONLY))>=0) {
 				free(TopologyFileName);
 				TopologyFileName = tmpname;
-				mfs_syslog(LOG_WARNING,"default sysconf path has changed - please move mfstopology.cfg from "ETC_PATH"/ to "ETC_PATH"/mfs/");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"default sysconf path has changed - please move mfstopology.cfg from "ETC_PATH"/ to "ETC_PATH"/mfs/");
 			} else {
 				free(tmpname);
 			}
@@ -561,6 +552,7 @@ void topology_reload(void) {
 		if (fd>=0) {
 			close(fd);
 		}
+		cfg_use_option("TOPOLOGY_FILENAME",TopologyFileName);
 	} else {
 		TopologyFileName = cfg_getstr("TOPOLOGY_FILENAME",ETC_PATH "/mfs/mfstopology.cfg");
 	}

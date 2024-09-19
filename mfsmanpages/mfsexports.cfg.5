@@ -1,4 +1,4 @@
-.TH mfsexports.cfg "5" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsexports.cfg "5" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsexports.cfg \- MooseFS access control for \fBmfsmount\fPs
 .SH DESCRIPTION
@@ -48,7 +48,17 @@ logically added; needed for supplementary groups to work (\fBmfsmaster\fP
 receives only user primary group information)
 .TP
 .B admin
-administrative privileges - currently: allow changing of quota values and storage classes management
+administrative privileges:
+.sp 0
+changing quota values
+.sp 0
+storage classes management - adding, deleting, modifying
+.sp 0
+patterns management - adding, deleting
+.sp 0
+using storage classes with admin flag (setting, overwriting)
+.sp 0
+manipulating UNDELETABLE, APPENDONLY and IMMUTABLE flags in filesystem objects
 .TP
 \fBmaproot=\fP\fIUSER\fP[\fB:\fP\fIGROUP\fP]
 maps root (uid=0) accesses to given user and group (similarly to maproot
@@ -69,22 +79,30 @@ rejects access from clients older than specified
 \fBmingoal=\fP\fIN\fP, \fBmaxgoal=\fP\fIN\fP
 specify range in which goal can be set by users
 .TP
+\fBmintrashretention=\fP\fITIME\fP, \fBmaxtrashretention=\fP\fITIME\fP
+specify range in which trash retention can be set by users
+.TP
 \fBmintrashtime=\fP\fITDUR\fP, \fBmaxtrashtime=\fP\fITDUR\fP
-specify range in which trashtime can be set by users
+deprectaed options (function similalry as above)
 .TP
 \fBdisable=\fP\fIOPERATION[:OPERATION[:...]]\fP 
 do not allow the client to perform certain operations
 .PP
-Default options are: \fBro, maproot=999:999, mingoal=1, maxgoal=9, mintrashtime=0, maxtrashtime=4294967295\fP.
+Default options are: \fBro, maproot=999:999, mingoal=1, maxgoal=9, mintrashretention=0, maxtrashretention=4294967295\fP.
+.PP
+Note! Default value for maxtrashretention is impossible to be set by user, so if the value is not set, then it can be considered close to infinity, but if it is set, then the maximum is 65535 hours (~390 weeks).
 .SH NOTES
 \fIUSER\fP and \fIGROUP\fP names (if not specified by explicit uid/gid
 number) are resolved on \fBmfsmaster\fP host.
 .PP
-TDUR can be specified as number without time unit (number of seconds) or
+TDUR (deprecated) can be specified as number without time unit (number of seconds) or
 combination of numbers with time units. Time units are:
 \fBW\fP,\fBD\fP,\fBH\fP,\fBM\fP,\fBS\fP. Order is important - less
 significant time units can't be defined before more significant time units.
-Time units are case insensitive.
+.PP
+TIME can be specified as a number of hours (integer) or as a time period in one of two possible formats: first format: #.#T where T is one of: h-hours, d-days or w-weeks; fractions of minimum unit will be rounded to integer value; second format: #w#d#h, any number of definitions can be ommited, but the remaining definitions must be in order (so #w#h is still a valid definition, but #h#w is not); ranges: h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h d will be unlimited)
+.PP
+Time units/periods are case insensitive.
 .PP
 Option \fBmapall\fP works in MooseFS in different way than in NFS, because MooseFS is
 using FUSE's "default_permissions" option. When \fBmapall\fP option is used, users
@@ -133,7 +151,7 @@ setfacl      - don't allow the client to set ACLs
 \fB192.168.1.0/24       /       rw,alldirs,maproot=0,password=passcode\fP
 \fB10.0.0.0-10.0.0.5    /test   rw,maproot=nobody,password=test\fP
 \fB10.1.0.0/255.255.0.0 /public rw,mapall=1000:1000\fP
-\fB10.2.0.0/16          /       rw,alldirs,maproot=0,mintrashtime=2h30m,maxtrashtime=2w\fP
+\fB10.2.0.0/16          /       rw,alldirs,maproot=0,mintrashretention=2d12h,maxtrashretention=2w\fP
 \fB192.168.1.0/24       /       rw,disable=unlink:rmdir:truncate\fP
 \fB192.168.1.0/24       /       rw,disable=unlink,disable=rmdir,disable=truncate\fP
 .fi
@@ -159,4 +177,4 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmaster (8),
-.BR mfsmaster.cfg (5)
+.BR mfsmaster.cfg (5)

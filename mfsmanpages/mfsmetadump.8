@@ -1,4 +1,4 @@
-.TH mfsmetadump "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsmetadump "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsmetadump - dump MooseFS metadata info in human readable format
 .SH SYNOPSIS
@@ -19,6 +19,7 @@ default behaviour in version < 3.0.110).
 	SESS - client sessions
 	LABS - labels (not used)
 	SCLA - storage classes
+	PATT - pattern overrides
 	NODE - tree nodes (i-nodes)
 	EDGE - tree edges (file names)
 	FREE - free nodes (deleted i-nodes)
@@ -31,6 +32,9 @@ default behaviour in version < 3.0.110).
 	CSDB - active chunkservers
 	CHNK - chunks
 .fi
+.TP
+\fBmetadata_file\fP
+path to metadata.mfs file
 .SH SECTION HEADER (precedes each section except HEAD)
 .TP 20
 section header 
@@ -103,6 +107,42 @@ c	create labels
 k	keep labels
 a	archive labels
 n	name
+.fi
+.TP 20
+SCLASSMAIN
+(used in version 4.0+ instead of SCLASS) line with common parameters of storage class
+.nf
+.ta +1i
+#	storage class id
+x	admin only
+m	create mode
+a	arch mode
+d	arch delay
+t	min trash retention
+n	name
+.fi
+.TP 20
+SCLASSEXPR
+(used in version 4.0+ instead of SCLASS) line with label expression
+.nf
+.ta +1i
+#	storage class id
+t	type ([C]reate,[K]eep,[A]rchive or [T]rash)
+e	expression
+.fi
+.SH PATTERNS SECTION (PATT)
+.TP 20
+PATTERN
+line with pattern definition
+.nf
+.ta +1i
+v	priority
+#	storage class id
+t	trash retention
+e	flags (extra mfs attributes)
+u	uid
+g	gid
+p	pattern
 .fi
 .SH NODES SECTION (NODE)
 .TP 20
@@ -275,9 +315,13 @@ line with chunk description
 .ta +1i
 i	chunk number
 v	chunk version
-t	"locked to" timestamp
+t	timestamp, if in the future, means lock timestamp, if in the past, last modification timestamp
 a	archive flag
+(s,#)	list of entries, s is storage class id, # is number of files in this storage class containing this chunk
+c	calculated storage class id (effecitvely used class id, if a chunk has more than one)
 .fi
+.PP
+NOTICE! If a chunk's timestamp equals 0, it means the chunk was created by MooseFS version older than 4.45.0 and has not been locked or modified since.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

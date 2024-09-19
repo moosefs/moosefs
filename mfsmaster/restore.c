@@ -37,17 +37,31 @@
 #include "csdb.h"
 #include "chunks.h"
 #include "storageclass.h"
+#include "patterns.h"
 #include "metadata.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "massert.h"
 #include "mfsstrerr.h"
 
 #define EAT(clptr,fn,vno,c) { \
 	if (*(clptr)!=(c)) { \
-		mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
 		return -1; \
 	} \
 	(clptr)++; \
+}
+
+#define NEXTSEPARATOR(c,clptr) { \
+	const char *_tmp_clptr = (const char *)clptr; \
+	char _tmp_c; \
+	(c) = '#'; \
+	while ((c)=='#') { \
+		_tmp_c = *(_tmp_clptr); \
+		(_tmp_clptr)++; \
+		if (_tmp_c<32 || _tmp_c>=127 || _tmp_c==',' || _tmp_c=='(' || _tmp_c==')') { \
+			(c) = _tmp_c; \
+		} \
+	} \
 }
 
 #define GETNAME(name,clptr,fn,vno,c) { \
@@ -57,7 +71,7 @@
 	_tmp_i = 0; \
 	while ((_tmp_c=*((clptr)++))!=c && _tmp_i<255) { \
 		if (_tmp_c=='\0' || _tmp_c=='\r' || _tmp_c=='\n') { \
-			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
 			return -1; \
 		} \
 		if (_tmp_c=='%') { \
@@ -68,7 +82,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -76,7 +90,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -93,7 +107,7 @@
 	_tmp_i = 0; \
 	while ((_tmp_c=*((clptr)++))!=c) { \
 		if (_tmp_c=='\0' || _tmp_c=='\r' || _tmp_c=='\n') { \
-			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
 			return -1; \
 		} \
 		if (_tmp_c=='%') { \
@@ -104,7 +118,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -112,7 +126,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -154,7 +168,7 @@
 	(leng) = 0; \
 	while ((_tmp_c=*((clptr)++))!=c) { \
 		if (_tmp_c=='\0' || _tmp_c=='\r' || _tmp_c=='\n') { \
-			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": '%c' expected",(fn),(vno),(c)); \
 			return -1; \
 		} \
 		if (_tmp_c=='%') { \
@@ -165,7 +179,7 @@
 			} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
 				_tmp_h1-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			if (_tmp_h2>='0' && _tmp_h2<='9') { \
@@ -173,7 +187,7 @@
 			} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
 				_tmp_h2-=('A'-10); \
 			} else { \
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": hex expected",(fn),(vno)); \
 				return -1; \
 			} \
 			_tmp_c = _tmp_h1*16+_tmp_h2; \
@@ -202,15 +216,16 @@
 	(leng) = 0; \
 	_tmp_c = *((clptr)++); \
 	if (_tmp_c!='[') { \
-		mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": '[' expected",(fn),(vno)); \
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": '[' expected",(fn),(vno)); \
 		return -1; \
 	} \
 	while ((_tmp_c=*((clptr)++))!=']') { \
 		if (_tmp_c=='\0' || _tmp_c=='\r' || _tmp_c=='\n') { \
-			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": ']' expected",(fn),(vno)); \
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": ']' expected",(fn),(vno)); \
 			return -1; \
 		} \
 		if (_tmp_c>='0' && _tmp_c<='9') { \
+			(clptr)--; \
 			if ((leng)>=(size)) { \
 				(size) = (leng)+32; \
 				if ((buff)==NULL) { \
@@ -224,12 +239,52 @@
 				} \
 				passert(buff); \
 			} \
-			(buff)[(leng)++] = strtoul(clptr,&eptr,10); \
-			clptr = (const char*)eptr; \
+			(buff)[(leng)++] = strtoul((clptr),&eptr,10); \
+			(clptr) = (const char*)eptr; \
 		} else if (_tmp_c!=',') { \
-			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": number or ',' expected",(fn),(vno)); \
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": number or ',' expected",(fn),(vno)); \
 			return -1; \
 		} \
+	} \
+}
+
+#define GETHEX(buff,leng,size,clptr,fn,vno) { \
+	char _tmp_h1,_tmp_h2; \
+	(leng) = 0; \
+	while (1) { \
+		_tmp_h1 = *((clptr)++); \
+		if (_tmp_h1>='0' && _tmp_h1<='9') { \
+			_tmp_h1-='0'; \
+		} else if (_tmp_h1>='A' && _tmp_h1<='F') { \
+			_tmp_h1-=('A'-10); \
+		} else { \
+			(clptr)--; \
+			break; \
+		} \
+		_tmp_h2 = *((clptr)++); \
+		if (_tmp_h2>='0' && _tmp_h2<='9') { \
+			_tmp_h2-='0'; \
+		} else if (_tmp_h2>='A' && _tmp_h2<='F') { \
+			_tmp_h2-=('A'-10); \
+		} else { \
+			(clptr)--; \
+			break; \
+		} \
+		_tmp_h1 = _tmp_h1*16+_tmp_h2; \
+		if ((leng)>=(size)) { \
+			(size) = (leng)+1000; \
+			if ((buff)==NULL) { \
+				(buff) = malloc(size); \
+			} else { \
+				uint8_t *_tmp_buff = (buff); \
+				(buff) = realloc((buff),(size)); \
+				if ((buff)==NULL) { \
+					free(_tmp_buff); \
+				} \
+			} \
+			passert(buff); \
+		} \
+		(buff)[(leng)++]=_tmp_h1; \
 	} \
 }
 
@@ -239,7 +294,7 @@
 	tmp=strtoul(clptr,&eptr,10); \
 	clptr = (const char*)eptr; \
 	if (tmp>255) { \
-		mfs_arg_syslog(LOG_WARNING,"value too big (%"PRIu32" - 0-255 expected)",tmp); \
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"value too big (%"PRIu32" - 0-255 expected)",tmp); \
 		return -1; \
 	} \
 	(data)=tmp; \
@@ -251,7 +306,7 @@
 	tmp=strtoul(clptr,&eptr,10); \
 	clptr = (const char*)eptr; \
 	if (tmp>65535) { \
-		mfs_arg_syslog(LOG_WARNING,"value too big (%"PRIu32" - 0-65535 expected)",tmp); \
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"value too big (%"PRIu32" - 0-65535 expected)",tmp); \
 		return -1; \
 	} \
 	(data)=tmp; \
@@ -291,6 +346,22 @@ int do_access(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
 	return fs_mr_access(ts,inode);
+}
+
+int do_addattr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,attrblobleng;
+	uint8_t flags;
+	static uint8_t *attrblob = NULL;
+	static uint32_t attrblobsize = 0;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(flags,ptr);
+	EAT(ptr,filename,lv,',');
+	GETDATA(attrblob,attrblobleng,attrblobsize,ptr,filename,lv,')');
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return fs_mr_additionalattr(ts,inode,flags,attrblob,attrblobleng);
 }
 
 int do_append(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -348,19 +419,49 @@ int do_archchg(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 }
 
 int do_amtime(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t inode,atime,mtime,ctime;
-	(void)ts;
+	uint32_t inode,xatime,xmtime,xctime;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(atime,ptr);
+	GETU32(xatime,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(mtime,ptr);
+	GETU32(xmtime,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(ctime,ptr);
+	GETU32(xctime,ptr);
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_amtime(inode,atime,mtime,ctime);
+	return fs_mr_amtime(inode,ts,xatime,xmtime,xctime);
+}
+
+int do_autoarch(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,archreftime;
+	uint32_t archchgchunks,trashchgchunks;
+	uint8_t intrash;
+	uint8_t format;
+	(void)ts;
+	format = 0;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(archreftime,ptr);
+	if (*ptr==',') {
+		format = 1;
+		EAT(ptr,filename,lv,',');
+		GETU8(intrash,ptr);
+	} else {
+		intrash = 1; // old metadata - do not clear trash flag
+	}
+	EAT(ptr,filename,lv,')');
+	EAT(ptr,filename,lv,':');
+	GETU32(archchgchunks,ptr);
+	if (format==1) {
+		EAT(ptr,filename,lv,',');
+		GETU32(trashchgchunks,ptr);
+	} else {
+		trashchgchunks = 0;
+	}
+	(void)ptr; // silence cppcheck warnings
+	return fs_mr_autoarch(inode,archreftime,intrash,archchgchunks,trashchgchunks);
 }
 
 int do_attr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -516,8 +617,18 @@ int do_chunkdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return chunk_mr_chunkdel(ts,chunkid,version);
 }
 
+int do_chunkflagsclr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint64_t chunkid;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU64(chunkid,ptr);
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return chunk_mr_flagsclr(ts,chunkid);
+}
+
 int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
-	uint32_t sustainedinodes,freeinodes,inode_chksum,bid;
+	uint32_t sustainedinodes,freeinodes,trashflaginodes,inode_chksum,bid;
 	EAT(ptr,filename,lv,'(');
 	if (*ptr!=')') {
 		GETU32(bid,ptr);
@@ -532,11 +643,19 @@ int do_emptytrash(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	if (*ptr==',') {
 		EAT(ptr,filename,lv,',');
 		GETU32(inode_chksum,ptr);
+		if (*ptr==',') {
+			EAT(ptr,filename,lv,',');
+			trashflaginodes = inode_chksum;
+			GETU32(inode_chksum,ptr);
+		} else {
+			trashflaginodes = UINT32_C(0xFFFFFFFF);
+		}
 	} else {
 		inode_chksum = 0;
+		trashflaginodes = UINT32_C(0xFFFFFFFF);
 	}
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_emptytrash(ts,bid,freeinodes,sustainedinodes,inode_chksum);
+	return fs_mr_emptytrash(ts,bid,freeinodes,sustainedinodes,trashflaginodes,inode_chksum);
 }
 
 int do_emptysustained(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -667,6 +786,8 @@ int do_length(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 int do_move(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,parent_src,parent_dst;
 	uint8_t name_src[256],name_dst[256];
+	uint8_t rmode;
+	char s;
 	EAT(ptr,filename,lv,'(');
 	GETU32(parent_src,ptr);
 	EAT(ptr,filename,lv,',');
@@ -674,12 +795,20 @@ int do_move(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(parent_dst,ptr);
 	EAT(ptr,filename,lv,',');
-	GETNAME(name_dst,ptr,filename,lv,')');
+	NEXTSEPARATOR(s,ptr);
+	if (s==',') {
+		GETNAME(name_dst,ptr,filename,lv,',');
+		EAT(ptr,filename,lv,',');
+		GETU8(rmode,ptr);
+	} else {
+		GETNAME(name_dst,ptr,filename,lv,')');
+		rmode = 0;
+	}
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU32(inode,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_move(ts,parent_src,strlen((char*)name_src),name_src,parent_dst,strlen((char*)name_dst),name_dst,inode);
+	return fs_mr_move(ts,parent_src,strlen((char*)name_src),name_src,parent_dst,strlen((char*)name_dst),name_dst,rmode,inode);
 }
 
 int do_nextchunkid(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -690,6 +819,54 @@ int do_nextchunkid(const char *filename,uint64_t lv,uint32_t ts,const char *ptr)
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
 	return chunk_mr_nextchunkid(chunkid);
+}
+
+int do_patadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint8_t gname[256];
+	uint32_t euid,egid;
+	uint8_t priority,omask,scid,seteattr,clreattr;
+	uint16_t trashretention;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETNAME(gname,ptr,filename,lv,',');
+	EAT(ptr,filename,lv,',');
+	GETU32(euid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(egid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(priority,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(omask,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(scid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU16(trashretention,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(seteattr,ptr);
+	if (*ptr==',') {
+		EAT(ptr,filename,lv,',');
+		GETU8(clreattr,ptr);
+	} else {
+		clreattr = 0;
+	}
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return patterns_mr_add(strlen((char*)gname),gname,euid,egid,priority,omask,scid,trashretention,seteattr,clreattr);
+}
+
+int do_patdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint8_t gname[256];
+	uint32_t euid,egid;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETNAME(gname,ptr,filename,lv,',');
+	EAT(ptr,filename,lv,',');
+	GETU32(euid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(egid,ptr);
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return patterns_mr_delete(strlen((char*)gname),gname,euid,egid);
 }
 
 int do_posixlock(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -839,7 +1016,7 @@ int do_session(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootinode,sesflags,peerip,sessionid;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
-	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
+	uint32_t mingoal,maxgoal,mintrashretention,maxtrashretention;
 	uint32_t disables;
 	uint16_t umaskval;
 	uint64_t exportscsum;
@@ -862,7 +1039,7 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	if (*ptr=='0') {
 		if (ptr[1]<'0' || ptr[1]>'7' || ptr[2]<'0' || ptr[2]>'7' || ptr[3]<'0' || ptr[3]>'7') {
-			mfs_arg_syslog(LOG_WARNING,"wrong session umask ('%c%c%c' - octal number expected)",ptr[1],ptr[2],ptr[3]);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"wrong session umask ('%c%c%c' - octal number expected)",ptr[1],ptr[2],ptr[3]);
 			return -1;
 		}
 		umaskval = (ptr[1]-'0') * 64 + (ptr[2]-'0') * 8 + (ptr[3]-'0');
@@ -883,9 +1060,9 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(maxgoal,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(mintrashtime,ptr);
+	GETU32(mintrashretention,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(maxtrashtime,ptr);
+	GETU32(maxtrashretention,ptr);
 	EAT(ptr,filename,lv,',');
 	if (ptr[0]=='0' && ptr[1]=='x') {
 		ptr+=2;
@@ -901,13 +1078,13 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,':');
 	GETU32(sessionid,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,peerip,info,ileng,sessionid);
+	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashretention,maxtrashretention,disables,peerip,info,ileng,sessionid);
 }
 
 int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootinode,sesflags,peerip,sessionid;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
-	uint32_t mingoal,maxgoal,mintrashtime,maxtrashtime;
+	uint32_t mingoal,maxgoal,mintrashretention,maxtrashretention;
 	uint32_t disables;
 	uint16_t umaskval;
 	uint64_t exportscsum;
@@ -932,7 +1109,7 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,',');
 	if (*ptr=='0') {
 		if (ptr[1]<'0' || ptr[1]>'7' || ptr[2]<'0' || ptr[2]>'7' || ptr[3]<'0' || ptr[3]>'7') {
-			mfs_arg_syslog(LOG_WARNING,"wrong session umask ('%c%c%c' - octal number expected)",ptr[1],ptr[2],ptr[3]);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"wrong session umask ('%c%c%c' - octal number expected)",ptr[1],ptr[2],ptr[3]);
 			return -1;
 		}
 		umaskval = (ptr[1]-'0') * 64 + (ptr[2]-'0') * 8 + (ptr[3]-'0');
@@ -953,9 +1130,9 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,',');
 	GETU32(maxgoal,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(mintrashtime,ptr);
+	GETU32(mintrashretention,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(maxtrashtime,ptr);
+	GETU32(maxtrashretention,ptr);
 	EAT(ptr,filename,lv,',');
 	if (ptr[0]=='0' && ptr[1]=='x') {
 		ptr+=2;
@@ -969,7 +1146,7 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	GETDATA(info,ileng,infosize,ptr,filename,lv,')');
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
-	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashtime,maxtrashtime,disables,peerip,info,ileng);
+	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashretention,maxtrashretention,disables,peerip,info,ileng);
 }
 
 int do_sesdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -981,6 +1158,17 @@ int do_sesdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
 	return sessions_mr_sesdel(sessionid);
+}
+
+int do_sesconnected(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t sessionid;
+
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU32(sessionid,ptr);
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return sessions_mr_connected(sessionid);
 }
 
 int do_sesdisconnected(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -996,7 +1184,6 @@ int do_sesdisconnected(const char *filename,uint64_t lv,uint32_t ts,const char *
 int do_rollback(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,indx;
 	uint64_t prevchunkid,chunkid;
-	(void)ts;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
@@ -1007,7 +1194,7 @@ int do_rollback(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	GETU64(chunkid,ptr);
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_rollback(inode,indx,prevchunkid,chunkid);
+	return fs_mr_rollback(ts,inode,indx,prevchunkid,chunkid);
 }
 
 int do_seteattr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -1118,16 +1305,16 @@ int do_setpath(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return fs_mr_setpath(inode,path);
 }
 
-int do_settrashtime(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+int do_settrashretention(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t inode,uid,ci,nci,npi;
-	uint32_t trashtime;
+	uint32_t trashretention;
 	uint8_t smode;
 	EAT(ptr,filename,lv,'(');
 	GETU32(inode,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(uid,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(trashtime,ptr);
+	GETU32(trashretention,ptr);
 	EAT(ptr,filename,lv,',');
 	GETU32(smode,ptr);
 	EAT(ptr,filename,lv,')');
@@ -1138,7 +1325,7 @@ int do_settrashtime(const char *filename,uint64_t lv,uint32_t ts,const char *ptr
 	EAT(ptr,filename,lv,',');
 	GETU32(npi,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_settrashtime(ts,inode,uid,trashtime,smode,ci,nci,npi);
+	return fs_mr_settrashretention(ts,inode,uid,trashretention,smode,ci,nci,npi);
 }
 
 int do_setxattr(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -1300,6 +1487,24 @@ int do_symlink(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	return fs_mr_symlink(ts,parent,strlen((char*)name),name,path,uid,gid,inode);
 }
 
+int do_scecon(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return sclass_mr_ec_version(1);
+}
+
+int do_scecversion(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint8_t ec_new_version;
+	(void)ts;
+	EAT(ptr,filename,lv,'(');
+	GETU8(ec_new_version,ptr);
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return sclass_mr_ec_version(ec_new_version);
+}
+
 int do_scdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint8_t name[256];
 	uint16_t spid;
@@ -1350,57 +1555,234 @@ int do_scren(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 int do_scset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint8_t name[256];
 	uint16_t spid;
-	uint16_t arch_delay;
-	uint8_t new_flag,adminonly;
-	uint8_t create_labelscnt,keep_labelscnt,arch_labelscnt,create_mode,i;
-	uint32_t create_labelmasks[MAXLABELSCNT*MASKORGROUP];
-	uint32_t keep_labelmasks[MAXLABELSCNT*MASKORGROUP];
-	uint32_t arch_labelmasks[MAXLABELSCNT*MASKORGROUP];
+	uint16_t arch_delay,min_trashretention;
+	uint64_t arch_min_size;
+	uint8_t new_flag,adminonly,labels_mode,arch_mode,i;
+	storagemode create,keep,arch,trash;
+//	uint8_t create_labelscnt,keep_labelscnt,arch_labelscnt;
+	uint32_t old_labelmasks[MAXLABELSCNT*MASKORGROUP];
+	uint32_t labelexpr_leng;
+	static uint8_t *labelexpr_buff = NULL;
+	static uint32_t labelexpr_size = 0;
+
 	(void)ts;
+	memset(&create,0,sizeof(storagemode));
+	memset(&keep,0,sizeof(storagemode));
+	memset(&arch,0,sizeof(storagemode));
+	memset(&trash,0,sizeof(storagemode));
+	create.labels_mode = LABELS_MODE_GLOBAL;
+	keep.labels_mode = LABELS_MODE_GLOBAL;
+	arch.labels_mode = LABELS_MODE_GLOBAL;
+	trash.labels_mode = LABELS_MODE_GLOBAL;
 	EAT(ptr,filename,lv,'(');
 	GETNAME(name,ptr,filename,lv,',');
 	EAT(ptr,filename,lv,',');
 	GETU8(new_flag,ptr);
 	EAT(ptr,filename,lv,',');
-	EAT(ptr,filename,lv,'W');
-	GETU8(create_labelscnt,ptr);
-	EAT(ptr,filename,lv,',');
-	EAT(ptr,filename,lv,'K');
-	GETU8(keep_labelscnt,ptr);
-	EAT(ptr,filename,lv,',');
-	EAT(ptr,filename,lv,'A');
-	GETU8(arch_labelscnt,ptr);
-	EAT(ptr,filename,lv,',');
-	GETU8(create_mode,ptr);
-	EAT(ptr,filename,lv,',');
-	GETU16(arch_delay,ptr);
-	EAT(ptr,filename,lv,',');
-	GETU8(adminonly,ptr);
-	if (create_labelscnt>MAXLABELSCNT || keep_labelscnt>MAXLABELSCNT || arch_labelscnt>MAXLABELSCNT) {
-		return MFS_ERROR_EINVAL;
-	}
-	if (create_labelscnt+keep_labelscnt+arch_labelscnt==0) {
+	if (*ptr=='W') { // MFS < 4.0
+		EAT(ptr,filename,lv,'W');
+		GETU8(create.labelscnt,ptr);
 		EAT(ptr,filename,lv,',');
-		EAT(ptr,filename,lv,'-');
+		EAT(ptr,filename,lv,'K');
+		GETU8(keep.labelscnt,ptr);
+		EAT(ptr,filename,lv,',');
+		EAT(ptr,filename,lv,'A');
+		GETU8(arch.labelscnt,ptr);
+		EAT(ptr,filename,lv,',');
+		GETU8(labels_mode,ptr);
+		EAT(ptr,filename,lv,',');
+		GETU16(arch_delay,ptr);
+		EAT(ptr,filename,lv,',');
+		GETU8(adminonly,ptr);
+		if (create.labelscnt>MAXLABELSCNT || keep.labelscnt>MAXLABELSCNT || arch.labelscnt>MAXLABELSCNT) {
+			return MFS_ERROR_EINVAL;
+		}
+		if (create.labelscnt+keep.labelscnt+arch.labelscnt==0) {
+			EAT(ptr,filename,lv,',');
+			EAT(ptr,filename,lv,'-');
+		} else {
+			for (i=0 ; i<create.labelscnt*MASKORGROUP ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETU32(old_labelmasks[i],ptr);
+			}
+			sclass_maskorgroup_to_labelexpr(create.labelexpr,old_labelmasks,create.labelscnt);
+			for (i=0 ; i<keep.labelscnt*MASKORGROUP ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETU32(old_labelmasks[i],ptr);
+			}
+			sclass_maskorgroup_to_labelexpr(keep.labelexpr,old_labelmasks,keep.labelscnt);
+			for (i=0 ; i<arch.labelscnt*MASKORGROUP ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETU32(old_labelmasks[i],ptr);
+			}
+			sclass_maskorgroup_to_labelexpr(arch.labelexpr,old_labelmasks,arch.labelscnt);
+			arch_delay *= 24;
+		}
+		min_trashretention = 0;
+		arch_min_size = 0;
+		arch_mode = SCLASS_ARCH_MODE_CTIME;
+	} else if (*ptr=='C') { // MFS >= 4.0
+		EAT(ptr,filename,lv,'C');
+		EAT(ptr,filename,lv,'(');
+		GETU8(create.labelscnt,ptr);
+		EAT(ptr,filename,lv,':');
+		GETU32(create.uniqmask,ptr);
+		if (*ptr==':') {
+			EAT(ptr,filename,lv,':');
+			GETU8(create.labels_mode,ptr);
+		}
+		EAT(ptr,filename,lv,')');
+		EAT(ptr,filename,lv,',');
+		EAT(ptr,filename,lv,'K');
+		EAT(ptr,filename,lv,'(');
+		GETU8(keep.labelscnt,ptr);
+		EAT(ptr,filename,lv,':');
+		GETU32(keep.uniqmask,ptr);
+		if (*ptr==':') {
+			EAT(ptr,filename,lv,':');
+			GETU8(keep.labels_mode,ptr);
+		}
+		EAT(ptr,filename,lv,')');
+		EAT(ptr,filename,lv,',');
+		EAT(ptr,filename,lv,'A');
+		EAT(ptr,filename,lv,'(');
+		GETU8(arch.labelscnt,ptr);
+		EAT(ptr,filename,lv,':');
+		GETU32(arch.uniqmask,ptr);
+		EAT(ptr,filename,lv,':');
+		GETU8(arch.ec_data_chksum_parts,ptr);
+		if (*ptr==':') {
+			EAT(ptr,filename,lv,':');
+			GETU8(arch.labels_mode,ptr);
+		}
+		EAT(ptr,filename,lv,')');
+		EAT(ptr,filename,lv,',');
+		EAT(ptr,filename,lv,'T');
+		EAT(ptr,filename,lv,'(');
+		GETU8(trash.labelscnt,ptr);
+		EAT(ptr,filename,lv,':');
+		GETU32(trash.uniqmask,ptr);
+		EAT(ptr,filename,lv,':');
+		GETU8(trash.ec_data_chksum_parts,ptr);
+		if (*ptr==':') {
+			EAT(ptr,filename,lv,':');
+			GETU8(trash.labels_mode,ptr);
+		}
+		EAT(ptr,filename,lv,')');
+		EAT(ptr,filename,lv,',');
+		GETU8(labels_mode,ptr);
+		EAT(ptr,filename,lv,',');
+		if (*ptr=='(') {
+			EAT(ptr,filename,lv,'(');
+			GETU8(arch_mode,ptr);
+			EAT(ptr,filename,lv,':');
+			GETU16(arch_delay,ptr);
+			if (*ptr==':') {
+				EAT(ptr,filename,lv,':');
+				GETU64(arch_min_size,ptr);
+			} else {
+				arch_min_size = 0;
+			}
+			EAT(ptr,filename,lv,')');
+		} else {
+			GETU16(arch_delay,ptr);
+			arch_mode = SCLASS_ARCH_MODE_CTIME;
+			arch_min_size = 0;
+		}
+		EAT(ptr,filename,lv,',');
+		GETU16(min_trashretention,ptr);
+		EAT(ptr,filename,lv,',');
+		GETU8(adminonly,ptr);
+		if (create.labelscnt>MAXLABELSCNT || keep.labelscnt>MAXLABELSCNT || arch.labelscnt>MAXLABELSCNT || trash.labelscnt>MAXLABELSCNT) {
+			return MFS_ERROR_EINVAL;
+		}
+		if (create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt==0) {
+			EAT(ptr,filename,lv,',');
+			EAT(ptr,filename,lv,'-');
+		} else {
+			for (i=0 ; i<create.labelscnt ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETHEX(labelexpr_buff,labelexpr_leng,labelexpr_size,ptr,filename,lv);
+				if (labelexpr_leng>SCLASS_EXPR_MAX_SIZE) {
+					return MFS_ERROR_EINVAL;
+				}
+				memcpy(create.labelexpr[i],labelexpr_buff,labelexpr_leng);
+			}
+			for (i=0 ; i<keep.labelscnt ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETHEX(labelexpr_buff,labelexpr_leng,labelexpr_size,ptr,filename,lv);
+				if (labelexpr_leng>SCLASS_EXPR_MAX_SIZE) {
+					return MFS_ERROR_EINVAL;
+				}
+				memcpy(keep.labelexpr[i],labelexpr_buff,labelexpr_leng);
+			}
+			for (i=0 ; i<arch.labelscnt ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETHEX(labelexpr_buff,labelexpr_leng,labelexpr_size,ptr,filename,lv);
+				if (labelexpr_leng>SCLASS_EXPR_MAX_SIZE) {
+					return MFS_ERROR_EINVAL;
+				}
+				memcpy(arch.labelexpr[i],labelexpr_buff,labelexpr_leng);
+			}
+			for (i=0 ; i<trash.labelscnt ; i++) {
+				EAT(ptr,filename,lv,',');
+				GETHEX(labelexpr_buff,labelexpr_leng,labelexpr_size,ptr,filename,lv);
+				if (labelexpr_leng>SCLASS_EXPR_MAX_SIZE) {
+					return MFS_ERROR_EINVAL;
+				}
+				memcpy(trash.labelexpr[i],labelexpr_buff,labelexpr_leng);
+			}
+		}
 	} else {
-		for (i=0 ; i<create_labelscnt*MASKORGROUP ; i++) {
-			EAT(ptr,filename,lv,',');
-			GETU32(create_labelmasks[i],ptr);
-		}
-		for (i=0 ; i<keep_labelscnt*MASKORGROUP ; i++) {
-			EAT(ptr,filename,lv,',');
-			GETU32(keep_labelmasks[i],ptr);
-		}
-		for (i=0 ; i<arch_labelscnt*MASKORGROUP ; i++) {
-			EAT(ptr,filename,lv,',');
-			GETU32(arch_labelmasks[i],ptr);
-		}
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"wrong storage class format ('%c' found - 'W' or 'C' expected)",*ptr);
+		return -1;
 	}
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU16(spid,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return sclass_mr_set_entry(strlen((char*)name),name,spid,new_flag,adminonly,create_mode,create_labelscnt,create_labelmasks,keep_labelscnt,keep_labelmasks,arch_labelscnt,arch_labelmasks,arch_delay);
+	return sclass_mr_set_entry(strlen((char*)name),name,spid,new_flag,adminonly,labels_mode,arch_mode,arch_delay,arch_min_size,min_trashretention,&create,&keep,&arch,&trash);
+}
+
+int do_trash_recover(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode,parent;
+	uint16_t cumask;
+	uint32_t uid,gid;
+	uint8_t copysgid;
+	static uint8_t *path = NULL;
+	static uint32_t pathsize = 0;
+	static uint8_t *created_path = NULL;
+	static uint32_t created_pathsize = 0;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(parent,ptr);
+	EAT(ptr,filename,lv,',');
+	GETPATH(path,pathsize,ptr,filename,lv,',');
+	EAT(ptr,filename,lv,',');
+	GETU16(cumask,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(uid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU32(gid,ptr);
+	EAT(ptr,filename,lv,',');
+	GETU8(copysgid,ptr);
+	EAT(ptr,filename,lv,')');
+	EAT(ptr,filename,lv,':');
+	EAT(ptr,filename,lv,'(');
+	GETPATH(created_path,created_pathsize,ptr,filename,lv,')');
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return fs_mr_trash_recover(ts,inode,parent,strlen((char*)path),path,cumask,uid,gid,copysgid,strlen((char*)created_path),created_path);
+}
+
+int do_trash_remove(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
+	uint32_t inode;
+	EAT(ptr,filename,lv,'(');
+	GETU32(inode,ptr);
+	EAT(ptr,filename,lv,')');
+	(void)ptr; // silence cppcheck warnings
+	return fs_mr_trash_remove(ts,inode);
 }
 
 int do_undel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -1428,12 +1810,11 @@ int do_unlink(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 
 int do_unlock(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint64_t chunkid;
-	(void)ts;
 	EAT(ptr,filename,lv,'(');
 	GETU64(chunkid,ptr);
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
-	return fs_mr_unlock(chunkid);
+	return fs_mr_unlock(ts,chunkid);
 }
 
 int do_trunc(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -1506,6 +1887,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_access(filename,lv,ts,ptr+6);
 			}
 			break;
+		case HASHCODE('A','D','D','A'):
+			if (strncmp(ptr,"ADDATTR",7)==0) {
+				return do_addattr(filename,lv,ts,ptr+7);
+			}
+			break;
 		case HASHCODE('A','T','T','R'):
 			return do_attr(filename,lv,ts,ptr+4);
 		case HASHCODE('A','P','P','E'):
@@ -1533,6 +1919,11 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_amtime(filename,lv,ts,ptr+6);
 			}
 			break;
+		case HASHCODE('A','U','T','O'):
+			if (strncmp(ptr,"AUTOARCH",8)==0) {
+				return do_autoarch(filename,lv,ts,ptr+8);
+			}
+			break;
 		case HASHCODE('C','R','E','A'):
 			if (strncmp(ptr,"CREATE",6)==0) {
 				return do_create(filename,lv,ts,ptr+6);
@@ -1543,6 +1934,8 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_chunkadd(filename,lv,ts,ptr+8);
 			} else if (strncmp(ptr,"CHUNKDEL",8)==0) {
 				return do_chunkdel(filename,lv,ts,ptr+8);
+			} else if (strncmp(ptr,"CHUNKFLAGSCLR",13)==0) {
+				return do_chunkflagsclr(filename,lv,ts,ptr+13);
 			}
 			break;
 		case HASHCODE('C','S','A','D'):
@@ -1603,6 +1996,16 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_nextchunkid(filename,lv,ts,ptr+11); // deprecated
 			}
 			break;
+		case HASHCODE('P','A','T','A'):
+			if (strncmp(ptr,"PATADD",6)==0) {
+				return do_patadd(filename,lv,ts,ptr+6);
+			}
+			break;
+		case HASHCODE('P','A','T','D'):
+			if (strncmp(ptr,"PATDEL",6)==0) {
+				return do_patdel(filename,lv,ts,ptr+6);
+			}
+			break;
 		case HASHCODE('P','O','S','I'):
 			if (strncmp(ptr,"POSIXLOCK",9)==0) {
 				return do_posixlock(filename,lv,ts,ptr+9);
@@ -1648,6 +2051,18 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 				return do_scdup(filename,lv,ts,ptr+5);
 			}
 			break;
+		case HASHCODE('S','C','E','C'):
+			if (strncmp(ptr,"SCECVERSION",11)==0) {
+				return do_scecversion(filename,lv,ts,ptr+11);
+			} else if (strncmp(ptr,"SCECON",6)==0) { // deprecated
+				return do_scecon(filename,lv,ts,ptr+6);
+			}
+			break;
+		case HASHCODE('S','C','R','A'):
+			if (strncmp(ptr,"SCRAIDON",8)==0) { // deprecated
+				return do_scecon(filename,lv,ts,ptr+8);
+			}
+			break;
 		case HASHCODE('S','C','R','E'):
 			if (strncmp(ptr,"SCREN",5)==0) {
 				return do_scren(filename,lv,ts,ptr+5);
@@ -1666,6 +2081,8 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 		case HASHCODE('S','E','S','C'):
 			if (strncmp(ptr,"SESCHANGED",10)==0) {
 				return do_seschanged(filename,lv,ts,ptr+10);
+			} else if (strncmp(ptr,"SESCONNECTED",12)==0) {
+				return do_sesconnected(filename,lv,ts,ptr+12);
 			}
 			break;
 		case HASHCODE('S','E','S','D'):
@@ -1717,7 +2134,7 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 			break;
 		case HASHCODE('S','E','T','T'):
 			if (strncmp(ptr,"SETTRASHTIME",12)==0) {
-				return do_settrashtime(filename,lv,ts,ptr+12);
+				return do_settrashretention(filename,lv,ts,ptr+12);
 			}
 			break;
 		case HASHCODE('S','E','T','V'):
@@ -1738,6 +2155,13 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 		case HASHCODE('S','Y','M','L'):
 			if (strncmp(ptr,"SYMLINK",7)==0) {
 				return do_symlink(filename,lv,ts,ptr+7);
+			}
+			break;
+		case HASHCODE('T','R','A','S'):
+			if (strncmp(ptr,"TRASH_RECOVER",13)==0) {
+				return do_trash_recover(filename,lv,ts,ptr+13);
+			} else if (strncmp(ptr,"TRASH_REMOVE",12)==0) {
+				return do_trash_remove(filename,lv,ts,ptr+12);
 			}
 			break;
 		case HASHCODE('T','R','U','N'):
@@ -1766,196 +2190,31 @@ int restore_line(const char *filename,uint64_t lv,const char *line,uint32_t *rts
 			}
 			break;
 	}
-	mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-#if 0
-	switch (*ptr) {
-		case 'A':
-			if (strncmp(ptr,"ACCESS",6)==0) {
-				status = do_access(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"ATTR",4)==0) {
-				status = do_attr(filename,lv,ts,ptr+4);
-			} else if (strncmp(ptr,"APPEND",6)==0) {
-				status = do_append(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"ACQUIRE",7)==0) {
-				status = do_acquire(filename,lv,ts,ptr+7);
-			} else if (strncmp(ptr,"AQUIRE",6)==0) {
-				status = do_acquire(filename,lv,ts,ptr+6);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'C':
-			if (strncmp(ptr,"CREATE",6)==0) {
-				status = do_create(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"CHUNKADD",8)==0) {
-				status = do_chunkadd(filename,lv,ts,ptr+8);
-			} else if (strncmp(ptr,"CHUNKDEL",8)==0) {
-				status = do_chunkdel(filename,lv,ts,ptr+8);
-			} else if (strncmp(ptr,"CSDBOP",6)==0) {
-				status = do_csdbop(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"CSADD",5)==0) {		// deprecated
-				status = do_csadd(filename,lv,ts,ptr+5);
-			} else if (strncmp(ptr,"CSDEL",5)==0) {		// deprecated
-				status = do_csdel(filename,lv,ts,ptr+5);
-			} else if (strncmp(ptr,"CUSTOMER",8)==0) {	// deprecated
-				status = do_session(filename,lv,ts,ptr+8);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'E':
-			if (strncmp(ptr,"EMPTYTRASH",10)==0) {
-				status = do_emptytrash(filename,lv,ts,ptr+10);
-			} else if (strncmp(ptr,"EMPTYSUSTAINED",14)==0) {
-				status = do_emptysustained(filename,lv,ts,ptr+14);
-			} else if (strncmp(ptr,"EMPTYRESERVED",13)==0) {
-				status = do_emptysustained(filename,lv,ts,ptr+13);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'F':
-			if (strncmp(ptr,"FREEINODES",10)==0) {
-				status = do_freeinodes(filename,lv,ts,ptr+10);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'I':
-			if (strncmp(ptr,"INCVERSION",10)==0) {
-				status = do_incversion(filename,lv,ts,ptr+10);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'L':
-			if (strncmp(ptr,"LENGTH",6)==0) {
-				status = do_length(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"LINK",4)==0) {
-				status = do_link(filename,lv,ts,ptr+4);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'N':
-			if (strncmp(ptr,"NEXTCHUNKID",11)==0) {
-				status = do_nextchunkid(filename,lv,ts,ptr+11); // deprecated
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-		case 'M':
-			if (strncmp(ptr,"MOVE",4)==0) {
-				status = do_move(filename,lv,ts,ptr+4);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'P':
-			if (strncmp(ptr,"PURGE",5)==0) {
-				status = do_purge(filename,lv,ts,ptr+5);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'Q':
-			if (strncmp(ptr,"QUOTA",5)==0) {
-				status = do_quota(filename,lv,ts,ptr+5);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'R':
-			if (strncmp(ptr,"RELEASE",7)==0) {
-				status = do_release(filename,lv,ts,ptr+7);
-			} else if (strncmp(ptr,"REPAIR",6)==0) {
-				status = do_repair(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"RENUMEDGES",10)==0) {
-				status = do_renumedges(filename,lv,ts,ptr+10);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'S':
-			if (strncmp(ptr,"SETEATTR",8)==0) {
-				status = do_seteattr(filename,lv,ts,ptr+8);
-			} else if (strncmp(ptr,"SETGOAL",7)==0) {
-				status = do_setgoal(filename,lv,ts,ptr+7);
-			} else if (strncmp(ptr,"SETPATH",7)==0) {
-				status = do_setpath(filename,lv,ts,ptr+7);
-			} else if (strncmp(ptr,"SETTRASHTIME",12)==0) {
-				status = do_settrashtime(filename,lv,ts,ptr+12);
-			} else if (strncmp(ptr,"SETXATTR",8)==0) {
-				status = do_setxattr(filename,lv,ts,ptr+8);
-			} else if (strncmp(ptr,"SETACL",6)==0) {
-				status = do_setacl(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"SNAPSHOT",8)==0) {
-				status = do_snapshot(filename,lv,ts,ptr+8);
-			} else if (strncmp(ptr,"SYMLINK",7)==0) {
-				status = do_symlink(filename,lv,ts,ptr+7);
-			} else if (strncmp(ptr,"SESSION",7)==0) { // deprecated
-				status = do_session(filename,lv,ts,ptr+7);
-			} else if (strncmp(ptr,"SESADD",6)==0) {
-				status = do_sesadd(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"SESDEL",6)==0) {
-				status = do_sesdel(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"SESDISCONNECTED",15)==0) {
-				status = do_sesdisconnected(filename,lv,ts,ptr+15);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'T':
-			if (strncmp(ptr,"TRUNC",5)==0) {
-				status = do_trunc(filename,lv,ts,ptr+5);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'U':
-			if (strncmp(ptr,"UNLINK",6)==0) {
-				status = do_unlink(filename,lv,ts,ptr+6);
-			} else if (strncmp(ptr,"UNDEL",5)==0) {
-				status = do_undel(filename,lv,ts,ptr+5);
-			} else if (strncmp(ptr,"UNLOCK",6)==0) {
-				status = do_unlock(filename,lv,ts,ptr+6);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		case 'W':
-			if (strncmp(ptr,"WRITE",5)==0) {
-				status = do_write(filename,lv,ts,ptr+5);
-			} else {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-			}
-			break;
-		default:
-			mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
-	}
-#endif
-//	if (status>MFS_STATUS_OK) {
-//		mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": error: %d (%s)\n",filename,lv,status,errormsgs[status]);
-//	}
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": unknown entry '%s'\n",filename,lv,ptr);
 	return status;
 }
 
 int restore_net(uint64_t lv,const char *ptr,uint32_t *rts) {
 	int status;
 	if (lv!=meta_version()) {
-		syslog(LOG_WARNING,"desync - invalid meta version (version in packet: %"PRIu64" / expected: %"PRIu64" / packet data: %s)",lv,meta_version(),ptr);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"desync - invalid meta version (version in packet: %"PRIu64" / expected: %"PRIu64" / packet data: %s)",lv,meta_version(),ptr);
 		return -1;
 	}
 	status = restore_line("NET",lv,ptr,rts);
 	if (status<0) {
-		syslog(LOG_WARNING,"desync - operation (%s) parse error",ptr);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"desync - operation (%s) parse error",ptr);
 		return -1;
 	}
 	if (status!=MFS_STATUS_OK) {
-		syslog(LOG_WARNING,"desync - operation (%s) error: %d (%s)",ptr,status,mfsstrerr(status));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"desync - operation (%s) error: %d (%s)",ptr,status,mfsstrerr(status));
 		return -1;
 	}
 	if (lv+1!=meta_version()) {
-		syslog(LOG_WARNING,"desync - meta version has not been increased after the operation (%s)",ptr);
+		if (lv+1>meta_version()) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"desync - meta version has not been increased after the operation (%s)",ptr);
+		} else {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"desync - meta version has been increased more then once after the operation (%s)",ptr);
+		}
 		return -1;
 	}
 	return 0;
@@ -1976,34 +2235,34 @@ int restore_file(void *shfilename,uint64_t lv,const char *ptr,uint8_t vlevel) {
 		lastfn = (char*)shp_get(lastshfn);
 	}
 	if (vlevel>1) {
-		mfs_arg_syslog(LOG_NOTICE,"filename: %s ; current meta version: %"PRIu64" ; previous changeid: %"PRIu64" ; current changeid: %"PRIu64" ; change data%s",filename,v,lastv,lv,ptr);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"filename: %s ; current meta version: %"PRIu64" ; previous changeid: %"PRIu64" ; current changeid: %"PRIu64" ; change data%s",filename,v,lastv,lv,ptr);
 	}
 	if (lv<lastv) {
-		mfs_arg_syslog(LOG_WARNING,"merge error - possibly corrupted input file - ignore entry (filename: %s)\n",filename);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"merge error - possibly corrupted input file - ignore entry (filename: %s)\n",filename);
 		return 0;
 	} else if (lv>=v) {
 		if (lv==lastv) {
 			if (vlevel>1) {
-				mfs_arg_syslog(LOG_WARNING,"duplicated entry: %"PRIu64" (previous file: %s, current file: %s)\n",lv,lastfn,filename);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"duplicated entry: %"PRIu64" (previous file: %s, current file: %s)\n",lv,lastfn,filename);
 			}
 		} else if (lv>lastv+1) {
-			mfs_arg_syslog(LOG_WARNING,"hole in change files (entries from %s:%"PRIu64" to %s:%"PRIu64" are missing) - add more files\n",lastfn,lastv+1,filename,lv-1);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"hole in change files (entries from %s:%"PRIu64" to %s:%"PRIu64" are missing) - add more files\n",lastfn,lastv+1,filename,lv-1);
 			return -2;
 		} else {
 			if (vlevel>0) {
-				mfs_arg_syslog(LOG_WARNING,"%s: change%s",filename,ptr);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"%s: change%s",filename,ptr);
 			}
 			status = restore_line(filename,lv,ptr,NULL);
 			if (status<0) { // parse error - just ignore this line
 				return 0;
 			}
 			if (status>0) { // other errors - stop processing data
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": operation (%s) error: %d (%s)",filename,lv,ptr,status,mfsstrerr(status));
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": operation (%s) error: %d (%s)",filename,lv,ptr,status,mfsstrerr(status));
 				return -1;
 			}
 			v = meta_version();
 			if (lv+1!=v) {
-				mfs_arg_syslog(LOG_WARNING,"%s:%"PRIu64": version mismatch\n",filename,lv);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"%s:%"PRIu64": version mismatch\n",filename,lv);
 				return -1;
 			}
 		}

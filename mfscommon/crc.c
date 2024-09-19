@@ -26,63 +26,15 @@
 #include <stdlib.h>
 #include "MFSCommunication.h"
 
-/* original crc32 code
-uint32_t* crc32_reference_generate(void) {
-	uint32_t *res;
-	uint32_t crc, poly, i, j;
-
-	res = (uint32_t*)malloc(sizeof(uint32_t)*256);
-	poly = CRC_POLY;
-	for (i=0 ; i<256 ; i++) {
-		crc=i;
-		for (j=0 ; j<8 ; j++) {
-			if (crc & 1) {
-				crc = (crc >> 1) ^ poly;
-			} else {
-				crc >>= 1;
-			}
-		}
-		res[i] = crc;
-//		printf("%08X,",(uint32_t)crc);
-//		if ((i&3)==3) {
-//			printf("\n");
-//		}
-	}
-	return res;
-}
-
-uint32_t crc32_reference(uint32_t crc,uint8_t *block,uint32_t leng) {
-	uint8_t c;
-	static uint32_t *crc_table = NULL;
-
-	if (crc_table==NULL) {
-		crc_table = crc32_reference_generate();
-	}
-
-	crc^=0xFFFFFFFF;
-	while (leng>0) {
-		c = *block++;
-		leng--;
-		crc = ((crc>>8) & 0x00FFFFFF) ^ crc_table[ (crc^c) & 0xFF ];
-	}
-	return crc^0xFFFFFFFF;
-}
-*/
-
-#define FASTCRC 1
-
-#ifdef FASTCRC
-#define BYTEREV(w) (((w)>>24)+(((w)>>8)&0xff00)+(((w)&0xff00)<<8)+(((w)&0xff)<<24))
-static uint32_t crc_table[8][256];
-#else
-static uint32_t crc_table[256];
+#ifndef CRC_POLY
+#define CRC_POLY 0xEDB88320
 #endif
 
-void crc_generate_main_tables(void) {
+static uint32_t crc_table[16][256];
+
+static void crc_generate_main_tables(void) {
 	uint32_t c,poly,i;
-#ifdef FASTCRC
 	uint32_t j;
-#endif
 
 	poly = CRC_POLY;
 	for (i=0; i<256; i++) {
@@ -95,107 +47,112 @@ void crc_generate_main_tables(void) {
 		c = (c&1) ? (poly^(c>>1)) : (c>>1);
 		c = (c&1) ? (poly^(c>>1)) : (c>>1);
 		c = (c&1) ? (poly^(c>>1)) : (c>>1);
-#ifdef FASTCRC
-#ifdef WORDS_BIGENDIAN
-		crc_table[0][i] = BYTEREV(c);
-#else /* little endian */
 		crc_table[0][i] = c;
-#endif
-#else
-		crc_table[i]=c;
-#endif
 	}
 
-#ifdef FASTCRC
 	for (i=0; i<256; i++) {
 		c = crc_table[0][i];
-		for (j=1 ; j<8 ; j++) {
-#ifdef WORDS_BIGENDIAN
-			c = crc_table[0][(c>>24)]^(c<<8);
-			crc_table[j][i] = c;
-#else /* little endian */
+		for (j=1 ; j<16 ; j++) {
 			c = crc_table[0][c&0xff]^(c>>8);
 			crc_table[j][i] = c;
-#endif
 		}
 	}
-#endif
 }
 
-uint32_t mycrc32(uint32_t crc,const uint8_t *block,uint32_t leng) {
-#ifdef FASTCRC
-	const uint32_t *block4;
-	uint32_t next;
-#endif
+// based on code bublished by Stephan Brumme on his page: http://create.stephan-brumme.com/crc32/
+// 16 byte slicing version by Bulat Ziganshin
 
-#ifdef FASTCRC
 #ifdef WORDS_BIGENDIAN
-#define CRC_REORDER crc=(BYTEREV(crc))^0xFFFFFFFF
-#define CRC_ONE_BYTE crc = crc_table[0][(crc >> 24) ^ *block++] ^ (crc << 8)
-#define CRC_EIGHT_BYTES { \
-	crc = (*block4++) ^ crc; \
-	next = (*block4++); \
-	crc = crc_table[0][next&0xFF] ^ crc_table[1][(next>>8)&0xFF] ^ crc_table[2][(next>>16)&0xFF] ^ crc_table[3][next>>24] ^ crc_table[4][crc&0xFF] ^ crc_table[5][(crc>>8)&0xFF] ^ crc_table[6][(crc>>16)&0xFF] ^ crc_table[7][crc>>24]; \
-}
-#else /* little endian */
-#define CRC_REORDER crc^=0xFFFFFFFF
-#define CRC_ONE_BYTE crc = crc_table[0][(crc ^ *block++) & 0xFF] ^ (crc >> 8)
-#define CRC_EIGHT_BYTES { \
-	crc = (*block4++) ^ crc; \
-	next = (*block4++); \
-	crc = crc_table[0][next>>24] ^ crc_table[1][(next>>16)&0xFF] ^ crc_table[2][(next>>8)&0xFF] ^ crc_table[3][next&0xFF] ^ crc_table[4][crc>>24] ^ crc_table[5][(crc>>16)&0xFF] ^ crc_table[6][(crc>>8)&0xFF] ^ crc_table[7][crc&0xFF]; \
+static inline uint32_t swap(uint32_t x) {
+#if defined(__GNUC__) || defined(__clang__)
+	return __builtin_bswap32(x);
+#else
+	return (x >> 24) |
+	      ((x >>  8) & 0x0000FF00) |
+	      ((x <<  8) & 0x00FF0000) |
+	       (x << 24);
+#endif
 }
 #endif
-	CRC_REORDER;
-#ifdef WIN32
-	while (leng && ((uintptr_t)block & 7)) {
+
+// #define CRC_PREFETCH 1
+
+uint32_t mycrc32(uint32_t crc,const void* data,uint32_t leng) {
+	const uint32_t *data4 = (const uint32_t*)data;
+	const uint8_t *data1;
+	uint32_t d0,d1,d2,d3;
+
+#ifdef WORDS_BIGENDIAN
+#define CRC_BLOCK { \
+	d0 = *data4++ ^ swap(crc); \
+	d1 = *data4++; \
+	d2 = *data4++; \
+	d3 = *data4++; \
+	crc =	crc_table[ 0][ d3        & 0xFF] ^ \
+		crc_table[ 1][(d3 >>  8) & 0xFF] ^ \
+		crc_table[ 2][(d3 >> 16) & 0xFF] ^ \
+		crc_table[ 3][(d3 >> 24) & 0xFF] ^ \
+		crc_table[ 4][ d2        & 0xFF] ^ \
+		crc_table[ 5][(d2 >>  8) & 0xFF] ^ \
+		crc_table[ 6][(d2 >> 16) & 0xFF] ^ \
+		crc_table[ 7][(d2 >> 24) & 0xFF] ^ \
+		crc_table[ 8][ d1        & 0xFF] ^ \
+		crc_table[ 9][(d1 >>  8) & 0xFF] ^ \
+		crc_table[10][(d1 >> 16) & 0xFF] ^ \
+		crc_table[11][(d1 >> 24) & 0xFF] ^ \
+		crc_table[12][ d0        & 0xFF] ^ \
+		crc_table[13][(d0 >>  8) & 0xFF] ^ \
+		crc_table[14][(d0 >> 16) & 0xFF] ^ \
+		crc_table[15][(d0 >> 24) & 0xFF];  \
+}
 #else
-	while (leng && ((unsigned long int)block & 7)) {
+#define CRC_BLOCK { \
+	d0 = *data4++ ^ crc; \
+	d1 = *data4++; \
+	d2 = *data4++; \
+	d3 = *data4++; \
+	crc =	crc_table[ 0][(d3 >> 24) & 0xFF] ^ \
+		crc_table[ 1][(d3 >> 16) & 0xFF] ^ \
+		crc_table[ 2][(d3 >>  8) & 0xFF] ^ \
+		crc_table[ 3][ d3        & 0xFF] ^ \
+		crc_table[ 4][(d2 >> 24) & 0xFF] ^ \
+		crc_table[ 5][(d2 >> 16) & 0xFF] ^ \
+		crc_table[ 6][(d2 >>  8) & 0xFF] ^ \
+		crc_table[ 7][ d2        & 0xFF] ^ \
+		crc_table[ 8][(d1 >> 24) & 0xFF] ^ \
+		crc_table[ 9][(d1 >> 16) & 0xFF] ^ \
+		crc_table[10][(d1 >>  8) & 0xFF] ^ \
+		crc_table[11][ d1        & 0xFF] ^ \
+		crc_table[12][(d0 >> 24) & 0xFF] ^ \
+		crc_table[13][(d0 >> 16) & 0xFF] ^ \
+		crc_table[14][(d0 >>  8) & 0xFF] ^ \
+		crc_table[15][ d0        & 0xFF];  \
+}
 #endif
-		CRC_ONE_BYTE;
-		leng--;
+
+	crc = ~crc;
+#ifdef __clang__
+	while (leng >= 16) {
+		CRC_BLOCK
+		leng -= 16;
 	}
-	block4 = (const uint32_t*)block;
-	while (leng>=64) {
-		CRC_EIGHT_BYTES;
-		CRC_EIGHT_BYTES;
-		CRC_EIGHT_BYTES;
-		CRC_EIGHT_BYTES;
-		CRC_EIGHT_BYTES;
-		CRC_EIGHT_BYTES;
-		CRC_EIGHT_BYTES;
-		CRC_EIGHT_BYTES;
-		leng-=64;
-	}
-	while (leng>=8) {
-		CRC_EIGHT_BYTES;
-		leng-=8;
-	}
-	block = (const uint8_t*)block4;
-	if (leng) do {
-		CRC_ONE_BYTE;
-	} while (--leng);
-	CRC_REORDER;
-	return crc;
 #else
-#define CRC_ONE_BYTE crc = (crc>>8)^crc_table[(crc^(*block++))&0xff]
-	crc^=0xFFFFFFFF;
-	while (leng>=8) {
-		CRC_ONE_BYTE;
-		CRC_ONE_BYTE;
-		CRC_ONE_BYTE;
-		CRC_ONE_BYTE;
-		CRC_ONE_BYTE;
-		CRC_ONE_BYTE;
-		CRC_ONE_BYTE;
-		CRC_ONE_BYTE;
-		leng-=8;
-	}
-	if (leng>0) do {
-		CRC_ONE_BYTE;
-	} while (--leng);
-	return crc^0xFFFFFFFF;
+	while (leng >= 64) {
+#if defined(CRC_PREFETCH) && defined(__GNUC__)
+		__builtin_prefetch(((const uint8_t*)data4)+256);
 #endif
+		CRC_BLOCK
+		CRC_BLOCK
+		CRC_BLOCK
+		CRC_BLOCK
+		leng -= 64;
+	}
+#endif
+	data1 = (const uint8_t*)data4;
+	while (leng-- != 0) {
+		crc = (crc >> 8) ^ crc_table[0][(crc & 0xFF) ^ *data1++];
+	}
+	return ~crc;
 }
 
 /* crc_combine */

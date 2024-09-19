@@ -52,7 +52,7 @@ static inline void allocator_name##_free_all(void) { \
 	allocator_name##_allocated = 0; \
 	allocator_name##_used = 0; \
 } \
-static inline element_type* allocator_name##_malloc() { \
+static inline element_type* allocator_name##_malloc(void) { \
 	allocator_name##_bucket *srb; \
 	element_type *ret; \
 	if (allocator_name##_free_head) { \

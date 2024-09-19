@@ -1,4 +1,4 @@
-.TH mfsstatsdump "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsstatsdump "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsstatsdump \- dump usage data from master stats file in csv or png format
 .SH SYNOPSIS
@@ -48,7 +48,7 @@ PNG chart height (should be divisible by 20 - if not then it will be adjusted; d
 \fB-d\fP
 show timestamps in YYYY-MM-DD HH:MM format
 .SH FIELDS
-.TP 14
+.TP 16
 ucpu
 User cpu usage
 .TP
@@ -141,6 +141,156 @@ Total raw disk space
 .TP
 space
 Total raw disk space (in csv the same as totalspace, in png shows both usedspace and totalspace using two colors)
+.TP
+readchunk
+Number of chunk_read operations
+.TP
+writechunk
+Number of chunk_write operations
+.TP
+create
+Number of chunk creation attempts
+.TP
+change
+Number of chunk internal operation attempts
+.TP
+delete_ok
+Number of successful chunk deletions
+.TP
+delete_err
+Number of unsuccessful chunk deletions
+.TP
+delete_stat
+Sum of succesful and unsuccessful chunk deletions (in png shows both delete_ok and delete_err using two colors)
+.TP
+replicate_ok
+Number of successful chunk replications
+.TP
+replicate_err
+Number of unsuccessful chunk replications
+.TP
+replicate_stat
+Sum of succesful and unsuccessful chunk replications (in png shows both replicate_ok and replicate_err using two colors)
+.TP
+create_ok
+Number of successful chunk creations
+.TP
+create_err
+Number of unsuccessful chunk creations
+.TP
+create_stat
+Sum of succesful and unsuccessful chunk creations (in png shows both create_ok and create_err using two colors)
+.TP
+change_ok
+Number of successful chunk internal operations
+.TP
+change_err
+Number of unsuccessful chunk internal operations
+.TP
+change_stat
+Sum of succesful and unsuccessfulchunk internal operations (in png shows both change_ok and change_err using two colors)
+.TP
+split_ok
+Number of successful chunk split operations
+.TP
+split_err
+Number of unsuccessful chunk split operations
+.TP
+split_stat
+Sum of succesful and unsuccessful chunk split operations (in png shows both split_ok and split_err using two colors)
+.TP
+fileobjects
+Number of file objects
+.TP
+metaobjects
+Number of non-file objects (directories,symlinks,etc.)
+.TP
+objects
+Number of all objects (in png shows both fileobjects and metaobjects using two colors)
+.TP
+chunksec8
+Total number of chunks stored in EC8 format
+.TP
+chunksec4
+Total number of chunks stored in EC4 format
+.TP
+chunkscopy
+Total number of chunks stored in COPY format
+.TP
+chunks
+Total number of chunks stored in any format (in png shows chunksec8, chunksec4 and chunkscopy using three colors)
+.TP
+chregdanger
+Number of endangered chunks (mark for removal excluded)
+.TP
+chregunder
+Number of undergoal chunks (mark for removal excluded)
+.TP
+regunder
+Number of endangered and undergoal chunks (mark for removal excluded, in png shows chregdanger and chregunder using two colors)
+.TP
+challdanger
+Number of endangered chunks (mark for removal included)
+.TP
+challunder
+Number of undergoal chunks (mark for removal included)
+.TP
+allunder
+Number of endangered and undergoal chunks (mark for removal included, in png shows challdanger and challunder using two colors)
+.TP
+bytesread
+Average number of bytes read per second by all clients
+.TP
+byteswrite
+Average number of bytes written per second by all clients
+.TP
+fsync
+Number of fsync operations
+.TP
+lock
+Number of lock operations
+.TP
+snapshot
+Number of snapshot operations
+.TP
+truncate
+Number of truncate operations
+.TP
+getxattr
+Number of getxattr operations
+.TP
+setxattr
+Number of setxattr operations
+.TP
+getfacl
+Number of getfacl operations
+.TP
+setfacl
+Number of setfacl operations
+.TP
+fcreate
+Number of file create operations
+.TP
+meta
+Number of extra metadata operations (sclass,trashretention,eattr etc.)
+.TP
+delay
+(pro only) Master max delay in seconds
+.TP
+servers
+Number of all registered chunk servers (both connected and disconnected)
+.TP
+dservers
+Number of all disconnected chunk servers
+.TP
+mdservers
+Number of disconnected chunk servers that are in maintenance mode
+.TP
+cservers
+Number of all registered chunk servers (in csv equals to servers, in png shows servers, dservers and mdservers using three different colors)
+.TP
+udiff
+Difference in space usage percent between the most and least used chunk server
 .SH OUTPUT
 Text output - text (csv) file where first column is a timestamp (or date if \fB-d\fP option
 was specified), the following column are what was specified with the \fB-f\fP options, formatted
@@ -149,6 +299,17 @@ according to used options (none, \fB-s\fP and \fB-h\fP or \fB-H\fP)
 Graphical output - one png file with a chart is created for every
 field specified with the \fB-f\fP option, according to the naming scheme declared
 with the \fB-p\fP option. Size may be adjusted with \fB-x\fP and \fB-y\fP options.
+.SH NOTES
+.PP
+Data sets \fBdelete\fP and \fBdelete_stat\fP in a properly working system should be roughly the same, but not always identical (in their CSV form), this stems from the fact that
+the \fBdelete\fP set is calculated using the number of requests sent by the master, and the \fBdelete_stat\fP set is calculated using the number of replies received from chunk servers, 
+so local fluctuations may be observed (i.e. one minute has more sent requests - higher value in the \fBdelete\fP set and the next minute has more answers - higher value in \fBdelete_stat\fP set).
+But if one were to calculate the sum of differences between the two sets over time, this sum should never grow over a certain number.
+.PP
+However, if there is some kind of problem (with network communication and/or chunk server process(es)) and some chunk delete requests are stalled/go missing, then \fBdelete\fP values may be 
+constantly higher than the \fBdelete_stat\fP values and the sum of differences between the two sets will be steadily growing over time.
+.PP
+Same goes for \fBreplicate\fP(_stat), \fBcreate\fP(_stat), \fBchange\fP(_stat) and \fBsplit\fP(_stat) data sets.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

@@ -49,7 +49,7 @@
 #include "crc.h"
 #include "datapack.h"
 #include "massert.h"
-#include "slogger.h"
+#include "mfslog.h"
 
 #define USE_NET_ORDER 1
 
@@ -551,7 +551,7 @@ void charts_store (void) {
 
 	fd = open(statsfilename,O_WRONLY | O_TRUNC | O_CREAT,0666);
 	if (fd<0) {
-		mfs_errlog(LOG_WARNING,"error creating charts data file");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error creating charts data file");
 #ifdef USE_PTHREADS
 		zassert(pthread_mutex_unlock(&glock));
 #endif
@@ -564,7 +564,7 @@ void charts_store (void) {
 	put32bit(&ptr,statdefscount);
 	put32bit(&ptr,timepoint[SHORTRANGE]);
 	if (write(fd,(void*)hdr,16)!=16) {
-		mfs_errlog(LOG_WARNING,"error writing charts data file");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error writing charts data file");
 		close(fd);
 #ifdef USE_PTHREADS
 		zassert(pthread_mutex_unlock(&glock));
@@ -577,7 +577,7 @@ void charts_store (void) {
 	hdr[2]=statdefscount;
 	hdr[3]=timepoint[SHORTRANGE];
 	if (write(fd,(void*)hdr,sizeof(uint32_t)*4)!=sizeof(uint32_t)*4) {
-		mfs_errlog(LOG_WARNING,"error writing charts data file");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error writing charts data file");
 		close(fd);
 #ifdef USE_PTHREADS
 		zassert(pthread_mutex_unlock(&glock));
@@ -590,7 +590,7 @@ void charts_store (void) {
 		memset(namehdr,0,100);
 		memcpy(namehdr,statdefs[i].name,(s>100)?100:s);
 		if (write(fd,(void*)namehdr,100)!=100) {
-			mfs_errlog(LOG_WARNING,"error writing charts data file");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error writing charts data file");
 			close(fd);
 #ifdef USE_PTHREADS
 			zassert(pthread_mutex_unlock(&glock));
@@ -606,7 +606,7 @@ void charts_store (void) {
 				put64bit(&ptr,tab[(p+s)%MAXLENG]);
 			}
 			if (write(fd,(void*)data,8*MAXLENG)!=(ssize_t)(8*MAXLENG)) {
-				mfs_errlog(LOG_WARNING,"error writing charts data file");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error writing charts data file");
 				close(fd);
 #ifdef USE_PTHREADS
 				zassert(pthread_mutex_unlock(&glock));
@@ -616,7 +616,7 @@ void charts_store (void) {
 #else
 			if (p<MAXLENG) {
 				if (write(fd,(void*)(tab+p),sizeof(uint64_t)*(MAXLENG-p))!=(ssize_t)(sizeof(uint64_t)*(MAXLENG-p))) {
-					mfs_errlog(LOG_WARNING,"error writing charts data file");
+					mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error writing charts data file");
 					close(fd);
 #ifdef USE_PTHREADS
 					zassert(pthread_mutex_unlock(&glock));
@@ -625,7 +625,7 @@ void charts_store (void) {
 				}
 			}
 			if (write(fd,(void*)tab,sizeof(uint64_t)*p)!=(ssize_t)(sizeof(uint64_t)*p)) {
-				mfs_errlog(LOG_WARNING,"error writing charts data file");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error writing charts data file");
 				close(fd);
 #ifdef USE_PTHREADS
 				zassert(pthread_mutex_unlock(&glock));
@@ -663,9 +663,9 @@ int charts_load(uint8_t mode) {
 			return -1;
 		}
 		if (errno!=ENOENT) {
-			mfs_errlog(LOG_WARNING,"error reading charts data file");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 		} else {
-			mfs_syslog(LOG_NOTICE,"no charts data file - initializing empty charts");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"no charts data file - initializing empty charts");
 		}
 		return 0;
 	}
@@ -676,7 +676,7 @@ int charts_load(uint8_t mode) {
 			close(fd);
 			return -1;
 		}
-		mfs_errlog(LOG_WARNING,"error reading charts data file");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 		close(fd);
 		return 0;
 	}
@@ -688,7 +688,7 @@ int charts_load(uint8_t mode) {
 			close(fd);
 			return -1;
 		}
-		mfs_syslog(LOG_WARNING,"unrecognized charts data file format - initializing empty charts");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"unrecognized charts data file format - initializing empty charts");
 		close(fd);
 		return 0;
 	}
@@ -706,7 +706,7 @@ int charts_load(uint8_t mode) {
 			close(fd);
 			return -1;
 		}
-		mfs_errlog(LOG_WARNING,"error reading charts data file");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 		close(fd);
 		return 0;
 	}
@@ -716,7 +716,7 @@ int charts_load(uint8_t mode) {
 			close(fd);
 			return -1;
 		}
-		mfs_syslog(LOG_WARNING,"unrecognized charts data file format - initializing empty charts");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"unrecognized charts data file format - initializing empty charts");
 		close(fd);
 		return 0;
 	}
@@ -726,7 +726,7 @@ int charts_load(uint8_t mode) {
 			close(fd);
 			return -1;
 		}
-		mfs_errlog(LOG_WARNING,"error reading charts data file");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 		close(fd);
 		return 0;
 	}
@@ -748,7 +748,7 @@ int charts_load(uint8_t mode) {
 				close(fd);
 				return -1;
 			}
-			mfs_errlog(LOG_WARNING,"error reading charts data file");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 			close(fd);
 			return 0;
 		}
@@ -771,7 +771,7 @@ int charts_load(uint8_t mode) {
 							close(fd);
 							return -1;
 						}
-						mfs_errlog(LOG_WARNING,"error reading charts data file");
+						mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 						close(fd);
 						return 0;
 					}
@@ -786,7 +786,7 @@ int charts_load(uint8_t mode) {
 							close(fd);
 							return -1;
 						}
-						mfs_errlog(LOG_WARNING,"error reading charts data file");
+						mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 						close(fd);
 						return 0;
 					}
@@ -803,7 +803,7 @@ int charts_load(uint8_t mode) {
 							close(fd);
 							return -1;
 						}
-						mfs_errlog(LOG_WARNING,"error reading charts data file");
+						mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 						close(fd);
 						return 0;
 					}
@@ -814,7 +814,7 @@ int charts_load(uint8_t mode) {
 							close(fd);
 							return -1;
 						}
-						mfs_errlog(LOG_WARNING,"error reading charts data file");
+						mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error reading charts data file");
 						close(fd);
 						return 0;
 					}
@@ -827,11 +827,48 @@ int charts_load(uint8_t mode) {
 	if (mode==1) {
 		return 0;
 	}
-	mfs_syslog(LOG_NOTICE,"stats file has been loaded");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"stats file has been loaded");
 	return 0;
 }
 
-uint8_t charts_filltab(uint64_t *datatab,uint32_t range,uint32_t type,uint32_t cno,uint32_t width) {
+uint8_t charts_seriescnt(uint32_t type) {
+	uint32_t src;
+	uint8_t s;
+	if (CHARTS_IS_DIRECT_STAT(type)) {
+		return 1;
+	}
+	if (CHARTS_IS_EXTENDED_STAT(type)) {
+		s = 0;
+		src = estatdefs[CHARTS_EXTENDED_POS(type)].c1src;
+		if (CHARTS_DEF_IS_DIRECT(src) || CHARTS_DEF_IS_CALC(src)) {
+			s++;
+			src = estatdefs[CHARTS_EXTENDED_POS(type)].c2src;
+			if (CHARTS_DEF_IS_DIRECT(src) || CHARTS_DEF_IS_CALC(src)) {
+				s++;
+				src = estatdefs[CHARTS_EXTENDED_POS(type)].c3src;
+				if (CHARTS_DEF_IS_DIRECT(src) || CHARTS_DEF_IS_CALC(src)) {
+					s++;
+				}
+			}
+		}
+		return s;
+	}
+	return 0;
+}
+
+uint64_t* charts_prepare_buff(uint64_t **datatab_ptr) {
+	uint64_t *datatab;
+	if (*datatab_ptr==NULL) {
+		datatab = malloc(sizeof(uint64_t)*MAXLENG);
+		passert(datatab);
+		*datatab_ptr = datatab;
+	} else {
+		datatab = *datatab_ptr;
+	}
+	return datatab;
+}
+
+uint8_t charts_filltab(uint64_t **datatab_ptr,uint32_t range,uint32_t type,uint32_t cno,uint32_t width) {
 #if defined(INT64_MIN)
 #  define STACK_NODATA INT64_MIN
 #elif defined(INT64_C)
@@ -845,6 +882,7 @@ uint8_t charts_filltab(uint64_t *datatab,uint32_t range,uint32_t type,uint32_t c
 	uint32_t src,*ops;
 	int64_t stack[50];
 	uint32_t sp;
+	uint64_t *datatab;
 
 	if (range>=RANGES || cno==0 || cno>3) {
 		return 0;
@@ -852,6 +890,7 @@ uint8_t charts_filltab(uint64_t *datatab,uint32_t range,uint32_t type,uint32_t c
 	pointer = pointers[range];
 	if (CHARTS_IS_DIRECT_STAT(type)) {
 		if (cno==1) {
+			datatab = charts_prepare_buff(datatab_ptr);
 			for (i=0 ; i<width ; i++) {
 				j = (MAXLENG-width+1+pointer+i)%MAXLENG;
 				datatab[i] = series[type][range][j];
@@ -867,12 +906,14 @@ uint8_t charts_filltab(uint64_t *datatab,uint32_t range,uint32_t type,uint32_t c
 			src = estatdefs[CHARTS_EXTENDED_POS(type)].c3src;
 		}
 		if (CHARTS_DEF_IS_DIRECT(src)) {
+			datatab = charts_prepare_buff(datatab_ptr);
 			for (i=0 ; i<width ; i++) {
 				j = (MAXLENG-width+1+pointer+i)%MAXLENG;
 				datatab[i] = series[CHARTS_DIRECT_POS(src)][range][j];
 			}
 			return 1;
 		} else if (CHARTS_DEF_IS_CALC(src)) {
+			datatab = charts_prepare_buff(datatab_ptr);
 			for (i=0 ; i<width ; i++) {
 				j = (MAXLENG-width+1+pointer+i)%MAXLENG;
 				sp=0;
@@ -1558,9 +1599,9 @@ void charts_makechart(uint32_t type,uint32_t range,uint32_t width,uint32_t heigh
 	uint64_t max;
 	double dmax;
 	uint64_t d,c1d,c2d,c3d;
-	uint64_t c1dispdata[MAXLENG];
-	uint64_t c2dispdata[MAXLENG];
-	uint64_t c3dispdata[MAXLENG];
+	uint64_t *c1dispdata;
+	uint64_t *c2dispdata;
+	uint64_t *c3dispdata;
 	uint8_t scale,mode=0,percent=0;
 	uint16_t base=0;
 	uint8_t text[6];
@@ -1568,14 +1609,18 @@ void charts_makechart(uint32_t type,uint32_t range,uint32_t width,uint32_t heigh
 
 	memset(chart,COLOR_TRANSPARENT,(MAXXSIZE)*(MAXYSIZE));
 
+	c1dispdata = NULL;
+	c2dispdata = NULL;
+	c3dispdata = NULL;
+
 	colors = 0;
-	if (charts_filltab(c1dispdata,range,type,1,width)) {
+	if (charts_filltab(&c1dispdata,range,type,1,width)) {
 		colors = 1;
 	}
-	if (charts_filltab(c2dispdata,range,type,2,width)) {
+	if (charts_filltab(&c2dispdata,range,type,2,width)) {
 		colors = 2;
 	}
-	if (charts_filltab(c3dispdata,range,type,3,width)) {
+	if (charts_filltab(&c3dispdata,range,type,3,width)) {
 		colors = 3;
 	}
 
@@ -1971,6 +2016,16 @@ void charts_makechart(uint32_t type,uint32_t range,uint32_t width,uint32_t heigh
 			}
 		}
 	}
+
+	if (c3dispdata!=NULL) {
+		free(c3dispdata);
+	}
+	if (c2dispdata!=NULL) {
+		free(c2dispdata);
+	}
+	if (c1dispdata!=NULL) {
+		free(c1dispdata);
+	}
 }
 
 uint32_t charts_monotonic_data (uint8_t *buff) {
@@ -2082,13 +2137,17 @@ uint32_t charts_getmaxleng(void) {
 
 void charts_getdata(double *data,uint32_t *timestamp,uint32_t *rsec,uint32_t number) {
 	uint32_t i,chtype,chrange;
-	uint64_t tab1[MAXLENG];
-	uint64_t tab2[MAXLENG];
-	uint64_t tab3[MAXLENG];
+	uint64_t *tab1;
+	uint64_t *tab2;
+	uint64_t *tab3;
 	uint64_t d;
 	uint32_t c;
 	uint8_t nd;
 	double mul;
+
+	tab1 = NULL;
+	tab2 = NULL;
+	tab3 = NULL;
 
 	charts_statid_converter(number,&chtype,&chrange);
 	if (data!=NULL && timestamp!=NULL && chrange<RANGES && (CHARTS_IS_DIRECT_STAT(chtype) || CHARTS_IS_EXTENDED_STAT(chtype))) {
@@ -2097,13 +2156,13 @@ void charts_getdata(double *data,uint32_t *timestamp,uint32_t *rsec,uint32_t num
 #endif
 		mul = charts_data_multiplier(chtype,chrange);
 		c = 0;
-		if (charts_filltab(tab1,chrange,chtype,1,MAXLENG)) {
+		if (charts_filltab(&tab1,chrange,chtype,1,MAXLENG)) {
 			c = 1;
 		}
-		if (charts_filltab(tab2,chrange,chtype,2,MAXLENG)) {
+		if (charts_filltab(&tab2,chrange,chtype,2,MAXLENG)) {
 			c = 2;
 		}
-		if (charts_filltab(tab3,chrange,chtype,3,MAXLENG)) {
+		if (charts_filltab(&tab3,chrange,chtype,3,MAXLENG)) {
 			c = 3;
 		}
 		switch (chrange) {
@@ -2146,53 +2205,161 @@ void charts_getdata(double *data,uint32_t *timestamp,uint32_t *rsec,uint32_t num
 		zassert(pthread_mutex_unlock(&glock));
 #endif
 	}
+
+	if (tab3!=NULL) {
+		free(tab3);
+	}
+	if (tab2!=NULL) {
+		free(tab2);
+	}
+	if (tab1!=NULL) {
+		free(tab1);
+	}
 }
 
-uint32_t charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries) {
+uint32_t charts_makedata(uint8_t *buff,uint32_t number,uint32_t maxentries,uint8_t multimode) {
 	uint32_t i,j,ts,chtype,chrange;
+	uint8_t chrfrom,chrto;
+	uint64_t *tabptr;
+	uint8_t scnt;
 	uint64_t *tab;
+	uint32_t cmul,cdiv,rdiv,perc,base,additive;
 
 	charts_statid_converter(number,&chtype,&chrange);
 	if (maxentries>MAXLENG) {
 		maxentries = MAXLENG;
 	}
-	if (buff==NULL) {
-		return (chrange<RANGES && CHARTS_IS_DIRECT_STAT(chtype))?maxentries*8+8:0;
-	}
-	if (chrange<RANGES && CHARTS_IS_DIRECT_STAT(chtype)) {
-#ifdef USE_PTHREADS
-		zassert(pthread_mutex_lock(&glock));
-#endif
-		tab = series[chtype][chrange];
-		j = pointers[chrange] % MAXLENG;
-		ts = timepoint[chrange];
-		switch (chrange) {
-			case SHORTRANGE:
-				ts *= 60;
-				break;
-			case MEDIUMRANGE:
-				ts *= 60*6;
-				break;
-			case LONGRANGE:
-				ts *= 60*30;
-				break;
-			case VERYLONGRANGE:
-				ts *= 60*60*24;
-				break;
+
+	if (multimode) {
+		scnt = charts_seriescnt(chtype);
+		if (scnt==0) {
+			return 0;
 		}
-		put32bit(&buff,ts);
+		if (chrange==9) {
+			chrfrom = 0;
+			chrto = RANGES;
+		} else if (chrange<RANGES) {
+			chrfrom = chrange;
+			chrto = chrange + 1;
+		} else {
+			return 0;
+		}
+		if (buff==NULL) {
+			return 8 + (chrto - chrfrom) * (13 + scnt * maxentries * 8);
+		}
+		if (CHARTS_IS_DIRECT_STAT(chtype)) {
+			base = statdefs[chtype].scale;
+			perc = statdefs[chtype].percent;
+			cmul = statdefs[chtype].multiplier;
+			cdiv = statdefs[chtype].divisor;
+			additive = (statdefs[chtype].mode==CHARTS_MODE_ADD)?1:0;
+		} else if (CHARTS_IS_EXTENDED_STAT(chtype)) {
+			base = estatdefs[CHARTS_EXTENDED_POS(chtype)].scale;
+			perc = estatdefs[CHARTS_EXTENDED_POS(chtype)].percent;
+			cmul = estatdefs[CHARTS_EXTENDED_POS(chtype)].multiplier;
+			cdiv = estatdefs[CHARTS_EXTENDED_POS(chtype)].divisor;
+			additive = (estatdefs[CHARTS_EXTENDED_POS(chtype)].mode==CHARTS_MODE_ADD)?1:0;
+		} else {
+			base = CHARTS_SCALE_NONE;
+			perc = 0;
+			cmul = 1;
+			cdiv = 1;
+			additive = 0;
+		}
+		put8bit(&buff,(chrto-chrfrom));
+		put8bit(&buff,scnt);
 		put32bit(&buff,maxentries);
-		for (i=0 ; i<maxentries ; i++) {
-			put64bit(&buff,tab[j]);
-			if (j>0) {
-				j--;
-			} else {
-				j = MAXLENG-1;
+		put8bit(&buff,perc);
+		put8bit(&buff,base);
+		for (chrange=chrfrom; chrange<chrto ; chrange++) {
+			put8bit(&buff,chrange);
+			ts = timepoint[chrange];
+			switch (chrange) {
+				case SHORTRANGE:
+					ts *= 60;
+					break;
+				case MEDIUMRANGE:
+					ts *= 60*6;
+					break;
+				case LONGRANGE:
+					ts *= 60*30;
+					break;
+				case VERYLONGRANGE:
+					ts *= 60*60*24;
+					break;
+			}
+			put32bit(&buff,ts);
+			rdiv = cdiv;
+			if (additive) {
+				switch (chrange) {
+					case MEDIUMRANGE:
+						rdiv *= 6;
+						break;
+					case LONGRANGE:
+						rdiv *= 30;
+						break;
+					case VERYLONGRANGE:
+						rdiv *= 1440;
+						break;
+				}
+			}
+			put32bit(&buff,cmul);
+			put32bit(&buff,rdiv);
+			tab = NULL;
+			for (i=0 ; i<scnt ; i++) {
+				if (charts_filltab(&tab,chrange,chtype,scnt-i,maxentries)) {
+					for (j=0 ; j<maxentries ; j++) {
+						put64bit(&buff,tab[maxentries-1-j]);
+					}
+				} else {
+					for (j=0 ; j<maxentries ; j++) {
+						put64bit(&buff,0);
+					}
+				}
+			}
+			if (tab!=NULL) {
+				free(tab);
 			}
 		}
+	} else {
+		if (buff==NULL) {
+			return (chrange<RANGES && CHARTS_IS_DIRECT_STAT(chtype))?maxentries*8+8:0;
+		}
+		if (chrange<RANGES && CHARTS_IS_DIRECT_STAT(chtype)) {
 #ifdef USE_PTHREADS
-		zassert(pthread_mutex_unlock(&glock));
+			zassert(pthread_mutex_lock(&glock));
 #endif
+			tabptr = series[chtype][chrange];
+			j = pointers[chrange] % MAXLENG;
+			ts = timepoint[chrange];
+			switch (chrange) {
+				case SHORTRANGE:
+					ts *= 60;
+					break;
+				case MEDIUMRANGE:
+					ts *= 60*6;
+					break;
+				case LONGRANGE:
+					ts *= 60*30;
+					break;
+				case VERYLONGRANGE:
+					ts *= 60*60*24;
+					break;
+			}
+			put32bit(&buff,ts);
+			put32bit(&buff,maxentries);
+			for (i=0 ; i<maxentries ; i++) {
+				put64bit(&buff,tabptr[j]);
+				if (j>0) {
+					j--;
+				} else {
+					j = MAXLENG-1;
+				}
+			}
+#ifdef USE_PTHREADS
+			zassert(pthread_mutex_unlock(&glock));
+#endif
+		}
 	}
 	return 0;
 }
@@ -2225,7 +2392,7 @@ void charts_fill_crc(uint8_t *buff,uint32_t leng) {
 			if (memcmp(ptr,"CRC#",4)==0) {
 				put32bit(&ptr,crc);
 			} else {
-				syslog(LOG_WARNING,"charts: unexpected data in generated png stream");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"charts: unexpected data in generated png stream");
 			}
 		}
 	}
@@ -2345,7 +2512,6 @@ uint32_t charts_make_png(uint32_t number,uint32_t chartwidth,uint32_t chartheigh
 		return sizeof(png_1x1);
 	}
 
-//	syslog(LOG_NOTICE,"rawchartsize: %u ; compbuffsize: %u",rawchartsize,compbuffsize);
 	zstr.next_in = rawchart;
 	zstr.avail_in = rawchartsize;
 	zstr.total_in = 0;

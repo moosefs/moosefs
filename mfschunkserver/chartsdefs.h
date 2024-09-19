@@ -57,8 +57,22 @@
 #define CHARTS_MOVELS 31
 #define CHARTS_MOVEHS 32
 #define CHARTS_CHANGE 33
+#define CHARTS_SPLIT 34
+#define CHARTS_USPACE 35
+#define CHARTS_TSPACE 36
+#define CHARTS_CHCOUNT 37
+#define CHARTS_TDUSPACE 38
+#define CHARTS_TDTSPACE 39
+#define CHARTS_TDCHCOUNT 40
+#define CHARTS_COPYCHUNKS 41
+#define CHARTS_EC4CHUNKS 42
+#define CHARTS_EC8CHUNKS 43
+#define CHARTS_HDD_OK 44
+#define CHARTS_HDD_MFR 45
+#define CHARTS_HDD_DMG 46
+#define CHARTS_USAGE_DIFF 47
 
-#define CHARTS 34
+#define CHARTS 48
 
 #define STRID(a,b,c,d) (((((uint8_t)a)*256U+(uint8_t)b)*256U+(uint8_t)c)*256U+(uint8_t)d)
 
@@ -98,11 +112,26 @@
 	{"movels"       ,STRID('M','O','V','L'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"movehs"       ,STRID('M','O','V','H'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
 	{"change"       ,STRID('C','H','G','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"split"        ,STRID('S','P','L','T'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"usedspace"    ,STRID('U','S','P','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"totalspace"   ,STRID('T','S','P','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"chunkcount"   ,STRID('C','C','N','T'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"tdusedspace"  ,STRID('T','D','U','S'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"tdtotalspace" ,STRID('T','D','T','S'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"tdchunkcount" ,STRID('T','D','C','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"copychunks"   ,STRID('C','P','Y','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"ec4chunks"    ,STRID('E','C','4','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"ec8chunks"    ,STRID('E','C','8','C'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"hddok"        ,STRID('H','D','O','K'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"hddmfr"       ,STRID('H','D','M','R'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"hdddmg"       ,STRID('H','D','D','M'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1,    1}, \
+	{"udiff"        ,STRID('U','D','I','F'),CHARTS_MODE_MAX,0,CHARTS_SCALE_MILI ,   1,    1}, \
 	{NULL           ,0                     ,0              ,0,0                 ,   0,    0}  \
 };
 
 #define CALCDEFS { \
 	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_MEMORY_VIRT,CHARTS_MEMORY_RSS))), \
+	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_TSPACE,CHARTS_USPACE))), \
 	CHARTS_DEFS_END \
 };
 
@@ -117,6 +146,9 @@
 	{"hddopsw"      ,STRID('H','D','O','W'),CHARTS_DIRECT(CHARTS_HDRLLOPW)    ,CHARTS_DIRECT(CHARTS_DATALLOPW)   ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"mem"          ,STRID('T','M','E','M'),CHARTS_CALC(0)                    ,CHARTS_DIRECT(CHARTS_MEMORY_RSS)  ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"move"         ,STRID('M','O','V','E'),CHARTS_DIRECT(CHARTS_MOVELS)      ,CHARTS_DIRECT(CHARTS_MOVEHS)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"space"        ,STRID('S','P','A','C'),CHARTS_CALC(1)                    ,CHARTS_DIRECT(CHARTS_USPACE)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"chunks"       ,STRID('C','H','N','K'),CHARTS_DIRECT(CHARTS_COPYCHUNKS)  ,CHARTS_DIRECT(CHARTS_EC4CHUNKS)   ,CHARTS_DIRECT(CHARTS_EC8CHUNKS)   ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"hddcnt"       ,STRID('H','D','C','N'),CHARTS_DIRECT(CHARTS_HDD_OK)      ,CHARTS_DIRECT(CHARTS_HDD_MFR)     ,CHARTS_DIRECT(CHARTS_HDD_DMG)     ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{NULL           ,0                     ,CHARTS_NONE                       ,CHARTS_NONE                       ,CHARTS_NONE                       ,0              ,0,0                 ,   0, 0}  \
 };
 

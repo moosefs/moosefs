@@ -46,36 +46,81 @@
 #include "portable.h"
 #include "clocks.h"
 
+// #define DEBUGTHREAD 1
+
 static pthread_t main_thread;
 static int keep_alive;
 
-uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
+#define HASHSIZE 65536
+#define HASHFN(pid,uid,gid) (((pid*0x74BF4863+uid)*0xB435C489+gid)%(HASHSIZE))
+
+typedef struct grcache {
+	double time;
+	pid_t pid;
+	uid_t uid;
+	gid_t gid;
+	groups *g;
+	struct grcache *next,**prev;
+} grcache;
+
+static grcache** groups_hashtab;
+static double to;
+static pthread_mutex_t glock;
+
+static int debug_mode;
+
+#ifdef DEBUGTHREAD
+static pthread_t debug_thread;
+static uint32_t malloc_cnt,free_cnt;
+#endif
+
+static inline groups* make_groups(gid_t gid,uint32_t gidcnt) {
+	groups *ret;
+#ifdef DEBUGTHREAD
+	zassert(pthread_mutex_lock(&glock));
+	malloc_cnt++;
+	zassert(pthread_mutex_unlock(&glock));
+#endif
+	ret = malloc(sizeof(groups)+sizeof(uint32_t)*gidcnt);
+	ret->lcnt = 1;
+	ret->gidcnt = gidcnt;
+	if (gidcnt>0) { // pro forma
+		ret->gidtab = (uint32_t*)(ret+1); // first byte after 'groups' structure
+		ret->gidtab[0] = gid;
+	} else {
+		ret->gidtab = NULL;
+	}
+	return ret;
+}
+
+static inline groups* get_groups(pid_t pid,gid_t gid) {
+	groups *ret;
 #if defined(__linux__)
-// Linux - supplementary groups are in file:
+// Linux - supplementary groups are in the file:
 // /proc/<PID>/status
 // line:
 // Groups: <GID1>  <GID2> <GID3> ...
 //
-// NetBSD - supplementary groups are in file:
+// NetBSD - supplementary groups are in the file:
 // /proc/<PID>/status
 // as comma separated list of gids at end of (single) line.
 	char proc_filename[50];
-	char linebuff[4096];
 	char *ptr;
 	uint32_t gcount,n;
 	gid_t g;
 	FILE *fd;
+	char *linebuff;
+	size_t lbsize;
 
 	snprintf(proc_filename,50,"/proc/%d/status",pid);
 
 	fd = fopen(proc_filename,"r");
 	if (fd==NULL) {
-		*gidtab = malloc(sizeof(uint32_t)*1);
-		passert(*gidtab);
-		(*gidtab)[0] = gid;
-		return 1;
+		return make_groups(gid,1);
 	}
-	while (fgets(linebuff,4096,fd)) {
+	linebuff = malloc(1024);
+	lbsize = 1024;
+	while (getline(&linebuff,&lbsize,fd)!=-1) {
 		if (strncmp(linebuff,"Groups:",7)==0) {
 			gcount = 1;
 			ptr = linebuff+7;
@@ -90,9 +135,7 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 					}
 				}
 			} while (*ptr==' ' || *ptr=='\t');
-			*gidtab = malloc(sizeof(uint32_t)*gcount);
-			passert(*gidtab);
-			(*gidtab)[0] = gid;
+			ret = make_groups(gid,gcount);
 			n = 1;
 			ptr = linebuff+7;
 			do {
@@ -102,16 +145,18 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 				if (*ptr>='0' && *ptr<='9') {
 					g = strtoul(ptr,&ptr,10);
 					if (g!=gid) {
-						(*gidtab)[n] = g;
+						ret->gidtab[n] = g;
 						n++;
 					}
 				}
 			} while ((*ptr==' ' || *ptr=='\t') && n<gcount);
 			fclose(fd);
-			return n;
+			free(linebuff);
+			return ret;
 		}
 	}
 	fclose(fd);
+	free(linebuff);
 #elif defined(__sun__) || defined(__sun)
 // Solaris - supplementary groups are in file:
 // /proc/<PID>/cred
@@ -128,10 +173,7 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 
 	fd = fopen(proc_filename,"rb");
 	if (fd==NULL) {
-		*gidtab = malloc(sizeof(uint32_t)*1);
-		passert(*gidtab);
-		(*gidtab)[0] = gid;
-		return 1;
+		return make_groups(gid,1);
 	}
 
 	n = fread(credbuff,sizeof(uint32_t),1024,fd);
@@ -139,10 +181,7 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 	fclose(fd);
 
 	if (n<7) {
-		*gidtab = malloc(sizeof(uint32_t)*1);
-		passert(*gidtab);
-		(*gidtab)[0] = gid;
-		return 1;
+		return make_groups(gid,1);
 	}
 
 	gcount = credbuff[6];
@@ -154,17 +193,15 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 			}
 		}
 
-		*gidtab = malloc(sizeof(uint32_t)*gids);
-		passert(*gidtab);
-		(*gidtab)[0] = gid;
+		ret = make_groups(gid,gids);
 		gids = 1;
 		for (n=0 ; n<gcount ; n++) {
 			if (credbuff[n+7]!=gid) {
-				(*gidtab)[gids] = credbuff[n+7];
+				ret->gidtab[gids] = credbuff[n+7];
 				gids++;
 			}
 		}
-		return gids;
+		return ret;
 	}
 #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
 // BSD-like - supplementary groups can be obtained from sysctl:
@@ -195,17 +232,15 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 				gids++;
 			}
 		}
-		*gidtab = malloc(sizeof(uint32_t)*gids);
-		passert(*gidtab);
-		(*gidtab)[0] = gid;
+		ret = make_groups(gid,gids);
 		gids = 1;
 		for (n=0 ; n<gcount ; n++) {
 			if (kp.kp_eproc.e_ucred.cr_groups[n]!=gid) {
-				(*gidtab)[gids] = kp.kp_eproc.e_ucred.cr_groups[n];
+				ret->gidtab[gids] = kp.kp_eproc.e_ucred.cr_groups[n];
 				gids++;
 			}
 		}
-		return gids;
+		return ret;
 #else /* FreeBSD */
 		gcount = kp.ki_ngroups;
 		gids = 1;
@@ -214,144 +249,165 @@ uint32_t get_groups(pid_t pid,gid_t gid,uint32_t **gidtab) {
 				gids++;
 			}
 		}
-		*gidtab = malloc(sizeof(uint32_t)*gids);
-		passert(*gidtab);
-		(*gidtab)[0] = gid;
+		ret = make_groups(gid,gids);
 		gids = 1;
 		for (n=0 ; n<gcount ; n++) {
 			if (kp.ki_groups[n]!=gid) {
-				(*gidtab)[gids] = kp.ki_groups[n];
+				ret->gidtab[gids] = kp.ki_groups[n];
 				gids++;
 			}
 		}
-		return gids;
+		return ret;
 #endif
 	}
 #endif
 	(void)pid;
-	*gidtab = malloc(sizeof(uint32_t)*1);
-	passert(*gidtab);
-	(*gidtab)[0] = gid;
-	return 1;
+	return make_groups(gid,1);
 }
 
-#define HASHSIZE 65536
-#define HASHFN(pid,uid,gid) (((pid*0x74BF4863+uid)*0xB435C489+gid)%(HASHSIZE))
+static inline void groups_dump(groups *g) {
+	uint32_t h;
 
-static groups** groups_hashtab;
-static double to;
-static pthread_mutex_t glock;
-
-static int debug_mode;
-
-static inline void groups_remove(groups *g) {
-	*(g->prev) = g->next;
-	if (g->next) {
-		g->next->prev = g->prev;
+	for (h=0 ; h<g->gidcnt ; h++) {
+		fprintf(stderr,"%c%"PRIu32,(h==0)?'(':',',g->gidtab[h]);
 	}
-	if (g->gidtab!=NULL) {
-		free(g->gidtab);
+	if (g->gidcnt==0) {
+		fprintf(stderr,"EMPTY\n");
+	} else {
+		fprintf(stderr,")\n");
 	}
-	free(g);
 }
 
-groups* groups_get_x(pid_t pid,uid_t uid,gid_t gid,uint8_t lockmode) {
+static inline void groups_decref(groups *g) {
+	if (g->lcnt>0) {
+		g->lcnt--;
+	}
+	if (g->lcnt==0) {
+#ifdef DEBUGTHREAD
+		free_cnt++;
+#endif
+		free(g);
+	}
+}
+
+static inline void groups_remove(grcache *gc) {
+	*(gc->prev) = gc->next;
+	if (gc->next) {
+		gc->next->prev = gc->prev;
+	}
+	groups_decref(gc->g);
+#ifdef DEBUGTHREAD
+	free_cnt++;
+#endif
+	free(gc);
+}
+
+// uid!=0 , cacheonly==0 
+//    result in cache -> return
+//    result not in cache -> get_groups and add to cache
+// uid==0 , cacheonly==0
+//    get_groups and add to cache (remove old if exists)
+// cacheonly!=0
+//    result in cache -> return
+//    result not in cache -> return make_groups(gid,1)
+
+groups* groups_get_common(pid_t pid,uid_t uid,gid_t gid,uint8_t cacheonly) {
 	double t;
 	uint32_t h;
-	groups *g,*gn,*gf;
+	groups *g,*gf;
+	grcache *gc,*gcn,*gcf;
+
 	if (debug_mode) {
 		fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32")\n",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
 	}
-	zassert(pthread_mutex_lock(&glock));
 	t = monotonic_seconds();
+	zassert(pthread_mutex_lock(&glock));
 	h = HASHFN(pid,uid,gid);
-//	fprintf(stderr,"groups_get hash: %"PRIu32"\n",h);
-	for (gf = NULL,g = groups_hashtab[h] ; g!=NULL ; g = gn) {
-		gn = g->next;
-		if (g->time + to < t && lockmode==0 && g->locked==0 && g->lcnt==0) {
-//			fprintf(stderr,"groups_get remove node (%"PRIu32",%"PRIu32",%"PRIu32") insert_time: %.3lf ; current_time: %.3lf ; timeout: %.3lf\n",g->pid,g->uid,g->gid,g->time,t,to);
-			groups_remove(g);
+	gcf = NULL;
+	for (gc = groups_hashtab[h] ; gc!=NULL ; gc = gcn) {
+		gcn = gc->next;
+		if (gc->time + to < t && cacheonly==0) {
+			groups_remove(gc);
 		} else {
-//			fprintf(stderr,"groups_get check node (%"PRIu32",%"PRIu32",%"PRIu32")\n",g->pid,g->uid,g->gid);
-			if (g->pid==pid && g->uid==uid && g->gid==gid) {
-				gf = g;
+			if (gc->pid==pid && gc->uid==uid && gc->gid==gid) {
+				gcf = gc;
 			}
 		}
 	}
-	g = gf;
-	if (g) {
-		if (debug_mode) {
-			fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32") - found data in cache\n",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
-		}
-		g->lcnt++;
-		if (lockmode==1) {
-			g->locked = 1;
-			if (debug_mode) {
-				fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32") - lock cache\n",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
-			}
-		}
-		if (g->lcnt==1 && g->locked==0 && g->uid==0) { // refresh groups for user 'root' - only root can change groups
-			if (debug_mode) {
-				fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32") - refresh cache\n",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
-			}
-			if (g->gidtab) {
-				free(g->gidtab);
-			}
-			g->gidcnt = get_groups(pid,gid,&(g->gidtab));
-		}
-		if (lockmode==2) {
-			g->locked = 0;
-			if (debug_mode) {
-				fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32") - unlock cache\n",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
-			}
-		}
+	if (gcf) {
+		gf = gcf->g;
+		gf->lcnt++;
 	} else {
-		g = malloc(sizeof(groups));
-		g->time = t;
-		g->pid = pid;
-		g->uid = uid;
-		g->gid = gid;
-		g->lcnt = 1;
-		if (lockmode==1) { // emergency case
+		gf = NULL;
+	}
+	zassert(pthread_mutex_unlock(&glock));
+	if (cacheonly) {
+		if (gf!=NULL) {
+			if (debug_mode) {
+				fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32"):",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
+				groups_dump(gf);
+			}
+			return gf;
+		} else {
 			if (debug_mode) {
 				fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32") - emergency mode\n",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
 			}
-			g->gidtab = malloc(sizeof(uint32_t));
-			g->gidtab[0] = gid;
-			g->gidcnt = 1;
-			g->locked = 1;
-		} else {
-			g->gidcnt = get_groups(pid,gid,&(g->gidtab));
-			g->locked = 0;
+			return make_groups(gid,1);
 		}
-		g->next = groups_hashtab[h];
-		if (g->next) {
-			g->next->prev = &(g->next);
+	} else {
+		if (gf!=NULL && uid!=0) {
+			if (debug_mode) {
+				fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32"):",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
+				groups_dump(gf);
+			}
+			return gf;
 		}
-		g->prev = groups_hashtab+h;
-		groups_hashtab[h] = g;
-//		fprintf(stderr,"groups_get insert node (%"PRIu32",%"PRIu32",%"PRIu32")\n",g->pid,g->uid,g->gid);
+	}
+	// assert cacheonly==0
+	g = get_groups(pid,gid);
+	zassert(pthread_mutex_lock(&glock));
+	if (gf!=NULL) {
+		groups_decref(gf);
+	}
+	gcf = NULL;
+	for (gc = groups_hashtab[h] ; gc!=NULL ; gc = gc->next) {
+		if (gc->pid==pid && gc->uid==uid && gc->gid==gid) {
+			gcf = gc;
+		}
+	}
+	if (gcf) {
+		groups_decref(gcf->g);
+		gcf->g = g;
+		g->lcnt++;
+	} else {
+#ifdef DEBUGTHREAD
+		malloc_cnt++;
+#endif
+		gc = malloc(sizeof(grcache));
+		gc->time = t;
+		gc->pid = pid;
+		gc->uid = uid;
+		gc->gid = gid;
+		gc->g = g;
+		g->lcnt++;
+		gc->next = groups_hashtab[h];
+		if (gc->next) {
+			gc->next->prev = &(gc->next);
+		}
+		gc->prev = groups_hashtab+h;
+		groups_hashtab[h] = gc;
 	}
 	zassert(pthread_mutex_unlock(&glock));
 	if (debug_mode) {
 		fprintf(stderr,"groups_get(pid=%"PRIu32",uid=%"PRIu32",gid=%"PRIu32"):",(uint32_t)pid,(uint32_t)uid,(uint32_t)gid);
-		for (h=0 ; h<g->gidcnt ; h++) {
-			fprintf(stderr,"%c%"PRIu32,(h==0)?'(':',',g->gidtab[h]);
-		}
-		if (g->gidcnt==0) {
-			fprintf(stderr,"EMPTY\n");
-		} else {
-			fprintf(stderr,")\n");
-		}
+		groups_dump(g);
 	}
 	return g;
 }
 
 void groups_rel(groups* g) {
 	zassert(pthread_mutex_lock(&glock));
-	if (g->lcnt>0) {
-		g->lcnt--;
-	}
+	groups_decref(g);
 	zassert(pthread_mutex_unlock(&glock));
 }
 
@@ -359,16 +415,16 @@ void* groups_cleanup_thread(void* arg) {
 	static uint32_t h = 0;
 	uint32_t i;
 	double t;
-	groups *g,*gn;
+	grcache *gc,*gcn;
 	int ka = 1;
 	while (ka) {
 		zassert(pthread_mutex_lock(&glock));
 		t = monotonic_seconds();
 		for (i=0 ; i<16 ; i++) {
-			for (g = groups_hashtab[h] ; g!=NULL ; g = gn) {
-				gn = g->next;
-				if (g->time + to < t && g->locked==0 && g->lcnt==0) {
-					groups_remove(g);
+			for (gc = groups_hashtab[h] ; gc!=NULL ; gc = gcn) {
+				gcn = gc->next;
+				if (gc->time + to < t) {
+					groups_remove(gc);
 				}
 			}
 			h++;
@@ -381,12 +437,13 @@ void* groups_cleanup_thread(void* arg) {
 	return arg;
 }
 
-/*
+#ifdef DEBUGTHREAD
 void* groups_debug_thread(void* arg) {
 	uint32_t i,j,k;
 	uint32_t l,u;
-	groups *g;
-	while (1) {
+	grcache *gc;
+	int ka = 1;
+	while (ka) {
 		zassert(pthread_mutex_lock(&glock));
 		k = 0;
 		l = 0;
@@ -396,42 +453,47 @@ void* groups_debug_thread(void* arg) {
 			if (groups_hashtab[i]!=NULL) {
 				l++;
 			}
-			for (g = groups_hashtab[i] ; g!=NULL ; g = g->next) {
+			for (gc = groups_hashtab[i] ; gc!=NULL ; gc = gc->next) {
 				j++;
 				u++;
-				fprintf(stderr,"hashpos: %"PRIu32" ; pid: %"PRIu32" ; uid: %"PRIu32" ; gid: %"PRIu32" ; time: %.6lf ; lcnt: %"PRIu32" ; locked: %"PRIu32" ; gidcnt: %"PRIu32"\n",i,g->pid,g->uid,g->gid,g->time,g->lcnt,g->locked,g->gidcnt);
+				fprintf(stderr,"hashpos: %"PRIu32" ; pid: %"PRIu32" ; uid: %"PRIu32" ; gid: %"PRIu32" ; time: %.6lf ; lcnt: %"PRIu32" ; gidcnt: %"PRIu32" ; gidtab: ",i,gc->pid,gc->uid,gc->gid,gc->time,gc->g->lcnt,gc->g->gidcnt);
+				groups_dump(gc->g);
 			}
 			if (j>k) {
 				k=j;
 			}
 		}
-		fprintf(stderr,"malloc cnt: %"PRIu32" ; free cnt: %"PRIu32" ; maxchain: %"PRIu32" ; used hashtab entries: %"PRIu32" ; data entries: %"PRIu32" ; avgchain: %.2lf / %.2lf\n",mallocs,frees,k,l,u,(double)(u)/(double)(HASHSIZE),(double)(u)/(double)(l));
+		fprintf(stderr,"malloc cnt: %"PRIu32" ; free cnt: %"PRIu32" ; maxchain: %"PRIu32" ; used hashtab entries: %"PRIu32" ; data entries: %"PRIu32" ; avgchain: %.2lf / %.2lf\n",malloc_cnt,free_cnt,k,l,u,(double)(u)/(double)(HASHSIZE),(double)(u)/(double)(l));
+		ka = keep_alive;
 		zassert(pthread_mutex_unlock(&glock));
 		sleep(5);
 	}
 	return arg;
 }
-*/
+#endif
 
 void groups_term(void) {
 	uint32_t i;
 #ifdef __clang_analyzer__
-	groups *gn;
+	groups *gcn;
 #endif
 	zassert(pthread_mutex_lock(&glock));
 	keep_alive = 0;
 	zassert(pthread_mutex_unlock(&glock));
 	pthread_join(main_thread,NULL);
+#ifdef DEBUGTHREAD
+	pthread_join(debug_thread,NULL);
+#endif
 	zassert(pthread_mutex_lock(&glock));
 	for (i=0 ; i<HASHSIZE ; i++) {
 		while (groups_hashtab[i]) {
 #ifdef __clang_analyzer__
-			gn = groups_hashtab[i]->next;
+			gcn = groups_hashtab[i]->next;
 #endif
 			groups_remove(groups_hashtab[i]);
 #ifdef __clang_analyzer__
 			// groups_hashtab[i] is changed by using 'prev' pointer, so after groups_remove variable groups_hashtab[i] has different value and can be used in while !!!
-			groups_hashtab[i] = gn;
+			groups_hashtab[i] = gcn;
 #endif
 		}
 	}
@@ -452,7 +514,9 @@ void groups_init(double _to,int dm) {
 	to = _to;
 	keep_alive = 1;
 	pthread_create(&main_thread,NULL,groups_cleanup_thread,NULL);
-//	pthread_create(&t,NULL,groups_debug_thread,NULL);
+#ifdef DEBUGTHREAD
+	pthread_create(&debug_thread,NULL,groups_debug_thread,NULL);
+#endif
 }
 
 /*

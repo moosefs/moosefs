@@ -32,10 +32,17 @@
 
 /* -------------- UNIVERSAL -------------- */
 
+#define STRIPSIZE 16
+#define STRIPPORTSIZE 32
+
+void univmakestrip(char strip[STRIPSIZE],uint32_t ip);
+void univmakestripport(char stripport[STRIPPORTSIZE],uint32_t ip,uint16_t port);
+char* univallocstrip(uint32_t ip);
+char* univallocstripport(uint32_t ip,uint16_t port);
 int univnonblock(int fd);
-int32_t univtoread(int fd,void *buff,uint32_t leng,uint32_t msecto);
-int32_t univtowrite(int fd,const void *buff,uint32_t leng,uint32_t msecto);
-int32_t univtoforward(int srcfd,int dstfd,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto);
+int32_t univtoread(int fd,void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall);
+int32_t univtowrite(int fd,const void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall);
+int32_t univtoforward(int srcfd,int dstfd,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msectopart,uint32_t msectoall);
 
 /* ----------------- TCP ----------------- */
 
@@ -56,13 +63,15 @@ int tcpstrconnect(int sock,const char *hostname,const char *service);
 int tcpstrtoconnect(int sock,const char *hostname,const char *service,uint32_t msecto);
 int tcpnumlisten(int sock,uint32_t ip,uint16_t port,uint16_t queue);
 int tcpstrlisten(int sock,const char *hostname,const char *service,uint16_t queue);
-int32_t tcptoread(int sock,void *buff,uint32_t leng,uint32_t msecto);
-int32_t tcptowrite(int sock,const void *buff,uint32_t leng,uint32_t msecto);
-int32_t tcptoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto);
+int32_t tcptoread(int sock,void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall);
+int32_t tcptowrite(int sock,const void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall);
+int32_t tcptoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msectopart,uint32_t msectoall);
+int tcptowait(int sock,uint32_t msectoall);
 int tcptoaccept(int sock,uint32_t msecto);
 int tcpaccept(int lsock);
 int tcpgetpeer(int sock,uint32_t *ip,uint16_t *port);
 int tcpgetmyaddr(int sock,uint32_t *ip,uint16_t *port);
+void tcpshutdown(int sock);
 int tcpclose(int sock);
 
 /* ----------------- UDP ----------------- */
@@ -85,9 +94,9 @@ int unixgetstatus(int sock);
 int unixconnect(int sock,const char *path);
 int unixtoconnect(int sock,const char *path,uint32_t msecto);
 int unixlisten(int sock,const char *path,int queue);
-int32_t unixtoread(int sock,void *buff,uint32_t leng,uint32_t msecto);
-int32_t unixtowrite(int sock,const void *buff,uint32_t leng,uint32_t msecto);
-int32_t unixtoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto);
+int32_t unixtoread(int sock,void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall);
+int32_t unixtowrite(int sock,const void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall);
+int32_t unixtoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msectopart,uint32_t msectoall);
 int unixtoaccept(int sock,uint32_t msecto);
 int unixaccept(int lsock);
 #define unixclose close

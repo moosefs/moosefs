@@ -532,11 +532,11 @@ if __name__=="__main__":
 	rootpath="%%CGIDIR%%"
 	datapath="%%DATAPATH%%"
 
-	opts,args = getopt.getopt(sys.argv[1:],"hH:P:R:t:fv")
+	opts,args = getopt.getopt(sys.argv[1:],"hH:P:R:D:t:fv")
 	for opt,val in opts:
 		if opt=='-h':
-			print("usage: %s [-H bind_host] [-P bind_port] [-R rootpath] [-t locktimeout] [-f [-v]] [start|stop|restart|test]\n" % sys.argv[0])
-			print("-H bind_host : local address to listen on (default: any)\n-P bind_port : port to listen on (default: @DEFAULT_CGISERV_HTTP_PORT@)\n-R rootpath : local path to use as HTTP document root (default: %%CGIDIR%%)\n-t locktimeout : how long to wait for lockfile (default: 60s)\n-f : run in foreground\n-v : log requests on stderr")
+			print("usage: %s [-H bind_host] [-P bind_port] [-R rootpath] [-D datapath] [-t locktimeout] [-f [-v]] [start|stop|restart|test]\n" % sys.argv[0])
+			print("-H bind_host : local address to listen on (default: any)\n-P bind_port : port to listen on (default: @DEFAULT_CGISERV_HTTP_PORT@)\n-R rootpath : local path to use as HTTP document root (default: %%CGIDIR%%)\n-D datapath : working directory (default: %%DATAPATH%%)\n-t locktimeout : how long to wait for lockfile (default: 60s)\n-f : run in foreground\n-v : log requests on stderr")
 			os._exit(0)
 		elif opt=='-H':
 			host = val
@@ -544,6 +544,8 @@ if __name__=="__main__":
 			port = int(val)
 		elif opt=='-R':
 			rootpath = val
+		elif opt=='-D':
+			datapath = val
 		elif opt=='t':
 			locktimeout = int(val)
 		elif opt=='-f':
@@ -581,7 +583,7 @@ if __name__=="__main__":
 			posix.read(pipefd[0],1)
 			os._exit(0)
 		try:
-			os.chdir("/")
+			os.chdir(datapath)
 		except OSError:
 			pass
 		os.setsid()

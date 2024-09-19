@@ -43,8 +43,10 @@
 # include <netdb.h>
 #endif
 #include <sys/types.h>
+#ifndef WIN32
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 #include <inttypes.h>
 #include <string.h>
 #include <stdio.h>
@@ -55,7 +57,7 @@
 #include "sockets.h"
 #include "clocks.h"
 
-/* Acid's simple socket library - ver 5.0 */
+/* Acid's simple socket library - ver 6.0 */
 
 /* ---------------SOCK ADDR--------------- */
 
@@ -145,6 +147,29 @@ static inline int sockresolve(const char *hostname,const char *service,uint32_t 
 	return 0;
 }
 
+void univmakestrip(char strip[STRIPSIZE],uint32_t ip) {
+	snprintf(strip,STRIPSIZE,"%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8,(uint8_t)(ip>>24),(uint8_t)(ip>>16),(uint8_t)(ip>>8),(uint8_t)ip);
+	strip[STRIPSIZE-1]=0;
+}
+
+void univmakestripport(char stripport[STRIPPORTSIZE],uint32_t ip,uint16_t port) {
+	snprintf(stripport,STRIPPORTSIZE,"%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8":%"PRIu16,(uint8_t)(ip>>24),(uint8_t)(ip>>16),(uint8_t)(ip>>8),(uint8_t)ip,port);
+	stripport[STRIPPORTSIZE-1]=0;
+}
+
+char* univallocstrip(uint32_t ip) {
+	char sbuff[STRIPSIZE];
+	univmakestrip(sbuff,ip);
+	return strdup(sbuff);
+}
+
+char* univallocstripport(uint32_t ip,uint16_t port) {
+	char sbuff[STRIPPORTSIZE];
+	univmakestripport(sbuff,ip,port);
+	return strdup(sbuff);
+}
+
+
 #ifndef WIN32
 static inline int sockaddrpathfill(struct sockaddr_un *sa,const char *path) {
 	size_t pl;
@@ -192,14 +217,65 @@ static inline int sockgetstatus(int sock) {
 
 /* ----------- STRAM UNIVERSAL ----------- */
 
-static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t msecto) {
-	uint32_t rcvd=0;
-	int i;
+static inline int streamtowait(int sock,uint32_t msectoall) {
 	struct pollfd pfd;
 	double s,c;
 	uint32_t msecpassed;
+	uint32_t msecpoll;
 
 	s = 0.0;
+	c = 0.0;
+
+	pfd.fd = sock;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+	while (1) {
+		if (s==0.0) {
+			s = monotonic_seconds();
+			c = s;
+			msecpassed = 0;
+		} else {
+			c = monotonic_seconds();
+			msecpassed = (c-s)*1000.0;
+			if (msecpassed>=msectoall) {
+				errno = ETIMEDOUT;
+				return -1;
+			}
+		}
+		pfd.revents = 0;
+		msecpoll = msectoall-msecpassed;
+		if (poll(&pfd,1,msecpoll)<0) {
+			if (errno!=EINTR) {
+				return -1;
+			} else {
+				continue;
+			}
+		}
+		if (pfd.revents & (POLLHUP|POLLIN)) {
+			return 0;
+		}
+		if (pfd.revents & POLLERR) {
+			return -1;
+		}
+		if ((pfd.revents & POLLIN)==0) {
+			errno = ETIMEDOUT;
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall) {
+	uint32_t rcvd=0;
+	int i;
+	struct pollfd pfd;
+	double s,c,l;
+	uint32_t msecpassed;
+	uint32_t msecpoll;
+
+	s = 0.0;
+	c = 0.0;
+
 	pfd.fd = sock;
 	pfd.events = POLLIN;
 	pfd.revents = 0;
@@ -224,6 +300,8 @@ static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t ms
 		if (i==0) {
 #ifdef ECONNRESET
 			errno = ECONNRESET;
+#else
+			errno = EPIPE;
 #endif
 			return rcvd;
 		}
@@ -240,17 +318,28 @@ static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t ms
 		}
 		if (s==0.0) {
 			s = monotonic_seconds();
+			c = s;
 			msecpassed = 0;
 		} else {
+			l = c;
 			c = monotonic_seconds();
+			msecpassed = (c-l)*1000.0;
+			if (msecpassed>=msectopart) {
+				errno = ETIMEDOUT;
+				return -1;
+			}
 			msecpassed = (c-s)*1000.0;
-			if (msecpassed>=msecto) {
+			if (msecpassed>=msectoall) {
 				errno = ETIMEDOUT;
 				return -1;
 			}
 		}
 		pfd.revents = 0;
-		if (poll(&pfd,1,msecto-msecpassed)<0) {
+		msecpoll = msectoall-msecpassed;
+		if (msectopart<msecpoll) {
+			msecpoll = msectopart;
+		}
+		if (poll(&pfd,1,msecpoll)<0) {
 			if (errno!=EINTR) {
 				return -1;
 			} else {
@@ -268,14 +357,17 @@ static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t ms
 	return rcvd;
 }
 
-static inline int32_t streamtowrite(int sock,const void *buff,uint32_t leng,uint32_t msecto) {
+static inline int32_t streamtowrite(int sock,const void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall) {
 	uint32_t sent=0;
 	int32_t i;
 	struct pollfd pfd;
-	double s,c;
+	double s,c,l;
 	uint32_t msecpassed;
+	uint32_t msecpoll;
 
 	s = 0.0;
+	c = 0.0;
+
 	pfd.fd = sock;
 	pfd.events = POLLOUT;
 	pfd.revents = 0;
@@ -289,7 +381,11 @@ static inline int32_t streamtowrite(int sock,const void *buff,uint32_t leng,uint
 					errno = EAGAIN;
 					break;
 				case WSAECONNRESET:
-					i=0;
+#ifdef ECONNRESET
+					errno = ECONNRESET;
+#else
+					errno = EPIPE;
+#endif
 					break;
 			}
 		}
@@ -297,10 +393,10 @@ static inline int32_t streamtowrite(int sock,const void *buff,uint32_t leng,uint
 #else
 		i = write(sock,((uint8_t*)buff)+sent,leng-sent);
 #endif
-		if (i==0) {
-			return 0;
-		}
-		if (i>0) {
+//		if (i==0) {
+//			return 0;
+//		}
+		if (i>=0) {
 			sent += i;
 		} else if (ERRNO_ERROR) {
 			return -1;
@@ -310,17 +406,28 @@ static inline int32_t streamtowrite(int sock,const void *buff,uint32_t leng,uint
 		}
 		if (s==0.0) {
 			s = monotonic_seconds();
+			c = s;
 			msecpassed = 0;
 		} else {
+			l = c;
 			c = monotonic_seconds();
+			msecpassed = (c-l)*1000.0;
+			if (msecpassed>=msectopart) {
+				errno = ETIMEDOUT;
+				return -1;
+			}
 			msecpassed = (c-s)*1000.0;
-			if (msecpassed>=msecto) {
+			if (msecpassed>=msectoall) {
 				errno = ETIMEDOUT;
 				return -1;
 			}
 		}
 		pfd.revents = 0;
-		if (poll(&pfd,1,msecto-msecpassed)<0) {
+		msecpoll = msectoall-msecpassed;
+		if (msectopart<msecpoll) {
+			msecpoll = msectopart;
+		}
+		if (poll(&pfd,1,msecpoll)<0) {
 			if (errno!=EINTR) {
 				return -1;
 			} else {
@@ -338,12 +445,16 @@ static inline int32_t streamtowrite(int sock,const void *buff,uint32_t leng,uint
 	return sent;
 }
 
-static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto) {
+static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msectopart,uint32_t msectoall) {
 	int32_t i;
 	struct pollfd pfd[2];
-	double s,c;
+	double s,c,l;
 	uint32_t msecpassed;
+	uint32_t msecpoll;
+
 	s = 0.0;
+	c = 0.0;
+
 	pfd[0].fd = srcsock;
 	pfd[0].events = POLLIN;
 	pfd[0].revents = 0;
@@ -388,14 +499,18 @@ static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_
 						errno = EAGAIN;
 						break;
 					case WSAECONNRESET:
-						i=0;
+#ifdef ECONNRESET
+						errno = ECONNRESET;
+#else
+						errno = EPIPE;
+#endif
 						break;
 				}
 			}
 #else
 			i = write(dstsock,((uint8_t*)buff)+sent,rcvd-sent);
 #endif
-			if (i>0) {
+			if (i>=0) {
 				sent += i;
 			} else if (ERRNO_ERROR) {
 				return -1;
@@ -406,19 +521,30 @@ static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_
 		}
 		if (s==0.0) {
 			s = monotonic_seconds();
+			c = s;
 			msecpassed = 0;
 		} else {
+			l = c;
 			c = monotonic_seconds();
+			msecpassed = (c-l)*1000.0;
+			if (msecpassed>=msectopart) {
+				errno = ETIMEDOUT;
+				return -1;
+			}
 			msecpassed = (c-s)*1000.0;
-			if (msecpassed>=msecto) {
+			if (msecpassed>=msectoall) {
 				errno = ETIMEDOUT;
 				return -1;
 			}
 		}
 		pfd[0].revents = 0;
 		pfd[1].revents = 0;
+		msecpoll = msectoall-msecpassed;
+		if (msectopart<msecpoll) {
+			msecpoll = msectopart;
+		}
 		if (rcvd==leng) { // only wait for write
-			if (poll(pfd+1,1,msecto-msecpassed)<0) {
+			if (poll(pfd+1,1,msecpoll)<0) {
 				if (errno!=EINTR) {
 					return -1;
 				} else {
@@ -430,7 +556,7 @@ static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_
 			}
 			pfd[0].revents = 0;
 		} else if (rcvd==sent) { // only wait for read
-			if (poll(pfd,1,msecto-msecpassed)<0) {
+			if (poll(pfd,1,msecpoll)<0) {
 				if (errno!=EINTR) {
 					return -1;
 				} else {
@@ -442,7 +568,7 @@ static inline int32_t streamtoforward(int srcsock,int dstsock,void *buff,uint32_
 			}
 			pfd[1].revents = 0;
 		} else {
-			if (poll(pfd,2,msecto-msecpassed)<0) {
+			if (poll(pfd,2,msecpoll)<0) {
 				if (errno!=EINTR) {
 					return -1;
 				} else {
@@ -518,16 +644,16 @@ int univnonblock(int fd) {
 	return descnonblock(fd);
 }
 
-int32_t univtoread(int fd,void *buff,uint32_t leng,uint32_t msecto) {
-	return streamtoread(fd,buff,leng,msecto);
+int32_t univtoread(int fd,void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall) {
+	return streamtoread(fd,buff,leng,msectopart,msectoall);
 }
 
-int32_t univtowrite(int fd,const void *buff,uint32_t leng,uint32_t msecto) {
-	return streamtowrite(fd,buff,leng,msecto);
+int32_t univtowrite(int fd,const void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall) {
+	return streamtowrite(fd,buff,leng,msectopart,msectoall);
 }
 
-int32_t univtoforward(int srcfd,int dstfd,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto) {
-	return streamtoforward(srcfd,dstfd,buff,leng,rcvd,sent,msecto);
+int32_t univtoforward(int srcfd,int dstfd,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msectopart,uint32_t msectoall) {
+	return streamtoforward(srcfd,dstfd,buff,leng,rcvd,sent,msectopart,msectoall);
 }
 
 /* ----------------- TCP ----------------- */
@@ -833,6 +959,14 @@ int tcpgetmyaddr(int sock,uint32_t *ip,uint16_t *port) {
 	return 0;
 }
 
+void tcpshutdown(int sock) {
+#ifdef WIN32
+	shutdown(sock,SD_SEND);
+#else
+	shutdown(sock,SHUT_WR);
+#endif
+}
+
 int tcpclose(int sock) {
 	// make sure that all pending data in the output buffer will be sent
 #ifdef WIN32
@@ -844,16 +978,20 @@ int tcpclose(int sock) {
 #endif
 }
 
-int32_t tcptoread(int sock,void *buff,uint32_t leng,uint32_t msecto) {
-	return streamtoread(sock,buff,leng,msecto);
+int32_t tcptoread(int sock,void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall) {
+	return streamtoread(sock,buff,leng,msectopart,msectoall);
 }
 
-int32_t tcptowrite(int sock,const void *buff,uint32_t leng,uint32_t msecto) {
-	return streamtowrite(sock,buff,leng,msecto);
+int32_t tcptowrite(int sock,const void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall) {
+	return streamtowrite(sock,buff,leng,msectopart,msectoall);
 }
 
-int32_t tcptoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto) {
-	return streamtoforward(srcsock,dstsock,buff,leng,rcvd,sent,msecto);
+int32_t tcptoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msectopart,uint32_t msectoall) {
+	return streamtoforward(srcsock,dstsock,buff,leng,rcvd,sent,msectopart,msectoall);
+}
+
+int tcptowait(int sock,uint32_t msectoall) {
+	return streamtowait(sock,msectoall);
 }
 
 int tcptoaccept(int lsock,uint32_t msecto) {
@@ -1054,16 +1192,16 @@ int unixlisten(int sock,const char *path,int queue) {
 	return 0;
 }
 
-int32_t unixtoread(int sock,void *buff,uint32_t leng,uint32_t msecto) {
-	return streamtoread(sock,buff,leng,msecto);
+int32_t unixtoread(int sock,void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall) {
+	return streamtoread(sock,buff,leng,msectopart,msectoall);
 }
 
-int32_t unixtowrite(int sock,const void *buff,uint32_t leng,uint32_t msecto) {
-	return streamtowrite(sock,buff,leng,msecto);
+int32_t unixtowrite(int sock,const void *buff,uint32_t leng,uint32_t msectopart,uint32_t msectoall) {
+	return streamtowrite(sock,buff,leng,msectopart,msectoall);
 }
 
-int32_t unixtoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msecto) {
-	return streamtoforward(srcsock,dstsock,buff,leng,rcvd,sent,msecto);
+int32_t unixtoforward(int srcsock,int dstsock,void *buff,uint32_t leng,uint32_t rcvd,uint32_t sent,uint32_t msectopart,uint32_t msectoall) {
+	return streamtoforward(srcsock,dstsock,buff,leng,rcvd,sent,msectopart,msectoall);
 }
 
 int unixtoaccept(int lsock,uint32_t msecto) {

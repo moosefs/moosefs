@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <errno.h>
 #include <pwd.h>
 #include <grp.h>
@@ -39,10 +38,11 @@
 #include "datapack.h"
 #include "main.h"
 #include "cfg.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "massert.h"
 #include "crc.h"
 #include "hashfn.h"
+#include "timeparser.h"
 
 typedef struct _exports {
 	uint32_t pleng;
@@ -59,8 +59,8 @@ typedef struct _exports {
 	uint8_t mingoal;
 	uint8_t maxgoal;
 	uint16_t umask;
-	uint32_t mintrashtime;
-	uint32_t maxtrashtime;
+	uint32_t mintrashretention;
+	uint32_t maxtrashretention;
 	uint32_t rootuid;
 	uint32_t rootgid;
 	uint32_t mapalluid;
@@ -94,8 +94,8 @@ uint64_t exports_entry_checksum(exports *e) {
 	put8bit(&ptr,e->mingoal);
 	put8bit(&ptr,e->maxgoal);
 	put16bit(&ptr,e->umask);
-	put32bit(&ptr,e->mintrashtime);
-	put32bit(&ptr,e->maxtrashtime);
+	put32bit(&ptr,e->mintrashretention);
+	put32bit(&ptr,e->maxtrashretention);
 	put32bit(&ptr,e->rootuid);
 	put32bit(&ptr,e->rootgid);
 	put32bit(&ptr,e->mapalluid);
@@ -206,8 +206,8 @@ void exports_info_data(uint8_t versmode,uint8_t *buff) {
 		if (versmode>0) {
 			put8bit(&buff,e->mingoal);
 			put8bit(&buff,e->maxgoal);
-			put32bit(&buff,e->mintrashtime);
-			put32bit(&buff,e->maxtrashtime);
+			put32bit(&buff,e->mintrashretention);
+			put32bit(&buff,e->maxtrashretention);
 		}
 		if (versmode>2) {
 			put32bit(&buff,e->disables);
@@ -215,7 +215,7 @@ void exports_info_data(uint8_t versmode,uint8_t *buff) {
 	}
 }
 
-uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime,uint32_t *disables) {
+uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashretention,uint32_t *maxtrashretention,uint32_t *disables) {
 	const uint8_t *p;
 	uint32_t pleng,i;
 	uint8_t rndstate;
@@ -225,7 +225,7 @@ uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uin
 	uint8_t entrydigest[16];
 	exports *e,*f;
 
-//	syslog(LOG_NOTICE,"check exports for: %u.%u.%u.%u:%s",(ip>>24)&0xFF,(ip>>16)&0xFF,(ip>>8)&0xFF,ip&0xFF,path);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"check exports for: %u.%u.%u.%u:%s",(ip>>24)&0xFF,(ip>>16)&0xFF,(ip>>8)&0xFF,ip&0xFF,path);
 	meta = (path==NULL)?1:0;
 
 	if (meta==0) {
@@ -254,22 +254,22 @@ uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uin
 	f=NULL;
 	for (e=exports_records ; e ; e=e->next) {
 		ok = 0;
-//		syslog(LOG_NOTICE,"entry: network:%u.%u.%u.%u-%u.%u.%u.%u",(e->fromip>>24)&0xFF,(e->fromip>>16)&0xFF,(e->fromip>>8)&0xFF,e->fromip&0xFF,(e->toip>>24)&0xFF,(e->toip>>16)&0xFF,(e->toip>>8)&0xFF,e->toip&0xFF);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"entry: network:%u.%u.%u.%u-%u.%u.%u.%u",(e->fromip>>24)&0xFF,(e->fromip>>16)&0xFF,(e->fromip>>8)&0xFF,e->fromip&0xFF,(e->toip>>24)&0xFF,(e->toip>>16)&0xFF,(e->toip>>8)&0xFF,e->toip&0xFF);
 		if (ip>=e->fromip && ip<=e->toip && version>=e->minversion && meta==e->meta) {
-//			syslog(LOG_NOTICE,"ip and version ok");
+//			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"ip and version ok");
 			// path check
 			if (meta) {	// no path in META
 				ok=1;
 			} else {
 				if (e->pleng==0) {	// root dir
-//					syslog(LOG_NOTICE,"rootdir entry (pleng:%u)",pleng);
+//					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"rootdir entry (pleng:%u)",pleng);
 					if (pleng==0) {
 						ok=1;
 					} else if (e->alldirs) {
 						ok=1;
 					}
 				} else {
-//					syslog(LOG_NOTICE,"entry path: %s (pleng:%u)",e->path,e->pleng);
+//					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"entry path: %s (pleng:%u)",e->path,e->pleng);
 					if (pleng==e->pleng && memcmp(p,e->path,pleng)==0) {
 						ok=1;
 					} else if (e->alldirs && pleng>e->pleng && p[e->pleng]=='/' && memcmp(p,e->path,e->pleng)==0) {
@@ -278,7 +278,7 @@ uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uin
 				}
 			}
 //			if (ok) {
-//				syslog(LOG_NOTICE,"path ok");
+//				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"path ok");
 //			}
 			if (ok && e->needpassword) {
 				if (rndstate==0 || rndcode==NULL || passcode==NULL) {
@@ -298,7 +298,7 @@ uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uin
 			}
 		}
 		if (ok) {
-//			syslog(LOG_NOTICE,"entry accepted");
+//			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"entry accepted");
 			if (f==NULL) {
 				f=e;
 			} else {
@@ -334,8 +334,8 @@ uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uin
 	*mapallgid = f->mapallgid;
 	*mingoal = f->mingoal;
 	*maxgoal = f->maxgoal;
-	*mintrashtime = f->mintrashtime;
-	*maxtrashtime = f->maxtrashtime;
+	*mintrashretention = f->mintrashretention;
+	*maxtrashretention = f->maxtrashretention;
 	*disables = f->disables;
 	return MFS_STATUS_OK;
 }
@@ -367,6 +367,9 @@ void exports_freelist(exports *arec) {
 //  umask=0###
 //  mingoal=#
 //  maxgoal=#
+//  mintrashretention=[#w][#d][#h][#m][#[s]]
+//  maxtrashretention=[#w][#d][#h][#m][#[s]]
+// deprecated:
 //  mintrashtime=[#w][#d][#h][#m][#[s]]
 //  maxtrashtime=[#w][#d][#h][#m][#[s]]
 //
@@ -505,8 +508,10 @@ int exports_parseumask(char *umaskstr,uint16_t *umaskval) {
 	return 0;
 }
 
+#if 0
+// use "timeparser.h" 
 // # | [#w][#d][#h][#m][#s]
-int exports_parsetime(char *timestr,uint32_t *time) {
+int exports_parsetime(char *timestr,uint32_t *rettime) {
 	uint64_t t;
 	uint64_t tp;
 	uint8_t bits;
@@ -584,12 +589,13 @@ int exports_parsetime(char *timestr,uint32_t *time) {
 			return -1;
 		}
 		if (*timestr=='\0') {
-			*time = t;
+			*rettime = t;
 			return 0;
 		}
 	}
 	return -1;	// unreachable
 }
+#endif
 
 // x | x.y | x.y.z -> ( x<<16 + y<<8 + z )
 int exports_parseversion(char *verstr,uint32_t *version) {
@@ -672,7 +678,7 @@ int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint32_t *r
 				grrec = NULL;
 			}
 			if (grrec==NULL) {
-				mfs_arg_syslog(LOG_WARNING,"mfsexports/maproot: can't find group named '%s' defined in line: %"PRIu32,gptr+1,lineno);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports/maproot: can't find group named '%s' defined in line: %"PRIu32,gptr+1,lineno);
 				return -1;
 			}
 			gid = grrec->gr_gid;
@@ -696,7 +702,7 @@ int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint32_t *r
 			pwrec = NULL;
 		}
 		if (pwrec==NULL) {
-			mfs_arg_syslog(LOG_WARNING,"mfsexports/maproot: can't find user named '%s' defined in line: %"PRIu32,uptr,lineno);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports/maproot: can't find user named '%s' defined in line: %"PRIu32,uptr,lineno);
 			return -1;
 		}
 		*ruid = pwrec->pw_uid;
@@ -715,7 +721,7 @@ int exports_parseuidgid(char *maproot,uint32_t lineno,uint32_t *ruid,uint32_t *r
 			pwrec = NULL;
 		}
 		if (pwrec==NULL) {
-			mfs_arg_syslog(LOG_WARNING,"mfsexports/maproot: can't determine gid, because can't find user with uid %"PRIu32" defined in line: %"PRIu32,uid,lineno);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports/maproot: can't determine gid, because can't find user with uid %"PRIu32" defined in line: %"PRIu32,uid,lineno);
 			return -1;
 		}
 		*ruid = pwrec->pw_uid;
@@ -836,7 +842,7 @@ int exports_parsedisable(char *disablestr,uint32_t lineno,uint32_t *disables) {
 				break;
 		}
 		if (o==0) {
-			mfs_arg_syslog(LOG_WARNING,"mfsexports: unknown disable command '%s' in line: %"PRIu32" (ignored)",p,lineno);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: unknown disable command '%s' in line: %"PRIu32" (ignored)",p,lineno);
 		}
 	}
 	return 0;
@@ -849,7 +855,7 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 
 	while ((p=exports_strsep(&opts,","))) {
 		o=0;
-//		syslog(LOG_WARNING,"option: %s",p);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"option: %s",p);
 		switch (*p) {
 		case 'r':
 			if (strcmp(p,"ro")==0) {
@@ -869,7 +875,7 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 		case 'i':
 			if (strcmp(p,"ignoregid")==0) {
 				if (arec->meta) {
-					mfs_arg_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					arec->sesflags |= SESFLAG_IGNOREGID;
 				}
@@ -879,14 +885,14 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 		case 'a':
 			if (strcmp(p,"alldirs")==0) {
 				if (arec->meta) {
-					mfs_arg_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					arec->alldirs = 1;
 				}
 				o=1;
 			} else if (strcmp(p,"admin")==0) {
 				if (arec->meta) {
-					mfs_arg_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					arec->sesflags |= SESFLAG_ADMIN;
 				}
@@ -900,7 +906,7 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 			} else if (strncmp(p,"disable=",8)==0) {
 				o=1;
 				if (arec->meta) {
-					mfs_arg_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					if (exports_parsedisable(p+8,lineno,&arec->disables)<0) {
 						return -1;
@@ -911,7 +917,7 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 		case 'c':
 			if (strcmp(p,"canchangequota")==0) { // deprecated - use 'admin'
 				if (arec->meta) {
-					mfs_arg_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					arec->sesflags |= SESFLAG_ADMIN;
 				}
@@ -922,7 +928,7 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 			if (strncmp(p,"maproot=",8)==0) {
 				o=1;
 				if (arec->meta) {
-					mfs_arg_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					if (exports_parseuidgid(p+8,lineno,&arec->rootuid,&arec->rootgid)<0) {
 						return -1;
@@ -932,7 +938,7 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 			} else if (strncmp(p,"mapall=",7)==0) {
 				o=1;
 				if (arec->meta) {
-					mfs_arg_syslog(LOG_WARNING,"meta option ignored: %s",p);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"meta option ignored: %s",p);
 				} else {
 					if (exports_parseuidgid(p+7,lineno,&arec->mapalluid,&arec->mapallgid)<0) {
 						return -1;
@@ -969,53 +975,77 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 					}
 					arec->needpassword=1;
 				} else {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect md5pass definition (%s) in line: %"PRIu32,p,lineno);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect md5pass definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"minversion=",11)==0) {
 				o=1;
 				if (exports_parseversion(p+11,&arec->minversion)<0) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect minversion definition (%s) in line: %"PRIu32,p,lineno);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect minversion definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"mingoal=",8)==0) {
 				o=1;
 				if (exports_parsegoal(p+8,&arec->mingoal)<0) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect mingoal definition (%s) in line: %"PRIu32,p,lineno);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect mingoal definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 				if (arec->mingoal>arec->maxgoal) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: mingoal>maxgoal in definition (%s) in line: %"PRIu32,p,lineno);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: mingoal>maxgoal in definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"maxgoal=",8)==0) {
 				o=1;
 				if (exports_parsegoal(p+8,&arec->maxgoal)<0) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect maxgoal definition (%s) in line: %"PRIu32,p,lineno);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect maxgoal definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 				if (arec->mingoal>arec->maxgoal) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: maxgoal<mingoal in definition (%s) in line: %"PRIu32,p,lineno);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: maxgoal<mingoal in definition (%s) in line: %"PRIu32,p,lineno);
+					return -1;
+				}
+			} else if (strncmp(p,"mintrashretention=",18)==0) {
+				o=1;
+				if (parse_hperiod(p+18,&arec->mintrashretention)<0) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect mintrashretention definition (%s) in line: %"PRIu32,p,lineno);
+					return -1;
+				}
+				arec->mintrashretention*=3600;
+				if (arec->mintrashretention>arec->maxtrashretention) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: mintrashretention>maxtrashretention in definition (%s) in line: %"PRIu32,p,lineno);
+					return -1;
+				}
+			} else if (strncmp(p,"maxtrashretention=",18)==0) {
+				o=1;
+				if (parse_hperiod(p+18,&arec->maxtrashretention)<0) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect maxtrashretention definition (%s) in line: %"PRIu32,p,lineno);
+					return -1;
+				}
+				arec->maxtrashretention*=3600;
+				if (arec->mintrashretention>arec->maxtrashretention) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: maxtrashretention<mintrashretention in definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"mintrashtime=",13)==0) {
 				o=1;
-				if (exports_parsetime(p+13,&arec->mintrashtime)<0) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect mintrashtime definition (%s) in line: %"PRIu32,p,lineno);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"mfsexports: mintrashtime option is deprecated, use mintrashretention instead");
+				if (parse_speriod(p+13,&arec->mintrashretention)<0) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect mintrashtime definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
-				if (arec->mintrashtime>arec->maxtrashtime) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: mintrashtime>maxtrashtime in definition (%s) in line: %"PRIu32,p,lineno);
+				if (arec->mintrashretention>arec->maxtrashretention) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: mintrashtime>maxtrashtime in definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 			} else if (strncmp(p,"maxtrashtime=",13)==0) {
 				o=1;
-				if (exports_parsetime(p+13,&arec->maxtrashtime)<0) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect maxtrashtime definition (%s) in line: %"PRIu32,p,lineno);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"mfsexports: maxtrashtime option is deprecated, use maxtrashretention instead");
+				if (parse_speriod(p+13,&arec->maxtrashretention)<0) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect maxtrashtime definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
-				if (arec->mintrashtime>arec->maxtrashtime) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: maxtrashtime<mintrashtime in definition (%s) in line: %"PRIu32,p,lineno);
+				if (arec->mintrashretention>arec->maxtrashretention) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: maxtrashtime<mintrashtime in definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 			}
@@ -1023,7 +1053,7 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 		case 'u':
 			if (strncmp(p,"umask=",6)==0) {
 				if (exports_parseumask(p+6,&arec->umask)<0) {
-					mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect umask definition (%s) in line: %"PRIu32,p,lineno);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect umask definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
 				o=1;
@@ -1040,7 +1070,7 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 			break;
 		}
 		if (o==0) {
-			mfs_arg_syslog(LOG_WARNING,"mfsexports: unknown option '%s' in line: %"PRIu32" (ignored)",p,lineno);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: unknown option '%s' in line: %"PRIu32" (ignored)",p,lineno);
 		}
 	}
 	return 0;
@@ -1065,8 +1095,8 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec,exports **default
 		arec->umask = 0;
 		arec->mingoal = 1;
 		arec->maxgoal = 9;
-		arec->mintrashtime = 0;
-		arec->maxtrashtime = UINT32_C(0xFFFFFFFF);
+		arec->mintrashretention = 0;
+		arec->maxtrashretention = UINT32_C(0xFFFFFFFF);
 		arec->rootuid = 999;
 		arec->rootgid = 999;
 		arec->mapalluid = 999;
@@ -1089,7 +1119,7 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec,exports **default
 		p++;
 	}
 	if (*p==0) {
-		mfs_arg_syslog(LOG_WARNING,"mfsexports: incomplete definition in line: %"PRIu32,lineno);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incomplete definition in line: %"PRIu32,lineno);
 		return -1;
 	}
 	*p=0;
@@ -1115,7 +1145,7 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec,exports **default
 		memcpy(*defaults,arec,sizeof(exports));
 		return 0;
 	} else if (exports_parsenet(net,&arec->fromip,&arec->toip)<0) {
-		mfs_arg_syslog(LOG_WARNING,"mfsexports: incorrect ip/network definition in line: %"PRIu32,lineno);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect ip/network definition in line: %"PRIu32,lineno);
 		return -1;
 	}
 
@@ -1187,7 +1217,8 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec,exports **default
 
 void exports_loadexports(void) {
 	FILE *fd;
-	char linebuff[10000];
+	char *linebuff;
+	size_t lbsize;
 	uint32_t s,lineno;
 	exports *newexports,**netail,*arec,*defaults;
 
@@ -1195,16 +1226,16 @@ void exports_loadexports(void) {
 	if (fd==NULL) {
 		if (errno==ENOENT) {
 			if (exports_records) {
-				syslog(LOG_WARNING,"mfsexports configuration file (%s) not found - exports not changed",ExportsFileName);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"mfsexports configuration file (%s) not found - exports not changed",ExportsFileName);
 			} else {
-				syslog(LOG_WARNING,"mfsexports configuration file (%s) not found - no exports !!!",ExportsFileName);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports configuration file (%s) not found - no exports !!!",ExportsFileName);
+				fprintf(stderr,"mfsexports configuration file (%s) not found - please create one (you can copy %s.sample to get a base configuration)\n",ExportsFileName,ExportsFileName);
 			}
-			fprintf(stderr,"mfsexports configuration file (%s) not found - please create one (you can copy %s.sample to get a base configuration)\n",ExportsFileName,ExportsFileName);
 		} else {
 			if (exports_records) {
-				mfs_arg_errlog(LOG_WARNING,"can't open mfsexports configuration file (%s) - exports not changed, error",ExportsFileName);
+				mfs_log(MFSLOG_ERRNO_SYSLOG,MFSLOG_WARNING,"can't open mfsexports configuration file (%s) - exports not changed, error",ExportsFileName);
 			} else {
-				mfs_arg_errlog(LOG_WARNING,"can't open mfsexports configuration file (%s) - no exports !!!, error",ExportsFileName);
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"can't open mfsexports configuration file (%s) - no exports !!!, error",ExportsFileName);
 			}
 		}
 		return;
@@ -1215,8 +1246,9 @@ void exports_loadexports(void) {
 	arec = malloc(sizeof(exports));
 	passert(arec);
 	defaults = NULL;
-	while (fgets(linebuff,10000,fd)) {
-		linebuff[9999]=0;
+	lbsize = 10000;
+	linebuff = malloc(lbsize);
+	while (getline(&linebuff,&lbsize,fd)!=-1) {
 		s=strlen(linebuff);
 		while (s>0 && (linebuff[s-1]=='\r' || linebuff[s-1]=='\n' || linebuff[s-1]=='\t' || linebuff[s-1]==' ')) {
 			s--;
@@ -1232,15 +1264,19 @@ void exports_loadexports(void) {
 		}
 		lineno++;
 	}
+	free(linebuff);
 	free(arec);
 	if (defaults!=NULL) {
 		free(defaults);
 	}
 	if (ferror(fd)) {
 		fclose(fd);
-		syslog(LOG_WARNING,"error reading mfsexports file - exports not changed");
+		if (exports_records) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"error reading mfsexports file - exports not changed");
+		} else {
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error reading mfsexports file - no exports !!!");
+		}
 		exports_freelist(newexports);
-		fprintf(stderr,"error reading mfsexports file - using defaults\n");
 		return;
 	}
 	fclose(fd);
@@ -1250,7 +1286,7 @@ void exports_loadexports(void) {
 	for (arec=exports_records ; arec!=NULL ; arec=arec->next) {
 		exports_csum += exports_entry_checksum(arec);
 	}
-	mfs_syslog(LOG_NOTICE,"exports file has been loaded");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"exports file has been loaded");
 }
 
 void exports_reload(void) {
@@ -1267,7 +1303,7 @@ void exports_reload(void) {
 			if ((fd = open(tmpname,O_RDONLY))>=0) {
 				free(ExportsFileName);
 				ExportsFileName = tmpname;
-				mfs_syslog(LOG_WARNING,"default sysconf path has changed - please move mfsexports.cfg from "ETC_PATH"/ to "ETC_PATH"/mfs/");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"default sysconf path has changed - please move mfsexports.cfg from "ETC_PATH"/ to "ETC_PATH"/mfs/");
 			} else {
 				free(tmpname);
 			}
@@ -1275,6 +1311,7 @@ void exports_reload(void) {
 		if (fd>=0) {
 			close(fd);
 		}
+		cfg_use_option("EXPORTS_FILENAME",ExportsFileName);
 	} else {
 		ExportsFileName = cfg_getstr("EXPORTS_FILENAME",ETC_PATH "/mfs/mfsexports.cfg");
 	}

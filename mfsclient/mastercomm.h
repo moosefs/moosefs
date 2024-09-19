@@ -25,15 +25,18 @@
 #include <sys/types.h>
 #include "MFSCommunication.h"
 
-void fs_getmasterlocation(uint8_t loc[14]);
+void fs_getmasterlocation(uint8_t loc[22]);
 uint32_t fs_getsrcip(void);
-
+void fs_getmasterparams(uint32_t *mip,uint16_t *mport,uint32_t *sid,uint32_t *mver,uint64_t *mprocid);
 
 void fs_atime(uint32_t inode);
 void fs_mtime(uint32_t inode);
 void fs_no_atime(uint32_t inode);
 void fs_no_mtime(uint32_t inode);
-void fs_fix_amtime(uint32_t inode,time_t *atime,time_t *mtime);
+void fs_fix_amtime(uint32_t inode,uint32_t *atime,uint32_t *mtime);
+
+void fs_set_working_flags(uint8_t sflags);
+void fs_clr_working_flags(uint8_t cflags);
 
 void fs_notify_sendremoved(uint32_t cnt,uint32_t *inodes);
 //int fs_direct_connect(void);
@@ -47,13 +50,19 @@ void fs_inc_acnt(uint32_t inode);
 void fs_dec_acnt(uint32_t inode);
 // uint8_t fs_is_sustained_entry(uint32_t inode);
 
-void fs_get_fleng(uint32_t inode,uint64_t *fleng);
-void fs_set_fleng(uint32_t inode,uint64_t fleng);
-void fs_inc_fleng(uint32_t inode,uint64_t fleng);
+//void fs_get_fleng(uint32_t inode,uint64_t *fleng);
+//void fs_set_fleng(uint32_t inode,uint64_t fleng);
+//void fs_inc_fleng(uint32_t inode,uint64_t fleng);
 
+void fs_read_notify(uint64_t bytes);
+void fs_write_notify(uint64_t bytes);
+void fs_fsync_notify(void);
+
+uint8_t fs_path_lookup(uint32_t base_inode,uint32_t pleng,const uint8_t *path,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *parent_inode,uint32_t *last_inode,uint8_t *nleng,uint8_t name[256],uint8_t attr[ATTR_RECORD_SIZE]);
 uint8_t fs_simple_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);
 
-uint8_t fs_get_cfg(const char *opt_name,char opt_value[256]);
+uint8_t fs_get_cfg(const char *opt_name,uint8_t *oleng,const uint8_t **odata);
+uint8_t fs_get_cfg_file(const char *opt_name,uint16_t *oleng,const uint8_t **odata);
 void fs_statfs(uint64_t *totalspace,uint64_t *availspace,uint64_t *freespace,uint64_t *trashspace,uint64_t *sustainedspace,uint32_t *inodes);
 uint8_t fs_access(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint16_t modemask);
 // uint8_t fs_lookup(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);
@@ -67,9 +76,9 @@ uint8_t fs_mknod(uint32_t parent,uint8_t nleng,const uint8_t *name,uint8_t type,
 uint8_t fs_mkdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint16_t mode,uint16_t cumask,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t copysgid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);
 uint8_t fs_unlink(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode);
 uint8_t fs_rmdir(uint32_t parent,uint8_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode);
-uint8_t fs_rename(uint32_t parent_src,uint8_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint8_t nleng,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);
+uint8_t fs_rename(uint32_t parent_src,uint8_t nleng_src,const uint8_t *name_src,uint32_t parent_dst,uint8_t nleng,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t mfsflags,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);
 uint8_t fs_link(uint32_t inode_src,uint32_t parent_dst,uint8_t nleng_dst,const uint8_t *name_dst,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE]);
-uint8_t fs_readdir(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint8_t wantattr,uint8_t addtocache,const uint8_t **dbuff,uint32_t *dbuffsize);
+uint8_t fs_readdir(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *edgeid,uint8_t wantattr,uint8_t addtocache,const uint8_t **dbuff,uint32_t *dbuffsize);
 
 // uint8_t fs_check(uint32_t inode,uint8_t dbuff[22]);
 
@@ -78,7 +87,7 @@ uint8_t fs_opencheck(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uin
 
 uint8_t fs_readchunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
 uint8_t fs_writechunk(uint32_t inode,uint32_t indx,uint8_t chunkopflags,uint8_t *csdataver,uint64_t *length,uint64_t *chunkid,uint32_t *version,const uint8_t **csdata,uint32_t *csdatasize);
-uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint32_t indx,uint64_t length,uint8_t chunkopflags);
+uint8_t fs_writeend(uint64_t chunkid,uint32_t inode,uint32_t indx,uint64_t length,uint8_t chunkopflags,uint32_t offset,uint32_t size);
 
 //uint8_t fs_fsync_send(uint32_t inode);
 //uint8_t fs_fsync_wait(void);
@@ -104,7 +113,7 @@ uint8_t fs_settrashpath(uint32_t inode,const uint8_t *path);
 uint8_t fs_undel(uint32_t inode);
 uint8_t fs_purge(uint32_t inode);
 
-uint8_t fs_custom(uint32_t qcmd,const uint8_t *query,uint32_t queryleng,uint32_t *acmd,uint8_t *answer,uint32_t *answerleng);
+uint8_t fs_custom(uint32_t qcmd,const uint8_t *query,uint32_t queryleng,uint32_t *acmd,const uint8_t **answer,uint32_t *answerleng);
 
 // for hardlink emulation only
 // uint8_t fs_append(uint32_t inode,uint32_t ainode,uint32_t uid,uint32_t gid);
@@ -112,8 +121,12 @@ uint8_t fs_custom(uint32_t qcmd,const uint8_t *query,uint32_t queryleng,uint32_t
 uint32_t master_version(void);
 uint8_t master_attrsize(void);
 
+const char* fs_get_current_srcstrip(void);
+const char* fs_get_current_masterstrip(void);
+uint16_t fs_get_current_masterport(void);
+
 // called before fork
-int fs_init_master_connection(const char *bindhostname,const char *masterhostname,const char *masterportname,uint8_t meta,const char *info,const char *subfolder,const uint8_t passworddigest[16],uint8_t donotrememberpassword,uint8_t bgregister);
+int fs_init_master_connection(const char *bindhostname,const char *masterhostname,const char *masterportname,uint8_t meta,const char *info,const char *subfolder,const uint8_t passworddigest[16],uint8_t donotrememberpassword,uint8_t bgregister,uint32_t minversion);
 // called after fork
 void fs_init_threads(uint32_t retries,uint32_t to);
 void fs_term(void);

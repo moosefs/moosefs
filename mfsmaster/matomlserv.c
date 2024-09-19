@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <netinet/in.h>
@@ -51,7 +50,7 @@
 #include "main.h"
 #include "sizestr.h"
 #include "sockets.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "massert.h"
 #include "clocks.h"
 #include "mfsalloc.h"
@@ -65,7 +64,7 @@
 enum{KILL,DATA,CLOSE};
 
 // matomlserventry.clienttype
-enum{UNKNOWN,METALOGGER};
+enum{UNKNOWN,METALOGGER,SUPERVISOR};
 
 // matomlserventry.logstate
 enum{NONE,DELAYED,SYNC};
@@ -110,12 +109,14 @@ typedef struct matomlserventry {
 	int upload_chain1_fd;
 	int upload_chain2_fd;
 
+
 	struct matomlserventry *next;
 } matomlserventry;
 
 static matomlserventry *matomlservhead=NULL;
 static int lsock;
 static int32_t lsockpdescpos;
+
 
 /*
 typedef struct old_changes_entry {
@@ -141,6 +142,8 @@ static char *ListenHost;
 static char *ListenPort;
 static uint32_t listenip;
 static uint16_t listenport;
+static uint32_t DefaultTimeout;
+static uint32_t ForceTimeout;
 
 
 static uint32_t BackMetaCopies;
@@ -212,6 +215,8 @@ static inline const char* matomlserv_clientname(matomlserventry *eptr) {
 				default:
 					return "METALOGGER";
 			}
+		case SUPERVISOR:
+			return "SUPERVISOR";
 	}
 	return "UNKNOWN";
 }
@@ -246,34 +251,10 @@ void matomlserv_status(void) {
 			return;
 		}
 	}
-	syslog(LOG_WARNING,"no metaloggers connected !!!");
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"no metaloggers connected !!!");
 }
 
-char* matomlserv_makestrip(uint32_t ip) {
-	uint8_t *ptr,pt[4];
-	uint32_t l,i;
-	char *optr;
-	ptr = pt;
-	put32bit(&ptr,ip);
-	l=0;
-	for (i=0 ; i<4 ; i++) {
-		if (pt[i]>=100) {
-			l+=3;
-		} else if (pt[i]>=10) {
-			l+=2;
-		} else {
-			l+=1;
-		}
-	}
-	l+=4;
-	optr = malloc(l);
-	passert(optr);
-	snprintf(optr,l,"%"PRIu8".%"PRIu8".%"PRIu8".%"PRIu8,pt[0],pt[1],pt[2],pt[3]);
-	optr[l-1]=0;
-	return optr;
-}
-
-uint8_t* matomlserv_createpacket(matomlserventry *eptr,uint32_t type,uint32_t size) {
+uint8_t* matomlserv_create_packet(matomlserventry *eptr,uint32_t type,uint32_t size) {
 	out_packetstruct *outpacket;
 	uint8_t *ptr;
 	uint32_t psize;
@@ -295,63 +276,31 @@ uint8_t* matomlserv_createpacket(matomlserventry *eptr,uint32_t type,uint32_t si
 	return ptr;
 }
 
-void matomlserv_send_old_change(void *veptr,uint64_t version,uint8_t *data,uint32_t length) {
-	matomlserventry *eptr = (matomlserventry *)veptr;
-	uint8_t *pdata;
 
-	pdata = matomlserv_createpacket(eptr,MATOAN_METACHANGES_LOG,9+length);
-	put8bit(&pdata,0xFF);
-	put64bit(&pdata,version);
-	memcpy(pdata,data,length);
-}
-
-/*
-void matomlserv_send_old_changes(matomlserventry *eptr,uint64_t version) {
-	uint64_t minver = changelog_get_minversion();
-	if (minver==0) {
-		// syslog(LOG_WARNING,"meta logger wants old changes, but storage is disabled");
-		return;
-	}
-	if (version<minver) {
-		syslog(LOG_WARNING,"meta logger wants changes since version: %"PRIu64", but minimal version in storage is: %"PRIu64,version,minver);
-		return;
-	}
-	changelog_get_old_changes(version,matomlserv_send_old_change,eptr);
-}
-*/
-/*
-void matomlserv_send_old_changes(matomlserventry *eptr,uint64_t version) {
-	old_changes_block *oc;
-	old_changes_entry *oce;
+void matomlserv_broadcast_timeout(void) {
+	matomlserventry *eptr;
 	uint8_t *data;
-	uint8_t start=0;
-	uint32_t i;
-	if (old_changes_head==NULL) {
-		// syslog(LOG_WARNING,"meta logger wants old changes, but storage is disabled");
-		return;
-	}
-	if (old_changes_head->minversion>version) {
-		syslog(LOG_WARNING,"meta logger wants changes since version: %"PRIu64", but minimal version in storage is: %"PRIu64,version,old_changes_head->minversion);
-		return;
-	}
-	for (oc=old_changes_head ; oc ; oc=oc->next) {
-		if (oc->minversion<=version && (oc->next==NULL || oc->next->minversion>version)) {
-			start=1;
-		}
-		if (start) {
-			for (i=0 ; i<oc->entries ; i++) {
-				oce = oc->old_changes_block + i;
-				if (version>=oce->version) {
-					data = matomlserv_createpacket(eptr,MATOAN_METACHANGES_LOG,9+oce->length);
-					put8bit(&data,0xFF);
-					put64bit(&data,oce->version);
-					memcpy(data,oce->data,oce->length);
-				}
+
+	if (ForceTimeout>0) {
+		for (eptr = matomlservhead ; eptr ; eptr=eptr->next) {
+			if (eptr->mode==DATA && (eptr->clienttype==METALOGGER && eptr->version>=VERSION2INT(4,24,0))) {
+				eptr->timeout = ForceTimeout;
+				data = matomlserv_create_packet(eptr,ANTOAN_FORCE_TIMEOUT,2);
+				put16bit(&data,ForceTimeout);
 			}
 		}
 	}
 }
-*/
+
+void matomlserv_send_old_change(void *veptr,uint64_t version,uint8_t *data,uint32_t length) {
+	matomlserventry *eptr = (matomlserventry *)veptr;
+	uint8_t *pdata;
+
+	pdata = matomlserv_create_packet(eptr,MATOAN_METACHANGES_LOG,9+length);
+	put8bit(&pdata,0xFF);
+	put64bit(&pdata,version);
+	memcpy(pdata,data,length);
+}
 
 
 void matomlserv_get_version(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -359,16 +308,16 @@ void matomlserv_get_version(matomlserventry *eptr,const uint8_t *data,uint32_t l
 	uint8_t *ptr;
 	static const char vstring[] = VERSSTR;
 	if (length!=0 && length!=4) {
-		syslog(LOG_NOTICE,"ANTOAN_GET_VERSION - wrong size (%"PRIu32"/4|0)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_VERSION - wrong size (%"PRIu32"/4|0)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	if (length==4) {
 		msgid = get32bit(&data);
-		ptr = matomlserv_createpacket(eptr,ANTOAN_VERSION,4+4+strlen(vstring));
+		ptr = matomlserv_create_packet(eptr,ANTOAN_VERSION,4+4+strlen(vstring));
 		put32bit(&ptr,msgid);
 	} else {
-		ptr = matomlserv_createpacket(eptr,ANTOAN_VERSION,4+strlen(vstring));
+		ptr = matomlserv_create_packet(eptr,ANTOAN_VERSION,4+strlen(vstring));
 	}
 	put16bit(&ptr,VERSMAJ);
 	put8bit(&ptr,VERSMID);
@@ -385,28 +334,104 @@ void matomlserv_get_config(matomlserventry *eptr,const uint8_t *data,uint32_t le
 	uint8_t *ptr;
 
 	if (length<5) {
-		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32")",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
 		return;
 	}
 	msgid = get32bit(&data);
 	nleng = get8bit(&data);
 	if (length!=5U+(uint32_t)nleng) {
-		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
 		eptr->mode = KILL;
 		return;
 	}
 	memcpy(name,data,nleng);
 	name[nleng] = 0;
-	val = cfg_getstr(name,"");
-	vleng = strlen(val);
-	if (vleng>255) {
-		vleng=255;
+	val = cfg_getdefaultstr(name);
+	if (val!=NULL) {
+		vleng = strlen(val);
+		if (vleng>255) {
+			vleng=255;
+		}
+	} else {
+		vleng = 0;
 	}
-	ptr = matomlserv_createpacket(eptr,ANTOAN_CONFIG_VALUE,5+vleng);
-	put32bit(&ptr,msgid);
+	if (msgid==0) {
+		ptr = matomlserv_create_packet(eptr,ANTOAN_CONFIG_VALUE,6+nleng+vleng);
+		put32bit(&ptr,0);
+		put8bit(&ptr,nleng);
+		if (nleng>0) {
+			memcpy(ptr,name,nleng);
+			ptr+=nleng;
+		}
+	} else {
+		ptr = matomlserv_create_packet(eptr,ANTOAN_CONFIG_VALUE,5+vleng);
+		put32bit(&ptr,msgid);
+	}
 	put8bit(&ptr,vleng);
-	memcpy(ptr,val,vleng);
+	if (vleng>0 && val!=NULL) {
+		memcpy(ptr,val,vleng);
+	}
+	if (val!=NULL) {
+		free(val);
+	}
+}
+
+void matomlserv_get_config_file(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	char name[256];
+	uint8_t nleng;
+	cfg_buff *fdata;
+	uint8_t *ptr;
+
+	if (length<5) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_CONFIG_FILE - wrong size (%"PRIu32")",length);
+		eptr->mode = KILL;
+		return;
+	}
+	msgid = get32bit(&data);
+	nleng = get8bit(&data);
+	if (length!=5U+(uint32_t)nleng) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_CONFIG_FILE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		eptr->mode = KILL;
+		return;
+	}
+	memcpy(name,data,nleng);
+	name[nleng] = 0;
+	fdata = cfg_getdefaultfile(name,65535);
+	if (fdata==NULL) {
+		ptr = matomlserv_create_packet(eptr,ANTOAN_CONFIG_FILE_CONTENT,5);
+		put32bit(&ptr,msgid);
+		put8bit(&ptr,MFS_ERROR_ENOENT);
+	} else {
+		ptr = matomlserv_create_packet(eptr,ANTOAN_CONFIG_FILE_CONTENT,6+fdata->leng);
+		put32bit(&ptr,msgid);
+		put16bit(&ptr,fdata->leng);
+		memcpy(ptr,fdata->data,fdata->leng);
+		free(fdata);
+	}
+}
+
+void matomlserv_syslog(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t priority;
+	uint32_t timestamp;
+	uint16_t msgsize;
+	if (length<3) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_SYSLOG - wrong size (%"PRIu32"/>=7)",length);
+		eptr->mode = KILL;
+		return;
+	}
+	priority = get8bit(&data);
+	timestamp = get32bit(&data);
+	msgsize = get16bit(&data);
+	if (length!=3U+msgsize) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_SYSLOG - wrong size (%"PRIu32"/7+msgsize(%"PRIu16"))",length,msgsize);
+		eptr->mode = KILL;
+		return;
+	}
+	(void)priority;
+	(void)timestamp;
+	// lc_log_new_pstr(eptr->modulelogname,priority,timestamp,msgsize,data);
 }
 
 void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -415,58 +440,139 @@ void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t leng
 	uint32_t n;
 
 	if (eptr->version>0) {
-		syslog(LOG_WARNING,"got register message from registered metalogger !!!");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"got register message from registered metalogger !!!");
 		eptr->mode = KILL;
 		return;
 	}
 	if (length<1) {
-		syslog(LOG_NOTICE,"ANTOMA_REGISTER - wrong size (%"PRIu32")",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_REGISTER - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
 		return;
 	} else {
 		rversion = get8bit(&data);
+		if (rversion==3) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_REGISTER - protocol not supported",length);
+			eptr->mode = KILL;
+			return;
+		}
 		if (rversion==1) {
 			eptr->clienttype = METALOGGER;
 			if (length!=7) {
-				syslog(LOG_NOTICE,"ANTOMA_REGISTER (logger 1) - wrong size (%"PRIu32"/7)",length);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_REGISTER (logger 1) - wrong size (%"PRIu32"/7)",length);
 				eptr->mode = KILL;
 				return;
 			}
 			eptr->version = get32bit(&data);
-			eptr->timeout = get16bit(&data);
-			eptr->logstate = SYNC;
+			if (ForceTimeout>0) {
+				data+=2;
+			} else {
+				eptr->timeout = get16bit(&data);
+			}
+			if ((eptr->version>=VERSION2INT(1,7,25) && eptr->version<VERSION2INT(2,0,0)) || (eptr->version>=VERSION2INT(2,0,0) && (eptr->version&1)) || eptr->version>=VERSION2INT(4,0,0)) {
+				uint8_t *p;
+				p = matomlserv_create_packet(eptr,MATOAN_MASTER_ACK,5);
+				put8bit(&p,1);
+				put32bit(&p,VERSHEX);
+				eptr->logstate = SYNC;
+			} else {
+				eptr->logstate = SYNC;
+			}
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"metalogger %s registered (using simple register protocol)",eptr->servstrip);
 		} else if (rversion==2) {
 			eptr->clienttype = METALOGGER;
 			if (length!=7+8) {
-				syslog(LOG_NOTICE,"ANTOMA_REGISTER (logger 2) - wrong size (%"PRIu32"/15)",length);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_REGISTER (logger 2) - wrong size (%"PRIu32"/15)",length);
 				eptr->mode = KILL;
 				return;
 			}
 			eptr->version = get32bit(&data);
-			eptr->timeout = get16bit(&data);
+			if (ForceTimeout>0) {
+				data+=2;
+			} else {
+				eptr->timeout = get16bit(&data);
+			}
 			req_minversion = get64bit(&data);
 			chlog_minversion = changelog_get_minversion();
-			if (chlog_minversion>0 && chlog_minversion<=req_minversion) {
-				n = changelog_get_old_changes(req_minversion,matomlserv_send_old_change,eptr,OLD_CHANGES_GROUP_COUNT);
-				if (n<OLD_CHANGES_GROUP_COUNT) {
-					eptr->logstate = SYNC;
+			if ((eptr->version>=VERSION2INT(1,7,25) && eptr->version<VERSION2INT(2,0,0)) || (eptr->version>=VERSION2INT(2,0,0) && (eptr->version&1)) || eptr->version>=VERSION2INT(4,0,0)) {
+				uint8_t *p;
+				p = matomlserv_create_packet(eptr,MATOAN_MASTER_ACK,5);
+				if (chlog_minversion==0 || chlog_minversion>req_minversion) {
+					put8bit(&p,1);
+					put32bit(&p,VERSHEX);
+					eptr->logstate = SYNC; // desync, but send current changelogs
 				} else {
-					eptr->next_log_version = req_minversion+n;
-					eptr->logstate = DELAYED;
+					put8bit(&p,0);
+					put32bit(&p,VERSHEX);
+//							printf("req_minversion: %"PRIu64"\n",req_minversion);
+					n = changelog_get_old_changes(req_minversion,matomlserv_send_old_change,eptr,OLD_CHANGES_GROUP_COUNT);
+					if (n<OLD_CHANGES_GROUP_COUNT) {
+						eptr->logstate = SYNC;
+					} else {
+						eptr->next_log_version = req_minversion+n;
+						eptr->logstate = DELAYED;
+					}
 				}
 			} else {
-				eptr->logstate = SYNC; // desync
+				if (chlog_minversion>0 && chlog_minversion<=req_minversion) {
+					n = changelog_get_old_changes(req_minversion,matomlserv_send_old_change,eptr,OLD_CHANGES_GROUP_COUNT);
+					if (n<OLD_CHANGES_GROUP_COUNT) {
+						eptr->logstate = SYNC;
+					} else {
+						eptr->next_log_version = req_minversion+n;
+						eptr->logstate = DELAYED;
+					}
+				} else {
+					eptr->logstate = SYNC; // desync
+				}
 			}
-		} else if (rversion==3 || rversion==4) { // just ignore PRO components
-			eptr->mode = KILL;
-			return;
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"metalogger %s registered (using advanced register protocol)",eptr->servstrip);
+		} else if (rversion==4) {
+			uint8_t *p;
+			uint8_t mode;
+			eptr->clienttype = SUPERVISOR;
+			if (length!=7) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_REGISTER (supervisor) - wrong size (%"PRIu32"/7)",length);
+				eptr->mode = KILL;
+				return;
+			}
+			eptr->version = get32bit(&data);
+			if (eptr->version>=VERSION2INT(4,23,5) && eptr->version<VERSION2INT(4,48,0)) {
+				eptr->version |= 1;
+			}
+			if (ForceTimeout>0) {
+				data += 2;
+			} else {
+				eptr->timeout = get16bit(&data);
+			}
+			if (eptr->version < VERSION2INT(3,0,0)) {
+				mode = (eptr->version>=VERSION2INT(2,0,82))?1:0;
+			} else if (eptr->version < VERSION2INT(4,0,0)) {
+				mode = (eptr->version>=VERSION2INT(3,0,107))?2:(eptr->version>=VERSION2INT(3,0,59))?1:0;
+			} else {
+				mode = (eptr->version>=VERSION2INT(4,17,0))?2:1;
+			}
+			p = matomlserv_create_packet(eptr,MATOAN_STATE,(mode>1)?40:(mode>0)?28:20);
+			put8bit(&p,0xFF);
+			put8bit(&p,0xFF);
+			put8bit(&p,0xFF);
+			put8bit(&p,0xFF);
+			put32bit(&p,0);
+			put32bit(&p,0);
+			put64bit(&p,meta_version());
+			if (mode>0) {
+				put64bit(&p,meta_get_id());
+			}
+			if (mode>1) {
+				put64bit(&p,main_utime());
+				put32bit(&p,0);
+			}
 		} else {
-			syslog(LOG_NOTICE,"ANTOMA_REGISTER - wrong version (%"PRIu8"/1)",rversion);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_REGISTER - wrong version (%"PRIu8"/1)",rversion);
 			eptr->mode = KILL;
 			return;
 		}
 		if (eptr->timeout<10) {
-			syslog(LOG_NOTICE,"ANTOMA_REGISTER communication timeout too small (%"PRIu16" seconds - should be at least 10 seconds)",eptr->timeout);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"ANTOMA_REGISTER communication timeout too small (%"PRIu16" seconds - should be at least 10 seconds)",eptr->timeout);
 			if (eptr->timeout<3) {
 				eptr->timeout=3;
 			}
@@ -476,13 +582,28 @@ void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t leng
 	}
 }
 
+void matomlserv_store_metadata(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
+	(void)data;
+	if (length!=0) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_STORE_METADATA - wrong size (%"PRIu32"/0)",length);
+		eptr->mode = KILL;
+		return;
+	}
+	if (eptr->clienttype!=SUPERVISOR) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_STORE_METADATA - wrong client type");
+		eptr->mode = KILL;
+		return;
+	}
+	meta_do_store_metadata();
+}
+
 
 void matomlserv_download_start(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t filenum;
 	uint64_t size;
 	uint8_t *ptr;
 	if (length!=1) {
-		syslog(LOG_NOTICE,"ANTOMA_DOWNLOAD_START - wrong size (%"PRIu32"/1)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_DOWNLOAD_START - wrong size (%"PRIu32"/1)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -525,17 +646,17 @@ void matomlserv_download_start(matomlserventry *eptr,const uint8_t *data,uint32_
 	}
 	if (eptr->upload_meta_fd<0) {
 		if (filenum==11 || filenum==12) {
-			ptr = matomlserv_createpacket(eptr,MATOAN_DOWNLOAD_INFO,8);
+			ptr = matomlserv_create_packet(eptr,MATOAN_DOWNLOAD_INFO,8);
 			put64bit(&ptr,0);
 			return;
 		} else {
-			ptr = matomlserv_createpacket(eptr,MATOAN_DOWNLOAD_INFO,1);
+			ptr = matomlserv_create_packet(eptr,MATOAN_DOWNLOAD_INFO,1);
 			put8bit(&ptr,0xff);	// error
 			return;
 		}
 	}
 	size = lseek(eptr->upload_meta_fd,0,SEEK_END);
-	ptr = matomlserv_createpacket(eptr,MATOAN_DOWNLOAD_INFO,8);
+	ptr = matomlserv_create_packet(eptr,MATOAN_DOWNLOAD_INFO,8);
 	put64bit(&ptr,size);	// ok
 }
 
@@ -547,18 +668,18 @@ void matomlserv_download_request(matomlserventry *eptr,const uint8_t *data,uint3
 	ssize_t ret;
 
 	if (length!=12) {
-		syslog(LOG_NOTICE,"ANTOMA_DOWNLOAD_REQUEST - wrong size (%"PRIu32"/12)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_DOWNLOAD_REQUEST - wrong size (%"PRIu32"/12)",length);
 		eptr->mode = KILL;
 		return;
 	}
 	if (eptr->upload_meta_fd<0) {
-		syslog(LOG_NOTICE,"ANTOMA_DOWNLOAD_REQUEST - file not opened");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_DOWNLOAD_REQUEST - file not opened");
 		eptr->mode = KILL;
 		return;
 	}
 	offset = get64bit(&data);
 	leng = get32bit(&data);
-	ptr = matomlserv_createpacket(eptr,MATOAN_DOWNLOAD_DATA,16+leng);
+	ptr = matomlserv_create_packet(eptr,MATOAN_DOWNLOAD_DATA,16+leng);
 	put64bit(&ptr,offset);
 	put32bit(&ptr,leng);
 #ifdef HAVE_PREAD
@@ -568,7 +689,7 @@ void matomlserv_download_request(matomlserventry *eptr,const uint8_t *data,uint3
 	ret = read(eptr->upload_meta_fd,ptr+4,leng);
 #endif /* HAVE_PWRITE */
 	if (ret!=(ssize_t)leng) {
-		mfs_errlog_silent(LOG_NOTICE,"error reading metafile");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error reading metafile");
 		eptr->mode = KILL;
 		return;
 	}
@@ -579,7 +700,7 @@ void matomlserv_download_request(matomlserventry *eptr,const uint8_t *data,uint3
 void matomlserv_download_end(matomlserventry *eptr,const uint8_t *data,uint32_t length) {
 	(void)data;
 	if (length!=0) {
-		syslog(LOG_NOTICE,"ANTOMA_DOWNLOAD_END - wrong size (%"PRIu32"/0)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_DOWNLOAD_END - wrong size (%"PRIu32"/0)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -596,7 +717,7 @@ void matomlserv_broadcast_logstring(uint64_t version,uint8_t *logstr,uint32_t lo
 
 	for (eptr = matomlservhead ; eptr ; eptr=eptr->next) {
 		if (eptr->version>0 && eptr->clienttype==METALOGGER && eptr->logstate==SYNC) {
-			data = matomlserv_createpacket(eptr,MATOAN_METACHANGES_LOG,9+logstrsize);
+			data = matomlserv_create_packet(eptr,MATOAN_METACHANGES_LOG,9+logstrsize);
 			put8bit(&data,0xFF);
 			put64bit(&data,version);
 			memcpy(data,logstr,logstrsize);
@@ -610,11 +731,12 @@ void matomlserv_broadcast_logrotate(void) {
 
 	for (eptr = matomlservhead ; eptr ; eptr=eptr->next) {
 		if (eptr->version>0 && eptr->clienttype==METALOGGER) {
-			data = matomlserv_createpacket(eptr,MATOAN_METACHANGES_LOG,1);
+			data = matomlserv_create_packet(eptr,MATOAN_METACHANGES_LOG,1);
 			put8bit(&data,0x55);
 		}
 	}
 }
+
 
 void matomlserv_beforeclose(matomlserventry *eptr) {
 	if (eptr->upload_meta_fd>=0) {
@@ -645,8 +767,17 @@ void matomlserv_gotpacket(matomlserventry *eptr,uint32_t type,const uint8_t *dat
 		case ANTOAN_GET_CONFIG:
 			matomlserv_get_config(eptr,data,length);
 			break;
+		case ANTOAN_GET_CONFIG_FILE:
+			matomlserv_get_config_file(eptr,data,length);
+			break;
+		case ANTOMA_SYSLOG:
+			matomlserv_syslog(eptr,data,length);
+			break;
 		case ANTOMA_REGISTER:
 			matomlserv_register(eptr,data,length);
+			break;
+		case ANTOMA_STORE_METADATA:
+			matomlserv_store_metadata(eptr,data,length);
 			break;
 		case ANTOMA_DOWNLOAD_START:
 			matomlserv_download_start(eptr,data,length);
@@ -658,7 +789,7 @@ void matomlserv_gotpacket(matomlserventry *eptr,uint32_t type,const uint8_t *dat
 			matomlserv_download_end(eptr,data,length);
 			break;
 		default:
-			syslog(LOG_NOTICE,"master control module: got unknown message (type:%"PRIu32")",type);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"master control module: got unknown message (type:%"PRIu32")",type);
 			eptr->mode = KILL;
 	}
 }
@@ -739,7 +870,7 @@ void matomlserv_read(matomlserventry *eptr,double now) {
 			leng = get32bit(&ptr);
 
 			if (leng>MaxPacketSize) {
-				syslog(LOG_WARNING,"ML(%s) packet too long (%"PRIu32"/%u) ; command:%"PRIu32,eptr->servstrip,leng,MaxPacketSize,type);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ML(%s) packet too long (%"PRIu32"/%u) ; command:%"PRIu32,eptr->servstrip,leng,MaxPacketSize,type);
 				eptr->input_end = 1;
 				return;
 			}
@@ -768,10 +899,12 @@ void matomlserv_read(matomlserventry *eptr,double now) {
 	}
 
 	if (hup) {
-		syslog(LOG_NOTICE,"connection with %s(%s) has been closed by peer",matomlserv_clientname(eptr),eptr->servstrip);
+		if (eptr->clienttype!=SUPERVISOR) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"connection with %s(%s) has been closed by peer",matomlserv_clientname(eptr),eptr->servstrip);
+		}
 		eptr->input_end = 1;
 	} else if (err) {
-		mfs_arg_errlog_silent(LOG_NOTICE,"read from ML(%s) error",eptr->servstrip);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"read from ML(%s) error",eptr->servstrip);
 		eptr->input_end = 1;
 	}
 }
@@ -820,7 +953,7 @@ void matomlserv_write(matomlserventry *eptr,double now) {
 		i = writev(eptr->sock,iovtab,iovdata);
 		if (i<0) {
 			if (ERRNO_ERROR) {
-				mfs_arg_errlog_silent(LOG_NOTICE,"write to ML(%s) error",eptr->servstrip);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"write to ML(%s) error",eptr->servstrip);
 				eptr->mode = KILL;
 			}
 			return;
@@ -857,7 +990,7 @@ void matomlserv_write(matomlserventry *eptr,double now) {
 		i=write(eptr->sock,opack->startptr,opack->bytesleft);
 		if (i<0) {
 			if (ERRNO_ERROR) {
-				mfs_arg_errlog_silent(LOG_NOTICE,"write to ML(%s) error",eptr->servstrip);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"write to ML(%s) error",eptr->servstrip);
 				eptr->mode = KILL;
 			}
 			return;
@@ -970,7 +1103,7 @@ void matomlserv_serve(struct pollfd *pdesc) {
 	if (lsockpdescpos>=0 && (pdesc[lsockpdescpos].revents & POLLIN)) {
 		ns=tcpaccept(lsock);
 		if (ns<0) {
-			mfs_errlog_silent(LOG_NOTICE,"Master<->ML socket: accept error");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"Master<->ML socket: accept error");
 		} else {
 			tcpnonblock(ns);
 			tcpnodelay(ns);
@@ -991,10 +1124,14 @@ void matomlserv_serve(struct pollfd *pdesc) {
 			eptr->inputtail = &(eptr->inputhead);
 			eptr->outputhead = NULL;
 			eptr->outputtail = &(eptr->outputhead);
-			eptr->timeout = 10;
+			if (ForceTimeout>0) {
+				eptr->timeout = ForceTimeout;
+			} else {
+				eptr->timeout = DefaultTimeout;
+			}
 
 			tcpgetpeer(eptr->sock,&(eptr->servip),NULL);
-			eptr->servstrip = matomlserv_makestrip(eptr->servip);
+			eptr->servstrip = univallocstrip(eptr->servip);
 			eptr->version = 0;
 			eptr->clienttype = UNKNOWN;
 			eptr->logstate = NONE;
@@ -1019,8 +1156,8 @@ void matomlserv_serve(struct pollfd *pdesc) {
 
 // write
 	for (eptr=matomlservhead ; eptr ; eptr=eptr->next) {
-		if ((eptr->lastwrite+(eptr->timeout/3.0))<now && eptr->outputhead==NULL && eptr->clienttype!=UNKNOWN) {
-			matomlserv_createpacket(eptr,ANTOAN_NOP,0);
+		if ((eptr->lastwrite+1.0)<now && eptr->outputhead==NULL && eptr->clienttype!=UNKNOWN && eptr->clienttype!=SUPERVISOR) {
+			matomlserv_create_packet(eptr,ANTOAN_NOP,0);
 		}
 		if (eptr->pdescpos>=0) {
 			if ((((pdesc[eptr->pdescpos].events & POLLOUT)==0 && (eptr->outputhead)) || (pdesc[eptr->pdescpos].revents & POLLOUT)) && eptr->mode!=KILL) {
@@ -1042,6 +1179,23 @@ void matomlserv_serve(struct pollfd *pdesc) {
 	matomlserv_disconnection_loop();
 }
 
+uint64_t matomlserv_get_min_version(void) {
+	matomlserventry *eptr;
+	uint64_t minversion;
+
+	minversion = meta_version();
+
+	for (eptr=matomlservhead ; eptr ; eptr=eptr->next) {
+		if (eptr->logstate==DELAYED) {
+			if (eptr->next_log_version < minversion) {
+				minversion = eptr->next_log_version;
+			}
+		}
+	}
+
+	return minversion;
+}
+
 void matomlserv_keep_alive(void) {
 	double now;
 	matomlserventry *eptr;
@@ -1055,8 +1209,8 @@ void matomlserv_keep_alive(void) {
 	}
 // write
 	for (eptr=matomlservhead ; eptr ; eptr=eptr->next) {
-		if ((eptr->lastwrite+(eptr->timeout/3.0))<now && eptr->outputhead==NULL && eptr->clienttype!=UNKNOWN) {
-			matomlserv_createpacket(eptr,ANTOAN_NOP,0);
+		if (eptr->lastwrite+1.0<now && eptr->outputhead==NULL && eptr->clienttype!=UNKNOWN && eptr->clienttype!=SUPERVISOR) {
+			matomlserv_create_packet(eptr,ANTOAN_NOP,0);
 		}
 		if (eptr->mode == DATA && eptr->outputhead) {
 			matomlserv_write(eptr,now);
@@ -1074,7 +1228,7 @@ void matomlserv_term(void) {
 	matomlserventry *eptr,*eaptr;
 	in_packetstruct *ipptr,*ipaptr;
 	out_packetstruct *opptr,*opaptr;
-	syslog(LOG_INFO,"master control module: closing %s:%s",ListenHost,ListenPort);
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"master control module: closing %s:%s",ListenHost,ListenPort);
 	tcpclose(lsock);
 
 	eptr = matomlservhead;
@@ -1099,6 +1253,7 @@ void matomlserv_term(void) {
 		free(eaptr);
 	}
 	matomlservhead=NULL;
+
 
 	matomlserv_read(NULL,0.0); // free internal read buffer
 
@@ -1128,7 +1283,26 @@ uint16_t matomlserv_getport(void) {
 	return listenport;
 }
 
+const char* matomlserv_getportstr(void) {
+	return ListenPort;
+}
+
 void matomlserv_reload_common(void) {
+	DefaultTimeout = cfg_getuint32("MATOML_TIMEOUT",10);
+	if (DefaultTimeout>65535) {
+		DefaultTimeout=65535;
+	} else if (DefaultTimeout<10) {
+		DefaultTimeout=10;
+	}
+
+	ForceTimeout = cfg_getuint32("MATOML_FORCE_TIMEOUT",0);
+	if (ForceTimeout>0 && ForceTimeout<10) {
+		ForceTimeout=10;
+	}
+	if (ForceTimeout>65535) {
+		ForceTimeout=65535;
+	}
+
 	BackMetaCopies = cfg_getuint32("BACK_META_KEEP_PREVIOUS",1);
 	if (BackMetaCopies>99) {
 		BackMetaCopies=99;
@@ -1153,13 +1327,13 @@ void matomlserv_reload(void) {
 	if (strcmp(oldListenHost,ListenHost)==0 && strcmp(oldListenPort,ListenPort)==0) {
 		free(oldListenHost);
 		free(oldListenPort);
-		mfs_arg_syslog(LOG_NOTICE,"master <-> metaloggers module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"master <-> metaloggers module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
 		return;
 	}
 
 	newlsock = tcpsocket();
 	if (newlsock<0) {
-		mfs_errlog(LOG_WARNING,"master <-> metaloggers module: socket address has changed, but can't create new socket");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"master <-> metaloggers module: socket address has changed, but can't create new socket");
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -1170,7 +1344,7 @@ void matomlserv_reload(void) {
 	tcpnodelay(newlsock);
 	tcpreuseaddr(newlsock);
 	if (tcpresolve(ListenHost,ListenPort,&listenip,&listenport,1)<0) {
-		mfs_arg_errlog(LOG_ERR,"master <-> metaloggers module: socket address has changed, but can't be resolved (%s:%s)",ListenHost,ListenPort);
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"master <-> metaloggers module: socket address has changed, but can't be resolved (%s:%s)",ListenHost,ListenPort);
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -1181,7 +1355,7 @@ void matomlserv_reload(void) {
 		return;
 	}
 	if (tcpnumlisten(newlsock,listenip,listenport,100)<0) {
-		mfs_arg_errlog(LOG_ERR,"master <-> metaloggers module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"master <-> metaloggers module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
 		free(ListenHost);
 		free(ListenPort);
 		ListenHost = oldListenHost;
@@ -1192,9 +1366,9 @@ void matomlserv_reload(void) {
 		return;
 	}
 	if (tcpsetacceptfilter(newlsock)<0 && errno!=ENOTSUP) {
-		mfs_errlog_silent(LOG_NOTICE,"master <-> metaloggers module: can't set accept filter");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"master <-> metaloggers module: can't set accept filter");
 	}
-	mfs_arg_syslog(LOG_NOTICE,"master <-> metaloggers module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"master <-> metaloggers module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
 	free(oldListenHost);
 	free(oldListenPort);
 	tcpclose(lsock);
@@ -1202,7 +1376,7 @@ void matomlserv_reload(void) {
 
 //	ChangelogSecondsToRemember = cfg_getuint16("MATOAN_LOG_PRESERVE_SECONDS",600);
 //	if (ChangelogSecondsToRemember>3600) {
-//		syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
 //		ChangelogSecondsToRemember=3600;
 //	}
 }
@@ -1215,35 +1389,35 @@ int matomlserv_init(void) {
 
 	lsock = tcpsocket();
 	if (lsock<0) {
-		mfs_errlog(LOG_ERR,"master <-> metaloggers module: can't create socket");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"master <-> metaloggers module: can't create socket");
 		return -1;
 	}
 	tcpnonblock(lsock);
 	tcpnodelay(lsock);
 	tcpreuseaddr(lsock);
 	if (tcpresolve(ListenHost,ListenPort,&listenip,&listenport,1)<0) {
-		mfs_arg_errlog(LOG_ERR,"master <-> metaloggers module: can't resolve %s:%s",ListenHost,ListenPort);
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"master <-> metaloggers module: can't resolve %s:%s",ListenHost,ListenPort);
 		return -1;
 	}
 	if (tcpnumlisten(lsock,listenip,listenport,100)<0) {
-		mfs_arg_errlog(LOG_ERR,"master <-> metaloggers module: can't listen on %s:%s",ListenHost,ListenPort);
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"master <-> metaloggers module: can't listen on %s:%s",ListenHost,ListenPort);
 		return -1;
 	}
 	if (tcpsetacceptfilter(lsock)<0 && errno!=ENOTSUP) {
-		mfs_errlog_silent(LOG_NOTICE,"master <-> metaloggers module: can't set accept filter");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"master <-> metaloggers module: can't set accept filter");
 	}
-	mfs_arg_syslog(LOG_NOTICE,"master <-> metaloggers module: listen on %s:%s",ListenHost,ListenPort);
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"master <-> metaloggers module: listen on %s:%s",ListenHost,ListenPort);
 
 	matomlservhead = NULL;
 //	ChangelogSecondsToRemember = cfg_getuint16("MATOAN_LOG_PRESERVE_SECONDS",600);
 //	if (ChangelogSecondsToRemember>3600) {
-//		syslog(LOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 3600 seconds",ChangelogSecondsToRemember);
 //		ChangelogSecondsToRemember=3600;
 //	}
 	main_reload_register(matomlserv_reload);
 	main_destruct_register(matomlserv_term);
 	main_poll_register(matomlserv_desc,matomlserv_serve);
 	main_keepalive_register(matomlserv_keep_alive);
-	main_time_register(3600,0,matomlserv_status);
+	main_time_register(10,0,matomlserv_broadcast_timeout);
 	return 0;
 }

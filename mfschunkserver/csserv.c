@@ -22,12 +22,12 @@
 
 #include <stddef.h>
 #include <time.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <netinet/in.h>
@@ -43,7 +43,7 @@
 #include "hddspacemgr.h"
 #include "masterconn.h"
 #include "charts.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "bgjobs.h"
 #include "massert.h"
 
@@ -62,13 +62,14 @@ enum {IDLE,READ,WRITE,CLOSE};
 
 struct csserventry;
 
-enum {IJ_GET_CHUNK_BLOCKS,IJ_GET_CHUNK_CHECKSUM,IJ_GET_CHUNK_CHECKSUM_TAB};
+enum {IJ_GET_CHUNK_BLOCKS,IJ_GET_CHUNK_CHECKSUM,IJ_GET_CHUNK_CHECKSUM_TAB,IJ_GET_CHUNK_INFO};
 
 typedef struct idlejob {
 	uint32_t jobid;
 	uint8_t op;
 	uint64_t chunkid;
 	uint32_t version;
+	uint8_t requested_info;
 	struct csserventry *eptr;
 	struct idlejob *next,**prev;
 	uint8_t buff[1];
@@ -153,7 +154,7 @@ void csserv_get_version(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t *ptr;
 	static const char vstring[] = VERSSTR;
 	if (length!=0 && length!=4) {
-		syslog(LOG_NOTICE,"ANTOAN_GET_VERSION - wrong size (%"PRIu32"/4|0)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_VERSION - wrong size (%"PRIu32"/4|0)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -179,28 +180,69 @@ void csserv_get_config(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t *ptr;
 
 	if (length<5) {
-		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32")",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32")",length);
 		eptr->state = CLOSE;
 		return;
 	}
 	msgid = get32bit(&data);
 	nleng = get8bit(&data);
 	if (length!=5U+(uint32_t)nleng) {
-		syslog(LOG_NOTICE,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_CONFIG - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
 		eptr->state = CLOSE;
 		return;
 	}
 	memcpy(name,data,nleng);
 	name[nleng] = 0;
-	val = cfg_getstr(name,"");
-	vleng = strlen(val);
-	if (vleng>255) {
-		vleng=255;
+	val = cfg_getdefaultstr(name);
+	if (val!=NULL) {
+		vleng = strlen(val);
+		if (vleng>255) {
+			vleng=255;
+		}
+	} else {
+		vleng = 0;
 	}
 	ptr = csserv_create_packet(eptr,ANTOAN_CONFIG_VALUE,5+vleng);
 	put32bit(&ptr,msgid);
 	put8bit(&ptr,vleng);
-	memcpy(ptr,val,vleng);
+	if (vleng>0 && val!=NULL) {
+		memcpy(ptr,val,vleng);
+	}
+}
+
+void csserv_get_config_file(csserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint32_t msgid;
+	char name[256];
+	uint8_t nleng;
+	cfg_buff *fdata;
+	uint8_t *ptr;
+
+	if (length<5) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_CONFIG_FILE - wrong size (%"PRIu32")",length);
+		eptr->state = CLOSE;
+		return;
+	}
+	msgid = get32bit(&data);
+	nleng = get8bit(&data);
+	if (length!=5U+(uint32_t)nleng) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOAN_GET_CONFIG_FILE - wrong size (%"PRIu32":nleng=%"PRIu8")",length,nleng);
+		eptr->state = CLOSE;
+		return;
+	}
+	memcpy(name,data,nleng);
+	name[nleng] = 0;
+	fdata = cfg_getdefaultfile(name,65535);
+	if (fdata==NULL) {
+		ptr = csserv_create_packet(eptr,ANTOAN_CONFIG_FILE_CONTENT,5);
+		put32bit(&ptr,msgid);
+		put8bit(&ptr,MFS_ERROR_ENOENT);
+	} else {
+		ptr = csserv_create_packet(eptr,ANTOAN_CONFIG_FILE_CONTENT,6+fdata->leng);
+		put32bit(&ptr,msgid);
+		put16bit(&ptr,fdata->leng);
+		memcpy(ptr,fdata->data,fdata->leng);
+		free(fdata);
+	}
 }
 
 void csserv_iothread_finished(uint8_t status,void *e) {
@@ -209,6 +251,7 @@ void csserv_iothread_finished(uint8_t status,void *e) {
 		eptr->state = CLOSE;
 	} else {
 		eptr->state = IDLE;
+		eptr->lastread = eptr->lastwrite = monotonic_seconds();
 	}
 	eptr->jobid = 0;
 	if (eptr->inputpacket.packet) {
@@ -224,7 +267,7 @@ void csserv_read_init(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	eptr->jobid = job_serv_read(csserv_iothread_finished,eptr,eptr->sock,data,length);
 	if (eptr->jobid==0) { // not done - queue full
 		if (length!=20 && length!=21) {
-			syslog(LOG_NOTICE,"CLTOCS_READ - wrong size (%"PRIu32"/20|21)",length);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_READ - wrong size (%"PRIu32"/20|21)",length);
 			eptr->state = CLOSE;
 			return;
 		}
@@ -247,14 +290,14 @@ void csserv_write_init(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	if (eptr->jobid==0) { // not done - queue full
 		if (length&1) {
 			if (length<13 || ((length-13)%6)!=0) {
-				syslog(LOG_NOTICE,"CLTOCS_WRITE - wrong size (%"PRIu32"/13+N*6)",length);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE - wrong size (%"PRIu32"/13+N*6)",length);
 				eptr->state = CLOSE;
 				return;
 			}
 			data++; // skip proto version
 		} else {
 			if (length<12 || ((length-12)%6)!=0) {
-				syslog(LOG_NOTICE,"CLTOCS_WRITE - wrong size (%"PRIu32"/12+N*6)",length);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE - wrong size (%"PRIu32"/12+N*6)",length);
 				eptr->state = CLOSE;
 				return;
 			}
@@ -273,6 +316,9 @@ void csserv_write_init(csserventry *eptr,const uint8_t *data,uint32_t length) {
 void csserv_idlejob_finished(uint8_t status,void *ijp) {
 	idlejob *ij = (idlejob*)ijp;
 	csserventry *eptr = ij->eptr;
+	uint32_t cpsize;
+	uint32_t psize;
+	uint32_t pleng;
 	uint8_t *ptr;
 
 	if (eptr) {
@@ -317,6 +363,41 @@ void csserv_idlejob_finished(uint8_t status,void *ijp) {
 					memcpy(ptr,ij->buff,4096);
 				}
 				break;
+			case IJ_GET_CHUNK_INFO:
+				if (status!=MFS_STATUS_OK) {
+					ptr = csserv_create_packet(eptr,CSTOAN_CHUNK_INFO,8+4+1);
+					put64bit(&ptr,ij->chunkid);
+					put32bit(&ptr,ij->version);
+					put8bit(&ptr,status);
+				} else {
+					cpsize = 0;
+					pleng = 0;
+					if (ij->requested_info & REQUEST_BLOCKS) {
+						cpsize += 2;
+					}
+					if (ij->requested_info & REQUEST_CHECKSUM) {
+						cpsize += 4;
+					}
+					if (ij->requested_info & REQUEST_CHECKSUM_TAB) {
+						cpsize += 4096;
+					}
+					psize = cpsize;
+					if (ij->requested_info & REQUEST_FILE_PATH) {
+						pleng = strlen((char*)(ij->buff + cpsize));
+						psize += 4+pleng;
+					}
+					ptr = csserv_create_packet(eptr,CSTOAN_CHUNK_INFO,8+4+psize);
+					put64bit(&ptr,ij->chunkid);
+					put32bit(&ptr,ij->version);
+					psize = 0;
+					memcpy(ptr,ij->buff,cpsize);
+					ptr+=cpsize;
+					if (ij->requested_info & REQUEST_FILE_PATH) {
+						put32bit(&ptr,pleng);
+						memcpy(ptr,ij->buff+cpsize,pleng);
+					}
+				}
+				break;
 		}
 		*(ij->prev) = ij->next;
 		if (ij->next) {
@@ -330,7 +411,7 @@ void csserv_get_chunk_blocks(csserventry *eptr,const uint8_t *data,uint32_t leng
 	idlejob *ij;
 
 	if (length!=8+4) {
-		syslog(LOG_NOTICE,"ANTOCS_GET_CHUNK_BLOCKS - wrong size (%"PRIu32"/12)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOCS_GET_CHUNK_BLOCKS - wrong size (%"PRIu32"/12)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -338,6 +419,7 @@ void csserv_get_chunk_blocks(csserventry *eptr,const uint8_t *data,uint32_t leng
 	ij->op = IJ_GET_CHUNK_BLOCKS;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);
+	ij->requested_info = 0;
 	ij->eptr = eptr;
 	ij->next = eptr->idlejobs;
 	ij->prev = &(eptr->idlejobs);
@@ -349,7 +431,7 @@ void csserv_get_chunk_checksum(csserventry *eptr,const uint8_t *data,uint32_t le
 	idlejob *ij;
 
 	if (length!=8+4) {
-		syslog(LOG_NOTICE,"ANTOCS_GET_CHUNK_CHECKSUM - wrong size (%"PRIu32"/12)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOCS_GET_CHUNK_CHECKSUM - wrong size (%"PRIu32"/12)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -357,6 +439,7 @@ void csserv_get_chunk_checksum(csserventry *eptr,const uint8_t *data,uint32_t le
 	ij->op = IJ_GET_CHUNK_CHECKSUM;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);
+	ij->requested_info = 0;
 	ij->eptr = eptr;
 	ij->next = eptr->idlejobs;
 	ij->prev = &(eptr->idlejobs);
@@ -368,7 +451,7 @@ void csserv_get_chunk_checksum_tab(csserventry *eptr,const uint8_t *data,uint32_
 	idlejob *ij;
 
 	if (length!=8+4) {
-		syslog(LOG_NOTICE,"ANTOCS_GET_CHUNK_CHECKSUM_TAB - wrong size (%"PRIu32"/12)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOCS_GET_CHUNK_CHECKSUM_TAB - wrong size (%"PRIu32"/12)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -376,11 +459,55 @@ void csserv_get_chunk_checksum_tab(csserventry *eptr,const uint8_t *data,uint32_
 	ij->op = IJ_GET_CHUNK_CHECKSUM_TAB;
 	ij->chunkid = get64bit(&data);
 	ij->version = get32bit(&data);
+	ij->requested_info = 0;
 	ij->eptr = eptr;
 	ij->next = eptr->idlejobs;
 	ij->prev = &(eptr->idlejobs);
 	eptr->idlejobs = ij;
 	ij->jobid = job_get_chunk_checksum_tab(csserv_idlejob_finished,ij,ij->chunkid,ij->version,ij->buff);
+}
+
+void csserv_get_chunk_info(csserventry *eptr,const uint8_t *data,uint32_t length) {
+	idlejob *ij;
+	uint64_t chunkid;
+	uint32_t version;
+	uint8_t requested_info;
+	uint32_t buffsize;
+
+	if (length!=8+4+1) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOCS_GET_CHUNK_INFO - wrong size (%"PRIu32"/13)",length);
+		eptr->state = CLOSE;
+		return;
+	}
+
+	chunkid = get64bit(&data);
+	version = get32bit(&data);
+	requested_info = get8bit(&data);
+
+	buffsize = 0;
+	if (requested_info & REQUEST_BLOCKS) {
+		buffsize += 2;
+	}
+	if (requested_info & REQUEST_CHECKSUM) {
+		buffsize += 4;
+	}
+	if (requested_info & REQUEST_CHECKSUM_TAB) {
+		buffsize += 4096;
+	}
+	if (requested_info & REQUEST_FILE_PATH) {
+		buffsize += PATH_MAX;
+	}
+
+	ij = malloc(MYSIZE(idlejob,buff,buffsize));
+	ij->op = IJ_GET_CHUNK_INFO;
+	ij->chunkid = chunkid;
+	ij->version = version;
+	ij->requested_info = requested_info;
+	ij->eptr = eptr;
+	ij->next = eptr->idlejobs;
+	ij->prev = &(eptr->idlejobs);
+	eptr->idlejobs = ij;
+	ij->jobid = job_get_chunk_info(csserv_idlejob_finished,ij,chunkid,version,requested_info,ij->buff);
 }
 
 void csserv_hdd_list(csserventry *eptr,const uint8_t *data,uint32_t length) {
@@ -389,7 +516,7 @@ void csserv_hdd_list(csserventry *eptr,const uint8_t *data,uint32_t length) {
 
 	(void)data;
 	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOCS_HDD_LIST - wrong size (%"PRIu32"/0)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_HDD_LIST - wrong size (%"PRIu32"/0)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -405,7 +532,7 @@ void csserv_chart(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint16_t w,h;
 
 	if (length!=4 && length!=8) {
-		syslog(LOG_NOTICE,"CLTOAN_CHART - wrong size (%"PRIu32"/4|8)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOAN_CHART - wrong size (%"PRIu32"/4|8)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -429,22 +556,26 @@ void csserv_chart_data(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t *ptr;
 	uint32_t l;
 	uint32_t maxentries;
+	uint8_t multimode;
 
-	if (length!=4 && length!=8) {
-		syslog(LOG_NOTICE,"CLTOAN_CHART_DATA - wrong size (%"PRIu32"/4|8)",length);
+	if (length!=4 && length!=8 && length!=9) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOAN_CHART_DATA - wrong size (%"PRIu32"/4|8|9)",length);
 		eptr->state = CLOSE;
 		return;
 	}
+	maxentries = UINT32_C(0xFFFFFFFF);
+	multimode = 0;
 	chartid = get32bit(&data);
-	if (length==8) {
+	if (length>=8) {
 		maxentries = get32bit(&data);
-	} else {
-		maxentries = UINT32_C(0xFFFFFFFF);
 	}
-	l = charts_makedata(NULL,chartid,maxentries);
+	if (length>=9) {
+		multimode = get8bit(&data);
+	}
+	l = charts_makedata(NULL,chartid,maxentries,multimode);
 	ptr = csserv_create_packet(eptr,ANTOCL_CHART_DATA,l);
 	if (l>0) {
-		charts_makedata(ptr,chartid,maxentries);
+		charts_makedata(ptr,chartid,maxentries,multimode);
 	}
 }
 
@@ -455,7 +586,7 @@ void csserv_monotonic_data(csserventry *eptr,const uint8_t *data,uint32_t length
 
 	(void)data;
 	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOAN_MONOTONIC_DATA - wrong size (%"PRIu32"/0)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOAN_MONOTONIC_DATA - wrong size (%"PRIu32"/0)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -473,7 +604,7 @@ void csserv_module_info(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint8_t *ptr;
 
 	if (length!=0) {
-		syslog(LOG_NOTICE,"CLTOAN_MODULE_INFO - wrong size (%"PRIu32"/0)",length);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOAN_MODULE_INFO - wrong size (%"PRIu32"/0)",length);
 		eptr->state = CLOSE;
 		return;
 	}
@@ -487,6 +618,27 @@ void csserv_module_info(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	put64bit(&ptr,masterconn_getmetaid());
 	put32bit(&ptr,masterconn_getmasterip());
 	put16bit(&ptr,masterconn_getmasterport());
+}
+
+void csserv_clear_errors(csserventry *eptr,const uint8_t *data,uint32_t length) {
+	uint8_t *ptr;
+	uint32_t pleng;
+	uint8_t res;
+
+	if (length<4) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOCS_CLEAR_ERRORS - wrong size (%"PRIu32"/>=4)",length);
+		eptr->state = CLOSE;
+		return;
+	}
+	pleng = get32bit(&data);
+	if (length!=pleng+4) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOCS_CLEAR_ERRORS - wrong size (%"PRIu32"/4+%"PRIu32")",length,pleng);
+		eptr->state = CLOSE;
+		return;
+	}
+	res = hdd_clear_errors(pleng,data);
+	ptr = csserv_create_packet(eptr,CSTOAN_CLEAR_ERRORS,1);
+	put8bit(&ptr,res);
 }
 
 void csserv_close(csserventry *eptr) {
@@ -507,7 +659,7 @@ void csserv_close(csserventry *eptr) {
 }
 
 void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32_t length) {
-//	syslog(LOG_NOTICE,"packet %u:%u",type,length);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"packet %u:%u",type,length);
 	if (type==ANTOAN_NOP) {
 		return;
 	}
@@ -525,6 +677,9 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 		case ANTOAN_GET_CONFIG:
 			csserv_get_config(eptr,data,length);
 			break;
+		case ANTOAN_GET_CONFIG_FILE:
+			csserv_get_config_file(eptr,data,length);
+			break;
 		case CLTOCS_READ:
 			csserv_read_init(eptr,data,length);
 			break;
@@ -539,6 +694,9 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 			break;
 		case ANTOCS_GET_CHUNK_CHECKSUM_TAB:
 			csserv_get_chunk_checksum_tab(eptr,data,length);
+			break;
+		case ANTOCS_GET_CHUNK_INFO:
+			csserv_get_chunk_info(eptr,data,length);
 			break;
 		case CLTOCS_HDD_LIST:
 			csserv_hdd_list(eptr,data,length);
@@ -555,22 +713,25 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 		case CLTOAN_MODULE_INFO:
 			csserv_module_info(eptr,data,length);
 			break;
+		case ANTOCS_CLEAR_ERRORS:
+			csserv_clear_errors(eptr,data,length);
+			break;
 		case CLTOCS_WRITE_DATA:
 		case CLTOCS_WRITE_FINISH:
 			eptr->state = CLOSE; // silently ignore those packets
 			break;
 		default:
-			syslog(LOG_NOTICE,"got unknown message (type:%"PRIu32")",type);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"got unknown message (type:%"PRIu32")",type);
 			eptr->state = CLOSE;
 		}
 	} else {
-		syslog(LOG_NOTICE,"got unknown message (type:%"PRIu32")",type);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"got unknown message (type:%"PRIu32")",type);
 		eptr->state = CLOSE;
 	}
 }
 
 void csserv_wantexit(void) {
-	syslog(LOG_NOTICE,"closing %s:%s",ListenHost,ListenPort);
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"closing %s:%s",ListenHost,ListenPort);
 	tcpclose(lsock);
 	lsock = -1;
 }
@@ -611,13 +772,13 @@ void csserv_read(csserventry *eptr) {
 	if (eptr->mode == HEADER) {
 		i=read(eptr->sock,eptr->inputpacket.startptr,eptr->inputpacket.bytesleft);
 		if (i==0) {
-//			syslog(LOG_NOTICE,"(read) connection closed");
+//			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"(read) connection closed");
 			eptr->state = CLOSE;
 			return;
 		}
 		if (i<0) {
 			if (ERRNO_ERROR) {
-				mfs_errlog_silent(LOG_NOTICE,"(read) read error");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"(read) read error");
 				eptr->state = CLOSE;
 			}
 			return;
@@ -636,7 +797,7 @@ void csserv_read(csserventry *eptr) {
 
 		if (size>0) {
 			if (size>MaxPacketSize) {
-				syslog(LOG_WARNING,"(read) packet too long (%"PRIu32"/%u) ; command:%"PRIu32,size,MaxPacketSize,type);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"(read) packet too long (%"PRIu32"/%u) ; command:%"PRIu32,size,MaxPacketSize,type);
 				eptr->state = CLOSE;
 				return;
 			}
@@ -651,13 +812,13 @@ void csserv_read(csserventry *eptr) {
 		if (eptr->inputpacket.bytesleft>0) {
 			i=read(eptr->sock,eptr->inputpacket.startptr,eptr->inputpacket.bytesleft);
 			if (i==0) {
-//				syslog(LOG_NOTICE,"(read) connection closed");
+//				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"(read) connection closed");
 				eptr->state = CLOSE;
 				return;
 			}
 			if (i<0) {
 				if (ERRNO_ERROR) {
-					mfs_errlog_silent(LOG_NOTICE,"(read) read error");
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"(read) read error");
 					eptr->state = CLOSE;
 				}
 				return;
@@ -699,13 +860,13 @@ void csserv_write(csserventry *eptr) {
 		}
 		i=write(eptr->sock,pack->startptr,pack->bytesleft);
 		if (i==0) {
-//			syslog(LOG_NOTICE,"(write) connection closed");
+//			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"(write) connection closed");
 			eptr->state = CLOSE;
 			return;
 		}
 		if (i<0) {
 			if (ERRNO_ERROR) {
-				mfs_errlog_silent(LOG_NOTICE,"(write) write error");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"(write) write error");
 				eptr->state = CLOSE;
 			}
 			return;
@@ -763,7 +924,7 @@ void csserv_serve(struct pollfd *pdesc) {
 	if (lsockpdescpos>=0 && (pdesc[lsockpdescpos].revents & POLLIN) && lsock>=0) {
 		ns=tcpaccept(lsock);
 		if (ns<0) {
-			mfs_errlog_silent(LOG_NOTICE,"accept error");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"accept error");
 		} else {
 			tcpnonblock(ns);
 			tcpnodelay(ns);
@@ -804,7 +965,7 @@ void csserv_serve(struct pollfd *pdesc) {
 			csserv_write(eptr);
 		}
 		if (eptr->state==IDLE && eptr->lastread+CSSERV_TIMEOUT<now) {
-//			syslog(LOG_NOTICE,"csserv: connection timed out");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"csserv: connection timed out");
 			eptr->state = CLOSE;
 		}
 	}
@@ -840,11 +1001,11 @@ void csserv_serve(struct pollfd *pdesc) {
 	}
 }
 
-uint32_t csserv_getlistenip() {
+uint32_t csserv_getlistenip(void) {
 	return mylistenip;
 }
 
-uint16_t csserv_getlistenport() {
+uint16_t csserv_getlistenport(void) {
 	return mylistenport;
 }
 
@@ -853,6 +1014,9 @@ void csserv_reload(void) {
 	uint32_t newmylistenip;
 	uint16_t newmylistenport;
 	int newlsock;
+
+	newmylistenip = 0;
+	newmylistenport = 0;
 
 	if (lsock<0) { // this is exiting stage - ignore reload
 		return ;
@@ -864,13 +1028,13 @@ void csserv_reload(void) {
 	if (strcmp(newListenHost,ListenHost)==0 && strcmp(newListenPort,ListenPort)==0) {
 		free(newListenHost);
 		free(newListenPort);
-		mfs_arg_syslog(LOG_NOTICE,"main server module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"main server module: socket address hasn't changed (%s:%s)",ListenHost,ListenPort);
 		return;
 	}
 
 	newlsock = tcpsocket();
 	if (newlsock<0) {
-		mfs_errlog(LOG_WARNING,"main server module: socket address has changed, but can't create new socket");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"main server module: socket address has changed, but can't create new socket");
 		free(newListenHost);
 		free(newListenPort);
 		return;
@@ -880,16 +1044,16 @@ void csserv_reload(void) {
 	tcpreuseaddr(newlsock);
 	tcpresolve(newListenHost,newListenPort,&newmylistenip,&newmylistenport,1);
 	if (tcpnumlisten(newlsock,newmylistenip,newmylistenport,100)<0) {
-		mfs_arg_errlog(LOG_ERR,"main server module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"main server module: socket address has changed, but can't listen on socket (%s:%s)",ListenHost,ListenPort);
 		free(newListenHost);
 		free(newListenPort);
 		tcpclose(newlsock);
 		return;
 	}
 	if (tcpsetacceptfilter(newlsock)<0 && errno!=ENOTSUP) {
-		mfs_errlog_silent(LOG_NOTICE,"main server module: can't set accept filter");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"main server module: can't set accept filter");
 	}
-	mfs_arg_syslog(LOG_NOTICE,"main server module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"main server module: socket address has changed, now listen on %s:%s",ListenHost,ListenPort);
 	free(ListenHost);
 	free(ListenPort);
 	ListenHost = newListenHost;
@@ -907,7 +1071,7 @@ int csserv_init(void) {
 
 	lsock = tcpsocket();
 	if (lsock<0) {
-		mfs_errlog(LOG_ERR,"main server module: can't create socket");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"main server module: can't create socket");
 		return -1;
 	}
 	tcpnonblock(lsock);
@@ -915,13 +1079,13 @@ int csserv_init(void) {
 	tcpreuseaddr(lsock);
 	tcpresolve(ListenHost,ListenPort,&mylistenip,&mylistenport,1);
 	if (tcpnumlisten(lsock,mylistenip,mylistenport,100)<0) {
-		mfs_errlog(LOG_ERR,"main server module: can't listen on socket");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"main server module: can't listen on socket");
 		return -1;
 	}
 	if (tcpsetacceptfilter(lsock)<0 && errno!=ENOTSUP) {
-		mfs_errlog_silent(LOG_NOTICE,"main server module: can't set accept filter");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"main server module: can't set accept filter");
 	}
-	mfs_arg_syslog(LOG_NOTICE,"main server module: listen on %s:%s",ListenHost,ListenPort);
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"main server module: listen on %s:%s",ListenHost,ListenPort);
 
 	csservhead = NULL;
 	main_wantexit_register(csserv_wantexit);

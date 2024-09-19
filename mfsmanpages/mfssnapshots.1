@@ -1,29 +1,30 @@
-.TH mfssnapshots "1" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfssnapshots "1" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfssnapshots \- \fBMooseFS\fP snapshot tools
 .SH SYNOPSIS
 .B mfsappendchunks
-[\fB-s \fP\fIFROM\fP\fB:\fP\fITO\fP] \fISNAPSHOT_FILE\fP \fIOBJECT\fP...
+[\fB-?\fP] [\fB-s \fP\fIFROM\fP\fB:\fP\fITO\fP] \fISNAPSHOT_FILE\fP \fIFILE\fP...
 .PP
 .B mfsmakesnapshot
-[\fB-o\fP|\fB-c\fP|\fB-p\fP] \fISOURCE\fP... \fIDESTINATION\fP
+[\fB-?\fP] [\fB-o\fP|\fB-c\fP|\fB-p\fP] \fISOURCE_OBJECT\fP... \fIDESTINATION\fP
 .PP
 .B mfsrmsnapshot
-[\fB-f\fP] \fIOBJECT\fP...
+[\fB-?\fP] [\fB-f\fP] \fIOBJECT\fP...
 .SH DESCRIPTION
 \fBmfsappendchunks\fP (equivalent of \fBmfssnapshot\fP from MooseFS 1.5)
-appends a lazy copy of specified file(s) to specified snapshot file ("lazy"
+appends a lazy copy of specified \fIFILE\fP(s) to specified \fISNAPSHOT_FILE\fP ("lazy"
 means that creation of new chunks is delayed to the moment one copy is
-modified). If multiple files are given, they are merged into one target file in such a way
+modified). IF \fISNAPSHOT_FILE\fP does not exist, it is created. If multiple files are given, they are merged into one target file in such a way
 that each file begins at \fIchunk\fP (64MB) boundary; padding space is left
 empty. Optionally only slice of chunks can be appended (option \fB-s\fP). Slice definition is similar to Python: \fIFROM\fP is included, \fITO\fP excluded, negative numbers mean backwards from the end. If \fIFROM\fP or \fITO\fP is not specified then it means from the beginning or to the end of file respectively. See examples below.
 
 .PP
 \fBmfsmakesnapshot\fP makes a "real" snapshot (lazy copy, like in case of
 \fBmfsappendchunks\fP) of some object(s) or subtree (similarly to \fBcp -r\fP
-command). It's atomic with respect to each \fISOURCE\fP argument separately.
+command). It's atomic with respect to each \fISOURCE_OBJECT\fP argument separately.
 If \fIDESTINATION\fP points to already existing file, error will be reported
-unless \fB-o\fP (overwrite) option is given. Note: if \fISOURCE\fP is
+unless \fB-o\fP (overwrite) option is given. If destination points to an already existing directory,
+snapshot is created inside this directory. Note: if \fISOURCE_OBJECT\fP is
 a directory, it is copied as a whole; but if it's followed by trailing slash,
 only directory content is copied. When \fB-c\fP option is given then attributes of newly created files are more similar to those created by ordinary \fBcp\fP (without attribute preserving). Option \fB-p\fP preserves hardlinks in \fISOURCE\fP (when two or more objects inside \fISOURCE\fP are hardlinked to each other then in \fIDESTINATION\fP folder those objects will be hardlinked to each other as well).
 .PP
@@ -49,6 +50,8 @@ will leave everything else untouched.
 :-1 = chunks 0,1,2,3,...,N-1
 .PP
 -4:-2 = chunks N-3,N-2
+.SH GENERAL OPTIONS
+Option \fB-?\fP displays short usage message.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

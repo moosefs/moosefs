@@ -1,13 +1,17 @@
 #include <time.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <stdlib.h>
 #include <signal.h>
 #include <pthread.h>
 #include <inttypes.h>
 // #include <stdio.h>
 
+#include "portable.h"
 #include "massert.h"
 #include "clocks.h"
+#include "mfslog.h"
 
 typedef struct _heapelem {
 	void (*fn)(void *);

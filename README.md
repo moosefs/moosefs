@@ -39,7 +39,7 @@ MooseFS can be installed on any POSIX compliant operating system including vario
 * FreeBSD
 * macOS
 
-MooseFS Linux Client uses [FUSE](https://github.com/libfuse/libfuse). MooseFS macOS Client uses [FUSE for macOS](https://github.com/osxfuse/osxfuse).
+MooseFS Client uses FUSE library, available for: [Linux & BSD](https://github.com/libfuse/libfuse) and [macOS](https://github.com/osxfuse/osxfuse).
 
 There is a separate MooseFS Client for Microsoft Windows available, built on top of [Dokany](https://github.com/dokan-dev/dokany).
 
@@ -55,6 +55,9 @@ You can install MooseFS using your favourite package manager on one of the follo
 * Debian 11 / 12 – Raspberry Pi
 
 Packages for CentOS 6 are also available, but no longer supported.
+
+Debian packages are compatible with Proxmox.
+CentOS packages are compatible with Rocky Linux, AlmaLinux and openSUSE Leap.
 
 Minimal set of packages, which are needed to run MooseFS:
 

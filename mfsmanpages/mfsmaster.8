@@ -1,10 +1,13 @@
-.TH mfsmaster "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsmaster "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
-mfsmaster \- start, restart or stop Moose File System master process
+mfsmaster \- start, restart or stop MooseFS master process
 .SH SYNOPSIS
 .B mfsmaster
 [\fB\-c\fP \fICFGFILE\fP]
+[\fB\-f\fP]
+[\fB\-d\fP]
 [\fB\-u\fP]
+[\fB\-n\fP]
 [\fB\-i\fP]
 [\fB\-a\fP]
 [\fB\-e\fP]
@@ -17,7 +20,7 @@ mfsmaster \- start, restart or stop Moose File System master process
 .B mfsmaster \-h
 .SH DESCRIPTION
 .PP
-\fBmfsmaster\fP is the master program of Moose File System.
+\fBmfsmaster\fP is the master program of MooseFS.
 .SH OPTIONS
 .TP
 \fB\-v\fP
@@ -30,23 +33,26 @@ print usage information and exit
 specify alternative path of configuration file (default is
 \fBmfsmaster.cfg\fP in system configuration directory)
 .TP
-\fB\-u\fP
-log undefined configuration values (when default is assumed)
-.TP
 \fB\-f\fP
 run in foreground, don't daemonize
 .TP
-\fB\-t\fP \fILOCKTIMEOUT\fP
-how long to wait for lockfile (in seconds; default is 1800 seconds)
+\fB\-d\fP
+run with dangerous options (names: DANGEROUS_*)
+.TP
+\fB\-u\fP
+log undefined configuration values (when default is assumed)
+.TP
+\fB\-n\fP
+do not attempt to increase limit of core dump size
 .TP
 \fB\-i\fP
-ignore some metadata structure errors (attach orphans to root, ignore names without inode, etc.). DO NOT use unless you are ready to pick up the pieces. See https://github.com/moosefs/moosefs/issues/151 for discussion.
+ignore some metadata structure errors
 .TP
 \fB\-a\fP
 automatically restore metadata from change logs
 .TP
 \fB\-e\fP
-start without metadata (usable only in pro version - used to start additional masters)
+(pro only) start without metadata (used to start additional masters)
 .TP
 \fB\-x\fP
 produce more verbose output
@@ -54,15 +60,29 @@ produce more verbose output
 \fB\-xx\fP
 even more verbose output
 .TP
+\fB\-t\fP \fILOCKTIMEOUT\fP
+how long to wait for lockfile (in seconds; default is 1800 seconds)
+.TP
 \fIACTION\fP
-is the one of \fBstart\fP, \fBstop\fP, \fBrestart\fP, \fBreload\fP, \fBtest\fP, \fBrestore\fP or \fBkill\fP. 
-Default action is \fBrestart\fP. The \fBtest\fP action will yield one of two responses:
-"mfsmaster pid: PID" or "mfsmaster is not running". The \fBkill\fP
-action will send a SIGKILL to the currently running master 
-process. SIGHUP or \fBreload\fP action forces \fBmfsmaster\fP 
-to reload all configuration files. \fBrestore\fP tries to restore metadata file
-using backup metadata files and changelogs; if successful it will store recovered
-metadata file end stop, it will never start master process.
+tells master to perform one of the following actions:
+.RS 
+.IP start 9
+Start master process if the process is not already running, otherwise display error message.
+.IP stop 
+Stop master process if the process is running, otherwise display error message.
+.IP restart 
+(default action) If the master process is running, restart it, if it's not running, start it. 
+.IP reload
+Send a signal to master process to reload config files.
+.IP info
+Send a singal to master process to dump debug information file in working directory.
+.IP test
+Displays "mfsmaster pid: PID" if the master is running (and return 0) or  "mfsmaster is not running" otherwise (and return 1).
+.IP kill
+Send termination signal to master process.
+.IP restore
+Restore current metadata file using backup metadata and changlog files (if possible, i.e. if correct files exist), write it to working directory and exit.
+.RE
 .SH FILES
 .TP
 \fBmfsmaster.cfg\fP

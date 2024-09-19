@@ -25,7 +25,7 @@
 
 uint32_t exports_info_size(uint8_t versmode);
 void exports_info_data(uint8_t versmode,uint8_t *buff);
-uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashtime,uint32_t *maxtrashtime,uint32_t *disables);
+uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashretention,uint32_t *maxtrashretention,uint32_t *disables);
 void exports_reload(void);
 uint64_t exports_checksum(void);
 int exports_init(void);

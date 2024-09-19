@@ -27,8 +27,8 @@ void csserv_stats(uint64_t *bin,uint64_t *bout);
 // void csserv_cstocs_connected(void *e,void *cptr);
 // void csserv_cstocs_gotstatus(void *e,uint64_t chunkid,uint32_t writeid,uint8_t s);
 // void csserv_cstocs_disconnected(void *e);
-uint32_t csserv_getlistenip();
-uint16_t csserv_getlistenport();
+uint32_t csserv_getlistenip(void);
+uint16_t csserv_getlistenport(void);
 int csserv_init(void);
 
 #endif

@@ -25,21 +25,21 @@
 #include "bio.h"
 
 void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr);
+void csdb_accept_server(void *v_csptr);
 uint16_t csdb_get_csid(void *v_csptr);
 void csdb_temporary_maintenance_mode(void *v_csptr);
 void csdb_lost_connection(void *v_csptr);
 void csdb_server_load(void *v_csptr,uint32_t load);
 uint8_t csdb_server_is_overloaded(void *v_csptr,uint32_t now);
 uint8_t csdb_server_is_being_maintained(void *v_csptr);
-uint32_t csdb_servlist_size(void);
-void csdb_servlist_data(uint8_t *ptr);
+uint32_t csdb_servlist_data(uint8_t mode,uint8_t *ptr,uint32_t clientip);
 uint8_t csdb_remove_server(uint32_t ip,uint16_t port);
 uint8_t csdb_back_to_work(uint32_t ip,uint16_t port);
 uint8_t csdb_maintenance(uint32_t ip,uint16_t port,uint8_t onoff);
 uint8_t csdb_have_all_servers(void);
-uint8_t csdb_have_more_than_half_servers(void);
-uint8_t csdb_replicate_undergoals(void);
+uint8_t csdb_stop_chunk_jobs(void);
 uint16_t csdb_servers_count(void);
+void csdb_get_server_counters(uint32_t *servers_ptr,uint32_t *disconnected_servers_ptr,uint32_t *disconnected_servers_in_maintenance_ptr);
 void csdb_cleanup(void);
 uint16_t csdb_sort_servers(void);
 uint16_t csdb_getnumber(void *v_csptr);

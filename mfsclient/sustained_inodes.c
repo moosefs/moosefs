@@ -25,7 +25,6 @@
 /* common */
 #include <sys/stat.h>
 #include <inttypes.h>
-#include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -44,7 +43,7 @@
 #include "lwthread.h"
 #include "massert.h"
 #include "strerr.h"
-#include "slogger.h"
+#include "mfslog.h"
 // #include "sustained_stats.h"
 
 #ifndef HAVE___SYNC_FETCH_AND_OP
@@ -201,8 +200,7 @@ void sinodes_pid_inodes(pid_t pid) {
 #elif defined(__FreeBSD__)
 	struct kinfo_file *kif;
 	uint8_t *p;
-	size_t len;
-	int i;
+	size_t len, olen;
 	int name[4];
 	int error;
 
@@ -212,18 +210,17 @@ void sinodes_pid_inodes(pid_t pid) {
 	name[2] = KERN_PROC_FILEDESC;
 	name[3] = pid;
 	p = NULL;
-	i = 0;
+	if (sysctl(name, 4, NULL, &len, NULL, 0)<0) {
+		if (errno!=ESRCH && errno!=EBUSY) {
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"sysctl(kern.proc.filedesc) error");
+		}
+		return;
+	}
+	if (len==0) {
+		return;
+	}
 	do {
-		if (sysctl(name, 4, NULL, &len, NULL, 0)<0) {
-			if (errno!=ESRCH && errno!=EBUSY) {
-				mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
-			}
-			return;
-		}
-		if (len==0) {
-			return;
-		}
-		len += len / 2;
+		len += len / 10;
 		if (p!=NULL) {
 			free(p);
 		}
@@ -231,12 +228,12 @@ void sinodes_pid_inodes(pid_t pid) {
 		if (p == NULL) {
 			return;
 		}
+		olen = len;
 		error = sysctl(name, 4, p, &len, NULL, 0);
-		i++;
-	} while (error < 0 && errno == ENOMEM && i < 10);
+	} while (error < 0 && errno == ENOMEM && olen == len);
 	if (error<0) {
 		if (errno!=ESRCH && errno!=EBUSY) {
-			mfs_errlog(LOG_NOTICE,"sysctl(kern.proc.filedesc) error");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"sysctl(kern.proc.filedesc) error");
 		}
 		free(p);
 		return;
@@ -246,7 +243,7 @@ void sinodes_pid_inodes(pid_t pid) {
 		kif = (struct kinfo_file*)((uint8_t*)(kif) + kif->kf_structsize);
 	} while ((uint8_t*)kif < p+len);
 	if ((uint8_t*)kif != p+len) {
-		syslog(LOG_WARNING,"kinfo_file structure size mismatch\n");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"kinfo_file structure size mismatch\n");
 		free(p);
 		return;
 	}
@@ -348,7 +345,7 @@ void sinodes_all_pids(void) {
 	name[3] = 0;
 	p = NULL;
 	if (sysctl(name, 4, NULL, &len, NULL, 0)<0) {
-		mfs_errlog(LOG_NOTICE,"sysctl(kern.proc) error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"sysctl(kern.proc) error");
 		return;
 	}
 	if (len==0) {
@@ -367,7 +364,7 @@ void sinodes_all_pids(void) {
 		error = sysctl(name, 4, p, &len, NULL, 0);
 	} while (error < 0 && errno == ENOMEM && olen == len);
 	if (error<0) {
-		mfs_errlog(LOG_NOTICE,"sysctl(kern.proc) error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"sysctl(kern.proc) error");
 		free(p);
 		return;
 	}
@@ -376,7 +373,7 @@ void sinodes_all_pids(void) {
 #else
 	if ((len % sizeof(*p)) != 0 || p->ki_structsize != sizeof(*p)) {
 #endif
-		syslog(LOG_WARNING,"kinfo_proc structure size mismatch (len = %llu)", (long long unsigned int)len);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"kinfo_proc structure size mismatch (len = %llu)", (long long unsigned int)len);
 		free(p);
 		return;
 	}
@@ -425,7 +422,7 @@ void* sinodes_scanthread(void *arg) {
 	st.st_ino = 1;
 	while (stat(mountpoint,&st)<0 || st.st_ino!=1) {
 		if (st.st_ino==1) {
-			mfs_arg_errlog(LOG_WARNING,"can't stat my mountpoint (%s)",mountpoint);
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"can't stat my mountpoint (%s)",mountpoint);
 		} else {
 			st.st_ino=1;
 		}
@@ -447,9 +444,9 @@ void* sinodes_scanthread(void *arg) {
 	}
 	free(mountpoint);
 	mountpoint = NULL;
-//	syslog("stat %s : st.st_ino: %lu ; st.st_dev: %u\n",mountpoint,st.st_ino,st.st_dev);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"stat %s : st.st_ino: %lu ; st.st_dev: %u\n",mountpoint,st.st_ino,st.st_dev);
 	mydevid = st.st_dev;
-	syslog(LOG_NOTICE,"my st_dev: %"PRIu32,mydevid);
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"my st_dev: %"PRIu32,mydevid);
 	i = 0;
 	while (1) {
 		if (i>RINODES_CHECK_INTERVAL_100MS) {

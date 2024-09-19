@@ -34,7 +34,6 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
-#include <syslog.h>
 #include <signal.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -82,7 +81,7 @@ enum {
 #include "sizestr.h"
 #include "sockets.h"
 #include "processname.h"
-#include "idstr.h"
+// #include "idstr.h"
 
 #define READ_TOMS 1000
 #define WRITE_TOMS 1000
@@ -105,6 +104,8 @@ enum {
 #define NBD_LINK_PREFIX_LENG 9
 
 #define NBD_ERR_SIZE 200
+
+static int NbdTimeout = 1800;
 
 /*
 
@@ -143,6 +144,7 @@ typedef struct nbdcommon {
 	char *nbddevice;
 	char *mfsfile;
 	uint64_t fsize;
+	uint32_t bsize;
 	uint32_t flags;
 	int sp[2];
 	int mfsfd;
@@ -244,7 +246,7 @@ void nbd_worker_fn(void *data,uint32_t workerscnt) {
 	nbdrequest *r = (nbdrequest*)data;
 	nbdcommon *nbdcp = r->nbdcp;
 
-//	syslog(LOG_NOTICE,"worker function for %s got request (cmd:%s)",nbdcp->nbddevice,nbd_cmd_str(r->cmd));
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"worker function for %s got request (cmd:%s)",nbdcp->nbddevice,nbd_cmd_str(r->cmd));
 	(void)workerscnt;
 	switch (r->cmd) {
 		case NBD_CMD_READ:
@@ -289,7 +291,7 @@ void nbd_worker_fn(void *data,uint32_t workerscnt) {
 			// ignore other commands
 			r->status = 0;
 	}
-//	syslog(LOG_NOTICE,"worker function for %s enqueue status %u (cmd:%s)",nbdcp->nbddevice,r->status,nbd_cmd_str(r->cmd));
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"worker function for %s enqueue status %u (cmd:%s)",nbdcp->nbddevice,r->status,nbd_cmd_str(r->cmd));
 	squeue_put(nbdcp->aqueue,r);
 }
 
@@ -308,7 +310,7 @@ void* receive_thread(void *arg) {
 	nbdrequest *r;
 	nbdcommon *nbdcp = (nbdcommon*)arg;
 
-//	syslog(LOG_NOTICE,"receive thread for %s started",nbdcp->nbddevice);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"receive thread for %s started",nbdcp->nbddevice);
 	bytesread = 0;
 	for (;;) {
 		res = read(nbdcp->sp[0],commbuff+bytesread,28-bytesread);
@@ -337,7 +339,7 @@ void* receive_thread(void *arg) {
 		if (magic!=NBD_REQUEST_MAGIC) { // desync - simulate NBD_CMD_DISC
 			cmd = NBD_CMD_DISC;
 		}
-//		syslog(LOG_NOTICE,"receive thread for %s got request (cmd:%s)",nbdcp->nbddevice,nbd_cmd_str(cmd));
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"receive thread for %s got request (cmd:%s)",nbdcp->nbddevice,nbd_cmd_str(cmd));
 		if (cmd==NBD_CMD_WRITE || cmd==NBD_CMD_READ) {
 			r = (nbdrequest*)malloc(offsetof(nbdrequest,data)+length);
 		} else {
@@ -369,17 +371,17 @@ void* send_thread(void *arg) {
 	void *data;
 	nbdcommon *nbdcp = (nbdcommon*)arg;
 
-//	syslog(LOG_NOTICE,"send thread for %s started",nbdcp->nbddevice);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"send thread for %s started",nbdcp->nbddevice);
 	wptr = commbuff;
 	put32bit(&wptr,NBD_REPLY_MAGIC);
 	for (;;) {
 		squeue_get(nbdcp->aqueue,&data);
 		if (data==NULL) {
-			syslog(LOG_NOTICE,"send thread for %s ending (data==NULL)",nbdcp->nbddevice);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"send thread for %s ending (data==NULL)",nbdcp->nbddevice);
 			return NULL;
 		}
 		r = (nbdrequest*)data;
-//		syslog(LOG_NOTICE,"send thread for %s got status %u for request (cmd:%s)",nbdcp->nbddevice,r->status,nbd_cmd_str(r->cmd));
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"send thread for %s got status %u for request (cmd:%s)",nbdcp->nbddevice,r->status,nbd_cmd_str(r->cmd));
 		wptr = commbuff+4;
 		put32bit(&wptr,r->status);
 		memcpy(wptr,r->handle,8);
@@ -388,7 +390,7 @@ void* send_thread(void *arg) {
 			writeall(nbdcp->sp[0],r->data,r->length);
 		}
 		if (r->cmd==NBD_CMD_DISC) {
-			syslog(LOG_NOTICE,"send thread for %s ending (cmd:DISC)",nbdcp->nbddevice);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"send thread for %s ending (cmd:DISC)",nbdcp->nbddevice);
 			return NULL;
 		}
 		free(r);
@@ -415,10 +417,10 @@ void* nbd_controller_thread(void *arg) {
 		return NULL;
 	}
 #endif
-//	syslog(LOG_NOTICE,"controller thread for %s performs DO_IT ioctl",nbdcp->nbddevice);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"controller thread for %s performs DO_IT ioctl",nbdcp->nbddevice);
 //	fprintf(stderr,"waiting for peer to finish ...\n");
 	ioctl(nbdcp->nbdfd, NBD_DO_IT); // this will wait
-	syslog(LOG_NOTICE,"controller thread for %s finished",nbdcp->nbddevice);
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"controller thread for %s finished",nbdcp->nbddevice);
 //	fprintf(stderr,"... finished\n");
 	ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
 	ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
@@ -456,13 +458,13 @@ void make_daemon(void) {
 	fflush(stderr);
 
 	if (pipe(pipefd)<0) {
-		syslog(LOG_ERR,"daemonize, pipe error: %s",strerror(errno));
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"daemonize, pipe error: %s",strerror(errno));
 		exit(1);
 	}
 
 	f = fork();
 	if (f<0) {
-		syslog(LOG_ERR,"daemonize, first fork error: %s",strerror(errno));
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"daemonize, first fork error: %s",strerror(errno));
 		exit(1);
 	}
 	if (f>0) {
@@ -476,13 +478,13 @@ void make_daemon(void) {
 		exit(0);
 	}
 	if (chdir("/")<0) {
-		syslog(LOG_NOTICE,"can't change working directory to '/': %s",strerror(errno));
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"can't change working directory to '/': %s",strerror(errno));
 	}
 	setsid();
 	setpgid(0,getpid());
 	f = fork();
 	if (f<0) {
-		syslog(LOG_ERR,"daemonize, second fork error: %s",strerror(errno));
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"daemonize, second fork error: %s",strerror(errno));
 		exit(1);
 	}
 	if (f>0) {
@@ -614,14 +616,34 @@ char* nbd_packet_to_str(const uint8_t *pstr,uint32_t pleng) {
 	return r;
 }
 
+void nbd_force_partition_reread(nbdcommon *nbdcp) {
+	int err,status;
+	err = fork(); // reread partition tables - needs to be done in separate process
+	if (err<0) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"fork error: %s",strerror(errno)); // ignore this
+	} else {
+		if (err==0) { // child
+			err = open(nbdcp->nbddevice,O_RDONLY);
+			if (err<0) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"error opening %s: %s",nbdcp->nbddevice,strerror(errno));
+			} else {
+				close(err);
+			}
+			exit(0);
+		} else {
+			waitpid(err,&status,0);
+		}
+	}
+}
+
 int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	uint64_t size;
 	int omode,lmode;
-	int err,status;
+	int err;
 	struct stat stbuf;
 
 #define nbd_start_err_msg(format, ...) {\
-	syslog(LOG_ERR,(format), __VA_ARGS__); \
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,(format), __VA_ARGS__); \
 	snprintf(errmsg,NBD_ERR_SIZE,(format), __VA_ARGS__); \
 }
 
@@ -676,7 +698,11 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 
 	if (mfs_flock(nbdcp->mfsfd,lmode|LOCK_NB)<0) {
 		if ((nbdcp->flags & FLAG_IGNORELOCK) == 0) {
-			nbd_start_err_msg("MFS file %s is locked (likely mapped elsewhere)",nbdcp->mfsfile);
+			if (errno==EROFS) {
+				nbd_start_err_msg("MFS file %s is on a read-only filesystem - only read-only devices can be used and lock ignoring must be on (options -r and -i)",nbdcp->mfsfile);
+			} else {
+				nbd_start_err_msg("MFS file %s is locked (likely mapped elsewhere)",nbdcp->mfsfile);
+			}
 			goto err4;
 		}
 	}
@@ -689,28 +715,20 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 		nbdcp->fsize = stbuf.st_size;
 	}
 
-	nbdcp->fsize = 4096 * (nbdcp->fsize/4096);
+	nbdcp->fsize = nbdcp->bsize * (nbdcp->fsize/nbdcp->bsize);
 
 	if (nbdcp->fsize==0) {
 		nbd_start_err_msg("%s","file size too low (less than one 4k block)");
 		goto err5;
 	}
 
-// use size
-#if 0
-	err = ioctl(nbdcp->nbdfd, NBD_SET_SIZE, nbdcp->fsize);
-	if (err<0) {
-		syslog(LOG_ERR,"error setting block device size (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err5;
-	}
-#endif
-// use blocks
-	err = ioctl(nbdcp->nbdfd, NBD_SET_BLKSIZE, 4096);
+	err = ioctl(nbdcp->nbdfd, NBD_SET_BLKSIZE, nbdcp->bsize);
 	if (err<0) {
 		nbd_start_err_msg("error setting block device block size (%s): %s",nbdcp->nbddevice,strerror(errno));
 		goto err5;
 	}
-	err = ioctl(nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, nbdcp->fsize / 4096);
+
+	err = ioctl(nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, nbdcp->fsize / nbdcp->bsize);
 	if (err<0) {
 		nbd_start_err_msg("error setting block device number of blocks (%s): %s",nbdcp->nbddevice,strerror(errno));
 		goto err5;
@@ -722,9 +740,9 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 		goto err5;
 	}
 
-	err = ioctl(nbdcp->nbdfd, NBD_SET_TIMEOUT, 1800);
+	err = ioctl(nbdcp->nbdfd, NBD_SET_TIMEOUT, NbdTimeout);
 	if (err<0) {
-		syslog(LOG_NOTICE,"error setting timeout for NBD device (%s): %s",nbdcp->nbddevice,strerror(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"error setting timeout for NBD device (%s): %s",nbdcp->nbddevice,strerror(errno));
 	}
 
 	nbdcp->aqueue = squeue_new(0);
@@ -751,28 +769,11 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 		goto err8;
 	}
 
-	err = fork(); // reread partition tables - needs to be done in separate process
-	if (err<0) {
-		syslog(LOG_NOTICE,"fork error: %s",strerror(errno)); // ignore this
-	} else {
-		if (err==0) { // child
-			err = open(nbdcp->nbddevice,O_RDONLY);
-			if (err<0) {
-				syslog(LOG_ERR,"error opening %s: %s",nbdcp->nbddevice,strerror(errno));
-			} else {
-				close(err);
-			}
-			exit(0);
-		} else {
-			waitpid(err,&status,0);
-		}
-	}
-
 	err = mkdir(NBD_LINK_PREFIX,0777); // ignore status
 	err = unlink(nbdcp->linkname); // ignore status
 	err = symlink(nbdcp->nbddevice,nbdcp->linkname);
 	if (err<0) {
-		syslog(LOG_NOTICE,"can't create nbd device symlink %s->%s: %s",nbdcp->linkname,nbdcp->nbddevice,strerror(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't create nbd device symlink %s->%s: %s",nbdcp->linkname,nbdcp->nbddevice,strerror(errno));
 	}
 	return 0;
 
@@ -804,15 +805,15 @@ void nbd_stop(nbdcommon *nbdcp) {
 
 	err = ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
 	if (err<0) {
-		syslog(LOG_ERR,"%s: ioctl (NBD_CLEAR_QUE) failed: %s",nbdcp->nbddevice,strerror(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"%s: ioctl (NBD_CLEAR_QUE) failed: %s",nbdcp->nbddevice,strerror(errno));
 	}
 	err = ioctl(nbdcp->nbdfd, NBD_DISCONNECT);
 	if (err<0) {
-		syslog(LOG_ERR,"%s: ioctl (NBD_DISCONNECT) failed: %s",nbdcp->nbddevice,strerror(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"%s: ioctl (NBD_DISCONNECT) failed: %s",nbdcp->nbddevice,strerror(errno));
 	}
 	err = ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
 	if (err<0) {
-		syslog(LOG_ERR,"%s: ioctl (NBD_CLEAR_SOCK) failed: %s",nbdcp->nbddevice,strerror(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"%s: ioctl (NBD_CLEAR_SOCK) failed: %s",nbdcp->nbddevice,strerror(errno));
 	}
 
 	pthread_join(nbdcp->recv_thread,NULL);
@@ -826,7 +827,7 @@ void nbd_stop(nbdcommon *nbdcp) {
 
 	err = unlink(nbdcp->linkname);
 	if (err<0) {
-		syslog(LOG_NOTICE,"can't remove nbd device symlink %s->%s: %s",nbdcp->linkname,nbdcp->nbddevice,strerror(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't remove nbd device symlink %s->%s: %s",nbdcp->linkname,nbdcp->nbddevice,strerror(errno));
 	}
 	close(nbdcp->nbdfd);
 }
@@ -855,6 +856,188 @@ static uint8_t nbd_match(nbdcommon *nbdcp,uint32_t pleng,const uint8_t *path,uin
 	return 1;
 }
 
+static uint8_t nbd_auto_maps(const char *cfgfname) {
+	const uint8_t *path,*device,*name;
+	uint16_t pleng;
+	uint8_t dleng,nleng;
+	uint64_t size;
+	uint32_t bsize;
+	uint32_t flags;
+	static bdlist *bdl;
+	char *ptr;
+	const char *eptr;
+	char *flagstr;
+	char *lbuff;
+	size_t lbsize;
+	char ans[NBD_ERR_SIZE];
+	FILE *cfd;
+
+	cfd = fopen(cfgfname,"r");
+	if (cfd==NULL) {
+		fprintf(stderr,"can't open auto mappings file: %s\n",cfgfname);
+		return 0;
+	}
+
+	lbsize = 10000;
+	lbuff = malloc(lbsize);
+	// <path> [ (<device> | '*') [ (<linkname> | '*') [ (<size> | '*') [ (<bsize> | '*') [ ('ro' | 'rw') ]]]]]
+	while (getline(&lbuff,&lbsize,cfd)!=-1) {
+		for (ptr=lbuff ; ptr[0]!='\r' && ptr[0]!='\n' && ptr[0] ; ptr++) {}
+		ptr[0] = 0;
+		if (lbuff[0]==';' || lbuff[0]=='#' || lbuff[0]==0) {
+			continue;
+		}
+		ptr = lbuff;
+
+		size = 0;
+		bsize = 0;
+		flags = 0;
+
+		// mfs file name
+		path = (uint8_t *)ptr;
+		pleng = 0;
+		while (*ptr!=' ' && *ptr!='\t' && *ptr) {
+			ptr++;
+			pleng++;
+		}
+		while (*ptr==' ' || *ptr=='\t') {
+			ptr++;
+		}
+
+		// device name
+		device = (uint8_t *)ptr;
+		dleng = 0;
+		while (*ptr!=' ' && *ptr!='\t' && *ptr) {
+			ptr++;
+			dleng++;
+		}
+		while (*ptr==' ' || *ptr=='\t') {
+			ptr++;
+		}
+		if (dleng==1 && device[0]=='*') {
+			dleng = 0;
+		}
+
+		// link name
+		name = (uint8_t*)ptr;
+		nleng = 0;
+		while (*ptr!=' ' && *ptr!='\t' && *ptr) {
+			ptr++;
+			nleng++;
+		}
+		while (*ptr==' ' || *ptr=='\t') {
+			ptr++;
+		}
+		if (nleng==1 && name[0]=='*') {
+			nleng = 0;
+		}
+
+		// size
+		if (*ptr) {
+			if (*ptr=='*' && (ptr[1]==' ' || ptr[1]=='\t' || ptr[1]==0)) {
+				ptr = ptr+1;
+			} else {
+				size = sizestrtod(ptr,&eptr);
+				ptr = (char*)eptr;
+				if (*ptr=='B') {
+					ptr++;
+				}
+			}
+			if (*ptr!=' ' && *ptr!='\t' && *ptr) {
+				fprintf(stderr,"error parsing device size\n");
+				free(lbuff);
+				fclose(cfd);
+				return 0;
+			}
+			while (*ptr==' ' || *ptr=='\t') {
+				ptr++;
+			}
+		}
+
+		// bsize
+		if (*ptr) {
+			if (*ptr=='*' && (ptr[1]==' ' || ptr[1]=='\t' || ptr[1]==0)) {
+				ptr = ptr+1;
+			} else {
+				bsize = sizestrtod(ptr,&eptr);
+				ptr = (char*)eptr;
+				if (*ptr=='B') {
+					ptr++;
+				}
+			}
+			if (*ptr!=' ' && *ptr!='\t' && *ptr) {
+				fprintf(stderr,"error parsing block size\n");
+				free(lbuff);
+				fclose(cfd);
+				return 0;
+			}
+			while (*ptr==' ' || *ptr=='\t') {
+				ptr++;
+			}
+		}
+
+		// flags (ro/rw ; lock/nolock)
+		while ((flagstr = strsep(&ptr,", \t")) != NULL) {
+			if (flagstr[0]) {
+				if (strcmp(flagstr,"ro")==0) {
+					flags |= FLAG_READONLY;
+				} else if (strcmp(flagstr,"rw")==0) {
+					flags &= ~FLAG_READONLY;
+				} else if (strcmp(flagstr,"nolock")==0) {
+					flags |= FLAG_IGNORELOCK;
+				} else if (strcmp(flagstr,"lock")==0) {
+					flags &= ~FLAG_IGNORELOCK;
+				} else {
+					fprintf(stderr,"unknown flag: %s - ignored\n",flagstr);
+				}
+			}
+		}
+
+		bdl = malloc(sizeof(bdlist));
+		passert(bdl);
+		bdl->nbdcp = malloc(sizeof(nbdcommon));
+		passert(bdl->nbdcp);
+		bdl->nbdcp->mfsfile = nbd_packet_to_str(path,pleng);
+		bdl->nbdcp->nbddevice = nbd_packet_to_str(device,dleng);
+		bdl->nbdcp->linkname = nbd_packet_to_str(name,nleng);
+		bdl->nbdcp->fsize = size;
+		bdl->nbdcp->bsize = bsize;
+		bdl->nbdcp->flags = flags;
+		bdl->nbdcp->linkname = linkname_generate(bdl->nbdcp->linkname,mcfg.masterhost,mcfg.masterport,bdl->nbdcp->mfsfile);
+		if (nbd_linktest(bdl->nbdcp)<0) {
+			fprintf(stderr,"link exists\n");
+			nbd_free(bdl->nbdcp);
+			free(bdl);
+			free(lbuff);
+			fclose(cfd);
+			return 0;
+		} else {
+			if (nbd_start(bdl->nbdcp,ans)<0) {
+				ans[NBD_ERR_SIZE-1]=0;
+				fprintf(stderr,"%s\n",ans);
+				nbd_free(bdl->nbdcp);
+				free(bdl);
+				free(lbuff);
+				fclose(cfd);
+				return 0;
+			} else {
+				fprintf(stderr,"started block device: (%s->%s : MFS:/%s : %.3lfGiB)\n",bdl->nbdcp->linkname,bdl->nbdcp->nbddevice,bdl->nbdcp->mfsfile,bdl->nbdcp->fsize/(1024.0*1024.0*1024.0));
+				bdl->next = bdhead;
+				bdhead = bdl;
+			}
+		}
+	}
+
+	free(lbuff);
+	fclose(cfd);
+
+	for (bdl=bdhead ; bdl!=NULL ; bdl=bdl->next) {
+		nbd_force_partition_reread(bdl->nbdcp);
+	}
+
+	return 1;
+}
+
 /* cli <-> daemon communication */
 
 /* daemon handlers */
@@ -867,7 +1050,7 @@ void nbd_handle_nop(int sock,const uint8_t *buff,uint32_t leng) {
 	wptr = ans;
 	put32bit(&wptr,MFSNBD_NOP);
 	put32bit(&wptr,0);
-	unixtowrite(sock,ans,8,1000); // ignore status
+	unixtowrite(sock,ans,8,1000,1000); // ignore status
 }
 
 void nbd_handle_stop_daemon(int sock,const uint8_t *buff,uint32_t leng) {
@@ -880,7 +1063,7 @@ void nbd_handle_stop_daemon(int sock,const uint8_t *buff,uint32_t leng) {
 	put32bit(&wptr,MFSNBD_STOP);
 	put32bit(&wptr,1);
 	put8bit(&wptr,(leng==0)?MFSNBD_OK:MFSNBD_ERROR);
-	unixtowrite(sock,ans,9,1000); // ignore status
+	unixtowrite(sock,ans,9,1000,1000); // ignore status
 }
 
 void nbd_handle_add_device(int sock,const uint8_t *buff,uint32_t leng) {
@@ -892,6 +1075,7 @@ void nbd_handle_add_device(int sock,const uint8_t *buff,uint32_t leng) {
 	uint16_t pleng;
 	uint8_t dleng,nleng;
 	uint64_t size;
+	uint32_t bsize;
 	uint32_t flags;
 	static bdlist *bdl;
 
@@ -899,32 +1083,33 @@ void nbd_handle_add_device(int sock,const uint8_t *buff,uint32_t leng) {
 	put32bit(&wptr,MFSNBD_ADD);
 	put32bit(&wptr,0);
 	rptr = buff;
-	if (leng<16U) {
-		unixtowrite(sock,ans,8,1000);
+	if (leng<20U) {
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	pleng = get16bit(&rptr);
 	path = rptr;
 	rptr += pleng;
-	if (leng<16U+pleng) {
-		unixtowrite(sock,ans,8,1000);
+	if (leng<20U+pleng) {
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	dleng = get8bit(&rptr);
 	device = rptr;
 	rptr += dleng;
-	if (leng<16U+pleng+dleng) {
-		unixtowrite(sock,ans,8,1000);
+	if (leng<20U+pleng+dleng) {
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	nleng = get8bit(&rptr);
 	name = rptr;
 	rptr += nleng;
-	if (leng!=16U+pleng+dleng+nleng) {
-		unixtowrite(sock,ans,8,1000);
+	if (leng!=20U+pleng+dleng+nleng) {
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	size = get64bit(&rptr);
+	bsize = get32bit(&rptr);
 	flags = get32bit(&rptr);
 	if (pleng==0) {
 		msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"empty filename");
@@ -938,6 +1123,7 @@ void nbd_handle_add_device(int sock,const uint8_t *buff,uint32_t leng) {
 		bdl->nbdcp->nbddevice = nbd_packet_to_str(device,dleng);
 		bdl->nbdcp->linkname = nbd_packet_to_str(name,nleng);
 		bdl->nbdcp->fsize = size;
+		bdl->nbdcp->bsize = bsize;
 		bdl->nbdcp->flags = flags;
 		bdl->nbdcp->linkname = linkname_generate(bdl->nbdcp->linkname,mcfg.masterhost,mcfg.masterport,bdl->nbdcp->mfsfile);
 		if (nbd_linktest(bdl->nbdcp)<0) {
@@ -953,6 +1139,7 @@ void nbd_handle_add_device(int sock,const uint8_t *buff,uint32_t leng) {
 				nbd_free(bdl->nbdcp);
 				free(bdl);
 			} else {
+				nbd_force_partition_reread(bdl->nbdcp);
 				msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"started block device: (%s->%s : MFS:/%s : %.3lfGiB)",bdl->nbdcp->linkname,bdl->nbdcp->nbddevice,bdl->nbdcp->mfsfile,bdl->nbdcp->fsize/(1024.0*1024.0*1024.0));
 				status = MFSNBD_OK;
 				bdl->next = bdhead;
@@ -967,7 +1154,7 @@ void nbd_handle_add_device(int sock,const uint8_t *buff,uint32_t leng) {
 	put32bit(&wptr,msglen+2);
 	put8bit(&wptr,status);
 	put8bit(&wptr,msglen);
-	unixtowrite(sock,ans,10+msglen,1000);
+	unixtowrite(sock,ans,10+msglen,1000,1000);
 	return;
 }
 
@@ -986,28 +1173,28 @@ void nbd_handle_remove_device(int sock,const uint8_t *buff,uint32_t leng) {
 	put32bit(&wptr,0);
 	rptr = buff;
 	if (leng<4U) {
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	pleng = get16bit(&rptr);
 	path = rptr;
 	rptr += pleng;
 	if (leng<4U+pleng) {
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	dleng = get8bit(&rptr);
 	device = rptr;
 	rptr += dleng;
 	if (leng<4U+pleng+dleng) {
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	nleng = get8bit(&rptr);
 	name = rptr;
 	rptr += nleng;
 	if (leng!=4U+pleng+dleng+nleng) {
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	found = 0;
@@ -1035,7 +1222,7 @@ void nbd_handle_remove_device(int sock,const uint8_t *buff,uint32_t leng) {
 	put32bit(&wptr,msglen+2);
 	put8bit(&wptr,(found)?MFSNBD_OK:MFSNBD_ERROR);
 	put8bit(&wptr,msglen);
-	unixtowrite(sock,ans,10+msglen,1000);
+	unixtowrite(sock,ans,10+msglen,1000,1000);
 	return;
 }
 
@@ -1053,7 +1240,7 @@ void nbd_handle_list_devices(int sock,const uint8_t *buff,uint32_t leng) {
 		wptr = ans;
 		put32bit(&wptr,MFSNBD_LIST);
 		put32bit(&wptr,0);
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		free(ans);
 		return;
 	}
@@ -1072,7 +1259,7 @@ void nbd_handle_list_devices(int sock,const uint8_t *buff,uint32_t leng) {
 		if (nleng>255) {
 			nleng = 255;
 		}
-		dsize += pleng + dleng + nleng + 16;
+		dsize += pleng + dleng + nleng + 20;
 		dcnt++;
 	}
 	ans = malloc(8+dsize);
@@ -1104,9 +1291,10 @@ void nbd_handle_list_devices(int sock,const uint8_t *buff,uint32_t leng) {
 		memcpy(wptr,bdl->nbdcp->linkname+NBD_LINK_PREFIX_LENG,nleng);
 		wptr+=nleng;
 		put64bit(&wptr,bdl->nbdcp->fsize);
+		put32bit(&wptr,bdl->nbdcp->bsize);
 		put32bit(&wptr,bdl->nbdcp->flags);
 	}
-	unixtowrite(sock,ans,8+dsize,1000);
+	unixtowrite(sock,ans,8+dsize,1000,1000);
 	free(ans);
 	return;
 }
@@ -1127,28 +1315,28 @@ void nbd_handle_resize_device(int sock,const uint8_t *buff,uint32_t leng) {
 	put32bit(&wptr,0);
 	rptr = buff;
 	if (leng<12U) {
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	pleng = get16bit(&rptr);
 	path = rptr;
 	rptr += pleng;
 	if (leng<12U+pleng) {
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	dleng = get8bit(&rptr);
 	device = rptr;
 	rptr += dleng;
 	if (leng<12U+pleng+dleng) {
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	nleng = get8bit(&rptr);
 	name = rptr;
 	rptr += nleng;
 	if (leng!=12U+pleng+dleng+nleng) {
-		unixtowrite(sock,ans,8,1000);
+		unixtowrite(sock,ans,8,1000,1000);
 		return;
 	}
 	size = get64bit(&rptr);
@@ -1165,13 +1353,13 @@ void nbd_handle_resize_device(int sock,const uint8_t *buff,uint32_t leng) {
 				}
 			}
 			if (size>0) {
-				size = 4096 * (size/4096);
+				size = bdl->nbdcp->bsize * (size/bdl->nbdcp->bsize);
 				if (size==0) {
-					msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"file size too low (less than one 4k block)");
+					msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"file size too low (less than block size (%uB))",bdl->nbdcp->bsize);
 				}
 			}
 			if (size>0) {
-				if (ioctl(bdl->nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, size / 4096)<0) {
+				if (ioctl(bdl->nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, size / bdl->nbdcp->bsize)<0) {
 					msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"error setting block device number of blocks (%s): %s",bdl->nbdcp->nbddevice,strerror(errno));
 				} else {
 					if (ioctl(bdl->nbdcp->nbdfd,BLKGETSIZE64,&tsize)<0) {
@@ -1199,7 +1387,7 @@ void nbd_handle_resize_device(int sock,const uint8_t *buff,uint32_t leng) {
 	put32bit(&wptr,msglen+2);
 	put8bit(&wptr,(found)?MFSNBD_OK:MFSNBD_ERROR);
 	put8bit(&wptr,msglen);
-	unixtowrite(sock,ans,10+msglen,1000);
+	unixtowrite(sock,ans,10+msglen,1000,1000);
 	return;
 }
 
@@ -1210,7 +1398,7 @@ void nbd_handle_request(int sock) {
 	const uint8_t *rptr;
 
 	buff = NULL;
-	if (unixtoread(sock,hdr,8,READ_TOMS)!=8) {
+	if (unixtoread(sock,hdr,8,READ_TOMS,READ_TOMS)!=8) {
 		goto err;
 	}
 	rptr = hdr;
@@ -1227,7 +1415,7 @@ void nbd_handle_request(int sock) {
 	} else {
 		buff = NULL;
 	}
-	if (unixtoread(sock,buff,leng,READ_TOMS)!=(int32_t)leng) {
+	if (unixtoread(sock,buff,leng,READ_TOMS,READ_TOMS)!=(int32_t)leng) {
 		goto err;
 	}
 	switch (cmd) {
@@ -1274,8 +1462,8 @@ void nbd_stop_all_devices(void) {
 
 char* password_read(const char *filename) {
 	FILE *fd;
-	char passwordbuff[1024];
-	char *ret;
+	char *passwordbuff;
+	size_t pbsize;
 	int i;
 
 	fd = fopen(filename,"r");
@@ -1283,13 +1471,17 @@ char* password_read(const char *filename) {
 		fprintf(stderr,"error opening password file: %s\n",filename);
 		return NULL;
 	}
-	if (fgets(passwordbuff,1024,fd)==NULL) {
+	passwordbuff = NULL;
+	pbsize = 0;
+	if (getline(&passwordbuff,&pbsize,fd)==-1) {
 		fprintf(stderr,"password file (%s) is empty\n",filename);
+		if (passwordbuff!=NULL) {
+			free(passwordbuff);
+		}
 		fclose(fd);
 		return NULL;
 	}
 	fclose(fd);
-	passwordbuff[1023]=0;
 	i = strlen(passwordbuff);
 	while (i>0) {
 		i--;
@@ -1301,30 +1493,167 @@ char* password_read(const char *filename) {
 	}
 	if (i==0) {
 		fprintf(stderr,"first line in password file (%s) is empty\n",filename);
+		free(passwordbuff);
 		return NULL;
 	}
-	ret = malloc(i+1);
-	passert(ret);
-	memcpy(ret,passwordbuff,i);
-	memset(passwordbuff,0,1024);
-	ret[i] = 0;
-	return ret;
+	return passwordbuff;
+}
+
+int parse_option(const char *oname,const char *ovalue) {
+	if (strcmp(oname,"mfsmaster")==0) {
+		if (mcfg.masterport!=NULL) {
+			free(mcfg.masterhost);
+		}
+		mcfg.masterhost = strdup(ovalue);
+	} else if (strcmp(oname,"mfsport")==0) {
+		if (mcfg.masterport!=NULL) {
+			free(mcfg.masterport);
+		}
+		mcfg.masterport = strdup(ovalue);
+	} else if (strcmp(oname,"mfsbind")==0) {
+		if (mcfg.masterbind!=NULL) {
+			free(mcfg.masterbind);
+		}
+		mcfg.masterbind = strdup(ovalue);
+	} else if (strcmp(oname,"mfspassword")==0) {
+		if (mcfg.masterpassword!=NULL) {
+			free(mcfg.masterpassword);
+		}
+		mcfg.masterpassword = strdup(ovalue);
+	} else if (strcmp(oname,"mfssubfolder")==0) {
+		if (mcfg.masterpath!=NULL) {
+			free(mcfg.masterpath);
+		}
+		mcfg.masterpath = strdup(ovalue);
+	} else if (strcmp(oname,"mfsioretries")==0) {
+		mcfg.io_try_cnt = strtoul(ovalue,NULL,0);
+	} else if (strcmp(oname,"mfstimeout")==0) {
+		mcfg.io_timeout = strtoul(ovalue,NULL,0);
+	} else if (strcmp(oname,"mfslogretry")==0) {
+		mcfg.min_log_entry = strtoul(ovalue,NULL,0);
+	} else if (strcmp(oname,"mfswritecachesize")==0) {
+		mcfg.write_cache_mb = strtoul(ovalue,NULL,0);
+	} else if (strcmp(oname,"mfsreadaheadsize")==0) {
+		mcfg.read_cache_mb = strtoul(ovalue,NULL,0);
+	} else if (strcmp(oname,"mfsreadaheadleng")==0) {
+		mcfg.readahead_leng = strtoul(ovalue,NULL,0);
+	} else if (strcmp(oname,"mfsreadaheadtrigger")==0) {
+		mcfg.readahead_trigger = strtoul(ovalue,NULL,0);
+	} else if (strcmp(oname,"mfserroronlostchunk")==0) {
+		if (*ovalue) {
+			printf("value %s not used in option mfserroronlostchunk\n",ovalue);
+		}
+		mcfg.error_on_lost_chunk = 1;
+	} else if (strcmp(oname,"mfserroronnospace")==0) {
+		if (*ovalue) {
+			printf("value %s not used in option mfserroronnospace\n",ovalue);
+		}
+		mcfg.error_on_no_space = 1;
+	} else if (strcmp(oname,"mfspreflabels")==0) {
+		if (mcfg.preferedlabels!=NULL) {
+			free(mcfg.preferedlabels);
+		}
+		mcfg.preferedlabels = strdup(ovalue);
+	} else if (strcmp(oname,"mfsnbdtimeout")==0) {
+		NbdTimeout = strtoul(ovalue,NULL,0);
+	} else {
+		fprintf(stderr,"unrecognized option: %s\n",oname);
+		return -1;
+	}
+	return 0;
+}
+
+int parse_options(const char *optstring) {
+	char *ostrcopy,*option,*osptr;
+	char *optr;
+	char *oname,*ovalue;
+	char *onend,*ovend;
+
+	ostrcopy = strdup(optstring);
+	osptr = ostrcopy;
+
+	while ((option = strsep(&osptr,","))!=NULL) {
+		optr = option;
+		while (*optr==' ' || *optr=='\t') {
+			optr++;
+		}
+		oname = optr;
+		while (*optr && *optr!=' ' && *optr!='\t' && *optr!='=') {
+			optr++;
+		}
+		onend = optr;
+		while (*optr==' ' || *optr=='\t') {
+			optr++;
+		}
+		if (*optr=='=') {
+			optr++;
+			while (*optr==' ' || *optr=='\t') {
+				optr++;
+			}
+			ovalue = optr;
+			while (*optr && *optr!=' ' && *optr!='\t') {
+				optr++;
+			}
+			ovend = optr;
+			while (*optr==' ' || *optr=='\t') {
+				optr++;
+			}
+		} else {
+			ovalue = optr;
+			ovend = optr;
+		}
+		if (*optr!=0) {
+			printf("option malformed: %s\n",option);
+			free(ostrcopy);
+			return -1;
+		}
+		if (oname==onend) { // empty option - just ignore
+			continue;
+		}
+		*onend = 0;
+		*ovend = 0;
+		if (parse_option(oname,ovalue)<0) {
+			free(ostrcopy);
+			return -1;
+		}
+	}
+
+	free(ostrcopy);
+	return 0;
 }
 
 void usage(const char *appname) {
 	fprintf(stderr,"usage:\n");
-	fprintf(stderr,"\tstart daemon:   %s start [ -H masterhost ] [ -P masterport ] [ -p masterpassword | -x passwordfile ] [ -l link_socket_name ]\n",appname);
+	fprintf(stderr,"\tstart daemon:   %s start [ -H masterhost ] [ -P masterport ] [ -B masterbind ] [ -S masterpath ] [ -p masterpassword | -x passwordfile ] [ -l link_socket_name ] [ -i init_mappings_file ] [ -o options ]\n",appname);
 	fprintf(stderr,"\tstop daemon:    %s stop [ -l link_socket_name ]\n",appname);
-	fprintf(stderr,"\tadd mapping:    %s map [ -l link_socket_name ] -f mfsfile [ -d /dev/nbdX ] [ -n linkname ] [ -s bdevsize ]\n",appname);
+	fprintf(stderr,"\tadd mapping:    %s map [ -l link_socket_name ] -f mfsfile [ -d /dev/nbdX ] [ -n linkname ] [ -s bdevsize ] [ -b blocksize | -5 | -1 | -2 | -4 ] [-r] [-i]\n",appname);
 	fprintf(stderr,"\tdelete mapping: %s unmap [ -l link_socket_name ] [ -f mfsfile ] [ -d /dev/nbdX ] [ -n linkname ]\n",appname);
-	fprintf(stderr,"\tlist mappings:  %s list [ -l link_socket_name ] [ -t m|u ]\n",appname);
+	fprintf(stderr,"\tlist mappings:  %s list [ -l link_socket_name ] [ -t m|u|i ]\n",appname);
 	fprintf(stderr,"\tchange size:    %s resize [ -l link_socket_name ] ( -f mfsfile | -d /dev/nbdX ) [ -s bdevsize ]\n",appname);
+	fprintf(stderr,"\noptions:\n");
+	fprintf(stderr,"\tmfswritecachesize=N      define size of write cache in MiB (default: 128)\n");
+	fprintf(stderr,"\tmfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 128)\n");
+	fprintf(stderr,"\tmfsreadaheadleng=N       define amount of bytes to be additionally read (default: 2097152 = 2MiB)\n");
+	fprintf(stderr,"\tmfsreadaheadtrigger=N    define amount of bytes read sequentially that turns on read ahead (default: 20971520)\n");
+	fprintf(stderr,"\tmfserroronlostchunk      when all known chunkservers are connected to the master and the required chunk is missing then immediately finish I/O and return an error\n");
+	fprintf(stderr,"\tmfserroronnospace        when all known chunkservers are connected to the master and there is no free space then immediately finish I/O and return an error\n");
+	fprintf(stderr,"\tmfsioretries=N           define number of retries before I/O error is returned (default: 30)\n");
+	fprintf(stderr,"\tmfstimeout=N             define maximum timeout in seconds before I/O error is returned (default: 0 - which means no timeout)\n");
+	fprintf(stderr,"\tmfslogretry=N            define minimal retry counter on which system will start log I/O messages (default: 5)\n");
+	fprintf(stderr,"\tmfsmaster=HOST           define mfsmaster location (default: " DEFAULT_MASTERNAME ")\n");
+	fprintf(stderr,"\tmfsport=PORT             define mfsmaster port number (default: " DEFAULT_MASTER_CLIENT_PORT ")\n");
+	fprintf(stderr,"\tmfsbind=IP               define source ip address for connections (default: NOT DEFINED - chosen automatically by OS)\n");
+	fprintf(stderr,"\tmfssubfolder=PATH        define subfolder to mount as root (default: /)\n");
+	fprintf(stderr,"\tmfspassword=PASSWORD     authenticate to mfsmaster with given password\n");
+	fprintf(stderr,"\tmfspreflabels=LABELEXPR  specify preferred labels for choosing chunkservers during I/O\n");
+	fprintf(stderr,"\tmfsnbdtimeout=N          define maximum timeout in seconds before kernel gives up (default: 1800)\n");
 //	exit(1);
 }
 
 int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 	char *passfile;
 	char *lsockname;
+	char *initfname;
 	int fg,ch;
 	int lsock;
 
@@ -1337,13 +1666,14 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 	argc--;
 	argv++;
 
-	memset(&mcfg,0,sizeof(mcfg));
+	mfs_set_defaults(&mcfg);
 	passfile = NULL;
 	lsockname = NULL;
+	initfname = NULL;
 	fg = 0;
 	bdhead = NULL;
 
-	while ((ch = getopt(argc, argv, "H:P:S:p:x:l:Fh?")) != -1) {
+	while ((ch = getopt(argc, argv, "H:P:B:S:p:x:l:i:o:Fh?")) != -1) {
 		switch (ch) {
 			case 'H':
 				if (mcfg.masterhost!=NULL) {
@@ -1356,6 +1686,12 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 					free(mcfg.masterport);
 				}
 				mcfg.masterport = strdup(optarg);
+				break;
+			case 'B':
+				if (mcfg.masterbind!=NULL) {
+					free(mcfg.masterbind);
+				}
+				mcfg.masterbind = strdup(optarg);
 				break;
 			case 'S':
 				if (mcfg.masterpath!=NULL) {
@@ -1381,6 +1717,18 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 				}
 				lsockname = strdup(optarg);
 				break;
+			case 'i':
+				if (initfname!=NULL) {
+					free(initfname);
+				}
+				initfname = strdup(optarg);
+				break;
+			case 'o':
+				if (parse_options(optarg)<0) {
+					usage(appname);
+					return 1;
+				}
+				break;
 			case 'F':
 				fg = 1;
 				break;
@@ -1402,25 +1750,43 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 		}
 	}
 
+	if (mcfg.write_cache_mb<16) {
+		fprintf(stderr,"write cache size too low (%u MiB) - increased to 16 MiB\n",mcfg.write_cache_mb);
+		mcfg.write_cache_mb=16;
+	}
+	if (mcfg.write_cache_mb>2048) {
+		fprintf(stderr,"write cache size too big (%u MiB) - decresed to 2048 MiB\n",mcfg.write_cache_mb);
+		mcfg.write_cache_mb=2048;
+	}
+	if (mcfg.read_cache_mb<16) {
+		fprintf(stderr,"read ahead size too low (%u MiB) - increased to 16 MiB\n",mcfg.read_cache_mb);
+		mcfg.read_cache_mb=16;
+	}
+	if (mcfg.read_cache_mb>2048) {
+		fprintf(stderr,"read ahead size too big (%u MiB) - decresed to 2048 MiB\n",mcfg.read_cache_mb);
+		mcfg.read_cache_mb=2048;
+	}
+	if (mcfg.readahead_leng<0x20000) {
+		fprintf(stderr,"read ahead length too low (%u B) - increased to 128 KiB\n",mcfg.readahead_leng);
+		mcfg.readahead_leng=0x20000;
+	}
+	if (mcfg.readahead_leng>0x200000) {
+		fprintf(stderr,"read ahead length too big (%u B) - decresed to 2 MiB\n",mcfg.readahead_leng);
+		mcfg.readahead_leng=0x200000;
+	}
+
 	processname_init(argc_back,argv_back); // prepare everything for 'processname_set'
 
-	openlog("mfsblockdev", LOG_PID | LOG_NDELAY, LOG_USER);
-
-	if (mcfg.masterhost==NULL) {
-		mcfg.masterhost = strdup("mfsmaster");
+	if (mcfg.logident!=NULL) {
+		free(mcfg.logident);
 	}
-	if (mcfg.masterport==NULL) {
-		mcfg.masterport = strdup("9421");
+	mcfg.logident = strdup("mfsblockdev");
+	mcfg.logdaemon = 1;
+
+	if (mcfg.mountpoint!=NULL) {
+		free(mcfg.mountpoint);
 	}
 	mcfg.mountpoint = strdup("[NBD]");
-	if (mcfg.masterpath==NULL) {
-		mcfg.masterpath = strdup("/");
-	}
-	mcfg.read_cache_mb = 128;
-	mcfg.write_cache_mb = 128;
-	mcfg.error_on_lost_chunk = 0;
-	mcfg.error_on_no_space = 0;
-	mcfg.io_try_cnt = 30;
 
 	if (lsockname==NULL) {
 		lsockname = strdup(NBD_LINK_PREFIX "nbdsock");
@@ -1441,7 +1807,6 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 			}
 		}
 		if (unixlisten(lsock,lsockname,5)<0) {
-			syslog(LOG_ERR,"error creating unix socket '%s': %s",lsockname,strerror(errno));
 			fprintf(stderr,"error creating unix socket '%s': %s\n",lsockname,strerror(errno));
 			free(lsockname);
 			return 1;
@@ -1449,7 +1814,6 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 	}
 
 	if (mfs_init(&mcfg,1)<0) {
-		syslog(LOG_ERR,"can't connect to master");
 		fprintf(stderr,"can't connect to master\n");
 		unixclose(lsock);
 		unlink(lsockname);
@@ -1464,8 +1828,7 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 	}
 
 	if (mfs_init(&mcfg,2)<0) {
-		syslog(LOG_ERR,"can't initialize MFS");
-		fprintf(stderr,"can't initialize MFS\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"can't initialize MFS");
 		unixclose(lsock);
 		unlink(lsockname);
 		free(lsockname);
@@ -1474,11 +1837,17 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 
 	workers_set = workers_init(150,30,0,"nbd",nbd_worker_fn);
 
+	if (initfname!=NULL) {
+		if (nbd_auto_maps(initfname)==0) {
+			term = 1;
+		}
+	}
+
 	if (fg==0) {
 		int f;
 		f = open("/dev/null", O_RDWR, 0);
 		if (dup2(f,STDERR_FILENO)<0) {
-			syslog(LOG_ERR,"dup2 error: %s",strerror(errno));
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"dup2 error: %s",strerror(errno));
 			term = 1;
 		}
 		close(f);
@@ -1486,7 +1855,7 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 
 	if (term==0) {
 		char pname[256];
-		syslog(LOG_NOTICE,"main loop start");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"main loop start");
 		snprintf(pname,256,"mfsbdev (daemon cmdlink:%s)",lsockname);
 		pname[255] = 0;
 		processname_set(pname); // removes password from 'ps'
@@ -1500,12 +1869,12 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 			unixclose(csock);
 		} else {
 			if (errno!=ETIMEDOUT) {
-				syslog(LOG_NOTICE,"accept returned: %s",strerror(errno));
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"accept returned: %s",strerror(errno));
 			}
 		}
 	}
 
-	syslog(LOG_NOTICE,"got term signal - closing nbd devices");
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"got term signal - closing nbd devices");
 
 	nbd_stop_all_devices();
 	massert(bdhead==NULL,"structures not cleared properly");
@@ -1514,11 +1883,11 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 	mfs_term();
 
 	unixclose(lsock);
-	syslog(LOG_NOTICE,"removing socket file '%s'",lsockname);
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"removing socket file '%s'",lsockname);
 	if (unlink(lsockname)<0) {
-		syslog(LOG_ERR,"can't unlink socket '%s': %s",lsockname,strerror(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't unlink socket '%s': %s",lsockname,strerror(errno));
 	}
-	syslog(LOG_NOTICE,"socket file '%s' removed",lsockname);
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"socket file '%s' removed",lsockname);
 	free(lsockname);
 
 	return 0;
@@ -1572,14 +1941,14 @@ int nbd_stop_daemon(const char *appname,int argc,char *argv[]) {
 	wptr = buff;
 	put32bit(&wptr,MFSNBD_STOP);
 	put32bit(&wptr,0);
-	if (unixtowrite(csock,buff,8,1000)!=8) {
+	if (unixtowrite(csock,buff,8,1000,1000)!=8) {
 		fprintf(stderr,"unable to send data to '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
 
 	memset(buff,0,8);
 
-	if (unixtoread(csock,buff,8,5000)!=8) {
+	if (unixtoread(csock,buff,8,5000,5000)!=8) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -1598,7 +1967,7 @@ int nbd_stop_daemon(const char *appname,int argc,char *argv[]) {
 		goto err;
 	}
 
-	if (unixtoread(csock,buff,1,1000)!=1) {
+	if (unixtoread(csock,buff,1,1000,1000)!=1) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -1646,6 +2015,7 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 	char *filename,*device,*linkname;
 	uint64_t size;
 	uint32_t flags;
+	uint32_t bsize;
 	uint32_t dsize,pleng,dleng,nleng;
 	uint8_t aleng,status;
 	char *answer;
@@ -1663,10 +2033,11 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 	linkname = NULL;
 	answer = NULL;
 	size = 0;
+	bsize = 4096;
 	flags = 0;
 	res = 1;
 
-	while ((ch = getopt(argc, argv, "l:f:d:n:s:ri?")) != -1) {
+	while ((ch = getopt(argc, argv, "l:f:d:n:s:b:5124ri?")) != -1) {
 		switch (ch) {
 			case 'l':
 				if (lsockname!=NULL) {
@@ -1698,6 +2069,21 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 				break;
 			case 's':
 				size = sizestrtod(optarg,NULL);
+				break;
+			case 'b':
+				bsize = sizestrtod(optarg,NULL);
+				break;
+			case '5':
+				bsize = 512;
+				break;
+			case '1':
+				bsize = 1024;
+				break;
+			case '2':
+				bsize = 2048;
+				break;
+			case '4':
+				bsize = 4096;
 				break;
 			case 'r':
 				flags |= FLAG_READONLY;
@@ -1749,7 +2135,7 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 	} else {
 		nleng = 0;
 	}
-	dsize = 16 + pleng + dleng + nleng;
+	dsize = 20 + pleng + dleng + nleng;
 
 	buff = malloc(8+dsize);
 	passert(buff);
@@ -1771,16 +2157,17 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 		wptr+=nleng;
 	}
 	put64bit(&wptr,size);
+	put32bit(&wptr,bsize);
 	put32bit(&wptr,flags);
 
-	if (unixtowrite(csock,buff,8+dsize,1000)!=(ssize_t)(8+dsize)) {
+	if (unixtowrite(csock,buff,8+dsize,1000,1000)!=(ssize_t)(8+dsize)) {
 		fprintf(stderr,"unable to send data to '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
 
 	memset(buff,0,8);
 
-	if (unixtoread(csock,buff,8,5000)!=8) {
+	if (unixtoread(csock,buff,8,5000,5000)!=8) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -1803,7 +2190,7 @@ int nbd_add_mapping(const char *appname,int argc,char *argv[]) {
 	buff = malloc(leng);
 	passert(buff);
 
-	if (unixtoread(csock,buff,leng,1000)!=(ssize_t)leng) {
+	if (unixtoread(csock,buff,leng,1000,1000)!=(ssize_t)leng) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -1975,14 +2362,14 @@ int nbd_remove_mapping(const char *appname,int argc,char *argv[]) {
 		wptr+=nleng;
 	}
 
-	if (unixtowrite(csock,buff,8+dsize,1000)!=(ssize_t)(8+dsize)) {
+	if (unixtowrite(csock,buff,8+dsize,1000,1000)!=(ssize_t)(8+dsize)) {
 		fprintf(stderr,"unable to send data to '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
 
 	memset(buff,0,8);
 
-	if (unixtoread(csock,buff,8,5000)!=8) {
+	if (unixtoread(csock,buff,8,5000,5000)!=8) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -2005,7 +2392,7 @@ int nbd_remove_mapping(const char *appname,int argc,char *argv[]) {
 	buff = malloc(leng);
 	passert(buff);
 
-	if (unixtoread(csock,buff,leng,1000)!=(ssize_t)leng) {
+	if (unixtoread(csock,buff,leng,1000,1000)!=(ssize_t)leng) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -2183,14 +2570,14 @@ int nbd_resize_bdev(const char *appname,int argc,char *argv[]) {
 	}
 	put64bit(&wptr,size);
 
-	if (unixtowrite(csock,buff,8+dsize,1000)!=(ssize_t)(8+dsize)) {
+	if (unixtowrite(csock,buff,8+dsize,1000,1000)!=(ssize_t)(8+dsize)) {
 		fprintf(stderr,"unable to send data to '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
 
 	memset(buff,0,8);
 
-	if (unixtoread(csock,buff,8,5000)!=8) {
+	if (unixtoread(csock,buff,8,5000,5000)!=8) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -2213,7 +2600,7 @@ int nbd_resize_bdev(const char *appname,int argc,char *argv[]) {
 	buff = malloc(leng);
 	passert(buff);
 
-	if (unixtoread(csock,buff,leng,1000)!=(ssize_t)leng) {
+	if (unixtoread(csock,buff,leng,1000,1000)!=(ssize_t)leng) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -2267,9 +2654,15 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 	uint8_t dcnt;
 	uint16_t pleng;
 	uint8_t dleng,nleng;
+	uint16_t maxpleng;
+	uint8_t maxdleng,maxnleng;
 	uint64_t size;
+	uint64_t maxsize;
+	uint32_t bsize;
+	uint32_t maxbsize;
 	uint32_t flags;
 	uint8_t displaymode;
+	char formatbuff[100];
 	char *path,*device,*linkname;
 	char *lsockname;
 	uint8_t lsockcustom;
@@ -2299,6 +2692,8 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 					displaymode = 1;
 				} else if (optarg[0]=='R' || optarg[0]=='r' || optarg[0]=='D' || optarg[0]=='d' || optarg[0]=='U' || optarg[0]=='u') {
 					displaymode = 2;
+				} else if (optarg[0]=='C' || optarg[0]=='c' || optarg[0]=='I' || optarg[0]=='i') {
+					displaymode = 3;
 				} else {
 					fprintf(stderr,"unknown display mode: %s\n",optarg);
 					usage(appname);
@@ -2325,14 +2720,14 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 	wptr = cbuff;
 	put32bit(&wptr,MFSNBD_LIST);
 	put32bit(&wptr,0);
-	if (unixtowrite(csock,cbuff,8,1000)!=8) {
+	if (unixtowrite(csock,cbuff,8,1000,1000)!=8) {
 		fprintf(stderr,"unable to send data to '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
 
 	memset(cbuff,0,8);
 
-	if (unixtoread(csock,cbuff,8,5000)!=8) {
+	if (unixtoread(csock,cbuff,8,5000,5000)!=8) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
@@ -2349,13 +2744,59 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 	buff = malloc(leng);
 	passert(buff);
 
-	if (unixtoread(csock,buff,leng,1000)!=(ssize_t)leng) {
+	if (unixtoread(csock,buff,leng,1000,1000)!=(ssize_t)leng) {
 		fprintf(stderr,"error receiving data from '%s': %s\n",lsockname,strerror(errno));
 		goto err;
 	}
 
 	unixclose(csock);
 	csock = -1;
+
+	maxpleng = 0;
+	maxdleng = 0;
+	maxnleng = 0;
+	maxsize = 0;
+	maxbsize = 0;
+	formatbuff[0]='\n';
+	formatbuff[1]=0;
+	if (displaymode==3) { // calc max path, max device, max link name
+		rptr = buff;
+		dcnt = get8bit(&rptr);
+		while (dcnt>0) {
+			pleng = get16bit(&rptr);
+			rptr += pleng;
+			dleng = get8bit(&rptr);
+			rptr += dleng;
+			nleng = get8bit(&rptr);
+			rptr += nleng;
+			size = get64bit(&rptr);
+			bsize = get32bit(&rptr);
+			rptr += 4; // ship flags
+			dcnt--;
+			if (pleng > maxpleng) {
+				maxpleng = pleng;
+			}
+			if (dleng > maxdleng) {
+				maxdleng = dleng;
+			}
+			if (nleng > maxnleng) {
+				maxnleng = nleng;
+			}
+			if (size > maxsize) {
+				maxsize = size;
+			}
+			if (bsize > maxbsize) {
+				maxbsize = bsize;
+			}
+		}
+		snprintf(formatbuff,100,"%"PRIu64,maxsize);
+		formatbuff[99]=0;
+		maxsize = strlen(formatbuff);
+		snprintf(formatbuff,100,"%"PRIu32,maxbsize);
+		formatbuff[99]=0;
+		maxbsize = strlen(formatbuff);
+		snprintf(formatbuff,100,"%%%u"PRIu64" %%%u"PRIu32" %%s,%%s\n",(unsigned int)maxsize,(unsigned int)maxbsize);
+	}
 
 	rptr = buff;
 	dcnt = get8bit(&rptr);
@@ -2370,37 +2811,58 @@ int nbd_list_mappings(const char *appname,int argc,char *argv[]) {
 		linkname = nbd_packet_to_str(rptr,nleng);
 		rptr += nleng;
 		size = get64bit(&rptr);
+		bsize = get32bit(&rptr);
 		flags = get32bit(&rptr);
 		if (displaymode!=0) {
-			if (displaymode==1) {
-				printf("%s map",appname);
+			if (displaymode==3) {
+				printf("%s",path);
+				while (pleng <= maxpleng) {
+					putchar(' ');
+					pleng++;
+				}
+				printf("%s",device);
+				while (dleng <= maxdleng) {
+					putchar(' ');
+					dleng++;
+				}
+				printf("%s",linkname);
+				while (nleng <= maxnleng) {
+					putchar(' ');
+					nleng++;
+				}
+				printf(formatbuff,size,bsize,(flags & FLAG_READONLY)?"ro":"rw",(flags & FLAG_IGNORELOCK)?"nolock":"lock");
 			} else {
-				printf("%s unmap",appname);
-			}
-			if (lsockcustom) {
-				printf(" -l '%s'",lsockname);
-			}
-			if (path!=NULL) {
-				printf(" -f '%s'",path);
-			}
-			if (device!=NULL) {
-				printf(" -d '%s'",device);
-			}
-			if (linkname!=NULL) {
-				printf(" -n '%s'",linkname);
-			}
-			if (displaymode==1) {
-				printf(" -s %"PRIu64,size);
-				if (flags & FLAG_READONLY) {
-					printf(" -r");
+				if (displaymode==1) {
+					printf("%s map",appname);
+				} else {
+					printf("%s unmap",appname);
 				}
-				if (flags & FLAG_IGNORELOCK) {
-					printf(" -i");
+				if (lsockcustom) {
+					printf(" -l '%s'",lsockname);
 				}
+				if (path!=NULL) {
+					printf(" -f '%s'",path);
+				}
+				if (device!=NULL) {
+					printf(" -d '%s'",device);
+				}
+				if (linkname!=NULL) {
+					printf(" -n '%s'",linkname);
+				}
+				if (displaymode==1) {
+					printf(" -s %"PRIu64,size);
+					printf(" -b %"PRIu32,bsize);
+					if (flags & FLAG_READONLY) {
+						printf(" -r");
+					}
+					if (flags & FLAG_IGNORELOCK) {
+						printf(" -i");
+					}
+				}
+				printf("\n");
 			}
-			printf("\n");
 		} else {
-			printf("file: %s ; device: %s ; link: %s ; size: %"PRIu64" (%.3lfGiB) ; rwmode: %s ; ignore_locks:%s\n",(path==NULL)?"":path,(device==NULL)?"":device,(linkname==NULL)?"":linkname,size,size/(1024.0*1024.0*1024.0),(flags & FLAG_READONLY)?"ro":"rw",(flags & FLAG_IGNORELOCK)?"yes":"no");
+			printf("file: %s ; device: %s ; link: %s ; size: %"PRIu64" (%.3lfGiB) ; blocksize: %"PRIu32" ; rwmode: %s ; ignore_locks:%s\n",(path==NULL)?"":path,(device==NULL)?"":device,(linkname==NULL)?"":linkname,size,size/(1024.0*1024.0*1024.0),bsize,(flags & FLAG_READONLY)?"ro":"rw",(flags & FLAG_IGNORELOCK)?"yes":"no");
 		}
 		if (path!=NULL) {
 			free(path);

@@ -22,9 +22,11 @@
 #define _REPLICATOR_H_
 
 #include <inttypes.h>
+#include "MFSCommunication.h"
+
+typedef enum {SIMPLE,SPLIT,RECOVER,JOIN} repmodeenum;
 
 void replicator_stats(uint64_t *bin,uint64_t *bout,uint32_t *repl);
-/* srcs: srccnt * (chunkid:64 version:32 ip:32 port:16) */
-uint8_t replicate(uint64_t chunkid,uint32_t version,const uint32_t xormasks[4],uint8_t srccnt,const uint8_t *srcs);
+uint8_t replicate(repmodeenum rmode,uint64_t chunkid,uint32_t version,uint8_t partno,uint8_t parts,const uint32_t srcip[MAX_EC_PARTS],const uint16_t srcport[MAX_EC_PARTS],const uint64_t srcchunkid[MAX_EC_PARTS]);
 
 #endif

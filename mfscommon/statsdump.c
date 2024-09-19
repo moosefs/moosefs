@@ -396,6 +396,7 @@ void statsdump_gencsv(int32_t *stats,uint32_t rmask,char sep,uint8_t flags) {
 
 	statsleng = charts_getmaxleng();
 	statscnt = 0;
+	timestamp = 0; // makes gcc happy
 	for (i=0 ; stats[i]>=0 ; i++) {
 		statscnt++;
 	}

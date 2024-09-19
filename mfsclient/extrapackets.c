@@ -43,6 +43,8 @@ typedef struct _extra_packets {
 	uint64_t chunkid;
 	uint32_t version;
 	uint64_t fleng;
+	uint32_t offset;
+	uint32_t size;
 	uint8_t truncflag;
 	struct _extra_packets *next;
 } extra_packets;
@@ -106,18 +108,22 @@ void* ep_thread(void *arg) {
 				chunksdatacache_change(ep->inode,ep->chindx,ep->chunkid,ep->version);
 				if (ep->truncflag) {
 					chunksdatacache_clear_inode(ep->inode,ep->chindx+1);
-					read_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,0);
+					read_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE+ep->offset,0);
 					read_inode_set_length_passive(ep->inode,ep->fleng);
 #ifdef MFSMOUNT
 					fdcache_invalidate(ep->inode);
 					mfs_inode_change_fleng(ep->inode,ep->fleng);
-					mfs_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,0);
+					mfs_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE+ep->offset,0);
 #endif
 				} else {
-					read_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,MFSCHUNKSIZE);
+					if (ep->size>0) {
+						read_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE+ep->offset,ep->size);
+					}
 #ifdef MFSMOUNT
 					fdcache_invalidate(ep->inode);
-					mfs_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE,MFSCHUNKSIZE);
+					if (ep->size>0) {
+						mfs_inode_clear_cache(ep->inode,(uint64_t)(ep->chindx)*MFSCHUNKSIZE+ep->offset,ep->size);
+					}
 #endif
 				}
 				break;
@@ -140,7 +146,7 @@ void* ep_thread(void *arg) {
 	return arg; // pro forma - unreachable
 }
 
-void ep_chunk_has_changed(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint64_t fleng,uint8_t truncflag) {
+void ep_chunk_has_changed(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32_t version,uint64_t fleng,uint8_t truncflag,uint32_t offset,uint32_t size) {
 	extra_packets *ep;
 	zassert(pthread_mutex_lock(&ep_lock));
 	ep = ep_get_packet();
@@ -151,6 +157,8 @@ void ep_chunk_has_changed(uint32_t inode,uint32_t chindx,uint64_t chunkid,uint32
 	ep->version = version;
 	ep->fleng = fleng;
 	ep->truncflag = truncflag;
+	ep->offset = offset;
+	ep->size = size;
 	ep_append_packet(ep);
 	zassert(pthread_mutex_unlock(&ep_lock));
 }

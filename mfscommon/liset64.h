@@ -23,7 +23,7 @@
 
 #include <inttypes.h>
 
-int liset_new();
+int liset_new(void);
 void liset_clear(int setid);
 void liset_remove(int setid);
 uint64_t liset_card(int setid);

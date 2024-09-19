@@ -79,9 +79,16 @@ uint32_t simple_pseudo_random(void) {
 
 int main(void) {
 	uint8_t *speedtestblock;
-	uint8_t rblock[65536],sblock[65536],xblock[65536];
+	uint8_t *rblock,*sblock,*xblock;
 	uint32_t i,j,s,crc,crc1,crc2;
 	double st,en,corr,mycrctime,refcrctime;
+
+	rblock = malloc(sizeof(uint8_t)*65536);
+	sblock = malloc(sizeof(uint8_t)*65536);
+	xblock = malloc(sizeof(uint8_t)*65536);
+	if (rblock==NULL || sblock==NULL || xblock==NULL) {
+		return 99;
+	}
 
 	mfstest_init();
 
@@ -194,4 +201,8 @@ int main(void) {
 
 	mfstest_end();
 	mfstest_return();
+
+	free(xblock);
+	free(sblock);
+	free(rblock);
 }

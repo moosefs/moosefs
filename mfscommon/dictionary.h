@@ -25,6 +25,7 @@
 
 int dict_init(void);
 void dict_cleanup(void);
+void dict_printall(void); // debug only
 void* dict_search(const uint8_t *data,uint32_t leng);
 void* dict_insert(const uint8_t *data,uint32_t leng);
 const uint8_t* dict_get_ptr(void *dptr);

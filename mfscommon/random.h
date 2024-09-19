@@ -25,9 +25,9 @@
 
 int rnd_init(void);
 
-uint8_t rndu8();
-uint32_t rndu32();
-uint64_t rndu64();
+uint8_t rndu8(void);
+uint32_t rndu32(void);
+uint64_t rndu64(void);
 
 void rndbuff(uint8_t *buff,uint32_t size);
 

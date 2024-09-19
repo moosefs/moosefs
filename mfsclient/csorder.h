@@ -29,7 +29,7 @@ typedef struct _cspri {
 	uint32_t priority;
 } cspri;
 
-int csorder_init(char *labelexpr);
+int csorder_init(const char *labelexpr);
 uint8_t csorder_calc(uint32_t labelmask);
 uint32_t csorder_sort(cspri chain[100],uint8_t csdataver,const uint8_t *csdata,uint32_t csdatasize,uint8_t writeflag);
 

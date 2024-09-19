@@ -416,7 +416,7 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 				if (ccode) {
 					printf(COLOR_CLEAR);
 				}
-				printf("\n");
+				printf(" (%"PRIu32")\n",mfslen);
 				if (payloadlen-8<=ud->maxdatainpacket) {
 					if (mfslen < payloadlen-8) {
 						hexdump(payload+8,mfslen);
@@ -463,7 +463,7 @@ void parse_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *
 			}
 		} else {
 			print_info(&(header->ts),ip,srcport,dstport);
-			printf(COLOR_WRONGPACKET "... not mfs packet (%u:%u) ..." COLOR_CLEAR "\n",mfscmd,mfslen);
+			printf(COLOR_WRONGPACKET "... not mfs packet (%"PRIu32":%"PRIu32") ..." COLOR_CLEAR "\n",mfscmd,mfslen);
 			if (cp!=NULL) {
 				c = *cp;
 				*cp = c->next;

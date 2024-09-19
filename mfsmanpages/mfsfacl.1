@@ -1,0 +1,109 @@
+.TH mfsfacl "1" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
+.SH NAME
+mfsfacl \- \fBMooseFS\fP file access control lists (extended attributes) management tools
+.SH SYNOPSIS
+.B mfsgetfacl
+[\fB-?\fP] [\fB-adceEspn\fP] \fIOBJECT\fP [\fIOBJECT\fP ...]
+.PP
+.B mfssetfacl
+[\fB-?\fP] [\fB-bKknd\fP] [{\fB-s|-m|-x\fP} \fIACL_SPEC\fP] [{\fB-S|-M|-X\fP} \fIACL_FILE\fP] \fIOBJECT\fP [\fIOBJECT\fP ...]
+.SH DESCRIPTION
+These tools operate on object's \fIaccess control list\fP (\fIACL\fP) value. 
+ACL's in \fBMooseFS\fP are compatible with Linux, so in Linux you may 
+use \fBsetfacl\fP and \fBgetfacl\fP commands.
+.PP
+\fBmfsgetfacl\fP prints current \fIACL\fP value of given object(s).
+.PP
+\fBmfssetfacl\fP sets/changes/removes current \fIACL\fP value of given object(s).
+.SH OPTIONS
+.PP
+\fBmfsgetfacl\fP options:
+.PP
+ \fB-a\fP - display the file access control list only
+.PP
+ \fB-d\fP - display the default access control list only
+.PP
+ \fB-c\fP - do not display the comment header
+.PP
+ \fB-e\fP - print all effective rights
+.PP
+ \fB-E\fP - print no effective rights
+.PP
+ \fB-s\fP - skip files that only have the base entries
+.PP
+ \fB-p\fP - don't strip leading '/' in pathnames
+.PP
+ \fB-n\fP - print numeric user/group identifiers
+.PP
+\fBmfssetfacl\fP options:
+.PP
+ \fB-b\fP - remove all extended ACL entries
+.PP
+ \fB-K\fP - remove the access ACL
+.PP
+ \fB-k\fP - remove the default ACL
+.PP
+ \fB-n\fP - don't recalculate the effective rights mask
+.PP
+ \fB-d\fP - operations apply to the default ACL
+.PP
+ \fB-s\fP - set the ACL of file(s), replacing the current ACL
+.PP
+ \fB-S\fP - read ACL entries to set from file
+.PP
+ \fB-m\fP - modify the current ACL(s) of file(s)
+.PP
+ \fB-M\fP - read ACL entries to modify from file
+.PP
+ \fB-x\fP - remove entries from the ACL(s) of file(s)
+.PP
+ \fB-X\fP - read ACL entries to remove from file
+.PP
+common options:
+.PP
+ \fB-?\fP - display short usage message
+.SH ACL SPECIFICATION
+For \fB-S\fP, \fB-M\fP and \fB-X\fP option the parameter \fIACL_FILE\fP should be a path to a file containing 
+ACL value specifications as described below (one definition per line, multiple lines possible, content after # sign
+is ignored, output from \fBmfsgetfacl\fP command is always a valid file content). 
+.PP
+\fIACL_SPEC\fP should be one of the following:
+.PP
+[d[efault]:][u[ser]:]uid[:perms]
+.PP
+[d[efault]:]g[roup]:gid[:perms]
+.PP
+[d[efault]:]m[ask][:][:perms]
+.PP
+[d[efault]:]o[ther][:][:perms]
+.PP
+\fBd\fP means work on default ACL values instead of access values. Next part indicates whether \fBuser\fP's, 
+\fBgroup\fP's or \fBother\fP's permissions or \fBmask\fP should be set. If that part is ommited and only 
+identifier is provided, it is assumed to be user indentifier.
+If user or group is indicated, if there is no identifier, default user's or group's permissions are modified.
+Identifier can be a string or a number. Permissions can be in the form of letters, any subset of rwx or number. 
+Zero, empty string or dash means no permissions for \fB-s\fP and \fB-m\fP. For \fB-x\fP, permissions must be ommited.
+Multiple specification can be supplied, divided by comma.
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR mfstools (1),

@@ -57,6 +57,12 @@
 #  include <sys/prctl.h>
 #endif
 
+#include <syslog.h>
+
+#ifdef USE_IONICE
+#include "ionice.h"
+#endif
+
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -68,7 +74,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <syslog.h>
 #include <string.h>
 #include <strings.h>
 #include <time.h>
@@ -91,9 +96,25 @@
 #include "crc.h"
 #include "init.h"
 #include "massert.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "portable.h"
 #include "processname.h"
+
+static double lcall_start,lcall_end;
+static double lcall_trigger = 0.0;
+
+static double loop_usleep = 0;
+
+#define LOOP_START if (lcall_trigger>0.0) { \
+	lcall_start = monotonic_seconds(); \
+}
+
+#define LOOP_END(name) if (lcall_trigger>0.0) { \
+	lcall_end = monotonic_seconds(); \
+	if (lcall_end-lcall_start > lcall_trigger) { \
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"long call detected: %s : %.2lfms",name,(lcall_end-lcall_start)*1000.0); \
+	} \
+}
 
 #define RM_RESTART 0
 #define RM_START 1
@@ -112,6 +133,15 @@ typedef struct deentry {
 } deentry;
 
 static deentry *dehead=NULL;
+
+
+typedef struct meentry {
+	int (*fun)(void);
+	char *fname;
+	struct meentry *next;
+} meentry;
+
+static meentry *mehead=NULL;
 
 
 typedef struct weentry {
@@ -142,7 +172,7 @@ static rlentry *rlhead=NULL;
 
 
 typedef struct inentry {
-	void (*fun)(void);
+	void (*fun)(FILE *);
 	char *fname;
 	struct inentry *next;
 } inentry;
@@ -181,7 +211,7 @@ static eloopentry *eloophead=NULL;
 
 typedef struct chldentry {
 	pid_t pid;
-	void (*fun)(int);
+	void (*fun)(pid_t,int);
 	char *fname;
 	struct chldentry *next;
 } chldentry;
@@ -204,7 +234,9 @@ static timeentry *timehead=NULL;
 static pthread_mutex_t nowlock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 static uint32_t now;
+static uint32_t start_time;
 static uint64_t usecnow;
+static double loop_start;
 //static int alcnt=0;
 
 static int signalpipe[2];
@@ -220,13 +252,13 @@ void main_destruct_register_fname (void (*fun)(void),const char *fname) {
 	dehead = aux;
 }
 
-void main_canexit_register_fname (int (*fun)(void),const char *fname) {
-	ceentry *aux=(ceentry*)malloc(sizeof(ceentry));
+void main_mayexit_register_fname (int (*fun)(void),const char *fname) {
+	meentry *aux=(meentry*)malloc(sizeof(meentry));
 	passert(aux);
 	aux->fun = fun;
 	aux->fname = strdup(fname);
-	aux->next = cehead;
-	cehead = aux;
+	aux->next = mehead;
+	mehead = aux;
 }
 
 void main_wantexit_register_fname (void (*fun)(void),const char *fname) {
@@ -238,6 +270,15 @@ void main_wantexit_register_fname (void (*fun)(void),const char *fname) {
 	wehead = aux;
 }
 
+void main_canexit_register_fname (int (*fun)(void),const char *fname) {
+	ceentry *aux=(ceentry*)malloc(sizeof(ceentry));
+	passert(aux);
+	aux->fun = fun;
+	aux->fname = strdup(fname);
+	aux->next = cehead;
+	cehead = aux;
+}
+
 void main_reload_register_fname (void (*fun)(void),const char *fname) {
 	rlentry *aux=(rlentry*)malloc(sizeof(rlentry));
 	passert(aux);
@@ -247,7 +288,7 @@ void main_reload_register_fname (void (*fun)(void),const char *fname) {
 	rlhead = aux;
 }
 
-void main_info_register_fname (void (*fun)(void),const char *fname) {
+void main_info_register_fname (void (*fun)(FILE *),const char *fname) {
 	inentry *aux=(inentry*)malloc(sizeof(inentry));
 	passert(aux);
 	aux->fun = fun;
@@ -285,7 +326,7 @@ void main_eachloop_register_fname (void (*fun)(void),const char *fname) {
 	eloophead = aux;
 }
 
-void main_chld_register_fname (pid_t pid,void (*fun)(int),const char *fname) {
+void main_chld_register_fname (pid_t pid,void (*fun)(pid_t,int),const char *fname) {
 	chldentry *aux=(chldentry*)malloc(sizeof(chldentry));
 	passert(aux);
 	aux->pid = pid;
@@ -404,7 +445,6 @@ void free_all_registered_entries(void) {
 }
 
 int canexit(void) {
-	LOOP_VARS;
 	int r;
 	ceentry *aux;
 
@@ -457,8 +497,19 @@ uint64_t main_utime(void) {
 	return usec;
 }
 
+uint32_t main_start_time(void) {
+#ifdef USE_PTHREADS
+	uint32_t ret;
+	zassert(pthread_mutex_lock(&nowlock));
+	ret = start_time;
+	zassert(pthread_mutex_unlock(&nowlock));
+	return ret;
+#else
+	return start_time;
+#endif
+}
+
 static inline void destruct(void) {
-	LOOP_VARS;
 	deentry *deit;
 
 	for (deit = dehead ; deit!=NULL ; deit=deit->next ) {
@@ -469,13 +520,16 @@ static inline void destruct(void) {
 }
 
 void main_keep_alive(void) {
-	LOOP_VARS;
-	uint64_t useclast;
+	double loop_end;
 	struct timeval tv;
 	kaentry *kait;
 
+	loop_end = monotonic_seconds();
+	if (loop_end - loop_start > 5.0) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"long loop detected (%.3lfs)",loop_end-loop_start);
+	}
+	loop_start = loop_end;
 	gettimeofday(&tv,NULL);
-	useclast = usecnow;
 	usecnow = tv.tv_sec;
 	usecnow *= 1000000;
 	usecnow += tv.tv_usec;
@@ -486,15 +540,6 @@ void main_keep_alive(void) {
 #ifdef USE_PTHREADS
 	zassert(pthread_mutex_unlock(&nowlock));
 #endif
-	if (usecnow>useclast && useclast>0) {
-		useclast = usecnow - useclast;
-	} else {
-		useclast = 0;
-	}
-	if (useclast > 5000000) {
-		syslog(LOG_WARNING,"long loop detected (%"PRIu64".%06"PRIu32"s)",useclast/1000000,(uint32_t)(useclast%1000000));
-	}
-
 	for (kait = kahead ; kait!=NULL ; kait=kait->next ) {
 		LOOP_START;
 		kait->fun();
@@ -502,26 +547,74 @@ void main_keep_alive(void) {
 	}
 }
 
-void mainloop() {
-	LOOP_VARS;
+void main_reload(void) {
+	static int firstflag = 0;
+	char *logminlevelstr;
+	char *logelevatetostr;
+	int tmp;
+
+	lcall_trigger = cfg_getdouble("LONG_CALL_TRIGGER_MS",0.0) / 1000.0; // debug option
+	loop_usleep = cfg_getuint32("DEBUG_LOOP_SLEEP_MS",0) * 1000; // debug option
+
+	logminlevelstr = cfg_getstr("SYSLOG_MIN_LEVEL","INFO");
+	logelevatetostr = cfg_getstr("SYSLOG_ELEVATE_TO","NOTICE");
+
+	tmp = mfs_log_str_to_pri(logminlevelstr);
+	if (tmp>=0) {
+		mfs_log_set_min_level(tmp);
+	} else {
+		if (firstflag==0) {
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error parsing SYSLOG_MIN_LEVEL option - using INFO");
+			mfs_log_set_min_level(MFSLOG_INFO);
+		} else {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"error parsing SYSLOG_MIN_LEVEL option - left unchanged");
+		}
+	}
+	free(logminlevelstr);
+
+	tmp = mfs_log_str_to_pri(logelevatetostr);
+	if (tmp>=0) {
+		mfs_log_set_elevate_to(tmp);
+	} else {
+		if (firstflag==0) {
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"error parsing SYSLOG_ELEVATE_TO option - using NOTICE");
+			mfs_log_set_elevate_to(MFSLOG_NOTICE);
+		} else {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"error parsing SYSLOG_ELEVATE_TO option - left unchanged");
+		}
+	}
+	free(logelevatetostr);
+
+	firstflag = 1;
+}
+
+int mainloop(void) {
 	uint64_t prevtime = 0;
-	uint64_t useclast;
 	struct timeval tv;
 	pollentry *pollit;
 	eloopentry *eloopit;
 	timeentry *timeit;
-	ceentry *ceit;
+	meentry *meit;
 	weentry *weit;
+	ceentry *ceit;
 	rlentry *rlit;
 	inentry *init;
-	struct pollfd pdesc[MFSMAXFILES];
+	FILE *infile;
+	struct pollfd *pdesc;
 	uint32_t ndesc;
+	double loop_end;
 	int i;
 	int t,r;
+	int status = 0;
 
 	t = 0;
 	r = 0;
+	pdesc = malloc(sizeof(struct pollfd)*MFSMAXFILES);
+	loop_start = monotonic_seconds();
 	while (t!=3) {
+		if (loop_usleep) {
+			portable_usleep(loop_usleep);
+		}
 		ndesc=1;
 		pdesc[0].fd = signalpipe[0];
 		pdesc[0].events = POLLIN;
@@ -531,9 +624,13 @@ void mainloop() {
 			pollit->desc(pdesc,&ndesc);
 			LOOP_END(pollit->dname);
 		}
+		loop_end = monotonic_seconds();
+		if (loop_end - loop_start > 5.0) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"long loop detected (%.3lfs)",loop_end-loop_start);
+		}
 		i = poll(pdesc,ndesc,10);
+		loop_start = monotonic_seconds();
 		gettimeofday(&tv,NULL);
-		useclast = usecnow;
 		usecnow = tv.tv_sec;
 		usecnow *= 1000000;
 		usecnow += tv.tv_usec;
@@ -544,22 +641,14 @@ void mainloop() {
 #ifdef USE_PTHREADS
 		zassert(pthread_mutex_unlock(&nowlock));
 #endif
-		if (usecnow>useclast && useclast>0) {
-			useclast = usecnow - useclast;
-		} else {
-			useclast = 0;
-		}
-		if (useclast > 5000000) {
-			syslog(LOG_WARNING,"long loop detected (%"PRIu64".%06"PRIu32"s)",useclast/1000000,(uint32_t)(useclast%1000000));
-		}
 		if (i<0) {
 			if (!ERRNO_ERROR) {
-				syslog(LOG_WARNING,"poll returned EAGAIN");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"poll returned EAGAIN");
 				portable_usleep(10000);
 				continue;
 			}
 			if (errno!=EINTR) {
-				syslog(LOG_WARNING,"poll error: %s",strerr(errno));
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"poll error: %s",strerr(errno));
 				break;
 			}
 		} else {
@@ -567,22 +656,23 @@ void mainloop() {
 				uint8_t sigid;
 				if (read(signalpipe[0],&sigid,1)==1) {
 					if (sigid=='\001' && t==0) {
-						syslog(LOG_NOTICE,"terminate signal received");
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"terminate signal received");
 						t = 1;
 					} else if (sigid=='\002') {
-						syslog(LOG_NOTICE,"reloading config files");
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"reloading config files");
 						r = 1;
 					} else if (sigid=='\003') {
-						syslog(LOG_NOTICE,"child finished");
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"child finished");
 						r = 2;
 					} else if (sigid=='\004') {
-						syslog(LOG_NOTICE,"log extra info");
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"log extra info");
 						r = 3;
 					} else if (sigid=='\005') {
-						syslog(LOG_NOTICE,"unexpected alarm/prof signal received - ignoring");
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"unexpected alarm/prof signal received - ignoring");
 					} else if (sigid=='\006') {
-						syslog(LOG_NOTICE,"internal terminate request");
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"internal terminate request");
 						t = 1;
+						status = 1;
 					}
 				}
 			}
@@ -640,6 +730,7 @@ void mainloop() {
 		prevtime = usecnow;
 		if (r==1) {
 			cfg_reload();
+			main_reload();
 			for (rlit = rlhead ; rlit!=NULL ; rlit=rlit->next ) {
 				LOOP_START;
 				rlit->fun();
@@ -649,14 +740,14 @@ void mainloop() {
 		} else if (r==2) {
 			chldentry *chldit,**chldptr;
 			pid_t pid;
-			int status;
+			int st;
 
-			while ( (pid = waitpid(-1,&status,WNOHANG)) > 0) {
+			while ( (pid = waitpid(-1,&st,WNOHANG)) > 0) {
 				chldptr = &chldhead;
 				while ((chldit = *chldptr)) {
 					if (chldit->pid == pid) {
 						LOOP_START;
-						chldit->fun(status);
+						chldit->fun(pid,st);
 						LOOP_END(chldit->fname);
 						*chldptr = chldit->next;
 						free(chldit);
@@ -667,20 +758,41 @@ void mainloop() {
 			}
 			r = 0;
 		} else if (r==3) {
-			for (init = inhead ; init!=NULL ; init=init->next ) {
-				LOOP_START;
-				init->fun();
-				LOOP_END(init->fname);
+			infile = fopen("." STR(APPNAME) "_info.txt","w");
+			if (infile==NULL) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't create info file");
+			} else {
+				fprintf(infile,"[general]\n");
+				fprintf(infile,"version: %s\n",VERSSTR);
+				fprintf(infile,"build: %s\n",STR(BUILDNO));
+				fprintf(infile,"\n");
+				cfg_info(infile);
+				for (init = inhead ; init!=NULL ; init=init->next ) {
+					LOOP_START;
+					init->fun(infile);
+					LOOP_END(init->fname);
+				}
+				fclose(infile);
 			}
 			r = 0;
 		}
 		if (t==1) {
-			for (weit = wehead ; weit!=NULL ; weit=weit->next ) {
+			i = 1;
+			for (meit = mehead ; meit!=NULL && i ; meit=meit->next ) {
 				LOOP_START;
-				weit->fun();
-				LOOP_END(weit->fname);
+				if (meit->fun()==0) {
+					i=0;
+				}
+				LOOP_END(meit->fname);
 			}
-			t = 2;
+			if (i==1) {
+				for (weit = wehead ; weit!=NULL ; weit=weit->next ) {
+					LOOP_START;
+					weit->fun();
+					LOOP_END(weit->fname);
+				}
+				t = 2;
+			}
 		}
 		if (t==2) {
 			i = 1;
@@ -696,6 +808,8 @@ void mainloop() {
 			}
 		}
 	}
+	free(pdesc);
+	return status;
 }
 
 int initialize(void) {
@@ -711,7 +825,7 @@ int initialize(void) {
 		zassert(pthread_mutex_unlock(&nowlock));
 #endif
 		if (RunTab[i].fn()<0) {
-			mfs_arg_syslog(LOG_ERR,"init: %s failed !!!",RunTab[i].name);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"init: %s failed !!!",RunTab[i].name);
 			ok=0;
 		}
 	}
@@ -731,7 +845,7 @@ int restore(void) {
 		zassert(pthread_mutex_unlock(&nowlock));
 #endif
 		if (RestoreRunTab[i].fn()<0) {
-			mfs_arg_syslog(LOG_ERR,"restore: %s failed !!!",RestoreRunTab[i].name);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"restore: %s failed !!!",RestoreRunTab[i].name);
 			ok=0;
 		}
 	}
@@ -751,14 +865,14 @@ int initialize_late(void) {
 		zassert(pthread_mutex_unlock(&nowlock));
 #endif
 		if (LateRunTab[i].fn()<0) {
-			mfs_arg_syslog(LOG_ERR,"init: %s failed !!!",LateRunTab[i].name);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"init: %s failed !!!",LateRunTab[i].name);
 			ok=0;
 		}
 	}
 #ifdef USE_PTHREADS
 	zassert(pthread_mutex_lock(&nowlock));
 #endif
-	now = time(NULL);
+	start_time = now = time(NULL);
 #ifdef USE_PTHREADS
 	zassert(pthread_mutex_unlock(&nowlock));
 #endif
@@ -907,6 +1021,10 @@ void set_signal_handlers(int daemonflag) {
 	}
 }
 
+void main_syslog_wrapper(int priority,const char *msg) {
+	syslog(priority,"%s",msg);
+}
+
 void main_exit(void) {
 	int i;
 	i = write(signalpipe[1],"\006",1);
@@ -942,7 +1060,7 @@ void changeugid(void) {
 				gr = NULL;
 			}
 			if (gr==NULL) {
-				mfs_arg_syslog(LOG_WARNING,"%s: no such group !!!",wgroup);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"%s: no such group !!!",wgroup);
 				exit(1);
 			}
 			wrk_gid = gr->gr_gid;
@@ -954,7 +1072,7 @@ void changeugid(void) {
 			if (gidok==0) {
 				getpwuid_r(wrk_uid,&pwd,pwdgrpbuff,16384,&pw);
 				if (pw==NULL) {
-					mfs_arg_syslog(LOG_ERR,"%s: no such user id - can't obtain group id",wuser+1);
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"%s: no such user id - can't obtain group id",wuser+1);
 					exit(1);
 				}
 				wrk_gid = pw->pw_gid;
@@ -964,7 +1082,7 @@ void changeugid(void) {
 				pw = NULL;
 			}
 			if (pw==NULL) {
-				mfs_arg_syslog(LOG_ERR,"%s: no such user !!!",wuser);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"%s: no such user !!!",wuser);
 				exit(1);
 			}
 			wrk_uid = pw->pw_uid;
@@ -976,16 +1094,16 @@ void changeugid(void) {
 		free(wgroup);
 
 		if (setgid(wrk_gid)<0) {
-			mfs_arg_errlog(LOG_ERR,"can't set gid to %d",(int)wrk_gid);
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't set gid to %d",(int)wrk_gid);
 			exit(1);
 		} else {
-			syslog(LOG_NOTICE,"set gid to %d",(int)wrk_gid);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"set gid to %d",(int)wrk_gid);
 		}
 		if (setuid(wrk_uid)<0) {
-			mfs_arg_errlog(LOG_ERR,"can't set uid to %d",(int)wrk_uid);
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't set uid to %d",(int)wrk_uid);
 			exit(1);
 		} else {
-			syslog(LOG_NOTICE,"set uid to %d",(int)wrk_uid);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"set uid to %d",(int)wrk_uid);
 		}
 	}
 }
@@ -1029,29 +1147,29 @@ uint8_t wdlock(uint8_t runmode,uint32_t timeout) {
 
 	lfd = open("." STR(APPNAME) ".lock",O_WRONLY|O_CREAT,0666);
 	if (lfd<0) {
-		mfs_errlog(LOG_ERR,"can't create lockfile in working directory");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't create lockfile in working directory");
 		return 1;
 	}
 	ownerpid = mylock(lfd);
 	if (ownerpid<0) {
-		mfs_errlog(LOG_ERR,"fcntl error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"fcntl error");
 		return 1;
 	}
 	if (ownerpid>0) {
 		if (runmode==RM_TEST) {
-			fprintf(stderr,STR(APPNAME) " pid: %ld\n",(long)ownerpid);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,STR(APPNAME) " pid: %ld",(long)ownerpid);
 			return 0;
 		}
 		if (runmode==RM_START) {
-			fprintf(stderr,"can't start: lockfile is already locked by another process\n");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"can't start: lockfile is already locked by another process");
 			return 1;
 		}
 		if (runmode==RM_RELOAD) {
 			if (kill(ownerpid,SIGHUP)<0) {
-				mfs_errlog(LOG_WARNING,"can't send reload signal to lock owner");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't send reload signal to lock owner");
 				return 1;
 			}
-			fprintf(stderr,"reload signal has been sent\n");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"reload signal has been sent");
 			return 0;
 		}
 		if (runmode==RM_INFO) {
@@ -1062,43 +1180,43 @@ uint8_t wdlock(uint8_t runmode,uint32_t timeout) {
 #else
 			if (1) {
 #endif
-				mfs_errlog(LOG_WARNING,"can't send info signal to lock owner");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't send info signal to lock owner");
 				return 1;
 			}
-			fprintf(stderr,"info signal has been sent\n");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"info signal has been sent");
 			return 0;
 		}
 		if (runmode==RM_KILL) {
-			fprintf(stderr,"sending SIGKILL to lock owner (pid:%ld)\n",(long int)ownerpid);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"sending SIGKILL to lock owner (pid:%ld)",(long int)ownerpid);
 			if (kill(ownerpid,SIGKILL)<0) {
-				mfs_errlog(LOG_WARNING,"can't kill lock owner");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't kill lock owner");
 				return 1;
 			}
 		} else {
-			fprintf(stderr,"sending SIGTERM to lock owner (pid:%ld)\n",(long int)ownerpid);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"sending SIGTERM to lock owner (pid:%ld)",(long int)ownerpid);
 			if (kill(ownerpid,SIGTERM)<0) {
-				mfs_errlog(LOG_WARNING,"can't kill lock owner");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't kill lock owner");
 				return 1;
 			}
 		}
 		l=0;
-		fprintf(stderr,"waiting for termination ");
+		fprintf(stderr,"waiting for termination ...");
 		fflush(stderr);
 		do {
 			newownerpid = mylock(lfd);
 			if (newownerpid<0) {
-				mfs_errlog(LOG_ERR,"fcntl error");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"fcntl error");
 				return 1;
 			}
 			if (newownerpid>0) {
 				l++;
 				if (l>=timeout) {
-					syslog(LOG_ERR,"about %"PRIu32" seconds passed and lockfile is still locked - giving up",l);
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"about %"PRIu32" seconds passed and lockfile is still locked - giving up",l);
 					fprintf(stderr,":giving up\n");
 					return 1;
 				}
 				if (l%10==0) {
-					syslog(LOG_WARNING,"about %"PRIu32" seconds passed and lock still exists",l);
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"about %"PRIu32" seconds passed and lock still exists",l);
 					fprintf(stderr,".");
 					fflush(stderr);
 				}
@@ -1108,14 +1226,14 @@ uint8_t wdlock(uint8_t runmode,uint32_t timeout) {
 						fprintf(stderr,":sending SIGKILL to lock owner (pid:%ld):",(long int)newownerpid);
 						fflush(stderr);
 						if (kill(newownerpid,SIGKILL)<0) {
-							mfs_errlog(LOG_WARNING,"can't kill lock owner");
+							mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't kill lock owner");
 							return 1;
 						}
 					} else {
 						fprintf(stderr,":sending SIGTERM to lock owner (pid:%ld):",(long int)newownerpid);
 						fflush(stderr);
 						if (kill(newownerpid,SIGTERM)<0) {
-							mfs_errlog(LOG_WARNING,"can't kill lock owner");
+							mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't kill lock owner");
 							return 1;
 						}
 					}
@@ -1124,39 +1242,39 @@ uint8_t wdlock(uint8_t runmode,uint32_t timeout) {
 			}
 			sleep(1);
 		} while (newownerpid!=0);
-		fprintf(stderr,"terminated\n");
+		fprintf(stderr," terminated\n");
 		return 0;
 	}
 	if (runmode==RM_START || runmode==RM_RESTART) {
 		char pidstr[20];
 		l = snprintf(pidstr,20,"%ld\n",(long)(getpid()));
 		if (ftruncate(lfd,0)<0) {
-			fprintf(stderr,"can't truncate pidfile\n");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"can't truncate pidfile");
 		}
 		if (write(lfd,pidstr,l)!=(ssize_t)l) {
-			fprintf(stderr,"can't write pid to pidfile\n");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"can't write pid to pidfile");
 		}
-		fprintf(stderr,"lockfile created and locked\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"lockfile created and locked");
 	} else if (runmode==RM_TRY_RESTART) {
-		fprintf(stderr,"can't find process to restart\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"can't find process to restart");
 		return 1;
 	} else if (runmode==RM_STOP || runmode==RM_KILL) {
-		fprintf(stderr,"can't find process to terminate\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"can't find process to terminate");
 		return 0;
 	} else if (runmode==RM_RELOAD) {
-		fprintf(stderr,"can't find process to send reload signal\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"can't find process to send reload signal");
 		return 1;
 	} else if (runmode==RM_INFO) {
-		fprintf(stderr,"can't find process to send info signal\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"can't find process to send info signal");
 		return 1;
 	} else if (runmode==RM_TEST) {
-		fprintf(stderr,STR(APPNAME) " is not running\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,STR(APPNAME) " is not running");
 		return 1;
 	}
 	return 0;
 }
 
-void makedaemon() {
+void makedaemon(void) {
 	int f;
 	uint8_t pipebuff[1000];
 	ssize_t r;
@@ -1166,18 +1284,18 @@ void makedaemon() {
 	fflush(stdout);
 	fflush(stderr);
 	if (pipe(piped)<0) {
-		fprintf(stderr,"pipe error\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"pipe error");
 		exit(1);
 	}
 	f = fork();
 	if (f<0) {
-		syslog(LOG_ERR,"first fork error: %s",strerr(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"first fork error: %s",strerr(errno));
 		exit(1);
 	}
 	if (f>0) {
 		wait(&f);	// just get child status - prevents child from being zombie during initialization stage
 		if (f) {
-			fprintf(stderr,"Child status: %d\n",f);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"Child status: %d",f);
 			exit(1);
 		}
 		close(piped[1]);
@@ -1194,7 +1312,7 @@ void makedaemon() {
 				happy = fwrite(pipebuff,1,r,stderr);
 				(void)happy;
 			} else {
-				fprintf(stderr,"Error reading pipe: %s\n",strerr(errno));
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"Error reading pipe: %s",strerr(errno));
 				exit(1);
 			}
 		}
@@ -1204,9 +1322,9 @@ void makedaemon() {
 	setpgid(0,getpid());
 	f = fork();
 	if (f<0) {
-		syslog(LOG_ERR,"second fork error: %s",strerr(errno));
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"second fork error: %s",strerr(errno));
 		if (write(piped[1],"fork error\n",11)!=11) {
-			syslog(LOG_ERR,"pipe write error: %s",strerr(errno));
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"pipe write error: %s",strerr(errno));
 		}
 		close(piped[1]);
 		exit(1);
@@ -1225,10 +1343,11 @@ void makedaemon() {
 	sassert(dup(piped[1])==STDERR_FILENO);
 	close(piped[1]);
 	close(f); // this stupid construction with open/dup/close is used due to cppcheck false negatives
+	mfs_log_detach_stderr();
 //	setvbuf(stderr,(char *)NULL,_IOLBF,0);
 }
 
-void close_msg_channel() {
+void close_msg_channel(void) {
 	int f;
 	fflush(stderr);
 	f = open("/dev/null", O_RDWR, 0);
@@ -1251,10 +1370,10 @@ void createpath(const char *filename) {
 			*dst='\0';
 			if (mkdir(pathbuff,(mode_t)0777)<0) {
 				if (errno!=EEXIST) {
-					mfs_arg_errlog(LOG_NOTICE,"creating directory %s",pathbuff);
+					mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_INFO,"creating directory %s",pathbuff);
 				}
 			} else {
-				mfs_arg_syslog(LOG_NOTICE,"directory %s has been created",pathbuff);
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"directory %s has been created",pathbuff);
 			}
 			*dst++=*src++;
 		}
@@ -1263,10 +1382,12 @@ void createpath(const char *filename) {
 
 void usage(const char *appname) {
 	printf(
-"usage: %s [-vfun] [-t locktimeout] [-c cfgfile] " MODULE_OPTIONS_SYNOPIS "[start|stop|restart|reload|info|test|kill|restore]\n"
+"usage: %s [-vhfdun] [-t locktimeout] [-c cfgfile] " MODULE_OPTIONS_SYNOPIS "[start|stop|restart|reload|info|test|kill|restore]\n"
 "\n"
 "-v : print version number and exit\n"
+"-h : print this info and exit\n"
 "-f : run in foreground\n"
+"-d : run with dangerous options (names: DANGEROUS_*)\n"
 "-u : log undefined config variables\n"
 "-n : do not attempt to increase limit of core dump size\n"
 "-t locktimeout : how long wait for lockfile\n"
@@ -1285,6 +1406,7 @@ int main(int argc,char **argv) {
 	char *appname;
 	int ch;
 	uint8_t runmode;
+	uint8_t allowdangerousoptions;
 	int rundaemon,logundefined;
 	int lockmemory;
 	int forcecoredump;
@@ -1325,6 +1447,7 @@ int main(int argc,char **argv) {
 	}
 	locktimeout = 1800;
 	rundaemon = 1;
+	allowdangerousoptions = 0;
 	runmode = RM_START;
 	logundefined = 0;
 	lockmemory = 0;
@@ -1338,12 +1461,11 @@ int main(int argc,char **argv) {
 				printf("version: %s ; build: %s\n",VERSSTR,STR(BUILDNO));
 				free(cfgfile);
 				return 0;
-			case 'd':
-				printf("option '-d' is deprecated - use '-f' instead\n");
-				// no break on purpose
-				nobreak;
 			case 'f':
-				rundaemon=0;
+				rundaemon = 0;
+				break;
+			case 'd':
+				allowdangerousoptions = 1;
 				break;
 			case 't':
 				locktimeout=strtoul(optarg,NULL,10);
@@ -1356,7 +1478,7 @@ int main(int argc,char **argv) {
 				userconfig = 1;
 				break;
 			case 'u':
-				logundefined=1;
+				logundefined = 1;
 				break;
 			case 'n':
 				forcecoredump = 0;
@@ -1401,7 +1523,7 @@ int main(int argc,char **argv) {
 	}
 
 	if (movewarning) {
-		mfs_syslog(LOG_WARNING,"default sysconf path has changed - please move " STR(APPNAME) ".cfg from "ETC_PATH"/ to "ETC_PATH"/mfs/");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"default sysconf path has changed - please move " STR(APPNAME) ".cfg from "ETC_PATH"/ to "ETC_PATH"/mfs/");
 	}
 
 	if (cfg_load(cfgfile,logundefined)==0) {
@@ -1413,7 +1535,13 @@ int main(int argc,char **argv) {
 			free(cfgfile);
 			return 1;
 		}
-		fprintf(stderr,"can't load config file: %s - using defaults\n",cfgfile);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"can't load config file: %s - using defaults",cfgfile);
+	}
+
+	if (cfg_dangerous_options() && allowdangerousoptions==0 && (runmode==RM_RELOAD || runmode==RM_START || runmode==RM_RESTART || runmode==RM_TRY_RESTART)) {
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"Dangerous option(s) detected in config file: %s - use '-d' option to force %s",cfgfile,(runmode==RM_RELOAD)?"reload":"start");
+		free(cfgfile);
+		return 1;
 	}
 	free(cfgfile);
 
@@ -1429,33 +1557,29 @@ int main(int argc,char **argv) {
 
 	logappname = cfg_getstr("SYSLOG_IDENT",STR(APPNAME));
 
-	if (rundaemon) {
-		if (logappname[0]) {
-			openlog(logappname, LOG_PID | LOG_NDELAY , LOG_DAEMON);
-		} else {
-			openlog(STR(APPNAME), LOG_PID | LOG_NDELAY , LOG_DAEMON);
-		}
+	if (logappname[0]) {
+		mfs_log_init(logappname,rundaemon);
 	} else {
-#if defined(LOG_PERROR)
-		if (logappname[0]) {
-			openlog(logappname, LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_USER);
-		} else {
-			openlog(STR(APPNAME), LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_USER);
-		}
-#else
-		if (logappname[0]) {
-			openlog(logappname, LOG_PID | LOG_NDELAY, LOG_USER);
-		} else {
-			openlog(STR(APPNAME), LOG_PID | LOG_NDELAY, LOG_USER);
-		}
-#endif
+		mfs_log_init(STR(APPNAME),rundaemon);
 	}
+
+/* syslog test
+	mfs_log_set_min_level(MFSLOG_DEBUG);
+	mfs_log_set_elevate_to(MFSLOG_DEBUG);
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_DEBUG,"This is an example debug message");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"This is simple info message");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"This is message that should be noticed");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"This is a warning message - it means that something went wrong");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"This is an error message - usually it means that module has to abort");
+*/
+
+	main_reload();
 
 	if (runmode==RM_START || runmode==RM_RESTART || runmode==RM_TRY_RESTART) {
 		rls.rlim_cur = MFSMAXFILES;
 		rls.rlim_max = MFSMAXFILES;
 		if (setrlimit(RLIMIT_NOFILE,&rls)<0) {
-			syslog(LOG_NOTICE,"can't change open files limit to: %u (trying to set smaller value)",(unsigned)(MFSMAXFILES));
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"can't change open files limit to: %u (trying to set smaller value)",(unsigned)(MFSMAXFILES));
 			if (getrlimit(RLIMIT_NOFILE,&rls)>=0) {
 				uint32_t limit;
 				if (rls.rlim_max > MFSMAXFILES) {
@@ -1466,7 +1590,7 @@ int main(int argc,char **argv) {
 				while (limit>1024) {
 					rls.rlim_cur = limit;
 					if (setrlimit(RLIMIT_NOFILE,&rls)>=0) {
-						mfs_arg_syslog(LOG_NOTICE,"open files limit has been set to: %"PRIu32,limit);
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"open files limit has been set to: %"PRIu32,limit);
 						break;
 					}
 					limit *= 3;
@@ -1474,7 +1598,7 @@ int main(int argc,char **argv) {
 				}
 			}
 		} else {
-			mfs_arg_syslog(LOG_NOTICE,"open files limit has been set to: %u",(unsigned)(MFSMAXFILES));
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"open files limit has been set to: %u",(unsigned)(MFSMAXFILES));
 		}
 
 		lockmemory = cfg_getnum("LOCK_MEMORY",0);
@@ -1489,20 +1613,33 @@ int main(int argc,char **argv) {
 		setpriority(PRIO_PROCESS,getpid(),nicelevel);
 	}
 
+#ifdef USE_IONICE
+
+#ifdef RLIMIT_NICE
+	rls.rlim_cur = RLIM_INFINITY;
+	rls.rlim_max = RLIM_INFINITY;
+	setrlimit(RLIMIT_NICE,&rls);
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"nice limit set to infinity");
+#endif
+
+	ionice_test(); // print using method
+	ionice_high(); // start with high priority - as not privileged user later we can only lower priority
+#endif
+
 	changeugid();
 
 	wrkdir = cfg_getstr("DATA_PATH",DATA_PATH);
 	if (runmode==RM_START || runmode==RM_RESTART || runmode==RM_TRY_RESTART) {
-		fprintf(stderr,"working directory: %s\n",wrkdir);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"working directory: %s",wrkdir);
 	}
 
 	if (chdir(wrkdir)<0) {
-		mfs_arg_syslog(LOG_ERR,"can't set working directory to %s",wrkdir);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"can't set working directory to %s",wrkdir);
 		if (rundaemon) {
 			fputc(0,stderr);
 			close_msg_channel();
 		}
-		closelog();
+		mfs_log_term();
 		free(logappname);
 		return 1;
 	}
@@ -1520,7 +1657,7 @@ int main(int argc,char **argv) {
 		cfg_term();
 		strerr_term();
 		wdunlock();
-		closelog();
+		mfs_log_term();
 		free(logappname);
 		return ch;
 	}
@@ -1540,7 +1677,7 @@ int main(int argc,char **argv) {
 		cfg_term();
 		strerr_term();
 		wdunlock();
-		closelog();
+		mfs_log_term();
 		free(logappname);
 		return ch;
 	}
@@ -1548,32 +1685,32 @@ int main(int argc,char **argv) {
 #ifdef MFS_USE_MEMLOCK
 	if (lockmemory) {
 		if (getrlimit(RLIMIT_MEMLOCK,&rls)<0) {
-			mfs_errlog(LOG_WARNING,"error getting memory lock limits");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error getting memory lock limits");
 		} else {
 			if (rls.rlim_cur!=RLIM_INFINITY && rls.rlim_max==RLIM_INFINITY) {
 				rls.rlim_cur = RLIM_INFINITY;
 				rls.rlim_max = RLIM_INFINITY;
 				if (setrlimit(RLIMIT_MEMLOCK,&rls)<0) {
-					mfs_errlog(LOG_WARNING,"error setting memory lock limit to unlimited");
+					mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error setting memory lock limit to unlimited");
 				}
 			}
 			if (getrlimit(RLIMIT_MEMLOCK,&rls)<0) {
-				mfs_errlog(LOG_WARNING,"error getting memory lock limits");
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error getting memory lock limits");
 			} else {
 				if (rls.rlim_cur!=RLIM_INFINITY) {
-					mfs_errlog(LOG_WARNING,"can't set memory lock limit to unlimited");
+					mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"can't set memory lock limit to unlimited");
 				} else {
 					if (mlockall(MCL_CURRENT|MCL_FUTURE)<0) {
-						mfs_errlog(LOG_WARNING,"memory lock error");
+						mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"memory lock error");
 					} else {
-						mfs_syslog(LOG_NOTICE,"process memory was successfully locked in RAM");
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"process memory was successfully locked in RAM");
 					}
 			}	}
 		}
 	}
 #else
 	if (lockmemory) {
-		mfs_syslog(LOG_WARNING,"memory lock not supported !!!");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"memory lock not supported !!!");
 	}
 #endif
 
@@ -1591,15 +1728,15 @@ int main(int argc,char **argv) {
 	limit_glibc_arenas = cfg_getuint8("LIMIT_GLIBC_MALLOC_ARENAS",4);
 	if (limit_glibc_arenas) {
 		if (!getenv("MALLOC_ARENA_MAX")) {
-			mfs_arg_syslog(LOG_NOTICE,"setting glibc malloc arena max to %"PRIu32,limit_glibc_arenas);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"setting glibc malloc arena max to %"PRIu32,limit_glibc_arenas);
 			mallopt(M_ARENA_MAX, limit_glibc_arenas);
 		}
 		if (!getenv("MALLOC_ARENA_TEST")) {
-			mfs_arg_syslog(LOG_NOTICE,"setting glibc malloc arena test to %"PRIu32,limit_glibc_arenas);
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"setting glibc malloc arena test to %"PRIu32,limit_glibc_arenas);
 			mallopt(M_ARENA_TEST, limit_glibc_arenas);
 		}
 	} else {
-		mfs_syslog(LOG_NOTICE,"setting glibc malloc arenas turned off");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"setting glibc malloc arenas turned off");
 	}
 #endif /* glibc malloc tuning */
 
@@ -1633,50 +1770,49 @@ int main(int argc,char **argv) {
 		}
 #  endif
 		if (oomdis) {
-			syslog(LOG_NOTICE,"out of memory killer disabled");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"out of memory killer disabled");
 		} else {
-			syslog(LOG_NOTICE,"can't disable out of memory killer");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't disable out of memory killer");
 		}
 	}
 #endif
 
-	syslog(LOG_NOTICE,"monotonic clock function: %s",monotonic_method());
-	syslog(LOG_NOTICE,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"monotonic clock function: %s",monotonic_method());
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
 
-	fprintf(stderr,"initializing %s modules ...\n",logappname);
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"initializing %s modules ...",logappname);
 
 	if (initialize()) {
 //		if (getrlimit(RLIMIT_NOFILE,&rls)==0) {
-//			syslog(LOG_NOTICE,"open files limit: %lu",(unsigned long)(rls.rlim_cur));
+//			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"open files limit: %lu",(unsigned long)(rls.rlim_cur));
 //		}
-		fprintf(stderr,"%s daemon initialized properly\n",logappname);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"%s daemon initialized properly",logappname);
 		if (rundaemon) {
 			close_msg_channel();
 		}
 		if (initialize_late()) {
-			mainloop();
-			mfs_syslog(LOG_NOTICE,"exited from main loop");
-			ch=0;
+			ch = mainloop();
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"exited from main loop");
 		} else {
 			ch=1;
 		}
 	} else {
-		fprintf(stderr,"error occurred during initialization - exiting\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"error occurred during initialization - exiting");
 		if (rundaemon) {
 			fputc(0,stderr);
 			close_msg_channel();
 		}
 		ch=1;
 	}
-	mfs_syslog(LOG_NOTICE,"exiting ...");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"exititng ...");
 	destruct();
 	free_all_registered_entries();
 	signal_cleanup();
 	cfg_term();
 	strerr_term();
 	wdunlock();
-	mfs_arg_syslog(LOG_NOTICE,"process exited successfully (status:%d)",ch);
-	closelog();
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"process exited successfully (status:%d)",ch);
+	mfs_log_term();
 	free(logappname);
 	return ch;
 }

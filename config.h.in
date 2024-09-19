@@ -78,6 +78,12 @@
 /* Define to 1 if you have the <attr/xattr.h> header file. */
 #undef HAVE_ATTR_XATTR_H
 
+/* Define to 1 if you have the 'backtrace' function. */
+#undef HAVE_BACKTRACE
+
+/* Define to 1 if you have the 'backtrace_symbols' function. */
+#undef HAVE_BACKTRACE_SYMBOLS
+
 /* Define to 1 if you have the 'bzero' function. */
 #undef HAVE_BZERO
 
@@ -95,11 +101,23 @@
    */
 #undef HAVE_DIRENT_H
 
+/* Define to 1 if you have the 'dlclose' function. */
+#undef HAVE_DLCLOSE
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
+/* Define to 1 if you have the 'dlopen' function. */
+#undef HAVE_DLOPEN
+
+/* Define to 1 if you have the 'dlsym' function. */
+#undef HAVE_DLSYM
+
 /* Define to 1 if you have the 'dup2' function. */
 #undef HAVE_DUP2
+
+/* Define to 1 if you have the <execinfo.h> header file. */
+#undef HAVE_EXECINFO_H
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
@@ -140,6 +158,12 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define to 1 if you have the 'lchmod' function. */
+#undef HAVE_LCHMOD
+
+/* Define to 1 if you have the 'lchown' function. */
+#undef HAVE_LCHOWN
+
 /* Define to 1 if you have the <limits.h> header file. */
 #undef HAVE_LIMITS_H
 
@@ -155,6 +179,9 @@
 /* Define to 1 if 'lstat' has the bug that it succeeds when given the
    zero-length file name argument. */
 #undef HAVE_LSTAT_EMPTY_STRING_BUG
+
+/* Define to 1 if you have the 'lutimes' function. */
+#undef HAVE_LUTIMES
 
 /* Define to 1 if you have the 'mach_absolute_time' function. */
 #undef HAVE_MACH_ABSOLUTE_TIME

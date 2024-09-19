@@ -1,6 +1,6 @@
-.TH mfsgoal "1" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsgoal "1" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
-mfsgoal \- \fBMooseFS\fP goal management tools
+mfsgoal \- \fBMooseFS\fP goal management tools DEPRECATED, use \fBmfssclass\fP tools instead
 .SH SYNOPSIS
 .B mfsgetgoal
 [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
@@ -10,63 +10,10 @@ mfsgoal \- \fBMooseFS\fP goal management tools
 .PP
 .B mfscopygoal
 [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
-.PP
-.B mfsrgetgoal
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
-.PP
-.B mfsrsetgoal
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIGOAL\fP[\fB+\fP|\fB-\fP] \fIOBJECT\fP...
 .SH DESCRIPTION
-These tools operate on object's \fIgoal\fP value,
-i.e. the number of copies in which all file data are stored. It means that
-file should survive failure of one less chunkservers than its \fIgoal\fP
-value. \fIGoal\fP must be set between 1 and 9 (note that 1 is strongly
-unadvised).
-.PP
-\fBmfsgetgoal\fP prints current \fIgoal\fP value of given object(s).
-\fB-r\fP option enables recursive mode, which works as usual for every
-given file, but for every given directory additionally prints current
-\fIgoal\fP value of all contained objects (files and directories).
-.PP
-\fBmfssetgoal\fP changes current \fIgoal\fP value of given object(s). If new
-value is specified in \fIN\fP\fB+\fP form, \fIgoal\fP value is increased to
-\fIN\fP for objects with lower \fIgoal\fP value and unchanged for the rest.
-Similarly, if new value is specified as \fIN\fP\fB-\fP, \fIgoal\fP value is
-decreased to \fIN\fP for objects with higher \fIgoal\fP value and unchanged
-for the rest. \fB-r\fP option enables recursive mode.
-These tools can be used on any file, directory or deleted (\fItrash\fP) file.
-.PP
-\fBmfscopygoal\fP tool can be used to copy \fIgoal\fP value from one object to another.
-.PP
-\fBmfsrgetgoal\fP and \fBmfsrsetgoal\fP are deprecated aliases for
-\fBmfsgetgoal -r\fP and \fBmfssetgoal -r\fP respectively.
-.SH STORAGE CLASSES
-Since version 3.0 of MooseFS goal has been extended to storage classes.
-Using storage classes user can also specify chunkservers on which copies should be stored
-by defining label expressions. To maintain compatibility with standard goal semantics, there are
-predefined storage classes from 1 to 9. Goal tools simply work only on these classes.
-To achieve more sophisticated storage scenarios use sclass tools (\fBmfsgetsclass\fP,\fBmfssetsclass\fP,...)
-.SH GENERAL OPTIONS
-Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
-options to select
-format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
-uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
-prefixes (k, M, G as 10^3, 10^6 etc.). \fB-k\fP, \fB-m\fP and \fB-g\fP show plain numbers
-respectivaly in kibis (binary kilo - 1024), mebis (binary mega - 1024^2)
-and gibis (binary giga - 1024^3).
-The same can be achieved by setting
-\fBMFSHRFORMAT\fP environment variable to: \fB0\fP (exact numbers), \fB1\fP
-or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
-\fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
-numbers and SI prefixes). The default is to print just exact numbers.
-.SH INHERITANCE
-When new object is created in MooseFS, attributes such as storage class, trashtime and extra
-attributes are inherited from parent directory. So if you set i.e. "noowner"
-attribute and storage class to "important" in a directory then every new object created in
-this directory will have storage class set to "important" and "noowner" flag set. A newly created
-object inherits always the current set of its parent's attributes. Changing a
-directory attribute does not affect its already created children. To change
-an attribute for a directory and all of its children use \fB-r\fP option.
+These tools are DEPRECATED and no longer available in MooseFS. The old synopsis is provided for reference.
+Currently, scripts with names as above call mfssclass tool with \fIOBJECT\fP, \fIGOAL\fP, \fISOURCE_OBJECT\fP
+provided. +/- signs in mfssetgoal are not supported.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

@@ -30,6 +30,9 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 uint8_t xattr_getattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint32_t *avleng,const uint8_t **attrvalue);
 uint8_t xattr_listattr_leng(uint32_t inode,void **xanode,uint32_t *xasize);
 void xattr_listattr_data(void *xanode,uint8_t *xabuff);
+uint32_t xattr_getall(uint32_t inode,uint8_t *dbuff);
+uint8_t xattr_check(uint32_t inode,const uint8_t *dbuff,uint32_t leng,uint32_t *pleng);
+uint8_t xattr_setall(uint32_t inode,const uint8_t *dbuff);
 uint8_t xattr_copy(uint32_t srcinode,uint32_t dstinode);
 void xattr_cleanup(void);
 uint8_t xattr_store(bio *fd);

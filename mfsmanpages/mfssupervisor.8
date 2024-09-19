@@ -1,0 +1,88 @@
+.TH mfssupervisor "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
+.SH NAME
+mfssupervisor \- tool for controlling the work of MooseFS master process
+.SH SYNOPSIS
+.B mfssupervisor
+[\fB\-xdfrc\fP]
+[\fB\-l\fP \fInew leader ip\fP]
+[\fB\-s\fP \fImode\fP]
+[\fB\-B\fP \fIlocal address\fP]
+[\fB\-H\fP \fImaster host name\fP]
+[\fB\-P\fP \fImaster supervising port\fP]
+.PP
+.B mfssupervisor \fB\-v\fP
+.PP
+.B mfssupervisor \fB\-h\fP
+.SH DESCRIPTION
+.PP
+\fBmfssupervisor\fP is the supervisor program of MooseFS. It can be used to force certain actions of MooseFS master(s), like saving metadata or changing leadership. When no action (options \fB-r\fP, \fB-l\fP or \fB-s\fP) is defined, the tool will just display info about the master(s) current state(s).
+.SH OPTIONS
+.TP
+\fB\-v\fP
+print version information and exit
+.TP
+\fB\-h\fP
+print usage information and exit
+.TP
+\fB\-x\fP
+produce more verbose output
+.TP
+\fB\-d\fP
+(pro only) dry run (print info, but do not change anything)
+.TP
+\fB\-f\fP
+(pro only) force electing not synchronized follower; see NOTES
+.TP
+\fB\-r\fP
+(pro only) try to resolve the master states situation; usually selects one of the followers and sets its state to ELECT if no elects or leaders are present
+.TP
+\fB\-l\fP
+(pro only) try to change the role of the master with given IP to leader; 
+.TP
+\fB\-c\fP
+(pro only) run configuration consistency check; if any inconsistencies are present, they will be reported via syslog
+.TP
+\fB\-s\fP
+force metadata store or (pro only) metadata check on given master group (pro version requires specifying a mode, possible values: \fBL\fP - LEADER only, 
+\fBF\fP - FOLLOWERS only, \fBA\fP - all servers with CRC check, 
+\fBC\fP - all servers CRC check only, no metadata is stored on disk)
+.TP
+\fB\-B\fP
+local address to use for master connections (default: *, i.e. default local address)
+.TP
+\fB\-H\fP
+use given host to find your master server(s) (default: mfsmaster)
+.TP
+\fB\-P\fP
+use given port to connect to your master server(s) (default: 9419)
+.SH NOTES
+.PP
+Options \fB-s\fP,\fB-r\fP and \fB-l\fP are mutually exclusive
+.PP
+Option \fB-f\fP can be used only with option \fB-r\fP
+.PP
+Option \fB-d\fP can be used only with option \fB-r\fP or \fB-l\fP
+.PP
+Option \fB-f\fP shouldn't be used unless it is necessary in situations when not all master servers defined in DNS are connected (i.e. after a crash when one of the master machines is offline). In an environment where all master machines are present, the leader should be picked automatically.
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmaster (8)

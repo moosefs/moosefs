@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.63)
-AC_INIT([MFS], [3.0.118], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [4.56.5], [bugs@moosefs.com], [moosefs])
 release=1
 buildno=$(cat buildno.txt)
 
@@ -85,7 +85,7 @@ fi
 if test "$GCC" = "yes"; then
 	if test "$enable_externalcflags" != "yes" ; then
 		if test "$enable_gperftools" = "yes" -o "$enable_debug" = "yes" ; then
-			CFLAGS="-O0 -fno-omit-frame-pointer -g -DMFSDEBUG $CCSTD -Wall -Wextra -Wshadow -pedantic -fwrapv"
+			CFLAGS="-O2 -fno-omit-frame-pointer -g -DMFSDEBUG $CCSTD -Wall -Wextra -Wshadow -pedantic -fwrapv -Wframe-larger-than=65536"
 		else
 			CFLAGS="-O2 $CFLAGS -g $CCSTD -Wall -Wextra -Wshadow -pedantic -fwrapv"
 		fi
@@ -244,7 +244,7 @@ AC_CHECK_FUNCS([mkstemp mktemp])
 AC_CHECK_FUNCS([strerror perror])
 
 # optional system functions
-AC_CHECK_FUNCS([dup2 mlockall getcwd setproctitle])
+AC_CHECK_FUNCS([dup2 mlockall getcwd setproctitle lutimes lchown lchmod])
 
 # check for mmap support
 AC_CHECK_HEADERS([sys/mman.h], [AC_CHECK_FUNCS([mmap])])
@@ -304,11 +304,17 @@ AC_CHECK_HEADERS([sys/prctl.h], [AC_CHECK_FUNCS([prctl])])
 # check for asprintf
 AC_CHECK_FUNCS([asprintf])
 
+# check for backtrace functions
+AC_CHECK_HEADERS([execinfo.h], [AC_CHECK_FUNCS([backtrace backtrace_symbols])])
+
 dnl optional thread functions
 dnl AC_CHECK_FUNCS([pthread_spin_lock])
 
 dnl optional interfaces (Linux, FreeBSD)
 dnl AC_CHECK_FUNCS([fopencookie funopen])
+
+# optional dynamic loader
+AC_CHECK_FUNCS([dlopen dlclose dlsym])
 
 AC_LANG([C])
 
@@ -466,10 +472,6 @@ AC_ARG_ENABLE([mfsmetalogger],
 	[AS_HELP_STRING([--disable-mfsmetalogger], [Do not build mfsmetalogger])],
 	[],
 	[enable_mfsmetalogger="$enable_all"])
-AC_ARG_ENABLE([mfssupervisor],
-	[AS_HELP_STRING([--disable-mfssupervisor], [Do not build mfssupervisor])],
-	[],
-	[enable_mfssupervisor="$enable_all"])
 AC_ARG_ENABLE([mfschunkserver],
 	[AS_HELP_STRING([--disable-mfschunkserver], [Do not build mfschunkserver])],
 	[],
@@ -517,8 +519,12 @@ AC_ARG_WITH([systemdsystemunitdir],
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 
 if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then
-	AC_CHECK_PROGS(PYTHON, [python3 python2 python python3.13 pytnon3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4 python2.7], [na])
-	if test "$PYTHON" = na; then
+	dnl AM_PATH_PYTHON([3.4],,[:])
+	dnl if test "$PYTHON" = :; then
+	dnl 	AM_PATH_PYTHON([2.7],,[:])
+	dnl fi
+	AC_CHECK_PROGS(PYTHON, [python3 python2 python python3.13 pytnon3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4 python2.7], [:])
+	if test "$PYTHON" = :; then
 		PYTHON="python"
 		AC_MSG_RESULT([Python binary not found !!! - using default in shebangs])
 	else
@@ -542,7 +548,6 @@ AC_SUBST([PYTHON])
 
 AM_CONDITIONAL([BUILD_MASTER], [test "$enable_mfsmaster" != "no"])
 AM_CONDITIONAL([BUILD_METALOGGER], [test "$enable_mfsmetalogger" != "no"])
-AM_CONDITIONAL([BUILD_SUPERVISOR], [test "$enable_mfssupervisor" != "no"])
 AM_CONDITIONAL([BUILD_CHUNKSERVER], [test "$enable_mfschunkserver" != "no"])
 
 pcap=no
@@ -704,13 +709,13 @@ AC_CONFIG_FILES([Makefile
 		mfsmaster/Makefile
 		mfsmetatools/Makefile
 		mfsmetalogger/Makefile
-		mfssupervisor/Makefile
 		mfsclient/Makefile
 		mfsnetdump/Makefile
 		mfstests/Makefile
 		systemd/Makefile
 		mfsscripts/mfscli.py
 		mfsscripts/chart.cgi
+		mfsscripts/chartdata.cgi
 		mfsscripts/index.html
 		mfsscripts/mfscgiserv.py
 		mfsdata/mfschunkserver.cfg
@@ -753,8 +758,6 @@ if test "$BUILD_MASTER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "BUILD_MASTER ........................ $RESULT"
 if test "$BUILD_METALOGGER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "BUILD_METALOGGER .................... $RESULT"
-if test "$BUILD_SUPERVISOR_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
-echo "BUILD_SUPERVISOR .................... $RESULT"
 if test "$BUILD_CHUNKSERVER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "BUILD_CHUNKSERVER ................... $RESULT"
 if test "$BUILD_NETDUMP_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi

@@ -1,4 +1,4 @@
-.TH mfscsstatsdump "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfscsstatsdump "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfscsstatsdump \- dump usage data from chunkserver stats file in csv or png format
 .SH SYNOPSIS
@@ -165,6 +165,69 @@ Virtual memory usage
 .TP
 mem
 Total memory usage (in csv is the same as memoryvirt, in png shows both memoryrss and memoryvirt using two colors)
+.TP
+movels
+Low speed move ops
+.TP
+movehs
+High speed move ops
+.TP
+move
+Low speed + high speed move ops (in png shows movels and movehas using two colors)
+.TP
+change
+Chunk changes in metadata (sum of version + duplicate + truncate + duptrunc + split)
+.TP
+split
+Split ops
+.TP
+usedspace
+Used HDD space in bytes (mark for removal excluded)
+.TP
+totalspace
+Total HDD space in bytes (mark for removal excluded)
+.TP
+space
+Total HDD space (in csv same as totalspace, in png shows both usedspace and totalspace using two colors)
+.TP
+chunkcount
+Number of stored chunks (mark for removal excluded)
+.TP
+tdusedspace
+Used HDD space in bytes on disks marked for removal
+.TP
+tdtotalspace
+Total HDD space in bytes on disks marked for removal
+.TP
+tdchunkcount
+Number of chunks stored on disks marked for removal
+.TP
+copychunks
+Number of chunks stored in copy format (all disks)
+.TP
+ec4chunks
+Number of chunk parts stored in EC4 format (all disks)
+.TP
+ec8chunks
+Number of chunk parts stored in EC8 format (all disks)
+.TP
+chunks
+Sum of copychunks + ec4chunks + ec8chunks (in png shows all three in different colors)
+.TP
+hddok
+Number of valid folders (hard drives)
+.TP
+hddmfr
+Number of folders (hard drives) that are marked for removal
+.TP
+hdddmg
+Number of folders (hard drives) that are marked as damaged
+.TP
+hddcnt
+Number of folders (hard drives) regardless of status, aka sum of hddok + hddmfr + hdddmg (in png shows all three in different colors)
+.TP
+udiff
+Difference in usage percent between the most and least used disk
 .SH OUTPUT
 Text output - text (csv) file where first column is a timestamp (or date if \fB-d\fP option
 was specified), the following column are what was specified with the \fB-f\fP options, formatted

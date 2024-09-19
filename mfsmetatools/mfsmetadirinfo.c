@@ -1,23 +1,3 @@
-/*
- * Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
- * 
- * This file is part of MooseFS.
- * 
- * MooseFS is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, version 2 (only).
- * 
- * MooseFS is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with MooseFS; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
- * or visit http://www.gnu.org/licenses/gpl-2.0.html
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -31,6 +11,7 @@
 // #define DEBUG 1
 
 #define PROGRESS_PRINT 100000
+#define MAX_EC_REDUNDANCY_LEVEL 9
 
 //static uint8_t humode=0;
 //static uint8_t numbermode=0;
@@ -139,25 +120,34 @@ static uint8_t sclass_keep_factor[256];
 static uint8_t sclass_arch_factor[256];
 
 int scan_sclass(FILE *fd,metasection *sdata) {
-	uint8_t buff[11];
+	uint8_t buff[42];
 	const uint8_t *rptr;
 	uint8_t i,l;
+	uint16_t exprsize;
+	uint8_t ec_is_turned_on;
 	uint8_t ogroup;
 	uint8_t nleng;
 	uint16_t sclassid;
 	uint8_t createcnt;
 	uint8_t keepcnt;
 	uint8_t archcnt;
+	uint8_t trashcnt;
+	uint8_t archec;
+	uint8_t archecdp;
+	uint8_t archeccp;
+	uint8_t trashec;
+	uint8_t trashecdp;
+	uint8_t trasheccp;
 	uint32_t chunkcount;
 
 	fseeko(fd,sdata->offset,SEEK_SET);
 
 	for (sclassid=0 ; sclassid<256 ; sclassid++) {
-		sclass_keep_factor[sclassid]=(sclassid<10)?sclassid:0;
-		sclass_arch_factor[sclassid]=(sclassid<10)?sclassid:0;
+		sclass_keep_factor[sclassid]=(sclassid<10)?(8*sclassid):0;
+		sclass_arch_factor[sclassid]=(sclassid<10)?(8*sclassid):0;
 	}
 
-	if (sdata->mver>0x16) {
+	if (sdata->mver>0x1B) {
 		fprintf(stderr,"unsupported sclass format\n");
 		return -1;
 	}
@@ -171,77 +161,188 @@ int scan_sclass(FILE *fd,metasection *sdata) {
 			fseeko(fd,l,SEEK_CUR);
 		}
 	}
-	if (sdata->mver==0x10) {
-		ogroup = 1;
-	} else {
-		ogroup = fgetc(fd);
-	}
-	if (ogroup<1) {
-		fprintf(stderr,"sclass section malformed\n");
-		return -1;
-	}
-	l = (sdata->mver==0x12)?11:(sdata->mver<=0x13)?3:(sdata->mver<=0x14)?5:(sdata->mver<=0x15)?8:10;
-	while (1) {
-		if (fread(buff,1,l,fd)!=l) {
-			fprintf(stderr,"loading labelset: read error\n");
+	if (sdata->mver>=0x17) { // expressions
+		if (fread(buff,1,3,fd)!=3) {
+			fprintf(stderr,"error reading metadata file\n");
 			return -1;
 		}
 		rptr = buff;
-		sclassid = get16bit(&rptr);
-		if (sdata->mver>0x15) {
+		exprsize = get16bit(&rptr);
+		ec_is_turned_on = get8bit(&rptr);
+		l = (sdata->mver>=0x1B)?42:(sdata->mver>=0x1A)?38:(sdata->mver>=0x18)?30:29;
+		while (1) {
+			if (fread(buff,1,2,fd)!=2) {
+				fprintf(stderr,"loading labelset: read error\n");
+				return -1;
+			}
+			rptr = buff;
+			sclassid = get16bit(&rptr);
+			if (sclassid==0) {
+				break;
+			}
+			if (fread(buff,1,l,fd)!=l) {
+				fprintf(stderr,"loading labelset: read error\n");
+				return -1;
+			}
+			rptr = buff;
 			nleng = get8bit(&rptr);
-			rptr+=4; // skip admin_only,create_mode,arch_delay
+			rptr += 6; // skip admin_only,create_mode,arch_delay,min_trashretention
+			if (sdata->mver>=0x1A) {
+				rptr += 8; // skip arch_min_size
+			}
+			if (sdata->mver>=0x18) {
+				rptr++; // skip arch_mode
+			}
 			createcnt = get8bit(&rptr);
+			rptr += 4; // skip create.uniqmask
+			if (sdata->mver>=0x1B) {
+				rptr++; // skip create.labels_mode
+			}
 			keepcnt = get8bit(&rptr);
+			rptr += 4; // skip keep.uniqmask
+			if (sdata->mver>=0x1B) {
+				rptr++; // skip keep.labels_mode
+			}
 			archcnt = get8bit(&rptr);
-			chunkcount = 0;
-		} else if (sdata->mver>0x14) {
-			nleng = 0;
-			rptr+=2; // skip create_mode,arch_delay
-			createcnt = get8bit(&rptr);
-			keepcnt = get8bit(&rptr);
-			archcnt = get8bit(&rptr);
-			chunkcount = 0;
-		} else if (sdata->mver>0x13) {
-			nleng = 0;
-			rptr++; // skip create_mode
-			createcnt = get8bit(&rptr);
-			keepcnt = get8bit(&rptr);
-			archcnt = keepcnt;
-			chunkcount = 0;
-		} else {
-			nleng = 0;
-			createcnt = get8bit(&rptr);
-			keepcnt = createcnt;
-			archcnt = createcnt;
-			if (sdata->mver==0x12) {
-				chunkcount = get32bit(&rptr);
+			archec = get8bit(&rptr);
+			rptr += 4; // skip arch.uniqmask
+			if (sdata->mver>=0x1B) {
+				rptr++; // skip arch.labels_mode
+			}
+			trashcnt = get8bit(&rptr);
+			trashec = get8bit(&rptr);
+			rptr += 4; // skip trash.uniqmask
+			if (sdata->mver>=0x1B) {
+				rptr++; // skip trash.labels_mode
+			}
+			if (nleng>0) {
+				fseeko(fd,nleng,SEEK_CUR);
+			}
+			if (sdata->mver<0x19) {
+				if (archec>1) {
+					archec--;
+				}
+				if (trashec>1) {
+					trashec--;
+				}
+				archecdp = 0;
+				archeccp = archec;
+				trashecdp = 0;
+				trasheccp = trashec;
 			} else {
-				chunkcount = 0;
+				archecdp = archec>>4;
+				archeccp = archec&0xF;
+				trashecdp = trashec>>4;
+				trasheccp = trashec&0xF;
+			}
+			if (archeccp>0 && archecdp==0) {
+				archecdp = 8;
+			}
+			if (trasheccp>0 && trashecdp==0) {
+				trashecdp = 8;
+			}
+//			fprintf(stderr,"archec:%02X ; archecdp:%u ; archeccp: %u ; trashec: %02X ; trashecdp: %u ; trasheccp: %u\n",archec,archecdp,archeccp,trashec,trashecdp,trasheccp);
+			if (keepcnt==0 || keepcnt>MAXLABELSCNT || createcnt>MAXLABELSCNT || archcnt>MAXLABELSCNT || trashcnt>MAXLABELSCNT || archeccp>MAX_EC_REDUNDANCY_LEVEL || trasheccp>MAX_EC_REDUNDANCY_LEVEL) {
+				fprintf(stderr,"sclass section malformed\n");
+				return -1;
+			}
+			if ((archeccp>0 && archecdp!=8 && archecdp!=4) || (trasheccp>0 && trashecdp!=8 && trashecdp!=4)) {
+				fprintf(stderr,"sclass section malformed\n");
+				return -1;
+			}
+			if ((archec>0 || trashec>0) && ec_is_turned_on<1) {
+				fprintf(stderr,"sclass section malformed\n");
+				return -1;
+			}
+			if ((archecdp==4 || trashecdp==4) && ec_is_turned_on<2) {
+				fprintf(stderr,"sclass section malformed\n");
+				return -1;
+			}
+			fseeko(fd,(createcnt+keepcnt+archcnt+trashcnt)*exprsize,SEEK_CUR);
+			sclass_keep_factor[sclassid] = 8 * keepcnt;
+			if (archec>0) {
+				if (archecdp==4) {
+					sclass_arch_factor[sclassid] = 2 * (archecdp + archeccp);
+				} else { // archecdp==8
+					sclass_arch_factor[sclassid] = archecdp + archeccp;
+				}
+			} else {
+				sclass_arch_factor[sclassid] = 8 * archcnt;
 			}
 		}
-		if (nleng>0) {
-			fseeko(fd,nleng,SEEK_CUR);
+	} else {
+		if (sdata->mver==0x10) {
+			ogroup = 1;
+		} else {
+			ogroup = fgetc(fd);
 		}
-		if (sclassid==0 && createcnt==0 && keepcnt==0 && archcnt==0) {
-			break;
-		}
-		if (keepcnt==0 || keepcnt>9 || archcnt==0 || archcnt>9) {
+		if (ogroup<1) {
 			fprintf(stderr,"sclass section malformed\n");
 			return -1;
 		}
-		if (sdata->mver>0x14) {
-			fseeko(fd,(createcnt+keepcnt+archcnt)*4*ogroup,SEEK_CUR);
-		} else if (sdata->mver>0x13) {
-			fseeko(fd,(createcnt+keepcnt)*4*ogroup,SEEK_CUR);
-		} else {
-			fseeko(fd,createcnt*4*ogroup,SEEK_CUR);
+		l = (sdata->mver==0x12)?11:(sdata->mver<=0x13)?3:(sdata->mver<=0x14)?5:(sdata->mver<=0x15)?8:10;
+		while (1) {
+			if (fread(buff,1,l,fd)!=l) {
+				fprintf(stderr,"loading labelset: read error\n");
+				return -1;
+			}
+			rptr = buff;
+			sclassid = get16bit(&rptr);
+			if (sdata->mver>0x15) {
+				nleng = get8bit(&rptr);
+				rptr+=4; // skip admin_only,create_mode,arch_delay
+				createcnt = get8bit(&rptr);
+				keepcnt = get8bit(&rptr);
+				archcnt = get8bit(&rptr);
+				chunkcount = 0;
+			} else if (sdata->mver>0x14) {
+				nleng = 0;
+				rptr+=2; // skip create_mode,arch_delay
+				createcnt = get8bit(&rptr);
+				keepcnt = get8bit(&rptr);
+				archcnt = get8bit(&rptr);
+				chunkcount = 0;
+			} else if (sdata->mver>0x13) {
+				nleng = 0;
+				rptr++; // skip create_mode
+				createcnt = get8bit(&rptr);
+				keepcnt = get8bit(&rptr);
+				archcnt = keepcnt;
+				chunkcount = 0;
+			} else {
+				nleng = 0;
+				createcnt = get8bit(&rptr);
+				keepcnt = createcnt;
+				archcnt = createcnt;
+				if (sdata->mver==0x12) {
+					chunkcount = get32bit(&rptr);
+				} else {
+					chunkcount = 0;
+				}
+			}
+			if (nleng>0) {
+				fseeko(fd,nleng,SEEK_CUR);
+			}
+			if (sclassid==0 && createcnt==0 && keepcnt==0 && archcnt==0) {
+				break;
+			}
+			if (keepcnt==0 || keepcnt>9 || archcnt==0 || archcnt>9) {
+				fprintf(stderr,"sclass section malformed\n");
+				return -1;
+			}
+			if (sdata->mver>0x14) {
+				fseeko(fd,(createcnt+keepcnt+archcnt)*4*ogroup,SEEK_CUR);
+			} else if (sdata->mver>0x13) {
+				fseeko(fd,(createcnt+keepcnt)*4*ogroup,SEEK_CUR);
+			} else {
+				fseeko(fd,createcnt*4*ogroup,SEEK_CUR);
+			}
+			if (chunkcount>0) {
+				fseeko(fd,chunkcount*8,SEEK_CUR);
+			}
+			sclass_keep_factor[sclassid] = 8 * keepcnt;
+			sclass_arch_factor[sclassid] = 8 * archcnt;
 		}
-		if (chunkcount>0) {
-			fseeko(fd,chunkcount*8,SEEK_CUR);
-		}
-		sclass_keep_factor[sclassid] = keepcnt;
-		sclass_arch_factor[sclassid] = archcnt;
 	}
 	return 0;
 }
@@ -283,7 +384,7 @@ int scan_nodes(FILE *fd,metasection *sdata) {
 		inode = get32bit(&rptr);
 		sclass = get8bit(&rptr);
 		if (sdata->mver<=0x13) {
-			fseeko(fd,27,SEEK_CUR); // 27 = 1+2+6*4 - flags,mode,uid,gid,atime,mtime,ctime,trashtime
+			fseeko(fd,27,SEEK_CUR); // 27 = 1+2+6*4 - flags,mode,uid,gid,atime,mtime,ctime,trashretention
 		} else {
 			fseeko(fd,26,SEEK_CUR); // 26 = 1+1+2+5*4+2 - flags,winattr,mode,uid,gid,atime,mtime,ctime,trashretention
 		}
@@ -499,19 +600,23 @@ int scan_edges(FILE *fd,metasection *sdata) {
 }
 
 int scan_chunks(FILE *fd,metasection *sdata) {
-	uint8_t buff[17];
+	uint8_t buff[18];
 	const uint8_t *rptr;
 	uint64_t chunkid;
 	uint8_t flags;
+	uint16_t pairs;
+	uint32_t skip;
 	uint32_t progresscnt;
+	uint32_t rsize;
 
-	if (sdata->mver>0x11) {
+	if (sdata->mver>0x12) {
 		fprintf(stderr,"loading chunks: unsupported format\n");
 		return -1;
 	}
 	if (sdata->mver==0x10) { // no archive bit - just do nothhing
 		return 0;
 	}
+	rsize = (sdata->mver==0x11)?17:18;
 	fseeko(fd,sdata->offset,SEEK_SET);
 	fseeko(fd,8,SEEK_CUR); // skip nextchunkid
 	progresscnt = 0;
@@ -522,7 +627,7 @@ int scan_chunks(FILE *fd,metasection *sdata) {
 			fprintf(stderr,"chunk scan: %.2lf%%\r",100.0*(ftello(fd)-sdata->offset)/sdata->length);
 			fflush(stderr);
 		}
-		if (fread(buff,1,17,fd)!=17) {
+		if (fread(buff,1,rsize,fd)!=rsize) {
 			fprintf(stderr,"error reading metadata file\n");
 			return -1;
 		}
@@ -530,6 +635,23 @@ int scan_chunks(FILE *fd,metasection *sdata) {
 		chunkid = get64bit(&rptr);
 		rptr+=8; // skip version,lockedto
 		flags = get8bit(&rptr);
+		if (sdata->mver==0x12) {
+			pairs = get8bit(&rptr);
+			if (flags&0x80) {
+				flags &= 0x7F;
+				pairs |= 0x100;
+			}
+			if (pairs==0) {
+				skip = 0;
+			} else if (pairs==1) {
+				skip = 1+3;
+			} else {
+				skip = (1+3)*pairs+1;
+			}
+			if (skip>0) {
+				fseeko(fd,skip,SEEK_CUR);
+			}
+		}
 		if (chunkid==0) {
 			fprintf(stderr,"chunk scan: 100.00%%\n");
 			return 0;
@@ -617,8 +739,8 @@ int calc_dirinfos(FILE *fd) {
 		fprintf(stderr,"can't find CH(U)NK section in metadata file\n");
 		return -1;
 	}
-	if (node.mver<0x13 || node.mver>0x14 || edge.mver!=0x11 || chnk.mver!=0x11) { // MFS 3.x
-		fprintf(stderr,"unsupported metadata format (MFS 3.x needed)\n");
+	if (node.mver<0x13 || node.mver>0x14 || edge.mver!=0x11 || chnk.mver<0x11 || chnk.mver>0x12) { // MFS >= 3.x
+		fprintf(stderr,"unsupported metadata format (MFS 3.x or newer is needed)\n");
 		return -1;
 	}
 
@@ -649,6 +771,12 @@ int calc_dirinfos(FILE *fd) {
 		return -1;
 	}
 
+	// EC fix
+	for (dis = dishead ; dis!=NULL ; dis=dis->next) {
+		dis->s.keeprsize /= 8;
+		dis->s.archrsize /= 8;
+		dis->s.rsize /= 8;
+	}
 	return 0;
 }
 
@@ -790,6 +918,8 @@ void print_result_csv(FILE *ofd,char s) {
 }
 
 void usage(const char *appname) {
+	printf("Calculates precise directory information from metadata file.\n");
+	printf("\n");
 	printf("usage: %s [-f J|C[separator]] [-o outputfile] [-a sum_name] metadata.mfs PATH ...\n",appname);
 	exit(1);
 }

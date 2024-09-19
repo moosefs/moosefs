@@ -25,18 +25,20 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
-#include <syslog.h>
 
 #include "massert.h"
 #include "sockets.h"
 #include "mastercomm.h"
 #include "datapack.h"
+#include "portable.h"
 #include "MFSCommunication.h"
 #include "negentrycache.h"
+#include "mfs_fuse.h"
 
-#define TOOLTIMEOUTMS 20000
-#define QUERYSIZE 50000
-#define ANSSIZE 4000000
+#define TOOLTIMEOUTPARTMS 10000
+#define TOOLTIMEOUTALLMS 30000
+#define TOOLSNOPMS 5000
+#define AUXBUFFSIZE 65536
 
 static int lsock = -1;
 static pthread_t proxythread;
@@ -57,22 +59,75 @@ void masterproxy_getlocation(uint8_t *masterinfo) {
 	}
 }
 
-static void* masterproxy_server(void *args) {
-	uint8_t header[8];
-	uint8_t *querybuffer;
-	uint8_t *ansbuffer;
+typedef struct _conn_data {
+	int sock;
+	int sendnops;
+	pthread_mutex_t lock;
+} conn_data;
+
+void masterproxy_free_conn_data (conn_data *cd) {
+	pthread_mutex_destroy(&(cd->lock));
+	tcpclose(cd->sock);
+	free(cd);
+}
+
+static void* masterproxy_keepalive(void *args) {
+	conn_data *cd = (conn_data*)(args);
+	int nopcnt;
+	uint8_t nopbuff[8];
 	uint8_t *wptr;
-	const uint8_t *rptr;
-	int sock = *((int*)args);
-	uint32_t psize,cmd,msgid,asize,acmd;
 
-	free(args);
-
-	querybuffer = malloc(QUERYSIZE);
-	ansbuffer = malloc(ANSSIZE);
+	wptr = nopbuff;
+	put32bit(&wptr,ANTOAN_NOP);
+	put32bit(&wptr,0);
+	nopcnt = 0;
 
 	for (;;) {
-		if (tcptoread(sock,header,8,TOOLTIMEOUTMS)!=8) {
+		pthread_mutex_lock(&(cd->lock));
+		if (cd->sendnops==255) {
+			pthread_mutex_unlock(&(cd->lock));
+			masterproxy_free_conn_data(cd);
+			return NULL;
+		}
+		if (cd->sendnops==0) {
+			pthread_mutex_unlock(&(cd->lock));
+			nopcnt=0;
+		} else {
+			nopcnt++;
+			if (nopcnt>=(TOOLSNOPMS/100)) {
+				cd->sendnops = 2;
+				pthread_mutex_unlock(&(cd->lock));
+				if (tcptowrite(cd->sock,nopbuff,8,TOOLTIMEOUTPARTMS,TOOLTIMEOUTALLMS)!=8) {
+					break;
+				}
+				pthread_mutex_lock(&(cd->lock));
+				cd->sendnops = 1;
+				nopcnt = 0;
+			}
+			pthread_mutex_unlock(&(cd->lock));
+		}
+		portable_usleep(100000);
+	}
+	return NULL;
+}
+
+static void* masterproxy_server(void *args) {
+	uint8_t header[8];
+	uint8_t *auxbuffer;
+	const uint8_t *aptr;
+	uint8_t *wptr;
+	const uint8_t *rptr;
+	conn_data *cd = (conn_data*)(args);
+	uint32_t psize,cmd,msgid,asize,acmd;
+	// special extra data for snapshots
+	uint32_t inode_dst;
+	uint8_t name_dst_len;
+	char name_dst[256];
+
+	auxbuffer = malloc(AUXBUFFSIZE);
+
+	for (;;) {
+		if (tcptoread(cd->sock,header,8,TOOLTIMEOUTPARTMS,TOOLTIMEOUTALLMS)!=8) {
 			break;
 		}
 
@@ -80,73 +135,111 @@ static void* masterproxy_server(void *args) {
 		cmd = get32bit(&rptr);
 		psize = get32bit(&rptr);
 		if (cmd==CLTOMA_FUSE_REGISTER) {	// special case: register
-			// if (psize>QUERYSIZE) {
+			// if (psize>AUXBUFFSIZE) {
 			if (psize!=73) {
 				break;
 			}
 
-			if (tcptoread(sock,querybuffer,psize,TOOLTIMEOUTMS)!=(int32_t)(psize)) {
+			if (tcptoread(cd->sock,auxbuffer,psize,TOOLTIMEOUTPARTMS,TOOLTIMEOUTALLMS)!=(int32_t)(psize)) {
 				break;
 			}
 
-			if (memcmp(querybuffer,FUSE_REGISTER_BLOB_ACL,64)!=0) {
+			if (memcmp(auxbuffer,FUSE_REGISTER_BLOB_ACL,64)!=0) {
 				break;
 			}
 
-			if (querybuffer[64]!=REGISTER_TOOLS) {
+			if (auxbuffer[64]!=REGISTER_TOOLS) {
 				break;
 			}
 
-			wptr = ansbuffer;
+			wptr = auxbuffer;
 			put32bit(&wptr,MATOCL_FUSE_REGISTER);
 			put32bit(&wptr,1);
 			put8bit(&wptr,MFS_STATUS_OK);
 
-			if (tcptowrite(sock,ansbuffer,9,TOOLTIMEOUTMS)!=9) {
+			if (tcptowrite(cd->sock,auxbuffer,9,TOOLTIMEOUTPARTMS,TOOLTIMEOUTALLMS)!=9) {
 				break;
 			}
 		} else {
-			if (psize<4 || psize>QUERYSIZE) {
+			if (psize<4 || psize>AUXBUFFSIZE) {
 				break;
 			}
 
-			if (tcptoread(sock,querybuffer,psize,TOOLTIMEOUTMS)!=(int32_t)(psize)) {
+			if (tcptoread(cd->sock,auxbuffer,psize,TOOLTIMEOUTPARTMS,TOOLTIMEOUTALLMS)!=(int32_t)(psize)) {
 				break;
 			}
 
-			rptr = querybuffer;
+			pthread_mutex_lock(&(cd->lock));
+			cd->sendnops = 1;
+			pthread_mutex_unlock(&(cd->lock));
+
+			rptr = auxbuffer;
 			msgid = get32bit(&rptr);
 
-			asize = ANSSIZE-12;
-			if (fs_custom(cmd,querybuffer+4,psize-4,&acmd,ansbuffer+12,&asize)!=MFS_STATUS_OK) {
+			inode_dst = 0;
+			name_dst_len = 0;
+			if (cmd==CLTOMA_FUSE_SNAPSHOT) {
+				if (psize>=13) {
+					rptr+=4; // ignore src inode
+					inode_dst = get32bit(&rptr);
+					name_dst_len = get8bit(&rptr);
+					if (psize>=13U+(uint32_t)name_dst_len) {
+						memcpy(name_dst,rptr,name_dst_len);
+						name_dst[name_dst_len]=0;
+					} else {
+						inode_dst = 0;
+					}
+				}
+			}
+
+			if (fs_custom(cmd,auxbuffer+4,psize-4,&acmd,&aptr,&asize)!=MFS_STATUS_OK) {
 				break;
 			}
 
 			if (cmd==CLTOMA_FUSE_SNAPSHOT && acmd==MATOCL_FUSE_SNAPSHOT) {
 				negentry_cache_clear();
+				if (inode_dst>0 && name_dst_len>0) {
+					mfs_dentry_invalidate(inode_dst,name_dst_len,name_dst);
+				}
 			}
 
-			wptr = ansbuffer;
+			wptr = auxbuffer;
 			put32bit(&wptr,acmd);
 			put32bit(&wptr,asize+4);
 			put32bit(&wptr,msgid);
 
-			if (tcptowrite(sock,ansbuffer,asize+12,TOOLTIMEOUTMS)!=(int32_t)(asize+12)) {
+			// stupid active wait - shuld be replaced by cond, but since it is highly improbable we can leave it
+			pthread_mutex_lock(&(cd->lock));
+			while (cd->sendnops==2) { // we don't want to send answer when nop packet is being sent
+				pthread_mutex_unlock(&(cd->lock));
+				portable_usleep(10000);
+				pthread_mutex_lock(&(cd->lock));
+			}
+			cd->sendnops = 0;
+			pthread_mutex_unlock(&(cd->lock));
+
+			if (tcptowrite(cd->sock,auxbuffer,12,TOOLTIMEOUTPARTMS,TOOLTIMEOUTALLMS)!=12) {
+				break;
+			}
+			if (tcptowrite(cd->sock,aptr,asize,TOOLTIMEOUTPARTMS,TOOLTIMEOUTALLMS)!=(int32_t)(asize)) {
 				break;
 			}
 		}
 	}
-	tcpclose(sock);
-	free(ansbuffer);
-	free(querybuffer);
+	free(auxbuffer);
+	pthread_mutex_lock(&(cd->lock));
+	cd->sendnops = 255;
+	pthread_mutex_unlock(&(cd->lock));
+
 	return NULL;
 }
 
 static void* masterproxy_acceptor(void *args) {
-	pthread_t clientthread;
+	pthread_t clientthread,nopthread;
 	pthread_attr_t thattr;
 	sigset_t oldset;
 	sigset_t newset;
+	conn_data *cd;
 	int sock,res;
 	(void)args;
 
@@ -163,9 +256,11 @@ static void* masterproxy_acceptor(void *args) {
 #endif
 		sock = tcptoaccept(lsock,1000);
 		if (sock>=0) {
-			int *s = malloc(sizeof(int));
+			cd = malloc(sizeof(conn_data));
+			cd->sock = sock;
+			cd->sendnops = 0;
+			pthread_mutex_init(&(cd->lock),NULL);
 			// memory is freed inside pthread routine !!!
-			*s = sock;
 			tcpnodelay(sock);
 			tcpnonblock(sock);
 			sigemptyset(&newset);
@@ -174,12 +269,18 @@ static void* masterproxy_acceptor(void *args) {
 			sigaddset(&newset, SIGHUP);
 			sigaddset(&newset, SIGQUIT);
 			pthread_sigmask(SIG_BLOCK, &newset, &oldset);
-			res = pthread_create(&clientthread,&thattr,masterproxy_server,s);
-			pthread_sigmask(SIG_SETMASK, &oldset, NULL);
+			res = pthread_create(&nopthread,&thattr,masterproxy_keepalive,cd);
 			if (res<0) {
-				free(s);
-				tcpclose(sock);
+				masterproxy_free_conn_data(cd);
+			} else {
+				res = pthread_create(&clientthread,&thattr,masterproxy_server,cd);
+				if (res<0) {
+					pthread_mutex_lock(&(cd->lock));
+					cd->sendnops = 255;
+					pthread_mutex_unlock(&(cd->lock));
+				}
 			}
+			pthread_sigmask(SIG_SETMASK, &oldset, NULL);
 		}
 #ifdef HAVE___SYNC_OP_AND_FETCH
 	}
@@ -215,23 +316,23 @@ int masterproxy_init(const char *masterproxyip) {
 
 	lsock = tcpsocket();
 	if (lsock<0) {
-		fprintf(stderr,"master proxy module: can't create socket\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"master proxy module: can't create socket");
 		return -1;
 	}
 	tcpnonblock(lsock);
 	tcpnodelay(lsock);
 	// tcpreuseaddr(lsock);
 	if (tcpstrlisten(lsock,masterproxyip,0,100)<0) {
-		fprintf(stderr,"master proxy module: can't listen on socket\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"master proxy module: can't listen on socket");
 		tcpclose(lsock);
 		lsock = -1;
 		return -1;
 	}
 	if (tcpsetacceptfilter(lsock)<0 && errno!=ENOTSUP) {
-		syslog(LOG_NOTICE,"master proxy module: can't set accept filter");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"master proxy module: can't set accept filter");
 	}
 	if (tcpgetmyaddr(lsock,&proxyhost,&proxyport)<0) {
-		fprintf(stderr,"master proxy module: can't obtain my address and port\n");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"master proxy module: can't obtain my address and port");
 		tcpclose(lsock);
 		lsock = -1;
 		return -1;

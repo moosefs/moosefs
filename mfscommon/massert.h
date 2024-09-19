@@ -22,33 +22,28 @@
 #define _MASSERT_H_
 
 #include <stdio.h>
-#ifdef WIN32
-#include "portable.h"
-//#define syslog(...) (void)0
-#else
-#include <syslog.h>
-#endif
+#include "mfslog.h"
 #include <stdlib.h>
 #include <errno.h>
 
 #include "strerr.h"
 
-#define uassert(msg) (fprintf(stderr,"%s:%u - unexpected event: %s\n",__FILE__,(unsigned)__LINE__,(msg)),syslog(LOG_ERR,"%s:%u - unexpected event: %s",__FILE__,(unsigned)__LINE__,(msg)),abort())
-#define massert(e,msg) ((e) ? (void)0 : (fprintf(stderr,"%s:%u - failed assertion '%s' : %s\n",__FILE__,(unsigned)__LINE__,#e,(msg)),syslog(LOG_ERR,"%s:%u - failed assertion '%s' : %s",__FILE__,(unsigned)__LINE__,#e,(msg)),abort()))
-#define sassert(e) ((e) ? (void)0 : (fprintf(stderr,"%s:%u - failed assertion '%s'\n",__FILE__,(unsigned)__LINE__,#e),syslog(LOG_ERR,"%s:%u - failed assertion '%s'",__FILE__,(unsigned)__LINE__,#e),abort()))
+#define uassert(msg) (fprintf(stderr,"%s:%u - unexpected event: %s\n",__FILE__,(unsigned)__LINE__,(msg)),mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - unexpected event: %s",__FILE__,(unsigned)__LINE__,(msg)),abort())
+#define massert(e,msg) ((e) ? (void)0 : (fprintf(stderr,"%s:%u - failed assertion '%s' : %s\n",__FILE__,(unsigned)__LINE__,#e,(msg)),mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - failed assertion '%s' : %s",__FILE__,(unsigned)__LINE__,#e,(msg)),abort()))
+#define sassert(e) ((e) ? (void)0 : (fprintf(stderr,"%s:%u - failed assertion '%s'\n",__FILE__,(unsigned)__LINE__,#e),mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - failed assertion '%s'",__FILE__,(unsigned)__LINE__,#e),abort()))
 #define passert(ptr) if (ptr==NULL) { \
 		fprintf(stderr,"%s:%u - out of memory: %s is NULL\n",__FILE__,(unsigned)__LINE__,#ptr); \
-		syslog(LOG_ERR,"%s:%u - out of memory: %s is NULL",__FILE__,(unsigned)__LINE__,#ptr); \
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - out of memory: %s is NULL",__FILE__,(unsigned)__LINE__,#ptr); \
 		abort(); \
 	} else if (ptr==((void*)(-1))) { \
 		const char *_mfs_errorstring = strerr(errno); \
-		syslog(LOG_ERR,"%s:%u - mmap error on %s, error: %s",__FILE__,(unsigned)__LINE__,#ptr,_mfs_errorstring); \
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - mmap error on %s, error: %s",__FILE__,(unsigned)__LINE__,#ptr,_mfs_errorstring); \
 		fprintf(stderr,"%s:%u - mmap error on %s, error: %s\n",__FILE__,(unsigned)__LINE__,#ptr,_mfs_errorstring); \
 		abort(); \
 	}
 #define eassert(e) if (!(e)) { \
 		const char *_mfs_errorstring = strerr(errno); \
-		syslog(LOG_ERR,"%s:%u - failed assertion '%s', error: %s",__FILE__,(unsigned)__LINE__,#e,_mfs_errorstring); \
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - failed assertion '%s', error: %s",__FILE__,(unsigned)__LINE__,#e,_mfs_errorstring); \
 		fprintf(stderr,"%s:%u - failed assertion '%s', error: %s\n",__FILE__,(unsigned)__LINE__,#e,_mfs_errorstring); \
 		abort(); \
 	}
@@ -57,16 +52,16 @@
 	if (_mfs_assert_ret!=0) { \
 		if (_mfs_assert_ret<0 && errno!=0) { \
 			const char *_mfs_errorstring = strerr(errno); \
-			syslog(LOG_ERR,"%s:%u - unexpected status, '%s' returned: %d (errno=%d: %s)",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,errno,_mfs_errorstring); \
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - unexpected status, '%s' returned: %d (errno=%d: %s)",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,errno,_mfs_errorstring); \
 			fprintf(stderr,"%s:%u - unexpected status, '%s' returned: %d (errno=%d: %s)\n",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,errno,_mfs_errorstring); \
 		} else if (_mfs_assert_ret>0 && errno==0) { \
 			const char *_mfs_errorstring = strerr(_mfs_assert_ret); \
-			syslog(LOG_ERR,"%s:%u - unexpected status, '%s' returned: %d : %s",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - unexpected status, '%s' returned: %d : %s",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
 			fprintf(stderr,"%s:%u - unexpected status, '%s' returned: %d : %s\n",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring); \
 		} else { \
 			const char *_mfs_errorstring_err = strerr(errno); \
 			const char *_mfs_errorstring_ret = strerr(_mfs_assert_ret); \
-			syslog(LOG_ERR,"%s:%u - unexpected status, '%s' returned: %d : %s (errno=%d: %s)",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring_ret,errno,_mfs_errorstring_err); \
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"%s:%u - unexpected status, '%s' returned: %d : %s (errno=%d: %s)",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring_ret,errno,_mfs_errorstring_err); \
 			fprintf(stderr,"%s:%u - unexpected status, '%s' returned: %d : %s (errno=%d: %s)\n",__FILE__,(unsigned)__LINE__,#e,_mfs_assert_ret,_mfs_errorstring_ret,errno,_mfs_errorstring_err); \
 		} \
 		abort(); \

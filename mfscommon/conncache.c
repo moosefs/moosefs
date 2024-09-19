@@ -20,10 +20,13 @@
 
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <pthread.h>
 
+#include "clocks.h"
 #include "massert.h"
 #include "sockets.h"
 #include "hashfn.h"
@@ -124,16 +127,18 @@ void* conncache_keepalive_thread(void* arg) {
 	int i,ka;
 	uint32_t p,q;
 	connentry *ce;
+	uint64_t st,en;
 
 	p = 0;
 	ka = 1;
 	while (ka) {
+		st = monotonic_useconds();
 		zassert(pthread_mutex_lock(&glock));
 		for (q=p ; q<capacity ; q+=200) {
 			ce = conncachetab+q;
 			if (ce->fd>=0) {
 #ifdef MFSDEBUG
-				syslog(LOG_NOTICE,"conncache: pos: %"PRIu32" ; desc: %d ; ip:%08X ; port:%u",p,ce->fd,ce->ip,ce->port);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"conncache: pos: %"PRIu32" ; desc: %d ; ip:%08X ; port:%u",p,ce->fd,ce->ip,ce->port);
 #endif
 				i = universal_read(ce->fd,nopbuff,8);
 				if (i<0) {
@@ -161,7 +166,11 @@ void* conncache_keepalive_thread(void* arg) {
 		}
 		ka = keep_alive;
 		zassert(pthread_mutex_unlock(&glock));
-		portable_usleep(2500); // 200 * 2500 = 500000 = 0.5s (send nops every half second)
+		en = monotonic_useconds();
+		// 200 * 5000 = 1000000us = 1s
+		if (en-st<5000) {
+			portable_usleep(5000 - (en-st));
+		}
 	}
 	return arg;
 }

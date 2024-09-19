@@ -35,7 +35,9 @@
 #include "changelog.h"
 #include "chartsdata.h"
 #include "missinglog.h"
+#include "globengine.h"
 #include "bgsaver.h"
+#include "multilan.h"
 
 #define MODULE_OPTIONS_GETOPT "iax"
 #define MODULE_OPTIONS_SWITCH \
@@ -57,9 +59,11 @@ struct {
 	runfn fn;
 	char *name;
 } RunTab[]={
-	{bgsaver_init,"bgsaver"},
-	{changelog_init,"change log"},
 	{rnd_init,"random generator"},
+	{bgsaver_init,"bgsaver"},
+	{glob_cache_init,"glob engine"},
+	{multilan_init,"multilan map"},
+	{changelog_init,"change log"},
 	{missing_log_init,"missing chunks/files log"}, // has to be before 'fs_init'
 	{dcm_init,"data cache manager"}, // has to be before 'fs_init' and 'matoclserv_init'
 	{exports_init,"exports manager"},
@@ -73,7 +77,7 @@ struct {
 },LateRunTab[]={
 	{(runfn)0,"****"}
 },RestoreRunTab[]={
-	{dcm_init,"data cache manager"}, // has to be before 'fs_init' and 'matoclserv_init'
+	{dcm_init,"data cache manager"},
 	{meta_restore,"metadata restore"},
 	{(runfn)0,"****"}
 };

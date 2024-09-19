@@ -82,13 +82,12 @@ static inline int hdd_check_filename(const char *fname,uint64_t *chunkid,uint32_
 	return 0;
 }
 
-int chunk_repair(const char *fname,uint8_t mode,uint8_t showok) {
+int chunk_repair(const char *fname,uint8_t mode,uint8_t showok,uint8_t *buff) {
 	uint64_t namechunkid;
 	uint32_t nameversion;
 	char *newname;
 	uint32_t i,j;
 	int fd;
-	uint8_t buff[MFSBLOCKSIZE];
 	uint32_t crc[1024];
 	uint32_t crcblock;
 	uint16_t hdrsize;
@@ -317,6 +316,7 @@ int main(int argc,char *argv[]) {
 	uint8_t mode = 0;
 	uint8_t verbose = 0;
 	uint8_t ret = 0;
+	uint8_t *auxbuff;
 	const char *appname;
 
 	appname = argv[0];
@@ -364,10 +364,15 @@ int main(int argc,char *argv[]) {
 
 	mycrc32_init();
 
+	auxbuff = malloc(MFSBLOCKSIZE);
+
 	while (argc>0) {
-		ret |= chunk_repair(*argv,mode,verbose);
+		ret |= chunk_repair(*argv,mode,verbose,auxbuff);
 		argv++;
 		argc--;
 	}
+
+	free(auxbuff);
+
 	return ret;
 }

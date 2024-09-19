@@ -1,14 +1,16 @@
-.TH mfsbdev "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsbdev "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsbdev \- \fBMooseFS\fP block device daemon/management tool
 .SH SYNOPSIS
 .B mfsbdev start
 [\fB-H\fP \fImasterhost\fP]
 [\fB-P\fP \fImasterport\fP]
+[\fB-B\fP \fImasterbind\fP]
 [\fB-S\fP \fImasterpath\fP]
 [\fB-p\fP \fImasterpassword\fP | \fB-x\fP \fIpasswordfile\fP]
 [\fB-l\fP \fIlinksocket\fP]
-[\fB-F\fP]
+[\fB-i\fP \fIinit_mappings_file\fP]
+[\fB-o\fP \fIoptions\fP]
 .PP
 .B mfsbdev stop
 [\fB-l\fP \fIlinksocket\fP]
@@ -19,6 +21,7 @@ mfsbdev \- \fBMooseFS\fP block device daemon/management tool
 [\fB-d\fP \fInbddevice\fP]
 [\fB-n\fP \fIlinkname\fP]
 [\fB-s\fP \fIbdevsize\fP]
+[\fB-b\fP \fIblocksize\fP | \fB-5\fP | \fB-1\fP | \fB-2\fP | \fB-4\fP]
 [\fB-r\fP]
 [\fB-i\fP]
 .PP
@@ -28,7 +31,7 @@ mfsbdev \- \fBMooseFS\fP block device daemon/management tool
 .PP
 .B mfsbdev list
 [\fB-l\fP \fIlinksocket\fP]
-[\fB-t\fP \fBm\fP|\fBu\fP]
+[\fB-t\fP \fBm\fP|\fBu\fP|\fBi\fP]
 .PP
 .B mfsbdev resize
 [\fB-l\fP \fIlinksocket\fP]
@@ -81,9 +84,6 @@ to connect without a password
 .B -l
 - path to communication socket; default is /dev/mfs/nbdsock
 .PP
-.B -F
-- do not daemonize the tool (run in foreground)
-.PP
 .B -f
 - path to mfs file used to map block device;
 .PP
@@ -100,17 +100,87 @@ default is a combination of master hostname, port and mfs file name
 - size of the block device, both SI and IEC suffixes can be used; default is the size
 of the file the block device is mapped to
 .PP
+.B -b 
+- block size in bytes
+.PP
+.B -5 
+- use block size 512 bytes (eq to -b 512)
+.PP
+.B -1 
+- use block size 1024 bytes (eq to -b 1024)
+.PP
+.B -2 
+- use block size 2048 bytes (eq to -b 2048)
+.PP
+.B -4 
+- use block size 4096 bytes (eq to -b 4096)
+.PP
 .B -r
 - maps block device as readonly (allows multiple mappings of the same file)
 .PP
-.B -i
+.B -i (map)
 - ignore locks; one file may be mapped to more than one block device, each map operation will try 
 to obtain the appropriate lock (shared for ro, exclusive for rw) but will succed even if 
 the lock is not obtained
 .PP
 .B -t
 - forces the list command to display information in a format ready to use with
-map (m parameter) or unmap (u parameter) command
+map (m parameter) or unmap (u parameter) command or with MooseFS mfsbdev.cfg file format (i parameter)
+.PP
+.B -i (start)
+- use config file supplied in parameter to start initial block devices; 
+for formatting of the config see \fBmfsbdev.cfg\fP\|(5)
+.PP
+.B -o
+- additional params, mfsmount-style, many params can be defined, separated by coma:
+.TP
+\fBmfswritecachesize=\fP\fIN\fP
+specify write cache size in MiB (in range: 16..2048 - default: 128)
+.TP
+\fBmfsreadaheadsize=\fP\fIN\fP
+define size of all read ahead buffers in MiB (in range: 16..2048 - default: 128)
+.TP
+\fBmfsreadaheadleng=\fP\fIN\fP
+define amount of bytes to be additionally read (in range: 128KiB..2MiB - default: 2097152 = 2MiB)
+.TP
+\fBmfsreadaheadtrigger=\fP\fIN\fP
+define amount of bytes read sequentially that turns on read ahead (default: 20971520)
+.TP
+\fBmfserroronlostchunk\fP
+when all known chunkservers are connected to the master and the required chunk is missing then immediately finish I/O and return an error
+.TP
+\fBmfserroronnospace\fP
+when all known chunkservers are connected to the master and there is no free space then immediately finish I/O and return an error
+.TP
+\fBmfsioretries=\fP\fIN\fP
+specify number of retries before I/O error is returned (default: 30)
+.TP
+\fBmfstimeout=\fP\fIN\fP
+define maximum timeout in seconds before I/O error is returned (default: 0 - which means no timeout)
+.TP
+\fBmfslogretry=\fP\fIN\fP
+define minimal retry counter on which system will start log I/O messages (default: 5)
+.TP
+\fBmfsmaster=\fP\fIHOST\fP
+connect with MooseFS master on \fIHOST\fP (default is mfsmaster) - equivalent to \fB-H\fP
+.TP
+\fBmfsport=\fP\fIPORT\fP
+connect with MooseFS master on \fIPORT\fP (default is 9421) - equivalent to \fB-P\fP
+.TP
+\fBmfsbind=\fP\fIIP\fP
+local address to use for connecting with master instead of default one - equivalent to \fB-B\fP
+.TP
+\fBmfssubfolder=\fP\fIPATH\fP 
+mount specified MooseFS directory (default is /, i.e. whole filesystem) - equivalent to \fB-S\fP
+.TP
+\fBmfspassword=\fP\fIPASSWORD\fP
+authenticate to MooseFS master with \fIPASSWORD\fP
+.TP
+\fBmfspreflabels=\fP\fILABELEXPR\fP
+specify preferred labels for choosing chunkservers during I/O
+.TP
+\fBmfsnbdtimeout=\fP\fIN\fP
+define maximum timeout in seconds before kernel gives up (default: 1800)
 .SH EXAMPLES
 .PP
 .B mfsbdev start
@@ -148,4 +218,6 @@ along with MooseFS; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
-.BR mfsmount (8)
+.BR mfsmount (8),
+.BR mfsbdev.cfg (5)
+

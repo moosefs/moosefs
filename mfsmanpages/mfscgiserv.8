@@ -1,11 +1,12 @@
-.TH mfscgiserv "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfscgiserv "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
-mfscgiserv \- start HTTP/CGI server for Moose File System monitoring
+mfscgiserv \- start HTTP/CGI server for MooseFS monitoring
 .SH SYNOPSIS
 .B mfscgiserv
 [\fB\-H\fP \fIBIND_HOST\fP]
 [\fB\-P\fP \fIBIND_PORT\fP]
 [\fB\-R\fP \fIROOT_PATH\fP]
+[\fB\-D\fP \fIDATA_PATH\fP]
 [\fB\-t\fP \fILOCKTIMEOUT\fP]
 [\fB\-f\fP [\fB\-v\fP]]
 [\fIACTION\fP]
@@ -14,7 +15,7 @@ mfscgiserv \- start HTTP/CGI server for Moose File System monitoring
 .SH DESCRIPTION
 .PP
 \fBmfscgiserv\fP is a very simple HTTP server capable of running CGI
-scripts for Moose File System monitoring.
+scripts for MooseFS monitoring.
 .SH OPTIONS
 .TP
 \fB\-h\fP
@@ -28,6 +29,9 @@ port to listen on (default: 9425)
 .TP
 \fB\-R\fP \fIROOT_PATH\fP
 local path to use as HTTP document root (default is CGIDIR set up at configure time)
+.TP
+\fB\-D\fP \fIDATA_PATH\fP
+working directory (default: /var/lib/mfs)
 .TP
 \fB\-f\fP
 run in foreground, don't daemonize

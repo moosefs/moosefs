@@ -18,13 +18,6 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
-// patch for old osxfuse
-//#if defined(__APPLE__)
-//# if ! defined(__DARWIN_64_BIT_INO_T) && ! defined(_DARWIN_USE_64_BIT_INODE)
-//#  define __DARWIN_64_BIT_INO_T 0
-//# endif
-//#endif
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -34,11 +27,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <syslog.h>
 #include <errno.h>
 #include <time.h>
 #include <pthread.h>
 
+#include "mfslog.h"
 #include "datapack.h"
 #include "mastercomm.h"
 #include "masterproxy.h"
@@ -100,16 +93,11 @@ typedef struct _pathbuf {
 // 0x01b6 = 0666
 //static uint8_t masterattr[ATTR_RECORD_SIZE]={'f', 0x01,0xB6, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,0};
 
-#define MASTERINFO_WITH_VERSION 1
-
 #define MASTERINFO_NAME ".masterinfo"
 #define MASTERINFO_INODE 0x7FFFFFFF
 // 0x0124 = 0444
-#ifdef MASTERINFO_WITH_VERSION
-static uint8_t masterinfoattr[ATTR_RECORD_SIZE]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,14};
-#else
-static uint8_t masterinfoattr[ATTR_RECORD_SIZE]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,10};
-#endif
+
+static uint8_t masterinfoattr[ATTR_RECORD_SIZE]={'f', 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,22};
 
 #define MIN_SPECIAL_INODE 0x7FFF0000
 #define IS_SPECIAL_INODE(ino) ((ino)>=MIN_SPECIAL_INODE || (ino)==META_ROOT_INODE)
@@ -825,7 +813,7 @@ static void dir_dataentries_convert(uint8_t *buff,const uint8_t *dbuff,uint32_t 
 			put32bit(&buff,inode);
 			put8bit(&buff,TYPE_FILE);
 		} else {
-			syslog(LOG_WARNING,"dir data malformed (trash)");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"dir data malformed (trash)");
 			dbuff=eptr;
 		}
 	}
@@ -867,7 +855,7 @@ static void dirbuf_meta_fill(dirbuf *b, uint32_t ino) {
 	}
 	b->p = malloc(msize+dcsize);
 	if (b->p==NULL) {
-		syslog(LOG_WARNING,"out of memory");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"out of memory");
 		return;
 	}
 	if (msize>0) {
@@ -921,7 +909,7 @@ void mfs_meta_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, st
 			free(dirinfo->p);
 		}
 		dirbuf_meta_fill(dirinfo,ino);
-//		syslog(LOG_WARNING,"inode: %lu , dirinfo->p: %p , dirinfo->size: %lu",(unsigned long)ino,dirinfo->p,(unsigned long)dirinfo->size);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"inode: %lu , dirinfo->p: %p , dirinfo->size: %lu",(unsigned long)ino,dirinfo->p,(unsigned long)dirinfo->size);
 	}
 	dirinfo->wasread=1;
 
@@ -1069,20 +1057,13 @@ void mfs_meta_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi)
 void mfs_meta_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi) {
 	pathbuf *pathinfo = (pathbuf *)((unsigned long)(fi->fh));
 	if (ino==MASTERINFO_INODE) {
-		uint8_t masterinfo[14];
+		uint8_t masterinfo[22];
 		fs_getmasterlocation(masterinfo);
 		masterproxy_getlocation(masterinfo);
-#ifdef MASTERINFO_WITH_VERSION
-		if (off>=14) {
+		if (off>=22) {
 			fuse_reply_buf(req,NULL,0);
-		} else if (off+size>14) {
-			fuse_reply_buf(req,(char*)(masterinfo+off),14-off);
-#else
-		if (off>=10) {
-			fuse_reply_buf(req,NULL,0);
-		} else if (off+size>10) {
-			fuse_reply_buf(req,(char*)(masterinfo+off),10-off);
-#endif
+		} else if (off+size>22) {
+			fuse_reply_buf(req,(char*)(masterinfo+off),22-off);
 		} else {
 			fuse_reply_buf(req,(char*)(masterinfo+off),size);
 		}
@@ -1092,22 +1073,6 @@ void mfs_meta_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struc
 		fuse_reply_err(req,EBADF);
 		return;
 	}
-//	if (ino==MASTER_INODE) {
-//		minfo *masterinfo = (minfo*)(unsigned long)(fi->fh);
-//		if (masterinfo->sent) {
-//			int rsize;
-//			uint8_t *buff;
-//			buff = malloc(size);
-//			rsize = fs_direct_read(masterinfo->sd,buff,size);
-//			fuse_reply_buf(req,(char*)buff,rsize);
-			//syslog(LOG_WARNING,"master received: %d/%u",rsize,size);
-//			free(buff);
-//		} else {
-//			syslog(LOG_WARNING,"master: read before write");
-//			fuse_reply_buf(req,NULL,0);
-//		}
-//		return;
-//	}
 	pthread_mutex_lock(&(pathinfo->lock));
 	if (off<0) {
 		pthread_mutex_unlock(&(pathinfo->lock));
@@ -1134,15 +1099,6 @@ void mfs_meta_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size
 		fuse_reply_err(req,EBADF);
 		return;
 	}
-//	if (ino==MASTER_INODE) {
-//		minfo *masterinfo = (minfo*)(unsigned long)(fi->fh);
-//		int wsize;
-//		masterinfo->sent=1;
-//		wsize = fs_direct_write(masterinfo->sd,(const uint8_t*)buf,size);
-		//syslog(LOG_WARNING,"master sent: %d/%u",wsize,size);
-//		fuse_reply_write(req,wsize);
-//		return;
-//	}
 	if (off + size > PATH_SIZE_LIMIT) {
 		fuse_reply_err(req,EINVAL);
 		return;

@@ -23,22 +23,51 @@
 
 #include <inttypes.h>
 
+#include "MFSCommunication.h"
 #include "bio.h"
 
-#define MAXSCLASS 256
 
-#define MAXLABELSCNT 9
+typedef struct _storagemode {
+	uint32_t uniqmask;
+	uint8_t ec_data_chksum_parts;
+	uint8_t has_labels; // internal
+	uint8_t matching_servers; // internal
+	// ec counters - begin
+	uint8_t valid_ec_counters; // 0 - invalid ; 1 - for one label ; 2 - for two labels
+	uint16_t replallowed; // internal
+	uint16_t overloaded; // internal
+	uint16_t allvalid; // internal
+	uint16_t data_replallowed; // internal
+	uint16_t data_overloaded; // internal
+	uint16_t data_allvalid; // internal
+	uint16_t chksum_replallowed; // internal
+	uint16_t chksum_overloaded; // internal
+	uint16_t chksum_allvalid; // internal
+	uint16_t both_replallowed; // internal
+	uint16_t both_overloaded; // internal
+	uint16_t both_allvalid; // internal
+	// ec counters - end
+	uint8_t labels_mode;
+	uint8_t labelscnt;
+	uint8_t labelexpr[MAXLABELSCNT][SCLASS_EXPR_MAX_SIZE];
+} storagemode;
 
-uint32_t sclass_info(uint8_t *buff);
+void sclass_maskorgroup_to_labelexpr(uint8_t labelexpr[MAXLABELSCNT][SCLASS_EXPR_MAX_SIZE],uint32_t labelmasks[MAXLABELSCNT*MASKORGROUP],uint8_t labelscnt);
+uint8_t sclass_labelexpr_to_maskorgroup(uint32_t labelmasks[MAXLABELSCNT*MASKORGROUP],uint8_t labelexpr[MAXLABELSCNT][SCLASS_EXPR_MAX_SIZE],uint8_t labelscnt);
 
-uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t adminonly,uint8_t create_mode,uint8_t create_labelscnt,uint32_t *create_labelmasks,uint8_t keep_labelscnt,uint32_t *keep_labelmasks,uint8_t arch_labelscnt,uint32_t *arch_labelmasks,uint16_t arch_delay);
-uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,uint8_t *adminonly,uint8_t *create_mode,uint8_t *create_labelscnt,uint32_t *create_labelmasks,uint8_t *keep_labelscnt,uint32_t *keep_labelmasks,uint8_t *arch_labelscnt,uint32_t *arch_labelmasks,uint16_t *arch_delay);
+uint8_t sclass_ec_version(void);
+uint8_t sclass_mr_ec_version(uint8_t ec_new_version);
+
+uint32_t sclass_info(uint8_t *buff,uint8_t fver);
+
+uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t admin_only,uint8_t labels_mode,uint8_t arch_mode,uint16_t arch_delay,uint64_t arch_min_size,uint16_t min_trashretention,storagemode *create,storagemode *keep,storagemode *arch,storagemode *trash);
+uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,uint8_t *admin_only,uint8_t *labels_mode,uint8_t *arch_mode,uint16_t *arch_delay,uint64_t *arch_min_size,uint16_t *min_trashretention,storagemode *create,storagemode *keep,storagemode *arch,storagemode *trash);
 uint8_t sclass_delete_entry(uint8_t nleng,const uint8_t *name);
 uint8_t sclass_duplicate_entry(uint8_t oldnleng,const uint8_t *oldname,uint8_t newnleng,const uint8_t *newname);
 uint8_t sclass_rename_entry(uint8_t oldnleng,const uint8_t *oldname,uint8_t newnleng,const uint8_t *newname);
 uint32_t sclass_list_entries(uint8_t *buff,uint8_t sclsmode);
 
-uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid,uint8_t new_flag,uint8_t adminonly,uint8_t create_mode,uint8_t create_labelscnt,uint32_t *create_labelmasks,uint8_t keep_labelscnt,uint32_t *keep_labelmasks,uint8_t arch_labelscnt,uint32_t *arch_labelmasks,uint16_t arch_delay);
+uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid,uint8_t new_flag,uint8_t admin_only,uint8_t labels_mode,uint8_t arch_mode,uint16_t arch_delay,uint64_t arch_min_size,uint16_t min_trashretention,storagemode *create,storagemode *keep,storagemode *arch,storagemode *trash);
 uint8_t sclass_mr_duplicate_entry(uint8_t oldnleng,const uint8_t *oldname,uint8_t newnleng,const uint8_t *newname,uint16_t essclassid,uint16_t edsclassid);
 uint8_t sclass_mr_rename_entry(uint8_t oldnleng,const uint8_t *oldname,uint8_t newnleng,const uint8_t *newname,uint16_t esclassid);
 uint8_t sclass_mr_delete_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid);
@@ -49,18 +78,20 @@ const uint8_t* sclass_get_name(uint8_t sclassid);
 
 void sclass_incref(uint16_t sclassid,uint8_t type);
 void sclass_decref(uint16_t sclassid,uint8_t type);
-uint8_t sclass_get_mode(uint16_t sclassid);
-uint8_t sclass_get_create_goal(uint16_t sclassid);
-uint8_t sclass_get_keepmax_goal(uint16_t sclassid);
-uint8_t sclass_get_keeparch_goal(uint16_t sclassid,uint8_t archflag);
-uint8_t sclass_get_create_labelmasks(uint16_t sclassid,uint32_t ***labelmasks);
-uint8_t sclass_get_keeparch_labelmasks(uint16_t sclassid,uint8_t archflag,uint32_t ***labelmasks);
-uint8_t sclass_is_simple_goal(uint16_t sclassid);
+uint8_t sclass_get_labels_mode(uint16_t sclassid,storagemode *sm);
+uint8_t sclass_get_arch_mode(uint16_t sclassid);
+uint8_t sclass_get_keeparch_max_goal_equivalent(uint16_t sclassid);
+uint8_t sclass_get_keeparch_storage_eights(uint16_t sclassid,uint8_t keepflag);
+uint8_t sclass_get_keeparch_maxstorage_eights(uint16_t sclassid);
+storagemode* sclass_get_create_storagemode(uint16_t sclassid);
+storagemode* sclass_get_keeparch_storagemode(uint16_t sclassid,uint8_t flags);
+uint8_t sclass_calc_goal_equivalent(storagemode *sm);
+uint8_t sclass_is_predefined(uint16_t sclassid);
 uint8_t sclass_is_admin_only(uint16_t sclassid);
-// uint8_t sclass_has_any_labels(uint16_t sclassid);
-uint8_t sclass_has_create_labels(uint16_t sclassid);
-uint8_t sclass_has_keeparch_labels(uint16_t sclassid,uint8_t archflag);
 uint16_t sclass_get_arch_delay(uint16_t sclassid);
+uint64_t sclass_get_arch_min_size(uint16_t sclassid);
+uint16_t sclass_get_min_trashretention(uint16_t sclassid);
+
 uint8_t sclass_store(bio *fd);
 int sclass_load(bio *fd,uint8_t mver,int ignoreflag);
 void sclass_cleanup(void);

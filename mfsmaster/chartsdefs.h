@@ -41,8 +41,8 @@
 #define CHARTS_LINK 15
 #define CHARTS_READDIR 16
 #define CHARTS_OPEN 17
-#define CHARTS_READ 18
-#define CHARTS_WRITE 19
+#define CHARTS_READCHUNK 18
+#define CHARTS_WRITECHUNK 19
 #define CHARTS_MEMORY_RSS 20
 #define CHARTS_PACKETSRCVD 21
 #define CHARTS_PACKETSSENT 22
@@ -61,8 +61,38 @@
 #define CHARTS_CREATECHUNK_ERR 35
 #define CHARTS_CHANGECHUNK_OK 36
 #define CHARTS_CHANGECHUNK_ERR 37
+#define CHARTS_SPLITCHUNK_OK 38
+#define CHARTS_SPLITCHUNK_ERR 39
+#define CHARTS_FILE_OBJECTS 40
+#define CHARTS_META_OBJECTS 41
+#define CHARTS_EC8_CHUNKS 42
+#define CHARTS_EC4_CHUNKS 43
+#define CHARTS_COPY_CHUNKS 44
+#define CHARTS_REG_ENDANGERED 45
+#define CHARTS_REG_UNDERGOAL 46
+#define CHARTS_ALL_ENDANGERED 47
+#define CHARTS_ALL_UNDERGOAL 48
+#define CHARTS_BYTESREAD 49
+#define CHARTS_BYTESWRITE 50
+#define CHARTS_READ 51
+#define CHARTS_WRITE 52
+#define CHARTS_FSYNC 53
+#define CHARTS_LOCK 54
+#define CHARTS_SNAPSHOT 55
+#define CHARTS_TRUNCATE 56
+#define CHARTS_GETXATTR 57
+#define CHARTS_SETXATTR 58
+#define CHARTS_GETFACL 59
+#define CHARTS_SETFACL 60
+#define CHARTS_CREATE 61
+#define CHARTS_META 62
+#define CHARTS_DELAY 63
+#define CHARTS_ALL_SERVERS 64
+#define CHARTS_MDISC_SERVERS 65
+#define CHARTS_DISC_SERVERS 66
+#define CHARTS_USAGE_DIFF 67
 
-#define CHARTS 38
+#define CHARTS 68
 
 #define STRID(a,b,c,d) (((((uint8_t)a)*256U+(uint8_t)b)*256U+(uint8_t)c)*256U+(uint8_t)d)
 
@@ -86,8 +116,8 @@
 	{"link"         ,STRID('L','I','N','K'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"readdir"      ,STRID('R','D','I','R'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"open"         ,STRID('O','P','E','N'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"read"         ,STRID('R','E','A','D'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"write"        ,STRID('W','R','I','T'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"readchunk"    ,STRID('R','E','A','D'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"writechunk"   ,STRID('W','R','I','T'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"memoryrss"    ,STRID('M','E','M','R'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"prcvd"        ,STRID('P','R','C','V'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
 	{"psent"        ,STRID('P','S','N','T'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
@@ -106,12 +136,44 @@
 	{"create_err"   ,STRID('N','E','W','E'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"change_ok"    ,STRID('I','N','T','O'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"change_err"   ,STRID('I','N','T','E'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"split_ok"     ,STRID('S','P','L','O'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"split_err"    ,STRID('S','P','L','E'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"fileobjects"  ,STRID('F','I','L','O'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"metaobjects"  ,STRID('M','E','T','O'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"chunksec8"    ,STRID('C','E','C','8'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"chunksec4"    ,STRID('C','E','C','4'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"chunkscopy"   ,STRID('C','C','P','Y'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"chregdanger"  ,STRID('C','H','R','E'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"chregunder"   ,STRID('C','H','R','U'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"challdanger"  ,STRID('C','H','A','E'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"challunder"   ,STRID('C','H','A','U'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"bytesread"    ,STRID('B','Y','T','R'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
+	{"byteswrite"   ,STRID('B','Y','T','W'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
+	{"read"         ,STRID('R','D','O','P'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"write"        ,STRID('W','R','O','P'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"fsync"        ,STRID('F','S','N','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"lock"         ,STRID('L','O','C','K'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"snapshot"     ,STRID('S','N','A','P'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"truncate"     ,STRID('T','R','U','N'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"getxattr"     ,STRID('G','X','A','T'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"setxattr"     ,STRID('S','X','A','T'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"getfacl"      ,STRID('G','F','A','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"setfacl"      ,STRID('S','F','A','C'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"fcreate"      ,STRID('C','R','E','A'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"meta"         ,STRID('M','E','T','A'),CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"delay"        ,STRID('D','E','L','Y'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"servers"      ,STRID('S','E','R','V'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"mdservers"    ,STRID('M','D','S','R'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"dservers"     ,STRID('D','S','R','V'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"udiff"        ,STRID('U','D','I','F'),CHARTS_MODE_MAX,0,CHARTS_SCALE_MILI ,   1, 1}, \
 	{NULL           ,0                     ,0              ,0,0                 ,   0, 0}  \
 };
 
 #define CALCDEFS { \
 	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_MEMORY_VIRT,CHARTS_MEMORY_RSS))), \
 	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_TOTAL_SPACE,CHARTS_USED_SPACE))), \
+	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_ALL_SERVERS,CHARTS_DISC_SERVERS))), \
+	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_DISC_SERVERS,CHARTS_MDISC_SERVERS))), \
 	CHARTS_DEFS_END \
 };
 
@@ -120,10 +182,16 @@
 	{"cpu"            ,STRID('T','C','P','U'),CHARTS_DIRECT(CHARTS_UCPU)                 ,CHARTS_DIRECT(CHARTS_SCPU)                ,CHARTS_NONE                       ,CHARTS_MODE_ADD,1,CHARTS_SCALE_MICRO, 100,60}, \
 	{"mem"            ,STRID('T','M','E','M'),CHARTS_CALC(0)                             ,CHARTS_DIRECT(CHARTS_MEMORY_RSS)          ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"space"          ,STRID('S','P','A','C'),CHARTS_CALC(1)                             ,CHARTS_DIRECT(CHARTS_USED_SPACE)          ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"delete_stat"    ,STRID('D','E','L','S'),CHARTS_DIRECT(CHARTS_DELETECHUNK_ERR)      ,CHARTS_DIRECT(CHARTS_DELETECHUNK_OK)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"replicate_stat" ,STRID('R','E','P','S'),CHARTS_DIRECT(CHARTS_REPLICATECHUNK_ERR)   ,CHARTS_DIRECT(CHARTS_REPLICATECHUNK_OK)   ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"create_stat"    ,STRID('N','E','W','S'),CHARTS_DIRECT(CHARTS_CREATECHUNK_ERR)      ,CHARTS_DIRECT(CHARTS_CREATECHUNK_OK)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"change_stat"    ,STRID('I','N','T','S'),CHARTS_DIRECT(CHARTS_CHANGECHUNK_ERR)      ,CHARTS_DIRECT(CHARTS_CHANGECHUNK_OK)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"delete_stat"    ,STRID('D','E','L','S'),CHARTS_DIRECT(CHARTS_DELETECHUNK_OK)       ,CHARTS_DIRECT(CHARTS_DELETECHUNK_ERR)     ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"replicate_stat" ,STRID('R','E','P','S'),CHARTS_DIRECT(CHARTS_REPLICATECHUNK_OK)    ,CHARTS_DIRECT(CHARTS_REPLICATECHUNK_ERR)  ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"create_stat"    ,STRID('N','E','W','S'),CHARTS_DIRECT(CHARTS_CREATECHUNK_OK)       ,CHARTS_DIRECT(CHARTS_CREATECHUNK_ERR)     ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"change_stat"    ,STRID('I','N','T','S'),CHARTS_DIRECT(CHARTS_CHANGECHUNK_OK)       ,CHARTS_DIRECT(CHARTS_CHANGECHUNK_ERR)     ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"split_stat"     ,STRID('S','P','L','S'),CHARTS_DIRECT(CHARTS_SPLITCHUNK_OK)        ,CHARTS_DIRECT(CHARTS_SPLITCHUNK_ERR)      ,CHARTS_NONE                       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"objects"        ,STRID('O','B','J','T'),CHARTS_DIRECT(CHARTS_FILE_OBJECTS)         ,CHARTS_DIRECT(CHARTS_META_OBJECTS)        ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"chunks"         ,STRID('C','H','N','K'),CHARTS_DIRECT(CHARTS_COPY_CHUNKS)          ,CHARTS_DIRECT(CHARTS_EC4_CHUNKS)          ,CHARTS_DIRECT(CHARTS_EC8_CHUNKS)  ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"regunder"       ,STRID('R','U','N','D'),CHARTS_DIRECT(CHARTS_REG_UNDERGOAL)        ,CHARTS_DIRECT(CHARTS_REG_ENDANGERED)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"allunder"       ,STRID('A','U','N','D'),CHARTS_DIRECT(CHARTS_ALL_UNDERGOAL)        ,CHARTS_DIRECT(CHARTS_ALL_ENDANGERED)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
+	{"cservers"       ,STRID('C','S','R','V'),CHARTS_CALC(2)                             ,CHARTS_DIRECT(CHARTS_MDISC_SERVERS)       ,CHARTS_CALC(3)                    ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{NULL             ,0                     ,CHARTS_NONE                                ,CHARTS_NONE                               ,CHARTS_NONE                       ,0              ,0,0                 ,   0, 0}  \
 };
 

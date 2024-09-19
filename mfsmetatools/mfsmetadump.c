@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <inttypes.h>
 
+#include "labelparser.h"
 #include "MFSCommunication.h"
 #include "datapack.h"
 #include "idstr.h"
@@ -37,6 +38,7 @@
 #define MAX_CHUNKS_PER_FILE (MAX_INDEX+1)
 
 #define MAXSCLASSNLENG 256
+#define MAX_EC_REDUNDANCY_LEVEL 9
 
 static int hide_nonprintable = 0;
 
@@ -94,14 +96,19 @@ void print_hex(FILE *in,uint32_t vleng) {
 
 int chunk_load(FILE *fd,uint8_t mver) {
 	uint8_t hdr[8];
-	uint8_t loadbuff[17];
+	uint8_t loadbuff[18];
+	uint8_t pairsbuff[(4+1)*255+1];
 	const uint8_t *ptr;
-	int32_t r,recsize;
+	int32_t r,recsize,dynsize;
 	uint64_t chunkid,nextchunkid;
 	uint32_t version,lockedto;
 	uint8_t archflag;
+	uint16_t pairs;
+	uint8_t sclassid;
+	uint32_t fcount;
+	int i;
 
-	if (mver>0x11) {
+	if (mver>0x12) {
 		fprintf(stderr,"loading chunks: unsupported format\n");
 		return -1;
 	}
@@ -111,7 +118,7 @@ int chunk_load(FILE *fd,uint8_t mver) {
 	}
 	ptr = hdr;
 	nextchunkid = get64bit(&ptr);
-	recsize = (mver==0x10)?16:17;
+	recsize = (mver==0x10)?16:(mver==0x11)?17:18;
 	printf("# nextchunkid: %016"PRIX64"\n",nextchunkid);
 	for (;;) {
 		r = fread(loadbuff,1,recsize,fd);
@@ -125,10 +132,48 @@ int chunk_load(FILE *fd,uint8_t mver) {
 		} else {
 			archflag = get8bit(&ptr);
 		}
+		if (mver<=0x11) {
+			pairs = 0;
+		} else {
+			pairs = get8bit(&ptr);
+		}
+		if (archflag&0x80) {
+			archflag &= 0x7F;
+			pairs |= 0x100;
+		}
+		if (pairs==0) {
+			dynsize = 0;
+		} else if (pairs==1) {
+			dynsize = 1+3;
+		} else {
+			dynsize = (1+3)*pairs+1;
+		}
 		if (chunkid==0 && version==0 && lockedto==0) {
 			return 0;
 		}
-		printf("CHUNK|i:0x%016"PRIX64"|v:0x%08"PRIX32"|t:%10"PRIu32"|a:%"PRIu8"\n",chunkid,version,lockedto,archflag);
+		if (mver<=0x11) {
+			printf("CHUNK|i:0x%016"PRIX64"|v:0x%08"PRIX32"|t:%10"PRIu32"|a:%"PRIu8"\n",chunkid,version,lockedto,archflag);
+		} else {
+			printf("CHUNK|i:0x%016"PRIX64"|v:0x%08"PRIX32"|t:%10"PRIu32"|a:%"PRIu8"|(",chunkid,version,lockedto,archflag);
+			if (dynsize>0) {
+				r = fread(pairsbuff,1,dynsize,fd);
+				(void)r;
+			}
+			ptr = pairsbuff;
+			sclassid = 0;
+			for (i=0 ; i<pairs ; i++) {
+				sclassid = get8bit(&ptr);
+				fcount = get24bit(&ptr);
+				printf("s:%"PRIu8",#:%"PRIu32,sclassid,fcount);
+				if (i+1<pairs) {
+					printf(";");
+				}
+			}
+			if (pairs>1) {
+				sclassid = get8bit(&ptr);
+			}
+			printf(")|c:%"PRIu8"\n",sclassid);
+		}
 	}
 }
 
@@ -198,11 +243,10 @@ static inline uint8_t fsnodes_type_convert(uint8_t type) {
 	return 0;
 }
 
-int fs_loadnode(FILE *fd,uint8_t mver) {
-	uint8_t unodebuff[4+1+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4];
+int fs_loadnode(FILE *fd,uint8_t mver,uint8_t *unodebuff) {
 	const uint8_t *ptr,*chptr;
 	uint8_t type,goal,flags,winattr;
-	uint32_t nodeid,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime;
+	uint32_t nodeid,uid,gid,atimestamp,mtimestamp,ctimestamp,trashretention;
 	uint16_t mode;
 	uint32_t hdrsize;
 	char c;
@@ -310,11 +354,11 @@ int fs_loadnode(FILE *fd,uint8_t mver) {
 	mtimestamp = get32bit(&ptr);
 	ctimestamp = get32bit(&ptr);
 	if (mver>=0x14) {
-		trashtime = get16bit(&ptr);
-		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|w:0x%1"PRIX8"|m:0%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%5"PRIu32"h",c,nodeid,goal,flags,winattr,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
+		trashretention = get16bit(&ptr);
+		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|w:0x%1"PRIX8"|m:0%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%5"PRIu32"h",c,nodeid,goal,flags,winattr,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashretention);
 	} else {
-		trashtime = get32bit(&ptr);
-		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|m:0%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%10"PRIu32"s",c,nodeid,goal,flags,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashtime);
+		trashretention = get32bit(&ptr);
+		printf("NODE|k:%c|i:%10"PRIu32"|#:%"PRIu8"|e:0x%02"PRIX8"|m:0%04"PRIo16"|u:%10"PRIu32"|g:%10"PRIu32"|a:%10"PRIu32",m:%10"PRIu32",c:%10"PRIu32"|t:%10"PRIu32"s",c,nodeid,goal,flags,mode,uid,gid,atimestamp,mtimestamp,ctimestamp,trashretention);
 	}
 
 	if (type==TYPE_BLOCKDEV || type==TYPE_CHARDEV) {
@@ -397,6 +441,7 @@ int fs_loadnode(FILE *fd,uint8_t mver) {
 
 int fs_loadnodes(FILE *fd,uint8_t fver,uint8_t mver) {
 	int s;
+	uint8_t *auxbuff;
 	uint8_t hdr[8];
 	const uint8_t *ptr;
 	uint32_t maxnodeid,hashelements;
@@ -425,12 +470,15 @@ int fs_loadnodes(FILE *fd,uint8_t fver,uint8_t mver) {
 			printf("# maxinode: %"PRIu32" ; hashelements: %"PRIu32"\n",maxnodeid,hashelements);
 		}
 	}
+	auxbuff = malloc(4+1+1+1+2+4+4+4+4+4+4+8+4+2+8*65536+4*65536+4);
 	do {
-		s = fs_loadnode(fd,mver);
+		s = fs_loadnode(fd,mver,auxbuff);
 		if (s<0) {
+			free(auxbuff);
 			return -1;
 		}
 	} while (s==0);
+	free(auxbuff);
 	return 0;
 }
 
@@ -691,7 +739,7 @@ int sessions_load(FILE *fd,uint8_t mver) {
 	uint16_t dver,statsinfile;
 	uint32_t recsize;
 	uint32_t i,nextsessionid,sessionid;
-	uint32_t ileng,peerip,rootinode,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected;
+	uint32_t ileng,peerip,rootinode,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disconnected;
 	uint32_t disables;
 	uint16_t umaskval;
 	uint64_t exportscsum;
@@ -777,8 +825,8 @@ int sessions_load(FILE *fd,uint8_t mver) {
 		}			
 		mingoal = get8bit(&ptr);
 		maxgoal = get8bit(&ptr);
-		mintrashtime = get32bit(&ptr);
-		maxtrashtime = get32bit(&ptr);
+		mintrashretention = get32bit(&ptr);
+		maxtrashretention = get32bit(&ptr);
 		rootuid = get32bit(&ptr);
 		rootgid = get32bit(&ptr);
 		mapalluid = get32bit(&ptr);
@@ -795,15 +843,15 @@ int sessions_load(FILE *fd,uint8_t mver) {
 			disconnected = 0;
 		}
 		if (mver>=0x15) {
-			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:0x%02"PRIX8"|u:0%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|x:0x%08"PRIX32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disables,disconnected);
+			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:0x%02"PRIX8"|u:0%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|x:0x%08"PRIX32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disables,disconnected);
 		} else if (mver>=0x14) {
-			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:0x%02"PRIX8"|u:0%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
+			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:0x%02"PRIX8"|u:0%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disconnected);
 		} else if (mver>=0x13) {
-			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
+			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,mingoal,maxgoal,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disconnected);
 		} else if (mver>=0x11) {
-			printf("SESSION|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid,disconnected);
+			printf("SESSION|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disconnected);
 		} else {
-			printf("SESSION|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashtime,maxtrashtime,rootuid,rootgid,mapalluid,mapallgid);
+			printf("SESSION|s:%10"PRIu32"|p:%s|r:%10"PRIu32"|f:%02"PRIX8"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|c:",sessionid,strip,rootinode,sesflags,mingoal,maxgoal,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid);
 		}
 		if (statsinfile==0) {
 			printf("[]|l:[]|i:");
@@ -1015,35 +1063,42 @@ static void print_labels(const uint8_t **rptr,uint8_t cnt,uint8_t orgroup) {
 
 int labelset_load(FILE *fd,uint8_t mver) {
 	uint8_t *databuff = NULL;
+	uint8_t hdrbuff[3];
+	char strbuff[LABELS_BUFF_SIZE];
 	const uint8_t *ptr;
 	uint32_t chunkcount;
 	uint16_t sclassid;
 	uint16_t arch_delay;
-	uint8_t mode;
+	uint16_t min_trashretention;
+	uint64_t arch_min_size;
+	uint8_t labels_mode;
+	uint8_t arch_mode;
 	uint8_t admin_only;
 	uint8_t nleng;
 	uint8_t name[MAXSCLASSNLENG];
-	uint8_t create_labelscnt;
-	uint8_t keep_labelscnt;
-	uint8_t arch_labelscnt;
+	parser_data create,keep,arch,trash;
+	parser_data *smptr;
+	uint8_t ec_is_turned_on;
 	uint8_t descrleng;
-	uint8_t i;
+	uint8_t i,j;
 	uint8_t orgroup;
+	uint16_t exprsize,lexprsize;
 	uint8_t hdrleng;
+	uint8_t dsize;
 
-	if (mver>0x16) {
-		fprintf(stderr,"loading labelset: unsupported format\n");
+	if (mver>0x1B) {
+		fprintf(stderr,"loading storage classes: unsupported format\n");
 		return -1;
 	}
 
 	if (mver<0x15) {
 		for (i=0 ; i<26 ; i++) {
 			if (fread(&descrleng,1,1,fd)!=1) {
-				fprintf(stderr,"loading labelset: read error\n");
+				fprintf(stderr,"loading storage classes: read error\n");
 				return -1;
 			}
 			if (descrleng>128) {
-				fprintf(stderr,"loading labelset: description too long\n");
+				fprintf(stderr,"loading storage classes: description too long\n");
 				return -1;
 			}
 			printf("LABELDESC|l:%c|n:",i+'A');
@@ -1052,139 +1107,352 @@ int labelset_load(FILE *fd,uint8_t mver) {
 		}
 	}
 
-	if (mver==0x10) {
-		orgroup = 1;
-	} else {
-		if (fread(&orgroup,1,1,fd)!=1) {
-			fprintf(stderr,"loading labelset: read error\n");
+	if (mver>=0x17) { // expressions
+		if (fread(hdrbuff,1,3,fd)!=3) {
+			fprintf(stderr,"loading storage classes: read error\n");
 			return -1;
 		}
-	}
-	if (orgroup<1) {
-		fprintf(stderr,"loading labelset: zero or-groups !!!\n");
-		return -1;
-	}
-	databuff = malloc(3U*9U*4U*(uint32_t)orgroup);
-	hdrleng = (mver==0x12)?11:(mver<=0x13)?3:(mver<=0x14)?5:(mver<=0x15)?8:10;
-
-	while (1) {
-		if (fread(databuff,1,hdrleng,fd)!=hdrleng) {
-			fprintf(stderr,"loading labelset: read error\n");
+		ptr = hdrbuff;
+		exprsize = get16bit(&ptr);
+		if (exprsize==0) {
+			fprintf(stderr,"loading storage classes: exprsize=0 !!!\n");
 			return -1;
 		}
-		ptr = databuff;
-		sclassid = get16bit(&ptr);
-		if (mver>0x15) {
+		ec_is_turned_on = get8bit(&ptr);
+		printf("SCLASSEC|%u\n",ec_is_turned_on);
+		dsize = (mver>=0x1B)?42:(mver>=0x1A)?38:(mver>=0x18)?30:29;
+		databuff = malloc(dsize);
+		while (1) {
+			if (fread(databuff,1,2,fd)!=2) {
+				fprintf(stderr,"loading storage classes: read error\n");
+				return -1;
+			}
+			ptr = databuff;
+			sclassid = get16bit(&ptr);
+			if (sclassid==0) {
+				break;
+			}
+			if (fread(databuff,1,dsize,fd)!=dsize) {
+				fprintf(stderr,"loading storage classes: read error\n");
+				return -1;
+			}
+			ptr = databuff;
+			memset(&create,0,sizeof(parser_data));
+			memset(&keep,0,sizeof(parser_data));
+			memset(&arch,0,sizeof(parser_data));
+			memset(&trash,0,sizeof(parser_data));
 			nleng = get8bit(&ptr);
 			admin_only = get8bit(&ptr);
-			mode = get8bit(&ptr);
-			arch_delay = get16bit(&ptr);
-			create_labelscnt = get8bit(&ptr);
-			keep_labelscnt = get8bit(&ptr);
-			arch_labelscnt = get8bit(&ptr);
-			chunkcount = 0;
-		} else if (mver>0x14) {
-			nleng = 0;
-			admin_only = 0;
-			mode = get8bit(&ptr);
-			arch_delay = get16bit(&ptr);
-			create_labelscnt = get8bit(&ptr);
-			keep_labelscnt = get8bit(&ptr);
-			arch_labelscnt = get8bit(&ptr);
-			chunkcount = 0;
-		} else if (mver>0x13) {
-			nleng = 0;
-			admin_only = 0;
-			mode = get8bit(&ptr);
-			create_labelscnt = get8bit(&ptr);
-			keep_labelscnt = get8bit(&ptr);
-			arch_labelscnt = keep_labelscnt;
-			arch_delay = 0;
-			chunkcount = 0;
-		} else {
-			nleng = 0;
-			admin_only = 0;
-			create_labelscnt = get8bit(&ptr);
-			keep_labelscnt = create_labelscnt;
-			arch_labelscnt = create_labelscnt;
-			mode = SCLASS_MODE_STD;
-			arch_delay = 0;
-			if (mver==0x12) {
-				chunkcount = get32bit(&ptr);
-				ptr+=4;
+			labels_mode = get8bit(&ptr);
+			if (mver>=0x18) {
+				arch_mode = get8bit(&ptr);
 			} else {
-				chunkcount = 0;
+				arch_mode = SCLASS_ARCH_MODE_CTIME;
+			}
+			arch_delay = get16bit(&ptr);
+			if (mver>=0x1A) {
+				arch_min_size = get64bit(&ptr);
+			} else {
+				arch_min_size = 0;
+			}
+			min_trashretention = get16bit(&ptr);
+			create.labelscnt = get8bit(&ptr);
+			create.uniqmask = get32bit(&ptr);
+			if (mver>=0x1B) {
+				create.labels_mode = get8bit(&ptr);
+			} else {
+				create.labels_mode = LABELS_MODE_GLOBAL;
+			}
+			keep.labelscnt = get8bit(&ptr);
+			keep.uniqmask = get32bit(&ptr);
+			if (mver>=0x1B) {
+				keep.labels_mode = get8bit(&ptr);
+			} else {
+				keep.labels_mode = LABELS_MODE_GLOBAL;
+			}
+			arch.labelscnt = get8bit(&ptr);
+			arch.ec_data_chksum_parts = get8bit(&ptr);
+			arch.uniqmask = get32bit(&ptr);
+			if (mver>=0x1B) {
+				arch.labels_mode = get8bit(&ptr);
+			} else {
+				arch.labels_mode = LABELS_MODE_GLOBAL;
+			}
+			trash.labelscnt = get8bit(&ptr);
+			trash.ec_data_chksum_parts = get8bit(&ptr);
+			trash.uniqmask = get32bit(&ptr);
+			if (mver>=0x1B) {
+				trash.labels_mode = get8bit(&ptr);
+			} else {
+				trash.labels_mode = LABELS_MODE_GLOBAL;
+			}
+			if (fread(name,1,nleng,fd)!=nleng) {
+				fprintf(stderr,"loading storage classes: read error\n");
+				return -1;
+			}
+			name[nleng]=0;
+			if (mver<0x19) {
+				if (arch.ec_data_chksum_parts>1) {
+					arch.ec_data_chksum_parts--;
+				}
+				if (trash.ec_data_chksum_parts>1) {
+					trash.ec_data_chksum_parts--;
+				}
+			}
+			if (keep.labelscnt==0 || keep.labelscnt>MAXLABELSCNT || create.labelscnt>MAXLABELSCNT || arch.labelscnt>MAXLABELSCNT || trash.labelscnt>MAXLABELSCNT || create.ec_data_chksum_parts>0 || keep.ec_data_chksum_parts>0 || (arch.ec_data_chksum_parts&0xF)>MAX_EC_REDUNDANCY_LEVEL || (trash.ec_data_chksum_parts&0xF)>MAX_EC_REDUNDANCY_LEVEL) {
+				fprintf(stderr,"loading storage classes: sclassid: %"PRIu16" - data format error (labelscnt,ec_data_chksum_parts) for create: (%"PRIu8",%"PRIu8") ; keep: (%"PRIu8",%"PRIu8") ; arch: (%"PRIu8",%"PRIu8") ; trash: (%"PRIu8",%"PRIu8")",sclassid,create.labelscnt,create.ec_data_chksum_parts,keep.labelscnt,keep.ec_data_chksum_parts,arch.labelscnt,arch.ec_data_chksum_parts,trash.labelscnt,trash.ec_data_chksum_parts);
+				return -1;
+			}
+			if ((arch.ec_data_chksum_parts>0 || trash.ec_data_chksum_parts>0) && ec_is_turned_on==0) {
+				fprintf(stderr,"loading storage class data: sclassid: %"PRIu16" - data format error (arch.ec_data_chksum_parts: %"PRIu8" ; trash.ec_data_chksum_parts: %"PRIu8" ; ec_is_turned_on: 0)",sclassid,arch.ec_data_chksum_parts,trash.ec_data_chksum_parts);
+				return -1;
+			}
+			if (exprsize>SCLASS_EXPR_MAX_SIZE) {
+				lexprsize = SCLASS_EXPR_MAX_SIZE;
+			} else {
+				lexprsize = exprsize;
+			}
+			printf("SCLASSMAIN|#:%5"PRIu16"|x:%u|m:%u|a:0x%"PRIX8"|d:%5"PRIu16"|s:%20"PRIu64"|t:%5"PRIu16"|n:%s\n",sclassid,admin_only,labels_mode,arch_mode,arch_delay,arch_min_size,min_trashretention,name);
+			smptr = NULL; // stupid old compilers !!!
+			for (i=0 ; i<4 ; i++) {
+				switch (i) {
+					case 0:
+						smptr = &create;
+						break;
+					case 1:
+						smptr = &keep;
+						break;
+					case 2:
+						smptr = &arch;
+						break;
+					case 3:
+						smptr = &trash;
+						break;
+				}
+				for (j=0 ; j<smptr->labelscnt ; j++) {
+					if (fread(smptr->labelexpr[j],1,lexprsize,fd)!=lexprsize) {
+						fprintf(stderr,"loading storage classes: read error\n");
+						return -1;
+					}
+					if (exprsize>SCLASS_EXPR_MAX_SIZE) {
+						fseek(fd,exprsize-SCLASS_EXPR_MAX_SIZE,SEEK_CUR);
+					}
+				}
+				if (smptr->labelscnt>0 || smptr->ec_data_chksum_parts>0) {
+					printf("SCLASSEXPR|#:%5"PRIu16"|t:%c|e:%s\n",sclassid,"CKAT"[i],make_label_expr(strbuff,smptr));
+				}
 			}
 		}
-		if (nleng>0) {
-			if (fread(name,1,nleng,fd)!=nleng) {
+	} else { // or groups
+		if (mver==0x10) {
+			orgroup = 1;
+		} else {
+			if (fread(&orgroup,1,1,fd)!=1) {
 				fprintf(stderr,"loading labelset: read error\n");
 				return -1;
 			}
 		}
-		name[nleng] = 0;
-		if (sclassid==0 && create_labelscnt==0 && keep_labelscnt==0 && arch_labelscnt==0 && chunkcount==0 && arch_delay==0) {
-			break;
-		}
-		if (create_labelscnt==0 || create_labelscnt>9 || keep_labelscnt==0 || keep_labelscnt>9 || arch_labelscnt==0 || arch_labelscnt>9) {
-			fprintf(stderr,"loading labelset: data format error (sclassid: %"PRIu16" ; mode: %"PRIu8" ; create_labelscnt: %"PRIu8" ; keep_labelscnt: %"PRIu8" ; arch_labelscnt: %"PRIu8" ; arch_delay: %"PRIu16")\n",sclassid,mode,create_labelscnt,keep_labelscnt,arch_labelscnt,arch_delay);
-			free(databuff);
-			databuff=NULL;
+		if (orgroup<1) {
+			fprintf(stderr,"loading labelset: zero or-groups !!!\n");
 			return -1;
 		}
-		if (mver>0x14) {
-			if (fread(databuff,1,(create_labelscnt+keep_labelscnt+arch_labelscnt)*4*orgroup,fd)!=(size_t)((create_labelscnt+keep_labelscnt+arch_labelscnt)*4*orgroup)) {
+		databuff = malloc(3U*9U*4U*(uint32_t)orgroup);
+		hdrleng = (mver==0x12)?11:(mver<=0x13)?3:(mver<=0x14)?5:(mver<=0x15)?8:10;
+
+		while (1) {
+			if (fread(databuff,1,hdrleng,fd)!=hdrleng) {
 				fprintf(stderr,"loading labelset: read error\n");
-				free(databuff);
-				databuff=NULL;
 				return -1;
 			}
-		} else if (mver>0x13) {
-			if (fread(databuff,1,(create_labelscnt+keep_labelscnt)*4*orgroup,fd)!=(size_t)((create_labelscnt+keep_labelscnt)*4*orgroup)) {
-				fprintf(stderr,"loading labelset: read error\n");
-				free(databuff);
-				databuff=NULL;
-				return -1;
-			}
-		} else {
-			if (fread(databuff,1,create_labelscnt*4*orgroup,fd)!=(size_t)(create_labelscnt*4*orgroup)) {
-				fprintf(stderr,"loading labelset: read error\n");
-				free(databuff);
-				databuff=NULL;
-				return -1;
-			}
-		}
-		if (chunkcount>0) {
-			fseek(fd,chunkcount*8,SEEK_CUR);
-		}
-		ptr = databuff;
-		printf("SCLASS|#:%5"PRIu16"|x:%u|m:%u|d:%5"PRIu16,sclassid,admin_only,mode,arch_delay);
-		if (mver<=0x13) {
-			printf("|c+k+a: ");
-		} else {
-			printf("|c: ");
-		}
-		print_labels(&ptr,create_labelscnt,orgroup);
-		if (mver>0x13) {
-			if (mver<=0x14) {
-				printf(" |k+a: ");
+			ptr = databuff;
+			sclassid = get16bit(&ptr);
+			if (mver>0x15) {
+				nleng = get8bit(&ptr);
+				admin_only = get8bit(&ptr);
+				labels_mode = get8bit(&ptr);
+				arch_delay = get16bit(&ptr);
+				create.labelscnt = get8bit(&ptr);
+				keep.labelscnt = get8bit(&ptr);
+				arch.labelscnt = get8bit(&ptr);
+				chunkcount = 0;
+			} else if (mver>0x14) {
+				nleng = 0;
+				admin_only = 0;
+				labels_mode = get8bit(&ptr);
+				arch_delay = get16bit(&ptr);
+				create.labelscnt = get8bit(&ptr);
+				keep.labelscnt = get8bit(&ptr);
+				arch.labelscnt = get8bit(&ptr);
+				chunkcount = 0;
+			} else if (mver>0x13) {
+				nleng = 0;
+				admin_only = 0;
+				labels_mode = get8bit(&ptr);
+				create.labelscnt = get8bit(&ptr);
+				keep.labelscnt = get8bit(&ptr);
+				arch.labelscnt = keep.labelscnt;
+				arch_delay = 0;
+				chunkcount = 0;
 			} else {
-				printf(" |k: ");
+				nleng = 0;
+				admin_only = 0;
+				create.labelscnt = get8bit(&ptr);
+				keep.labelscnt = create.labelscnt;
+				arch.labelscnt = create.labelscnt;
+				labels_mode = LABELS_MODE_STD;
+				arch_delay = 0;
+				if (mver==0x12) {
+					chunkcount = get32bit(&ptr);
+					ptr+=4;
+				} else {
+					chunkcount = 0;
+				}
 			}
-			print_labels(&ptr,keep_labelscnt,orgroup);
+			if (nleng>0) {
+				if (fread(name,1,nleng,fd)!=nleng) {
+					fprintf(stderr,"loading labelset: read error\n");
+					return -1;
+				}
+			}
+			name[nleng] = 0;
+			if (sclassid==0 && create.labelscnt==0 && keep.labelscnt==0 && arch.labelscnt==0 && chunkcount==0 && arch_delay==0) {
+				break;
+			}
+			if (create.labelscnt==0 || create.labelscnt>9 || keep.labelscnt==0 || keep.labelscnt>9 || arch.labelscnt==0 || arch.labelscnt>9) {
+				fprintf(stderr,"loading labelset: data format error (sclassid: %"PRIu16" ; labels_mode: %"PRIu8" ; create.labelscnt: %"PRIu8" ; keep.labelscnt: %"PRIu8" ; arch.labelscnt: %"PRIu8" ; arch_delay: %"PRIu16")\n",sclassid,labels_mode,create.labelscnt,keep.labelscnt,arch.labelscnt,arch_delay);
+				free(databuff);
+				databuff=NULL;
+				return -1;
+			}
 			if (mver>0x14) {
-				printf(" |a: ");
-				print_labels(&ptr,arch_labelscnt,orgroup);
+				if (fread(databuff,1,(create.labelscnt+keep.labelscnt+arch.labelscnt)*4*orgroup,fd)!=(size_t)((create.labelscnt+keep.labelscnt+arch.labelscnt)*4*orgroup)) {
+					fprintf(stderr,"loading labelset: read error\n");
+					free(databuff);
+					databuff=NULL;
+					return -1;
+				}
+			} else if (mver>0x13) {
+				if (fread(databuff,1,(create.labelscnt+keep.labelscnt)*4*orgroup,fd)!=(size_t)((create.labelscnt+keep.labelscnt)*4*orgroup)) {
+					fprintf(stderr,"loading labelset: read error\n");
+					free(databuff);
+					databuff=NULL;
+					return -1;
+				}
+			} else {
+				if (fread(databuff,1,create.labelscnt*4*orgroup,fd)!=(size_t)(create.labelscnt*4*orgroup)) {
+					fprintf(stderr,"loading labelset: read error\n");
+					free(databuff);
+					databuff=NULL;
+					return -1;
+				}
 			}
+			if (chunkcount>0) {
+				fseek(fd,chunkcount*8,SEEK_CUR);
+			}
+			ptr = databuff;
+			printf("SCLASS|#:%5"PRIu16"|x:%u|m:%u|d:%5"PRIu16,sclassid,admin_only,labels_mode,arch_delay);
+			if (mver<=0x13) {
+				printf("|c+k+a: ");
+			} else {
+				printf("|c: ");
+			}
+			print_labels(&ptr,create.labelscnt,orgroup);
+			if (mver>0x13) {
+				if (mver<=0x14) {
+					printf(" |k+a: ");
+				} else {
+					printf(" |k: ");
+				}
+				print_labels(&ptr,keep.labelscnt,orgroup);
+				if (mver>0x14) {
+					printf(" |a: ");
+					print_labels(&ptr,arch.labelscnt,orgroup);
+				}
+			}
+			if (nleng>0) {
+				printf(" |n:%s",name);
+			}
+			printf("\n");
 		}
-		if (nleng>0) {
-			printf(" |n:%s",name);
-		}
-		printf("\n");
 	}
 	free(databuff);
 	databuff=NULL;
 	return 0;
+}
+
+int patterns_load(FILE *fd,uint8_t mver) {
+	uint8_t databuff[9]; // MAX(1+4+4,1+1+1+2+1)
+	const uint8_t *ptr;
+	uint8_t psize;
+	uint8_t gnleng;
+	uint32_t euid,egid;
+	uint8_t priority,omask,seteattr,clreattr,scid;
+	uint16_t trashretention;
+
+	if (mver>0x11) {
+		fprintf(stderr,"loading patterns data: unsupported format");
+		return -1;
+	}
+	psize = (mver==0x10)?6:7;
+	for (;;) {
+		if (fread(databuff,1,(1+4+4),fd)!=(1+4+4)) {
+			fprintf(stderr,"loading patterns data: read error");
+			return -1;
+		}
+		ptr = databuff;
+		gnleng = get8bit(&ptr);
+		euid = get32bit(&ptr);
+		egid = get32bit(&ptr);
+		if (gnleng==0 && euid==PATTERN_EUGID_ANY && egid==PATTERN_EUGID_ANY) {
+			break;
+		}
+		if (fread(databuff,1,psize,fd)!=psize) {
+			fprintf(stderr,"loading patterns data: read error");
+			return -1;
+		}
+		ptr = databuff;
+		priority = get8bit(&ptr);
+		omask = get8bit(&ptr);
+		scid = get16bit(&ptr);
+		trashretention = get16bit(&ptr);
+		seteattr = get8bit(&ptr);
+		if (mver==0x10) {
+			clreattr = 0;
+		} else {
+			clreattr = get8bit(&ptr);
+		}
+		printf("PATTERN|v:%3"PRIu8,priority);
+		if (omask&PATTERN_OMASK_SCLASS) {
+			printf("|#:%3"PRIu8,scid);
+		} else {
+			printf("|#:---");
+		}
+		if (omask&PATTERN_OMASK_TRASHRETENTION) {
+			printf("|t:%5"PRIu16"h",trashretention);
+		} else {
+			printf("|t:------");
+		}
+		if (omask&PATTERN_OMASK_EATTR) {
+			printf("|e:+0x%1"PRIX8"/-0x%1"PRIX8,seteattr,clreattr);
+		} else {
+			printf("|e:-");
+		}
+		if (euid==PATTERN_EUGID_ANY) {
+			printf("|u:       ANY");
+		} else {
+			printf("|u:10%"PRIu32,euid);
+		}
+		printf("|g:");
+		if (egid==PATTERN_EUGID_ANY) {
+			printf("|g:       ANY");
+		} else {
+			printf("|g:%10"PRIu32,egid);
+		}
+		printf("|p:");
+		print_name(fd,gnleng);
+		printf("\n");
+	}
+	return 1;
 }
 
 int hexdump(FILE *fd,uint64_t sleng) {
@@ -1328,6 +1596,11 @@ int fs_load(FILE *fd,uint8_t fver,const char section[4]) {
 					printf("error reading metadata (SCLA)\n");
 					return -1;
 				}
+			} else if (memcmp(hdr,"PATT",4)==0) {
+				if (patterns_load(fd,mver)<0) {
+					printf("error reading metadata (PATT)\n");
+					return -1;
+				}
 			} else if (memcmp(hdr,"NODE",4)==0) {
 				if (fs_loadnodes(fd,fver,mver)<0) {
 					printf("error reading metadata (NODE)\n");
@@ -1461,6 +1734,8 @@ int fs_loadall(const char *fname,const char section[4]) {
 
 void usage(const char *appname) {
 //	printf("usage: %s [-f J|C[separator]] [-o outputfile] [-a sum_name] metadata.mfs PATH ...\n",appname);
+	printf("Dumps metadata file or selected section of it into human readable format.\n");
+	printf("\n");
 	printf("usage: %s [-d] [-s section to dump] metadata.mfs\n",appname);
 	printf("options:\n");
 	printf("\td: print dot instead of non printable characters\n");
@@ -1470,6 +1745,7 @@ void usage(const char *appname) {
 	printf("\tSESS - client sessions\n");
 	printf("\tLABS - labels (not used)\n");
 	printf("\tSCLA - storage classes\n");
+	printf("\tPATT - file patterns\n");
 	printf("\tNODE - tree nodes (i-nodes)\n");
 	printf("\tEDGE - tree edges (file names)\n");
 	printf("\tFREE - free nodes (deleted i-nodes)\n");

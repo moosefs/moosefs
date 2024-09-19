@@ -69,7 +69,6 @@
 #include <strings.h>
 #include <stddef.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <signal.h>
 #include <errno.h>
 #include <pthread.h>
@@ -110,6 +109,7 @@
 
 #if defined(__APPLE__)
 #define DEFAULT_OPTIONS "allow_other,daemon_timeout=600,novncache"
+// #define DEFAULT_OPTIONS "allow_other,daemon_timeout=600,novncache"
 // #define DEFAULT_OPTIONS "allow_other,default_permissions,daemon_timeout=600,iosize=65536,novncache"
 #else
 #define DEFAULT_OPTIONS "allow_other"
@@ -206,6 +206,10 @@ struct mfsopts {
 #ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
 	int nonempty;
 #endif
+	char *logminlevelstr;
+	int logminlevel;
+	char *logelevatetostr;
+	int logelevateto;
 	int nostdmountoptions;
 	int meta;
 	int debug;
@@ -294,6 +298,8 @@ static struct fuse_opt mfs_opts_stage2[] = {
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	MFS_OPT("mfsallowoomkiller", allowoomkiller, 1),
 #endif
+	MFS_OPT("mfslogminlevel=%s", logminlevelstr, 0),
+	MFS_OPT("mfslogelevateto=%s", logelevatetostr, 0),
 #ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
 	MFS_OPT("nonempty", nonempty, 1),
 #endif
@@ -427,6 +433,8 @@ static void usage(const char *progname) {
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	fprintf(fd,"    -o mfsallowoomkiller        do not disable out of memory killer\n");
 #endif
+	fprintf(fd,"    -o mfslogminlevel=LEVEL     minimal message level to log ([D]EBUG,[I]NFO,[N]OTICE,[W]ARNING or [E]RROR - default is INFO)\n");
+	fprintf(fd,"    -o mfslogelevateto=LEVEL    send messages with log level lower than LEVEL to syslog as LEVEL (levels as above - default in NOTICE)\n");
 	fprintf(fd,"    -o mfsfsyncmintime=SEC      force fsync before last file close when file was opened/created at least SEC seconds earlier (default: 0.0 - always do fsync before close)\n");
 	fprintf(fd,"    -o mfswritecachesize=N      define size of write cache in MiB (default: 256)\n");
 	fprintf(fd,"    -o mfsreadaheadsize=N       define size of all read ahead buffers in MiB (default: 256)\n");
@@ -487,7 +495,8 @@ static void usage(const char *progname) {
 
 static void mfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse_args *outargs) {
 	FILE *fd;
-	char lbuff[1000],*p;
+	char *lbuff,*p;
+	size_t lbsize;
 
 	fd = fopen(filename,"r");
 	if (fd==NULL) {
@@ -501,8 +510,10 @@ static void mfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse
 		}
 		return;
 	}
+	lbsize = 1000;
+	lbuff = malloc(lbsize);
 	custom_cfg = 1;
-	while (fgets(lbuff,999,fd)) {
+	while (getline(&lbuff,&lbsize,fd)!=-1) {
 		if (lbuff[0]!='#' && lbuff[0]!=';') {
 			lbuff[999]=0;
 			for (p = lbuff ; *p ; p++) {
@@ -536,6 +547,7 @@ static void mfs_opt_parse_cfg_file(const char *filename,int optional,struct fuse
 			}
 		}
 	}
+	free(lbuff);
 	fclose(fd);
 }
 
@@ -798,8 +810,10 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 #if defined(__FreeBSD__)
 	if (conn->proto_major>7 || (conn->proto_major==7 && conn->proto_minor>=23)) { // This is "New" Fuse introduced in FBSD 12.1 with many fixes - we want to change our default behaviour
 		mfs_freebsd_workarounds(0);
+//		fs_set_working_flags(WFLAG_INVALIDATE_CACHE);
 	} else {
 		mfs_freebsd_workarounds(1);
+//		fs_clr_working_flags(WFLAG_INVALIDATE_CACHE);
 	}
 #endif
 	fuse_proto_major = conn->proto_major;
@@ -809,10 +823,29 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 	fuse_want = conn->want;
 #endif
 	fuse_init_set = 1;
+
+#if FUSE_VERSION >= 28
+# if defined(__FreeBSD__)
+	if (conn->proto_major>7 || (conn->proto_major==7 && conn->proto_minor>=23)) {
+		fs_set_working_flags(WFLAG_INVALIDATE_CACHE);
+	} else {
+		fs_clr_working_flags(WFLAG_INVALIDATE_CACHE);
+	}
+# else
+#  if defined(__linux__)
+	fs_set_working_flags(WFLAG_INVALIDATE_CACHE);
+#  else /* apple - assumed that cache invalidation doesn't work well in macos fuse implementation */
+	fs_clr_working_flags(WFLAG_INVALIDATE_CACHE);
+#  endif
+# endif
+#else
+	fs_clr_working_flags(WFLAG_INVALIDATE_CACHE);
+#endif
+
 	if (piped[1]>=0) {
 		s=0;
 		if (write(piped[1],&s,1)!=1) {
-			syslog(LOG_ERR,"pipe write error: %s",strerr(errno));
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"pipe write error: %s",strerr(errno));
 		}
 		close(piped[1]);
 	}
@@ -826,11 +859,11 @@ static uint32_t params_mapalluid = 0;
 static uint32_t params_mapallgid = 0;
 static uint8_t params_mingoal = 0;
 static uint8_t params_maxgoal = 0;
-static uint32_t params_mintrashtime = 0;
-static uint32_t params_maxtrashtime = 0;
+static uint32_t params_mintrashretention = 0;
+static uint32_t params_maxtrashretention = 0;
 static uint32_t params_disables = 0;
 
-void main_setparams(uint8_t sesflags,uint16_t umaskval,uint32_t maprootuid,uint32_t maprootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashtime,uint32_t maxtrashtime,uint32_t disables) {
+void main_setparams(uint8_t sesflags,uint16_t umaskval,uint32_t maprootuid,uint32_t maprootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashretention,uint32_t maxtrashretention,uint32_t disables) {
 	params_sesflags = sesflags;
 	params_umaskval = umaskval;
 	params_maprootuid = maprootuid;
@@ -839,8 +872,8 @@ void main_setparams(uint8_t sesflags,uint16_t umaskval,uint32_t maprootuid,uint3
 	params_mapallgid = mapallgid;
 	params_mingoal = mingoal;
 	params_maxgoal = maxgoal;
-	params_mintrashtime = mintrashtime;
-	params_maxtrashtime = maxtrashtime;
+	params_mintrashretention = mintrashretention;
+	params_maxtrashretention = maxtrashretention;
 	params_disables = disables;
 }
 
@@ -850,12 +883,16 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 #define bprintf(...) { if (leng<size) leng+=snprintf(buff+leng,size-leng,__VA_ARGS__); }
 #define NOTNULL(a) (((a)==NULL)?"(not defined)":(a))
 #define DIRECTOPT(name,string) bprintf(name ": %s\n",string);
-#define BOOLOPT(name,opt) bprintf(name ": %s\n",(mfsopts.opt)?"(defined)":"(not defined)");
+#define BOOLOPT(name,opt) bprintf(name ": %s\n",(mfsopts.opt)?"TRUE":"FALSE");
 #define STROPT(name,opt) bprintf(name ": %s\n",NOTNULL(mfsopts.opt));
 #define NUMOPT(name,format,opt) bprintf(name ": %" format "\n",(mfsopts.opt));
+
 	STROPT("mfsmaster",masterhost);
+	DIRECTOPT("working_masterip",fs_get_current_masterstrip());
 	STROPT("mfsport",masterport);
+	bprintf("working_masterport: %"PRIu16"\n",fs_get_current_masterport());
 	STROPT("mfsbind",bindhost);
+	DIRECTOPT("working_bindip",fs_get_current_srcstrip());
 	STROPT("mfsproxy",proxyhost);
 	STROPT("mfssubfolder",subfolder);
 	STROPT("mfspassword",password);
@@ -875,6 +912,20 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 #if defined(__linux__) && defined(OOM_ADJUSTABLE)
 	BOOLOPT("mfsallowoomkiller",allowoomkiller);
 #endif
+	DIRECTOPT("mfslogminlevel",
+			(mfsopts.logminlevel==MFSLOG_DEBUG)?"DEBUG":
+			(mfsopts.logminlevel==MFSLOG_INFO)?"INFO":
+			(mfsopts.logminlevel==MFSLOG_NOTICE)?"NOTICE":
+			(mfsopts.logminlevel==MFSLOG_WARNING)?"WARNING":
+			(mfsopts.logminlevel==MFSLOG_ERR)?"ERROR":
+			"(unknown value)");
+	DIRECTOPT("mfslogelevateto",
+			(mfsopts.logelevateto==MFSLOG_DEBUG)?"DEBUG":
+			(mfsopts.logelevateto==MFSLOG_INFO)?"INFO":
+			(mfsopts.logelevateto==MFSLOG_NOTICE)?"NOTICE":
+			(mfsopts.logelevateto==MFSLOG_WARNING)?"WARNING":
+			(mfsopts.logelevateto==MFSLOG_ERR)?"ERROR":
+			"(unknown value)");
 #ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
 	BOOLOPT("nonempty",nonempty);
 #endif
@@ -896,9 +947,7 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	BOOLOPT("mfsnoxattrs",noxattrs);
 	BOOLOPT("mfsnoposixlocks",noposixlocks);
 	BOOLOPT("mfsnobsdlocks",nobsdlocks);
-	STROPT("mfscachemode",cachemode);
 	NUMOPT("mfsmkdircopysgid","u",mkdircopysgid);
-	STROPT("mfssugidclearmode",sugidclearmodestr);
 	NUMOPT("mfsattrcacheto",".3lf",attrcacheto);
 	NUMOPT("mfsxattrcacheto",".3lf",xattrcacheto);
 	NUMOPT("mfsentrycacheto",".3lf",entrycacheto);
@@ -908,6 +957,7 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	NUMOPT("mfsgroupscacheto",".3lf",groupscacheto);
 	NUMOPT("mfsfsyncmintime",".3lf",fsyncmintime);
 	BOOLOPT("mfsfsyncbeforeclose",fsyncbeforeclose);
+	STROPT("mfscachemode",cachemode);
 	DIRECTOPT("working_keep_cache_mode",
 			(mfsopts.keepcache==0)?"AUTO":
 			(mfsopts.keepcache==1)?"YES":
@@ -915,6 +965,7 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 			(mfsopts.keepcache==3)?"DIRECT":
 			(mfsopts.keepcache==4)?"FBSDAUTO":
 			"(unknown value)");
+	STROPT("mfssugidclearmode",sugidclearmodestr);
 	DIRECTOPT("working_sugid_clear_mode",
 			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_NEVER)?"NEVER":
 			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_ALWAYS)?"ALWAYS":
@@ -923,13 +974,13 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_EXT)?"EXT":
 			(mfsopts.sugidclearmode==SUGID_CLEAR_MODE_XFS)?"XFS":
 			"(unknown value)");
-	DIRECTOPT("no_std_mount_options",(mfsopts.nostdmountoptions)?"(defined)":"(not defined)");
+	DIRECTOPT("no_std_mount_options",(mfsopts.nostdmountoptions)?"TRUE":"FALSE");
 	bprintf("master_sesflags: %"PRIu8"\n",params_sesflags);
 	bprintf("master_umaskval: 0%03"PRIo16"\n",params_umaskval);
 	bprintf("master_maproot: %"PRIu32":%"PRIu32"\n",params_maprootuid,params_maprootgid);
 	bprintf("master_mapall: %"PRIu32":%"PRIu32"\n",params_mapalluid,params_mapallgid);
 	bprintf("master_goallimit: %"PRIu8":%"PRIu8"\n",params_mingoal,params_maxgoal);
-	bprintf("master_trashlimit: %"PRIu32":%"PRIu32"\n",params_mintrashtime,params_maxtrashtime);
+	bprintf("master_trashlimit: %"PRIu32":%"PRIu32"\n",params_mintrashretention,params_maxtrashretention);
 	bprintf("master_disables: 0x%"PRIX32"\n",params_disables);
 	{
 		uint32_t mver = master_version();
@@ -1017,6 +1068,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	md5ctx ctx;
 	uint8_t md5pass[16];
 
+
 	if (mfsopts.passwordask && mfsopts.password==NULL && mfsopts.md5pass==NULL) {
 		mfsopts.password = getpass("MFS Password:");
 	}
@@ -1060,34 +1112,29 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 
 	if (mfsopts.delayedinit) {
 #if FUSE_VERSION >= 30
-		fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,cmdopts->mountpoint,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,1);
+		fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,cmdopts->mountpoint,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,1,0);
 #else /* FUSE2 */
-		fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,mp,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,1);
+		fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,mp,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,1,0);
 #endif
 	} else {
 #if FUSE_VERSION >= 30
-		if (fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,cmdopts->mountpoint,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,0)<0) {
+		if (fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,cmdopts->mountpoint,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,0,0)<0) {
 #else /* FUSE2 */
-		if (fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,mp,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,0)<0) {
+		if (fs_init_master_connection(mfsopts.bindhost,mfsopts.masterhost,mfsopts.masterport,mfsopts.meta,mp,mfsopts.subfolder,(mfsopts.password||mfsopts.md5pass)?md5pass:NULL,mfsopts.donotrememberpassword,0,0)<0) {
 #endif
 			return 1;
 		}
 	}
 	memset(md5pass,0,16);
 
+
 #if FUSE_VERSION >= 30
-	if (cmdopts->foreground==0) {
+	mfs_log_init(STR(APPNAME),(cmdopts->foreground==0)?1:0);
 #else /* FUSE2 */
-	if (fg==0) {
+	mfs_log_init(STR(APPNAME),(fg==0)?1:0);
 #endif
-		openlog(STR(APPNAME), LOG_PID | LOG_NDELAY , LOG_DAEMON);
-	} else {
-#if defined(LOG_PERROR)
-		openlog(STR(APPNAME), LOG_PID | LOG_NDELAY | LOG_PERROR, LOG_USER);
-#else
-		openlog(STR(APPNAME), LOG_PID | LOG_NDELAY, LOG_USER);
-#endif
-	}
+	mfs_log_set_min_level(mfsopts.logminlevel);
+	mfs_log_set_elevate_to(mfsopts.logelevateto);
 
 	i = mfsopts.nofile;
 	while (1) {
@@ -1144,13 +1191,17 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		}
 		close(piped[0]);
 		s=1;
+
+		if (chdir("/")<0) {
+			fprintf(stderr,"chdir error\n");
+		}
 	}
 
 
 #ifdef MFS_USE_MEMLOCK
 	if (mfsopts.memlock) {
 		if (mlockall(MCL_CURRENT|MCL_FUTURE)==0) {
-			syslog(LOG_NOTICE,"process memory was successfully locked in RAM");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"process memory was successfully locked in RAM");
 		}
 	}
 #endif
@@ -1159,15 +1210,15 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 #ifdef MFS_USE_MALLOPT
 	if (mfsopts.limitarenas) {
 		if (!getenv("MALLOC_ARENA_MAX")) {
-			syslog(LOG_NOTICE,"setting glibc malloc arena max to %u",mfsopts.limitarenas);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"setting glibc malloc arena max to %u",mfsopts.limitarenas);
 			mallopt(M_ARENA_MAX, mfsopts.limitarenas);
 		}
 		if (!getenv("MALLOC_ARENA_TEST")) {
-			syslog(LOG_NOTICE,"setting glibc malloc arena test to %u",mfsopts.limitarenas);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"setting glibc malloc arena test to %u",mfsopts.limitarenas);
 			mallopt(M_ARENA_TEST, mfsopts.limitarenas);
 		}
 	} else {
-		syslog(LOG_NOTICE,"setting glibc malloc arenas turned off");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"setting glibc malloc arenas turned off");
 	}
 #endif /* glibc malloc tuning */
 
@@ -1201,15 +1252,15 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		}
 #  endif
 		if (dis) {
-			syslog(LOG_NOTICE,"out of memory killer disabled");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"out of memory killer disabled");
 		} else {
-			syslog(LOG_NOTICE,"can't disable out of memory killer");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't disable out of memory killer");
 		}
 	}
 #endif
 
-	syslog(LOG_NOTICE,"monotonic clock function: %s",monotonic_method());
-	syslog(LOG_NOTICE,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"monotonic clock function: %s",monotonic_method());
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());
 
 	inoleng_init();
 	conncache_init(200);
@@ -1368,7 +1419,7 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	if (err) {
 		if (piped[1]>=0) {
 			if (write(piped[1],&s,1)!=1) {
-				syslog(LOG_ERR,"pipe write error: %s",strerr(errno));
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"pipe write error: %s",strerr(errno));
 			}
 			close(piped[1]);
 		}
@@ -1405,6 +1456,7 @@ exit2:
 	chunkrwlock_term();
 	conncache_term();
 	inoleng_term();
+	mfs_log_term();
 	return err ? 1 : 0;
 }
 
@@ -1494,7 +1546,7 @@ void make_fsname(struct fuse_args *args) {
 					fsnamearg[l++]='/';
 				}
 			}
-			if (mfsopts.subfolder[0]!='/' && mfsopts.subfolder[1]!=0) {
+			if (mfsopts.subfolder[0]!='/' || mfsopts.subfolder[1]!=0) {
 				l += strncpy_escape_commas(fsnamearg+l,256-l,mfsopts.subfolder);
 			}
 			if (l>255) {
@@ -1512,7 +1564,7 @@ void make_fsname(struct fuse_args *args) {
 					fsnamearg[l++]='/';
 				}
 			}
-			if (mfsopts.subfolder[0]!='/' && mfsopts.subfolder[1]!=0) {
+			if (mfsopts.subfolder[0]!='/' || mfsopts.subfolder[1]!=0) {
 				l += strncpy_remove_commas(fsnamearg+l,256-l,mfsopts.subfolder);
 			}
 			if (l>255) {
@@ -1533,7 +1585,7 @@ void make_fsname(struct fuse_args *args) {
 				fsnamearg[l++]='/';
 			}
 		}
-		if (mfsopts.subfolder[0]!='/' && mfsopts.subfolder[1]!=0) {
+		if (mfsopts.subfolder[0]!='/' || mfsopts.subfolder[1]!=0) {
 			l += strncpy_remove_commas(fsnamearg+l,256-l,mfsopts.subfolder);
 		}
 		if (l>255) {
@@ -1547,19 +1599,20 @@ void make_fsname(struct fuse_args *args) {
 	fuse_opt_insert_arg(args, 1, fsnamearg);
 }
 
-/* debug function
+// #define ARGS_DEBUG 1
+#ifdef ARGS_DEBUG
 void dump_args(const char *prfx,struct fuse_args *args) {
 	int i;
 	for (i=0 ; i<args->argc ; i++) {
 		printf("%s [%d]: %s\n",prfx,i,args->argv[i]);
 	}
 }
-*/
+#endif
 
 char* password_read(const char *filename) {
 	FILE *fd;
-	char passwordbuff[1024];
-	char *ret;
+	char *passwordbuff;
+	size_t pbsize;
 	int i;
 
 	fd = fopen(filename,"r");
@@ -1567,13 +1620,17 @@ char* password_read(const char *filename) {
 		fprintf(stderr,"error opening password file: %s\n",filename);
 		return NULL;
 	}
-	if (fgets(passwordbuff,1024,fd)==NULL) {
+	pbsize = 0;
+	passwordbuff = NULL;
+	if (getline(&passwordbuff,&pbsize,fd)==-1) {
 		fprintf(stderr,"password file (%s) is empty\n",filename);
+		if (passwordbuff!=NULL) {
+			free(passwordbuff);
+		}
 		fclose(fd);
 		return NULL;
 	}
 	fclose(fd);
-	passwordbuff[1023]=0;
 	i = strlen(passwordbuff);
 	while (i>0) {
 		i--;
@@ -1585,14 +1642,10 @@ char* password_read(const char *filename) {
 	}
 	if (i==0) {
 		fprintf(stderr,"first line in password file (%s) is empty\n",filename);
+		free(passwordbuff);
 		return NULL;
 	}
-	ret = malloc(i+1);
-	passert(ret);
-	memcpy(ret,passwordbuff,i);
-	memset(passwordbuff,0,1024);
-	ret[i] = 0;
-	return ret;
+	return passwordbuff;
 }
 
 #ifdef FUSE_ALLOWS_NOT_EMPTY_DIRS
@@ -1739,7 +1792,9 @@ int main(int argc, char *argv[]) {
 
 	custom_cfg = 0;
 
-//	dump_args("input_args",&args);
+#ifdef ARGS_DEBUG
+	dump_args("input_args",&args);
+#endif
 
 	if (args.argc>1) {
 		uint32_t hostlen,portlen,colons;
@@ -1808,7 +1863,9 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-//	dump_args("after_first_filter",&args);
+#ifdef ARGS_DEBUG
+	dump_args("after_first_filter",&args);
+#endif
 
 	if (fuse_opt_parse(&args, &defaultargs, mfs_opts_stage1, mfs_opt_proc_stage1)<0) {
 		exit(1);
@@ -1833,20 +1890,29 @@ int main(int argc, char *argv[]) {
 		free(cfgfile);
 	}
 
-//	dump_args("parsed_defaults",&defaultargs);
-//	dump_args("changed_args",&args);
+#ifdef ARGS_DEBUG
+	dump_args("parsed_defaults",&defaultargs);
+	dump_args("changed_args",&args);
+#endif
 
-	for (i=0 ; i<defaultargs.argc ; i++) {
-		fuse_opt_add_arg(&args,defaultargs.argv[i]);
+//	for (i=0 ; i<defaultargs.argc ; i++) {
+//		fuse_opt_add_arg(&args,defaultargs.argv[i]);
+//	}
+	for (i=defaultargs.argc ; i>0 ; i--) {
+		fuse_opt_insert_arg(&args, 1, defaultargs.argv[i-1]);
 	}
 
-//	dump_args("combined_args",&args);
+#ifdef ARGS_DEBUG
+	dump_args("combined_args",&args);
+#endif
 
 	if (fuse_opt_parse(&args, &mfsopts, mfs_opts_stage2, mfs_opt_proc_stage2)<0) {
 		exit(1);
 	}
 
-//	dump_args("combined_args_after_parse",&args);
+#ifdef ARGS_DEBUG
+	dump_args("combined_args_after_parse",&args);
+#endif
 
 	if (mfsopts.cachemode!=NULL && mfsopts.cachefiles) {
 		fprintf(stderr,"mfscachemode and mfscachefiles options are exclusive - use only mfscachemode\nsee: %s -h for help\n",argv[0]);
@@ -1900,6 +1966,24 @@ int main(int argc, char *argv[]) {
 	} else {
 		fprintf(stderr,"unrecognized sugidclearmode option\nsee: %s -h for help\n",argv[0]);
 		return 1;
+	}
+	if (mfsopts.logminlevelstr==NULL) {
+		mfsopts.logminlevel = MFSLOG_INFO;
+	} else {
+		mfsopts.logminlevel = mfs_log_str_to_pri(mfsopts.logminlevelstr);
+		if (mfsopts.logminlevel<0) {
+			fprintf(stderr,"mfslogminlevel: unrecognized log level, valid levels: [D]EBUG,[I]NFO,[N]OTICE,[W]ARNING,[E]RROR\n");
+			return 1;
+		}
+	}
+	if (mfsopts.logelevatetostr==NULL) {
+		mfsopts.logelevateto = MFSLOG_NOTICE;
+	} else {
+		mfsopts.logelevateto = mfs_log_str_to_pri(mfsopts.logelevatetostr);
+		if (mfsopts.logelevateto<0) {
+			fprintf(stderr,"mfslogelevateto: unrecognized log level, valid levels: [D]EBUG,[I]NFO,[N]OTICE,[W]ARNING,[E]RROR\n");
+			return 1;
+		}
 	}
 	if (mfsopts.masterhost==NULL) {
 		mfsopts.masterhost = strdup(DEFAULT_MASTERNAME);
@@ -2003,7 +2087,9 @@ int main(int argc, char *argv[]) {
 	}
 	remove_mfsmount_magic(&args);
 
-//	dump_args("combined_args_before_fuse_parse_cmdline",&args);
+#ifdef ARGS_DEBUG
+	dump_args("combined_args_before_fuse_parse_cmdline",&args);
+#endif
 
 #if FUSE_VERSION >= 30
 	if (fuse_parse_cmdline(&args,&cmdopts)<0) {

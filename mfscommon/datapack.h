@@ -61,6 +61,57 @@ static inline void put64bit(uint8_t **ptr,uint64_t val) {
 	(*ptr)+=8;
 }
 
+static inline void put56bit(uint8_t **ptr,uint64_t val) {
+#ifdef FAST_DATAPACK
+#  ifndef WORDS_BIGENDIAN
+	val = BSWAP64(val);
+#  endif
+	memcpy(*ptr,((uint8_t*)&val)+1,7);
+#else
+	(*ptr)[0]=((val)>>48)&0xFF;
+	(*ptr)[1]=((val)>>40)&0xFF;
+	(*ptr)[2]=((val)>>32)&0xFF;
+	(*ptr)[3]=((val)>>24)&0xFF;
+	(*ptr)[4]=((val)>>16)&0xFF;
+	(*ptr)[5]=((val)>>8)&0xFF;
+	(*ptr)[6]=(val)&0xFF;
+#endif
+	(*ptr)+=7;
+}
+
+static inline void put48bit(uint8_t **ptr,uint64_t val) {
+#ifdef FAST_DATAPACK
+#  ifndef WORDS_BIGENDIAN
+	val = BSWAP64(val);
+#  endif
+	memcpy(*ptr,((uint8_t*)&val)+2,6);
+#else
+	(*ptr)[0]=((val)>>40)&0xFF;
+	(*ptr)[1]=((val)>>32)&0xFF;
+	(*ptr)[2]=((val)>>24)&0xFF;
+	(*ptr)[3]=((val)>>16)&0xFF;
+	(*ptr)[4]=((val)>>8)&0xFF;
+	(*ptr)[5]=(val)&0xFF;
+#endif
+	(*ptr)+=6;
+}
+
+static inline void put40bit(uint8_t **ptr,uint64_t val) {
+#ifdef FAST_DATAPACK
+#  ifndef WORDS_BIGENDIAN
+	val = BSWAP64(val);
+#  endif
+	memcpy(*ptr,((uint8_t*)&val)+3,5);
+#else
+	(*ptr)[0]=((val)>>32)&0xFF;
+	(*ptr)[1]=((val)>>24)&0xFF;
+	(*ptr)[2]=((val)>>16)&0xFF;
+	(*ptr)[3]=((val)>>8)&0xFF;
+	(*ptr)[4]=(val)&0xFF;
+#endif
+	(*ptr)+=5;
+}
+
 static inline void put32bit(uint8_t **ptr,uint32_t val) {
 #ifdef FAST_DATAPACK
 #  ifndef WORDS_BIGENDIAN
@@ -74,6 +125,20 @@ static inline void put32bit(uint8_t **ptr,uint32_t val) {
 	(*ptr)[3]=(val)&0xFF;
 #endif
 	(*ptr)+=4;
+}
+
+static inline void put24bit(uint8_t **ptr,uint32_t val) {
+#ifdef FAST_DATAPACK
+#  ifndef WORDS_BIGENDIAN
+	val = BSWAP32(val);
+#  endif
+	memcpy(*ptr,((uint8_t*)&val)+1,3);
+#else
+	(*ptr)[0]=((val)>>16)&0xFF;
+	(*ptr)[1]=((val)>>8)&0xFF;
+	(*ptr)[2]=(val)&0xFF;
+#endif
+	(*ptr)+=3;
 }
 
 static inline void put16bit(uint8_t **ptr,uint16_t val) {
@@ -113,6 +178,66 @@ static inline uint64_t get64bit(const uint8_t **ptr) {
 #endif
 }
 
+static inline uint64_t get56bit(const uint8_t **ptr) {
+	uint64_t t64;
+#ifdef FAST_DATAPACK
+	memset(&t64,0,1);
+	memcpy(((uint8_t*)&t64)+1,*ptr,7);
+	(*ptr)+=7;
+#  ifdef WORDS_BIGENDIAN
+	return t64;
+#  else
+	return BSWAP64(t64);
+#  endif
+#else
+	t64=((*ptr)[2]+256U*((*ptr)[1]+256U*(*ptr)[0]));
+	t64<<=32;
+	t64|=(uint32_t)(((*ptr)[6]+256U*((*ptr)[5]+256U*((*ptr)[4]+256U*(*ptr)[3]))));
+	(*ptr)+=7;
+	return t64;
+#endif
+}
+
+static inline uint64_t get48bit(const uint8_t **ptr) {
+	uint64_t t64;
+#ifdef FAST_DATAPACK
+	memset(&t64,0,2);
+	memcpy(((uint8_t*)&t64)+2,*ptr,6);
+	(*ptr)+=6;
+#  ifdef WORDS_BIGENDIAN
+	return t64;
+#  else
+	return BSWAP64(t64);
+#  endif
+#else
+	t64=((*ptr)[1]+256U*(*ptr)[0]);
+	t64<<=32;
+	t64|=(uint32_t)(((*ptr)[5]+256U*((*ptr)[4]+256U*((*ptr)[3]+256U*(*ptr)[2]))));
+	(*ptr)+=6;
+	return t64;
+#endif
+}
+
+static inline uint64_t get40bit(const uint8_t **ptr) {
+	uint64_t t64;
+#ifdef FAST_DATAPACK
+	memset(&t64,0,3);
+	memcpy(((uint8_t*)&t64)+3,*ptr,5);
+	(*ptr)+=5;
+#  ifdef WORDS_BIGENDIAN
+	return t64;
+#  else
+	return BSWAP64(t64);
+#  endif
+#else
+	t64=(*ptr)[0];
+	t64<<=32;
+	t64|=(uint32_t)(((*ptr)[4]+256U*((*ptr)[3]+256U*((*ptr)[2]+256U*(*ptr)[1]))));
+	(*ptr)+=5;
+	return t64;
+#endif
+}
+
 static inline uint32_t get32bit(const uint8_t **ptr) {
 	uint32_t t32;
 #ifdef FAST_DATAPACK
@@ -126,6 +251,24 @@ static inline uint32_t get32bit(const uint8_t **ptr) {
 #else
 	t32=((*ptr)[3]+256U*((*ptr)[2]+256U*((*ptr)[1]+256U*(*ptr)[0])));
 	(*ptr)+=4;
+	return t32;
+#endif
+}
+
+static inline uint32_t get24bit(const uint8_t **ptr) {
+	uint32_t t32;
+#ifdef FAST_DATAPACK
+	memset(&t32,0,1);
+	memcpy(((uint8_t*)&t32)+1,*ptr,3);
+	(*ptr)+=3;
+#  ifdef WORDS_BIGENDIAN
+	return t32;
+#  else
+	return BSWAP32(t32);
+#  endif
+#else
+	t32=((*ptr)[2]+256U*((*ptr)[1]+256U*(*ptr)[0]));
+	(*ptr)+=3;
 	return t32;
 #endif
 }

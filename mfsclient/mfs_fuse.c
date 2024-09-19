@@ -18,13 +18,6 @@
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
  */
 
-// patch for old osxfuse
-//#if defined(__APPLE__)
-//# if ! defined(__DARWIN_64_BIT_INO_T) && ! defined(_DARWIN_USE_64_BIT_INODE)
-//#  define __DARWIN_64_BIT_INO_T 0
-//# endif
-//#endif
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -38,7 +31,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <assert.h>
-#include <syslog.h>
 #include <inttypes.h>
 #include <pthread.h>
 #ifdef HAVE_SYS_XATTR_H
@@ -123,16 +115,11 @@ static int freebsd_workarounds = 1;
 
 #define PKGVERSION ((VERSMAJ)*1000000+(VERSMID)*10000+((VERSMIN)>>1)*100+(RELEASE))
 
-#define MASTERINFO_WITH_VERSION 1
-
 #define MASTERINFO_NAME ".masterinfo"
 #define MASTERINFO_INODE 0x7FFFFFFF
 // 0x0124 == 0b100100100 == 0444
-#ifdef MASTERINFO_WITH_VERSION
-static uint8_t masterinfoattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,14, 0};
-#else
-static uint8_t masterinfoattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,10, 0};
-#endif
+
+static uint8_t masterinfoattr[ATTR_RECORD_SIZE]={0, (TYPE_FILE << 4) | 0x01,0x24, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0,0,0,0,22, 0};
 
 #define STATS_NAME ".stats"
 #define STATS_INODE 0x7FFFFFF0
@@ -283,12 +270,24 @@ static void sinfo_freeall(void) {
 
 
 /* DIRECTORY INODE BUFFERS */
+/*
+typedef struct _dirfragment {
+	uint8_t *data;
+	off_t offset;
+	size_t size;
+	void *dcache;
+	uint64_t edgeid;
+	struct _dirfragment *next;
+} dirfragment;
+*/
 
 typedef struct _dirbuf {
-	int wasread;
+	fuse_ino_t inode;
 	int dataformat;
+	uint8_t wasread;
 	uid_t uid;
 	gid_t gid;
+//	dirfragment *dfhead,*dfcurr;
 	const uint8_t *p;
 	size_t size;
 	void *dcache;
@@ -894,6 +893,12 @@ static int mfs_errorconv(int status) {
 	case MFS_ERROR_INDEXTOOBIG:
 		ret=EFBIG;
 		break;
+	case MFS_ERROR_ENAMETOOLONG:
+		ret=ENAMETOOLONG;
+		break;
+	case MFS_ERROR_EMLINK:
+		ret=EMLINK;
+		break;
 	default:
 		ret=EINVAL;
 		break;
@@ -917,6 +922,15 @@ static int mfs_errorconv(int status) {
 #endif
 	}
 	return ret;
+}
+
+static inline void mfs_fix_amtime(uint32_t inode,time_t *atime,time_t *mtime) {
+	uint32_t at,mt;
+	at = *atime;
+	mt = *mtime;
+	fs_fix_amtime(inode,&at,&mt);
+	*atime = at;
+	*mtime = mt;
 }
 
 static inline uint8_t fsnodes_type_convert(uint8_t type) {
@@ -1435,7 +1449,11 @@ void mfs_access(fuse_req_t req, fuse_ino_t ino, int mask) {
 		}
 	} else {
 		if (full_permissions) {
+#if defined(__APPLE__)
+			gids = groups_get_cacheonly(ctx.pid,ctx.uid,ctx.gid);
+#else
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+#endif
 			status = fs_access(ino,ctx.uid,gids->gidcnt,gids->gidtab,mmode);
 			groups_rel(gids);
 		} else {
@@ -1692,7 +1710,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 						}
 				}
 		}
-	} else 
+	} else
 */
 	if (usedircache && dcache_lookup(&ctx,parent,nleng,(const uint8_t*)name,&inode,attr)) {
 		if (debug_mode) {
@@ -1792,7 +1810,7 @@ void mfs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name) {
 		read_inode_set_length_passive(inode,e.attr.st_size);
 		finfo_change_fleng(inode,e.attr.st_size);
 	}
-	fs_fix_amtime(inode,&(e.attr.st_atime),&(e.attr.st_mtime));
+	mfs_fix_amtime(inode,&(e.attr.st_atime),&(e.attr.st_mtime));
 //	if (type==TYPE_FILE && debug_mode) {
 //		fprintf(stderr,"lookup inode %lu - file size: %llu\n",(unsigned long int)inode,(unsigned long long int)e.attr.st_size);
 //	}
@@ -1951,7 +1969,7 @@ void mfs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		finfo_change_fleng(ino,o_stbuf.st_size);
 		fdcache_invalidate(ino);
 	}
-	fs_fix_amtime(ino,&(o_stbuf.st_atime),&(o_stbuf.st_mtime));
+	mfs_fix_amtime(ino,&(o_stbuf.st_atime),&(o_stbuf.st_mtime));
 	attr_timeout = ((mfs_attr_get_mattr(attr)&MATTR_NOACACHE) || force_mode)?0.0:attr_cache_timeout;
 	mfs_makeattrstr(attrstr,256,&o_stbuf);
 	if (fi!=NULL) {
@@ -1993,6 +2011,11 @@ void mfs_make_setattr_str(char *strbuff,uint32_t strsize,struct stat *stbuf,int 
 	} else if (strleng<strsize && (to_set&FUSE_SET_ATTR_MTIME)) {
 		strleng+=snprintf(strbuff+strleng,strsize-strleng,"mtime=%lu;",(unsigned long int)(stbuf->st_mtime));
 	}
+#if defined(FUSE_SET_ATTR_CTIME)
+	if (strleng<strsize && (to_set&FUSE_SET_ATTR_CTIME)) {
+		strleng+=snprintf(strbuff+strleng,strsize-strleng,"ctime=%lu;",(unsigned long int)(stbuf->st_ctime));
+	}
+#endif
 	if (strleng<strsize && (to_set&FUSE_SET_ATTR_SIZE)) {
 		strleng+=snprintf(strbuff+strleng,strsize-strleng,"size=%llu;",(unsigned long long int)(stbuf->st_size));
 	}
@@ -2705,6 +2728,8 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 #if FUSE_VERSION < 30
 	unsigned int flags = 0;
 #endif
+	uint8_t mfsflags;
+	int mask;
 
 	ctx = *(fuse_req_ctx(req));
 	mfs_stats_inc(OP_RENAME);
@@ -2712,8 +2737,14 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u) ...",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags);
 		fprintf(stderr,"rename (%lu,%s,%lu,%s,%u)\n",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags);
 	}
-	// TODO implement support for new flags available in fuse3
-	if (flags!=0) {
+	mask = 0;
+#ifdef RENAME_EXCHANGE
+	mask |= RENAME_EXCHANGE;
+#endif
+#ifdef RENAME_NOREPLACE
+	mask |= RENAME_NOREPLACE;
+#endif
+	if ((flags & ~mask)!=0 || (flags!=0 && master_version()<VERSION2INT(4,18,0))) {
 		oplog_printf(&ctx,"rename (%lu,%s,%lu,%s,%u): %s",(unsigned long int)parent,name,(unsigned long int)newparent,newname,flags,strerr(EINVAL));
 		fuse_reply_err(req, EINVAL);
 		return;
@@ -2745,13 +2776,25 @@ void mfs_rename(fuse_req_t req, fuse_ino_t parent, const char *name, fuse_ino_t 
 		return;
 	}
 
+	mfsflags = 0;
+#ifdef RENAME_EXCHANGE
+	if (flags & RENAME_EXCHANGE) {
+		mfsflags |= MFS_RENAME_EXCHANGE;
+	}
+#endif
+#ifdef RENAME_NOREPLACE
+	if (flags & RENAME_NOREPLACE) {
+		mfsflags |= MFS_RENAME_NOREPLACE;
+	}
+#endif
+
 	if (full_permissions) {
 		gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-		status = fs_rename(parent,nleng,(const uint8_t*)name,newparent,newnleng,(const uint8_t*)newname,ctx.uid,gids->gidcnt,gids->gidtab,&inode,attr);
+		status = fs_rename(parent,nleng,(const uint8_t*)name,newparent,newnleng,(const uint8_t*)newname,ctx.uid,gids->gidcnt,gids->gidtab,mfsflags,&inode,attr);
 		groups_rel(gids);
 	} else {
 		uint32_t gidtmp = ctx.gid;
-		status = fs_rename(parent,nleng,(const uint8_t*)name,newparent,newnleng,(const uint8_t*)newname,ctx.uid,1,&gidtmp,&inode,attr);
+		status = fs_rename(parent,nleng,(const uint8_t*)name,newparent,newnleng,(const uint8_t*)newname,ctx.uid,1,&gidtmp,mfsflags,&inode,attr);
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {
@@ -2831,9 +2874,6 @@ void mfs_link(fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, const char *
 		status = fs_link(ino,newparent,newnleng,(const uint8_t*)newname,ctx.uid,1,&gidtmp,&inode,attr);
 	}
 	status = mfs_errorconv(status);
-	if (status==ENOSPC) {
-		status=EMLINK;
-	}
 	if (status!=0) {
 		oplog_printf(&ctx,"link (%lu,%lu,%s): %s",(unsigned long int)ino,(unsigned long int)newparent,newname,strerr(status));
 		fuse_reply_err(req, status);
@@ -2941,6 +2981,73 @@ void mfs_opendir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 }
 
+/*
+static inline void df_clear_all(dirbuf *dirinfo) {
+	dirfragment *df,*dfn;
+
+	for (df=dirinfo->dfhead ; df!=NULL ; df=dfn) {
+		dfn = df->next;
+		if (df->dcache) {
+			dcache_release(df->dcache);
+		}
+		if (df->data) {
+			free((uint8_t*)(df->data));
+		}
+		free(df);
+	}
+	dirinfo->dfhead = NULL;
+	dirinfo->dfcurr = NULL;
+}
+
+static inline df_fill_fragment(struct fuse_ctx *ctx,dirbuf *dirinfo,dirfragment *df,uint64_t edgeid,uint32_t limit,uint8_t attrsize) {
+	int status;
+	const uint8_t *dbuff;
+	uint32_t dsize;
+	uint8_t dataformat;
+	groups *gids;
+
+	if (dirinfo->dataformat) {
+		if (full_permissions) {
+			gids = groups_get(ctx->pid,ctx->uid,ctx->gid);
+			status = fs_readdir(dirinfo->inode,ctx->uid,gids->gidcnt,gids->gidtab,NULL,1,0,&dbuff,&dsize);
+			groups_rel(gids);
+		} else {
+			uint32_t gidtmp = ctx->gid;
+			status = fs_readdir(dirinfo->inode,ctx->uid,1,&gidtmp,NULL,1,0,&dbuff,&dsize);
+		}
+		if (status==0) {
+			if (dataformat) {
+				mfs_stats_inc(OP_GETDIR_FULL);
+			} else {
+				mfs_stats_inc(OP_GETDIR_SMALL);
+			}
+		}
+	} else {
+		if (full_permissions) {
+			gids = groups_get(ctx->pid,ctx->uid,ctx->gid);
+			status = fs_readdir(dirinfo->inode,ctx->uid,gids->gidcnt,gids->gidtab,NULL,0,0,&dbuff,&dsize);
+			groups_rel(gids);
+		} else {
+			uint32_t gidtmp = ctx->gid;
+			status = fs_readdir(dirinfo->inode,ctx->uid,1,&gidtmp,NULL,0,0,&dbuff,&dsize);
+		}
+		if (status==0) {
+			mfs_stats_inc(OP_GETDIR_SMALL);
+		}
+	}
+
+	if (status==0) {
+		df->data = malloc(dsize);
+		passert(df->data);
+		memcpy(df->data,dbuff,dsize);
+		df->size = dsize;
+		if (dirinfo->dataformat==1) {
+			df->dcache = dcache_new(ctx,dirinfo->inode,df->data,df->size,attrsize);
+		}
+	}
+}
+*/
+
 void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi) {
 	int status;
 	dirbuf *dirinfo;
@@ -2986,6 +3093,11 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 	attrsize = master_attrsize();
 
 	zassert(pthread_mutex_lock(&(dirinfo->lock)));
+/*
+	if (off==0) {
+		df_clear_all(dirinfo);
+	}
+*/
 	if (dirinfo->wasread==0 || (dirinfo->wasread==1 && off==0)) {
 		const uint8_t *dbuff;
 		uint32_t dsize;
@@ -3007,25 +3119,25 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 				needscopy = 1;
 				dirinfo->dataformat = 1;
 			}
-		} else 
+		} else
 */
 		if (usedircache) {
 			uint8_t df;
 			df = 1;
 			if (full_permissions) {
 				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-				status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,1,0,&dbuff,&dsize);
+				status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,NULL,1,0,&dbuff,&dsize);
 				if (status==MFS_ERROR_EACCES) {
 					df = 0;
-					status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,0,0,&dbuff,&dsize);
+					status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,NULL,0,0,&dbuff,&dsize);
 				}
 				groups_rel(gids);
 			} else {
 				uint32_t gidtmp = ctx.gid;
-				status = fs_readdir(ino,ctx.uid,1,&gidtmp,1,0,&dbuff,&dsize);
+				status = fs_readdir(ino,ctx.uid,1,&gidtmp,NULL,1,0,&dbuff,&dsize);
 				if (status==MFS_ERROR_EACCES) {
 					df = 0;
-					status = fs_readdir(ino,ctx.uid,1,&gidtmp,0,0,&dbuff,&dsize);
+					status = fs_readdir(ino,ctx.uid,1,&gidtmp,NULL,0,0,&dbuff,&dsize);
 				}
 			}
 			if (status==0) {
@@ -3040,11 +3152,11 @@ void mfs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct 
 		} else {
 			if (full_permissions) {
 				gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-				status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,0,0,&dbuff,&dsize);
+				status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,NULL,0,0,&dbuff,&dsize);
 				groups_rel(gids);
 			} else {
 				uint32_t gidtmp = ctx.gid;
-				status = fs_readdir(ino,ctx.uid,1,&gidtmp,0,0,&dbuff,&dsize);
+				status = fs_readdir(ino,ctx.uid,1,&gidtmp,NULL,0,0,&dbuff,&dsize);
 			}
 			if (status==0) {
 				mfs_stats_inc(OP_GETDIR_SMALL);
@@ -3186,11 +3298,11 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
-			status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,1,0,&dbuff,&dsize);
+			status = fs_readdir(ino,ctx.uid,gids->gidcnt,gids->gidtab,NULL,1,0,&dbuff,&dsize);
 			groups_rel(gids);
 		} else {
 			uint32_t gidtmp = ctx.gid;
-			status = fs_readdir(ino,ctx.uid,1,&gidtmp,1,0,&dbuff,&dsize);
+			status = fs_readdir(ino,ctx.uid,1,&gidtmp,NULL,1,0,&dbuff,&dsize);
 		}
 		if (status==0) {
 			mfs_stats_inc(OP_GETDIR_PLUS);
@@ -3283,7 +3395,7 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 					read_inode_set_length_passive(inode,e.attr.st_size);
 					finfo_change_fleng(inode,e.attr.st_size);
 				}
-				fs_fix_amtime(inode,&(e.attr.st_atime),&(e.attr.st_mtime));
+				mfs_fix_amtime(inode,&(e.attr.st_atime),&(e.attr.st_mtime));
 				ptr+=attrsize;
 				oleng = fuse_add_direntry_plus(req, buffer + opos, size - opos, name, &e, off);
 				if (opos+oleng>size) {
@@ -3625,7 +3737,7 @@ void mfs_create(fuse_req_t req, fuse_ino_t parent, const char *name, mode_t mode
 	}
 	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,inode,0,1,(oflags&OPEN_APPENDONLY)?1:0);
 	fi->fh = findex;
-	if ((oflags&(OPEN_DIRECTMODE|OPEN_APPENDONLY)) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
+	if ((oflags&(OPEN_DIRECTMODE/*|OPEN_APPENDONLY*/)) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
 		fi->keep_cache = 0;
 		fi->direct_io = 1;
 	} else {
@@ -3808,7 +3920,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 	if (fi->flags & O_TRUNC) {
 		uint32_t mver = master_version();
-		noatomictrunc = (mver<VERSION2INT(3,0,113))?1:0;
+		noatomictrunc = ((mver<VERSION2INT(4,18,0)&&mver>=VERSION2INT(4,0,0))||mver<VERSION2INT(3,0,113))?1:0;
 		flags |= OPEN_TRUNCATE;
 		fdrec = NULL; // with trunc flag we have to communicate with master, so can't use fdcache
 	} else {
@@ -3835,12 +3947,16 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 			if (lflags & LOOKUP_KEEPCACHE) {
 				oflags |= OPEN_KEEPCACHE;
 			}
-		} 
+		}
 		fdcache_release(fdrec);
 	} else {
 		write_data_flush_inode(ino); // update file attributes in master !!!
 		if (full_permissions) {
-			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,2); // allow group refresh again (see: getxattr for "com.apple.quarantine")
+#if defined(__APPLE__)
+			gids = groups_get_cacheonly(ctx.pid,ctx.uid,ctx.gid);
+#else
+			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+#endif
 			status = fs_opencheck(ino,ctx.uid,gids->gidcnt,gids->gidtab,flags,attr,&oflags);
 			if (status==MFS_STATUS_OK && (fi->flags & O_TRUNC) && noatomictrunc) {
 				status = do_truncate(ino,TRUNCATE_FLAG_OPENED,ctx.uid,gids->gidcnt,gids->gidtab,0,attr,NULL);
@@ -3887,7 +4003,7 @@ void mfs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 	}
 	findex = mfs_newfileinfo(fi->flags & O_ACCMODE,ino,mfs_attr_get_fleng(attr),(fdrec)?0:1,(oflags&OPEN_APPENDONLY)?1:0);
 	fi->fh = findex;
-	if ((oflags&(OPEN_DIRECTMODE|OPEN_APPENDONLY)) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
+	if ((oflags&(OPEN_DIRECTMODE/*|OPEN_APPENDONLY*/)) || (mfs_disables&(DISABLE_READ|DISABLE_WRITE))) {
 		fi->keep_cache = 0;
 		fi->direct_io = 1;
 	} else {
@@ -4157,24 +4273,15 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		fprintf(stderr,"read from inode %lu up to %llu bytes from position %llu\n",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
 	}
 	if (ino==MASTERINFO_INODE) {
-		uint8_t masterinfo[14];
+		uint8_t masterinfo[22];
 		fs_getmasterlocation(masterinfo);
 		masterproxy_getlocation(masterinfo);
-#ifdef MASTERINFO_WITH_VERSION
-		if (off>=14) {
+		if (off>=22) {
 			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
 			fuse_reply_buf(req,NULL,0);
-		} else if (off+size>14) {
-			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)(14-off));
-			fuse_reply_buf(req,(char*)(masterinfo+off),14-off);
-#else
-		if (off>=10) {
-			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (no data)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off);
-			fuse_reply_buf(req,NULL,0);
-		} else if (off+size>10) {
-			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)(10-off));
-			fuse_reply_buf(req,(char*)(masterinfo+off),10-off);
-#endif
+		} else if (off+size>22) {
+			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)(22-off));
+			fuse_reply_buf(req,(char*)(masterinfo+off),22-off);
 		} else {
 			oplog_printf(&ctx,"read (%lu,%llu,%llu): OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(unsigned long int)size);
 			fuse_reply_buf(req,(char*)(masterinfo+off),size);
@@ -4314,21 +4421,6 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		fuse_reply_err(req,EBADF);
 		return;
 	}
-//	if (ino==MASTER_INODE) {
-//		minfo *masterinfo = (minfo*)(unsigned long)(fi->fh);
-//		if (masterinfo->sent) {
-//			int rsize;
-//			buff = malloc(size);
-//			rsize = fs_direct_read(masterinfo->sd,buff,size);
-//			fuse_reply_buf(req,(char*)buff,rsize);
-//			//syslog(LOG_WARNING,"master received: %d/%llu",rsize,(unsigned long long int)size);
-//			free(buff);
-//		} else {
-//			syslog(LOG_WARNING,"master: read before write");
-//			fuse_reply_buf(req,NULL,0);
-//		}
-//		return;
-//	}
 	if (off>=MAX_FILE_SIZE || off+size>=MAX_FILE_SIZE) {
 		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EFBIG));
 		fuse_reply_err(req,EFBIG);
@@ -4393,12 +4485,14 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 	if (oerr) {
 		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"] (this is open error): %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
 		fuse_reply_err(req,err);
+		fs_read_notify(0);
 	} else if (err!=0) {
 		if (debug_mode) {
 			fprintf(stderr,"IO error occurred while reading inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
 		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
 		fuse_reply_err(req,err);
+		fs_read_notify(0);
 	} else {
 		if (debug_mode) {
 			fprintf(stderr,"%"PRIu32" bytes have been read from inode %lu (offset:%llu)\n",ssize,(unsigned long int)ino,(unsigned long long int)off);
@@ -4406,6 +4500,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 		oplog_printf(&ctx,"read (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (%lu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),(unsigned long int)ssize);
 //		fuse_reply_buf(req,(char*)buff,ssize);
 		fuse_reply_iov(req,iov,iovcnt);
+		fs_read_notify(ssize);
 	}
 //	read_data_freebuff(fileinfo->rdata);
 	read_data_free_buff(fileinfo->rdata,buffptr,iov);
@@ -4427,6 +4522,7 @@ void mfs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fus
 void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off_t off, struct fuse_file_info *fi) {
 	finfo *fileinfo;
 	int err;
+	off_t original_off;
 	uint8_t appendonly;
 	off_t leng;
 	struct fuse_ctx ctx;
@@ -4488,15 +4584,6 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		fuse_reply_err(req,EBADF);
 		return;
 	}
-//	if (ino==MASTER_INODE) {
-//		minfo *masterinfo = (minfo*)(unsigned long)(fi->fh);
-//		int wsize;
-//		masterinfo->sent=1;
-//		wsize = fs_direct_write(masterinfo->sd,(const uint8_t*)buf,size);
-//		//syslog(LOG_WARNING,"master sent: %d/%llu",wsize,(unsigned long long int)size);
-//		fuse_reply_write(req,wsize);
-//		return;
-//	}
 	if (off>=MAX_FILE_SIZE || off+size>=MAX_FILE_SIZE) {
 		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(EFBIG));
 		fuse_reply_err(req, EFBIG);
@@ -4539,10 +4626,12 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 #ifdef FREEBSD_DELAYED_RELEASE
 	fileinfo->ops_in_progress++;
 #endif
+	original_off = off;
 	leng = inoleng_getfleng(fileinfo->flengptr);
 	err = 0;
 	if (appendonly) {
-		if (master_version()>=VERSION2INT(3,0,113)) {
+		uint32_t mver = master_version();
+		if ((mver>=VERSION2INT(3,0,113) && mver<VERSION2INT(4,0,0)) || mver>=VERSION2INT(4,22,0)) {
 			uint8_t status;
 			uint64_t prevleng;
 			uint32_t gid = 0;
@@ -4568,9 +4657,13 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		}
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 
-		fs_mtime(ino);
-		err = write_data(fileinfo->wdata,off,size,(const uint8_t*)buf,(ctx.uid==0)?1:0);
-		fs_mtime(ino);
+		if (off>=MAX_FILE_SIZE || off+size>=MAX_FILE_SIZE) { // append can change 'off', so we need to check it again
+			err = EFBIG;
+		} else {
+			fs_mtime(ino);
+			err = write_data(fileinfo->wdata,off,size,(const uint8_t*)buf,(ctx.uid==0)?1:0);
+			fs_mtime(ino);
+		}
 
 		zassert(pthread_mutex_lock(&(fileinfo->lock)));
 	}
@@ -4582,13 +4675,21 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 	fileinfo->ops_in_progress--;
 	fileinfo->lastuse = monotonic_seconds();
 #endif
+	if (debug_mode && off!=original_off) {
+		fprintf(stderr,"file offset has changed due to append mode (kernel offset: %llu , actual offset: %llu)\n",(unsigned long long int)original_off,(unsigned long long int)off);
+	}
 	if (err!=0) {
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
 		if (debug_mode) {
 			fprintf(stderr,"IO error occurred while writing inode %lu (offset:%llu,size:%llu)\n",(unsigned long int)ino,(unsigned long long int)off,(unsigned long long int)size);
 		}
-		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
+		if (off!=original_off) {
+			oplog_printf(&ctx,"write (%lu,%llu,%llu->%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)original_off,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
+		} else {
+			oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: %s",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),strerr(err));
+		}
 		fuse_reply_err(req,err);
+		fs_write_notify(0);
 	} else {
 		uint64_t newfleng;
 		if ((uint64_t)(off+size)>inoleng_getfleng(fileinfo->flengptr)) {
@@ -4601,7 +4702,11 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		if (debug_mode) {
 			fprintf(stderr,"%llu bytes have been written to inode %lu (offset:%llu)\n",(unsigned long long int)size,(unsigned long int)ino,(unsigned long long int)off);
 		}
-		oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),(unsigned long long int)size);
+		if (off!=original_off) {
+			oplog_printf(&ctx,"write (%lu,%llu,%llu->%llu) [handle:%08"PRIX32"]: OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)original_off,(unsigned long long int)off,(uint32_t)(fi->fh),(unsigned long long int)size);
+		} else {
+			oplog_printf(&ctx,"write (%lu,%llu,%llu) [handle:%08"PRIX32"]: OK (%llu)",(unsigned long int)ino,(unsigned long long int)size,(unsigned long long int)off,(uint32_t)(fi->fh),(unsigned long long int)size);
+		}
 		if (newfleng>0) {
 			read_inode_set_length_passive(ino,newfleng);
 			write_data_inode_setmaxfleng(ino,newfleng);
@@ -4610,6 +4715,7 @@ void mfs_write(fuse_req_t req, fuse_ino_t ino, const char *buf, size_t size, off
 		read_inode_clear_cache(ino,off,size);
 		fdcache_invalidate(ino);
 		fuse_reply_write(req,size);
+		fs_write_notify(size);
 	}
 	inoleng_write_end(fileinfo->flengptr);
 }
@@ -4701,7 +4807,7 @@ void mfs_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi) {
 		fuse_reply_err(req,EBADF);
 		return;
 	}
-//	syslog(LOG_NOTICE,"remove_locks inode:%lu owner:%llu",(unsigned long int)ino,(unsigned long long int)fi->lock_owner);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"remove_locks inode:%lu owner:%llu",(unsigned long int)ino,(unsigned long long int)fi->lock_owner);
 	err = 0;
 //	fuse_reply_err(req,err);
 
@@ -4865,6 +4971,7 @@ void mfs_fsync(fuse_req_t req, fuse_ino_t ino, int datasync, struct fuse_file_in
 		oplog_printf(&ctx,"fsync (%lu,%d) [handle:%08"PRIX32"]: OK",(unsigned long int)ino,datasync,(uint32_t)(fi->fh));
 	}
 	fuse_reply_err(req,err);
+	fs_fsync_notify();
 }
 
 #if FUSE_VERSION >= 29
@@ -5858,11 +5965,15 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 		xattr_value_release = NULL;
 	}
 	if (aclxattr==POSIX_ACL_NONE && full_permissions && xattr_value_release==NULL) { // and get groups only if data were not found in cache
+#if defined(__APPLE__)
 		if (strcmp(name,"com.apple.quarantine")==0) { // special case - obtaining groups from the kernel here leads to freeze, so avoid it
-			gids = groups_get_x(ctx.pid,ctx.uid,ctx.gid,1);
+			gids = groups_get_cacheonly(ctx.pid,ctx.uid,ctx.gid);
 		} else {
+#endif
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
+#if defined(__APPLE__)
 		}
+#endif
 	} else {
 		gids = NULL;
 	}
@@ -6129,10 +6240,15 @@ void mfs_inode_clear_cache(uint32_t inode,uint64_t offset,uint64_t leng) {
 	} else
 #endif
 	if (fuse_comm!=NULL) {
-		fuse_lowlevel_notify_inval_inode(fuse_comm,inode,offset,leng);
-		oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): ok",inode,offset,leng);
+		if (fuse_lowlevel_notify_inval_inode(fuse_comm,inode,offset,leng)<0) {
+			fs_clr_working_flags(WFLAG_INVALIDATE_CACHE);
+			oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): error",inode,offset,leng);
+		} else {
+			oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): ok",inode,offset,leng);
+		}
 	} else {
 		oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): lost",inode,offset,leng);
+		fs_clr_working_flags(WFLAG_INVALIDATE_CACHE);
 	}
 #else
 	oplog_printf(&ctx,"invalidate cache (%"PRIu32":%"PRIu64":%"PRIu64"): not supported",inode,offset,leng);

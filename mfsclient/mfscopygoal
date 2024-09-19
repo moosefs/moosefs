@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+echo "mfscopygoal is deprecated, use mfscopysclass instead"
+mfscopysclass "$@"

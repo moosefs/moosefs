@@ -1,0 +1,83 @@
+.TH mfsbdev.cfg "5" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
+.SH NAME
+mfsbdev.cfg \- \fBMooseFS\fP block device daemon config file
+.SH DESCRIPTION
+.PP
+This is the config file that can be read by the \fBmfbsdev\fP tool if the \fB-i\fP option was 
+supplied along with the \fBstart\fP command.
+The file contains definitions of block devices (one per line) that should be initialized 
+when \fBmfsbdev\fP tool is started.
+.PP
+It is strongly recommended to not create this file from scratch. Instead, it's best to create all the
+necessary devices using \fBmfsbdev\fP command and its parameters, as described in \fBmfsbdev\fP\|(8) 
+and then list them with the \fBmfsbdev list -i\fP command and use the output to create a config file.
+The following description is provided so it explains the content of the config file and allows to 
+adjust it if necessary.
+.SH FORMAT
+.PP
+Empty lines and lines that start with a semicolon (\fB;\fP) or hash (\fB#\fP) sign are ignored. Every other 
+line should match the format:
+.PP
+\fIpath\fP [ \fIdevice\fP|\fB*\fP [ \fIlinkname\fP|\fB*\fP [ \fIsize\fP|\fB*\fP [ \fIbsize\fP|\fB*\fP [ \fIflags\fP ]]]]]
+.PP
+\fIpath\fP information is obligatory and should be a path to a file on MooseFS that will be
+used as the block device; the path should be relative to MooseFS root or path defined with \fB-S\fP option
+when starting \fBmfsbdev\fP, not your local file system root
+.PP
+\fIdevice\fP information is optional, if supplied should point to a network block device path 
+(eg. /dev/nbd1); if not present or \fB*\fP is supplied, first available block device will be used
+.PP
+\fIlinkname\fP information is optional, if supplied should indicate the name of symbolic link 
+created in '/dev/mfs', pointing at the network block device created by the map command; 
+if not present or \fB*\fP is supplied, default link name will be used
+.PP
+\fIsize\fP information is optional, if supplied indicates block device size; if not present or \fB*\fP is supplied, 
+the size of the file indicated by the first parameter is used
+.PP
+\fIbsize\fP information is optional, if supplied indicates block size; if not present or \fB*\fP is supplied,
+4096 bytes block is used
+.PP
+\fIflags\fP information is optional, can contain the following flags 
+(separated by comma if more than one is listed) \fBro\fP - read only device, \fBrw\fP read/write device, 
+\fBlock\fP - device requires an appropriate type of lock (shared for \fBro\fP, exlusive for \fBrw\fP), \fBnolock\fP
+- device does not require a lock (will try to obtain it, but will ignore failure); 
+if nothing is supplied, the default of \fBrw\fP, \fBlock\fP is assumed; 
+if two conflicting flags are supplied (i.e. \fBro\fP and \fBrw\fP or \fBlock\fP and \fBnolock\fP) the last one wins
+.SH EXAMPLES
+.PP
+Create read/write devices with default block device path, default linkname, using file size as 
+device size, with default block size:
+.PP
+.B my_devices/device1
+.PP
+.B my_devices/device2 * * * * rw
+.PP
+Create read only devices with specific parameters:
+.PP
+.B my_devices/device1 /dev/nbd3 mfsdevice1 67108864 1024 ro
+.PP
+.B my_devices/device2 /dev/nbd7 mfsdevice2 64MiB 1024 ro,nolock
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR mfsbdev (8)
+

@@ -25,11 +25,12 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 
 #include "main.h"
 #include "cfg.h"
 #include "datapack.h"
+#include "mfslog.h"
+#include "chunks.h"
 
 typedef struct mlogentry {
 	uint64_t chunkid;
@@ -96,6 +97,14 @@ void missing_log_swap(void) {
 uint32_t missing_log_getdata(uint8_t *buff,uint8_t mode) {
 	uint32_t i,j;
 	if (buff==NULL) {
+		for (i=0 ; i<mloghashprevsize ; i++) {
+			if (mloghashprev[i].chunkid!=0) {
+				if (chunk_remove_from_missing_log(mloghashprev[i].chunkid)) {
+					mloghashprev[i].chunkid = 0;
+					mloghashprevelements--;
+				}
+			}
+		}
 		return mloghashprevelements*((mode==0)?16:17);
 	} else {
 		j = 0;
@@ -120,10 +129,10 @@ void missing_log_reload(void) {
 	ncapacity = cfg_getuint32("MISSING_LOG_CAPACITY",100000);
 
 	if (ncapacity<1000) {
-		syslog(LOG_WARNING,"MISSING_LOG_CAPACITY to low - increased to 1000");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MISSING_LOG_CAPACITY to low - increased to 1000");
 	}
 	if (ncapacity>1000000) {
-		syslog(LOG_WARNING,"MISSING_LOG_CAPACITY to high - decreased to 1000000");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MISSING_LOG_CAPACITY to high - decreased to 1000000");
 	}
 
 	if (ncapacity != mloghashcapacity) {

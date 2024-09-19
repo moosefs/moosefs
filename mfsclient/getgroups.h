@@ -25,19 +25,14 @@
 #include <inttypes.h>
 
 typedef struct groups {
-	double time;
-	pid_t pid;
-	uid_t uid;
-	gid_t gid;
-	uint16_t lcnt;
-	uint8_t locked;
+	uint32_t lcnt;
 	uint32_t gidcnt;
 	uint32_t *gidtab;
-	struct groups *next,**prev;
 } groups;
 
-groups* groups_get_x(pid_t pid,uid_t uid,gid_t gid,uint8_t lockmode);
-#define groups_get(p,u,g) groups_get_x(p,u,g,0)
+groups* groups_get_common(pid_t pid,uid_t uid,gid_t gid,uint8_t cacheonly);
+#define groups_get(p,u,g) groups_get_common(p,u,g,0)
+#define groups_get_cacheonly(p,u,g) groups_get_common(p,u,g,1)
 void groups_rel(groups* g);
 void groups_term(void);
 void groups_init(double _to,int dm);

@@ -1,31 +1,23 @@
-.TH mfsmetalogger "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsmetalogger "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
-mfsmetalogger \- start, restart or stop Moose File System metalogger process
+mfsmetalogger \- start, restart or stop MooseFS metalogger process
 .SH SYNOPSIS
 .B mfsmetalogger
-[\fB\-f\fP]
-[\fB\-c\fP \fICFGFILE\fP] [\fB\-u\fP]
-[\fB\-d\fP]
-[\fB\-t\fP\fI LOCKTIMEOUT\fP]
-[\fIACTION\fP]
-.PP
-.B mfsmetalogger \-s
 [\fB\-c\fP \fICFGFILE\fP]
+[\fB\-f\fP]
+[\fB\-d\fP]
+[\fB\-u\fP]
+[\fB\-n\fP]
+[\fB\-t\fP \fILOCKTIMEOUT\fP]
+[\fIACTION\fP]
 .PP
 .B mfsmetalogger \-v
 .PP
 .B mfsmetalogger \-h
 .SH DESCRIPTION
 .PP
-\fBmfsmetalogger\fP is the metadata replication server of Moose File System.
-Depending on parameters it can start, restart or stop MooseFS metalogger process.
-Without any options it starts MooseFS metalogger, killing previously run process
-if lock file exists.
-.PP
-SIGHUP (or 'reload' \fIACTION\fP) forces \fBmfsmetalogger\fP to reload all configuration files.
-.PP
-mfsmetalogger exists since 1.6.5 version of MooseFS; before this version
-\fBmfschunkserver\fP\|(8) was responsible of logging metadata changes.
+\fBmfsmetalogger\fP is the metadata replication server of MooseFS.
+.SH OPTIONS
 .TP
 \fB\-v\fP
 print version information and exit
@@ -33,33 +25,45 @@ print version information and exit
 \fB\-h\fP
 print usage information and exit
 .TP
-\fB\-f\fP
-(deprecated, use \fBstart\fP action instead)
-forcily run MooseFS metalogger process, without trying to kill previous instance
-(this option allows to run MooseFS metalogger if stale PID file exists)
-.TP
-\fB\-s\fP
-(deprecated, use \fBstop\fP action instead)
-stop MooseFS metalogger process
-.TP
 \fB\-c\fP \fICFGFILE\fP
 specify alternative path of configuration file (default is
 \fBmfsmetalogger.cfg\fP in system configuration directory)
 .TP
+\fB\-f\fP
+run in foreground, don't daemonize
+.TP
+\fB\-d\fP
+run with dangerous options (names: DANGEROUS_*)
+.TP
 \fB\-u\fP
 log undefined configuration values (when default is assumed)
 .TP
-\fB\-d\fP
-run in foreground, don't daemonize
+\fB\-n\fP
+do not attempt to increase limit of core dump size
 .TP
 \fB\-t\fP \fILOCKTIMEOUT\fP
-how long to wait for lockfile (default is 60 seconds)
+how long to wait for lockfile (in seconds; default is 60 seconds)
 .TP
 \fIACTION\fP
-is the one of \fBstart\fP, \fBstop\fP, \fBrestart\fP, \fBreload\fP, \fBtest\fP or \fBkill\fP. Default action is
-\fBrestart\fP unless \fB\-s\fP (stop) or \fB\-f\fP (start) option is given.
-Note that \fB\-s\fP and \fB\-f\fP options are deprecated, likely to disappear
-and \fIACTION\fP parameter to become obligatory in MooseFS 1.7.
+tells metalogger to perform one of the following actions:
+.RS 
+.IP start 9
+Start metalogger process if the process is not already running, otherwise display error message.
+.IP stop 
+Stop metalogger process if the process is running, otherwise display error message.
+.IP restart 
+(default action) If the metalogger process is running, restart it, if it's not running, start it. 
+.IP reload
+Send a signal to metalogger process to reload config files.
+.IP info
+Send a singal to metalogger process to dump debug information file in working directory.
+.IP test
+Displays "mfsmetalogger pid: PID" if the metalogger is running (and return 0) or  "mfsmetalogger is not running" otherwise (and return 1).
+.IP kill
+Send termination signal to metalogger process.
+.IP restore
+Not implemented.
+.RE
 .SH FILES
 .TP
 \fBmfsmetalogger.cfg\fP

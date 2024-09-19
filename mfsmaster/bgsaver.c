@@ -39,7 +39,7 @@
 #include "crc.h"
 #include "main.h"
 #include "cfg.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "massert.h"
 #include "sockets.h"
 #include "mfsalloc.h"
@@ -49,7 +49,7 @@
 
 #define MAXLOGNUMBER 1000U
 
-enum {BGSAVER_ALIVE,BGSAVER_START,BGSAVER_WRITE,BGSAVER_FINISH,BGSAVER_DONE,BGSAVER_CHANGELOG,BGSAVER_CHANGELOG_ACK,BGSAVER_ROTATELOG,BGSAVER_TERMINATE};
+enum {BGSAVER_ALIVE,BGSAVER_START,BGSAVER_WRITE,BGSAVER_FINISH,BGSAVER_DONE,BGSAVER_CHANGELOG,BGSAVER_CHANGELOG_ACK,BGSAVER_CHANGELOG_NACK,BGSAVER_ROTATELOG,BGSAVER_TERMINATE};
 
 enum {FREE,DATA,KILL}; // bgsaverconn.mode
 
@@ -202,11 +202,11 @@ void bgsaver_worker(void) {
 
 	lf = open(".bgwriter.lock",O_RDWR,0666);
 	if (lf<0) {
-		mfs_errlog(LOG_ERR,"background data writer - can't open lockfile");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"background data writer - can't open lockfile");
 		goto err;
 	}
 	if (lockf(lf,F_TLOCK,0)<0) {
-		mfs_errlog(LOG_ERR,"background data writer - can't get lock on lockfile");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"background data writer - can't get lock on lockfile");
 		goto err;
 	}
 
@@ -222,7 +222,7 @@ void bgsaver_worker(void) {
 		pfd.events = POLLIN;
 		poll(&pfd,1,100);
 		if ((pfd.revents&(POLLERR|POLLHUP))!=0) {
-			mfs_errlog_silent(LOG_ERR,"background data writer - HUP/ERR detected on data pipe");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"background data writer - HUP/ERR detected on data pipe");
 			goto err;
 		}
 		if ((pfd.revents&POLLIN)==0) {
@@ -230,7 +230,7 @@ void bgsaver_worker(void) {
 		}
 		l = readall(eptr->data_pipe[PIPE_READ],auxbuff,8);
 		if (l!=8) {
-			mfs_errlog_silent(LOG_ERR,"background data writer - reading pipe error");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"background data writer - reading pipe error");
 			goto err;
 		}
 		rptr = auxbuff;
@@ -246,23 +246,23 @@ void bgsaver_worker(void) {
 				if (buff!=NULL) {
 					buffsize = leng;
 				} else {
-					syslog(LOG_ERR,"background data writer - out of memory (alloc size: %"PRIu32")",newleng);
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"background data writer - out of memory (alloc size: %"PRIu32")",newleng);
 					goto err;
 				}
 			}
 			l = readall(eptr->data_pipe[PIPE_READ],buff,leng);
 		} else {
-			syslog(LOG_ERR,"background data writer - packet too long (packet size: %"PRIu32")",leng);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"background data writer - packet too long (packet size: %"PRIu32")",leng);
 			goto err;
 		}
 		if (l!=(int32_t)leng) {
-			mfs_errlog_silent(LOG_ERR,"background data writer - reading pipe error");
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"background data writer - reading pipe error");
 			goto err;
 		}
 		switch (cmd) {
 			case BGSAVER_START:
 				if (leng!=4) {
-					syslog(LOG_ERR,"background data writer - leng error (BGSAVER_START packet)");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"background data writer - leng error (BGSAVER_START packet)");
 					status = 0;
 				} else {
 					rptr = buff;
@@ -272,7 +272,7 @@ void bgsaver_worker(void) {
 					}
 					fd = open("metadata_download.tmp",O_WRONLY | O_TRUNC | O_CREAT,0666);
 					if (fd<0) {
-						mfs_errlog_silent(LOG_ERR,"background data writer - error opening 'metadata_download.tmp'");
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error opening 'metadata_download.tmp'");
 						status = 0;
 					} else {
 						bytes = 0;
@@ -290,7 +290,7 @@ void bgsaver_worker(void) {
 					wleng = get32bit(&rptr);
 					wcrc = get32bit(&rptr);
 					if (wleng!=leng-16) {
-						syslog(LOG_ERR,"background data writer - leng error (BGSAVER_WRITE packet)");
+						mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"background data writer - leng error (BGSAVER_WRITE packet)");
 						status = 0;
 					} else {
 #ifdef HAVE_PWRITE
@@ -300,10 +300,10 @@ void bgsaver_worker(void) {
 						ret = write(fd,rptr,wleng);
 #endif /* HAVE_PWRITE */
 						if (ret!=(ssize_t)wleng) {
-							mfs_errlog_silent(LOG_ERR,"background data writer - error writing 'metadata_download.tmp'");
+							mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error writing 'metadata_download.tmp'");
 							status = 0;
 						} else if (wcrc != mycrc32(0,rptr,wleng)) {
-							syslog(LOG_ERR,"background data writer - crc error (BGSAVER_WRITE packet)");
+							mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"background data writer - crc error (BGSAVER_WRITE packet)");
 							status = 0;
 						} else {
 							if (speedlimit>0) {
@@ -326,16 +326,16 @@ void bgsaver_worker(void) {
 				break;
 			case BGSAVER_FINISH:
 				if (leng!=0) {
-					syslog(LOG_ERR,"background data writer - leng error (BGSAVER_FINISH packet)");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"background data writer - leng error (BGSAVER_FINISH packet)");
 					status = 0;
 				} else {
 					status = 1;
 					if (fsync(fd)<0) {
-						mfs_errlog_silent(LOG_ERR,"background data writer - error syncing 'metadata_download.tmp'");
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error syncing 'metadata_download.tmp'");
 						status = 0;
 					}
 					if (close(fd)<0) {
-						mfs_errlog_silent(LOG_ERR,"background data writer - error closing 'metadata_download.tmp'");
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error closing 'metadata_download.tmp'");
 						status = 0;
 					}
 					fd = -1;
@@ -379,67 +379,71 @@ void bgsaver_worker(void) {
 							if (write(logfd,chlogbuff,wleng)==(ssize_t)wleng) {
 								status = 1;
 							} else {
-								mfs_errlog_silent(LOG_ERR,"background data writer - error writing 'changelog.0.mfs'");
+								mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error writing 'changelog.0.mfs'");
 							}
 						}
 					} else {
-						mfs_errlog_silent(LOG_ERR,"background data writer - error opening 'changelog.0.mfs'");
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error opening 'changelog.0.mfs'");
 					}
 				}
 				break;
 			case BGSAVER_ROTATELOG:
-				if (leng!=0) {
+				if (leng!=4) {
 					status = 0;
 				} else {
 					char logname1[100],logname2[100];
 					uint32_t i;
+					uint32_t backlogsno;
+
+					rptr = buff;
+					backlogsno = get32bit(&rptr);
 
 					status = 1;
 					if (logfd>=0) {
 						if (fsync(logfd)<0) {
-							mfs_errlog_silent(LOG_ERR,"background data writer - error syncing 'changelog.0.mfs'");
+							mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error syncing 'changelog.0.mfs'");
 							status = 0;
 						}
 						if (close(logfd)<0) {
-							mfs_errlog_silent(LOG_ERR,"background data writer - error closing 'changelog.0.mfs'");
+							mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error closing 'changelog.0.mfs'");
 							status = 0;
 						}
 						logfd=-1;
 					}
-					if (BackLogsNumber>0) {
-						for (i=BackLogsNumber ; i>0 ; i--) {
+					if (backlogsno>0) {
+						for (i=backlogsno ; i>0 ; i--) {
 							snprintf(logname1,100,"changelog.%"PRIu32".mfs",i);
 							snprintf(logname2,100,"changelog.%"PRIu32".mfs",i-1);
 							if (rename(logname2,logname1)<0) {
 								if (errno!=ENOENT) {
-									mfs_arg_errlog_silent(LOG_ERR,"background data writer - error renaming '%s'->'%s'",logname2,logname1);
+									mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error renaming '%s'->'%s'",logname2,logname1);
 								}
 							}
 						}
 					} else {
 						if (unlink("changelog.0.mfs")<0) {
 							if (errno!=ENOENT) {
-								mfs_errlog_silent(LOG_ERR,"background data writer - error deleting 'changelog.0.mfs'");
+								mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"background data writer - error deleting 'changelog.0.mfs'");
 							}
 						}
 					}
 				}
 				break;
 			case BGSAVER_TERMINATE:
-				syslog(LOG_NOTICE,"background data writer - terminating");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"background data writer - terminating");
 				if (logfd>=0) {
 					fsync(logfd);
 					close(logfd);
 				}
 				if (fd>=0) {
-					syslog(LOG_NOTICE,"background data writer - removing unfinished metadata file");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"background data writer - removing unfinished metadata file");
 					close(fd);
 					unlink("metadata_download.tmp");
 				}
 				goto err;
 				break; // just silent compiler warnings
 			default:
-				syslog(LOG_ERR,"background data writer - got unrecognized command (%"PRIu32")",cmd);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"background data writer - got unrecognized command (%"PRIu32")",cmd);
 				goto err;
 		}
 		if (cmd==BGSAVER_START || cmd==BGSAVER_WRITE || cmd==BGSAVER_FINISH) { // status required
@@ -452,16 +456,7 @@ void bgsaver_worker(void) {
 			*wptr = status;
 			writeall(eptr->status_pipe[PIPE_WRITE],auxbuff,9);
 		} else if (cmd==BGSAVER_CHANGELOG || cmd==BGSAVER_ROTATELOG) { // status only used for logging
-			if (status==0) {
-				if (chloglostcnt==0) {
-					syslog(LOG_WARNING,"changelog lost !!!");
-				} else if (chloglostcnt==100000) {
-					syslog(LOG_WARNING,"next 100000 changelogs are lost !!!");
-					chloglostcnt = 0;
-				}
-				chloglostcnt++;
-			}
-			if (status==1) {
+			if (status) {
 				if (cmd==BGSAVER_CHANGELOG && timestamp>=last_timestamp) {
 					last_timestamp = timestamp;
 					wptr = auxbuff;
@@ -471,6 +466,18 @@ void bgsaver_worker(void) {
 					writeall(eptr->status_pipe[PIPE_WRITE],auxbuff,12);
 				}
 				chloglostcnt = 0;
+			} else {
+				if (chloglostcnt==0) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"changelog lost !!!");
+				} else if (chloglostcnt==100000) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"next 100000 changelogs are lost !!!");
+					chloglostcnt = 0;
+				}
+				chloglostcnt++;
+				wptr = auxbuff;
+				put32bit(&wptr,BGSAVER_CHANGELOG_NACK);
+				put32bit(&wptr,0);
+				writeall(eptr->status_pipe[PIPE_WRITE],auxbuff,8);
 			}
 		}
 	}
@@ -483,11 +490,11 @@ err:
 	}
 	if (lf>=0) {
 		if (lockf(lf,F_ULOCK,0)<0) { // pro forma
-			syslog(LOG_NOTICE,"background data writer - error removing lock from lockfile");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"background data writer - error removing lock from lockfile");
 		}
 		close(lf);
 	}
-	syslog(LOG_NOTICE,"background data writer - exiting");
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"background data writer - exiting");
 	exit(0);
 }
 
@@ -587,7 +594,7 @@ void bgsaver_done(bgsaverconn *eptr,const uint8_t *data,uint32_t length) {
 	eptr->ud = NULL;
 
 	if (length!=1) {
-		syslog(LOG_WARNING,"mallformed packet from bgworker");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"mallformed packet from bgworker");
 		eptr->mode = KILL;
 		if (donefn!=NULL) {
 			donefn(ud,-1);
@@ -605,10 +612,10 @@ void bgsaver_changelog(uint64_t version,const char *message) {
 	uint8_t *buff;
 
 	if (terminating) {
-		syslog(LOG_WARNING,"changelog received during termination - changelog line lost");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"changelog received during termination - changelog line lost");
 	}
 	if (eptr==NULL || eptr->mode!=DATA) {
-		syslog(LOG_WARNING,"problems with data write subprocess detected - changelog line lost - force termination");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"problems with data write subprocess detected - changelog line lost - force termination");
 		main_exit();
 		return;
 	}
@@ -622,12 +629,14 @@ void bgsaver_changelog(uint64_t version,const char *message) {
 
 void bgsaver_rotatelog(void) {
 	bgsaverconn *eptr = bgsaversingleton;
+	uint8_t *buff;
 
 	if (eptr==NULL || eptr->mode!=DATA) {
 		return;
 	}
 
-	bgsaver_createpacket(eptr,BGSAVER_ROTATELOG,0);
+	buff = bgsaver_createpacket(eptr,BGSAVER_ROTATELOG,4);
+	put32bit(&buff,BackLogsNumber);
 }
 
 void bgsaver_changelog_ack(bgsaverconn *eptr,const uint8_t *data,uint32_t length) {
@@ -635,7 +644,7 @@ void bgsaver_changelog_ack(bgsaverconn *eptr,const uint8_t *data,uint32_t length
 	uint32_t timestamp,timestamp_ack;
 
 	if (length!=4) {
-		syslog(LOG_WARNING,"mallformed packet from bgworker");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"mallformed packet from bgworker");
 		eptr->mode = KILL;
 		return;
 	}
@@ -649,11 +658,21 @@ void bgsaver_changelog_ack(bgsaverconn *eptr,const uint8_t *data,uint32_t length
 	}
 }
 
+void bgsaver_changelog_nack(bgsaverconn *eptr,const uint8_t *data,uint32_t length) {
+	if (length!=0) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"mallformed packet from bgworker");
+		eptr->mode = KILL;
+		return;
+	}
+	(void)data;
+	main_exit();
+}
+
 void bgsaver_alive(bgsaverconn *eptr,const uint8_t *data,uint32_t length) {
 	(void)eptr;
 	(void)data;
 	if (length!=0) {
-		syslog(LOG_WARNING,"mallformed packet from bgworker");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"mallformed packet from bgworker");
 		eptr->mode = KILL;
 		return;
 	}
@@ -668,11 +687,14 @@ void bgsaver_gotpacket(bgsaverconn *eptr,uint32_t type,const uint8_t *data,uint3
 		case BGSAVER_CHANGELOG_ACK:
 			bgsaver_changelog_ack(eptr,data,length);
 			break;
+		case BGSAVER_CHANGELOG_NACK:
+			bgsaver_changelog_nack(eptr,data,length);
+			break;
 		case BGSAVER_ALIVE:
 			bgsaver_alive(eptr,data,length);
 			break;
 		default:
-			syslog(LOG_NOTICE,"got unknown message (type:%"PRIu32")",type);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"got unknown message (type:%"PRIu32")",type);
 			eptr->mode = KILL;
 	}
 }
@@ -749,7 +771,7 @@ void bgsaver_read(bgsaverconn *eptr) {
 			leng = get32bit(&ptr);
 
 			if (leng>MAX_STATUS_SIZE) {
-				syslog(LOG_WARNING,"bgworker packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MAX_STATUS_SIZE,type);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"bgworker packet too long (%"PRIu32"/%u) ; command:%"PRIu32,leng,MAX_STATUS_SIZE,type);
 				eptr->input_end = 1;
 				return;
 			}
@@ -778,10 +800,10 @@ void bgsaver_read(bgsaverconn *eptr) {
 	}
 
 	if (hup) {
-		syslog(LOG_NOTICE,"connection was reset by bgworker");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"connection was reset by bgworker");
 		eptr->input_end = 1;
 	} else if (err) {
-		mfs_errlog_silent(LOG_NOTICE,"read from bgworker error");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"read from bgworker error");
 		eptr->input_end = 1;
 	}
 }
@@ -824,7 +846,7 @@ void bgsaver_write(bgsaverconn *eptr) {
 		i = writev(eptr->data_pipe[PIPE_WRITE],iovtab,iovdata);
 		if (i<0) {
 			if (ERRNO_ERROR) {
-				mfs_errlog_silent(LOG_NOTICE,"write to Master error");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"write to Master error");
 				eptr->mode = KILL;
 			}
 			return;
@@ -858,7 +880,7 @@ void bgsaver_write(bgsaverconn *eptr) {
 		i=write(eptr->data_pipe[PIPE_WRITE],opack->startptr,opack->bytesleft);
 		if (i<0) {
 			if (ERRNO_ERROR) {
-				mfs_errlog_silent(LOG_NOTICE,"write to Master error");
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"write to Master error");
 				eptr->mode = KILL;
 			}
 			return;
@@ -937,7 +959,7 @@ void bgsaver_disconnection_check(void) {
 		eptr->outputtail = &(eptr->outputhead);
 		eptr->mode = FREE;
 		if (terminating==0) {
-			syslog(LOG_ERR,"connection lost with background data writer - exiting");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"connection with background data writer has been terminated - exiting");
 			main_exit();
 		}
 	}
@@ -977,9 +999,9 @@ void bgsaver_alive_check(void) {
 		if (now - bgsaver_last_activity > bgsaver_last_report + 50) {
 			bgsaver_last_report += 50;
 			if (bgsaver_last_report<300) {
-				syslog(LOG_WARNING,"background data writer is not responding (last ping received more than %u seconds ago)",bgsaver_last_report);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"background data writer is not responding (last ping received more than %u seconds ago)",bgsaver_last_report);
 			} else {
-				syslog(LOG_ERR,"background data writer is not responding (last ping received more than %u seconds ago) - terminating",bgsaver_last_report);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"background data writer is not responding (last ping received more than %u seconds ago) - terminating",bgsaver_last_report);
 				main_exit();
 			}
 		} else if (now - bgsaver_last_activity < 5.0) {
@@ -991,10 +1013,11 @@ void bgsaver_alive_check(void) {
 void bgsaver_reload(void) {
 	BackLogsNumber = cfg_getuint32("BACK_LOGS",50);
 	if (BackLogsNumber>MAXLOGNUMBER) {
-		syslog(LOG_WARNING,"BACK_LOGS value too big !!!");
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"BACK_LOGS value too big !!!");
 		BackLogsNumber = MAXLOGNUMBER;
 	}
 }
+
 
 void bgsaver_termcheck(void) {
 	bgsaverconn *eptr = bgsaversingleton;
@@ -1009,7 +1032,6 @@ void bgsaver_termcheck(void) {
 }
 
 void bgsaver_wantexit(void) {
-
 	main_time_register(1,0,bgsaver_termcheck);
 }
 
@@ -1056,11 +1078,11 @@ int bgsaver_init(void) {
 
 	lf = open(".bgwriter.lock",O_RDWR|O_CREAT,0666);
 	if (lf<0) {
-		mfs_errlog(LOG_ERR,"can't create bgsaver lockfile");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't create bgsaver lockfile");
 		return -1;
 	}
 	if (lockf(lf,F_TEST,0)<0) {
-		mfs_errlog(LOG_ERR,"bgsaver lock exists");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"bgsaver lock exists");
 		close(lf);
 		return -1;
 	}
@@ -1072,11 +1094,11 @@ int bgsaver_init(void) {
 	passert(eptr);
 
 	if (pipe(eptr->data_pipe)<0) {
-		mfs_errlog(LOG_ERR,"can't create pipe");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't create pipe");
 		return -1;
 	}
 	if (pipe(eptr->status_pipe)<0) {
-		mfs_errlog(LOG_ERR,"can't create pipe");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't create pipe");
 		return -1;
 	}
 	univnonblock(eptr->data_pipe[PIPE_READ]);
@@ -1085,7 +1107,7 @@ int bgsaver_init(void) {
 	univnonblock(eptr->status_pipe[PIPE_WRITE]);
 	e = fork();
 	if (e<0) {
-		mfs_errlog(LOG_ERR,"fork error");
+		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"fork error");
 		return -1;
 	}
 	if (e==0) {
@@ -1123,8 +1145,8 @@ int bgsaver_init(void) {
 	bgsaver_last_check = monotonic_seconds();
 	bgsaver_last_check_count = 0;
 	bgsaver_last_report = 0;
-
 	termdelay = 0;
+
 	main_wantexit_register(bgsaver_wantexit);
 	main_time_register(1,0,bgsaver_alive_check);
 	main_canexit_register(bgsaver_canexit);

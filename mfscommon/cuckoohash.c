@@ -281,7 +281,7 @@ static inline void hash_rehash_job(htab *ht) {
 	}
 }
 
-void* chash_new() {
+void* chash_new(void) {
 	htab *ht;
 
 	ht = malloc(sizeof(htab));

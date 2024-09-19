@@ -26,6 +26,8 @@
 #include <stdio.h>
 
 /*
+	(inode,sessionid) in set means that cache can be kept on open
+
      open(inode,sessionid) -> isset? (inode,sessionid)
      access(inode,sessionid) -> set (inode,sessionid)
      modify(inode,sessionid) -> clear (inode,!sessionid) and set (inode,sessionid)

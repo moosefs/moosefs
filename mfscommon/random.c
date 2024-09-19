@@ -90,7 +90,7 @@ int rnd_init(void) {
 	i++; \
 }
 
-uint8_t rndu8() {
+uint8_t rndu8(void) {
 	uint8_t r;
 #ifdef _USE_PTHREADS
 	pthread_mutex_lock(&lock);
@@ -102,7 +102,7 @@ uint8_t rndu8() {
 	return r;
 }
 
-uint32_t rndu32() {
+uint32_t rndu32(void) {
 	uint32_t res;
 	uint8_t *r = (uint8_t*)&res;
 #ifdef _USE_PTHREADS
@@ -118,7 +118,7 @@ uint32_t rndu32() {
 	return res;
 }
 
-uint64_t rndu64() {
+uint64_t rndu64(void) {
 	uint64_t res;
 	uint8_t *r = (uint8_t*)&res;
 #ifdef _USE_PTHREADS

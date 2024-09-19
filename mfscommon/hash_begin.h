@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <inttypes.h>
+#include <stdio.h> // debug only
 #ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>
 #endif
@@ -68,6 +69,10 @@ static inline uint32_t GLUE_FN_NAME_PREFIX(_hash)(HASH_ARGS_TYPE_LIST) {
 
 static inline uint32_t GLUE_FN_NAME_PREFIX(_ehash)(ENTRY_TYPE *e) {
 	return e->value;
+}
+
+static inline void GLUE_FN_NAME_PREFIX(_print)(ENTRY_TYPE *e) {
+	printf("%" PRIu32,e->value);
 }
 #endif
 
@@ -134,6 +139,31 @@ static inline void GLUE_FN_NAME_PREFIX(_hash_cleanup)(void) {
 #endif
 		}
 		GLUE_HASH_TAB_PREFIX(hashtab)[i] = NULL;
+	}
+}
+
+// test only 
+static inline void GLUE_FN_NAME_PREFIX(_hash_print)(void) {
+	uint16_t i;
+	uint32_t j;
+	ENTRY_TYPE *e;
+	printf("hash elem: %" PRIu32 "\n",GLUE_HASH_TAB_PREFIX(hashelem));
+	printf("hash size: %" PRIu32 "\n",GLUE_HASH_TAB_PREFIX(hashsize));
+	for (i=0 ; i<HASHTAB_HISIZE ; i++) {
+		if (GLUE_HASH_TAB_PREFIX(hashtab)[i]!=NULL) {
+			for (j=0 ; j<HASHTAB_LOSIZE ; j++) {
+				if (GLUE_HASH_TAB_PREFIX(hashtab)[i][j]!=NULL) {
+					printf("hash pos: %" PRIu16 ",%" PRIu32 ":",i,j);
+					for (e=GLUE_HASH_TAB_PREFIX(hashtab)[i][j] ; e ; e=e->next) {
+						GLUE_FN_NAME_PREFIX(_print)(e);
+						if (e->next) {
+							printf(" , ");
+						}
+					}
+					printf("\n");
+				}
+			}
+		}
 	}
 }
 

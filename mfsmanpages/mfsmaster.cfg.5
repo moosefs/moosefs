@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
@@ -10,14 +10,14 @@ Syntax is:
 .IB OPTION " = " VALUE
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
-.SH OPTIONS
-Configuration options:
+.SH STARTUP OPTIONS
+Changes in this section require process restart.
 .TP
 .B WORKING_USER
 user to run daemon as
 .TP
 .B WORKING_GROUP
-group to run daemon as; optional value - if empty then default user group will be used
+group to run daemon as; optional value - if empty, then user's default group will be used
 .TP
 .B SYSLOG_IDENT
 name of process to place in syslog messages; default is mfsmaster
@@ -26,7 +26,7 @@ name of process to place in syslog messages; default is mfsmaster
 whether to perform mlockall() to avoid swapping out mfsmaster process; default is 0, i.e. no
 .TP
 .B LIMIT_GLIBC_MALLOC_ARENAS
-limit malloc arenas to given value - prevents server from using huge amount of virtual memory (Linux onty, default is 4)
+limit malloc arenas to given value - prevents server from using huge amount of virtual memory (Linux only, default is 4)
 .TP
 .B DISABLE_OOM_KILLER
 disable out of memory killer (Linux only, default is 1)
@@ -35,10 +35,15 @@ disable out of memory killer (Linux only, default is 1)
 nice level to run daemon with; default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with
 .TP
 .B FILE_UMASK
-set default umask for group and others (user has always 0); default is 027 - block write for group and block all for others
+set default umask for group and others (user always has 0); default is 027 - block write for group and block all for others
 .TP
 .B DATA_PATH
 where to store metadata files and lock file
+.SH RUNTIME OPTIONS
+Changes in this section require only process reload.
+.TP
+.B LICENCE_FILENAME
+(pro only) alternate location/name of \fBmfslicence.bin\fP file
 .TP
 .B EXPORTS_FILENAME
 alternate location/name of \fBmfsexports.cfg\fP file
@@ -46,28 +51,45 @@ alternate location/name of \fBmfsexports.cfg\fP file
 .B TOPOLOGY_FILENAME
 alternate location/name of \fBmfstopology.cfg\fP file
 .TP
-.B LICENCE_FILENAME
-(pro only) alternate location/name of \fBmfslicence.bin\fP file
+.B INSTANCE_NAME
+optional name of MooseFS instance (cluster) that will be displayed in CGI interface (default is empty string)
 .TP
 .B BACK_LOGS
 number of metadata change log files (default is 50)
 .TP
+.B METADATA_SAVE_OFFSET
+offset used for options: METADATA_SAVE_FREQ, (pro only) METADATA_DOWNLOAD_FREQ, (pro only) METADATA_CRCCHECK_FREQ (minutes - default is 0);
+format X:Y is also accepted and means X hours and Y minutes, suffix "L" can be added to mean local(server) time
+zone instead of UTC; if hours are provided, modulo value of 
+METADATA_SAVE_FREQ, METADATA_DOWNLOAD_FREQ, METADATA_CRCCHECK_FREQ will be calculated and used, see NOTES
+.TP
 .B METADATA_SAVE_FREQ
-how often (in hours) master will store metadata (default is 1)
+how often (in hours) master (single or follower) will store metadata (default is 1)
 .TP
 .B METADATA_DOWNLOAD_FREQ
-(pro only) how often (in hours) leader will download metadata from followers (default is 24)
+(pro only) how often (in hours) leader will download metadata from followers (default is 0 - which means never)
+.TP
+.B METADATA_CRCCHECK_FREQ
+(pro only) how often (in hours) leader will check metadata consistency with followers (also saves metadata ; default is 24)
 .TP
 .B METADATA_DOWNLOAD_LIMIT
 (pro only) metadata downloading limit in mebibytes per second (0 means no limit, default is 50 - 50MiB/s = ~52.4MB/s)
+.TP
+.B DEPUTY_ELECTION_TIME
+(pro only) how many seconds until master-elect turns into master-deputy (a.k.a master-readonly) if there are not enough chunkservers connected to become master-leader (default is 0 - which means never)
 .TP
 .B BACK_META_KEEP_PREVIOUS
 number of previous metadata files to be kept (default is 1)
 .TP
 .B CHANGELOG_PRESERVE_SECONDS
-how many seconds of change logs have to be preserved in memory (default is 1800; 
+how many seconds of change logs have to be preserved in memory (default is 5000; 
 this sets the minimum, actual number may be a bit bigger due to logs being kept 
 in 5k blocks; zero disables extra logs storage)
+.TP
+.B CHANGELOG_PRESERVE_MB
+how much RAM can be used to preserve change logs in memory in megabytes (deafult is 500; this sets the minimum, actual number may be a bit bigger 
+due to logs being kept in 5k blocks; zero disables extra logs storage);
+master will always preserve the lower number of 5k blocks defined by \fBCHANGELOG_PRESERVE_SECONDS\fP and \fBCHANGELOG_PRESERVE_MB\fP, so be sure to set both appropriately
 .TP
 .B CHANGELOG_SAVE_MODE
 Changelog save mode (default is 0)
@@ -81,14 +103,33 @@ Changelog save mode (default is 0)
 .B MISSING_LOG_CAPACITY
 how many missing chunks will be stored in master (up to 100*MISSING_LOG_CAPACITY bytes of memory will be allocated ; default value is 100000)
 .TP
+.B CONFIGURATION_TEST_PERIOD
+(pro only) how often (in hours) master leader should run a test, that checks if configuration options are consistent betewen modules (default is 24, max possible value is 168, 0 means no tests are performed)
+.TP
+.B SYSLOG_MIN_LEVEL
+minimum level of messages that will be reported by master; levels in order of importance: ERROR, WARNING, NOTICE, INFO, DEBUG (default is INFO)
+.TP
+.B SYSLOG_ELEVATE_TO
+reported messages of level lower than set by this option will be elevated to this level (i.e. if \fBSYSLOG_MIN_LEVEL\fP is set to DEBUG and \fBSYSLOG_ELEVATE_TO\fP is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE ; default is NOTICE)
+.SH COMMAND CONNECTION OPTIONS
+Changes in this section require only process reload.
+.TP
 .B MATOML_LISTEN_HOST
-IP address to listen on for metalogger, masters and supervisors connections (* means any)
+IP address to listen on for metalogger, (pro only) masters and supervisors connections (* means any)
 .TP
 .B MATOML_LISTEN_PORT
-port to listen on for metalogger, masters and supervisors connections
+port to listen on for metalogger, (pro only) masters and supervisors connections
+.TP
+.B MATOML_TIMEOUT
+default timeout in seconds for master-metalogger (or master follower, pro only) connection (default is 10)
+.TP
+.B MATOML_FORCE_TIMEOUT
+forced timeout in seconds for master-metalogger (or master follower, pro only) connection (default is 0 - do not force timeouts)
+.SH MASTER-LEADER CONNECTION OPTIONS
+Changes in this section require only process reload.
 .TP
 .B MASTER_HOST
-(pro only) MooseFS master host, IP is allowed only in single-master installations (default is mfsmaster)
+(pro only) MooseFS master host (default is mfsmaster)
 .TP
 .B MASTER_RECONNECTION_DELAY
 (pro only) delay in seconds before next try to reconnect to master-leader if not connected (default is 5)
@@ -98,6 +139,8 @@ port to listen on for metalogger, masters and supervisors connections
 .TP
 .B BIND_HOST
 (pro only) local address to use for connecting with master-leader (default is *, i.e. default local address)
+.SH CHUNKSERVER CONNECTION OPTIONS
+Changes in this section require only process reload.
 .TP
 .B MATOCS_LISTEN_HOST
 IP address to listen on for chunkserver connections (\fB*\fP means any)
@@ -108,11 +151,22 @@ port to listen on for chunkserver connections
 .B MATOCS_TIMEOUT
 default timeout in seconds for master-chunkserver connection (default is 10)
 .TP
+.B MATOCS_FORCE_TIMEOUT
+forced timeout in seconds for master-chunkserver connection (default is 0 - do not force timeouts)
+.TP
 .B AUTH_CODE
-Optional authentication string. When defined - then only chunkservers with the same AUTH_CODE are allowed to connect to this master. When not defined (default) - then all chunkservers are allowed. If you want to switch on chunkserver authentication, then first define AUTH_CODE in all your chunkservers (and reload/restart them) then define this option and master and reload/restart it. Remember that after reload currently connected chunkservers are NOT disconnected. New AUTH_CODE will be used only when chunkservers will make new connection.
+Optional authentication string. When defined - then only chunkservers with the same AUTH_CODE are allowed to connect to this master. When not defined (default) - then all chunkservers are allowed. If you want to switch on chunkserver authentication, then first define AUTH_CODE in all your chunkservers (and reload/restart them), then define this option in master and reload/restart it. Remember, that after reload currently connected chunkservers are NOT disconnected. New AUTH_CODE will be used only when chunkservers will make a new connection.
 .TP
 .BR REMAP_BITS ", " REMAP_SOURCE_IP_CLASS ", " REMAP_DESTINATION_IP_CLASS
-Optional IP class remapping. Remap chunkserver IP addresses with first REMAP_BITS of IP equal to first REMAP_BITS of REMAP_SOURCE_IP_CLASS. During remapping system will set first REMAP_BITS of IP address to first REMAP_BITS of REMAP_DESTINATION_IP_CLASS. (defaults are zeros which means no remap)
+Optional IP class remapping. Remap chunkserver IP addresses with first REMAP_BITS of IP equal to first REMAP_BITS of REMAP_SOURCE_IP_CLASS. During remapping system will set first REMAP_BITS of IP address to first REMAP_BITS of REMAP_DESTINATION_IP_CLASS. All three option need to be defined for the remapping to work.
+.TP
+.BR MULTILAN_BITS ", " MULTILAN_CLASSES
+Optional LAN IP class remapping. Remap chunkservers IP addresses with first MULTILAN_BITS of client's IP for all client IPs matching one of the MULTILAN_CLASSES (classes must be separated by comma). All masters and chunkservers must have valid IPs from each of the MULTILAN_CLASSES classes. Both options need to be defined for the remapping to work.
+.TP
+.BR MULTILAN_IPMAP_FILENAME
+alternate location/name of \fBmfsipmap.cfg\fP file. This file defines optional custom IP mapping.
+.SH CHUNKSERVER WORKING OPTIONS
+Changes in this section require only process reload.
 .TP
 .B REPLICATIONS_DELAY_INIT
 initial delay in seconds before starting replications (default is 60)
@@ -122,9 +176,10 @@ whether to make undergoal replications respect topology (default is 0)
 .br
 0 - do not respect topology
 .br
-1 - pick destination server at random, but then choose best source server
+1 - pick a destination server at random, but then choose the best source server
 .br
-2 - try to find destination server in the same rack as one of the existing copies and then replicate chunk locally (in the same rack)
+2 - try to find a destination server in the same rack as one of the existing copies and then 
+replicate the chunk locally (in the same rack)
 .TP
 .B CREATIONS_RESPECT_TOPOLOGY
 whether new chunks should be recorded with respect to topology (default is 0)
@@ -141,6 +196,12 @@ avoid using same ip/rack for different chunk copies (default is 0)
 1 - avoid storing more than one copy on chunkservers using same IP number
 .br
 2 - avoid storing more than one copy on chunkservers using IP number from the same rack id
+.br
+\fbNOTICE!\fP This parameter is available for backward compatibility purposes and should not be set 
+to a value other than 0. Instead, distinguish feature from storage classes should be used. 
+However, if it is set to a value other than 0, it will override any distinguish definintion in 
+storage classes. For more informations about storage classes and distinguish feature refer to
+\fBmfsscadmin\fP\|(1) manual.
 .TP
 .B CHUNKS_LOOP_MAX_CPS
 Chunks loop shouldn't check more chunks per seconds than given number (default is 100000)
@@ -155,10 +216,10 @@ Soft maximum number of chunks to delete on one chunkserver (default is 10)
 Hard maximum number of chunks to delete on one chunkserver (default is 25)
 .TP
 .B CHUNKS_WRITE_REP_LIMIT
-Maximum number of chunks to replicate to one chunkserver (default is 2,1,1,4 - see NOTES)
+Maximum number of chunks to replicate to one chunkserver (default is 2,1,1,4,4 - see NOTES)
 .TP
 .B CHUNKS_READ_REP_LIMIT
-Maximum number of chunks to replicate from one chunkserver (default is 10,5,2,5 - see NOTES)
+Maximum number of chunks to replicate from one chunkserver (default is 10,5,2,5,10 - see NOTES)
 .TP
 .B CS_HEAVY_LOAD_THRESHOLD
 Threshold for chunkserver load. (default is 150 - see NOTES)
@@ -169,23 +230,22 @@ Threshold ratio for chunkserver load (default is 3.0 - see NOTES)
 .B CS_HEAVY_LOAD_GRACE_PERIOD
 Defines how long chunkservers will remain in 'grace' mode (default is 900 - see NOTES)
 .TP
-.B CS_MAINTENANCE_MODE_TIMEOUT
-Maximum number of seconds server can be in maintenance mode (default value is 0 - which means 'forever')
-.TP
-.B CS_TEMP_MAINTENANCE_MODE_TIMEOUT
-Maximum number of seconds server can be in "temporary" maintenance mode (server is switched to this mode whenever is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 1800)
-.TP
-.B CS_DAYS_TO_REMOVE_UNUSED
-How many days unused (disconnected) chunkserver should be kept in master data structures (valid values: 0 - 365 ; 0 means indefinitely ; default value: 7)
-.TP
-.B ACCEPTABLE_DIFFERENCE
-Maximum difference between space usage of chunkservers (deprecated, use \fBACCEPTABLE_PERCENTAGE_DIFFERENCE\fP instead)
-.TP
 .B ACCEPTABLE_PERCENTAGE_DIFFERENCE
 Maximum percentage difference between space usage of chunkservers (default is 1 = 1%)
 .TP
 .B PRIORITY_QUEUES_LENGTH
 Length of priority queues (for endangered, undergoal etc. chunks - chunks that should be processed first - default is 1000000)
+.TP
+.B CS_MAINTENANCE_MODE_TIMEOUT
+Maximum time server can be in maintenance mode (default value is 0 - which means 'forever'); for value formatting see TIME
+.TP
+.B CS_TEMP_MAINTENANCE_MODE_TIMEOUT
+Maximum time server can be in "temporary" maintenance mode (server is switched to this mode whenever it is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 30m); for value formatting see TIME
+.TP
+.B CS_DAYS_TO_REMOVE_UNUSED
+How many days unused (disconnected) chunkserver should be kept in master data structures (valid values: 0 - 365 ; 0 means indefinitely ; default value: 7)
+.SH CLIENTS CONNECTION OPTIONS
+Changes in this section require only process reload.
 .TP
 .B MATOCL_LISTEN_HOST
 IP address to listen on for client (mount) connections (\fB*\fP means any)
@@ -193,17 +253,31 @@ IP address to listen on for client (mount) connections (\fB*\fP means any)
 .B MATOCL_LISTEN_PORT
 port to listen on for client (mount) connections
 .TP
-.B SESSION_SUSTAIN_TIME
-How long to sustain a disconnected client session (in seconds; default is 86400 = 1 day)
+.B MATOCL_TIMEOUT
+default timeout in seconds for master-client connection (default is 10)
 .TP
-.B QUOTA_TIME_LIMIT
-Grace period in secods for soft quota (deprecated, use \fBQUOTA_DEFAULT_GRACE_PERIOD\fP instead for default value or specify it individually)
+.B MATOCL_FORCE_TIMEOUT
+forced timeout in seconds for master-client connection (default is 0 - do not force timeouts)
+.TP
+.B RESTRICT_INCOMPATIBLE_CLIENT_VERSIONS
+Whether MooseFS should prevent connections from clients that are unable to read all data (especially erasure encoded data). Default is 1 - prevent connections. If this option is set to 0, clients that try to read data in a format they do not understand will return read errors. Use with caution.
+.SH CLIENTS WORKING OPTIONS
+Changes in this section require only process reload.
+.TP
+.B SESSION_SUSTAIN_TIME
+How long to sustain a disconnected client session (default is 1 day); for value formatting see TIME
+.SH FILE SYSTEM OPTIONS
+Changes in this section require only process reload.
 .TP
 .B QUOTA_DEFAULT_GRACE_PERIOD
-Default grace period in seconds for soft quota (default is 604800 = 7 days)
+Default grace for soft quota (default is 7 days); for value formatting see TIME
 .TP
 .B ATIME_MODE
 Set atime modification mode (default is 2 : similar to 'relatime' - see NOTES)
+\# relatime is not a typo :)
+.TP
+.B KEEP_EMPTY_FILES_IN_TRASH
+Move empty files to trash after unlink? (default is 0 - delete empty files immediately regardless of trash retention settings)
 .TP
 .B RESERVE_SPACE
 Set amount of space reserved for superuser (default is 0 = do not reserve space for superuser - see NOTES)
@@ -212,17 +286,36 @@ Set amount of space reserved for superuser (default is 0 = do not reserve space 
 Define limit for number of hardlinks allowed for one object (default is 32767; possible values are from 8 to 65000)
 .TP
 .B INODE_REUSE_DELAY
-Delay time in seconds after which inodes of deleted objects will be reused. BE AWARE if you change this value below 86400 (1 day) you MUST ensure that this value is higher than any of the following timeouts in all clients:
-\fBmfsattrcacheto\fP, \fBmfsxattrcacheto\fP, \fBmfsentrycacheto\fP, \fBmfsdirentrycacheto\fP, \fBmfsnegentrycacheto\fP, \fBmfssymlinkcacheto\fP. (default is 86400; possible values are from 300 to 3000000)
+Delay time after which inodes of deleted objects will be reused. BE AWARE if you change this value below 1 day you MUST ensure that this value is higher than any of the following timeouts in all clients:
+\fBmfsattrcacheto\fP, \fBmfsxattrcacheto\fP, \fBmfsentrycacheto\fP, \fBmfsdirentrycacheto\fP, \fBmfsnegentrycacheto\fP, \fBmfssymlinkcacheto\fP. (default is 1d; possible values are from 300 to 3000000 seconds); for value formatting see TIME
+TP
+.B DEFAULT_EC_DATA_PARTS
+How many data parts should the system use when old style EC definition is in use (@n instead of @8+n or @4+n; default is 8; possible values are 4 or 8)
+.SH TIME
+.PP
+For config variables that define time without requiring a single, specific unit, time can be defined as a number of seconds (integer) or a time period in one of two possible formats:
+.PP
+first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
+.PP
+second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
+o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+.PP
+Examples:
+.PP
+1.5h is the same as 1h30m, is the same as 90m, is the same as 5400s, is the same as 5400
+.PP
+2.5d is the same as 2d12h, is the same as 60h; 1d36h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
+.PP
+1.03m is the same as 62s (61.8 seconds will be rounded up to 62)
 .SH NOTES
 .PP
 Chunks in master are tested in a loop. Speed (or frequency) is regulated by two
-options \fBCHUNKS_LOOP_MIN_TIME\fP and \fBCHUNKS_LOOP_MAX_CPS\fP. First
+options: \fBCHUNKS_LOOP_MIN_TIME\fP and \fBCHUNKS_LOOP_MAX_CPS\fP. First
 defines minimal time between iterations of the loop and second defines 
 maximal number of chunk tests per second. 
-Typically at the beginning, when number of chunks is small, time is
-constant, regulated by \fBCHUNK_LOOP_MIN_TIME\fP, but when number of chunks
-beccomes bigger then time of loop can increase according to
+Typically at the beginning, when the number of chunks is small, time is
+constant, regulated by \fBCHUNK_LOOP_MIN_TIME\fP, but the when number of chunks
+becomes bigger, then time of loop can increase according to
 \fBCHUNKS_LOOP_MAX_CPS\fP.
 .PP
 Example: \fBCHUNKS_LOOP_MIN_TIME\fP is set to 300, \fBCHUNKS_LOOP_MAX_CPS\fP 
@@ -231,24 +324,26 @@ which is less than 300, so one loop iteration will take 300 seconds.
 With 1000000000 (one billion) chunks the system needs 10000 seconds for one iteration of the loop.
 .PP
 Deletion limits are defined as 'soft' and 'hard' limit. When number of chunks
-to delete increases from loop to loop, current limit can be temporary
+to delete increases from loop to loop, current limit can be temporarily
 increased above soft limit, but never above hard limit.
 .PP
-Replication limits are divided into four cases:
+Replication limits are divided into five cases:
 .IP \[bu] 2
 first limit is for endangered chunks (chunks with only one copy)
 .IP \[bu] 2
 second limit is for undergoal chunks (chunks with number of copies lower than specified goal)
 .IP \[bu] 2
-third limit is for rebalance between servers with space usage around arithmetic mean
+third limit is for rebalance between servers with space usage close to arithmetic mean
 .IP \[bu] 2
 fourth limit is for rebalance between other servers (very low or very high space usage)
+.IP \[bu] 2
+fifth limit is for recovery replications caused by I/O operations (read/write)
 .PP
-Usually first number should be grater than or equal to second, second greater than or equal to third, and fourth greater than or equal to third ( 1st >= 2nd >= 3rd <= 4th ). If one number is given, then all limits are set to this number (for backward compatibility).
+Usually first number should be greater than or equal to second, second greater than or equal to third, and fourth greater than or equal to third ( 1st >= 2nd >= 3rd <= 4th ). Fifth limit should be equal or greater than any of the other limits. If one number is given, then all limits are set to this number (for backward compatibility). If only four numbers are given, the fifth will be set as maximum of the four (also for backward compatibility).
 .PP
 Whenever chunkserver load is higher than \fBCS_HEAVY_LOAD_THRESHOLD\fP  and \fBCS_HEAVY_LOAD_RATIO_THRESHOLD\fP times higher than average load, then chunkserver is switched into 'grace' mode. Chunkserver stays in grace mode for \fBCS_HEAVY_LOAD_GRACE_PERIOD\fP seconds.
 .PP
-There are five values for \fBATIME_MODE\fP (all other values are treated as 0):
+There are five possible values for \fBATIME_MODE\fP (all other values are treated as 0):
 .IP \[bu] 2
 \fB0\fP = Always modify atime for files, folders and symlinks.
 .IP \[bu] 2
@@ -270,9 +365,109 @@ You can reserve space for superuser using \fBRESERVE_SPACE\fP option. You can de
 .IP \[bu] 2
 \fI#\fP\fBC\fP or \fI#\fP\fB.\fP\fI#\fP\fBC\fP = multiplies of "C" value; C is defined as maximum total capacity of a single chunkserver
 .PP
-When your network has two (or more) IP classes you may want to use one network for standard communication between MFS modules and separate network only for I/O. It can be done by setting REMAP_BITS, REMAP_SOURCE_IP_CLASS and REMAP_DESTINATION_IP_CLASS.
+When your network has two (or more) IP classes you may want to use one network for standard communication between MFS modules and separate network only for I/O. It can be done by setting \fBREMAP_BITS\fP, \fBREMAP_SOURCE_IP_CLASS\fP and \fBREMAP_DESTINATION_IP_CLASS\fP.
 When you set these options then master will change internally IP addresses of chunkservers and will send them as chunk locations, so clients will make connections with chunkservers using new (destination) IP for all I/O, but still communicate with master using original (source) IP.
 Also chunkservers will use original IP to communicate with master, but they will use new IP's to communicate between themselves during replication. Beware that all clients and chunkservers must have access to both networks, but masters, metaloggers etc. will need only access to the source network.
+.PP
+When your clients are separated into two or more LAN or VLAN networks, you may want them to connect to masters and chunkservers using IPs from their network. It can be done by setting \fBMULTILAN_BITS\fP and \fBMULTILAN_CLASSES\fP.
+Each time a client connects, the master will check whether the connection came from one of the defined LAN classes and if yes, it will remap the first \fBMULTILAN_BITS\fP of any chunkserver IP before it sends the chunkserver's IP to the client. Connections coming from other IP addresses will be treated as usual (i.e. original chunkserver IPs will be sent in response). All masters and chunkservers need to have one IP from each of the defined \fBMULTILAN_CLASSES\fP and one module (chunkserver or master) needs to have the same IP suffix in each class.
+Proper DNS configuration is also required: clients in each LAN must either get different IP when querying DNS about master host or must use different master host names that are resolved to IPs in their class.
+See \fBmfsmount\fP\|(8), \fBmfsbdev\fP\|(8) for more info about master host name.
+.PP
+The two above sets of options can be used together. One purpose would be to create a separate network for replication of data between chunkservers while also maintaning several separate networks (LANs) for separate sets of clients.
+For example, with the following configuration:
+.PP
+REMAP_BITS = 24
+.br
+REMAP_SOURCE_IP_CLASS = 10.0.0.0
+.br
+REMAP_DESTINATION_IP_CLASS = 10.0.1.0
+.br
+MULTILAN_BITS = 24
+.br
+MULTILAN_CLASSES = 192.168.1.0, 192.168.2.0, 192.168.3.0, 10.0.1.0
+.PP
+all network traffic from clients matching one of the LAN classes will be handled on that network (so a client with IP 192.168.1.17 will connect to the master and chunkservers using IPs with prefix 192.168.1 and a client with IP 192.168.2.13 will connect to the master and chunkservers using IPs with prefix 192.168.2), all metadata traffic between master and chunkservers will be handled on network with prefix 10.0.0 and all direct communication between chunkservers (i.e. chunk replications) will be handled on network with prefix 10.0.1.
+Be aware that any client from outside of the defined LAN classes will connect to the chunkservers via IPs defined by \fBREMAP_DESTINATION_IP_CLASS\fP. This also assumes proper DNS configuration, that is, if master server uses IP suffix 1, a client with IP 192.168.1.17 should resolve master host name as 192.168.1.1 and a client with IP 192.168.2.13 should resolve master host name as 192.168.2.1. A client from outside of the defined LAN classes may use any of master server IPs, although preferably 10.0.0.1
+.PP
+Masters save metadata to a file on a local disk. The exact times of these operations are regulated by four
+variables: METADATA_SAVE_OFFSET, METADATA_SAVE_FREQ, (pro only) METADATA_DOWNLOAD_FREQ, (pro only) METADATA_CRCCHECK_FREQ.
+.PP
+A single master will save metadata every METADATA_SAVE_FREQ hours. 
+First save of the day happens at midnight, every other one is after METADATA_SAVE_FREQ 
+from previous one. This can be changed with METADATA_SAVE_OFFSET. METADATA_SAVE_OFFSET set to a single value will mean minutes. So settings like this:
+.PP
+METADATA_SAVE_FREQ = 2
+.br
+METADATA_SAVE_OFFSET = 15
+.PP
+will mean saving at 00:15, 02:15, 04:15 etc., up to 22:15.
+If hour is provided, this is also taken into account, but only as modulo, so:
+.PP
+METADATA_SAVE_FREQ = 2
+.br
+METADATA_SAVE_OFFSET = 1:15
+.PP
+will behave exactly the same as:
+.PP
+METADATA_SAVE_FREQ = 2
+.br
+METADATA_SAVE_OFFSET = 5:15
+.PP
+and will save metadata at 01:15, 03:15, 05:15 etc.
+.PP
+All times mentioned above are calculated in UTC, unless "L" suffix is used. So, if your servers are in
+CET zone (UTC-1), this setting:
+.PP
+METADATA_SAVE_FREQ = 2
+.br
+METADATA_SAVE_OFFSET = 1:15
+.PP
+will mean the master will save metadata at 01:15, 3:15, etc. UTC, which means 0:15, 2:15, etc. local (CET) time. 
+To save at 01:15 (and every 2 hours from that) local time, you need to write:
+.PP
+METADATA_SAVE_FREQ = 2
+.br
+METADATA_SAVE_OFFSET = 1:15L
+.PP
+(pro only) With multiple masters the leader will save metadata according to the setting from METADATA_CRCCHECK_FREQ, but also taking into account the offset.
+So setting like:
+.PP
+METADATA_CRCCHECK_FREQ = 12
+.br
+METADATA_SAVE_FREQ = 2
+.br
+METADATA_SAVE_OFFSET = 1:15
+.PP
+will mean that the leader saves (and compares against followers) metadata at 01:15 and 13:15, while followers
+save at 01:15, 03:15, 05:15 etc.
+.PP
+METADATA_DOWNLOAD_FREQ means the leader will download metadata from a follower and that will also take
+into account the METADATA_SAVE_OFFSET in the manner identical that METADATA_CRCCHECK_FREQ does.
+.PP
+Times mentioned above are calculated in UTC. So, if your servers are in PST zone (UTC-8), this setting:
+.PP
+METADATA_CRCCHECK_FREQ = 12
+.br
+METADATA_SAVE_FREQ = 2
+.br
+METADATA_SAVE_OFFSET = 1:15
+.PP
+will mean the leader will save metadata at 01:15 and 13:15 UTC, which means 17:15 and 5:15 
+(5:15 PM and 5:15 AM) local (PST) time. To save at 01:15 and 13:15 (1:15 AM and 1:15 PM) local time, you
+need to write:
+.PP
+METADATA_CRCCHECK_FREQ = 12
+.br
+METADATA_SAVE_FREQ = 2
+.br
+METADATA_SAVE_OFFSET = 1:15L
+.PP
+Setting:
+.PP
+METADATA_SAVE_OFFSET = 0L
+.PP
+can be used to adjust saving times to local timezone without changing the default metadata saving schedule.
 .SH COPYRIGHT
 Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
 
@@ -295,3 +490,4 @@ or visit http://www.gnu.org/licenses/gpl-2.0.html
 .BR mfsmaster (8),
 .BR mfsexports.cfg (5)
 .BR mfstopology.cfg (5)
+.BR mfsipmap.cfg (5)

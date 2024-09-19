@@ -28,9 +28,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <syslog.h>
 #include <errno.h>
-
 
 #include "charts.h"
 #include "main.h"
@@ -41,84 +39,10 @@
 #include "memusage.h"
 #include "cpuusage.h"
 #include "matocsserv.h"
+#include "csdb.h"
 
 #include "chartsdefs.h"
 
-#if 0
-#define CHARTS_FILENAME "stats.mfs"
-
-#define CHARTS_UCPU 0
-#define CHARTS_SCPU 1
-#define CHARTS_DELCHUNK 2
-#define CHARTS_REPLCHUNK 3
-#define CHARTS_STATFS 4
-#define CHARTS_GETATTR 5
-#define CHARTS_SETATTR 6
-#define CHARTS_LOOKUP 7
-#define CHARTS_MKDIR 8
-#define CHARTS_RMDIR 9
-#define CHARTS_SYMLINK 10
-#define CHARTS_READLINK 11
-#define CHARTS_MKNOD 12
-#define CHARTS_UNLINK 13
-#define CHARTS_RENAME 14
-#define CHARTS_LINK 15
-#define CHARTS_READDIR 16
-#define CHARTS_OPEN 17
-#define CHARTS_READ 18
-#define CHARTS_WRITE 19
-#define CHARTS_MEMORY_RSS 20
-#define CHARTS_PACKETSRCVD 21
-#define CHARTS_PACKETSSENT 22
-#define CHARTS_BYTESRCVD 23
-#define CHARTS_BYTESSENT 24
-#define CHARTS_MEMORY_VIRT 25
-
-#define CHARTS 26
-
-/* name , join mode , percent , scale , multiplier , divisor */
-#define STATDEFS { \
-	{"ucpu"         ,CHARTS_MODE_ADD,1,CHARTS_SCALE_MICRO, 100,60}, \
-	{"scpu"         ,CHARTS_MODE_ADD,1,CHARTS_SCALE_MICRO, 100,60}, \
-	{"delete"       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"replicate"    ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"statfs"       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"getattr"      ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"setattr"      ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"lookup"       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"mkdir"        ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"rmdir"        ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"symlink"      ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"readlink"     ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"mknod"        ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"unlink"       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"rename"       ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"link"         ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"readdir"      ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"open"         ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"read"         ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"write"        ,CHARTS_MODE_ADD,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"memoryrss"    ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{"prcvd"        ,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
-	{"psent"        ,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
-	{"brcvd"        ,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-	{"bsent"        ,CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,8000,60}, \
-	{"memoryvirt"   ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{NULL           ,0              ,0,0                 ,   0, 0}  \
-};
-
-#define CALCDEFS { \
-	CHARTS_CALCDEF(CHARTS_MAX(CHARTS_CONST(0),CHARTS_SUB(CHARTS_MEMORY_VIRT,CHARTS_MEMORY_RSS))), \
-	CHARTS_DEFS_END \
-};
-
-/* c1_def , c2_def , c3_def , join mode , percent , scale , multiplier , divisor */
-#define ESTATDEFS { \
-	{CHARTS_DIRECT(CHARTS_UCPU)        ,CHARTS_DIRECT(CHARTS_SCPU)            ,CHARTS_NONE                       ,CHARTS_MODE_ADD,1,CHARTS_SCALE_MICRO, 100,60}, \
-	{CHARTS_CALC(0)                    ,CHARTS_DIRECT(CHARTS_MEMORY_RSS)      ,CHARTS_NONE                       ,CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
-	{CHARTS_NONE                       ,CHARTS_NONE                           ,CHARTS_NONE                       ,0              ,0,0                 ,   0, 0}  \
-};
-#endif
 static const uint32_t calcdefs[]=CALCDEFS
 static const statdef statdefs[]=STATDEFS
 static const estatdef estatdefs[]=ESTATDEFS
@@ -134,10 +58,13 @@ void chartsdata_resusage(uint64_t *mem,uint64_t *syscpu,uint64_t *usrcpu) {
 
 void chartsdata_refresh(void) {
 	uint64_t data[CHARTS];
-	uint32_t fsdata[16];
-	uint32_t chunkops[12];
+	uint32_t fsdata[24];
+	uint32_t fobj,mobj;
+	uint64_t cldata[10];
+	uint32_t chunkops[CHUNK_STATS_CNT];
 	uint32_t i;
 	uint64_t total,avail;
+	uint32_t servers,disc_servers,mdisc_servers;
 
 	for (i=0 ; i<CHARTS ; i++) {
 		data[i]=CHARTS_NODATA;
@@ -158,25 +85,55 @@ void chartsdata_refresh(void) {
 	data[CHARTS_DELCHUNK]=chunkops[CHUNK_OP_DELETE_TRY];
 	data[CHARTS_REPLCHUNK]=chunkops[CHUNK_OP_REPLICATE_TRY];
 	data[CHARTS_CREATECHUNK]=chunkops[CHUNK_OP_CREATE_TRY];
-	data[CHARTS_CHANGECHUNK]=chunkops[CHUNK_OP_CHANGE_TRY];
+	data[CHARTS_CHANGECHUNK]=chunkops[CHUNK_OP_CHANGE_TRY]+chunkops[CHUNK_OP_SPLIT_TRY];
 	data[CHARTS_DELETECHUNK_OK]=chunkops[CHUNK_OP_DELETE_OK];
 	data[CHARTS_REPLICATECHUNK_OK]=chunkops[CHUNK_OP_REPLICATE_OK];
 	data[CHARTS_CREATECHUNK_OK]=chunkops[CHUNK_OP_CREATE_OK];
 	data[CHARTS_CHANGECHUNK_OK]=chunkops[CHUNK_OP_CHANGE_OK];
+	data[CHARTS_SPLITCHUNK_OK]=chunkops[CHUNK_OP_SPLIT_OK];
 	data[CHARTS_DELETECHUNK_ERR]=chunkops[CHUNK_OP_DELETE_ERR];
 	data[CHARTS_REPLICATECHUNK_ERR]=chunkops[CHUNK_OP_REPLICATE_ERR];
 	data[CHARTS_CREATECHUNK_ERR]=chunkops[CHUNK_OP_CREATE_ERR];
 	data[CHARTS_CHANGECHUNK_ERR]=chunkops[CHUNK_OP_CHANGE_ERR];
+	data[CHARTS_SPLITCHUNK_ERR]=chunkops[CHUNK_OP_SPLIT_ERR];
 
 	fs_stats(fsdata);
 	for (i=0 ; i<16 ; i++) {
 		data[CHARTS_STATFS+i]=fsdata[i];
 	}
-	matoclserv_stats(data+CHARTS_PACKETSRCVD);
+	for (i=0 ; i<8 ; i++) {
+		data[CHARTS_SNAPSHOT+i]=fsdata[16+i];
+	}
+	matoclserv_stats(cldata);
+	data[CHARTS_PACKETSRCVD] = cldata[0];
+	data[CHARTS_PACKETSSENT] = cldata[1];
+	data[CHARTS_BYTESRCVD] = cldata[2];
+	data[CHARTS_BYTESSENT] = cldata[3];
+	data[CHARTS_BYTESREAD] = cldata[4];
+	data[CHARTS_BYTESWRITE] = cldata[5];
+	data[CHARTS_READ] = cldata[6];
+	data[CHARTS_WRITE] = cldata[7];
+	data[CHARTS_FSYNC] = cldata[8];
+	data[CHARTS_LOCK] = cldata[9];
 
 	matocsserv_getspace(&total,&avail,NULL);
 	data[CHARTS_USED_SPACE]=total-avail;
 	data[CHARTS_TOTAL_SPACE]=total;
+
+	fs_charts_data(&fobj,&mobj);
+	data[CHARTS_FILE_OBJECTS] = fobj;
+	data[CHARTS_META_OBJECTS] = mobj;
+
+	chunk_chart_data(data+CHARTS_COPY_CHUNKS,data+CHARTS_EC8_CHUNKS,data+CHARTS_EC4_CHUNKS,data+CHARTS_REG_ENDANGERED,data+CHARTS_REG_UNDERGOAL,data+CHARTS_ALL_ENDANGERED,data+CHARTS_ALL_UNDERGOAL);
+
+	data[CHARTS_DELAY] = CHARTS_NODATA;
+
+	csdb_get_server_counters(&servers,&disc_servers,&mdisc_servers);
+	data[CHARTS_ALL_SERVERS] = servers;
+	data[CHARTS_MDISC_SERVERS] = mdisc_servers;
+	data[CHARTS_DISC_SERVERS] = disc_servers;
+
+	data[CHARTS_USAGE_DIFF] = matocsserv_getusagediff();
 
 	charts_add(data,main_time()-60);
 }

@@ -23,7 +23,13 @@
 
 #include <inttypes.h>
 #include "datapack.h"
-#include "config.h"
+
+#ifdef HAVE_CONFIG_H
+#  include "config.h"
+#else
+#  define nobreak (void)0
+#endif
+
 
 static uint32_t hash_primes_tab[]={0,
 	         5U,         7U,        13U,        19U,        31U,        43U,        61U,        73U,
@@ -62,6 +68,73 @@ static inline uint32_t hash_next_size(uint32_t i) {
 		}
 	}
 	return hash_primes_tab[e];
+}
+
+/* The polynomial rolling hash function ; m = 10e9 + 7 ; p = 29791
+ * other values for m: 1000000009
+ * other values for p: 31,11111,111111
+ * for m = 5381 and p = 33 it is called "djb2"
+ * for m = 0 and p = 33 it is called "KR v2"
+ */
+static inline uint32_t hashstr_poly(const char *key,uint32_t hash) {
+	uint8_t p;
+	hash ^= UINT32_C(1000000007);
+	while ((p=*key)!=0) {
+		key++;
+		hash = hash*29791+p;
+	}
+	return hash;
+}
+
+/* FNV */
+static inline uint32_t hashstr_fnv(const char *key,uint32_t hash) { 
+	uint8_t p;
+	hash ^= UINT32_C(2166136261);
+	while ((p=*key)!=0) {
+		key++;
+		hash ^= p;
+		hash *= 16777619;
+	}
+	return hash;
+}
+
+/* Jenkins's one at a time hash function */
+static inline uint32_t hashstr_jenkins(const char *key,uint32_t hash) {
+	uint8_t p;
+	while ((p=*key)!=0) {
+		key++;
+		hash += p;
+		hash += hash << 10;
+		hash ^= hash >> 6;
+	}
+	hash += hash << 3;
+	hash ^= hash >> 11;
+	hash += hash << 15;
+	return hash;
+}
+
+static inline uint32_t hashstr_murmur32(const char *key,uint32_t hash) {
+	uint8_t p;
+	hash ^= UINT32_C(3323198485);
+	while ((p=*key)!=0) {
+		key++;
+		hash ^= p;
+		hash *= 0x5bd1e995;
+		hash ^= hash >> 15;
+	}
+	return hash;
+}
+
+static inline uint64_t hashstr_murmur64(const char *key,uint64_t hash) {
+	uint8_t p;
+	hash ^= UINT64_C(525201411107845655);
+	while ((p=*key)!=0) {
+		key++;
+		hash ^= p;
+		hash *= UINT64_C(0x5bd1e9955bd1e995);
+		hash ^= hash >> 47;
+	}
+	return hash;
 }
 
 /* fast integer hash functions by Thomas Wang */

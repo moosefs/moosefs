@@ -63,6 +63,21 @@ static inline uint32_t GLUE_FN_NAME_PREFIX(_hash)(HASH_ARGS_TYPE_LIST) {
 	return hash;
 }
 
+static inline void GLUE_FN_NAME_PREFIX(_print)(ENTRY_TYPE *e) {
+	uint32_t i;
+	uint8_t c;
+	printf("(refcnt:%" PRIu32 ",leng:%" PRIu32",data:",e->refcnt,e->leng);
+	for (i=0 ; i<e->leng ; i++) {
+		c = e->data[i];
+		if (c>=32 && c<127) {
+			printf("%c",c);
+		} else {
+			printf(".");
+		}
+	}
+	printf(")");
+}
+
 // GLUE_FN_NAME_PREFIX(_ehash) is needed only if HASH_VALUE_FIELD is not defined !!!
 
 #include "hash_begin.h"
@@ -76,6 +91,10 @@ int dict_init(void) {
 
 void dict_cleanup(void) {
 	dict_hash_cleanup();
+}
+
+void dict_printall(void) {
+	dict_hash_print();
 }
 
 void* dict_search(const uint8_t *data,uint32_t leng) {

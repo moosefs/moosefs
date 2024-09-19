@@ -29,13 +29,16 @@
 #include <string.h>
 #include <inttypes.h>
 #include <errno.h>
-#include <syslog.h>
 
 #include "bio.h"
 #include "massert.h"
 #include "sockets.h"
 #include "strerr.h"
 #include "crc.h"
+
+#define BIO_TYPE_FILE 0
+#define BIO_TYPE_SOCKET 1
+#define BIO_TYPE_NULL 2
 
 struct _bio {
 	uint8_t *buff;
@@ -49,8 +52,29 @@ struct _bio {
 	uint8_t type;
 	uint8_t error;
 	uint8_t eof;
+	int lasterrno;
 	int fd;
 };
+
+bio* bio_null_open(uint8_t direction) {
+	bio *b;
+	b = malloc(sizeof(bio));
+	passert(b);
+	b->buff = NULL;
+	b->size = 0;
+	b->leng = 0;
+	b->pos = 0;
+	b->msecto = 0;
+	b->fileposition = 0;
+	b->crc = 0;
+	b->direction = direction;
+	b->type = BIO_TYPE_NULL;
+	b->error = 0;
+	b->eof = 0;
+	b->lasterrno = 0;
+	b->fd = -1;
+	return b;
+}
 
 bio* bio_file_open(const char *fname,uint8_t direction,uint32_t buffersize) {
 	int fd;
@@ -76,9 +100,10 @@ bio* bio_file_open(const char *fname,uint8_t direction,uint32_t buffersize) {
 	b->fileposition = 0;
 	b->crc = 0;
 	b->direction = direction;
-	b->type = 0;
+	b->type = BIO_TYPE_FILE;
 	b->error = 0;
 	b->eof = 0;
+	b->lasterrno = 0;
 	b->fd = fd;
 	return b;
 }
@@ -96,24 +121,30 @@ bio* bio_socket_open(int socket,uint8_t direction,uint32_t buffersize,uint32_t m
 	b->fileposition = 0;
 	b->crc = 0;
 	b->direction = direction;
-	b->type = 1;
+	b->type = BIO_TYPE_SOCKET;
 	b->error = 0;
 	b->eof = 0;
+	b->lasterrno = 0;
 	b->fd = socket;
 	return b;
 }
 
 static inline int32_t bio_internal_write(bio *b,const uint8_t *buff,uint32_t leng) {
 	int32_t ret;
-	if (b->type==0) {
+	if (b->type==BIO_TYPE_FILE) {
 		ret = write(b->fd,buff,leng);
-	} else {
-		ret = tcptowrite(b->fd,buff,leng,b->msecto);
+	} else if (b->type==BIO_TYPE_SOCKET) {
+		ret = tcptowrite(b->fd,buff,leng,b->msecto,30*b->msecto);
 //		if ((int32_t)leng!=ret) {
-//			syslog(LOG_NOTICE,"write %"PRIu32" -> %"PRId32" (error:%s)",leng,ret,strerr(errno));
+//			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"write %"PRIu32" -> %"PRId32" (error:%s)",leng,ret,strerr(errno));
 //		}
+	} else {
+		ret = leng;
 	}
 	if (ret<(int32_t)leng) {
+		if (b->lasterrno==0) {
+			b->lasterrno = errno;
+		}
 		b->error=1;
 		if (ret<0) {
 			return 0;
@@ -125,15 +156,20 @@ static inline int32_t bio_internal_write(bio *b,const uint8_t *buff,uint32_t len
 
 static inline int32_t bio_internal_read(bio *b,uint8_t *buff,uint32_t leng) {
 	int32_t ret;
-	if (b->type==0) {
+	if (b->type==BIO_TYPE_FILE) {
 		ret = read(b->fd,buff,leng);
-	} else {
-		ret = tcptoread(b->fd,buff,leng,b->msecto);
+	} else if (b->type==BIO_TYPE_SOCKET) {
+		ret = tcptoread(b->fd,buff,leng,b->msecto,30*b->msecto);
 //		if ((int32_t)leng!=ret) {
-//			syslog(LOG_NOTICE,"read %"PRIu32" -> %"PRId32" (error:%s)\n",leng,ret,strerr(errno));
+//			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"read %"PRIu32" -> %"PRId32" (error:%s)\n",leng,ret,strerr(errno));
 //		}
+	} else {
+		ret = 0;
 	}
 	if (ret<0) {
+		if (b->lasterrno==0) {
+			b->lasterrno = errno;
+		}
 		b->error = 1;
 		return 0;
 	} else if (ret==0) {
@@ -147,6 +183,9 @@ static inline int bio_flush(bio *b) {
 	if (b->direction==BIO_READ || b->error) {
 		return -1;
 	}
+	if (b->type==BIO_TYPE_NULL) {
+		return 0;
+	}
 	if (b->leng>0) {
 		bio_internal_write(b,b->buff,b->leng);
 		b->leng = 0;
@@ -157,6 +196,9 @@ static inline int bio_flush(bio *b) {
 static inline int bio_fill(bio *b) {
 	if (b->direction==BIO_WRITE || b->error || b->eof) {
 		return -1;
+	}
+	if (b->type==BIO_TYPE_NULL) {
+		return 0;
 	}
 	if (b->pos<b->leng) {
 		memmove(b->buff,b->buff+b->pos,b->leng-b->pos);
@@ -170,7 +212,7 @@ static inline int bio_fill(bio *b) {
 }
 
 uint64_t bio_file_position(bio *b) {
-	if (b->type!=0) {
+	if (b->type!=BIO_TYPE_FILE) {
 		return 0;
 	}
 	if (b->direction==BIO_WRITE) {
@@ -184,7 +226,7 @@ uint64_t bio_file_position(bio *b) {
 uint64_t bio_file_size(bio *b) {
 	struct stat st;
 
-	if (b->type!=0) {
+	if (b->type!=BIO_TYPE_FILE) {
 		return 0;
 	}
 	if (b->direction==BIO_WRITE) {
@@ -210,6 +252,9 @@ int64_t bio_read(bio *b,void *vdst,uint64_t len) {
 	uint8_t *dst = (uint8_t*)vdst;
 	if (b->direction==BIO_WRITE || b->error || b->eof) {
 		return -1;
+	}
+	if (b->type==BIO_TYPE_NULL) {
+		return 0;
 	}
 	if (len>=b->size) {
 		if (b->leng>b->pos) {
@@ -269,6 +314,9 @@ int64_t bio_write(bio *b,const void *vsrc,uint64_t len) {
 		return -1;
 	}
 	b->crc ^= mycrc32(0,src,len);
+	if (b->type==BIO_TYPE_NULL) { // bio_null - just calculate crc
+		return len;
+	}
 	if (len>=b->size) {
 		if (bio_flush(b)<0) {
 			return -1;
@@ -317,7 +365,7 @@ int64_t bio_write(bio *b,const void *vsrc,uint64_t len) {
 
 int8_t bio_seek(bio *b,int64_t offset,int whence) {
 	int64_t p;
-	if (b->type!=0) {
+	if (b->type!=BIO_TYPE_FILE) {
 		return -1;
 	}
 	if (b->direction==BIO_WRITE) {
@@ -344,7 +392,7 @@ void bio_skip(bio *b,uint64_t len) {
 		b->pos += len;
 		return;
 	} else {
-		if (b->type!=0) {
+		if (b->type!=BIO_TYPE_FILE) {
 			while (len>0) {
 				if (b->leng==b->pos) {
 					if (bio_fill(b)<0) {
@@ -367,26 +415,53 @@ void bio_skip(bio *b,uint64_t len) {
 }
 
 uint8_t bio_eof(bio *b) {
-	return (b->eof);
+	return b->eof;
 }
 
 uint8_t bio_error(bio *b) {
-	return (b->error);
+	return b->error;
+}
+
+int bio_lasterrno(bio *b) {
+	return b->lasterrno;
 }
 
 int bio_descriptor(bio *b) {
 	return (b->fd);
 }
 
+void bio_sync(bio *b) {
+	if (b->direction==BIO_WRITE) {
+		bio_flush(b);
+	}
+}
+
+void bio_shutdown(bio *b) {
+	if (b->direction==BIO_WRITE) {
+		bio_flush(b);
+		if (b->type==BIO_TYPE_SOCKET) {
+			tcpshutdown(b->fd);
+		}
+	}
+}
+
+void bio_wait(bio *b) {
+	if (b->error==0 && b->direction==BIO_WRITE && b->type==BIO_TYPE_SOCKET) {
+		tcptowait(b->fd,30*b->msecto);
+	}
+}
+
 void bio_close(bio *b) {
 	if (b->direction==BIO_WRITE) {
 		bio_flush(b);
 	}
-	if (b->type==0) {
+	if (b->type==BIO_TYPE_FILE) {
 		close(b->fd);
-	} else {
+	} else if (b->type==BIO_TYPE_SOCKET) {
 		tcpclose(b->fd);
 	}
-	free(b->buff);
+	if (b->buff!=NULL) {
+		free(b->buff);
+	}
 	free(b);
 }

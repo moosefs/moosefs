@@ -38,9 +38,6 @@
 #endif
 
 
-#define BUCKETS_MT_MMAP_ALLOC 1
-
-
 #include <stdlib.h>
 #include <inttypes.h>
 #include <pthread.h>
@@ -173,7 +170,13 @@ void inoleng_release(void *ptr) {
 		}
 #endif
 		zassert(pthread_mutex_unlock(hashlock+h));
+#if HAVE_ATOMICS || HAVE_SYNCS
 	}
+#else
+	} else {
+		zassert(pthread_mutex_unlock(&(il->lock)));
+	}
+#endif
 }
 
 uint64_t inoleng_getfleng(void *ptr) {
@@ -308,7 +311,7 @@ void inoleng_term(void) {
 			refcnt = ilptr->refcnt;
 			zassert(pthread_mutex_unlock(&(ilptr->lock)));
 #endif
-			syslog(LOG_WARNING,"inode fleng data structure leftovers (ino: %"PRIu32" ; refcnt: %"PRIu32")",ilptr->inode,refcnt);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"inode fleng data structure leftovers (ino: %"PRIu32" ; refcnt: %"PRIu32")",ilptr->inode,refcnt);
 			ileng_free(ilptr);
 		}
 		

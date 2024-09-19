@@ -20,11 +20,13 @@
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#else
+#define nobreak (void)0
 #endif
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <syslog.h>
 #include <errno.h>
 #include <inttypes.h>
 #ifdef HAVE_SYS_MMAN_H
@@ -33,7 +35,7 @@
 
 #include "MFSCommunication.h"
 #include "massert.h"
-#include "slogger.h"
+#include "mfslog.h"
 #include "datapack.h"
 #include "filesystem.h"
 #include "xattr.h"
@@ -74,6 +76,10 @@ static inline uint32_t GLUE_FN_NAME_PREFIX(_ehash)(ENTRY_TYPE *e) {
 	return e->inode;
 }
 
+static inline void GLUE_FN_NAME_PREFIX(_print)(ENTRY_TYPE *e) {
+	printf("%" PRIu32,e->inode);
+}
+
 #include "hash_begin.h"
 
 static inline void xattr_cleanup_node(xattrentry *xe) {
@@ -112,6 +118,7 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 	xattrentry *xe;
 	xattrpair *xp,**xpp;
 	void *dictname;
+	void *dictvalue;
 	uint32_t inode_anleng;
 
 	if (anleng + 1 > MFS_XATTR_LIST_MAX) {
@@ -171,8 +178,13 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 						return MFS_ERROR_ERANGE;
 					}
 //					xe->avleng -= dict_get_leng(xp->dictvalue);
-					dict_dec_ref(xp->dictvalue);
-					xp->dictvalue = dict_insert(attrvalue,avleng);
+					dictvalue = dict_insert(attrvalue,avleng);
+					if (xp->dictvalue==dictvalue) {
+						dict_dec_ref(dictvalue);
+					} else {
+						dict_dec_ref(xp->dictvalue);
+						xp->dictvalue = dictvalue;
+					}
 //					xe->avleng += avleng;
 					return MFS_STATUS_OK;
 				default:
@@ -256,6 +268,201 @@ void xattr_listattr_data(void *xanode,uint8_t *xabuff) {
 	}
 }
 
+uint32_t xattr_getall(uint32_t inode,uint8_t *dbuff) {
+	xattrentry *xe;
+	xattrpair *xp;
+	uint32_t leng;
+	uint16_t cnt;
+	uint32_t anleng;
+	uint32_t avleng;
+	uint8_t *cntptr;
+
+	leng = 2;
+	cnt = 0;
+	cntptr = dbuff;
+	if (dbuff!=NULL) {
+		dbuff+=2;
+	}
+
+	xe = GLUE_FN_NAME_PREFIX(_find)(inode);
+	if (xe!=NULL) {
+		for (xp=xe->pairhead ; xp!=NULL ; xp=xp->next) {
+			cnt++;
+			anleng = dict_get_leng(xp->dictname);
+			avleng = dict_get_leng(xp->dictvalue);
+			leng += 1U + anleng + 4U + avleng;
+			if (dbuff!=NULL) {
+				put8bit(&dbuff,anleng);
+				memcpy(dbuff,dict_get_ptr(xp->dictname),anleng);
+				dbuff+=anleng;
+				put32bit(&dbuff,avleng);
+				memcpy(dbuff,dict_get_ptr(xp->dictvalue),avleng);
+				dbuff+=avleng;
+			}
+		}
+	}
+	if (cntptr!=NULL) {
+		put16bit(&cntptr,cnt);
+	}
+	return leng;
+}
+
+// return values
+//  0 - different
+//  1 - same
+//  2 - error
+uint8_t xattr_check(uint32_t inode,const uint8_t *dbuff,uint32_t leng,uint32_t *pleng) {
+	xattrentry *xe;
+	xattrpair *xp;
+	uint16_t i,cnt,xattrcnt,checkcnt;
+	uint8_t anleng,xattranleng;
+	const uint8_t *attrname;
+	uint32_t avleng,xattravleng;
+	const uint8_t *attrvalue;
+	uint32_t ileng;
+
+	ileng = leng;
+	*pleng = 0;
+	if (leng<2) {
+		return 2;
+	}
+	cnt = get16bit(&dbuff);
+	leng -= 2;
+
+	xe = GLUE_FN_NAME_PREFIX(_find)(inode);
+
+	xattrcnt = 0;
+	if (xe!=NULL) {
+		for (xp=xe->pairhead ; xp!=NULL ; xp=xp->next) {
+			xattrcnt++;
+		}
+	}
+
+	checkcnt = 0;
+	for (i=0 ; i<cnt ; i++) {
+		if (leng<1) {
+			return 2;
+		}
+		anleng = get8bit(&dbuff);
+		leng--;
+		if (leng<anleng) {
+			return 2;
+		}
+		attrname = dbuff;
+		dbuff += anleng;
+		leng -= anleng;
+		if (leng<4) {
+			return 2;
+		}
+		avleng = get32bit(&dbuff);
+		leng-=4;
+		if (leng<avleng) {
+			return 2;
+		}
+		attrvalue = dbuff;
+		dbuff += avleng;
+		leng -= avleng;
+		if (xe!=NULL && xattrcnt==cnt && i==checkcnt) { // check xattr existence only if the inode has xattrs, the number of xattrs is the same and all previous xattrs have been found
+			for (xp=xe->pairhead ; xp!=NULL ; xp=xp->next) {
+				xattranleng = dict_get_leng(xp->dictname);
+				xattravleng = dict_get_leng(xp->dictvalue);
+				if (xattranleng==anleng && xattravleng==avleng) {
+					if (memcmp(attrname,dict_get_ptr(xp->dictname),anleng)==0 && memcmp(attrvalue,dict_get_ptr(xp->dictvalue),avleng)==0) {
+						checkcnt++;
+					}
+				}
+			}
+		}
+	}
+	*pleng = ileng-leng;
+	return (checkcnt==cnt && xattrcnt==cnt)?1:0;
+}
+
+uint8_t xattr_setall(uint32_t inode,const uint8_t *dbuff) {
+	xattrentry *xe;
+	xattrpair *xp,*xpnew,**xptail,**xpprev;
+	uint16_t i,cnt,moved;
+	uint8_t anleng;
+	const uint8_t *attrname;
+	uint32_t avleng;
+	const uint8_t *attrvalue;
+	void *dictname;
+	void *dictvalue;
+
+	cnt = get16bit(&dbuff);
+
+	xe = GLUE_FN_NAME_PREFIX(_find)(inode);
+	if (xe==NULL) {
+		if (cnt==0) { // no xattrs in inode and no new replace them - it is ok.
+			return 0; // clear xattr flag
+		} else {
+			xe = malloc(sizeof(xattrentry));
+			passert(xe);
+			xe->inode = inode;
+//			xe->anleng = 0;
+//			xe->avleng = 0;
+			xe->pairhead = NULL;
+			GLUE_FN_NAME_PREFIX(_add)(xe);
+//			fs_set_xattrflag(inode);
+		}
+	}
+
+	xpnew = NULL;
+	xptail = &xpnew;
+
+	for (i=0 ; i<cnt ; i++) {
+		anleng = get8bit(&dbuff);
+		attrname = dbuff;
+		dbuff += anleng;
+		avleng = get32bit(&dbuff);
+		attrvalue = dbuff;
+		dbuff += avleng;
+		dictname = dict_insert(attrname,anleng);
+		moved = 0;
+		xpprev = &(xe->pairhead);
+		while (moved==0 && (xp = *xpprev)!=NULL) {
+			if (xp->dictname==dictname) {
+				dict_dec_ref(xp->dictname);
+				dictvalue = dict_insert(attrvalue,avleng);
+				if (xp->dictvalue==dictvalue) {
+					dict_dec_ref(dictvalue);
+				} else {
+					dict_dec_ref(xp->dictvalue);
+					xp->dictvalue = dictvalue;
+				}
+				*xpprev = xp->next;
+				*xptail = xp;
+				xp->next = NULL;
+				xptail = &(xp->next);
+				moved = 1;
+			} else {
+				xpprev = &(xp->next);
+			}
+		}
+		if (moved==0) {
+			xp = malloc(sizeof(xattrpair));
+			xp->dictname = dictname;
+			xp->dictvalue = dict_insert(attrvalue,avleng);
+			*xptail = xp;
+			xp->next = NULL;
+			xptail = &(xp->next);
+		}
+	}
+	while ((xp=xe->pairhead)!=NULL) {
+		dict_dec_ref(xp->dictname);
+		dict_dec_ref(xp->dictvalue);
+		xe->pairhead = xp->next;
+		free(xp);
+	}
+	if (xpnew==NULL) { // remove node
+		GLUE_FN_NAME_PREFIX(_delete)(xe);
+		free(xe);
+		return 0;
+	}
+	xe->pairhead = xpnew;
+	return 1;
+}
+
 uint8_t xattr_copy(uint32_t srcinode,uint32_t dstinode) {
 	xattrentry *sxe,*dxe;
 	xattrpair *sxp,*dxp,**xpt;
@@ -330,16 +537,13 @@ uint8_t xattr_store(bio *fd) {
 						put8bit(&ptr,anleng);
 						put32bit(&ptr,avleng);
 						if (bio_write(fd,hdrbuff,4+1+4)!=(4+1+4)) {
-							syslog(LOG_NOTICE,"write error");
 							return 0xFF;
 						}
 						if (bio_write(fd,dict_get_ptr(xp->dictname),anleng)!=anleng) {
-							syslog(LOG_NOTICE,"write error");
 							return 0xFF;
 						}
 						if (avleng>0) {
 							if (bio_write(fd,dict_get_ptr(xp->dictvalue),avleng)!=avleng) {
-								syslog(LOG_NOTICE,"write error");
 								return 0xFF;
 							}
 						}
@@ -350,7 +554,6 @@ uint8_t xattr_store(bio *fd) {
 	}
 	memset(hdrbuff,0,4+1+4);
 	if (bio_write(fd,hdrbuff,4+1+4)!=(4+1+4)) {
-		syslog(LOG_NOTICE,"write error");
 		return 0xFF;
 	}
 	return 0;
@@ -382,7 +585,7 @@ int xattr_load(bio *fd,uint8_t mver,int ignoreflag) {
 				// nl=0;
 			}
 			errno = err;
-			mfs_errlog(LOG_ERR,"loading xattr: read error");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"loading xattr: read error");
 			free(databuff);
 			return -1;
 		}
@@ -403,11 +606,12 @@ int xattr_load(bio *fd,uint8_t mver,int ignoreflag) {
 				fputc('\n',stderr);
 				nl=0;
 			}
-			mfs_syslog(LOG_ERR,"loading xattr: empty name");
 			if (ignoreflag) {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading xattr: empty name - ignoring");
 				bio_skip(fd,anleng+avleng);
 				continue;
 			} else {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading xattr: empty name");
 				free(databuff);
 				return -1;
 			}
@@ -421,11 +625,12 @@ int xattr_load(bio *fd,uint8_t mver,int ignoreflag) {
 				fputc('\n',stderr);
 				nl=0;
 			}
-			mfs_syslog(LOG_ERR,"loading xattr: value oversized");
 			if (ignoreflag) {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading xattr: value oversized - ignoring");
 				bio_skip(fd,anleng+avleng);
 				continue;
 			} else {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading xattr: value oversized");
 				free(databuff);
 				return -1;
 			}
@@ -455,7 +660,7 @@ int xattr_load(bio *fd,uint8_t mver,int ignoreflag) {
 				// nl=0;
 			}
 			errno = err;
-			mfs_errlog(LOG_ERR,"loading xattr: read error");
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"loading xattr: read error");
 			free(databuff);
 			return -1;
 		}

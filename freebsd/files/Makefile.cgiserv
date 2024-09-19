@@ -8,6 +8,6 @@ LICENSE=	GPLv2
 
 MFS_COMPONENT=	cgiserv
 
-MASTERDIR=	${.CURDIR}/../moosefs3-master
+MASTERDIR=	${.CURDIR}/../moosefs4-master
 
 .include "${MASTERDIR}/Makefile"

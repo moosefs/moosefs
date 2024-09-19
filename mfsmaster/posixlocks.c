@@ -22,6 +22,7 @@
 #include "config.h"
 #endif
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
 
@@ -34,10 +35,11 @@
 #include "openfiles.h"
 #include "metadata.h"
 #include "main.h"
+#include "cfg.h"
 #include "changelog.h"
 #include "datapack.h"
 #include "bio.h"
-#include "slogger.h"
+#include "mfslog.h"
 
 #endif
 
@@ -62,6 +64,7 @@ typedef struct _alock {
 
 typedef struct _wlock {
 	uint64_t owner;
+	void *connptr;
 	uint32_t sessionid;
 	uint32_t pid;
 	uint32_t msgid;
@@ -85,6 +88,8 @@ typedef struct _inodelocks {
 
 static inodelocks **inodehash;
 
+static uint8_t DebugInfo;
+
 #if 0
 static inline void posix_lock_dump(void) {
 	uint32_t h;
@@ -92,26 +97,26 @@ static inline void posix_lock_dump(void) {
 	alock *al;
 	wlock *wl,**wlptr;
 	range *r;
-	syslog(LOG_NOTICE,"posix lock dump:");
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"posix lock dump:");
 	for (h=0 ; h<POSIX_LOCK_INODE_HASHSIZE ; h++) {
 		for (il = inodehash[h] ; il ; il=il->next) {
-			syslog(LOG_NOTICE,"  inode: %"PRIu32" (active:%s,waiting:%s)",il->inode,il->active?"yes":"no",il->waiting_head?"yes":"no");
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"  inode: %"PRIu32" (active:%s,waiting:%s)",il->inode,il->active?"yes":"no",il->waiting_head?"yes":"no");
 			for (al = il->active ; al ; al=al->next) {
-				syslog(LOG_NOTICE,"    active lock: session:%"PRIu32",owner:%"PRIu64",pid:%"PRIu32,al->sessionid,al->owner,al->pid);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"    active lock: session:%"PRIu32",owner:%"PRIu64",pid:%"PRIu32,al->sessionid,al->owner,al->pid);
 				if (al->ranges==NULL) {
-					syslog(LOG_WARNING,"      no lock ranges !!!");
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"      no lock ranges !!!");
 				}
 				for (r = al->ranges ; r ; r=r->next) {
-					syslog(LOG_NOTICE,"      range: start:%"PRIu64",end:%"PRIu64",type:%c",r->start,r->end,(r->type==POSIX_LOCK_RDLCK)?'R':(r->type==POSIX_LOCK_WRLCK)?'W':'?');
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"      range: start:%"PRIu64",end:%"PRIu64",type:%c",r->start,r->end,(r->type==POSIX_LOCK_RDLCK)?'R':(r->type==POSIX_LOCK_WRLCK)?'W':'?');
 				}
 			}
 			wlptr = &(il->waiting_head);
 			for (wl = il->waiting_head ; wl ; wl=wl->next) {
-				syslog(LOG_NOTICE,"    waiting lock: session:%"PRIu32",owner:%"PRIu64",pid:%"PRIu32",start:%"PRIu64",end:%"PRIu64",type:%c",wl->sessionid,wl->owner,wl->pid,wl->start,wl->end,wl->type);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"    waiting lock: session:%"PRIu32",owner:%"PRIu64",pid:%"PRIu32",start:%"PRIu64",end:%"PRIu64",type:%c",wl->sessionid,wl->owner,wl->pid,wl->start,wl->end,wl->type);
 				wlptr = &(wl->next);
 			}
 			if (il->waiting_tail != wlptr) {
-				syslog(LOG_WARNING,"    wrong tail pointer !!!");
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"    wrong tail pointer !!!");
 			}
 		}
 	}
@@ -398,11 +403,12 @@ static inline void posix_lock_apply_lock(inodelocks *il,uint32_t sessionid,uint6
 	posix_lock_do_apply_lock(il,sessionid,owner,type,start,end,pid);
 }
 
-static inline void posix_lock_append_lock(inodelocks *il,uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint64_t owner,uint8_t type,uint64_t start,uint64_t end,uint32_t pid) {
+static inline void posix_lock_append_lock(inodelocks *il,void *connptr,uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint64_t owner,uint8_t type,uint64_t start,uint64_t end,uint32_t pid) {
 	wlock *wl;
 	wl = malloc(sizeof(wlock));
 	passert(wl);
 	wl->owner = owner;
+	wl->connptr = connptr;
 	wl->sessionid = sessionid;
 	wl->pid = pid;
 	wl->msgid = msgid;
@@ -416,11 +422,11 @@ static inline void posix_lock_append_lock(inodelocks *il,uint32_t sessionid,uint
 	il->waiting_tail = &(wl->next);
 }
 
-static inline void posix_lock_interrupt(inodelocks *il,uint32_t sessionid,uint32_t reqid) {
+static inline void posix_lock_interrupt(inodelocks *il,void *connptr,uint32_t reqid) {
 	wlock *wl;
 	for (wl=il->waiting_head ; wl ; wl=wl->next) {
-		if (wl->sessionid==sessionid && wl->reqid==reqid) {
-			matoclserv_fuse_posix_lock_wake_up(sessionid,wl->msgid,MFS_ERROR_EINTR);
+		if (wl->connptr==connptr && wl->reqid==reqid) {
+			matoclserv_fuse_posix_lock_wake_up(connptr,wl->msgid,MFS_ERROR_EINTR);
 			posix_lock_remove_lock(il,wl);
 			return;
 		}
@@ -438,14 +444,33 @@ static inline void posix_lock_check_waiting(inodelocks *il) {
 		nwl = wl->next;
 		if (posix_lock_find_offensive_lock(il,wl->sessionid,wl->owner,wl->type,wl->start,wl->end)==0) {
 			posix_lock_apply_lock(il,wl->sessionid,wl->owner,wl->type,wl->start,wl->end,wl->pid);
-			matoclserv_fuse_posix_lock_wake_up(wl->sessionid,wl->msgid,MFS_STATUS_OK);
+			matoclserv_fuse_posix_lock_wake_up(wl->connptr,wl->msgid,MFS_STATUS_OK);
 			posix_lock_remove_lock(il,wl);
 		}
 		wl = nwl;
 	}
 }
 
-uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t inode,uint64_t owner,uint8_t op,uint8_t *type,uint64_t *start,uint64_t *end,uint32_t *pid) {
+void posix_lock_disconnected(void *connptr) {
+	uint32_t h;
+	inodelocks *il;
+	wlock *wl,*nwl;
+
+	for (h=0 ; h<POSIX_LOCK_INODE_HASHSIZE ; h++) {
+		for (il = inodehash[h] ; il!=NULL ; il=il->next) {
+			wl = il->waiting_head;
+			while (wl) {
+				nwl = wl->next;
+				if (wl->connptr==connptr) {
+					posix_lock_remove_lock(il,wl);
+				}
+				wl = nwl;
+			}
+		}
+	}
+}
+
+uint8_t posix_lock_cmd(void *connptr,uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t inode,uint64_t owner,uint8_t op,uint8_t *type,uint64_t *start,uint64_t *end,uint32_t *pid) {
 	inodelocks *il;
 	uint8_t i_type;
 	uint64_t i_start;
@@ -458,7 +483,7 @@ uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t
 	i_pid = *pid;
 
 //	posix_lock_dump();
-//	syslog(LOG_NOTICE,"new lock cmd: sessionid:%"PRIu32",msgid:%"PRIu32",reqid:%"PRIu32",inode:%"PRIu32",owner:%"PRIX64",op:%c,type:%c,start:%"PRIu64",end:%"PRIu64",pid:%"PRIu32,sessionid,msgid,reqid,inode,owner,(op==POSIX_LOCK_CMD_INT)?'I':(op==POSIX_LOCK_CMD_GET)?'G':(op==POSIX_LOCK_CMD_SET)?'S':(op==POSIX_LOCK_CMD_TRY)?'T':'?',(i_type==POSIX_LOCK_RDLCK)?'R':(i_type==POSIX_LOCK_WRLCK)?'W':(i_type==POSIX_LOCK_UNLCK)?'U':'?',i_start,i_end,i_pid);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"new lock cmd: sessionid:%"PRIu32",msgid:%"PRIu32",reqid:%"PRIu32",inode:%"PRIu32",owner:%"PRIX64",op:%c,type:%c,start:%"PRIu64",end:%"PRIu64",pid:%"PRIu32,sessionid,msgid,reqid,inode,owner,(op==POSIX_LOCK_CMD_INT)?'I':(op==POSIX_LOCK_CMD_GET)?'G':(op==POSIX_LOCK_CMD_SET)?'S':(op==POSIX_LOCK_CMD_TRY)?'T':'?',(i_type==POSIX_LOCK_RDLCK)?'R':(i_type==POSIX_LOCK_WRLCK)?'W':(i_type==POSIX_LOCK_UNLCK)?'U':'?',i_start,i_end,i_pid);
 
 	if ((op==POSIX_LOCK_CMD_SET || op==POSIX_LOCK_CMD_TRY) && i_type!=POSIX_LOCK_UNLCK) {
 		if (of_checknode(sessionid,inode)==0) {
@@ -472,7 +497,7 @@ uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t
 		if (il==NULL) {
 			return MFS_STATUS_OK;
 		}
-		posix_lock_interrupt(il,sessionid,reqid);
+		posix_lock_interrupt(il,connptr,reqid);
 		return MFS_STATUS_OK;
 	}
 	if (op==POSIX_LOCK_CMD_GET) {
@@ -492,7 +517,7 @@ uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t
 			if (op==POSIX_LOCK_CMD_TRY) {
 				return MFS_ERROR_EAGAIN;
 			} else {
-				posix_lock_append_lock(il,sessionid,msgid,reqid,owner,i_type,i_start,i_end,i_pid);
+				posix_lock_append_lock(il,connptr,sessionid,msgid,reqid,owner,i_type,i_start,i_end,i_pid);
 				return MFS_ERROR_WAITING;
 			}
 		}
@@ -509,7 +534,7 @@ uint8_t posix_lock_cmd(uint32_t sessionid,uint32_t msgid,uint32_t reqid,uint32_t
 		il = posix_lock_inode_new(inode);
 	}
 	if (posix_lock_find_offensive_lock(il,sessionid,owner,i_type,i_start,i_end)) {
-		posix_lock_append_lock(il,sessionid,msgid,reqid,owner,i_type,i_start,i_end,i_pid);
+		posix_lock_append_lock(il,connptr,sessionid,msgid,reqid,owner,i_type,i_start,i_end,i_pid);
 		return MFS_ERROR_WAITING;
 	}
 	posix_lock_apply_lock(il,sessionid,owner,i_type,i_start,i_end,i_pid);
@@ -747,10 +772,10 @@ int posix_lock_load(bio *fd,uint8_t mver,uint8_t ignoreflag) {
 		if (inode!=lastinode || sessionid!=lastsessionid || fino || fses) {
 			if (of_checknode(sessionid,inode)==0) {
 				if (ignoreflag) {
-					mfs_syslog(LOG_ERR,"loading posix_locks: lock on closed file !!! (ignoring)");
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading posix_locks: lock on closed file !!! (ignoring)");
 					continue;
 				} else {
-					mfs_syslog(LOG_ERR,"loading posix_locks: lock on closed file !!!");
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading posix_locks: lock on closed file !!!");
 					return -1;
 				}
 			}
@@ -788,19 +813,19 @@ int posix_lock_load(bio *fd,uint8_t mver,uint8_t ignoreflag) {
 		if (lasttype!=POSIX_LOCK_UNLCK) {
 			if (start<lastend) {
 				if (ignoreflag) {
-					mfs_syslog(LOG_ERR,"loading posix_locks: lock range not in order !!! (ignoring)");
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading posix_locks: lock range not in order !!! (ignoring)");
 					continue;
 				} else {
-					mfs_syslog(LOG_ERR,"loading posix_locks: lock range not in order !!!");
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading posix_locks: lock range not in order !!!");
 					return -1;
 				}
 			}
 			if (type==lasttype && start==lastend) {
 				if (ignoreflag) {
-					mfs_syslog(LOG_ERR,"loading posix_locks: lock range not connected !!! (ignoring)");
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading posix_locks: lock range not connected !!! (ignoring)");
 					continue;
 				} else {
-					mfs_syslog(LOG_ERR,"loading posix_locks: lock range not connected !!!");
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading posix_locks: lock range not connected !!!");
 					return -1;
 				}
 			}
@@ -855,6 +880,38 @@ void posix_lock_cleanup(void) {
 	}
 }
 
+
+void posix_lock_info(FILE *fd) {
+	uint32_t h;
+	inodelocks *il;
+	wlock *wl;
+	alock *al;
+	range *r;
+
+	if (DebugInfo) {
+		fprintf(fd,"[posix locks]\n");
+		for (h=0 ; h<POSIX_LOCK_INODE_HASHSIZE ; h++) {
+			for (il = inodehash[h] ; il!=NULL ; il=il->next) {
+				fprintf(fd,"- inode: %u\n",il->inode);
+				for (wl = il->waiting_head ; wl!=NULL ; wl=wl->next) {
+					fprintf(fd,"  - waiting_lock: owner: %"PRIu64", sessionid: %"PRIu32", pid: %"PRIu32", msgid: %"PRIu32", reqid: %"PRIu32", start: %"PRIu64", end: %"PRIu64", type: %c\n",wl->owner,wl->sessionid,wl->pid,wl->msgid,wl->reqid,wl->start,wl->end,(wl->type==POSIX_LOCK_RDLCK)?'R':(wl->type==POSIX_LOCK_WRLCK)?'W':'U');
+				}
+				for (al = il->active ; al!=NULL ; al=al->next) {
+					fprintf(fd,"  - active_lock: owner: %"PRIu64", sessionid: %"PRIu32", pid: %"PRIu32"\n",al->owner,al->sessionid,al->pid);
+					for (r = al->ranges ; r!=NULL ; r=r->next) {
+						fprintf(fd,"    - start: %"PRIu64", end: %"PRIu64", type: %c\n",r->start,r->end,(r->type==POSIX_LOCK_RDLCK)?'R':(r->type==POSIX_LOCK_WRLCK)?'W':'U');
+					}
+				}
+			}
+		}
+		fprintf(fd,"\n");
+	}
+}
+
+void posix_lock_reload(void) {
+	DebugInfo = cfg_getuint8("EXTRA_DEBUG_INFO",0); // debug option
+}
+
 int posix_lock_init(void) {
 	uint32_t i;
 	inodehash = malloc(sizeof(inodelocks*)*POSIX_LOCK_INODE_HASHSIZE);
@@ -862,6 +919,9 @@ int posix_lock_init(void) {
 	for (i=0 ; i<POSIX_LOCK_INODE_HASHSIZE ; i++) {
 		inodehash[i] = NULL;
 	}
+	posix_lock_reload();
+	main_reload_register(posix_lock_reload);
+	main_info_register(posix_lock_info);
 	return 0;
 }
 

@@ -1,0 +1,132 @@
+.TH mfspatadmin "1" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
+.SH NAME
+mfspatadmin \- \fBMooseFS\fP patterns administration tool
+.SH SYNOPSIS
+.B mfscreatepattern
+[\fB-?\fP] [\fB-M\fP \fIMOUNTPOINT\fP]
+\fB-n\fP \fIpattern\fP
+[\fB-u\fP \fIuid\fP]
+[\fB-g\fP \fIgid\fP]
+[\fB-p\fP \fIpriority\fP]
+[\fB-c\fP \fIstorage_class\fP]
+[\fB-t\fP \fItrash_retention\fP]
+[\fB-f\fP \fIeattr\fP]
+.PP
+.B mfsdeletepattern
+[\fB-?\fP] [\fB-M\fP \fIMOUNTPOINT\fP]
+\fB-n\fP \fIpattern\fP
+[\fB-u\fP \fIuid\fP]
+[\fB-g\fP \fIgid\fP]
+.PP
+.B mfslistpattern
+[\fB-?\fP] [\fB-M\fP \fIMOUNTPOINT\fP]
+.SH DESCRIPTION
+This  is  a  set  of  tools for managing patterns, which are used to override
+storage classes, trash retention and/or extra attributes whenever a new file is created or an existing file is renamed.
+.PP
+\fBmfscreatepattern\fP adds new pattern definition, described below.
+.PP
+\fBmfsdeletepattern\fP removes specific pattern definition
+.PP
+\fBmfslistpattern\fP lists all the pattern definitions
+.SH OPTIONS
+.PP
+\fB-n\fP defines pattern that will be matched against file names. This is simple GLOB
+format (see below). This option must be defined for \fBadd\fP and \fBdelete\fP commands
+.PP
+\fB-u\fP defines user id that has to be equal to effective user id of the user
+that creates or renames a file. If not specified, user id will not be checked on match.
+.PP
+\fB-g\fP defines group id that has to be equal to one of the group ids of the user
+that creates or renames a file. If not specified, group id will not be checked on match.
+.PP
+\fB-p\fP priority of match. When there are more patterns that match a file name,
+patterns with higher priority take precedence. Priority can be defined as a value between
+\fB0\fP (lowest) and \fB255\fP (highest). If not specified, default value of \fB128\fP is used. 
+If two or more patterns with the same priority match a file name (with highest possible priority 
+for that file), only one (unspecified) of them will be used.
+.PP
+\fB-c\fP name of storage class that will be set on match
+.PP
+\fB-t\fP value of trash retention that will be set on match; minimum unit is hours, for value formating see TIME
+.PP
+\fB-f\fP names of flags, separated by commas, that will be set on match. 
+Each flag \fBmust\fP be preceded with either '+' or '-' sign, meaning that this flag should be set on or off,
+respectively. For description of flags refer to
+.BR mfseattr (1).
+.PP
+\fB-M\fP \fBMooseFS\fP mount point, doesn't need to be specified if a tool is run inside \fBMooseFS\fP 
+mounted directory or \fBMooseFS\fP is mounted in /mnt/mfs/
+.PP
+\fB-?\fP displays short usage message
+.PP
+At least one of the \fB-c\fP, \fB-t\fP, \fB-f\fP options must be defined for \fBadd\fP command.
+.SH TIME
+.PP
+For variables that define time without requiring a single, specific unit, time can be defined as a number of seconds or hours (integer), depending on minimum unit for the variable, or as a time period in one of two possible formats:
+.PP
+first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of minimum unit will be rounded
+.PP
+second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
+o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+.PP
+If a minimum unit of a variable is larger than seconds, units below the minimum one will not be accepted. For example, a variable that has hours as a minimum unit will not accept s and m units.
+.PP
+Examples:
+.PP
+1.5d is the same as 1d12h, is the same as 36h
+.PP
+2.5w is the same as 2w3d12h, is the same as 420h; 2w84h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
+.SH PATTERN DEFINITION
+Pattern is a string with optional wildcards (similar to UNIX glob). Recognized wildcards:
+.PP
+\fB*\fP - matches any number of any characters including none
+.PP
+\fB?\fP - matches any single character
+.PP
+\fB[\fP\fIabc\fP\fB]\fP - matches one character given in the bracket
+.PP
+\fB[\fP\fIFROM\fP\fB-\fP\fITO\fP\fB]\fP - matches one character from the range given in the bracket
+.PP
+\fB[!\fP\fIabc\fP\fB]\fP - matches one character that is not given in the bracket
+.PP
+\fB[!\fP\fIFROM\fP\fB-\fP\fITO\fP\fB]\fP - matches one character that is not from the range given in the bracket
+.PP
+Examples of patterns:
+.PP
+\fBexactname\fP - matches file with name 'exactname' only
+.PP
+\fB*.txt\fP - matches any 'text' file (formally file with name suffix '.txt').
+.PP
+\fBmyproject*\fP - matches any file with name prefix 'myproject'.
+.PP
+\fBletter[0-9]\fP - matches files with names 'letter0', 'letter1', 'letter2', ... 'letter9'.
+.PP
+\fB[CB]at\fP - matches files with names 'Cat' and 'Bat'.
+.PP
+\fB[!0-9]*\fP - matches files with names that don't start with a digit
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8),
+.BR mfstools (1),
+.BR mfssclass (1),
+.BR mfseattr (1)

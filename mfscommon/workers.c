@@ -26,9 +26,6 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <signal.h>
-#ifndef WIN32
-#include <syslog.h>
-#endif
 #include <inttypes.h>
 
 #include "squeue.h"
@@ -87,7 +84,7 @@ static inline void workers_spawn_worker(workers *ws) {
 	ws->avail++;
 	ws->total++;
 	if (ws->total%10==0 && ws->total!=ws->lastnotify) {
-		syslog(LOG_INFO,"%s workers: %"PRIu32"+",ws->name,ws->total);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"%s workers: %"PRIu32"+",ws->name,ws->total);
 		ws->lastnotify = ws->total;
 	}
 }
@@ -99,7 +96,7 @@ static inline void workers_close_worker(worker *w) {
 	ws->avail--;
 	ws->total--;
 	if (ws->total%10==0 && ws->total!=ws->lastnotify) {
-		syslog(LOG_INFO,"%s workers: %"PRIu32"-",ws->name,ws->total);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"%s workers: %"PRIu32"-",ws->name,ws->total);
 		ws->lastnotify = ws->total;
 	}
 	if (ws->total==0) {
@@ -117,7 +114,7 @@ static void* workers_worker_thread(void *arg) {
 	uint8_t firstrun = 1;
 
 	for (;;) {
-//		syslog(LOG_NOTICE,"workers: worker loop");
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"workers: worker loop");
 		if (firstrun==0) {
 			zassert(pthread_mutex_lock(&(ws->lock)));
 			ws->avail++;
@@ -130,9 +127,9 @@ static void* workers_worker_thread(void *arg) {
 		}
 		firstrun = 0;
 
-//		syslog(LOG_NOTICE,"waiting for jobs (queue:%p) ...",ws->jqueue);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"waiting for jobs (queue:%p) ...",ws->jqueue);
 		squeue_get(ws->jqueue,&data);
-//		syslog(LOG_NOTICE,"got job (data:%p)",data);
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"got job (data:%p)",data);
 
 		zassert(pthread_mutex_lock(&(ws->lock)));
 
@@ -205,7 +202,7 @@ void workers_term(void *wsv) {
 
 void workers_newjob(void *wsv,void *data) {
 	workers *ws = (workers*)wsv;
-//	syslog(LOG_NOTICE,"enqueue job %p to queue %p",data,ws->jqueue);
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"enqueue job %p to queue %p",data,ws->jqueue);
 	squeue_put(ws->jqueue,data);
-//	syslog(LOG_NOTICE,"job enqueued");
+//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"job enqueued");
 }

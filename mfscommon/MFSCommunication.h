@@ -68,13 +68,22 @@
 
 #define MFS_ROOT_ID 1
 
-#define MASKORGROUP 4
+#define MASKORGROUP 4  // obsolete (see SCLASS_EXPR_MAX_SIZE) - only for compatibility with version 3.0
+#define MAXSCLASS 256
+
+#define SCLASS_EXPR_MAX_SIZE 128
+#define MAXSCLASSNLENG 256
+#define MAXLABELSCNT 9
+
+#define MAXPATTERNLENG 256
 
 #define MFS_NAME_MAX 255
 #define MFS_SYMLINK_MAX 4096
 #define MFS_PATH_MAX 1024
 
 #define MFS_MAX_FILE_SIZE (((uint64_t)(MFSCHUNKSIZE))<<31)
+
+#define EDGEID_MAX UINT64_C(0x7FFFFFFFFFFFFFFF)
 
 #define TRASH_BUCKETS 4096
 #define SUSTAINED_BUCKETS 256
@@ -145,8 +154,22 @@
 #define MFS_ERROR_CLASSLIMITREACH 51    // Maximum number of classes reached
 #define MFS_ERROR_NOSUCHCLASS     52    // No such class
 #define MFS_ERROR_CLASSINUSE      53    // Class in use
+#define MFS_ERROR_INCOMPATVERSION 54    // Incompatible version
 
-#define MFS_ERROR_MAX             54
+#define MFS_ERROR_PATTERNEXISTS   55    // Pattern already defined
+#define MFS_ERROR_PATLIMITREACHED 56    // Maximum number of patterns reached
+#define MFS_ERROR_NOSUCHPATTERN   57    // No such pattern
+
+#define MFS_ERROR_ENAMETOOLONG    58    // File name too long
+#define MFS_ERROR_EMLINK          59    // Too many links
+
+#define MFS_ERROR_ETIMEDOUT       60    // Operation timed out
+
+#define MFS_ERROR_EBADF           61    // Bad file descriptor
+#define MFS_ERROR_EFBIG           62    // File too large
+#define MFS_ERROR_EISDIR          63    // Is a directory
+
+#define MFS_ERROR_MAX             64
 
 #define MFS_ERROR_STRINGS \
 	"OK", \
@@ -203,15 +226,68 @@
 	"Maximum number of classes reached", \
 	"No such class", \
 	"Class in use", \
+	"Incompatible version", \
+	"Pattern already defined", \
+	"Maximum number of patterns reached", \
+	"No such pattern", \
+	"File name too long", \
+	"Too many links", \
+	"Operation timed out", \
+	"Bad file descriptor", \
+	"File too large", \
+	"Is a directory", \
 	"Unknown MFS error"
 
+#define MFSLOG_DEBUG                       0
+#define MFSLOG_INFO                        1
+#define MFSLOG_NOTICE                      2
+#define MFSLOG_WARNING                     3
+#define MFSLOG_ERR                         4
+
+#define MFSLOG_STRINGS \
+	"debug", \
+	"info", \
+	"notice", \
+	"warning", \
+	"error"
+
 #define SCLASS_CHG_ADMIN_ONLY              0x0001
-#define SCLASS_CHG_MODE                    0x0002
+#define SCLASS_CHG_LABELS_MODE             0x0002
 #define SCLASS_CHG_CREATE_MASKS            0x0004
 #define SCLASS_CHG_KEEP_MASKS              0x0008
 #define SCLASS_CHG_ARCH_MASKS              0x0010
 #define SCLASS_CHG_ARCH_DELAY              0x0020
+#define SCLASS_CHG_TRASH_MASKS             0x0040
+#define SCLASS_CHG_MIN_TRASHRETENTION      0x0080
+#define SCLASS_CHG_ARCH_MODE               0x0100
+#define SCLASS_CHG_ARCH_MIN_SIZE           0x0200
 #define SCLASS_CHG_FORCE                   0x8000
+
+#define SCLASS_ARCH_MODE_CTIME             0x01
+#define SCLASS_ARCH_MODE_MTIME             0x02
+#define SCLASS_ARCH_MODE_ATIME             0x04
+#define SCLASS_ARCH_MODE_REVERSIBLE        0x08
+#define SCLASS_ARCH_MODE_FAST              0x10
+#define SCLASS_ARCH_MODE_CHUNK             0x20
+
+#define SCLASS_EXPR_TYPE_MASK              0xC0
+#define SCLASS_EXPR_VALUE_MASK             0x3F
+#define SCLASS_EXPR_SYMBOL                 0xC0
+#define SCLASS_EXPR_SYMBOL_ANY             0xFF
+#define SCLASS_EXPR_OP_AND                 0x80
+#define SCLASS_EXPR_OP_OR                  0x40
+#define SCLASS_EXPR_OP_ONE                 0x00
+#define SCLASS_EXPR_OP_NOT                 0x01
+
+#define UNIQ_MASK_IP                       (1U<<(1+'Z'-'A'))
+#define UNIQ_MASK_RACK                     (1U<<(2+'Z'-'A'))
+
+#define LIST_UID_ANY                       UINT32_C(0xFFFFFFFF)
+
+#define PATTERN_EUGID_ANY                  UINT32_C(0xFFFFFFFF)
+#define PATTERN_OMASK_SCLASS               0x01
+#define PATTERN_OMASK_TRASHRETENTION       0x02
+#define PATTERN_OMASK_EATTR                0x04
 
 /* type for readdir command */
 #define DISP_TYPE_FILE                     'f'
@@ -237,6 +313,12 @@
 #define TYPE_SOCKET                        7
 #define TYPE_TRASH                         8
 #define TYPE_SUSTAINED                     9
+
+// bits in 'winattr' field of attributes
+#define WINATTR_READ_ONLY 1
+#define WINATTR_HIDDEN 2
+#define WINATTR_SYSTEM 4
+#define WINATTR_ARCHIVE 8
 
 // mode mask: "modemask" field in "CLTOMA_FUSE_ACCESS"
 #define MODE_MASK_R                        4
@@ -282,6 +364,13 @@
 #define SET_MTIME_FLAG                     0x20
 #define SET_ATIME_FLAG                     0x40
 #define SET_ATIME_NOW_FLAG                 0x80
+
+#define MAX_EC_PARTS                       8
+
+// rename.mode
+#define MFS_RENAME_STD                     0
+#define MFS_RENAME_EXCHANGE                1
+#define MFS_RENAME_NOREPLACE               2
 
 // check.type:
 #define CHECK_VALID                        0
@@ -334,13 +423,14 @@
 #define GMODE_RECURSIVE                    1
 #define GMODE_ISVALID(x)                   (((uint32_t)(x))<=1)
 
-// mode (storage class):
+// labels_mode:
 // loose = use other labels when servers are overloaded or full
 // std = use other labels when servers are full
 // strict = never use other labels
-#define SCLASS_MODE_LOOSE                  0
-#define SCLASS_MODE_STD                    1
-#define SCLASS_MODE_STRICT                 2
+#define LABELS_MODE_LOOSE                  0
+#define LABELS_MODE_STD                    1
+#define LABELS_MODE_STRICT                 2
+#define LABELS_MODE_GLOBAL                 0xFF
 
 // extraattr:
 
@@ -396,6 +486,8 @@
 #define QUOTA_FLAG_HSIZE                   0x40
 #define QUOTA_FLAG_HREALSIZE               0x80
 #define QUOTA_FLAG_HALL                    0xF0
+#define QUOTA_PERIOD_DEFAULT               0x0
+#define QUOTA_PERIOD_DONT_CHANGE           UINT32_C(0xFFFFFFFF)
 
 // append slice
 #define APPEND_SLICE_FROM_NEG              0x01
@@ -481,8 +573,9 @@
 #define HLSTATUS_DEFAULT                   0
 #define HLSTATUS_OK                        1
 #define HLSTATUS_OVERLOADED                2
-#define HLSTATUS_REBALANCE                 3
+#define HLSTATUS_LSREBALANCE               3
 #define HLSTATUS_GRACEFUL                  4
+#define HLSTATUS_HSREBALANCE               5
 
 // "flags" fileld in "CLTOMA_FUSE_OPEN"
 #define OPEN_READ                          0x01
@@ -517,6 +610,19 @@
 #define MFS_XATTR_SIZE_MAX                 65536
 #define MFS_XATTR_LIST_MAX                 65536
 
+// CLTOMA_FULL_DIRECTORY_DATA.flags
+#define FULL_DIRECTORY_ADD_CHUNKID         1
+#define FULL_DIRECTORY_ADD_SYMLINK         2
+#define FULL_DIRECTORY_ADD_XATTR           4
+#define FULL_DIRECTORY_ADD_FACL            8
+#define FULL_DIRECTORY_ADD_EATTR           16
+
+// CLTOMA_SET_ALL_NODE_ATTRIBUTES.flags
+#define SET_ALL_WINATTR                    1
+#define SET_ALL_EATTR                      2
+#define SET_ALL_XATTR                      4
+#define SET_ALL_FACL                       8
+
 // CLTOMA_FUSE_READ_CHUNK,CLTOMA_FUSE_WRITE_CHUNK,CLTOMA_FUSE_WRITE_CHUNK_END - chunkopflags
 #define CHUNKOPFLAG_CANMODTIME             1
 #define CHUNKOPFLAG_CONTINUEOP             2
@@ -533,6 +639,19 @@
 #define ATIME_FILES_AND_RELATIVE_ONLY      3
 #define ATIME_NEVER                        4
 
+
+// current_load.transferingchunks
+#define TRANSFERING_LOST_CHUNKS            1
+#define TRANSFERING_NEW_CHUNKS             2
+
+// chunk_info.requestedinfo
+#define REQUEST_BLOCKS                     1
+#define REQUEST_CHECKSUM                   2
+#define REQUEST_CHECKSUM_TAB               4
+#define REQUEST_FILE_PATH                  8
+
+// wflags
+#define WFLAG_INVALIDATE_CACHE             1
 
 #define ATTR_RECORD_SIZE                   36
 
@@ -638,6 +757,8 @@
 #define ANTOAN_BAD_COMMAND_SIZE 2
 // [ msgid:32 ] cmdno:32 size:32 version:32 (msgid - only in communication from master to client)
 
+#define ANTOAN_FORCE_TIMEOUT 5
+// [ msgid:32 ] timeout_in_seconds:16 (intr. in version 4.12.0)
 
 #define ANTOAN_GET_VERSION 10
 // [ msgid:32 ]
@@ -646,7 +767,40 @@
 // [ msgid:32 ] version:32 strversion:string ( N*[ char:8 ] )
 
 
+
+// INTERNAL PROXY PACKETS
+
+// packet conversion (encapsulation)
+// N:32 (leng) C:32 (command) [N bytes] (data) <-> (N+8):32 INTERN_PACKET:32 ID:32 (connection id) C:32 (command) [N bytes] (data)
+// ID: 0xCCIIIIII - 0xCC - simple count, 0xIIIIII - tab index
+
+// PROXY -> CORE
+#define INTERN_CONNECT 20
+// connid:32 ip:32
+
+// PROXY <-> CORE
+#define INTERN_DISCONNECT 21
+// connid:32
+
+// PROXY <-> CORE
+#define INTERN_PACKET 22
+// connid:32 command:32 data:....
+
+// CORE -> PROXY
+#define INTERN_CONNFLAGS 23
+// connid:32 flags:32
+
+// CORE -> PROXY
+#define INTERN_FINISH 24
+// -
+
+// CORE -> PROXY
+#define INTERN_RELOAD 25
+// -
+
+
 // METALOGGERS/MASTERS/MANAGERS <-> MASTER
+
 
 // 0x0032
 #define ANTOMA_REGISTER (PROTO_BASE+50)
@@ -660,6 +814,26 @@
 // 0xFF:8 version:64 logdata:string ( N*[ char:8 ] ) = LOG_DATA
 // 0xAA:8 version:64 logdata:string ( N*[ char:8 ] ) = LOG_DATA with ack (intr. in version 3.0.10)
 // 0x55:8 = LOG_ROTATE
+
+// 0x0034
+#define MATOAN_MASTER_ACK (PROTO_BASE+52)
+// atype:8
+
+// 0x0035
+#define MATOAN_STATE (PROTO_BASE+53)
+// signature1:32 signature2:32 signature3:32 metaversion:64 metaid:64 utimestamp:64 tmp:32
+
+// 0x0038
+#define ANTOMA_FORCE_METADATA_SAVE (PROTO_BASE+56)
+// - (since 4.4.0)
+
+// 0x0039
+#define MATOMA_METADATA_CHECKSUM (PROTO_BASE+57)
+// metaversion:64 metaid:64 N * [ section:32 checksum:32 ] (since 4.4.0)
+
+// 0x003A
+#define MATOMA_FORCE_DESYNC (PROTO_BASE+58)
+// - (since 4.4.0)
 
 
 // 0x003C
@@ -685,6 +859,14 @@
 #define ANTOMA_DOWNLOAD_END (PROTO_BASE+64)
 // -
 
+// 0x0041
+#define ANTOMA_STORE_METADATA (PROTO_BASE+65)
+// -
+
+// 0x0047
+#define ANTOMA_SYSLOG (PROTO_BASE+71)
+// priority:8 msgsize:16 message:msgsizeB
+
 
 // 0x0050
 #define ANTOAN_GET_CONFIG (PROTO_BASE+80)
@@ -692,11 +874,47 @@
 
 // 0x0051
 #define ANTOAN_CONFIG_VALUE (PROTO_BASE+81)
-// msgid:32 option_value:NAME
+// msgid:32 [option_name:NAME] option_value:NAME
+// option name exists when msgid==0
+
+// 0x0052
+#define ANTOAN_GET_CONFIG_FILE (PROTO_BASE+82)
+// msgid:32 option_name:NAME
+
+// 0x0053
+#define ANTOAN_CONFIG_FILE_CONTENT (PROTO_BASE+83)
+// msgid:32 [option_name:NAME] size:16 data:sizeB
+// option name exists when msgid==0
+
+// 0x0054
+#define ANTOAN_GET_CONFIG_FILE_MD5 (PROTO_BASE+84)
+// msgid:32 txtmode:8 option_name:NAME
+// txtmode == 1 - parse file pointed by option as a text file - skip empty lines and comments (starting with '#')
+
+// 0x0055
+#define ANTOAN_CONFIG_FILE_MD5 (PROTO_BASE+85)
+// msgid:32 [option_name:NAME] md5_digest:16B
+// option name exists when msgid==0
 
 
 
 // CHUNKSERVER <-> MASTER
+
+// 0x0060
+#define CSTOMA_CHUNK_DOESNT_EXIST (PROTO_BASE+96)
+// N * [ chunkid:64 ]
+
+// 0x0061
+#define MATOCS_CHUNK_STATUS (PROTO_BASE+97)
+// chunkid:64
+
+// 0x0062
+#define CSTOMA_CHUNK_STATUS (PROTO_BASE+98)
+// N * [ ecid:8 status:8 version:32 ]
+
+// 0x0063
+#define MATOCS_REGISTER_FIRST (PROTO_BASE+99)
+// chunkid:64
 
 // 0x0064
 #define CSTOMA_REGISTER (PROTO_BASE+100)
@@ -728,6 +946,7 @@
 //		( rver:8 ) -
 //	rver==63:	// version 6 / DISCONNECT
 
+
 // 0x0065
 #define CSTOMA_SPACE (PROTO_BASE+101)
 // usedspace:64 totalspace:64
@@ -736,7 +955,7 @@
 
 // 0x0066
 #define CSTOMA_CHUNK_DAMAGED (PROTO_BASE+102)
-// N*[chunkid:64]
+// N * [chunkid:64]
 
 // 0x0067
 // #define MATOCS_STRUCTURE_LOG (PROTO_BASE+103)
@@ -745,7 +964,8 @@
 // since version 1.6.28:
 #define CSTOMA_CURRENT_LOAD (PROTO_BASE+103)
 // load:32 - (version < 3.0.7)
-// load:32 hlstatus:8 - (version >= 3.0.7)
+// load:32 hlstatus:8 - (version >= 3.0.7 && version < 4.32.0)
+// load:32 hlstatus:8 transferingchunks:8 - (version >= 4.32.0)
 
 // 0x0068
 // #define MATOCS_STRUCTURE_LOG_ROTATE (PROTO_BASE+104)
@@ -757,7 +977,7 @@
 
 // 0x0069
 #define CSTOMA_CHUNK_LOST (PROTO_BASE+105)
-// N*[ chunkid:64 ]
+// N * [ chunkid:64 ]
 
 // 0x006A
 #define CSTOMA_ERROR_OCCURRED (PROTO_BASE+106)
@@ -765,7 +985,7 @@
 
 // 0x006B
 #define CSTOMA_CHUNK_NEW (PROTO_BASE+107)
-// N*[ chunkid:64 version:32 ]
+// N * [ chunkid:64 version:32 ]
 
 
 // 0x006D
@@ -817,6 +1037,7 @@
 // all chunk operations
 // newversion>0 && length==0xFFFFFFFF && copychunkid==0              -> change version
 // newversion>0 && length==0xFFFFFFFF && copychunkid>0               -> duplicate
+// newversion>0 && length&0x80000000 -> split
 // newversion>0 && length>=0 && length<=MFSCHUNKSIZE && copychunkid==0  -> truncate
 // newversion>0 && length>=0 && length<=MFSCHUNKSIZE && copychunkid>0   -> duplicate and truncate
 // newversion==0 && length==0                                        -> delete
@@ -828,6 +1049,29 @@
 #define CSTOMA_CHUNKOP (PROTO_BASE+153)
 // chunkid:64 version:32 newversion:32 copychunkid:64 copyversion:32 length:32 status:8
 
+// 0x009A
+#define MATOCS_REPLICATE_SPLIT (PROTO_BASE+154)
+// chunkid:64 version:32 ip:32 port:16 srcchunkid:64 partno:8 parts:8
+
+// 0x009B
+#define CSTOMA_REPLICATE_SPLIT (PROTO_BASE+155)
+// chunkid:64 version:32 status:8
+
+// 0x009C
+#define MATOCS_REPLICATE_RECOVER (PROTO_BASE+156)
+// chunkid:64 version:32 matrix:4*32 parts:8 parts * [ip:32 port:16 srcchunkid:64]
+
+// 0x009D
+#define CSTOMA_REPLICATE_RECOVER (PROTO_BASE+157)
+// chunkid:64 version:32 status:8
+
+// 0x009E
+#define MATOCS_REPLICATE_JOIN (PROTO_BASE+158)
+// chunkid:64 version:32 parts:8 parts * [ip:32 port:16 srcchunkid:64]
+
+// 0x009F
+#define CSTOMA_REPLICATE_JOIN (PROTO_BASE+159)
+// chunkid:64 version:32 status:8
 
 // 0x00A0
 #define MATOCS_TRUNCATE (PROTO_BASE+160)
@@ -844,6 +1088,14 @@
 // 0x00AB
 #define CSTOMA_DUPTRUNC (PROTO_BASE+171)
 // chunkid:64 status:8
+
+// 0x00B4
+#define MATOCS_LOCALSPLIT (PROTO_BASE+180)
+// chunkid:64 version:32 missingmask:32
+
+// 0x00B5
+#define CSTOMA_LOCALSPLIT (PROTO_BASE+181)
+// chunkid:64 version:32 status:8
 
 
 
@@ -911,25 +1163,73 @@
 // chunkid:64 version:32 1024*[checksum:32]
 // chunkid:64 version:32 status:8
 
+#define ANTOCS_GET_CHUNK_INFO (PROTO_BASE+304)
+// chunkid:64 version:32 requestedinfo:8
 
+#define CSTOAN_CHUNK_INFO (PROTO_BASE+305)
+// chunkid:64 version:32 status:8
+// chunkid:64 version:32 [blocks:16] [checksum:32] [1024*[checksum:32] [pleng:32 path:plengB]
 
+#define ANTOCS_CLEAR_ERRORS (PROTO_BASE+306)
+// pleng:32 path:plengB
+
+#define CSTOAN_CLEAR_ERRORS (PROTO_BASE+307)
+// cleared_folders:8
 
 // CLIENT <-> MASTER
 
 // Storage Class
 
+// sclass packet changes:
+// 0: first approach with labels defined as and/or groups (in list - lists only names)
+// 1: in create/change same as 2, in list same as 0 in create/change
+// 2: added trash, labels defined as expressions, arch_delay changed from days to hours, added EC support
+// 3: added 'arch_mode' (MFS 4.2.0)
+// 4: added 'arch_min_size' (MFS 4.34.0)
+// 5: added 'label_mode' override for CREATE,KEEP,ARCH and TRASH (MFS 4.53.0)
+
 #define CLTOMA_SCLASS_CREATE (PROTO_BASE+350)
-// msgid:32 storage_class_name:NAME fver:8 admin_only:8 mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// msgid:32 storage_class_name:NAME fver:8
+// fver==0: (arch_delay in days)
+//	admin_only:8 labels_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// fver==1,2: (arch_delay in hours)
+//	admin_only:8 labels_mode:8 arch_delay:16 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr:SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==3: (arch_delay in hours)
+//	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr:SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==4: (arch_delay in hours)
+//	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr:SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==5: (arch_delay in hours)
+//	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr:SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
 
 #define MATOCL_SCLASS_CREATE (PROTO_BASE+351)
 // msgid:32 status:8
 
 #define CLTOMA_SCLASS_CHANGE (PROTO_BASE+352)
-// msgid:32 storage_class_name:NAME fver:8 chgmask:16 admin_only:8 mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// msgid:32 storage_class_name:NAME fver:8
+// fver==0: (arch_delay in days)
+//	chgmask:16 admin_only:8 labels_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// fver==1,2: (arch_delay in hours)
+//	chgmask:16 admin_only:8 labels_mode:8 arch_delay:16 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==3: (arch_delay in hours)
+//	chgmask:16 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==4: (arch_delay in hours)
+//	chgmask:16 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==5: (arch_delay in hours)
+//	chgmask:16 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
 
 #define MATOCL_SCLASS_CHANGE (PROTO_BASE+353)
 // msgid:32 status:8
-// msgid:32 fver:8 admin_only:8 mode:8 arch_delay:16 create_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt:8 keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt:8 arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// msgid:32 fver:8
+// fver==0: (arch_delay in days !!!)
+//	admin_only:8 labels_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ]
+// fver==1,2: (arch_delay in hours)
+//	admin_only:8 labels_mode:8 arch_delay:16 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==3: (arch_delay in hours)
+//	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==4: (arch_delay in hours)
+//	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==5: (arch_delay in hours)
+//	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
 
 #define CLTOMA_SCLASS_DELETE (PROTO_BASE+354)
 // msgid:32 storage_class_name:NAME
@@ -956,9 +1256,95 @@
 // msgid:32
 // fver==0:
 //	N * [ storage_class_name:NAME ]
-// fver!=0:
-//	N * [ storage_class_name:NAME admin_only:8 mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] ]
+// (fver!=0 && masterversion < 4.0) || (fver==1 && masterversion >= 4.0):
+//	N * [ storage_class_name:NAME admin_only:8 labels_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] ]
+// fver==2 && masterversion >= 4.0:
+//	N * [ storage_class_name:NAME admin_only:8 labels_mode:8 arch_delay:16 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] ]
+// fver==3 && masterversion >= 4.2.0:
+//	N * [ storage_class_name:NAME admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] ]
+// fver==4 && masterversion >= 4.34.2:
+//	N * [ classid:8 storage_class_name:NAME admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] ]
+// fver==5 && masterversion >= 4.53.0:
+//	N * [ classid:8 storage_class_name:NAME admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] ]
+// fvar==0xFF && masterversion >= 4.34.2
+//	N * [ classid:8 storage_class_name:NAME ]
 
+
+
+// GLOB patterns
+
+// (glob,euid,egid) -> (sclass,trashretention,eattr) with given priority
+
+#define CLTOMA_PATTERN_ADD (PROTO_BASE+370)
+// msgid:32 fver:8
+// fver==0:
+//	glob:NAME euid:32 egid:32 priority:8 omask:8 sclass_name:NAME trashretention:16 seteattr:8 clreattr:8
+
+#define MATOCL_PATTERN_ADD (PROTO_BASE+371)
+// msgid:32 status:8
+
+#define CLTOMA_PATTERN_DELETE (PROTO_BASE+372)
+// msgid:32 fver:8
+// fver==0:
+//	glob:NAME euid:32 egid:32
+
+#define MATOCL_PATTERN_DELETE (PROTO_BASE+373)
+// msgid:32 status:8
+
+#define CLTOMA_PATTERN_LIST (PROTO_BASE+374)
+// msgid:32 fver:8
+// fver==0:
+//	-
+
+#define MATOCL_PATTERN_LIST (PROTO_BASE+375)
+// msgid:32
+// fver==0:
+//	N * [ glob:NAME euid:32 egid:32 priority:8 omask:8 sclass_name:NAME trashretention:16 seteattr:8 clreattr:8 ]
+
+
+// TRASH tools (min version 4.6.0)
+#define CLTOMA_TRASH_LIST (PROTO_BASE+380)
+// msgid:32 partno:8 format:8 uid:32 mints:32 maxts:32 (version <= 4.19)
+// msgid:32 partno:8 format:8 uid:32 mints:32 maxts:32 glob:NAME (version >= 4.20)
+
+#define MATOCL_TRASH_LIST (PROTO_BASE+381)
+// msgid:32 status:8 - in case of error
+// msgid:32 totalcount:32 N * [ inode:32 pleng:32 path:plengB ] - format = 0 (version >= 4.6 && version <= 4.14)
+// msgid:32 totalcount:32 N * [ inode:32 attr:ATTR trashretention:16 pleng:32 path:plengB ] - format = 1 (version >= 4.6 && version <= 4.14)
+// msgid:32 totalcount:32 userfiles:32 matchedfiles:32 matchedfiles * [ inode:32 pleng:32 path:plengB ] - format = 0 (version >= 4.15)
+// msgid:32 totalcount:32 userfiles:32 matchedfiles:32 matchedfiles * [ inode:32 attr:ATTR trashretention:16 pleng:32 path:plengB ] - format = 1 (version >= 4.15)
+
+#define CLTOMA_TRASH_RECOVER (PROTO_BASE+382)
+// msgid:32 inode:32 path_root:32 pleng:32 path:plengB umask:16 uid:32 gcnt:32 gcnt * [ gid:32 ] copysgid:8
+
+#define MATOCL_TRASH_RECOVER (PROTO_BASE+383)
+// msgid:32 status:8
+// msgid:32 pleng:32 path:plengB - only when the path has been changed
+
+#define CLTOMA_TRASH_REMOVE (PROTO_BASE+384)
+// msgid:32 inode:32 uid:32
+
+#define MATOCL_TRASH_REMOVE (PROTO_BASE+385)
+// msgid:32 status:8
+
+#define CLTOMA_SUSTAINED_LIST (PROTO_BASE+388)
+// msgid:32 partno:8 uid:32 (version <= 4.19)
+// msgid:32 partno:8 uid:32 glob:NAME (version >= 4.20)
+
+#define MATOCL_SUSTAINED_LIST (PROTO_BASE+389)
+// msgid:32 status:8 - in case of error
+// msgid:32 totalcount:32 N * [ inode:32 sessionscount:32 sessionscount * [ sessionid:32 ] pleng:32 path:plengB ] (version >= 4.6 && version <= 4.14)
+// msgid:32 totalcount:32 matchedfiles:32 matchedfiles * [ inode:32 sessionscount:32 sessionscount * [ sessionid:32 ] pleng:32 path:plengB ] (version >= 4.15)
+
+
+
+// libmfsio extra packets
+#define CLTOMA_PATH_LOOKUP (PROTO_BASE+390)
+// msgid:32 base_inode:32 length:32 path:lengthB uid:32 gcnt:32 gcnt * [ gid:32 ]
+
+#define MATOCL_PATH_LOOKUP (PROTO_BASE+391)
+// msgid:32 status:8
+// msgid:32 parent_inode:32 last_name:NAME last_inode:32 attr:ATTR
 
 // Fuse
 
@@ -1020,10 +1406,10 @@
 //  sessionid:32 sesflags:8 rootuid:32 rootgid:32 ( version < 1.6.1)
 //  sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 ( version >= 1.6.1 && version < 1.6.21 )
 //  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 ( version >= 1.6.21 && version < 1.6.26 )
-//  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 1.6.26 )
-//  version:32 sessionid:32 metaid:64 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.11 )
-//  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.72 )
-//  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 disables:32 ( version >= 3.0.112 )
+//  version:32 sessionid:32 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 1.6.26 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 3.0.11 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 3.0.72 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 disables:32 ( version >= 3.0.112 / 4.21.0 )
 //  status:8
 
 #define REGISTER_RECONNECT 3
@@ -1032,6 +1418,7 @@
 //  rcode:8 sessionid:32 version:32 [ metaid:64 ]
 // MATOCL:
 //  status:8
+//  version:32 status:8 ( both versions >= 3.0.95 / 4.0.7 )
 
 #define REGISTER_TOOLS 4
 // rcode==4: tools connect
@@ -1047,8 +1434,8 @@
 // MATOCL:
 //  sessionid:32 sesflags:8 ( version < 1.6.21 )
 //  version:32 sessionid:32 sesflags:8 ( version >= 1.6.21 && version < 1.6.26 )
-//  version:32 sessionid:32 sesflags:8 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 1.6.26 )
-//  version:32 sessionid:32 metaid:64 sesflags:8 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ( version >= 3.0.11 )
+//  version:32 sessionid:32 sesflags:8 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 1.6.26 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 3.0.11 )
 //  status:8
 
 #define REGISTER_CLOSESESSION 6
@@ -1073,8 +1460,10 @@
 
 // 0x0193
 #define MATOCL_FUSE_STATFS (PROTO_BASE+403)
-// msgid:32 totalspace:64 availspace:64 trashspace:64 sustainedspace:64 inodes:32 - version < 3.0.102 (and < 4.9.0 in 4.x)
-// msgid:32 totalspace:64 availspace:64 freespace:64 trashspace:64 sustainedspace:64 inodes:32
+// deprecated (version < 3.0.102 in 3.x and < 4.9.0 in 4.x):
+//	msgid:32 totalspace:64 availspace:64 trashspace:64 inodes:32
+// current:
+//	msgid:32 totalspace:64 availspace:64 trashspace:64 sustainedspace:64 inodes:32
 
 // 0x0194
 #define CLTOMA_FUSE_ACCESS (PROTO_BASE+404)
@@ -1095,6 +1484,7 @@
 // msgid:32 status:8
 // msgid:32 inode:32 attr:ATTR - (master version or client version < 3.0.40)
 // msgid:32 inode:32 attr:ATTR lflags:16 [ protocolid:8 chunkid:64 version:32 N * [ ip:32 port:16 cs_ver:32 labelmask:32 ] ] - (master and client both versions >= 3.0.40 - protocolid==2 ; chunk 0 data only for one-chunk files with unlocked chunk)
+// msgid:32 inode:32 attr:ATTR lflags:16 [ protocolid:8 chunkid:64 version:32 8 * [ ip:32 port:16 cs_ver:32 labelmask:32 ] ] - (master and client both versions >= 4.0.0 and chunk is split into eight parts - protocolid==3 ; chunk 0 data only for one-chunk files with unlocked chunk)
 
 // 0x0198
 #define CLTOMA_FUSE_GETATTR (PROTO_BASE+408)
@@ -1168,7 +1558,7 @@
 // 0x01A5
 #define MATOCL_FUSE_UNLINK (PROTO_BASE+421)
 // msgid:32 status:8
-// since 3.0.107 (after successful remove):
+// since 3.0.107/4.18.0 (after successful remove):
 // msgid:32 inode:32
 
 // 0x01A6
@@ -1179,13 +1569,14 @@
 // 0x01A7
 #define MATOCL_FUSE_RMDIR (PROTO_BASE+423)
 // msgid:32 status:8
-// since 3.0.107 (after successful remove):
+// since 3.0.107/4.18.0 (after successful remove):
 // msgid:32 inode:32
 
 // 0x01A8
 #define CLTOMA_FUSE_RENAME (PROTO_BASE+424)
 // msgid:32 inode_src:32 name_src:NAME inode_dst:32 name_dst:NAME uid:32 gid:32 - version < 2.0.0
-// msgid:32 inode_src:32 name_src:NAME inode_dst:32 name_dst:NAME uid:32 gcnt:32 gcnt * [ gid:32 ]
+// msgid:32 inode_src:32 name_src:NAME inode_dst:32 name_dst:NAME uid:32 gcnt:32 gcnt * [ gid:32 ] - version < 4.18.0
+// msgid:32 inode_src:32 name_src:NAME inode_dst:32 name_dst:NAME uid:32 gcnt:32 gcnt * [ gid:32 ] mode:8
 
 // 0x01A9
 #define MATOCL_FUSE_RENAME (PROTO_BASE+425)
@@ -1223,8 +1614,8 @@
 // 0x01AF
 #define MATOCL_FUSE_OPEN (PROTO_BASE+431)
 // msgid:32 status:8
-// msgid:32 attr:ATTR (version < 3.0.113)
-// msgid:32 flags:8 attr:ATTR (version >= 3.0.113)
+// msgid:32 attr:ATTR (version < 3.0.113, version < 4.22)
+// msgid:32 flags:8 attr:ATTR (version >= 3.0.113, version >= 4.22)
 
 // 0x01B0
 #define CLTOMA_FUSE_READ_CHUNK (PROTO_BASE+432)
@@ -1238,6 +1629,7 @@
 // msgid:32 length:64 chunkid:64 version:32 N*[ ip:32 port:16 ]
 // msgid:32 protocolid:8 length:64 chunkid:64 version:32 N * [ ip:32 port:16 cs_ver:32 ] (master and client both versions >= 1.7.32 - protocolid==1)
 // msgid:32 protocolid:8 length:64 chunkid:64 version:32 N * [ ip:32 port:16 cs_ver:32 labelmask:32 ] (master and client both versions >= 3.0.10 - protocolid==2)
+// msgid:32 protocolid:8 length:64 chunkid:64 version:32 (4 or 8) * [ ip:32 port:16 cs_ver:32 labelmask:32 ] (master and client both versions >= 4.0.0 and chunk is split into eight parts - protocolid==3)
 
 // 0x01B2
 #define CLTOMA_FUSE_WRITE_CHUNK (PROTO_BASE+434)
@@ -1279,6 +1671,7 @@
 #define CLTOMA_FUSE_CHECK (PROTO_BASE+440)
 // msgid:32 inode:32
 // msgid:32 inode:32 chunkindx:32 (version >= 3.0.26)
+// msgid:32 mode:8 inode:32 [ chunkindx:32 ] (version >= 4.0.0)
 
 // 0x01B9
 #define MATOCL_FUSE_CHECK (PROTO_BASE+441)
@@ -1288,25 +1681,28 @@
 // msgid:32 11*[ chunks:32 ] - 0 copies, 1 copy, 2 copies, ..., 10+ copies (version >= 1.6.23 and no chunkindx)
 // msgid:32 12*[ chunks:32 ] - 0 copies, 1 copy, 2 copies, ..., 10+ copies, 'empty' copies (version >= 3.0.30 and no chunkindx)
 // msgid:32 chunkid:64 version:32 N*[ ip:32 port:16 type:8 ] (version >= 3.0.26 and chunkindx present)
+// msgid:32 chunkid:64 version:32 N*[ ip:32 port:16 type:8 ecid:8 ] (version >= 4.0.0 and mode is equal to 1)
+// msgid:32 N * [ storage_index:8 chunks:32 ] ; storage_index: 0 - chunk not found, 1 - 'empty' chunk, 2 + fullcopies + 11 * ec_parts (version >= 4.0.0 and mode is equal to 2)
+// msgid:32 N * [ storage_index:16 chunks:32 ] ; storage_index: 0 - chunk not found, 1 - 'empty' chunk, 2 + fullcopies + 11 * ec8_parts + 198 * ec4_parts (version >= 4.36.0 and mode is equal to 3)
 
 
 // 0x01BA
-#define CLTOMA_FUSE_GETTRASHTIME (PROTO_BASE+442)
+#define CLTOMA_FUSE_GETTRASHRETENTION (PROTO_BASE+442)
 // msgid:32 inode:32 gmode:8
 
 // 0x01BB
-#define MATOCL_FUSE_GETTRASHTIME (PROTO_BASE+443)
+#define MATOCL_FUSE_GETTRASHRETENTION (PROTO_BASE+443)
 // maxsize=100000
 // msgid:32 status:8
-// msgid:32 tdirs:32 tfiles:32 tdirs*[ trashtime:32 dirs:32 ] tfiles*[ trashtime:32 files:32 ]
+// msgid:32 tdirs:32 tfiles:32 tdirs*[ trashretention:32 dirs:32 ] tfiles*[ trashretention:32 files:32 ]
 
 
 // 0x01BC
-#define CLTOMA_FUSE_SETTRASHTIME (PROTO_BASE+444)
-// msgid:32 inode:32 uid:32 trashtimeout:32 smode:8
+#define CLTOMA_FUSE_SETTRASHRETENTION (PROTO_BASE+444)
+// msgid:32 inode:32 uid:32 trashretentionout:32 smode:8
 
 // 0x01BD
-#define MATOCL_FUSE_SETTRASHTIME (PROTO_BASE+445)
+#define MATOCL_FUSE_SETTRASHRETENTION (PROTO_BASE+445)
 // msgid:32 status:8
 // msgid:32 changed:32 notchanged:32 notpermitted:32
 
@@ -1328,7 +1724,7 @@
 #define CLTOMA_FUSE_SETSCLASS (PROTO_BASE+448)
 // msgid:32 inode:32 uid:32 goal:8 smode:8 (any version)
 // msgid:32 inode:32 uid:32 labelscnt:8 smode:8 labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 2.1.0)
-// msgid:32 inode:32 uid:32 zero:8 smode:8 create_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 3.0.0)
+// msgid:32 inode:32 uid:32 zero:8 smode:8 labels_mode:8 arch_delay:16 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 create_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] keep_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] arch_labelscnt * [ MASKORGROUP * [ labelmask:32 ] ] (version >= 3.0.0)
 // msgid:32 inode:32 uid:32 0xFF:8 smode:8 storage_class:NAME                             (version >= 3.0.75 && (smode & SMODE_TMASK) != SMODE_EXCHANGE )
 // msgid:32 inode:32 uid:32 0xFF:8 smode:8 old_storage_class:NAME new_storage_class:NAME  (version >= 3.0.75 && (smode & SMODE_TMASK) == SMODE_EXCHANGE )
 
@@ -1418,8 +1814,8 @@
 // 0x01D1
 #define MATOCL_FUSE_TRUNCATE (PROTO_BASE+465)
 // msgid:32 status:8
-// msgid:32 attr:ATTR (version < 3.0.113)
-// msgid:32 prevsize:64 attr:ATTR (version >= 3.0.113)
+// msgid:32 attr:ATTR (version < 3.0.113, version < 4.22)
+// msgid:32 prevsize:64 attr:ATTR (version >= 3.0.113, version >= 4.22)
 
 // 0x01D2
 #define CLTOMA_FUSE_REPAIR (PROTO_BASE+466)
@@ -1476,13 +1872,16 @@
 
 // 0x01DC
 #define CLTOMA_FUSE_QUOTACONTROL (PROTO_BASE+476)
-// msgid:32 inode:32 qflags:8 - delete quota
-// msgid:32 inode:32 qflags:8 sinodes:32 slength:64 ssize:64 srealsize:64 hinodes:32 hlength:64 hsize:64 hrealsize:64 - set quota
+// msgid:32 inode:32 qflags:8 - delete quota (ver < 4.51.0)
+// msgid:32 inode:32 qflags:8 sinodes:32 slength:64 ssize:64 srealsize:64 hinodes:32 hlength:64 hsize:64 hrealsize:64 - set quota (ver < 3.0.9)
+// msgid:32 inode:32 qflags:8 graceperiod:32 sinodes:32 slength:64 ssize:64 srealsize:64 hinodes:32 hlength:64 hsize:64 hrealsize:64 - set quota (ver >= 3.0.9)
 
 // 0x01DD
 #define MATOCL_FUSE_QUOTACONTROL (PROTO_BASE+477)
 // msgid:32 status:8
 // msgid:32 qflags:8 sinodes:32 slength:64 ssize:64 srealsize:64 hinodes:32 hlength:64 hsize:64 hrealsize:64 curinodes:32 curlength:64 cursize:64 currealsize:64
+// msgid:32 qflags:8 graceperiod:32 sinodes:32 slength:64 ssize:64 srealsize:64 hinodes:32 hlength:64 hsize:64 hrealsize:64 curinodes:32 curlength:64 cursize:64 currealsize:64
+// msgid:32 qflags:8 pflags:8 graceperiod:32 sinodes:32 slength:64 ssize:64 srealsize:64 hinodes:32 hlength:64 hsize:64 hrealsize:64 curinodes:32 curlength:64 cursize:64 currealsize:64
 
 
 // 0x01DE
@@ -1513,7 +1912,7 @@
 
 // 0x01E1
 #define MATOCL_FUSE_SETXATTR (PROTO_BASE+481)
-// msgid:32 status:8 
+// msgid:32 status:8
 
 // 0x01E2
 #define CLTOMA_FUSE_CREATE (PROTO_BASE+482)
@@ -1523,8 +1922,8 @@
 // 0x01E3
 #define MATOCL_FUSE_CREATE (PROTO_BASE+483)
 // msgid:32 status:8
-// msgid:32 inode:32 attr:ATTR (version < 3.0.113)
-// msgid:32 flags:8 inode:32 attr:ATTR (version >= 3.0.113)
+// msgid:32 inode:32 attr:ATTR (version < 3.0.113, version < 4.22)
+// msgid:32 flags:8 inode:32 attr:ATTR (version >= 3.0.113, version >= 4.22)
 
 // 0x01E4
 #define CLTOMA_FUSE_PARENTS (PROTO_BASE+484)
@@ -1614,15 +2013,18 @@
 
 // 0x01F4
 #define CLTOMA_CSERV_LIST (PROTO_BASE+500)
-// -
+// [ mode:8 ]
 
 // 0x01F5
 #define MATOCL_CSERV_LIST (PROTO_BASE+501)
 // N*[ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 ] (version < 1.5.13)
 // N*[disconnected:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 ] (version >= 1.5.13 && version < 1.6.28)
-// N*[flags:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 ] (version >= 1.6.28 && version < 1.7.25)
-// N*[flags:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 ] (version >= 1.7.25 && version < 2.1.0)
-// N*[flags:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 labelmask:32 ] (version >= 2.1.0)
+// N*[disconnected:8 version:24 ip:32 port:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 ] (version >= 1.6.28 && version < 1.7.25)
+// N*[flags:8 version:24 ip:32 port:16 csid:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 ] (version >= 1.7.25 && version < 2.1.0)
+// N*[flags:8 version:24 ip:32 port:16 csid:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 labelmask:32 ] (version >= 2.1.0 && version < 3.0.38)
+// N*[flags:8 version:24 ip:32 port:16 csid:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 labelmask:32 mfrstatus:8 ] (version >= 3.0.38 && version < 4.26.0)
+// N*[flags:8 version:24 originalip:32 ip:32 port:16 csid:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 labelmask:32 mfrstatus:8 ] (version >= 4.26.0 && version < 4.35.0 or mode == 0 && version >= 4.35.0)
+// N*[flags:8 version:24 originalip:32 ip:32 port:16 csid:16 used:64 total:64 chunks:32 tdused:64 tdtotal:64 tdchunks:32 errorcount:32 load:32 gracetime:32 labelmask:32 mfrstatus:8 maintenance_to:32 ] (version >= 4.35.0 and mode > 0)
 
 
 // 0x01F6
@@ -1649,12 +2051,14 @@
 #define CLTOAN_CHART_DATA (PROTO_BASE+506)
 // chartid:32 (version < 2.0.15)
 // chartid:32 [ maxentries:32 ] (version >= 2.0.15)
+// chartid:32 [ maxentries:32 ] [ multimode:8 ] (version >= 4.31.0)
 
 // 0x01FB
 #define ANTOCL_CHART_DATA (PROTO_BASE+507)
 // maxsize=10000000
 // time:32 N*[ data:64 ] (version < 2.0.15)
-// time:32 entries:32 N*[ data:64 ] (version >= 2.0.15)
+// time:32 entries:32 entries*[ data:64 ] (version >= 2.0.15 and version < 4.31.0)
+// ranges:8 series:8 entries:32 percent:8 base:8 ranges * [ range:8 time:32 mul:32 div:32 series * [ entries * [ data:64 ] ] ] (version >= 4.31.0 and multimode>0 ; base : 0=micro,1=mili,2=none,3=kilo and so on)
 
 
 // 0x01FC
@@ -1666,10 +2070,11 @@
 // N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 16 * [ current_statdata:32 ] 16 * [ last_statdata:32 ] ] - vmode = 0 or empty and version < 1.6.21
 // N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 21 * [ current_statdata:32 ] 21 * [ last_statdata:32 ] ] - vmode = 0 or empty and version == 1.6.21
 // stats:16 N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 0 or empty and version > 1.6.21
-// stats:16 N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 1 (valid since version 1.6.26)
-// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 2 (valid since version 1.7.8)
-// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 3 (valid since version 3.0.72)
-// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 disables:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 4 (valid since version 3.0.112)
+// stats:16 N*[ sessionid:32 ip:32 version:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 1 (valid since version 1.6.26)
+// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 2 (valid since version 1.7.8)
+// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 3 (valid since version 3.0.72)
+// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 disables:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 4 (valid since version 3.0.112 / 4.21.0)
+// N*[ sessionid:32 ip:32 expire:32 ileng:32 info:ilengB ] - vmode = 0xFF (valid since version 4.7.0)
 
 
 // 0x01FE
@@ -1682,9 +2087,8 @@
 // version:32 memusage:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 (size = 76,version < 2.0.0)
 // version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 laststore_ts:32 laststore_duration:32 laststore_status:8 (size = 101,version < 2.0.0)
 // version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 (size = 121,version >= 2.0.0)
-// version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 (size = 129,version >= 2.0.0)
-// version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 freespace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 (size = 137,version >= 2.0.0)
-// version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 freespace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 usec_local_time:64 last_changelog_time:32 (size = 149,version >= 2.0.0)
+// version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 (size = 129,version >= 3.0.32)
+// version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 copy_chunks:32 ec_chunks:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 metadata_id:64 last_store_meta_version:64 last_store_meta_checksum:32 all_chunk_copies:64 all_chunk_parts:64 all_chunk_hypothetical_copies:64 (size = 173,version >= 4.4.0)
 
 // 0x0200
 #define CLTOMA_FSTEST_INFO (PROTO_BASE+512)
@@ -1712,12 +2116,15 @@
 
 // 0x0204
 #define CLTOMA_CHUNKS_MATRIX (PROTO_BASE+516)
-// [matrix_id:8]
+// (version >= 1.7.0 - empty request means all matrices for all storage classes - 2,6 or 8 matrices - depending on master version)
+// [matrix_id:8] (all versions)
+// [null_byte:8 sclassid:8] (version >= 4.44.0 - all matrices for a given storage class id, sclassid==0 means all classes)
 
 // 0x0205
 #define MATOCL_CHUNKS_MATRIX (PROTO_BASE+517)
-// maxsize=969 minsize=484
-// 11*[11* count:32] [ 11*[11* count:32]] - 11x11 matrix of chunks counters (goal x validcopies), 10 means 10 or more
+// maxsize=3873 minsize=484
+// 11 * [ 11 * count:32 ] - 11x11 matrix of chunks counters (goal x validcopies), 10 means 10 or more (this will be sent back when request length==1 - with matrix_id)
+// progress_status:8 N * [ 11 * [ 11 * count:32 ] ] - N can be 2,6 or 8 - depending on master version, (this will be sent back for requests with length==0 or 2)
 
 
 // 0x0206
@@ -1736,9 +2143,9 @@
 // 0x0209
 #define MATOCL_EXPORTS_INFO (PROTO_BASE+521)
 // N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 ] - vmode = 0 (or not present)
-// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ] - vmode = 1 (valid since version 1.6.26)
-// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 ] - vmode = 2 (valid since version 3.0.72)
-// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashtime:32 maxtrashtime:32 disables:32 ] - vmode = 3 (valid since version 3.0.112)
+// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ] - vmode = 1 (valid since version 1.6.26)
+// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ] - vmode = 2 (valid since version 3.0.72)
+// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 disables:32 ] - vmode = 3 (valid since version 3.0.112 / 4.21.0)
 
 
 // 0x020A
@@ -1835,13 +2242,58 @@
 
 // 0x021E
 #define CLTOMA_SCLASS_INFO (PROTO_BASE+542)
-// - 
+// [ fver:8 ] ( if not present then fver==0 - versions < 4.2.0 )
 
 // 0x021F
 #define MATOCL_SCLASS_INFO (PROTO_BASE+543)
-// allservers:16 N*[ sclassid:8 sclassname:NAME files:32 dirs:32 3 * [ stdchunks:64 archchunks:64 ] admin_only:8 mode:8 arch_delay:16 3 * [ canbefulfilled:8 labelscnt:8 ] 3 * [ labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ] ]
+// fver==0:
+//	allservers:16 N*[ sclassid:8 sclassname:NAME files:32 dirs:32 3 * [ stdchunks:64 archchunks:64 ] admin_only:8 labels_mode:8 arch_delay:16 3 * [ canbefulfilled:8 labelscnt:8 ] 3 * [ labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ] ]
 //  - redundancy classes (0 - undergoal ; 1 - ok ; 2 - overgoal)
 //  - label sets (0 - create ; 1 - keep ; 2 - archive)
+// fver==1: (version >= 4.2.0)
+//	allservers:16 N*[
+//		sclassid:8 sclassname:NAME files:32 dirs:32
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER)
+//		admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 min_trashretention:16
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 (CREATE)
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 (KEEP)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (ARCH)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (TRASH)
+//	]
+// fver==2: (version >= 4.5.0)
+//	allservers:16 N*[
+//		sclassid:8 sclassname:NAME files:32 dirs:32
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER EC)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT EC)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER EC)
+//		admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 min_trashretention:16
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 (CREATE)
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 (KEEP)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (ARCH)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (TRASH)
+//	]
+// fver==2: (version >= 4.34.0)
+//	allservers:16 N*[
+//		sclassid:8 sclassname:NAME files:32 dirs:32
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER EC)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT EC)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER EC)
+//		admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 (CREATE)
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 (KEEP)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (ARCH)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (TRASH)
+//	]
+// fver==128: (version >= 4.44.0)
+//	N * [ sclassid:8 sclassname:NAME has_chunks:8]
 
 // 0x0220
 #define CLTOMA_MISSING_CHUNKS (PROTO_BASE+544)
@@ -1861,6 +2313,40 @@
 // [ msgid:32 ] anstype:16 // anstype == 0 (node is neither directory nor file)
 // [ msgid:32 ] anstype:16 continueid:64 N * [ inode:32 ] // anstype == 1 (node is directory)
 // [ msgid:32 ] anstype:16 continueid:64 length:64 N * [ chunkid:64 chunksize:32 copies:8 ] // anstype == 2 (node is file)
+// [ msgid:32 ] anstype:16 continueid:64 length:64 N * [ chunkid:64 chunksize:32 copies_eights:8 ] // anstype == 3 (node is file and version >= 4.0.0)
+
+// 0x0224
+#define CLTOMA_PATTERN_INFO (PROTO_BASE+548)
+// -
+
+// 0x0225
+#define MATOCL_PATTERN_INFO (PROTO_BASE+549)
+// N * [ glob:NAME euid:32 egid:32 priority:8 omask:8 sclass_name:NAME trashretention:16 seteattr:8 clreattr:8 ]
+
+// 0x0226
+#define CLTOMA_INSTANCE_NAME (PROTO_BASE+550)
+// -
+
+// 0x0227
+#define MATOCL_INSTANCE_NAME (PROTO_BASE+551)
+// iname:NAME
+
+// 0x0228
+#define CLTOMA_FULL_DIRECTORY_DATA (PROTO_BASE+552)
+// msgid:32 inode:32 maxentries:32 continueid:64 [ flags:8 ]
+
+// 0x0229
+#define MATOCL_FULL_DIRECTORY_DATA (PROTO_BASE+553)
+// msgid:32 status:8
+// msgid:32 continueid:64 N * [ name:NAME inode:32 attr:ATTR [ chunkcnt:32 chunkcnt * [ chunkid:64 ] ] [ length:32 path:lengthB ] [ xattr_cnt:16 xattr_cnt * [ xattr_name_leng:8 xattr_name:xattr_name_lengB xattr_value_leng:16 xattr_value:xattr_value_lengB ] ] [ acl_cnt:8 acl_cnt * [acltype:8 userperm:16 groupperm:16 otherperm:16 mask:16 namedusers:16 namedgroups:16 namedusers * [ id:32 perm:16 ] namedgroups * [ id:32 perm:16 ] ] ] ]
+
+// 0x022A
+#define CLTOMA_SET_ALL_NODE_ATTRIBUTES (PROTO_BASE+554)
+// msgid:32 inode:32 flags:8 [ attr:ATTR ] [ eattr:8 ] [ xattrcnt:16 xattrcnt * [xattr_name_leng:8 xattr_name:xattr_name_lengB xattr_value_leng:16 xattr_value:xattr_value_lengB ] ] [ acl_cnt:8 acl_cnt * [acltype:8 userperm:16 groupperm:16 otherperm:16 mask:16 namedusers:16 namedgroups:16 namedusers * [ id:32 perm:16 ] namedgroups * [ id:32 perm:16 ] ] ]
+
+// 0x022B
+#define MATOCL_SET_ALL_NODE_ATTRIBUTES (PROTO_BASE+555)
+// msgid:32 statis:8
 
 // CHUNKSERVER STATS
 
@@ -1901,6 +2387,11 @@
 // #define MATOCL_FUSE_INVALIDATE_DATA_CACHE (PROTO_BASE+707)
 // zero:32 inode:32
 
+#define CLTOMA_FUSE_OPDATA (PROTO_BASE+710)
+// readbytes:64 writebytes:64 readcnt:32 writecnt:32 fsynccnt:32
+
+#define CLTOMA_FUSE_WFLAGS (PROTO_BASE+711)
+// wflags:8
 
 
 #endif

@@ -24,9 +24,10 @@
 #include <inttypes.h>
 #include "bio.h"
 
-uint8_t flock_locks_cmd(uint32_t sessionid,uint32_t message_id,uint32_t req_id,uint32_t inode,uint64_t lock_owner,uint8_t op);
+uint8_t flock_locks_cmd(void *connptr,uint32_t sessionid,uint32_t message_id,uint32_t req_id,uint32_t inode,uint64_t lock_owner,uint8_t op);
 void flock_file_closed(uint32_t sessionid,uint32_t inode);
 uint32_t flock_list(uint32_t inode,uint8_t *buff);
+void flock_disconnected(void *connptr);
 
 uint8_t flock_mr_change(uint32_t inode,uint32_t sessionid,uint64_t owner,char cmd);
 

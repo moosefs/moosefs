@@ -1,40 +1,45 @@
-.TH mfsdiagtools "1" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsdiagtools "1" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsdiagtools \- \fBMooseFS\fP diagnostic tools
 .SH SYNOPSIS
 .B mfscheckfile
-\fIFILE\fP...
-.PP
-.B mfsfilerepair
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIFILE\fP...
+[\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIFILE\fP...
 .PP
 .B mfsfileinfo
-\fIFILE\fP...
+[\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-q\fP|\fB-c\fP|\fB-s\fP] [\fB-p\fP] [\fB-w\fP] \fIFILE\fP...
+.PP
+.B mfsfilerepair
+[\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-d\fP] \fIFILE\fP...
 .PP
 .B mfsdirinfo
-[\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-i\fP|\fB-d\fP|\fB-f\fP|\fB-c\fP|\fB-l\fP|\fB-s\fP|\fB-r\fP] [\fB-p\fP] \fIOBJECT\fP...
+[\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] [\fB-i\fP|\fB-d\fP|\fB-f\fP|\fB-c\fP|\fB-l\fP|\fB-s\fP|\fB-r\fP] [\fB-p\fP] \fIOBJECT\fP...
 .PP
 .B mfsfilepaths
-\fIOBJECT\fP|\fIINODE\fP...
+[\fB-?\fP] \fIOBJECT\fP|\fIINODE\fP...
 .SH DESCRIPTION
 \fBmfscheckfile\fP checks and prints number of chunks and number of chunk
 copies belonging to specified file(s).
 It can be used on any file, included deleted (\fItrash\fP).
 .PP
-\fBmfsfilerepair\fP deals with broken files (those which cause I/O errors on
-read operations) to make them partially readable. In case of missing chunk
-it fills missing parts of file with zeros; in case of chunk version mismatch
-it sets chunk version known to \fBmfsmaster\fP to highest one found on
-chunkservers. Note: because in the second case content mismatch can occur in
-chunks with the same version, it is advised to make a copy (not a snapshot!)
-and delete original file after "repairing".
-.PP
 \fBmfsfileinfo\fP prints location (\fIchunkserver\fP host and port) of each
 chunk copy belonging to specified file(s).
-It can be used on any file, included deleted (\fItrash\fP).
+It can be used on any file, including deleted (\fItrash\fP). Option \fB-q\fP turns on quick mode (only number of EC parts or valid copies).
+Option \fB-c\fP turns on receiving chunk checksums from chunkservers, and finally \fB-s\fP turns on calculating file signature (from received checksums).
+Option \fB-p\fP displays path to chunk file on chunkserver for each chunk. 
+Option \fB-w\fP displays only "wrong" (invalid, missing, wrong version) chunks.
+.PP
+\fBmfsfilerepair\fP deals with broken files (those which cause I/O errors on
+read operations) to make them partially readable. In case of chunk version mismatch,
+it sets chunk version known to \fBmfsmaster\fP to highest one found on
+chunkservers. In case there is no available copy of a chunk (all copies are invalid or missing), the chunk
+is marked as "read-as-zeros" (read operation will return zeros, write operation will fail). When/if a chunkserver with the missing chunk connects,
+the file will be fully available again. If option \fB-d\fP is used
+then the missing/invalid chunk is permanently zeroed. Note: it is advisable to make a copy (not a snapshot) of any file repaired
+with this tool, especially if there is a possibility that chunkservers with more existing chunks will be connected to the system in the future 
+(for example after an outage). This it to prevent mismatched content of chunks with the same version in a file.
 .PP
 \fBmfsdirinfo\fP is extended, MooseFS-specific equivalent of \fBdu -s\fP
-command. It prints summary for each specified object (single file or
+command. It prints a summary for each specified object (single file or
 directory tree). If you only want to see one parameter, then add one of
 show options (see \fBSHOW OPTIONS\fP). By default it returns data from internal
 master counters (very fast, but not precise). All repeated nodes (hard links) and
@@ -44,11 +49,11 @@ nodes and chunks are counted only once and the system uses current number of chu
 copies instead of goal/labels. System administrators might consider using \fBmfsmetadirinfo\fP (see \fBmfsmetadirinfo\fP(8)).
 .PP
 \fBmfsfilepaths\fP tool can be used to find all occurrences (hard links) of given file 
-in filesystem. It can also be used to find a file with given i-node number. 
-In case of searching for i-node number, the tool has to be run
+in filesystem. It can also be used to find a file with given inode number. 
+In case of searching for inode number, the tool has to be run
 in mfs mounted directory.
 .SH GENERAL OPTIONS
-Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
+Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
 uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
@@ -60,6 +65,8 @@ The same can be achieved by setting
 or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
 \fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
 numbers and SI prefixes). The default is to print just exact numbers.
+.PP
+Option \fB-?\fP displays short usage message.
 .SH SHOW OPTIONS
 .TP
 \fB-i\fP
@@ -75,13 +82,13 @@ show number of files
 show number of chunks
 .TP
 \fB-l\fP
-show length
+show length (sum of file lengths)
 .TP
 \fB-s\fP
-show size
+show size (sum of chunks lenghts)
 .TP
 \fB-r\fP
-show realsize
+show realsize (estimated hdd usagesimple - usually size multiplied by current goal)
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

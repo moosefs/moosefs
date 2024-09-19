@@ -1,8 +1,8 @@
-.TH mfsmetadirinfo "8" "August 2024" "MooseFS 3.0.118-1" "This is part of MooseFS"
+.TH mfsmetadirinfo "8" "September 2024" "MooseFS 4.56.5-1" "This is part of MooseFS"
 .SH NAME
 mfsmetadirinfo - uses MooseFS metadata to calculate precise directory information (similar to mfsdirinfo)
 .SH SYNOPSIS
-\fBmfsmetadirinfo\fP [\fB\-f\fP \fBJ\fP|\fBC\fP|\fBC\fP \fIx\fP] [\fB\-o\fP \fIoutputfile\fP] [\fB\-a\fP \fIsum_name\fP] \fImetadata.mfs\fP \fIPATH\fP [\fIPATH...\fP]
+\fBmfsmetadirinfo\fP [\fB\-f\fP \fBJ\fP|\fBC\fP|\fBC\fP \fIx\fP] [\fB\-o\fP \fIoutputfile\fP] [\fB\-a\fP \fIsum_name\fP] \fImetadata_file\fP \fIPATH\fP [\fIPATH...\fP]
 .SH DESCRIPTION
 \fBmfsmetadirinfo\fP is a tool that can be used to calculate precise directory information such as number of inodes, number of chunks, total length of all files, size, real size etc. Output can be generated as plain text, CSV or JSON.
 Data for calculations is read from indicated \fImetadata.mfs\fP mfs master metadata file and is
@@ -22,6 +22,9 @@ write output to \fIoutputfile\fP instead of stdout
 \fB\-a\fP
 optional parameter that indicates the tool should calculate the information for all
 supplied paths together (a sum), this calculation is indicated by \fIsum_name\fP in output data
+.TP
+\fBmetadata_file\fP
+path to metadata.mfs file
 .SH OUTPUT FIELDS
 For each \fIPATH\fP and, if defined, for \fIsum_name\fP, following information will be indicated:
 .TP 10

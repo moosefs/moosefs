@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.56.6-1 (2024-09-23)
+
+  - (cgi+cli) fixed bugs in CLI mode introduced by new CGI features
+
 * MooseFS 4.56.5-1 (2024-09-18)
 
   - (cgi) changed links to knobs

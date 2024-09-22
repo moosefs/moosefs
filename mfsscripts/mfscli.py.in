@@ -134,6 +134,7 @@ import codecs
 import json
 
 cgimode = 1 if 'GATEWAY_INTERFACE' in os.environ else 0
+ajax_request = False
 
 try:
 	xrange
@@ -8311,7 +8312,7 @@ if "MS" in sectionset and leaderfound:
 		if len(dservers)>0 and masterconn.version_at_least(1,7,8):
 			if cgimode:
 				out.append("""</table>""")
-				out.append("""<div class="tab_title">Active mounts (parameters)</div>""")
+				out.append("""<div class="tab_title">Inactive mounts (parameters)</div>""")
 				out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfsmounts" cellspacing="0">""")
 				out.append("""	<tr>""")
 				out.append("""		<th class="acid_tab_enumerate">#</th>""")
@@ -9290,7 +9291,8 @@ if "RS" in sectionset and leaderfound:
 							data.append(rlstr)
 							data.append(labstr)
 							data.append(uniqstr)
-							data.append("")
+							if not show_labelmode_overrides:
+								data.append("")
 							tab.append(*data)
 			if cgimode:
 				out.append("""</table>""")

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.63)
-AC_INIT([MFS], [4.56.5], [bugs@moosefs.com], [moosefs])
+AC_INIT([MFS], [4.56.6], [bugs@moosefs.com], [moosefs])
 release=1
 buildno=$(cat buildno.txt)
 

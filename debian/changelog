@@ -1,3 +1,9 @@
+moosefs (4.56.6-1) unstable; urgency=medium
+
+  * (cgi+cli) fixed bugs in CLI mode introduced by new CGI features
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 23 Sep 2024 13:00:00 +0200
+
 moosefs (4.56.5-1) unstable; urgency=medium
 
   * (cgi) changed links to knobs

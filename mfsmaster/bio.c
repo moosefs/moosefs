@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 Jakub Kruszona-Zawadzki, Saglabs SA
+ * Copyright (C) 2025 Jakub Kruszona-Zawadzki, Saglabs SA
  * 
  * This file is part of MooseFS.
  * 

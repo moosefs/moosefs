@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed changelog rotation issues
   - (autoconf) updated configure.ac for new PKG_PROG_PKG_CONFIG macro
   - (daemons) added timestamp to info file
+  - (master) added meta info to info file
 
 * MooseFS 4.57.0-1 (2024-12-09)
 

@@ -1971,6 +1971,40 @@ int meta_restore(void) {
 	return -1;
 }
 
+const char *meta_store_status_str(void) {
+	switch(laststorestatus) {
+		case LASTSTORE_DOWNLOADED:
+			return "DOWNLOADED";
+		case LASTSTORE_CRC_STORED_BG:
+			return "CRC ONLY IN BACKGROUND";
+		case LASTSTORE_META_STORED_BG:
+			return "STORED IN BACKGROUND";
+		case LASTSTORE_META_STORED_FG:
+			return "STORED IN FOREGROUND";
+	}
+	return "???";
+}
+
+void meta_log_extra_info(FILE *fd) {
+	fprintf(fd,"[meta]\n");
+	fprintf(fd,"meta id: 0x%016"PRIX64"\n",metaid);
+	fprintf(fd,"meta version: %"PRIu64"\n",metaversion);
+	if (laststoremetaversion>0) {
+		fprintf(fd,"last stored meta version: %"PRIu64"\n",laststoremetaversion);
+	}
+	if (lastsuccessfulstore>0) {
+		fprintf(fd,"metadata has been stored %d seconds ago\n",main_time()-lastsuccessfulstore);
+		fprintf(fd,"last metadata store mode: %s\n",meta_store_status_str());
+	}
+	if (metasaverpid>=0) {
+		fprintf(fd,"background sotre in progress; process pid: %d\n",(int)metasaverpid);
+	}
+	if (storestarttime>0) {
+		fprintf(fd,"store started %.2lf seconds ego\n",monotonic_seconds()-storestarttime);
+	}
+	fprintf(fd,"\n");
+}
+
 int meta_init(void) {
 	if (meta_prepare_data_structures()<0) {
 		return -1;
@@ -1987,6 +2021,7 @@ int meta_init(void) {
 	}
 	meta_reload();
 	main_reload_register(meta_reload);
+	main_info_register(meta_log_extra_info);
 	main_time_register(STORE_UNIT,0,meta_store_task);
 	main_mayexit_register(meta_mayexit);
 	main_destruct_register(meta_term);

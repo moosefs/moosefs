@@ -323,6 +323,34 @@ char* changelog_escape_name(uint32_t nleng,const uint8_t *name) {
 	return currescname;
 }
 
+void changelog_info(FILE *fd) {
+	uint64_t minversion_to_keep;
+	uint64_t current_meteversion;
+
+	current_meteversion = meta_version();
+
+	fprintf(fd,"[changelog]\n");
+	if (old_changes_head) {
+		fprintf(fd,"oldest_metaversion: %"PRIu64"\n",old_changes_head->minversion);
+		fprintf(fd,"oldest_timestamp: %"PRIu32" (%d seconds)\n",old_changes_head->mintimestamp,main_time()-old_changes_head->mintimestamp);
+		fprintf(fd,"total_size: %"PRIu64"\n",old_changes_total_size);
+	} else {
+		fprintf(fd,"changelog memory is empty\n");
+	}
+	minversion_to_keep = meta_chlog_keep_version();
+	if (minversion_to_keep < current_meteversion) {
+		fprintf(fd,"min_changelog_kept_for_metadata_sending: %"PRIu64"\n",minversion_to_keep);
+	} else {
+		fprintf(fd,"min_changelog_kept_for_metadata_sending: -\n");
+	}
+	minversion_to_keep = matomlserv_get_min_version();
+	if (minversion_to_keep < current_meteversion) {
+		fprintf(fd,"min_changelog_kept_for_delayed_receivers: %"PRIu64"\n",minversion_to_keep);
+	} else {
+		fprintf(fd,"min_changelog_kept_for_delayed_receivers: -\n");
+	}
+	fprintf(fd,"\n");
+}
 
 void changelog_reload(void) {
 	uint16_t changelog_preserve_mb;
@@ -357,6 +385,7 @@ void changelog_reload(void) {
 int changelog_init(void) {
 	changelog_reload();
 	main_reload_register(changelog_reload);
+	main_info_register(changelog_info);
 	currentfd = NULL;
 	return 0;
 }

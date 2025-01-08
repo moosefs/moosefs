@@ -2,6 +2,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 4.57.0-1 (2024-12-09)
 
+  - (master) added info for changelog module
   - (daemons) warnings if a variable is defined more than once in a config file
   - (bdev) added test for posix compliant ioctl prototype
   - (freebsd) moved port files from sysutils to filesystems

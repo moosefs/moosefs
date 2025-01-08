@@ -6,6 +6,7 @@ This file lists noteworthy changes in MooseFS.
   - (daemons) warnings if a variable is defined more than once in a config file
   - (bdev) added test for posix compliant ioctl prototype
   - (freebsd) moved port files from sysutils to filesystems
+  - (all) added names to some constants used across the system
 
 * MooseFS 4.56.6-1 (2024-09-23)
 

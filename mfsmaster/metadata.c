@@ -103,7 +103,7 @@ static uint8_t verboselevel = 0;
 
 static uint32_t lastsuccessfulstore = 0;
 static double laststoretime = 0.0;
-static uint8_t laststorestatus = 0;
+static uint8_t laststorestatus = LASTSTORE_UNKNOWN;
 
 static uint64_t laststoremetaversion = 0;
 static uint32_t laststorechecksum = 0;
@@ -864,7 +864,7 @@ void meta_storeended(pid_t pid,int status) {
 			main_exit();
 		} else {
 			storestarttime = 0.0;
-			laststorestatus = (metasavermode)?3:0;
+			laststorestatus = (metasavermode)?LASTSTORE_CRC_STORED_BG:LASTSTORE_META_STORED_BG;
 			lastsuccessfulstore = main_time();
 			meta_process_crcdata();
 		}
@@ -1030,7 +1030,7 @@ int meta_storeall(int bg,uint8_t dontstore) {
 			lastsuccessfulstore = time(NULL);
 			laststoretime = monotonic_seconds()-storestarttime;
 			storestarttime = 0.0;
-			laststorestatus = 2; // Stored in foreground
+			laststorestatus = LASTSTORE_META_STORED_FG; // Stored in foreground
 			meta_process_crcdata();
 		}
 	} else {
@@ -1058,7 +1058,7 @@ void meta_download_status(uint8_t status) {
 	}
 	storestarttime = 0.0;
 	if (status==0) { // download successful
-		laststorestatus = 1; // Downloaded
+		laststorestatus = LASTSTORE_DOWNLOADED; // Downloaded
 		lastsuccessfulstore = main_time();
 		laststoremetaversion = 0;
 		laststorechecksum = 0;

@@ -1144,7 +1144,7 @@ void hdd_diskinfo_data(uint8_t *buff) {
 				}
 			}
 			if (f!=NULL) {
-				put8bit(&buff,((f->markforremoval)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANJOBINPROGRESS || f->scanstate==SCST_ATTRJOBINPROGRESS)?4:0));
+				put8bit(&buff,((f->markforremoval)?CS_HDD_MFR:0)+((f->damaged)?CS_HDD_DAMAGED:0)+((f->scanstate==SCST_SCANJOBINPROGRESS || f->scanstate==SCST_ATTRJOBINPROGRESS)?CS_HDD_SCANNING:0));
 				ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
 				put64bit(&buff,f->lasterrtab[ei].chunkid);
 				put32bit(&buff,f->lasterrtab[ei].timestamp);
@@ -1167,7 +1167,7 @@ void hdd_diskinfo_data(uint8_t *buff) {
 				}
 				hdd_stats_binary_pack(&buff,&s);	// 64B
 			} else {
-				put8bit(&buff,2+8);
+				put8bit(&buff,CS_HDD_DAMAGED+CS_HDD_INVALID);
 				memset(buff,0,32+3*64);
 				buff+=32+3*64;
 			}
@@ -1221,7 +1221,7 @@ void hdd_diskinfo_monotonic_data(uint8_t *buff) {
 					buff += sl;
 				}
 			}
-			put8bit(&buff,((f->markforremoval)?1:0)+((f->damaged)?2:0)+((f->scanstate==SCST_SCANJOBINPROGRESS || f->scanstate==SCST_ATTRJOBINPROGRESS)?4:0));
+			put8bit(&buff,((f->markforremoval)?CS_HDD_MFR:0)+((f->damaged)?CS_HDD_DAMAGED:0)+((f->scanstate==SCST_SCANJOBINPROGRESS || f->scanstate==SCST_ATTRJOBINPROGRESS)?CS_HDD_SCANNING:0));
 			ei = (f->lasterrindx+(LASTERRSIZE-1))%LASTERRSIZE;
 			put64bit(&buff,f->lasterrtab[ei].chunkid);
 			put32bit(&buff,f->lasterrtab[ei].timestamp);

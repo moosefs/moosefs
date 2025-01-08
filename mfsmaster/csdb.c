@@ -62,6 +62,10 @@ static uint32_t SecondsToRemoveUnusedCS;
 #define CSDBHASHSIZE 256
 #define CSDBHASHFN(ip,port) (hash32((ip)^((port)<<16))%(CSDBHASHSIZE))
 
+#define MAINTENANCE_OFF 0
+#define MAINTENANCE_ON 1
+#define MAINTENANCE_TMP 2
+
 typedef struct csdbentry {
 	uint32_t ip;
 	uint16_t port;
@@ -111,18 +115,18 @@ void csdb_self_check(void) {
 	s = 0;
 	for (hash=0 ; hash<CSDBHASHSIZE ; hash++) {
 		for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
-			if ((csptr->maintenance==2 && csptr->eptr!=NULL) || (csptr->maintenance!=0 && csptr->maintenance_timeout>0 && now>csptr->maintenance_timeout)) {
+			if ((csptr->maintenance==MAINTENANCE_TMP && csptr->eptr!=NULL) || (csptr->maintenance!=MAINTENANCE_OFF && csptr->maintenance_timeout>0 && now>csptr->maintenance_timeout)) {
 				if (csptr->eptr==NULL) {
 					disconnected_servers_in_maintenance--;
 				}
-				csptr->maintenance = 0;
+				csptr->maintenance = MAINTENANCE_OFF;
 				csptr->maintenance_timeout = 0;
 				changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",0)",main_time(),CSDB_OP_MAINTENANCEOFF,csptr->ip,csptr->port);
 			}
 			s++;
 			if (csptr->eptr==NULL) {
 				ds++;
-				if (csptr->maintenance) {
+				if (csptr->maintenance!=MAINTENANCE_OFF) {
 					dsm++;
 				}
 			}
@@ -176,7 +180,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 		}
 		csidptr->eptr = eptr;
 		disconnected_servers--;
-		if (csidptr->maintenance) {
+		if (csidptr->maintenance!=MAINTENANCE_OFF) {
 			disconnected_servers_in_maintenance--;
 		}
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"csdb: found cs using ip:port and csid (%s:%"PRIu16",%"PRIu16")",strip,port,csid);
@@ -191,7 +195,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 			}
 			csptr->eptr = eptr;
 			disconnected_servers--;
-			if (csptr->maintenance) {
+			if (csptr->maintenance!=MAINTENANCE_OFF) {
 				disconnected_servers_in_maintenance--;
 			}
 			return csptr;
@@ -217,7 +221,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 			changelog("%"PRIu32"|CSDBOP(%u,%"PRIu32",%"PRIu16",%"PRIu16")",main_time(),CSDB_OP_NEWIPPORT,ip,port,csidptr->csid);
 		csidptr->eptr = eptr;
 		disconnected_servers--;
-		if (csidptr->maintenance) {
+		if (csidptr->maintenance!=MAINTENANCE_OFF) {
 			disconnected_servers_in_maintenance--;
 		}
 		return csidptr;
@@ -237,7 +241,7 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 	csptr->csid = csid;
 	csptr->heavyloadts = 0;
 	csptr->maintenance_timeout = 0;
-	csptr->maintenance = 0;
+	csptr->maintenance = MAINTENANCE_OFF;
 	csptr->disconnection_time = main_time();
 //	csptr->fastreplication = 1;
 	csptr->load = 0;
@@ -251,8 +255,8 @@ void* csdb_new_connection(uint32_t ip,uint16_t port,uint16_t csid,void *eptr) {
 
 void csdb_temporary_maintenance_mode(void *v_csptr) {
 	csdbentry *csptr = (csdbentry*)v_csptr;
-	if (csptr!=NULL && csptr->eptr!=NULL && csptr->maintenance==0) {
-		csptr->maintenance = 2;
+	if (csptr!=NULL && csptr->eptr!=NULL && csptr->maintenance==MAINTENANCE_OFF) {
+		csptr->maintenance = MAINTENANCE_TMP;
 		if (TempMaintenanceModeTimeout>0) {
 			csptr->maintenance_timeout = main_time() + TempMaintenanceModeTimeout;
 		} else {
@@ -268,7 +272,7 @@ void csdb_lost_connection(void *v_csptr) {
 		csptr->disconnection_time = main_time();
 		csptr->eptr = NULL;
 		disconnected_servers++;
-		if (csptr->maintenance) {
+		if (csptr->maintenance!=MAINTENANCE_OFF) {
 			disconnected_servers_in_maintenance++;
 		}
 	}
@@ -315,7 +319,7 @@ uint8_t csdb_server_is_overloaded(void *v_csptr,uint32_t now) {
 
 uint8_t csdb_server_is_being_maintained(void *v_csptr) {
 	csdbentry *csptr = (csdbentry*)v_csptr;
-	return csptr->maintenance;
+	return (csptr->maintenance!=MAINTENANCE_OFF)?1:0;
 }
 
 
@@ -377,7 +381,7 @@ uint32_t csdb_servlist_data(uint8_t mode,uint8_t *ptr,uint32_t clientip) {
 					put32bit(&ptr,labelmask);
 					put8bit(&ptr,mfrstatus);
 				} else {
-					put32bit(&ptr,0x01000000);
+					put32bit(&ptr,0);
 					put32bit(&ptr,csptr->ip);
 					put32bit(&ptr,multilan_map(csptr->ip,clientip));
 					put16bit(&ptr,csptr->port);
@@ -397,11 +401,14 @@ uint32_t csdb_servlist_data(uint8_t mode,uint8_t *ptr,uint32_t clientip) {
 				if (mode>0) {
 					put32bit(&ptr,maintenance_timeout);
 				}
-				if (csptr->maintenance) {
-					*p |= 2;
+				if (csptr->eptr==NULL) {
+					*p |= CSERV_FLAG_DISCONNECTED;
 				}
-				if (csptr->maintenance==2) {
-					*p |= 4;
+				if (csptr->maintenance!=MAINTENANCE_OFF) {
+					*p |= CSERV_FLAG_MAINTENANCE;
+				}
+				if (csptr->maintenance==MAINTENANCE_TMP) {
+					*p |= CSERV_FLAG_TMPMAINTENANCE;
 				}
 			}
 			i++;
@@ -424,7 +431,7 @@ uint8_t csdb_remove_server(uint32_t ip,uint16_t port) {
 			if (csptr->csid>0) {
 				csdb_delid(csptr->csid);
 			}
-			if (csptr->maintenance) {
+			if (csptr->maintenance!=MAINTENANCE_OFF) {
 				disconnected_servers_in_maintenance--;
 			}
 			*cspptr = csptr->next;
@@ -455,7 +462,7 @@ void csdb_remove_unused(void) {
 					if (csptr->csid>0) {
 						csdb_delid(csptr->csid);
 					}
-					if (csptr->maintenance) {
+					if (csptr->maintenance!=MAINTENANCE_OFF) {
 						disconnected_servers_in_maintenance--;
 					}
 					*cspptr = csptr->next;
@@ -494,7 +501,7 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 			csdbtab[arg] = csptr;
 			csptr->heavyloadts = 0;
 			csptr->maintenance_timeout = 0;
-			csptr->maintenance = 0;
+			csptr->maintenance = MAINTENANCE_OFF;
 			csptr->disconnection_time = main_time();
 //			csptr->fastreplication = 1;
 			csptr->load = 0;
@@ -516,7 +523,7 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 					if (csptr->csid>0) {
 						csdb_delid(csptr->csid);
 					}
-					if (csptr->maintenance) {
+					if (csptr->maintenance!=MAINTENANCE_OFF) {
 						disconnected_servers_in_maintenance--;
 					}
 					*cspptr = csptr->next;
@@ -579,12 +586,12 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if (csptr->ip == ip && csptr->port == port) {
-					if (csptr->maintenance==0) {
+					if (csptr->maintenance==MAINTENANCE_OFF) {
 						if (csptr->eptr==NULL) {
 							disconnected_servers_in_maintenance++;
 						}
 					}
-					csptr->maintenance = 1;
+					csptr->maintenance = MAINTENANCE_ON;
 					csptr->maintenance_timeout = arg;
 					meta_version_inc();
 					return MFS_STATUS_OK;
@@ -595,12 +602,12 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if (csptr->ip == ip && csptr->port == port) {
-					if (csptr->maintenance!=0) {
+					if (csptr->maintenance!=MAINTENANCE_OFF) {
 						if (csptr->eptr==NULL) {
 							disconnected_servers_in_maintenance--;
 						}
 					}
-					csptr->maintenance = 0;
+					csptr->maintenance = MAINTENANCE_OFF;
 					csptr->maintenance_timeout = arg;
 					meta_version_inc();
 					return MFS_STATUS_OK;
@@ -611,12 +618,12 @@ uint8_t csdb_mr_op(uint8_t op,uint32_t ip,uint16_t port, uint32_t arg) {
 			hash = CSDBHASHFN(ip,port);
 			for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 				if (csptr->ip == ip && csptr->port == port) {
-					if (csptr->maintenance==0) {
+					if (csptr->maintenance==MAINTENANCE_OFF) {
 						if (csptr->eptr==NULL) {
 							disconnected_servers_in_maintenance++;
 						}
 					}
-					csptr->maintenance = 2;
+					csptr->maintenance = MAINTENANCE_TMP;
 					csptr->maintenance_timeout = arg;
 					meta_version_inc();
 					return MFS_STATUS_OK;
@@ -679,9 +686,9 @@ uint8_t csdb_maintenance(uint32_t ip,uint16_t port,uint8_t onoff) {
 	hash = CSDBHASHFN(ip,port);
 	for (csptr = csdbhash[hash] ; csptr ; csptr = csptr->next) {
 		if (csptr->ip == ip && csptr->port == port) {
-			if ((csptr->maintenance!=0 && onoff==0) || (csptr->maintenance==0 && onoff==1)) {
-				csptr->maintenance = onoff;
-				if (csptr->maintenance==1 && MaintenanceModeTimeout>0) {
+			if ((csptr->maintenance!=MAINTENANCE_OFF && onoff==0) || (csptr->maintenance==MAINTENANCE_OFF && onoff==1)) {
+				csptr->maintenance = onoff?MAINTENANCE_ON:MAINTENANCE_OFF;
+				if (csptr->maintenance==MAINTENANCE_ON && MaintenanceModeTimeout>0) {
 					csptr->maintenance_timeout = main_time()+MaintenanceModeTimeout;
 				} else {
 					csptr->maintenance_timeout = 0;
@@ -912,7 +919,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		if (mver>=0x12) {
 			maintenance = get8bit(&ptr);
 		} else {
-			maintenance = 0;
+			maintenance = MAINTENANCE_OFF;
 		}
 		if (mver>=0x13) {
 			maintenance_timeout = get32bit(&ptr);
@@ -967,7 +974,7 @@ int csdb_load(bio *fd,uint8_t mver,int ignoreflag) {
 		csdbhash[hash] = csptr;
 		servers++;
 		disconnected_servers++;
-		if (maintenance) {
+		if (maintenance!=MAINTENANCE_OFF) {
 			disconnected_servers_in_maintenance++;
 		}
 		l--;

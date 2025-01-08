@@ -76,6 +76,7 @@ static uint8_t ChangelogSaveMode;
 #define SAVEMODE_BACKGROUND 0
 #define SAVEMODE_ASYNC 1
 #define SAVEMODE_SYNC 2
+#define SAVEMODE_MAX 2
 
 static inline void changelog_old_changes_free_block(old_changes_block *oc) {
 	uint32_t i;
@@ -188,7 +189,7 @@ void changelog_rotate(uint8_t broadcast) {
 		char logname1[100],logname2[100];
 		uint32_t i;
 		if (currentfd) {
-			if (ChangelogSaveMode==2) {
+			if (ChangelogSaveMode==SAVEMODE_SYNC) {
 				fsync(fileno(currentfd));
 			}
 			fclose(currentfd);
@@ -210,7 +211,7 @@ void changelog_rotate(uint8_t broadcast) {
 }
 
 void changelog_mr(uint64_t version,const char *data) {
-	if (ChangelogSaveMode==0) {
+	if (ChangelogSaveMode==SAVEMODE_BACKGROUND) {
 		bgsaver_changelog(version,data);
 	} else {
 		if (currentfd==NULL) {
@@ -223,7 +224,7 @@ void changelog_mr(uint64_t version,const char *data) {
 		if (currentfd) {
 			fprintf(currentfd,"%"PRIu64": %s\n",version,data);
 			fflush(currentfd);
-			if (ChangelogSaveMode==2) {
+			if (ChangelogSaveMode==SAVEMODE_SYNC) {
 				fsync(fileno(currentfd));
 			}
 		}
@@ -376,9 +377,9 @@ void changelog_reload(void) {
 	ChangeLogMaxSize = changelog_preserve_mb;
 	ChangeLogMaxSize *= (1024*1024);
 	ChangelogSaveMode = cfg_getuint8("CHANGELOG_SAVE_MODE",0);
-	if (ChangelogSaveMode>2) {
+	if (ChangelogSaveMode>SAVEMODE_MAX) {
 		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"CHANGELOG_SAVE_MODE - wrong value - using 0 (write in background)");
-		ChangelogSaveMode = 0;
+		ChangelogSaveMode = SAVEMODE_BACKGROUND;
 	}
 }
 

@@ -589,6 +589,36 @@
 #define OPEN_DIRECTMODE                    0x02
 #define OPEN_APPENDONLY                    0x04
 
+// "flags" fileld in "CSTOCL_HDD_LIST" (warning !!! - cli/gui uses bits 8+)
+#define CS_HDD_MFR                         0x01
+#define CS_HDD_DAMAGED                     0x02
+#define CS_HDD_SCANNING                    0x04
+#define CS_HDD_INVALID                     0x08
+
+// "mfrstatus" field in "MATOCL_CSERV_LIST"
+#define MFRSTATUS_VALIDATING               0
+#define MFRSTATUS_INPROGRESS               1
+#define MFRSTATUS_READY                    2
+
+// MATOCL_CSERV_LIST.flags
+#define CSERV_FLAG_DISCONNECTED            1
+#define CSERV_FLAG_MAINTENANCE             2
+#define CSERV_FLAG_TMPMAINTENANCE          4
+
+// MATOCL_CSERV_LIST.mfrstatus
+#define MFRSTATUS_VALIDATING               0
+#define MFRSTATUS_INPROGRESS               1
+#define MFRSTATUS_READY                    2
+
+// MATOCL_INFO.laststore_status
+// when MATOCL_INFO.laststore_ts==0
+#define LASTSTORE_UNKNOWN                  0
+// when MATOCL_INFO.laststore_ts>0
+#define LASTSTORE_META_STORED_BG           0
+#define LASTSTORE_DOWNLOADED               1
+#define LASTSTORE_META_STORED_FG           2
+#define LASTSTORE_CRC_STORED_BG            3
+
 #define MFS_XATTR_CREATE_OR_REPLACE        0
 #define MFS_XATTR_CREATE_ONLY              1
 #define MFS_XATTR_REPLACE_ONLY             2
@@ -643,6 +673,10 @@
 // current_load.transferingchunks
 #define TRANSFERING_LOST_CHUNKS            1
 #define TRANSFERING_NEW_CHUNKS             2
+
+// chunks matrix in progress (MATOCL_CHUNKS_MATRIX.progress_status)
+#define CHUNKSERVERS_DISCONNECTING         TRANSFERING_LOST_CHUNKS
+#define CHUNKSERVERS_CONNECTING            TRANSFERING_NEW_CHUNKS
 
 // chunk_info.requestedinfo
 #define REQUEST_BLOCKS                     1

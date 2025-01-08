@@ -1628,7 +1628,7 @@ void chunk_chart_data(uint64_t *copychunks,uint64_t *ec8chunks,uint64_t *ec4chun
 
 uint8_t chunk_counters_in_progress(void) {
 //	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"discservers: %p , discservers_next: %p , csregisterinprogress: %"PRIu16,discservers,discservers_next,csregisterinprogress);
-	return ((discservers!=NULL || discservers_next!=NULL)?1:0)|((csregisterinprogress>0)?2:0)|(matocsserv_receiving_chunks_state()&(TRANSFERING_LOST_CHUNKS|TRANSFERING_NEW_CHUNKS));
+	return ((discservers!=NULL || discservers_next!=NULL)?CHUNKSERVERS_DISCONNECTING:0)|((csregisterinprogress>0)?CHUNKSERVERS_CONNECTING:0)|(matocsserv_receiving_chunks_state()&(TRANSFERING_LOST_CHUNKS|TRANSFERING_NEW_CHUNKS));
 }
 
 void chunk_store_chunkcounters(uint8_t *buff,uint8_t matrixid,int16_t classid) {
@@ -4576,16 +4576,16 @@ uint8_t chunk_get_mfrstatus(uint16_t csid) {
 		switch (cstab[csid].mfr_state) {
 			case UNKNOWN_HARD:
 			case UNKNOWN_SOFT:
-				return 0;
+				return MFRSTATUS_VALIDATING;
 			case CAN_BE_REMOVED:
-				return 2;
+				return MFRSTATUS_READY;
 			case REPL_IN_PROGRESS:
 			case WAS_IN_PROGRESS:
-				return 1;
+				return MFRSTATUS_INPROGRESS;
 
 		}
 	}
-	return 0;
+	return MFRSTATUS_VALIDATING;
 }
 
 static inline void chunk_server_remove_csid(uint16_t csid) {

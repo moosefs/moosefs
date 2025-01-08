@@ -1,3 +1,39 @@
+moosefs (4.57.1-1) unstable; urgency=medium
+
+  * (master) fixed bug in case of making space for ec parts marked for removal
+  * (gui) fixed tmp maintenance time display
+  * (gui) fixed graph summary bar display
+  * (master) fixed changelog rotation issues
+  * (mfsio) fixed mutex initialization issue
+  * (autoconf) updated configure.ac for new PKG_PROG_PKG_CONFIG macro
+  * (daemons) added timestamp to info file
+  * (master) added meta info to info file
+  * (gui) fixed asyncio for python <3.7
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 08 Jan 2025 12:00:00 +0100
+
+moosefs (4.57.0-1) unstable; urgency=medium
+
+  * (all) added storage class priority, description and export group
+  * (master) added storage class group allowance to exports.cfg (deprecates
+    mingoal/maxgoal)
+  * (master) changed predefined storage classes in new MFS instances
+  * (all) removed support for python 2.7
+  * (master) always resolve master hostname on 'info' signal (pro only)
+  * (master) added to supervisor in 'simple mode' broadcasting leader ip to all
+    followers (pro only)
+  * (master) added info for changelog module
+  * (daemons) warnings if a variable is defined more than once in a config file
+  * (bdev) added test for posix compliant ioctl prototype
+  * (freebsd) moved port files from sysutils to filesystems
+  * (master) fixed chunkserver registration in DEPUTY mode (pro only)
+  * (all) added names to some constants used across the system
+  * (all) added new charts data (total data I/O from all clients)
+  * (metasearch) added printing paths for trash and sustained items
+  * (master) fixed constants in metadata storage module
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 09 Dec 2024 12:00:00 +0100
+
 moosefs (4.56.6-1) unstable; urgency=medium
 
   * (cgi+cli) fixed bugs in CLI mode introduced by new CGI features

@@ -5791,6 +5791,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 	uint32_t vcmask4,tdcmask4,ivcmask4,bcmask4,tdbmask4,dcmask4,wvcmask4,tdwmask4;
 	uint32_t vcmask8,tdcmask8,ivcmask8,bcmask8,tdbmask8,dcmask8,wvcmask8,tdwmask8;
 	uint32_t overmask4,overmask8;
+	uint32_t tdovermask4,tdovermask8;
 	uint32_t mfrmask4,mfrmask8;
 	uint32_t mask,wlmask;
 	int32_t ltotalec4csid,ltotalec8csid;
@@ -5965,6 +5966,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 	wvcmask4 = 0;
 	tdwmask4 = 0;
 	overmask4 = 0;
+	tdovermask4 = 0;
 	vcmask8 = 0;
 	tdcmask8 = 0;
 	ivcmask8 = 0;
@@ -5974,6 +5976,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 	wvcmask8 = 0;
 	tdwmask8 = 0;
 	overmask8 = 0;
+	tdovermask8 = 0;
 	parts_on_the_same_server = 0;
 	lcsid4 = -1;
 	lcsid8 = -1;
@@ -6076,8 +6079,14 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 			break;
 		case TDVALID:
 			if (s->ecid&0x20) {
+				if ((vcmask8|tdcmask8)&mask) {
+					tdovermask8 |= mask;
+				}
 				tdcmask8 |= mask;
 			} else if (s->ecid&0x10) {
+				if ((vcmask4|tdcmask4)&mask) {
+					tdovermask4 |= mask;
+				}
 				tdcmask4 |= mask;
 			} else {
 				tdc++;
@@ -6085,6 +6094,9 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 			break;
 		case VALID:
 			if (s->ecid&0x20) {
+				if ((vcmask8|tdcmask8)&mask) {
+					tdovermask8 |= mask;
+				}
 				if (vcmask8&mask) {
 					overmask8 |= mask;
 				}
@@ -6094,6 +6106,9 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 				}
 				lcsid8 = s->csid;
 			} else if (s->ecid&0x10) {
+				if ((vcmask4|tdcmask4)&mask) {
+					tdovermask4 |= mask;
+				}
 				if (vcmask4&mask) {
 					overmask4 |= mask;
 				}
@@ -6819,10 +6834,10 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 
 	if (dontdelete==0 && regularecgoalequiv<goal && ((ec_data_parts==8 && tdcmask8!=0) || (ec_data_parts==4 && tdcmask4!=0)) &&
 		chunk_priority_is_empty(CHUNK_PRIORITY_ONECOPY_HIGHGOAL) && 
-		chunk_priority_is_empty(CHUNK_PRIORITY_ONECOPY_ANY) && 
-		chunk_priority_is_empty(CHUNK_PRIORITY_ONEREGCOPY_PLUSMFR)) {
+		chunk_priority_is_empty(CHUNK_PRIORITY_ONECOPY_ANY)) {
 
 		uint8_t can_delete_mark_for_removal;
+		uint32_t vcmask;
 
 		can_delete_mark_for_removal = 0;
 		if (ec_strict_mode==0) { // EC loose mode or copy mode
@@ -6843,8 +6858,16 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 		}
 
 		if (can_delete_mark_for_removal) {
+			vcmask = (ec_data_parts==8) ? tdovermask8 : tdovermask4;
 			for (s=c->slisthead ; s ; s=s->next) {
-				if ((s->valid==TDVALID) && s->ecid>=minecid && s->ecid<=maxecid) {
+				if (s->ecid>=0x20 && s->ecid<=0x30) {
+					mask = (UINT32_C(1) << (s->ecid & 0x1F));
+				} else if (s->ecid>=0x10 && s->ecid<=0x1C) {
+					mask = (UINT32_C(1) << (s->ecid & 0x0F));
+				} else {
+					mask = 0;
+				}
+				if ((s->valid==TDVALID) && s->ecid>=minecid && s->ecid<=maxecid && (mask&vcmask)) {
 					if (matocsserv_deletion_counter(cstab[s->csid].ptr)<TmpMaxDel) {
 						if (matocsserv_send_deletechunk(cstab[s->csid].ptr,c->chunkid,s->ecid,c->version,OP_DEL_OVERGOAL)>=0) {
 							s->valid = DEL;
@@ -7897,7 +7920,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 // COPY mode - all servers are occupied and some copies have mark for removal status - in such case delete them
 // ------------------------------------------------------------------------------------------------------------
 
-	if (ec_data_parts==0 && vc+tdc>=scount && vc<goal && tdc>0 && vc+tdc>1 && chunk_priority_is_empty(CHUNK_PRIORITY_ONECOPY_HIGHGOAL) && chunk_priority_is_empty(CHUNK_PRIORITY_ONECOPY_ANY) && chunk_priority_is_empty(CHUNK_PRIORITY_ONEREGCOPY_PLUSMFR)) {
+	if (ec_data_parts==0 && vc+tdc>=scount && vc<goal && tdc>0 && vc+tdc>1 && chunk_priority_is_empty(CHUNK_PRIORITY_ONECOPY_HIGHGOAL) && chunk_priority_is_empty(CHUNK_PRIORITY_ONECOPY_ANY)) {
 		uint8_t tdcr = 0;
 		for (s=c->slisthead ; s ; s=s->next) {
 			if (s->valid==TDVALID && s->ecid==0) {

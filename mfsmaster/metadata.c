@@ -1096,7 +1096,7 @@ void meta_store_task(void) {
 	}
 	htime = ( curtime / STORE_UNIT ) - offset;
 	if ((htime % MetaSaveFreq) == 0) {
-		if (metasaverpid>=0 && last_store_htime + 120 * STORE_UNIT > rhtime) { // previus save still in progress - silently ignore this request
+		if (metasaverpid>=0 && last_store_htime + 2 * STORE_UNIT > rhtime) { // previus save still in progress - silently ignore this request
 			return;
 		}
 		last_store_htime = rhtime;
@@ -1422,6 +1422,16 @@ int meta_loadall(void) {
 	int i;
 
 	if (emptystart) {
+		status = meta_check_metadatafile("metadata.mfs",&ver,&id);
+		if (status==META_CHECK_OK) {
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"found valid file 'metadata.mfs' (version: %"PRIu64" ; id: %"PRIX64") in 'empty start' mode - will try to rename it",ver,id);
+			if (rename("metadata.mfs","metadata.mfs.back_emptystarted")<0) {
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't rename metadata.mfs -> metadata.mfs.back_emptystarted");
+				return -1;
+			} else {
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_INFO,"file metadata.mfs has been renamed to metadata.mfs.back_emptystarted");
+			}
+		}
 		return 0;
 	}
 	if (allowautorestore) {

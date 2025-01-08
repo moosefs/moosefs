@@ -13,6 +13,7 @@ This file lists noteworthy changes in MooseFS.
   - (all) added names to some constants used across the system
   - (all) added new charts data (total data I/O from all clients)
   - (metasearch) added printing paths for trash and sustained items
+  - (master) fixed constants in metadata storage module
 
 * MooseFS 4.56.6-1 (2024-09-23)
 

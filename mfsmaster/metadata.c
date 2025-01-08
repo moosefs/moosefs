@@ -1095,6 +1095,9 @@ void meta_store_task(void) {
 		offset = MetaSaveOffset;
 	}
 	htime = ( curtime / STORE_UNIT ) - offset;
+	if ((rhtime % 60)==0) {
+		changelog_rotate(0);
+	}
 	if ((htime % MetaSaveFreq) == 0) {
 		if (metasaverpid>=0 && last_store_htime + 2 * STORE_UNIT > rhtime) { // previus save still in progress - silently ignore this request
 			return;
@@ -1184,7 +1187,7 @@ int meta_mayexit(void) {
 }
 
 void meta_term(void) {
-	changelog_rotate(0);
+	changelog_rotate(ROTATE_FLAG_FOREGROUND);
 	for (;;) {
 		uint8_t status;
 		status = meta_storeall(0,0);

@@ -627,16 +627,17 @@ void bgsaver_changelog(uint64_t version,const char *message) {
 	memcpy(buff,message,l+1); // copy message with ending zero
 }
 
-void bgsaver_rotatelog(void) {
+int bgsaver_rotatelog(void) {
 	bgsaverconn *eptr = bgsaversingleton;
 	uint8_t *buff;
 
 	if (eptr==NULL || eptr->mode!=DATA) {
-		return;
+		return -1;
 	}
 
 	buff = bgsaver_createpacket(eptr,BGSAVER_ROTATELOG,4);
 	put32bit(&buff,BackLogsNumber);
+	return 0;
 }
 
 void bgsaver_changelog_ack(bgsaverconn *eptr,const uint8_t *data,uint32_t length) {

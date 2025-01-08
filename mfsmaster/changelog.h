@@ -26,7 +26,10 @@
 uint32_t changelog_get_old_changes(uint64_t version,void (*sendfn)(void *,uint64_t,uint8_t *,uint32_t),void *userdata,uint32_t limit);
 uint64_t changelog_get_minversion(void);
 
-void changelog_rotate(uint8_t broadcast);
+#define ROTATE_FLAG_BROADCAST 1
+#define ROTATE_FLAG_FOREGROUND 2
+
+void changelog_rotate(uint8_t rotate_flags);
 void changelog_mr(uint64_t version,const char *data);
 
 #ifdef __printflike

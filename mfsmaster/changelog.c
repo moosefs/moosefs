@@ -65,6 +65,7 @@ typedef struct old_changes_block {
 
 static old_changes_block *old_changes_head=NULL;
 static old_changes_block *old_changes_current=NULL;
+static double lastchange = 0.0;
 
 static uint64_t old_changes_total_size = 0;
 
@@ -182,10 +183,16 @@ uint64_t changelog_get_minversion(void) {
 	return old_changes_head->minversion;
 }
 
-void changelog_rotate(uint8_t broadcast) {
-	if (ChangelogSaveMode==0) {
-		bgsaver_rotatelog();
-	} else {
+void changelog_rotate(uint8_t rotate_flags) {
+	if (ChangelogSaveMode!=SAVEMODE_BACKGROUND) {
+		rotate_flags |= ROTATE_FLAG_FOREGROUND;
+	}
+	if ((rotate_flags&ROTATE_FLAG_FOREGROUND)==0) { // try to rotate in background
+		if (bgsaver_rotatelog()<0) { // in case of error - switch to foreground
+			rotate_flags |= ROTATE_FLAG_FOREGROUND;
+		}
+	}
+	if (rotate_flags&ROTATE_FLAG_FOREGROUND) {
 		char logname1[100],logname2[100];
 		uint32_t i;
 		if (currentfd) {
@@ -205,7 +212,7 @@ void changelog_rotate(uint8_t broadcast) {
 			unlink("changelog.0.mfs");
 		}
 	}
-	if (broadcast) {
+	if (rotate_flags&ROTATE_FLAG_BROADCAST) {
 		matomlserv_broadcast_logrotate();
 	}
 }
@@ -253,6 +260,7 @@ void changelog(const char *format,...) {
 
 	changelog_mr(version,printbuff);
 	changelog_store_logstring(version,(uint8_t*)printbuff,leng);
+	lastchange = monotonic_seconds();
 }
 
 char* changelog_generate_gids(uint32_t gids,uint32_t *gid) {
@@ -324,6 +332,12 @@ char* changelog_escape_name(uint32_t nleng,const uint8_t *name) {
 	return currescname;
 }
 
+void changelog_sendnop(void) {
+	if (lastchange + 30.0 <= monotonic_seconds()) {
+		changelog("%"PRIu32"|IDLE()",main_time());
+	}
+}
+
 void changelog_info(FILE *fd) {
 	uint64_t minversion_to_keep;
 	uint64_t current_meteversion;
@@ -385,6 +399,7 @@ void changelog_reload(void) {
 
 int changelog_init(void) {
 	changelog_reload();
+	main_time_register(1,0,changelog_sendnop);
 	main_reload_register(changelog_reload);
 	main_info_register(changelog_info);
 	currentfd = NULL;

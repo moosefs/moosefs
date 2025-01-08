@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.57.1-1 (2025-01-08)
 
   - (master) fixed bug in case of making space for ec parts marked for removal
+  - (master) fixed changelog rotation issues
 
 * MooseFS 4.57.0-1 (2024-12-09)
 

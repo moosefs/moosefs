@@ -28,7 +28,7 @@ void bgsaver_open(uint32_t speedlimit,void *ud,void (*donefn)(void*,int));
 void bgsaver_store(const uint8_t *data,uint64_t offset,uint32_t leng,uint32_t crc,void *ud,void (*donefn)(void*,int));
 void bgsaver_close(void *ud,void (*donefn)(void*,int));
 void bgsaver_changelog(uint64_t version,const char *message);
-void bgsaver_rotatelog(void);
+int bgsaver_rotatelog(void);
 int bgsaver_init(void);
 
 #endif

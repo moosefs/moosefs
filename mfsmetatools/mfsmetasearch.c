@@ -206,9 +206,9 @@ int scan_edges_pass2(FILE *fd) {
 			child = get32bit(&rptr);
 			rptr += 8; // skip 'edgeid'
 			nleng = get16bit(&rptr);
-			if (parent==0) {
-				fseeko(fd,nleng,SEEK_CUR);
-			} else {
+//			if (parent==0) {
+//				fseeko(fd,nleng,SEEK_CUR);
+//			} else {
 				ese = malloc(sizeof(edgestackel));
 				ese->parent = parent;
 				ese->child = child;
@@ -220,7 +220,7 @@ int scan_edges_pass2(FILE *fd) {
 				ese->name[nleng]=0;
 				ese->next = edgestack;
 				edgestack = ese;
-			}
+//			}
 			emp->cnt--;
 		}
 		while (edgestack!=NULL) {
@@ -591,9 +591,9 @@ void print_result_plain(FILE *ofd) {
 				while (s!=NULL) {
 					fprintf(ofd,"inode: %u ; type: %s ; path: ",s->inode,type2str(s->type));
 					if (s->type==TYPE_TRASH) {
-						fprintf(ofd,"[TRASH]\n");
+						fprintf(ofd,"[TRASH] %s\n",s->name);
 					} else if (s->type==TYPE_SUSTAINED) {
-						fprintf(ofd,"[SUSTAINED]\n");
+						fprintf(ofd,"[SUSTAINED] %s\n",s->name);
 					} else {
 						print_path(ofd,s,0);
 						fprintf(ofd,"\n");
@@ -624,9 +624,11 @@ void print_result_json(FILE *ofd) {
 				while (s!=NULL) {
 					fputc('"',ofd);
 					if (s->type==TYPE_TRASH) {
-						fprintf(ofd,"[TRASH]");
+						fprintf(ofd,"[TRASH] ");
+						print_escaped(ofd,s->name);
 					} else if (s->type==TYPE_SUSTAINED) {
-						fprintf(ofd,"[SUSTAINED]");
+						fprintf(ofd,"[SUSTAINED] ");
+						print_escaped(ofd,s->name);
 					} else {
 						print_path(ofd,s,1);
 					}
@@ -656,9 +658,9 @@ void print_result_csv(FILE *ofd,char sep) {
 				while (s!=NULL) {
 					fprintf(ofd,"%u%c%s%c",s->inode,sep,type2str(s->type),sep);
 					if (s->type==TYPE_TRASH) {
-						fprintf(ofd,"[TRASH]\n");
+						fprintf(ofd,"[TRASH] %s\n",s->name);
 					} else if (s->type==TYPE_SUSTAINED) {
-						fprintf(ofd,"[SUSTAINED]\n");
+						fprintf(ofd,"[SUSTAINED] %s\n",s->name);
 					} else {
 						print_path(ofd,s,0);
 						fprintf(ofd,"\n");
@@ -836,8 +838,10 @@ int main(int argc,char *argv[]) {
 			goto error;
 		}
 
-		printf("parsed expr: ");
-		expr_print(expr);
+		if (outfname!=NULL) {
+			printf("parsed expr: ");
+			expr_print(expr);
+		}
 	} else {
 		chunkid_set = liset_new();
 

@@ -462,12 +462,19 @@ AC_MSG_RESULT($ac_have_working_attribute_fallthrough)
 CFLAGS="$saved_cflags"
 
 AC_CHECK_PROGS([KILL], [kill])
-PKG_PROG_PKG_CONFIG
-PKG_CHECK_MODULES([SYSTEMD], [systemd], [
-	systemdunitdir="`$PKG_CONFIG --variable=systemdsystemunitdir systemd`"
-], [
-	systemdunitdir=no
+PKG_PROG_PKG_CONFIG([0.9.0],[
+	PKG_CONFIG=
 ])
+if test -n "$PKG_CONFIG"; then
+	PKG_CHECK_MODULES([SYSTEMD], [systemd], [
+		systemdunitdir="`$PKG_CONFIG --variable=systemdsystemunitdir systemd`"
+	], [
+		systemdunitdir=
+	])
+else
+	echo "no pkg-config - can't check systemd systemunitdir"
+	systemdunitdir=
+fi
 AC_SUBST([systemdunitdir])
 
 dnl this is work in progress

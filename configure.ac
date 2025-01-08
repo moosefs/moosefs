@@ -351,6 +351,21 @@ AC_LINK_IFELSE(
 	AC_DEFINE([BSWAP64(x)], [((((x)<<56)&0xFF00000000000000) | (((x)<<40)&0xFF000000000000) | (((x)<<24)&0xFF0000000000) | (((x)<<8)&0xFF00000000) | (((x)>>8)&0xFF000000) | (((x)>>24)&0xFF0000) | (((x)>>40)&0xFF00) | (((x)>>56)&0xFF))], [bswap64])
 	])
 
+CFLAGSBACK="$CFLAGS"
+CFLAGS="-std=gnu11"
+AC_MSG_CHECKING([for ioctl(int,int,...) prototype])
+AC_COMPILE_IFELSE(
+	[AC_LANG_SOURCE([
+#include <sys/ioctl.h>
+typeof(ioctl) prototest;
+int prototest(int x,int y ,...) { return x+y; }
+	])],[
+		AC_MSG_RESULT([yes])
+		AC_DEFINE([IOCTL_INTOP], [1], [ioclt operation argument is of type int])
+	],[
+		AC_MSG_RESULT([no])
+	])
+CFLAGS="$CFLAGSBACK"
 
 # Check for Mac OS X's broken poll
 if test "$okpoll" = "maybe" -a "$ac_cv_func_poll" = "yes"; then

@@ -33,6 +33,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <errno.h>
@@ -576,7 +577,11 @@ char* find_free_nbddevice(void) {
 				return NULL;
 			}
 		} else {
+#ifdef IOCTL_INTOP
+			err = ioctl(nbdfd,(int)BLKGETSIZE64,&size);
+#else
 			err = ioctl(nbdfd,BLKGETSIZE64,&size);
+#endif
 			close(nbdfd);
 			if (err<0) {
 				return NULL;
@@ -595,7 +600,11 @@ int nbd_linktest(nbdcommon *nbdcp) {
 
 	fd = open(nbdcp->linkname,O_RDWR);
 	if (fd>=0) {
+#ifdef IOCTL_INTOP
+		err = ioctl(fd,(int)BLKGETSIZE64,&size);
+#else
 		err = ioctl(fd,BLKGETSIZE64,&size);
+#endif
 		close(fd);
 		if (err>=0 && size>0) {
 			return -1;
@@ -670,7 +679,11 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 		goto err2;
 	}
 
+#ifdef IOCTL_INTOP
+	err = ioctl(nbdcp->nbdfd,(int)BLKGETSIZE64,&size);
+#else
 	err = ioctl(nbdcp->nbdfd,BLKGETSIZE64,&size);
+#endif
 	if (err<0) {
 		nbd_start_err_msg("can't obtain size of block device (%s): %s",nbdcp->nbddevice,strerror(errno));
 		goto err3;
@@ -1362,7 +1375,11 @@ void nbd_handle_resize_device(int sock,const uint8_t *buff,uint32_t leng) {
 				if (ioctl(bdl->nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, size / bdl->nbdcp->bsize)<0) {
 					msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"error setting block device number of blocks (%s): %s",bdl->nbdcp->nbddevice,strerror(errno));
 				} else {
+#ifdef IOCTL_INTOP
+					if (ioctl(bdl->nbdcp->nbdfd,(int)BLKGETSIZE64,&tsize)<0) {
+#else
 					if (ioctl(bdl->nbdcp->nbdfd,BLKGETSIZE64,&tsize)<0) {
+#endif
 						msglen = snprintf((char*)(ans+10),NBD_ERR_SIZE,"error testing block device size (%s): %s",bdl->nbdcp->nbddevice,strerror(errno));
 					} else {
 						if (tsize != size) {

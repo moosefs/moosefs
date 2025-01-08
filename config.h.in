@@ -451,6 +451,9 @@
 /* have __sync_OP_and_fetch intrinsics */
 #undef HAVE___SYNC_OP_AND_FETCH
 
+/* ioclt operation argument is of type int */
+#undef IOCTL_INTOP
+
 /* Build light version */
 #undef LIGHT_MFS
 

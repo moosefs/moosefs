@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.57.0-1 (2024-12-09)
 
   - (daemons) warnings if a variable is defined more than once in a config file
+  - (bdev) added test for posix compliant ioctl prototype
 
 * MooseFS 4.56.6-1 (2024-09-23)
 

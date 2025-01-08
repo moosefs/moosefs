@@ -2109,6 +2109,8 @@ int mfs_int_init(mfs_int_cfg *mcfg,uint8_t stage) {
 		conncache_init(200);
 		chunkrwlock_init();
 		chunksdatacache_init();
+		read_init();
+		write_init();
 		fs_init_threads(mcfg->io_try_cnt,mcfg->io_timeout);
 
 		csdb_init();
@@ -2172,6 +2174,8 @@ void mfs_int_term(void) {
 	csdb_term();
 
 	fs_term();
+	write_term();
+	read_term();
 	chunksdatacache_term();
 	chunkrwlock_term();
 	conncache_term();

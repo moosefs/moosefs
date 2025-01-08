@@ -24,6 +24,20 @@
 #define VERSION2INT(maj,med,min) ((maj)*0x10000+(med)*0x100+(((maj)>1)?((min)*2):(min)))
 #endif
 
+#ifdef HAVE_ATOMICS
+#include <stdatomic.h>
+#undef HAVE_ATOMICS
+#define HAVE_ATOMICS 1
+#else
+#define HAVE_ATOMICS 0
+#endif
+
+#if defined(HAVE___SYNC_OP_AND_FETCH)
+#define HAVE_SYNCS 1
+#else
+#define HAVE_SYNCS 0
+#endif
+
 #include <sys/types.h>
 #ifdef HAVE_WRITEV
 #include <sys/uio.h>
@@ -179,6 +193,43 @@ static pthread_cond_t worker_term_cond;
 static pthread_attr_t worker_thattr;
 
 static void *jqueue; //,*dqueue;
+
+#if HAVE_ATOMICS
+static _Atomic uint64_t total_bytes_sent;
+#elif HAVE_SYNCS
+static volatile uint64_t total_bytes_sent;
+#else
+static volatile uint64_t total_bytes_sent;
+#define TOTAL_COUNT_USE_LOCK 1
+static pthread_mutex_t total_bytes_lock;
+#endif
+
+static inline void write_increase_total_bytes(uint32_t v) {
+#if HAVE_ATOMICS
+	atomic_fetch_add(&total_bytes_sent,v);
+#elif HAVE_SYNCS
+	__sync_add_and_fetch(&total_bytes_sent,v);
+#else
+	zassert(pthread_mutex_lock(&total_bytes_lock));
+	total_bytes_sent += v;
+	zassert(pthread_mutex_unlock(&total_bytes_lock));
+#endif
+}
+
+uint64_t write_get_total_bytes(void) {
+	uint64_t v;
+#if HAVE_ATOMICS
+	v = atomic_fetch_and(&total_bytes_sent,0);
+#elif HAVE_SYNCS
+	v = __sync_fetch_and_and(&total_bytes_sent,0);
+#else
+	zassert(pthread_mutex_lock(&total_bytes_lock));
+	v = total_bytes_sent;
+	total_bytes_sent = 0;
+	zassert(pthread_mutex_unlock(&total_bytes_lock));
+#endif
+	return v;
+}
 
 #ifdef BUFFER_DEBUG
 void* write_info_worker(void *arg) {
@@ -1271,6 +1322,7 @@ void* write_worker(void *arg) {
 						sent+=i;
 						if (sent==32+cb->to-cb->from) {
 							sending_mode = 0;
+							write_increase_total_bytes(cb->to-cb->from);
 						}
 					}
 					break;
@@ -1999,3 +2051,17 @@ int write_data_end(void *vid) {
 	ret = write_data_do_flush((inodedata*)vid,1);
 	return ret;
 }
+
+void write_init(void) {
+#ifdef TOTAL_COUNT_USE_LOCK
+	zassert(pthread_mutex_init(&total_bytes_lock,NULL));
+#endif
+	write_get_total_bytes(); // zero counters
+}
+
+void write_term(void) {
+#ifdef TOTAL_COUNT_USE_LOCK
+	zassert(pthread_mutex_destroy(&total_bytes_lock));
+#endif
+}
+

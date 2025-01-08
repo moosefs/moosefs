@@ -23,7 +23,7 @@
 
 #include <inttypes.h>
 
-void matoclserv_stats(uint64_t stats[10]);
+void matoclserv_stats(uint64_t stats[12]);
 uint32_t matoclserv_get_min_cl_version(void);
 
 void matoclserv_chunk_unlocked(uint64_t chunkid,void *cptr);

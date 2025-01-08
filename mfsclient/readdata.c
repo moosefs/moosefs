@@ -16,12 +16,26 @@
  * along with MooseFS; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
  * or visit http://www.gnu.org/licenses/gpl-2.0.html
-*/
+ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #else
 #define VERSION2INT(maj,med,min) ((maj)*0x10000+(med)*0x100+(((maj)>1)?((min)*2):(min)))
+#endif
+
+#ifdef HAVE_ATOMICS
+#include <stdatomic.h>
+#undef HAVE_ATOMICS
+#define HAVE_ATOMICS 1
+#else
+#define HAVE_ATOMICS 0
+#endif
+
+#if defined(HAVE___SYNC_OP_AND_FETCH)
+#define HAVE_SYNCS 1
+#else
+#define HAVE_SYNCS 0
 #endif
 
 #include <sys/types.h>
@@ -232,6 +246,43 @@ static pthread_attr_t worker_thattr;
 //static inodedata *read_worker_id[WORKERS];
 
 static void *jqueue; //,*dqueue;
+
+#if HAVE_ATOMICS
+static _Atomic uint64_t total_bytes_rcvd;
+#elif HAVE_SYNCS
+static volatile uint64_t total_bytes_rcvd;
+#else
+static volatile uint64_t total_bytes_rcvd;
+#define TOTAL_COUNT_USE_LOCK 1
+static pthread_mutex_t total_bytes_lock;
+#endif
+
+static inline void read_increase_total_bytes(uint32_t v) {
+#if HAVE_ATOMICS
+	atomic_fetch_add(&total_bytes_rcvd,v);
+#elif HAVE_SYNCS
+	__sync_add_and_fetch(&total_bytes_rcvd,v);
+#else
+	zassert(pthread_mutex_lock(&total_bytes_lock));
+	total_bytes_rcvd += v;
+	zassert(pthread_mutex_unlock(&total_bytes_lock));
+#endif
+}
+
+uint64_t read_get_total_bytes(void) {
+	uint64_t v;
+#if HAVE_ATOMICS
+	v = atomic_fetch_and(&total_bytes_rcvd,0);
+#elif HAVE_SYNCS
+	v = __sync_fetch_and_and(&total_bytes_rcvd,0);
+#else
+	zassert(pthread_mutex_lock(&total_bytes_lock));
+	v = total_bytes_rcvd;
+	total_bytes_rcvd = 0;
+	zassert(pthread_mutex_unlock(&total_bytes_lock));
+#endif
+	return v;
+}
 
 /* queues */
 
@@ -1826,6 +1877,7 @@ void* read_worker(void *arg) {
 										resetpos = 1; // start again from beginning
 										break;
 									}
+									read_increase_total_bytes(recsize);
 									readanything = 1;
 								}
 								datasrc[part].received = 0;
@@ -2812,5 +2864,18 @@ void read_data_end(void *vid) {
 	zassert(pthread_mutex_unlock(&inode_lock));
 #ifdef RDEBUG
 	fprintf(stderr,"%.6lf: closing: inode_structure: %p - exit\n",monotonic_seconds(),(void*)ind);
+#endif
+}
+
+void read_init(void) {
+#ifdef TOTAL_COUNT_USE_LOCK
+	zassert(pthread_mutex_init(&total_bytes_lock,NULL));
+#endif
+	read_get_total_bytes(); // zero counters
+}
+
+void read_term(void) {
+#ifdef TOTAL_COUNT_USE_LOCK
+	zassert(pthread_mutex_destroy(&total_bytes_lock));
 #endif
 }

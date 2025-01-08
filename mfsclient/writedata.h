@@ -37,5 +37,9 @@ int write_data_flush_inode(uint32_t inode);
 int write_data(void *vid,uint64_t offset,uint32_t size,const uint8_t *buff,uint8_t superuser);
 uint8_t write_cache_almost_full(void);
 // uint64_t write_data_get_maxfleng(uint32_t inode);
+uint64_t write_get_total_bytes(void);
+
+void write_init(void);
+void write_term(void);
 
 #endif

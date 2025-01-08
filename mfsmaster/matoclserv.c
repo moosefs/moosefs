@@ -205,33 +205,39 @@ static uint32_t stats_prcvd = 0;
 static uint32_t stats_psent = 0;
 static uint64_t stats_brcvd = 0;
 static uint64_t stats_bsent = 0;
-static uint64_t stats_bread = 0;
-static uint64_t stats_bwrite = 0;
-static uint32_t stats_rcnt = 0;
-static uint32_t stats_wcnt = 0;
-static uint32_t stats_fcnt = 0;
+static uint64_t stats_mounts_bread = 0;
+static uint64_t stats_mounts_bwrite = 0;
+static uint32_t stats_mounts_rcnt = 0;
+static uint32_t stats_mounts_wcnt = 0;
+static uint32_t stats_mounts_fcnt = 0;
+static uint64_t stats_mounts_brcvd = 0;
+static uint64_t stats_mounts_bsent = 0;
 static uint32_t stats_lcnt = 0;
 
-void matoclserv_stats(uint64_t stats[10]) {
+void matoclserv_stats(uint64_t stats[12]) {
 	stats[0] = stats_prcvd;
 	stats[1] = stats_psent;
 	stats[2] = stats_brcvd;
 	stats[3] = stats_bsent;
-	stats[4] = stats_bread;
-	stats[5] = stats_bwrite;
-	stats[6] = stats_rcnt;
-	stats[7] = stats_wcnt;
-	stats[8] = stats_fcnt;
-	stats[9] = stats_lcnt;
+	stats[4] = stats_mounts_bread;
+	stats[5] = stats_mounts_bwrite;
+	stats[6] = stats_mounts_rcnt;
+	stats[7] = stats_mounts_wcnt;
+	stats[8] = stats_mounts_fcnt;
+	stats[9] = stats_mounts_brcvd;
+	stats[10] = stats_mounts_bsent;
+	stats[11] = stats_lcnt;
 	stats_prcvd = 0;
 	stats_psent = 0;
 	stats_brcvd = 0;
 	stats_bsent = 0;
-	stats_bread = 0;
-	stats_bwrite = 0;
-	stats_rcnt = 0;
-	stats_wcnt = 0;
-	stats_fcnt = 0;
+	stats_mounts_bread = 0;
+	stats_mounts_bwrite = 0;
+	stats_mounts_rcnt = 0;
+	stats_mounts_wcnt = 0;
+	stats_mounts_fcnt = 0;
+	stats_mounts_brcvd = 0;
+	stats_mounts_bsent = 0;
 	stats_lcnt = 0;
 }
 
@@ -2271,9 +2277,10 @@ void matoclserv_fuse_opdata(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	const uint8_t *rptr;
 	uint32_t rcnt,wcnt,fcnt;
 	uint64_t rbyt,wbyt;
+	uint64_t rcvdbyt,sentbyt;
 
-	if (length!=28) {
-		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_OPDATA - wrong size (%"PRIu32"/28)",length);
+	if (length!=28 && length!=44) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_OPDATA - wrong size (%"PRIu32"/28|44)",length);
 		eptr->mode = KILL;
 		return;
 	}
@@ -2290,11 +2297,20 @@ void matoclserv_fuse_opdata(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	rcnt = get32bit(&rptr);
 	wcnt = get32bit(&rptr);
 	fcnt = get32bit(&rptr);
-	stats_bread += rbyt;
-	stats_bwrite += wbyt;
-	stats_rcnt += rcnt;
-	stats_wcnt += wcnt;
-	stats_fcnt += fcnt;
+	if (length==44) {
+		rcvdbyt = get64bit(&rptr);
+		sentbyt = get64bit(&rptr);
+	} else {
+		rcvdbyt = 0;
+		sentbyt = 0;
+	}
+	stats_mounts_bread += rbyt;
+	stats_mounts_bwrite += wbyt;
+	stats_mounts_rcnt += rcnt;
+	stats_mounts_wcnt += wcnt;
+	stats_mounts_fcnt += fcnt;
+	stats_mounts_brcvd += rcvdbyt;
+	stats_mounts_bsent += sentbyt;
 	sessions_add_stats(eptr->sesdata,SES_OP_READ,rcnt);
 	sessions_add_stats(eptr->sesdata,SES_OP_WRITE,wcnt);
 	sessions_add_stats(eptr->sesdata,SES_OP_FSYNC,fcnt);

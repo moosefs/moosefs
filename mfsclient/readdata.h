@@ -44,5 +44,9 @@ void read_inode_set_length_active(uint32_t inode,uint64_t newlength);
 void read_inode_set_length_passive(uint32_t inode,uint64_t newlength);
 void* read_data_new(uint32_t inode,uint64_t fleng);
 void read_data_end(void *vid);
+uint64_t read_get_total_bytes(void);
+
+void read_init(void);
+void read_term(void);
 
 #endif

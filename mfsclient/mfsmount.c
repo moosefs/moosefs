@@ -1269,6 +1269,8 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 	symlink_cache_init(mfsopts.symlinkcacheto);
 	negentry_cache_init(mfsopts.negentrycacheto);
 //	dir_cache_init();
+	read_init();
+	write_init();
 	fs_init_threads(mfsopts.ioretries,mfsopts.timeout);
 	if (masterproxy_init(mfsopts.proxyhost)<0) {
 		err = 1;
@@ -1449,6 +1451,8 @@ exit1:
 	masterproxy_term();
 exit2:
 	fs_term();
+	write_term();
+	read_term();
 //	dir_cache_term();
 	negentry_cache_term();
 	symlink_cache_term();

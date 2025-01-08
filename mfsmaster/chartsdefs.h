@@ -91,8 +91,10 @@
 #define CHARTS_MDISC_SERVERS 65
 #define CHARTS_DISC_SERVERS 66
 #define CHARTS_USAGE_DIFF 67
+#define CHARTS_MOUNTS_BYTES_RECEIVED 68
+#define CHARTS_MOUNTS_BYTES_SENT 69
 
-#define CHARTS 68
+#define CHARTS 70
 
 #define STRID(a,b,c,d) (((((uint8_t)a)*256U+(uint8_t)b)*256U+(uint8_t)c)*256U+(uint8_t)d)
 
@@ -166,6 +168,8 @@
 	{"mdservers"    ,STRID('M','D','S','R'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"dservers"     ,STRID('D','S','R','V'),CHARTS_MODE_MAX,0,CHARTS_SCALE_NONE ,   1, 1}, \
 	{"udiff"        ,STRID('U','D','I','F'),CHARTS_MODE_MAX,0,CHARTS_SCALE_MILI ,   1, 1}, \
+	{"mountbytrcvd" ,STRID('M','B','Y','R'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
+	{"mountbytsent" ,STRID('M','B','Y','S'),CHARTS_MODE_ADD,0,CHARTS_SCALE_MILI ,1000,60}, \
 	{NULL           ,0                     ,0              ,0,0                 ,   0, 0}  \
 };
 

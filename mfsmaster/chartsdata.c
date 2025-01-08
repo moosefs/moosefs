@@ -60,7 +60,7 @@ void chartsdata_refresh(void) {
 	uint64_t data[CHARTS];
 	uint32_t fsdata[24];
 	uint32_t fobj,mobj;
-	uint64_t cldata[10];
+	uint64_t cldata[12];
 	uint32_t chunkops[CHUNK_STATS_CNT];
 	uint32_t i;
 	uint64_t total,avail;
@@ -114,7 +114,9 @@ void chartsdata_refresh(void) {
 	data[CHARTS_READ] = cldata[6];
 	data[CHARTS_WRITE] = cldata[7];
 	data[CHARTS_FSYNC] = cldata[8];
-	data[CHARTS_LOCK] = cldata[9];
+	data[CHARTS_MOUNTS_BYTES_RECEIVED] = cldata[9];
+	data[CHARTS_MOUNTS_BYTES_SENT] = cldata[10];
+	data[CHARTS_LOCK] = cldata[11];
 
 	matocsserv_getspace(&total,&avail,NULL);
 	data[CHARTS_USED_SPACE]=total-avail;

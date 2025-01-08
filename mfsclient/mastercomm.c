@@ -24,6 +24,20 @@
 #  define VERSION2INT(maj,med,min) ((maj)*0x10000+(med)*0x100+(((maj)>1)?((min)*2):(min)))
 #endif
 
+#ifdef HAVE_ATOMICS
+#include <stdatomic.h>
+#undef HAVE_ATOMICS
+#define HAVE_ATOMICS 1
+#else
+#define HAVE_ATOMICS 0
+#endif
+
+#if defined(HAVE___SYNC_OP_AND_FETCH)
+#define HAVE_SYNCS 1
+#else
+#define HAVE_SYNCS 0
+#endif
+
 #ifdef WIN32
 # include "portable.h"
 #endif
@@ -67,7 +81,8 @@
 #include "mfsmount.h"
 #endif
 #include "chunksdatacache.h"
-//#include "readdata.h"
+#include "readdata.h"
+#include "writedata.h"
 // #include "dircache.h"
 
 #define CONNECT_TIMEOUT 2000
@@ -168,11 +183,21 @@ static uint64_t lastsyncsend = 0;
 static uint64_t usectimeout;
 static uint32_t maxretries;
 
-static uint32_t rcnt,wcnt,fcnt;
-static uint64_t rbyt,wbyt;
+#if HAVE_ATOMICS
+static _Atomic uint32_t rcnt,wcnt,fcnt;
+static _Atomic uint64_t rbyt,wbyt;
+#elif HAVE_SYNCS
+static volatile uint32_t rcnt,wcnt,fcnt;
+static volatile uint64_t rbyt,wbyt;
+#else
+static volatile uint32_t rcnt,wcnt,fcnt;
+static volatile uint64_t rbyt,wbyt;
+#define OPDATA_USE_LOCK 1
+static pthread_mutex_t opdatalock;
+#endif
 
 static pthread_t rpthid,npthid;
-static pthread_mutex_t fdlock,reclock,aflock,amtimelock,opdatalock;
+static pthread_mutex_t fdlock,reclock,aflock,amtimelock;
 static pthread_key_t reckey;
 static threc *mainrec;
 
@@ -608,23 +633,69 @@ void fs_dec_acnt(uint32_t inode) {
 }
 
 void fs_read_notify(uint64_t bytes) {
+#if HAVE_ATOMICS
+	atomic_fetch_add(&rbyt,bytes);
+	atomic_fetch_add(&rcnt,1);
+#elif HAVE_SYNCS
+	__sync_add_and_fetch(&rbyt,bytes);
+	__sync_add_and_fetch(&rcnt,1);
+#else
 	pthread_mutex_lock(&opdatalock);
 	rbyt+=bytes;
 	rcnt++;
 	pthread_mutex_unlock(&opdatalock);
+#endif
 }
 
 void fs_write_notify(uint64_t bytes) {
+#if HAVE_ATOMICS
+	atomic_fetch_add(&wbyt,bytes);
+	atomic_fetch_add(&wcnt,1);
+#elif HAVE_SYNCS
+	__sync_add_and_fetch(&wbyt,bytes);
+	__sync_add_and_fetch(&wcnt,1);
+#else
 	pthread_mutex_lock(&opdatalock);
 	wbyt+=bytes;
 	wcnt++;
 	pthread_mutex_unlock(&opdatalock);
+#endif
 }
 
 void fs_fsync_notify(void) {
+#if HAVE_ATOMICS
+	atomic_fetch_add(&fcnt,1);
+#elif HAVE_SYNCS
+	__sync_add_and_fetch(&fcnt,1);
+#else
 	pthread_mutex_lock(&opdatalock);
 	fcnt++;
 	pthread_mutex_unlock(&opdatalock);
+#endif
+}
+
+void fs_init_counters(void) {
+#if HAVE_ATOMICS
+	atomic_fetch_and(&rbyt,0);
+	atomic_fetch_and(&rcnt,0);
+	atomic_fetch_and(&wbyt,0);
+	atomic_fetch_and(&wcnt,0);
+	atomic_fetch_and(&fcnt,0);
+#elif HAVE_SYNCS
+	__sync_fetch_and_and(&rbyt,0);
+	__sync_fetch_and_and(&rcnt,0);
+	__sync_fetch_and_and(&wbyt,0);
+	__sync_fetch_and_and(&wcnt,0);
+	__sync_fetch_and_and(&fcnt,0);
+#else
+	pthread_mutex_lock(&opdatalock);
+	rbyt = 0;
+	rcnt = 0;
+	wbyt = 0;
+	wcnt = 0;
+	fcnt = 0;
+	pthread_mutex_unlock(&opdatalock);
+#endif
 }
 
 void fs_free_threc(void *vrec) {
@@ -1928,38 +1999,74 @@ void fs_send_open_inodes(void) {
 }
 
 void fs_send_opdata(void) {
-	uint8_t packetdata[8+28];
-	uint8_t senddata;
+	uint8_t packetdata[8+44];
+	int32_t senddata;
 	uint8_t *wptr;
+	uint64_t rbyt_copy,wbyt_copy;
+	uint64_t sentbyt_copy,rcvdbyt_copy;
+	uint32_t rcnt_copy,wcnt_copy,fcnt_copy;
 
 	senddata = 0;
+#if HAVE_ATOMICS
+	rbyt_copy = atomic_fetch_and(&rbyt,0);
+	rcnt_copy = atomic_fetch_and(&rcnt,0);
+	wbyt_copy = atomic_fetch_and(&wbyt,0);
+	wcnt_copy = atomic_fetch_and(&wcnt,0);
+	fcnt_copy = atomic_fetch_and(&fcnt,0);
+#elif HAVE_SYNCS
+	rbyt_copy = __sync_fetch_and_and(&rbyt,0);
+	rcnt_copy = __sync_fetch_and_and(&rcnt,0);
+	wbyt_copy = __sync_fetch_and_and(&wbyt,0);
+	wcnt_copy = __sync_fetch_and_and(&wcnt,0);
+	fcnt_copy = __sync_fetch_and_and(&fcnt,0);
+#else
 	pthread_mutex_lock(&opdatalock);
-	if (masterversion>=VERSION2INT(4,27,0) && (rbyt|wbyt|rcnt|wcnt|fcnt)!=0) {
+	rbyt_copy = rbyt;
+	rcnt_copy = rcnt;
+	wbyt_copy = wbyt;
+	wcnt_copy = wcnt;
+	fcnt_copy = fcnt;
+	rbyt = 0;
+	rcnt = 0;
+	wbyt = 0;
+	wcnt = 0;
+	fcnt = 0;
+	pthread_mutex_unlock(&opdatalock);
+#endif
+	sentbyt_copy = write_get_total_bytes();
+	rcvdbyt_copy = read_get_total_bytes();
+	if (masterversion>=VERSION2INT(4,57,0) && (rbyt_copy|wbyt_copy|sentbyt_copy|rcvdbyt_copy|rcnt_copy|wcnt_copy|fcnt_copy)!=0) {
+		wptr = packetdata;
+		put32bit(&wptr,CLTOMA_FUSE_OPDATA);
+		put32bit(&wptr,44);
+		put64bit(&wptr,rbyt_copy);
+		put64bit(&wptr,wbyt_copy);
+		put32bit(&wptr,rcnt_copy);
+		put32bit(&wptr,wcnt_copy);
+		put32bit(&wptr,fcnt_copy);
+		put64bit(&wptr,rcvdbyt_copy);
+		put64bit(&wptr,sentbyt_copy);
+		senddata = 44+8;
+	} else if (masterversion>=VERSION2INT(4,27,0) && (rbyt_copy|wbyt_copy|rcnt_copy|wcnt_copy|fcnt_copy)!=0) {
 		wptr = packetdata;
 		put32bit(&wptr,CLTOMA_FUSE_OPDATA);
 		put32bit(&wptr,28);
-		put64bit(&wptr,rbyt);
-		put64bit(&wptr,wbyt);
-		put32bit(&wptr,rcnt);
-		put32bit(&wptr,wcnt);
-		put32bit(&wptr,fcnt);
-		rbyt = 0;
-		wbyt = 0;
-		rcnt = 0;
-		wcnt = 0;
-		fcnt = 0;
-		senddata = 1;
+		put64bit(&wptr,rbyt_copy);
+		put64bit(&wptr,wbyt_copy);
+		put32bit(&wptr,rcnt_copy);
+		put32bit(&wptr,wcnt_copy);
+		put32bit(&wptr,fcnt_copy);
+		senddata = 28+8;
 	}
-	pthread_mutex_unlock(&opdatalock);
 	if (senddata) {
-		if (tcptowrite(fd,packetdata,8+28,1000,send_timeout*1000)!=(8+28)) {
+		if (tcptowrite(fd,packetdata,senddata,1000,send_timeout*1000)!=senddata) {
 #ifdef HAVE___SYNC_FETCH_AND_OP
 			(void)__sync_fetch_and_or(&disconnect,1);
 #else
 			disconnect = 1;
 #endif
 		} else {
-			master_stats_add(MASTER_BYTESSENT,8+28);
+			master_stats_add(MASTER_BYTESSENT,senddata);
 			master_stats_inc(MASTER_PACKETSSENT);
 		}
 	}
@@ -2473,11 +2580,6 @@ void fs_init_threads(uint32_t retries,uint32_t timeout) {
 	usectimeout = timeout;
 	usectimeout *= 1000000; // sec -> usec
 	fterm = 0;
-	rbyt = 0;
-	wbyt = 0;
-	rcnt = 0;
-	wcnt = 0;
-	fcnt = 0;
 	ep_init();
 	for (i=0 ; i<AMTIME_HASH_SIZE ; i++) {
 		amtime_hash[i] = NULL;
@@ -2498,13 +2600,16 @@ void fs_init_threads(uint32_t retries,uint32_t timeout) {
 	zassert(pthread_mutex_init(&fdlock,NULL));
 	zassert(pthread_mutex_init(&aflock,NULL));
 	zassert(pthread_mutex_init(&amtimelock,NULL));
+#ifdef OPDATA_USE_LOCK
 	zassert(pthread_mutex_init(&opdatalock,NULL));
+#endif
 	zassert(pthread_attr_init(&thattr));
 	zassert(pthread_attr_setstacksize(&thattr,0x100000));
 	zassert(pthread_create(&rpthid,&thattr,fs_receive_thread,NULL));
 	zassert(pthread_create(&npthid,&thattr,fs_nop_thread,NULL));
 	zassert(pthread_attr_destroy(&thattr));
 	mainrec = fs_get_my_threc();
+	fs_init_counters();
 }
 
 void fs_term(void) {
@@ -2519,7 +2624,9 @@ void fs_term(void) {
 	zassert(pthread_mutex_unlock(&fdlock));
 	zassert(pthread_join(npthid,NULL));
 	zassert(pthread_join(rpthid,NULL));
+#ifdef OPDATA_USE_LOCK
 	zassert(pthread_mutex_destroy(&opdatalock));
+#endif
 	zassert(pthread_mutex_destroy(&amtimelock));
 	zassert(pthread_mutex_destroy(&aflock));
 	zassert(pthread_mutex_destroy(&fdlock));

@@ -765,6 +765,7 @@ int mainloop(void) {
 				fprintf(infile,"[general]\n");
 				fprintf(infile,"version: %s\n",VERSSTR);
 				fprintf(infile,"build: %s\n",STR(BUILDNO));
+				fprintf(infile,"timestamp: %ld\n",(long int)time(NULL));
 				fprintf(infile,"\n");
 				cfg_info(infile);
 				for (init = inhead ; init!=NULL ; init=init->next ) {

@@ -4,7 +4,7 @@ PORTNAME=		moosefs4
 DISTVERSION=		0.0.0
 DISTVERSIONSUFFIX=	0
 PORTREVISION=		0
-CATEGORIES=		sysutils
+CATEGORIES=		filesystems sysutils
 MASTER_SITES=		http://ppa.moosefs.com/src/
 PKGNAMESUFFIX?=		-master
 DISTNAME=		moosefs-${DISTVERSION}-${DISTVERSIONSUFFIX}
@@ -54,7 +54,7 @@ PKGMESSAGE=		${WRKDIR}/pkg-message-cgiserv
 PLIST_SUB+=		MFS_WORKDIR="${MFS_WORKDIR}"
 CONFIGURE_ARGS+=	--enable-mfscgiserv \
 			--with-mfscgiserv-dir=${MFS_CGISERVDIR}
-RUN_DEPENDS=		moosefs4-cgi>0:sysutils/moosefs4-cgi
+RUN_DEPENDS=		moosefs4-cgi>0:filesystems/moosefs4-cgi
 .else
 CONFIGURE_ARGS+=	--disable-mfscgiserv
 .endif

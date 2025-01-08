@@ -5,8 +5,14 @@
 #  - untar distfile
 #  - run this script from untared distfile
 
+if [ `uname -r | cut -d '.' -f1` -ge 14 ]; then
+	PORTBASESUBDIR="filesystems"
+else
+	PORTBASESUBDIR="sysutils"
+fi
+
 if [ "x$1" == "x" ]; then
-	PORTBASE="/usr/ports/sysutils"
+	PORTBASE="/usr/ports/$PORTBASESUBDIR"
 else
 	PORTBASE="$1"
 fi
@@ -34,6 +40,13 @@ RELEASE=1
 
 cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^DISTVERSION=.*$/DISTVERSION=		${VERSION}/" | sed "s/^DISTVERSIONSUFFIX=.*$/DISTVERSIONSUFFIX=	${RELEASE}/" | uniq > .tmp
 mv .tmp "${FILEBASEDIR}/files/Makefile.master"
+if [ `uname -r | cut -d '.' -f1` -ge 14 ]; then
+	cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/sysutils/filesystems/g" | sed "s/^CATEGORIES=.*$/CATEGORIES=		filesystems sysutils/" > .tmp
+	mv .tmp "${FILEBASEDIR}/files/Makefile.master"
+else
+	cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^CATEGORIES=.*$/CATEGORIES=		sysutils/" | sed "s/filesystems/sysutils/g" > .tmp
+	mv .tmp "${FILEBASEDIR}/files/Makefile.master"
+fi
 
 for portname in ${PORTNAMES}; do
 	portdir="${PORTBASE}/moosefs4-${portname}"

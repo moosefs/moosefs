@@ -92,6 +92,7 @@
 #define CHLOG_KEEP_ATEND 300
 
 #define STORE_UNIT 60
+#define STORE_TIMEOUT (7200/(STORE_UNIT))
 
 static uint64_t metaversion;
 static uint64_t metaid;
@@ -1099,7 +1100,7 @@ void meta_store_task(void) {
 		changelog_rotate(0);
 	}
 	if ((htime % MetaSaveFreq) == 0) {
-		if (metasaverpid>=0 && last_store_htime + 2 * STORE_UNIT > rhtime) { // previus save still in progress - silently ignore this request
+		if (metasaverpid>=0 && last_store_htime + STORE_TIMEOUT > rhtime) { // previus save still in progress - silently ignore this request
 			return;
 		}
 		last_store_htime = rhtime;

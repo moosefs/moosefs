@@ -311,6 +311,11 @@ static inline int32_t streamtoread(int sock,void *buff,uint32_t leng,uint32_t ms
 			return -1;
 		}
 		if (pfd.revents & POLLHUP) {
+#ifdef ECONNRESET
+			errno = ECONNRESET;
+#else
+			errno = EPIPE;
+#endif
 			return rcvd;
 		}
 		if (rcvd>=leng) {

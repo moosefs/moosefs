@@ -228,7 +228,7 @@
 	"Maximum number of classes reached", \
 	"No such class", \
 	"Class in use", \
-	"Incompatible version", \
+	"One of MFS instance components is too old to perform this operation", \
 	"Pattern already defined", \
 	"Maximum number of patterns reached", \
 	"No such pattern", \

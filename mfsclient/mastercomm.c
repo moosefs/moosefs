@@ -1165,6 +1165,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	uint16_t umaskval;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
 	uint8_t mingoal,maxgoal;
+	int32_t sclassgroups;
 	uint32_t mintrashretention,maxtrashretention;
 	uint32_t disables;
 	int32_t rleng;
@@ -1488,8 +1489,15 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 		mapalluid = 0;
 		mapallgid = 0;
 	}
-	mingoal = get8bit(&rptr);
-	maxgoal = get8bit(&rptr);
+	if (masterversion < VERSION2INT(4,57,0)) {
+		mingoal = get8bit(&rptr);
+		maxgoal = get8bit(&rptr);
+		sclassgroups = -1;
+	} else {
+		mingoal = 1;
+		maxgoal = 9;
+		sclassgroups = get16bit(&rptr);
+	}
 	mintrashretention = get32bit(&rptr);
 	maxtrashretention = get32bit(&rptr);
 	if (!cargs->meta) {
@@ -1510,7 +1518,7 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 	lastwrite = monotonic_seconds();
 #ifdef MFSMOUNT
 	mfs_setdisables(disables);
-	main_setparams(sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashretention,maxtrashretention,disables);
+	main_setparams(sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,sclassgroups,mingoal,maxgoal,mintrashretention,maxtrashretention,disables);
 #endif
 	if (oninit==0) {
 		if (sessionlost==2) {
@@ -1583,9 +1591,30 @@ int fs_connect(uint8_t oninit,struct connect_args_t *cargs) {
 		}
 #endif
 	}
-	if (mingoal>0 && maxgoal>0) {
+	if ((mingoal>0 && maxgoal>0)) {
 		if (mingoal>1 || maxgoal<9) {
 			buffprintf(" ; setgoal limited to (%u:%u)",mingoal,maxgoal);
+		}
+		if (sclassgroups>=0) {
+			buffprintf(" ; sclass groups allowed: ");
+			if (sclassgroups==0xFFFF) {
+				buffprintf("ALL");
+			} else {
+				j = 0;
+				for (i=0 ; i<EXPORT_GROUPS ; i++) {
+					if ((1<<i) & sclassgroups) {
+						if (j) {
+							buffprintf(",%u",i);
+						} else {
+							buffprintf("%u",i);
+							j = 1;
+						}
+					}
+				}
+				if (j==0) {
+					buffprintf("-");
+				}
+			}
 		}
 		if (mintrashretention>0 || maxtrashretention<UINT32_C(0xFFFFFFFF)) {
 			buffprintf(" ; settrashretention limited to (");

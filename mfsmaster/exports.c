@@ -56,8 +56,7 @@ typedef struct _exports {
 	unsigned rootredefined:1;
 //	unsigned old:1;
 	uint8_t sesflags;
-	uint8_t mingoal;
-	uint8_t maxgoal;
+	uint16_t sclassgroups;
 	uint16_t umask;
 	uint32_t mintrashretention;
 	uint32_t maxtrashretention;
@@ -91,8 +90,7 @@ uint64_t exports_entry_checksum(exports *e) {
 	ptr+=16;
 	put8bit(&ptr,(e->alldirs<<3) + (e->needpassword<<2) + (e->meta<<1) + e->rootredefined);
 	put8bit(&ptr,e->sesflags);
-	put8bit(&ptr,e->mingoal);
-	put8bit(&ptr,e->maxgoal);
+	put16bit(&ptr,e->sclassgroups);
 	put16bit(&ptr,e->umask);
 	put32bit(&ptr,e->mintrashretention);
 	put32bit(&ptr,e->maxtrashretention);
@@ -204,8 +202,12 @@ void exports_info_data(uint8_t versmode,uint8_t *buff) {
 		put32bit(&buff,e->mapalluid);
 		put32bit(&buff,e->mapallgid);
 		if (versmode>0) {
-			put8bit(&buff,e->mingoal);
-			put8bit(&buff,e->maxgoal);
+			if (versmode>3) {
+				put16bit(&buff,e->sclassgroups);
+			} else {
+				put8bit(&buff,0); // mingoal
+				put8bit(&buff,0); // maxgoal
+			}
 			put32bit(&buff,e->mintrashretention);
 			put32bit(&buff,e->maxtrashretention);
 		}
@@ -215,7 +217,7 @@ void exports_info_data(uint8_t versmode,uint8_t *buff) {
 	}
 }
 
-uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint8_t *mingoal,uint8_t *maxgoal,uint32_t *mintrashretention,uint32_t *maxtrashretention,uint32_t *disables) {
+uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uint8_t rndcode[32],const uint8_t passcode[16],uint8_t *sesflags,uint16_t *umaskval,uint32_t *rootuid,uint32_t *rootgid,uint32_t *mapalluid,uint32_t *mapallgid,uint16_t *sclassgroups,uint32_t *mintrashretention,uint32_t *maxtrashretention,uint32_t *disables) {
 	const uint8_t *p;
 	uint32_t pleng,i;
 	uint8_t rndstate;
@@ -332,8 +334,7 @@ uint8_t exports_check(uint32_t ip,uint32_t version,const uint8_t *path,const uin
 	*rootgid = f->rootgid;
 	*mapalluid = f->mapalluid;
 	*mapallgid = f->mapallgid;
-	*mingoal = f->mingoal;
-	*maxgoal = f->maxgoal;
+	*sclassgroups = f->sclassgroups;
 	*mintrashretention = f->mintrashretention;
 	*maxtrashretention = f->maxtrashretention;
 	*disables = f->disables;
@@ -357,7 +358,11 @@ void exports_freelist(exports *arec) {
 //
 // options:
 //  readonly
+//  ro
+//  readwrite
+//  rw
 //  maproot=uid[:gid]
+//  mapall=uid[:gid]
 //  alldirs
 //  md5pass=md5(password)
 //  password=password
@@ -365,20 +370,24 @@ void exports_freelist(exports *arec) {
 //  ignoregid
 //  admin
 //  umask=0###
-//  mingoal=#
-//  maxgoal=#
+//  sclassgroups=-|#[:#[...]]
 //  mintrashretention=[#w][#d][#h][#m][#[s]]
 //  maxtrashretention=[#w][#d][#h][#m][#[s]]
+//  disable=cmd[:cmd[...]]
+//  minversion=#.#.#
 // deprecated:
 //  mintrashtime=[#w][#d][#h][#m][#[s]]
 //  maxtrashtime=[#w][#d][#h][#m][#[s]]
+//  mingoal=# (sets corresponding bits in sclassgroups)
+//  maxgoal=# (sets corresponding bits in sclassgroups)
+//  canchangequota
 //
 // ip[/bits] can be '*' (same as 0.0.0.0/0)
 //
 // default:
 // *	/	alldirs,maproot=0
 
-int exports_parsenet(char *net,uint32_t *fromip,uint32_t *toip) {
+int exports_parsenet(const char *net,uint32_t *fromip,uint32_t *toip) {
 	uint32_t ip,i,octet;
 	if (net[0]=='*' && net[1]==0) {
 		*fromip = 0;
@@ -491,7 +500,38 @@ int exports_parsenet(char *net,uint32_t *fromip,uint32_t *toip) {
 	return -1;
 }
 
-int exports_parsegoal(char *goalstr,uint8_t *goal) {
+int exports_parsesclassgroups(const char *sgstr,uint16_t *sclassgroups) {
+	uint8_t group;
+	uint16_t result;
+
+	result = 0;
+	if (*sgstr=='-' && sgstr[1]==0) {
+		*sclassgroups = 0;
+		return 0;
+	}
+	while (*sgstr>='0' && *sgstr<='9') {
+		group = 0;
+		while (*sgstr>='0' && *sgstr<='9' && group<EXPORT_GROUPS) {
+			group = (group * 10) + (*sgstr-'0');
+			sgstr++;
+		}
+		if (group>=EXPORT_GROUPS) {
+			return -1;
+		}
+		result |= (1<<group);
+		if (*sgstr==0) {
+			*sclassgroups = result;
+			return 0;
+		}
+		if (*sgstr!=':') {
+			return -1;
+		}
+		sgstr++;
+	}
+	return -1;
+}
+
+int exports_parsegoal(const char *goalstr,uint8_t *goal) {
 	if (*goalstr<'1' || *goalstr>'9' || *(goalstr+1)) {
 		return -1;
 	}
@@ -500,7 +540,7 @@ int exports_parsegoal(char *goalstr,uint8_t *goal) {
 }
 
 // we only accept octal format: 0###
-int exports_parseumask(char *umaskstr,uint16_t *umaskval) {
+int exports_parseumask(const char *umaskstr,uint16_t *umaskval) {
 	if (*umaskstr!='0' || umaskstr[1]<'0' || umaskstr[1]>'7' || umaskstr[2]<'0' || umaskstr[2]>'7' || umaskstr[3]<'0' || umaskstr[3]>'7') {
 		return -1;
 	}
@@ -598,7 +638,7 @@ int exports_parsetime(char *timestr,uint32_t *rettime) {
 #endif
 
 // x | x.y | x.y.z -> ( x<<16 + y<<8 + z )
-int exports_parseversion(char *verstr,uint32_t *version) {
+int exports_parseversion(const char *verstr,uint32_t *version) {
 	uint32_t vp;
 	if (*verstr<'0' || *verstr>'9') {
 		return -1;
@@ -852,6 +892,10 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 	char *p;
 	int o;
 	md5ctx ctx;
+	uint8_t mingoal=1,maxgoal=9;
+	uint8_t goal_defined = 0;
+	uint8_t sclassgroups_defined = 0;
+	uint16_t sclassgroups;
 
 	while ((p=exports_strsep(&opts,","))) {
 		o=0;
@@ -986,24 +1030,36 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 				}
 			} else if (strncmp(p,"mingoal=",8)==0) {
 				o=1;
-				if (exports_parsegoal(p+8,&arec->mingoal)<0) {
+				if (sclassgroups_defined) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: mingoal defined together with sclassgroupsin line: %"PRIu32" - use only sclassgroups",lineno);
+					return -1;
+				}
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"mfsexports: mingoal option is deprecated, use sclassgroups instead");
+				if (exports_parsegoal(p+8,&mingoal)<0) {
 					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect mingoal definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
-				if (arec->mingoal>arec->maxgoal) {
+				if (mingoal>maxgoal) {
 					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: mingoal>maxgoal in definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
+				goal_defined=1;
 			} else if (strncmp(p,"maxgoal=",8)==0) {
 				o=1;
-				if (exports_parsegoal(p+8,&arec->maxgoal)<0) {
+				if (sclassgroups_defined) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: maxgoal defined together with sclassgroupsin line: %"PRIu32" - use only sclassgroups",lineno);
+					return -1;
+				}
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"mfsexports: maxgoal option is deprecated, use sclassgroups instead");
+				if (exports_parsegoal(p+8,&maxgoal)<0) {
 					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect maxgoal definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
-				if (arec->mingoal>arec->maxgoal) {
+				if (mingoal>maxgoal) {
 					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: maxgoal<mingoal in definition (%s) in line: %"PRIu32,p,lineno);
 					return -1;
 				}
+				goal_defined=1;
 			} else if (strncmp(p,"mintrashretention=",18)==0) {
 				o=1;
 				if (parse_hperiod(p+18,&arec->mintrashretention)<0) {
@@ -1068,9 +1124,34 @@ int exports_parseoptions(char *opts,uint32_t lineno,exports *arec) {
 				o=1;
 			}
 			break;
+		case 's':
+			if (strncmp(p,"sclassgroups=",13)==0) {
+				if (goal_defined) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: sclassgroups defined together with mingoal/maxgoal in line: %"PRIu32" - use only sclassgroups",lineno);
+					return -1;
+				}
+				if (exports_parsesclassgroups(p+13,&sclassgroups)<0) {
+					mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: incorrect sclassgroups definition (%s) in line: %"PRIu32,p,lineno);
+					return -1;
+				}
+				if (sclassgroups_defined) {
+					arec->sclassgroups |= sclassgroups;
+				} else {
+					arec->sclassgroups = sclassgroups;
+					sclassgroups_defined = 1;
+				}
+				o=1;
+			}
+			break;
 		}
 		if (o==0) {
 			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"mfsexports: unknown option '%s' in line: %"PRIu32" (ignored)",p,lineno);
+		}
+	}
+	if (goal_defined) {
+		arec->sclassgroups = 1; // group '0'
+		for (o=mingoal ; o<=maxgoal ; o++) {
+			arec->sclassgroups |= (1<<o);
 		}
 	}
 	return 0;
@@ -1093,8 +1174,7 @@ int exports_parseline(char *line,uint32_t lineno,exports *arec,exports **default
 		arec->rootredefined = 0;
 		arec->sesflags = SESFLAG_READONLY;
 		arec->umask = 0;
-		arec->mingoal = 1;
-		arec->maxgoal = 9;
+		arec->sclassgroups = 0xFFFF;
 		arec->mintrashretention = 0;
 		arec->maxtrashretention = UINT32_C(0xFFFFFFFF);
 		arec->rootuid = 999;

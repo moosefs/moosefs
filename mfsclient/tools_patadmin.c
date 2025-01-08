@@ -38,7 +38,7 @@ typedef struct _pattern {
 	uint32_t egid;
 	uint8_t priority;
 	uint8_t omask;
-	char sclass_name[MAXSCLASSNLENG];
+	char sclass_name[MAXSCLASSNAMELENG];
 	uint16_t trashretention;
 	uint8_t seteattr;
 	uint8_t clreattr;
@@ -491,7 +491,7 @@ int pattern_parse_options(int option,char *optarg_value,pattern *pat) {
 				fprintf(stderr,"option '%c' defined twice\n",option);
 				return -1;
 			}
-			if (strlen(optarg_value)>MAXSCLASSNLENG) {
+			if (strlen(optarg_value)>=MAXSCLASSNAMELENG) {
 				fprintf(stderr,"sclass name too long\n");
 				return -1;
 			}

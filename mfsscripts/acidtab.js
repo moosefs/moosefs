@@ -278,7 +278,7 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 				if (table.acid_tab_sortedby!=null && table.acid_tab_indicator) {
 					table.acid_tab_indicator = document.createElement('span');
 					dir = (table.acid_tab_reversed)?'up':'down';
-					table.acid_tab_indicator.innerHTML = '<svg class="sort"><use xlink:href="#icon-sort-'+dir+'"/></svg>';				
+					table.acid_tab_indicator.innerHTML = '&#8205;<svg class="sort"><use xlink:href="#icon-sort-'+dir+'"/></svg>';				
 					table.acid_tab_sortedby.appendChild(table.acid_tab_indicator);
 				}
 				acid_tab.resort(table);
@@ -367,7 +367,7 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 						if (table.acid_tab_indicator) {
 							table.acid_tab_indicator = document.createElement('span');
 							dir = (table.acid_tab_reversed)?'up':'down';
-							table.acid_tab_indicator.innerHTML = '<svg class="sort"><use xlink:href="#icon-sort-'+dir+'"/></svg>';
+							table.acid_tab_indicator.innerHTML = '&#8205;<svg class="sort"><use xlink:href="#icon-sort-'+dir+'"/></svg>';
 							hcell.appendChild(table.acid_tab_indicator);
 							
 						}
@@ -439,7 +439,7 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 					if (table.acid_tab_indicator) {
 						table.acid_tab_indicator = document.createElement('span');
 						dir = (table.acid_tab_reversed)?'up':'down';
-						table.acid_tab_indicator.innerHTML = '<svg class="sort"><use xlink:href="#icon-sort-'+dir+'"/></svg>';
+						table.acid_tab_indicator.innerHTML = '&#8205;<svg class="sort"><use xlink:href="#icon-sort-'+dir+'"/></svg>';
 						hcell.appendChild(table.acid_tab_indicator);
 					}
 					acid_tab.remember(table);

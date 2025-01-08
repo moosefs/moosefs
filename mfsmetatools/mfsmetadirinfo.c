@@ -127,6 +127,7 @@ int scan_sclass(FILE *fd,metasection *sdata) {
 	uint8_t ec_is_turned_on;
 	uint8_t ogroup;
 	uint8_t nleng;
+	uint8_t dleng;
 	uint16_t sclassid;
 	uint8_t createcnt;
 	uint8_t keepcnt;
@@ -147,7 +148,7 @@ int scan_sclass(FILE *fd,metasection *sdata) {
 		sclass_arch_factor[sclassid]=(sclassid<10)?(8*sclassid):0;
 	}
 
-	if (sdata->mver>0x1B) {
+	if (sdata->mver>0x1C) {
 		fprintf(stderr,"unsupported sclass format\n");
 		return -1;
 	}
@@ -169,7 +170,7 @@ int scan_sclass(FILE *fd,metasection *sdata) {
 		rptr = buff;
 		exprsize = get16bit(&rptr);
 		ec_is_turned_on = get8bit(&rptr);
-		l = (sdata->mver>=0x1B)?42:(sdata->mver>=0x1A)?38:(sdata->mver>=0x18)?30:29;
+		l = (sdata->mver>=0x1C)?48:(sdata->mver>=0x1B)?42:(sdata->mver>=0x1A)?38:(sdata->mver>=0x18)?30:29;
 		while (1) {
 			if (fread(buff,1,2,fd)!=2) {
 				fprintf(stderr,"loading labelset: read error\n");
@@ -186,6 +187,12 @@ int scan_sclass(FILE *fd,metasection *sdata) {
 			}
 			rptr = buff;
 			nleng = get8bit(&rptr);
+			if (sdata->mver>=0x1C) {
+				dleng = get8bit(&rptr);
+				rptr += 5; // skip priority,export_group
+			} else {
+				dleng = 0;
+			}
 			rptr += 6; // skip admin_only,create_mode,arch_delay,min_trashretention
 			if (sdata->mver>=0x1A) {
 				rptr += 8; // skip arch_min_size
@@ -217,6 +224,9 @@ int scan_sclass(FILE *fd,metasection *sdata) {
 			}
 			if (nleng>0) {
 				fseeko(fd,nleng,SEEK_CUR);
+			}
+			if (dleng>0) {
+				fseeko(fd,dleng,SEEK_CUR);
 			}
 			if (sdata->mver<0x19) {
 				if (archec>1) {

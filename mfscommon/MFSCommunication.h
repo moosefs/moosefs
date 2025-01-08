@@ -72,8 +72,10 @@
 #define MAXSCLASS 256
 
 #define SCLASS_EXPR_MAX_SIZE 128
-#define MAXSCLASSNLENG 256
+#define MAXSCLASSNAMELENG 256 // actual max leng is 255
+#define MAXSCLASSDESCLENG 256 // as above !!!
 #define MAXLABELSCNT 9
+#define EXPORT_GROUPS 16
 
 #define MAXPATTERNLENG 256
 
@@ -261,7 +263,10 @@
 #define SCLASS_CHG_MIN_TRASHRETENTION      0x0080
 #define SCLASS_CHG_ARCH_MODE               0x0100
 #define SCLASS_CHG_ARCH_MIN_SIZE           0x0200
-#define SCLASS_CHG_FORCE                   0x8000
+#define SCLASS_CHG_PRIORITY                0x0400
+#define SCLASS_CHG_DESCRIPTION             0x0800
+#define SCLASS_CHG_EXPORT_GROUP            0x1000
+// #define SCLASS_CHG_FORCE                   0x8000 // removed in version 4.57
 
 #define SCLASS_ARCH_MODE_CTIME             0x01
 #define SCLASS_ARCH_MODE_MTIME             0x02
@@ -769,6 +774,7 @@
 	"setfacl", \
 	NULL
 
+
 #define CSTOMA_MAXPACKETSIZE 500000000
 #define CLTOMA_MAXPACKETSIZE 50000000
 #define ANTOMA_MAXPACKETSIZE 1500000
@@ -1221,6 +1227,7 @@
 // 3: added 'arch_mode' (MFS 4.2.0)
 // 4: added 'arch_min_size' (MFS 4.34.0)
 // 5: added 'label_mode' override for CREATE,KEEP,ARCH and TRASH (MFS 4.53.0)
+// 6: added 'priority', 'description' and 'export_group' (MFS 4.57.0)
 
 #define CLTOMA_SCLASS_CREATE (PROTO_BASE+350)
 // msgid:32 storage_class_name:NAME fver:8
@@ -1234,6 +1241,9 @@
 //	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr:SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
 // fver==5: (arch_delay in hours)
 //	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr:SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==6: (arch_delay in hours)
+//	description:NAME priority:32 export_group:8 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr:SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+
 
 #define MATOCL_SCLASS_CREATE (PROTO_BASE+351)
 // msgid:32 status:8
@@ -1250,6 +1260,9 @@
 //	chgmask:16 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
 // fver==5: (arch_delay in hours)
 //	chgmask:16 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==6: (arch_delay in hours)
+//	chgmask:16 description:NAME priority:32 export_group:8 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+
 
 #define MATOCL_SCLASS_CHANGE (PROTO_BASE+353)
 // msgid:32 status:8
@@ -1264,6 +1277,8 @@
 //	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
 // fver==5: (arch_delay in hours)
 //	admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
+// fver==6: (arch_delay in hours)
+//	description:NAME priority:32 export_group:8 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ]
 
 #define CLTOMA_SCLASS_DELETE (PROTO_BASE+354)
 // msgid:32 storage_class_name:NAME
@@ -1300,6 +1315,8 @@
 //	N * [ classid:8 storage_class_name:NAME admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] ]
 // fver==5 && masterversion >= 4.53.0:
 //	N * [ classid:8 storage_class_name:NAME admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] ]
+// fver==6 && masterversion >= 4.57.0:
+//	N * [ classid:8 storage_class_name:NAME description:NAME priority:32 export_group:8 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16 arch_redundancy_level:8 trash_redundancy_level:8 create_labels_mode:8 keep_labels_mode:8 arch_labels_mode:8 trash_labels_mode:8 create_labels_uniqmask:32 keep_labels_uniqmask:32 arch_labels_uniqmask:32 trash_labels_uniqmask:32 create_labelscnt:8 keep_labelscnt:8 arch_labelscnt:8 trash_labelscnt:8 create_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] keep_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] arch_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] trash_labelscnt * [ labelexpr: SCLASS_EXPR_MAX_SIZE bytes ] ]
 // fvar==0xFF && masterversion >= 4.34.2
 //	N * [ classid:8 storage_class_name:NAME ]
 
@@ -1444,6 +1461,7 @@
 //  version:32 sessionid:32 metaid:64 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 3.0.11 )
 //  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 3.0.72 )
 //  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 disables:32 ( version >= 3.0.112 / 4.21.0 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 sclassgroups:16 mintrashretention:32 maxtrashretention:32 disables:32 ( version >= 4.57.0 )
 //  status:8
 
 #define REGISTER_RECONNECT 3
@@ -1470,6 +1488,7 @@
 //  version:32 sessionid:32 sesflags:8 ( version >= 1.6.21 && version < 1.6.26 )
 //  version:32 sessionid:32 sesflags:8 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 1.6.26 )
 //  version:32 sessionid:32 metaid:64 sesflags:8 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ( version >= 3.0.11 )
+//  version:32 sessionid:32 metaid:64 sesflags:8 sclassgroups:16 mintrashretention:32 maxtrashretention:32 ( version >= 4.57.0 )
 //  status:8
 
 #define REGISTER_CLOSESESSION 6
@@ -2108,6 +2127,7 @@
 // stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 2 (valid since version 1.7.8)
 // stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 3 (valid since version 3.0.72)
 // stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 disables:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 4 (valid since version 3.0.112 / 4.21.0)
+// stats:16 N*[ sessionid:32 ip:32 version:32 openfiles:32 nsocks:8 expire:32 ileng:32 info:ilengB pleng:32 path:plengB sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 sclassgroups:16 mintrashretention:32 maxtrashretention:32 disables:32 stats * [ current_statdata:32 ] stats * [ last_statdata:32 ] ] - vmode = 5 (valid since version 4.57.0)
 // N*[ sessionid:32 ip:32 expire:32 ileng:32 info:ilengB ] - vmode = 0xFF (valid since version 4.7.0)
 
 
@@ -2180,6 +2200,7 @@
 // N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ] - vmode = 1 (valid since version 1.6.26)
 // N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 ] - vmode = 2 (valid since version 3.0.72)
 // N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 mingoal:8 maxgoal:8 mintrashretention:32 maxtrashretention:32 disables:32 ] - vmode = 3 (valid since version 3.0.112 / 4.21.0)
+// N*[ fromip:32 toip:32 pleng:32 path:plengB version:32 extraflags:8 sesflags:8 umask:16 rootuid:32 rootgid:32 mapalluid:32 mapallgid:32 sclassgroups:16 mintrashretention:32 maxtrashretention:32 disables:32 ] - vmode = 4 (valid since version 4.57.0)
 
 
 // 0x020A
@@ -2284,7 +2305,7 @@
 //	allservers:16 N*[ sclassid:8 sclassname:NAME files:32 dirs:32 3 * [ stdchunks:64 archchunks:64 ] admin_only:8 labels_mode:8 arch_delay:16 3 * [ canbefulfilled:8 labelscnt:8 ] 3 * [ labelscnt * [ MASKORGROUP * [ labelmask:32 ] matchingservers:16 ] ] ]
 //  - redundancy classes (0 - undergoal ; 1 - ok ; 2 - overgoal)
 //  - label sets (0 - create ; 1 - keep ; 2 - archive)
-// fver==1: (version >= 4.2.0)
+// fver==1: (version >= 4.2.0 ; added 'arch_mode')
 //	allservers:16 N*[
 //		sclassid:8 sclassname:NAME files:32 dirs:32
 //			keepchunks:64 archchunks:64 trashchunks:64 (UNDER)
@@ -2296,7 +2317,7 @@
 //			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (ARCH)
 //			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (TRASH)
 //	]
-// fver==2: (version >= 4.5.0)
+// fver==2: (version >= 4.5.0 ; added counters for EC mode)
 //	allservers:16 N*[
 //		sclassid:8 sclassname:NAME files:32 dirs:32
 //			keepchunks:64 archchunks:64 trashchunks:64 (UNDER COPY)
@@ -2311,7 +2332,7 @@
 //			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (ARCH)
 //			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (TRASH)
 //	]
-// fver==2: (version >= 4.34.0)
+// fver==3: (version >= 4.34.0 ; added 'arch_mode_size')
 //	allservers:16 N*[
 //		sclassid:8 sclassname:NAME files:32 dirs:32
 //			keepchunks:64 archchunks:64 trashchunks:64 (UNDER COPY)
@@ -2325,6 +2346,36 @@
 //			canbefulfilled:8 labelscnt:8 uniqmask:32 (KEEP)
 //			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (ARCH)
 //			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 (TRASH)
+//	]
+// fver==4: (version >= 4.53.0 ; added 'label_mode' overrides)
+//	allservers:16 N*[
+//		sclassid:8 sclassname:NAME files:32 dirs:32
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER EC)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT EC)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER EC)
+//		admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 labels_mode:8 (CREATE)
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 labels_mode:8 (KEEP)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 labels_mode:8 (ARCH)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 labels_mode:8 (TRASH)
+//	]
+// fver==5: (version >= 4.57.0 ; added 'priority')
+//	allservers:16 N*[
+//		sclassid:8 sclassname:NAME description:NAME files:32 dirs:32
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (UNDER EC)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (EXACT EC)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER COPY)
+//			keepchunks:64 archchunks:64 trashchunks:64 (OVER EC)
+//		priority:32 export_group:8 admin_only:8 labels_mode:8 arch_mode:8 arch_delay:16 arch_min_size:64 min_trashretention:16
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 labels_mode:8 (CREATE)
+//			canbefulfilled:8 labelscnt:8 uniqmask:32 labels_mode:8 (KEEP)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 labels_mode:8 (ARCH)
+//			canbefulfilled:8 labelscnt:8 ec_level:8 uniqmask:32 labels_mode:8 (TRASH)
 //	]
 // fver==128: (version >= 4.44.0)
 //	N * [ sclassid:8 sclassname:NAME has_chunks:8]

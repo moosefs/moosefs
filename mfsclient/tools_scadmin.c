@@ -28,6 +28,10 @@
 #define DEFAULT_PATH "/mnt/mfs"
 
 typedef struct _storage_class {
+	uint8_t dleng;
+	uint8_t desc[MAXSCLASSDESCLENG];
+	uint32_t priority;
+	uint8_t export_group;
 	uint8_t admin_only;
 	uint8_t labels_mode;
 	uint8_t arch_mode;
@@ -42,19 +46,33 @@ typedef struct _storage_class {
 
 static inline int deserialize_sc_new(uint8_t protocol, int32_t leng, storage_class *sc) {
 	uint8_t i;
-	int32_t	dbg;
 	int32_t header_leng;
 
-	header_leng = (protocol>=5)?41:(protocol>=4)?37:29;
+	header_leng = (protocol>=6)?47:(protocol>=5)?41:(protocol>=4)?37:29;
 
 	memset(sc, 0, sizeof(storage_class));
 	if (leng<header_leng) {		//not enough data for the mandatory fields
 		return -1;
 	}
-	sc->admin_only    = ps_get8();
-	sc->labels_mode   = ps_get8();
-	sc->arch_mode     = ps_get8();
-	sc->arch_delay    = ps_get16();
+	if (protocol>=6) {
+		sc->dleng = ps_get8();
+		if (leng<header_leng+sc->dleng) {
+			return -1;
+		}
+		if (sc->dleng>0) {
+			ps_getbytes(sc->desc,sc->dleng);
+		}
+		sc->priority = ps_get32();
+		sc->export_group = ps_get8();
+	} else {
+		sc->dleng = 0;
+		sc->priority = 0;
+		sc->export_group = 0;
+	}
+	sc->admin_only = ps_get8();
+	sc->labels_mode = ps_get8();
+	sc->arch_mode = ps_get8();
+	sc->arch_delay = ps_get16();
 	if (protocol>=4) {
 		sc->arch_min_size = ps_get64();
 	} else {
@@ -83,7 +101,7 @@ static inline int deserialize_sc_new(uint8_t protocol, int32_t leng, storage_cla
 	sc->arch.labelscnt = ps_get8();
 	sc->trash.labelscnt = ps_get8();
 
-	if (leng<(dbg=(header_leng+(sc->create.labelscnt+sc->keep.labelscnt+sc->arch.labelscnt+sc->trash.labelscnt)*SCLASS_EXPR_MAX_SIZE))) {
+	if (leng<(header_leng+sc->dleng+(sc->create.labelscnt+sc->keep.labelscnt+sc->arch.labelscnt+sc->trash.labelscnt)*SCLASS_EXPR_MAX_SIZE)) {
 		return -1;
 	}
 	if ((sc->create.labelscnt>9)\
@@ -106,15 +124,21 @@ static inline int deserialize_sc_new(uint8_t protocol, int32_t leng, storage_cla
 		ps_getbytes(sc->trash.labelexpr[i], SCLASS_EXPR_MAX_SIZE);
 	}
 //ok:
-	return header_leng+(sc->create.labelscnt+sc->keep.labelscnt+sc->arch.labelscnt+sc->trash.labelscnt)*SCLASS_EXPR_MAX_SIZE;
+	return header_leng+sc->dleng+(sc->create.labelscnt+sc->keep.labelscnt+sc->arch.labelscnt+sc->trash.labelscnt)*SCLASS_EXPR_MAX_SIZE;
 }
 
 static inline uint32_t serialize_sc_new(uint8_t protocol,const storage_class *sc) {
 	uint8_t i;
 	int32_t header_leng;
 
-	header_leng = (protocol>=5)?41:(protocol>=4)?37:29;
+	header_leng = (protocol>=6)?(47+sc->dleng):(protocol>=5)?41:(protocol>=4)?37:29;
 
+	if (protocol>=6) {
+		ps_put8(sc->dleng);
+		ps_putbytes(sc->desc,sc->dleng);
+		ps_put32(sc->priority);
+		ps_put8(sc->export_group);
+	}
 	ps_put8 (sc->admin_only);
 	ps_put8 (sc->labels_mode);
 	ps_put8 (sc->arch_mode);
@@ -153,6 +177,40 @@ static inline uint32_t serialize_sc_new(uint8_t protocol,const storage_class *sc
 		ps_putbytes(sc->trash.labelexpr[i], SCLASS_EXPR_MAX_SIZE);
 	}
 	return header_leng+(sc->create.labelscnt+sc->keep.labelscnt+sc->arch.labelscnt+sc->trash.labelscnt)*SCLASS_EXPR_MAX_SIZE;
+}
+
+int name_validate(const char *name) {
+	uint8_t c,space_flag;
+	if (name[0]==' ') {
+		return -1;
+	}
+	space_flag = 0;
+	while (*name) {
+		c = *name;
+		if (c<32) {
+			return -1;
+		} else if (c==32) {
+			space_flag = 1;
+		} else {
+			space_flag = 0;
+		}
+		name++;
+	}
+	if (space_flag) {
+		return -1;
+	}
+	return 0;
+}
+
+int names_validate(int argc,char *argv[]) {
+	while (argc>0) {
+		if (name_validate(*argv)<0) {
+			return -1;
+		}
+		argc--;
+		argv++;
+	}
+	return 0;
 }
 
 void printf_time(uint16_t h) {
@@ -236,6 +294,7 @@ const char *arch_mode_descr[] = {
 };
 
 void printf_sc(const storage_class *sc, const char *scname, uint8_t classid, char *endstr) {
+	int i;
 	char labelsbuff[LABELS_BUFF_SIZE];
 
 	if (scname != NULL) {
@@ -247,7 +306,14 @@ void printf_sc(const storage_class *sc, const char *scname, uint8_t classid, cha
 	if (classid>0) {
 		printf("\tclassid: %u\n",classid);
 	}
-
+	if (sc->dleng>0) {
+		printf("\tdescription: ");
+		for (i=0 ; i<sc->dleng ; i++) {
+			putchar(sc->desc[i]);
+		}
+		printf("\n");
+	}
+	printf("\tpriority: %"PRIu32" ; export_group: %"PRIu8"\n",sc->priority,sc->export_group);
 	printf("\tadmin_only: %s ; labels_mode: %s ; ",
 		(sc->admin_only) ? "YES" : "NO",
 		(sc->labels_mode==LABELS_MODE_LOOSE) ? "LOOSE" : (sc->labels_mode==LABELS_MODE_STRICT) ? "STRICT" : "STD");
@@ -284,13 +350,14 @@ void printf_sc(const storage_class *sc, const char *scname, uint8_t classid, cha
 
 // used in admin
 int make_sc(const char *mfsmp, const char *scname, storage_class *sc) {
+	uint32_t masterversion;
 	uint8_t protocol;
 	int32_t leng;
 	uint32_t nleng;
 	char cwdbuff[MAXPATHLEN];
 
 	nleng = strlen(scname);
-	if (nleng >= MAXSCLASSNLENG) {
+	if (nleng >= MAXSCLASSNAMELENG) {
 		fprintf(stderr,"%s: name too long\n",scname);
 		return -1;
 	}
@@ -304,12 +371,14 @@ int make_sc(const char *mfsmp, const char *scname, storage_class *sc) {
 		}
 	}
 
-	if (getmasterversion()<VERSION2INT(4,2,0)) {
+	masterversion = getmasterversion();
+
+	if (masterversion<VERSION2INT(4,2,0)) {
 		fprintf(stderr,"master too old, this tool needs master 4.2.0 or newer\n");
 		goto error;
 	}
 
-	protocol = (getmasterversion()<VERSION2INT(4,34,2))?3:(getmasterversion()<VERSION2INT(4,53,0))?4:5;
+	protocol = (masterversion<VERSION2INT(4,34,2))?3:(masterversion<VERSION2INT(4,53,0))?4:(masterversion<VERSION2INT(4,57,0))?5:6;
 
 	ps_comminit();
 
@@ -342,13 +411,14 @@ error:
 
 
 int change_sc(const char *mfsmp, const char *scname, uint16_t chgmask, storage_class *sc) {
+	uint32_t masterversion;
 	uint8_t protocol;
 	int32_t leng;
 	uint32_t nleng;
 	char cwdbuff[MAXPATHLEN];
 
 	nleng=strlen(scname);
-	if (nleng >= MAXSCLASSNLENG) {
+	if (nleng >= MAXSCLASSNAMELENG) {
 		fprintf(stderr,"%s: name too long\n",scname);
 		return -1;
 	}
@@ -362,12 +432,14 @@ int change_sc(const char *mfsmp, const char *scname, uint16_t chgmask, storage_c
 		}
 	}
 
-	if (getmasterversion()<VERSION2INT(4,2,0)) {
+	masterversion = getmasterversion();
+
+	if (masterversion<VERSION2INT(4,2,0)) {
 		fprintf(stderr,"master too old, this tool needs master 4.2.0 or newer\n");
 		goto error;
 	}
 
-	protocol = (getmasterversion()<VERSION2INT(4,34,2))?3:(getmasterversion()<VERSION2INT(4,53,0))?4:5;
+	protocol = (masterversion<VERSION2INT(4,34,2))?3:(masterversion<VERSION2INT(4,53,0))?4:(masterversion<VERSION2INT(4,57,0))?5:6;
 
 	ps_comminit();
 
@@ -414,7 +486,7 @@ int remove_sc(const char *mfsmp, const char *scname) {
 	char cwdbuff[MAXPATHLEN];
 
 	nleng = strlen(scname);
-	if (nleng >= MAXSCLASSNLENG) {
+	if (nleng >= MAXSCLASSNAMELENG) {
 		fprintf(stderr,"%s: name too long\n",scname);
 		return -1;
 	}
@@ -458,11 +530,11 @@ int clone_sc(const char *mfsmp, const char *oldscname, const char *newscname) {
 
 	onleng = strlen(oldscname);
 	nnleng = strlen(newscname);
-	if (onleng >= MAXSCLASSNLENG) {
+	if (onleng >= MAXSCLASSNAMELENG) {
 		fprintf(stderr,"%s: name too long\n", oldscname);
 		return -1;
 	}
-	if (nnleng >= MAXSCLASSNLENG) {
+	if (nnleng >= MAXSCLASSNAMELENG) {
 		fprintf(stderr,"%s: name too long\n", newscname);
 		return -1;
 	}
@@ -509,11 +581,11 @@ int move_sc(const char *mfsmp, const char *oldscname, const char *newscname) {
 
 	onleng = strlen(oldscname);
 	nnleng = strlen(newscname);
-	if (onleng >= MAXSCLASSNLENG) {
+	if (onleng >= MAXSCLASSNAMELENG) {
 		fprintf(stderr,"%s: name too long\n", oldscname);
 		return -1;
 	}
-	if (nnleng >= MAXSCLASSNLENG) {
+	if (nnleng >= MAXSCLASSNAMELENG) {
 		fprintf(stderr,"%s: name too long\n", newscname);
 		return -1;
 	}
@@ -554,7 +626,8 @@ error:
 
 
 int list_sc(const char *mfsmp, uint8_t longmode, uint8_t insens, int argc, char *argv[]) {
-	char scname[MAXSCLASSNLENG];
+	uint32_t masterversion;
+	char scname[MAXSCLASSNAMELENG];
 	int32_t leng;
 	int dret, scn=0;
 	storage_class sc;
@@ -572,15 +645,17 @@ int list_sc(const char *mfsmp, uint8_t longmode, uint8_t insens, int argc, char 
 		}
 	}
 
-	if (longmode && getmasterversion()<VERSION2INT(4,2,0)) {
+	masterversion = getmasterversion();
+
+	if (longmode && masterversion<VERSION2INT(4,2,0)) {
 		fprintf(stderr,"long mode not supported (master too old)\n");
 		goto error;
 	}
 
-	protocol = (getmasterversion()<VERSION2INT(4,34,2))?3:(getmasterversion()<VERSION2INT(4,53,0))?4:5;
+	protocol = (masterversion<VERSION2INT(4,34,2))?3:(masterversion<VERSION2INT(4,53,0))?4:(masterversion<VERSION2INT(4,57,0))?5:6;
 
 	ps_comminit();
-	ps_put8(longmode ? protocol : 0); // 0,3,4,5 - requested packet version
+	ps_put8(longmode ? protocol : 0); // 0,3,4,5,6 - requested packet version
 	if ((leng = ps_send_and_receive(CLTOMA_SCLASS_LIST, MATOCL_SCLASS_LIST, NULL)) < 0) {
 		return -1;
 	}
@@ -652,6 +727,7 @@ error:
 int make_or_change_sc(const char *mfsmp,const char *scname,storage_class *sc,uint8_t overwrite) {
 	// debug:
 	// printf_sc(sc,scname,0,"\n");
+	uint32_t masterversion;
 	uint8_t protocol;
 	uint8_t mfsstatus;
 	int32_t leng;
@@ -659,7 +735,7 @@ int make_or_change_sc(const char *mfsmp,const char *scname,storage_class *sc,uin
 	char cwdbuff[MAXPATHLEN];
 
 	nleng = strlen(scname);
-	if (nleng >= MAXSCLASSNLENG) {
+	if (nleng >= MAXSCLASSNAMELENG) {
 		printf("%s: name too long\n",scname);
 		return -1;
 	}
@@ -673,12 +749,14 @@ int make_or_change_sc(const char *mfsmp,const char *scname,storage_class *sc,uin
 		}
 	}
 
-	if (getmasterversion()<VERSION2INT(4,2,0)) {
+	masterversion = getmasterversion();
+
+	if (masterversion<VERSION2INT(4,2,0)) {
 		fprintf(stderr,"master too old, this tool needs master 4.2.0 or newer\n");
 		goto error;
 	}
 
-	protocol = (getmasterversion()<VERSION2INT(4,34,2))?3:(getmasterversion()<VERSION2INT(4,53,0))?4:5;
+	protocol = (masterversion<VERSION2INT(4,34,2))?3:(masterversion<VERSION2INT(4,53,0))?4:(masterversion<VERSION2INT(4,57,0))?5:6;
 
 	ps_comminit();
 
@@ -821,6 +899,40 @@ int import_sc(const char *mfsmp, FILE *fd,uint8_t overwrite) {
 			scname = strdup(p);
 		} else if (check_string(&p,"classid: ")) {
 			// ignore
+		} else if (check_string(&p,"description: ")) {
+			while (*p>=32 && (sc.dleng+1)<MAXSCLASSDESCLENG) {
+				sc.desc[sc.dleng] = *p;
+				sc.dleng++;
+				p++;
+			}
+			if (*p) {
+				perr = 1;
+			}
+		} else if (check_string(&p,"priority: ")) {
+			sc.priority = 0;
+			while (*p>='0' && *p<='9') {
+				sc.priority *= 10;
+				sc.priority += (*p - '0');
+				p++;
+			}
+			if (perr==0) {
+				if (check_string(&p," ; export_group: ")) {
+					sc.export_group = 0;
+					while (*p>='0' && *p<='9') {
+						sc.export_group *= 10;
+						sc.export_group += (*p - '0');
+						p++;
+						if (sc.export_group>=EXPORT_GROUPS) {
+							perr = 1;
+						}
+					}
+					if (*p) {
+						perr = 1;
+					}
+				} else {
+					perr = 1;
+				}
+			}
 		} else if (check_string(&p,"admin_only: ")) {
 			if (check_string(&p,"YES")) {
 				sc.admin_only = 1;
@@ -952,8 +1064,11 @@ error:
 //----------------------------------------------------------------------
 
 static const char *createmodifysctxt[] = {
-	" -a - set admin only mode ( 0 - anybody can use this storage class, 1 - only admin can use this storage class ) - by default it set to 0",
-	" -m - set create mode (options are: 'l'/'L' for 'loose', 's'/'S' for 'strict' and 'd'/'D' or not specified for 'default')",
+	" -c - set description",
+	" -p - set join priority (default is 0)",
+	" -g - set export group (0..15, default is 0)",
+	" -a - set admin only mode (0 - anybody can use this storage class, 1 - only admin can use this storage class) - by default it set to 0",
+	" -m - set labels mode (options are: 'l'/'L' for 'loose', 's'/'S' for 'strict' and 'd'/'D' or not specified for 'default')",
 	"    'default' mode: if there are overloaded servers, system will wait for them, but in case of no space available will use other servers (disregarding the labels).",
 	"    'strict' mode: the system will wait for overloaded servers, but will return error (ENOSPC) when there is no space on servers with correct labels.",
 	"    'loose' mode: the system will disregard the labels in both cases.",
@@ -982,7 +1097,7 @@ static const char *createmodifysctxt[] = {
 static const char *createsctxt[] = {
 	"create new storage class",
 	"",
-	"usage: "_EXENAME_" [-?] [-M mount_point] -K keep_labels [-a admin_only] [-m create_mode] [-o arch_mode] [-C create_labels] [-A archive_labels] [-d archive_delay] [-s archive_minimum_file_length] [-T trash_labels] [-t min_trashretention] sclass_name [sclass_name ...]",
+	"usage: "_EXENAME_" [-?] [-M mount_point] -K keep_labels [-c description] [-p priority] [-g export_group] [-a admin_only] [-m labels_mode] [-o arch_mode] [-C create_labels] [-A archive_labels] [-d archive_delay] [-s archive_minimum_file_length] [-T trash_labels] [-t min_trashretention] sclass_name [sclass_name ...]",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	NULL
@@ -991,10 +1106,9 @@ static const char *createsctxt[] = {
 static const char *modifysctxt[] = {
 	"modify existing storage class",
 	"",
-	"usage: "_EXENAME_" [-?] [-M mount_point] [-f] [-a admin_only] [-m create_mode] [-o arch_mode] [-C create_labels] [-K keep_labels] [-A archive_labels] [-d archive_delay] [-s archive_minimum_file_length] [-T trash_labels] [-t min_trashretention] sclass_name [sclass_name ...]",
+	"usage: "_EXENAME_" [-?] [-M mount_point] [-c description] [-p priority] [-g export_group] [-a admin_only] [-m labels_mode] [-o arch_mode] [-C create_labels] [-K keep_labels] [-A archive_labels] [-d archive_delay] [-s archive_minimum_file_length] [-T trash_labels] [-t min_trashretention] sclass_name [sclass_name ...]",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
-	" -f - force modification of classes 1 to 9",
 	NULL
 };
 
@@ -1167,6 +1281,48 @@ int change_modify_common_opts(int option,char *optarg_value,storage_class *sc,ui
 			}
 			(*chgmask) |= SCLASS_CHG_LABELS_MODE;
 			break;
+		case 'c':
+			if ((*chgmask) & SCLASS_CHG_DESCRIPTION) {
+				fprintf(stderr,"option '%c' defined twice\n",option);
+				return -1;
+			}
+			if (name_validate(optarg_value)<0) {
+				fprintf(stderr,"bad characters in description string\n");
+				return -1;
+			}
+			v = strlen(optarg_value);
+			if (v>=MAXSCLASSDESCLENG) {
+				fprintf(stderr,"bad description length\n");
+				return -1;
+			}
+			sc->dleng = v;
+			memcpy(sc->desc,optarg_value,v);
+			(*chgmask) |= SCLASS_CHG_DESCRIPTION;
+			break;
+		case 'p':
+			if ((*chgmask) & SCLASS_CHG_PRIORITY) {
+				fprintf(stderr,"option '%c' defined twice\n",option);
+				return -1;
+			}
+			if (my_get_number(optarg_value, &v,UINT32_MAX,0)<0) {
+				fprintf(stderr,"bad priority\n");
+				return -1;
+			}
+			sc->priority = v;
+			(*chgmask) |= SCLASS_CHG_PRIORITY;
+			break;
+		case 'g':
+			if ((*chgmask) & SCLASS_CHG_EXPORT_GROUP) {
+				fprintf(stderr,"option '%c' defined twice\n",option);
+				return -1;
+			}
+			if (my_get_number(optarg_value, &v,EXPORT_GROUPS-1,0)<0) {
+				fprintf(stderr,"bad export group\n");
+				return -1;
+			}
+			sc->export_group = v;
+			(*chgmask) |= SCLASS_CHG_EXPORT_GROUP;
+			break;
 		case 'a':
 			if ((*chgmask) & SCLASS_CHG_ADMIN_ONLY) {
 				fprintf(stderr,"option '%c' defined twice\n",option);
@@ -1258,7 +1414,7 @@ int createscexe(int argc,char *argv[]) {
 	sc.arch_mode = SCLASS_ARCH_MODE_CTIME;
 	chgmask = 0;
 
-	while ((ch=getopt(argc,argv,"?M:A:K:C:T:d:t:m:a:s:o:"))!=-1) {
+	while ((ch=getopt(argc,argv,"?M:A:K:C:T:d:t:m:c:p:g:a:s:o:"))!=-1) {
 		switch (ch) {
 			case 'M':
 				if (mountpoint!=NULL) {
@@ -1273,6 +1429,9 @@ int createscexe(int argc,char *argv[]) {
 			case 'd':
 			case 't':
 			case 'm':
+			case 'c':
+			case 'p':
+			case 'g':
 			case 'a':
 			case 's':
 			case 'o':
@@ -1313,6 +1472,12 @@ int createscexe(int argc,char *argv[]) {
 		return 1;
 	}
 
+	if (names_validate(argc,argv)<0) {
+		fprintf(stderr,"bad characters in class name\n");
+		createscusage();
+		return 1;
+	}
+
 	while (argc>0) {
 		if (make_sc(mountpoint,*argv,&sc)<0) {
 			status = 1;
@@ -1338,7 +1503,7 @@ int modifyscexe(int argc,char *argv[]) {
 	sc.arch_mode = SCLASS_ARCH_MODE_CTIME;
 	chgmask = 0;
 
-	while ((ch=getopt(argc,argv,"?M:A:K:C:T:d:t:m:a:s:o:f"))!=-1) {
+	while ((ch=getopt(argc,argv,"?M:A:K:C:T:d:t:m:c:p:g:a:s:o:"))!=-1) {
 		switch (ch) {
 			case 'M':
 				if (mountpoint!=NULL) {
@@ -1353,15 +1518,15 @@ int modifyscexe(int argc,char *argv[]) {
 			case 'd':
 			case 't':
 			case 'm':
+			case 'c':
+			case 'p':
+			case 'g':
 			case 'a':
 			case 's':
 			case 'o':
 				if (change_modify_common_opts(ch,optarg,&sc,&chgmask)<0) {
 					modifyscusage();
 				}
-				break;
-			case 'f':
-				chgmask |= SCLASS_CHG_FORCE;
 				break;
 			default:
 				modifyscusage();
@@ -1388,6 +1553,12 @@ int modifyscexe(int argc,char *argv[]) {
 
 
 	if (argc==0) {
+		modifyscusage();
+		return 1;
+	}
+
+	if (names_validate(argc,argv)<0) {
+		fprintf(stderr,"bad characters in class name\n");
 		modifyscusage();
 		return 1;
 	}
@@ -1431,6 +1602,12 @@ int deletescexe(int argc,char *argv[]) {
 		return 1;
 	}
 
+	if (names_validate(argc,argv)<0) {
+		fprintf(stderr,"bad characters in class name\n");
+		deletescusage();
+		return 1;
+	}
+
 	while (argc>0) {
 		if (remove_sc(mountpoint,*argv)<0) {
 			status = 1;
@@ -1467,6 +1644,12 @@ int clonescexe(int argc,char *argv[]) {
 	argv += optind;
 
 	if (argc<=1) {
+		clonescusage();
+		return 1;
+	}
+
+	if (names_validate(argc,argv)<0) {
+		fprintf(stderr,"bad characters in class name\n");
 		clonescusage();
 		return 1;
 	}
@@ -1512,6 +1695,12 @@ int renamescexe(int argc,char *argv[]) {
 	argv += optind;
 
 	if (argc<=1) {
+		renamescusage();
+		return 1;
+	}
+
+	if (names_validate(argc,argv)<0) {
+		fprintf(stderr,"bad characters in class name\n");
 		renamescusage();
 		return 1;
 	}

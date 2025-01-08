@@ -2814,11 +2814,37 @@ int chunk_mr_increase_version(uint64_t chunkid) {
 
 /* --- */
 
+static inline void chunk_recalc_sclassid(chunk *c) {
+	uint8_t sclassid;
+	uint64_t pri,bestpri;
+	uint32_t findx;
+	flist *fl;
+
+	if (c->fhead>=FLISTFIRSTINDX) {
+		sclassid = 0;
+		bestpri = 0;
+		findx = c->fhead;
+		while (findx!=FLISTNULLINDX) {
+			fl = flist_get(findx);
+			findx = fl->nexti;
+			pri = sclass_get_joining_priority(fl->sclassid);
+			if (pri>bestpri) {
+				sclassid = fl->sclassid;
+				bestpri = pri;
+			}
+		}
+		massert(sclassid>0,"wrong labels set");
+		if (sclassid!=c->sclassid) {
+			chunk_state_set_sclass(c,sclassid);
+			chunk_priority_queue_check(c,1);
+		}
+	}
+}
+
 // find new sclassid and compact list if possible
 static inline uint16_t chunk_compact_and_find_sclassid(chunk *c) {
-	uint8_t g;
-	uint8_t mg;
-	uint8_t sclassid,v;
+	uint8_t sclassid;
+	uint64_t pri,bestpri;
 	uint32_t findx;
 	flist *fl;
 
@@ -2839,25 +2865,16 @@ static inline uint16_t chunk_compact_and_find_sclassid(chunk *c) {
 		}
 		return sclassid;
 	} else {
-		mg = 0;
 		sclassid = 0;
-		v = 0;
+		bestpri = 0;
 		findx = c->fhead;
 		while (findx!=FLISTNULLINDX) {
 			fl = flist_get(findx);
 			findx = fl->nexti;
-			g = sclass_get_keeparch_max_goal_equivalent(fl->sclassid);
-			if (g>mg) {
-				mg = g;
+			pri = sclass_get_joining_priority(fl->sclassid);
+			if (pri>bestpri) {
 				sclassid = fl->sclassid;
-				v = 0;
-			} else if (g==mg) {
-				if (sclassid<=9 && v==0) {
-					sclassid = fl->sclassid;
-				} else if (sclassid>9 && fl->sclassid>9) {
-					sclassid = g;
-					v = 1;
-				}
+				bestpri = pri;
 			}
 		}
 		massert(sclassid>0,"wrong labels set");
@@ -8730,6 +8747,7 @@ void chunk_jobs_main(void) {
 					}
 					chunk_delete(c);
 				} else {
+					chunk_recalc_sclassid(c);
 					if (scmaxml[c->sclassid]<MaxFailsPerClass || MaxFailsPerClass==0 || FailClassCounterResetCalls==0) {
 						job_call[c->sclassid][DANGER_PRIORITIES]++;
 						chunk_do_jobs(c,JOBS_CHUNK,now,0);

@@ -741,12 +741,12 @@ int sessions_load(FILE *fd,uint8_t mver) {
 	uint32_t i,nextsessionid,sessionid;
 	uint32_t ileng,peerip,rootinode,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disconnected;
 	uint32_t disables;
-	uint16_t umaskval;
+	uint16_t umaskval,sclassgroups;
 	uint64_t exportscsum;
 	uint8_t sesflags,mingoal,maxgoal;
 	char strip[16];
 
-	if (mver>0x15) {
+	if (mver>0x16) {
 		fprintf(stderr,"loading sessions: unsupported format\n");
 		return -1;
 	}
@@ -788,7 +788,7 @@ int sessions_load(FILE *fd,uint8_t mver) {
 		recsize = 55+statsinfile*8;
 	} else if (mver<0x15) {
 		recsize = 57+statsinfile*8;
-	} else {
+	} else { // 0x15,0x16
 		recsize = 61+statsinfile*8;
 	}
 	fsesrecord = malloc(recsize);
@@ -822,9 +822,15 @@ int sessions_load(FILE *fd,uint8_t mver) {
 			umaskval = get16bit(&ptr);
 		} else {
 			umaskval = 0;
-		}			
-		mingoal = get8bit(&ptr);
-		maxgoal = get8bit(&ptr);
+		}
+		if (mver>=0x16) {
+			sclassgroups = get16bit(&ptr);
+			mingoal = maxgoal = 0;
+		} else {
+			sclassgroups = 0;
+			mingoal = get8bit(&ptr);
+			maxgoal = get8bit(&ptr);
+		}
 		mintrashretention = get32bit(&ptr);
 		maxtrashretention = get32bit(&ptr);
 		rootuid = get32bit(&ptr);
@@ -842,7 +848,9 @@ int sessions_load(FILE *fd,uint8_t mver) {
 		} else {
 			disconnected = 0;
 		}
-		if (mver>=0x15) {
+		if (mver>=0x16) {
+			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:0x%02"PRIX8"|u:0%03"PRIo16"|a:0x%04"PRIX16"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|x:0x%08"PRIX32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,sclassgroups,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disables,disconnected);
+		} else if (mver>=0x15) {
 			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:0x%02"PRIX8"|u:0%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|x:0x%08"PRIX32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disables,disconnected);
 		} else if (mver>=0x14) {
 			printf("SESSION|s:%10"PRIu32"|e:#%"PRIu64"|p:%s|r:%10"PRIu32"|f:0x%02"PRIX8"|u:0%03"PRIo16"|g:%"PRIu8"-%"PRIu8"|t:%10"PRIu32"-%10"PRIu32"|m:%10"PRIu32",%10"PRIu32",%10"PRIu32",%10"PRIu32"|d:%10"PRIu32"|c:",sessionid,exportscsum,strip,rootinode,sesflags,umaskval,mingoal,maxgoal,mintrashretention,maxtrashretention,rootuid,rootgid,mapalluid,mapallgid,disconnected);
@@ -1061,12 +1069,13 @@ static void print_labels(const uint8_t **rptr,uint8_t cnt,uint8_t orgroup) {
 	}
 }
 
-int labelset_load(FILE *fd,uint8_t mver) {
+int sclass_load(FILE *fd,uint8_t mver) {
 	uint8_t *databuff = NULL;
 	uint8_t hdrbuff[3];
 	char strbuff[LABELS_BUFF_SIZE];
 	const uint8_t *ptr;
 	uint32_t chunkcount;
+	uint32_t priority;
 	uint16_t sclassid;
 	uint16_t arch_delay;
 	uint16_t min_trashretention;
@@ -1074,8 +1083,11 @@ int labelset_load(FILE *fd,uint8_t mver) {
 	uint8_t labels_mode;
 	uint8_t arch_mode;
 	uint8_t admin_only;
+	uint8_t export_group;
+	uint8_t dleng;
+	uint8_t desc[MAXSCLASSDESCLENG];
 	uint8_t nleng;
-	uint8_t name[MAXSCLASSNLENG];
+	uint8_t name[MAXSCLASSNAMELENG];
 	parser_data create,keep,arch,trash;
 	parser_data *smptr;
 	uint8_t ec_is_turned_on;
@@ -1086,7 +1098,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 	uint8_t hdrleng;
 	uint8_t dsize;
 
-	if (mver>0x1B) {
+	if (mver>0x1C) {
 		fprintf(stderr,"loading storage classes: unsupported format\n");
 		return -1;
 	}
@@ -1120,7 +1132,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 		}
 		ec_is_turned_on = get8bit(&ptr);
 		printf("SCLASSEC|%u\n",ec_is_turned_on);
-		dsize = (mver>=0x1B)?42:(mver>=0x1A)?38:(mver>=0x18)?30:29;
+		dsize = (mver>=0x1C)?48:(mver>=0x1B)?42:(mver>=0x1A)?38:(mver>=0x18)?30:29;
 		databuff = malloc(dsize);
 		while (1) {
 			if (fread(databuff,1,2,fd)!=2) {
@@ -1142,6 +1154,19 @@ int labelset_load(FILE *fd,uint8_t mver) {
 			memset(&arch,0,sizeof(parser_data));
 			memset(&trash,0,sizeof(parser_data));
 			nleng = get8bit(&ptr);
+			if (mver>=0x1C) {
+				dleng = get8bit(&ptr);
+				priority = get32bit(&ptr);
+				export_group = get8bit(&ptr);
+			} else {
+				dleng = 0;
+				priority = 0;
+				if (sclassid<10) {
+					export_group = sclassid;
+				} else {
+					export_group = 0;
+				}
+			}
 			admin_only = get8bit(&ptr);
 			labels_mode = get8bit(&ptr);
 			if (mver>=0x18) {
@@ -1191,6 +1216,13 @@ int labelset_load(FILE *fd,uint8_t mver) {
 				return -1;
 			}
 			name[nleng]=0;
+			if (dleng>0) {
+				if (fread(desc,1,dleng,fd)!=dleng) {
+					fprintf(stderr,"loading storage classes: read error\n");
+					return -1;
+				}
+				desc[dleng]=0;
+			}
 			if (mver<0x19) {
 				if (arch.ec_data_chksum_parts>1) {
 					arch.ec_data_chksum_parts--;
@@ -1212,7 +1244,7 @@ int labelset_load(FILE *fd,uint8_t mver) {
 			} else {
 				lexprsize = exprsize;
 			}
-			printf("SCLASSMAIN|#:%5"PRIu16"|x:%u|m:%u|a:0x%"PRIX8"|d:%5"PRIu16"|s:%20"PRIu64"|t:%5"PRIu16"|n:%s\n",sclassid,admin_only,labels_mode,arch_mode,arch_delay,arch_min_size,min_trashretention,name);
+			printf("SCLASSMAIN|#:%5"PRIu16"|p:%"PRIu32"|g:%u|x:%u|m:%u|a:0x%"PRIX8"|d:%5"PRIu16"|s:%20"PRIu64"|t:%5"PRIu16"|n:%s|c:%s\n",sclassid,priority,export_group,admin_only,labels_mode,arch_mode,arch_delay,arch_min_size,min_trashretention,name,desc);
 			smptr = NULL; // stupid old compilers !!!
 			for (i=0 ; i<4 ; i++) {
 				switch (i) {
@@ -1587,12 +1619,12 @@ int fs_load(FILE *fd,uint8_t fver,const char section[4]) {
 					return -1;
 				}
 			} else if (memcmp(hdr,"LABS",4)==0) {
-				if (labelset_load(fd,mver)<0) {
+				if (sclass_load(fd,mver)<0) {
 					printf("error reading metadata (LABS)\n");
 					return -1;
 				}
 			} else if (memcmp(hdr,"SCLA",4)==0) {
-				if (labelset_load(fd,mver)<0) {
+				if (sclass_load(fd,mver)<0) {
 					printf("error reading metadata (SCLA)\n");
 					return -1;
 				}

@@ -1673,7 +1673,7 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 		uint32_t rootinode;
 		uint8_t sesflags;
 		uint16_t umaskval;
-		uint8_t mingoal,maxgoal;
+		uint16_t sclassgroups;
 		uint32_t mintrashretention,maxtrashretention;
 		uint32_t disables;
 		uint32_t rootuid,rootgid;
@@ -1793,13 +1793,13 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				if (length>=77+16+ileng+pleng) {
 					eptr->usepassword = 1;
 					memcpy(eptr->passwordmd5,rptr,16);
-					status = exports_check(eptr->peerip,eptr->version,eptr->path,eptr->passwordrnd,rptr,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashretention,&maxtrashretention,&disables);
+					status = exports_check(eptr->peerip,eptr->version,eptr->path,eptr->passwordrnd,rptr,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&sclassgroups,&mintrashretention,&maxtrashretention,&disables);
 					if (status==MFS_ERROR_BADPASSWORD) {
 						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"client from IP:%s attempted a connection with wrong password",eptr->strip);
 					}
 				} else {
 					eptr->usepassword = 0;
-					status = exports_check(eptr->peerip,eptr->version,eptr->path,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashretention,&maxtrashretention,&disables);
+					status = exports_check(eptr->peerip,eptr->version,eptr->path,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&sclassgroups,&mintrashretention,&maxtrashretention,&disables);
 					if (status==MFS_ERROR_NOPASSWORD) {
 						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"client from IP:%s attempted a connection without needed password",eptr->strip);
 					}
@@ -1815,11 +1815,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 					if (eptr->sesdata==NULL) {
 						sessionid = 0;
 					} else {
-						sessionid = sessions_chg_session(eptr->sesdata,exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashretention,maxtrashretention,disables,eptr->peerip,eptr->info,eptr->ileng);
+						sessionid = sessions_chg_session(eptr->sesdata,exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,sclassgroups,mintrashretention,maxtrashretention,disables,eptr->peerip,eptr->info,eptr->ileng);
 					}
 				}
 				if (sessionid==0) {
-					eptr->sesdata = sessions_new_session(exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashretention,maxtrashretention,disables,eptr->peerip,eptr->info,eptr->ileng);
+					eptr->sesdata = sessions_new_session(exports_checksum(),rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,sclassgroups,mintrashretention,maxtrashretention,disables,eptr->peerip,eptr->info,eptr->ileng);
 					created = 1;
 				}
 				if (eptr->sesdata==NULL) {
@@ -1877,8 +1877,12 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				put32bit(&wptr,mapallgid);
 			}
 			if (eptr->version>=VERSION2INT(1,6,26)) {
-				put8bit(&wptr,mingoal);
-				put8bit(&wptr,maxgoal);
+				if (eptr->version>=VERSION2INT(4,57,0)) {
+					put16bit(&wptr,sclassgroups);
+				} else {
+					put8bit(&wptr,1);
+					put8bit(&wptr,9);
+				}
 				put32bit(&wptr,mintrashretention);
 				put32bit(&wptr,maxtrashretention);
 			}
@@ -1960,13 +1964,13 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 				if (length>=73+16+ileng) {
 					eptr->usepassword = 1;
 					memcpy(eptr->passwordmd5,rptr,16);
-					status = exports_check(eptr->peerip,eptr->version,NULL,eptr->passwordrnd,rptr,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashretention,&maxtrashretention,&disables);
+					status = exports_check(eptr->peerip,eptr->version,NULL,eptr->passwordrnd,rptr,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&sclassgroups,&mintrashretention,&maxtrashretention,&disables);
 					if (status==MFS_ERROR_BADPASSWORD) {
 						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"client from IP:%s attempted a connection with wrong password",eptr->strip);
 					}
 				} else {
 					eptr->usepassword = 0;
-					status = exports_check(eptr->peerip,eptr->version,NULL,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&mingoal,&maxgoal,&mintrashretention,&maxtrashretention,&disables);
+					status = exports_check(eptr->peerip,eptr->version,NULL,NULL,NULL,&sesflags,&umaskval,&rootuid,&rootgid,&mapalluid,&mapallgid,&sclassgroups,&mintrashretention,&maxtrashretention,&disables);
 					if (status==MFS_ERROR_NOPASSWORD) {
 						mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"client from IP:%s attempted a connection without needed password",eptr->strip);
 					}
@@ -1978,11 +1982,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 					if (eptr->sesdata==NULL) {
 						sessionid = 0;
 					} else {
-						sessionid = sessions_chg_session(eptr->sesdata,exports_checksum(),0,sesflags,umaskval,0,0,0,0,mingoal,maxgoal,mintrashretention,maxtrashretention,disables,eptr->peerip,eptr->info,eptr->ileng);
+						sessionid = sessions_chg_session(eptr->sesdata,exports_checksum(),0,sesflags,umaskval,0,0,0,0,sclassgroups,mintrashretention,maxtrashretention,disables,eptr->peerip,eptr->info,eptr->ileng);
 					}
 				}
 				if (sessionid==0) {
-					eptr->sesdata = sessions_new_session(exports_checksum(),0,sesflags,umaskval,0,0,0,0,mingoal,maxgoal,mintrashretention,maxtrashretention,disables,eptr->peerip,eptr->info,eptr->ileng);
+					eptr->sesdata = sessions_new_session(exports_checksum(),0,sesflags,umaskval,0,0,0,0,sclassgroups,mintrashretention,maxtrashretention,disables,eptr->peerip,eptr->info,eptr->ileng);
 				}
 				if (eptr->sesdata==NULL) {
 					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't allocate session record");
@@ -2022,8 +2026,12 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 			put8bit(&wptr,sesflags);
 			if (eptr->version>=VERSION2INT(1,6,26)) {
-				put8bit(&wptr,mingoal);
-				put8bit(&wptr,maxgoal);
+				if (eptr->version>=VERSION2INT(4,57,0)) {
+					put16bit(&wptr,sclassgroups);
+				} else {
+					put8bit(&wptr,1);
+					put8bit(&wptr,9);
+				}
 				put32bit(&wptr,mintrashretention);
 				put32bit(&wptr,maxtrashretention);
 			}
@@ -4308,7 +4316,7 @@ void matoclserv_fuse_getsclass(matoclserventry *eptr,const uint8_t *data,uint32_
 	psize = 6;
 	if (status==MFS_STATUS_OK) {
 		for (i=1 ; i<MAXSCLASS ; i++) {
-			if (sclass_is_predefined(i) && eptr->version<VERSION2INT(3,0,75)) {
+			if (i<10 && eptr->version<VERSION2INT(3,0,75)) {
 				if (fgtab[i]) {
 					fn++;
 					psize += 5;
@@ -4338,7 +4346,7 @@ void matoclserv_fuse_getsclass(matoclserventry *eptr,const uint8_t *data,uint32_
 		put8bit(&ptr,dn);
 		for (i=1 ; i<MAXSCLASS ; i++) {
 			if (fgtab[i]) {
-				if (sclass_is_predefined(i) && eptr->version<VERSION2INT(3,0,75)) {
+				if (i<10 && eptr->version<VERSION2INT(3,0,75)) {
 					put8bit(&ptr,i);
 					put32bit(&ptr,fgtab[i]);
 				} else if (eptr->version>=VERSION2INT(3,0,75)) {
@@ -4353,7 +4361,7 @@ void matoclserv_fuse_getsclass(matoclserventry *eptr,const uint8_t *data,uint32_
 		}
 		for (i=1 ; i<MAXSCLASS ; i++) {
 			if (dgtab[i]) {
-				if (sclass_is_predefined(i) && eptr->version<VERSION2INT(3,0,75)) {
+				if (i<10 && eptr->version<VERSION2INT(3,0,75)) {
 					put8bit(&ptr,i);
 					put32bit(&ptr,dgtab[i]);
 				} else if (eptr->version>=VERSION2INT(3,0,9)) {
@@ -4424,11 +4432,7 @@ void matoclserv_fuse_setsclass(matoclserventry *eptr,const uint8_t *data,uint32_
 		} else if (src_sclassid==0 || dst_sclassid==0) {
 			status = MFS_ERROR_NOSUCHCLASS;
 		} else {
-			if (sclass_is_predefined(dst_sclassid)) {
-				status = sessions_check_goal(eptr->sesdata,smode&SMODE_TMASK,dst_sclassid);
-			} else {
-				status = MFS_STATUS_OK;
-			}
+			status = sessions_check_sclass(eptr->sesdata,smode&SMODE_TMASK,dst_sclassid);
 		}
 	} else { // setid == goal
 		if (sessions_get_disables(eptr->sesdata)&DISABLE_SETSCLASS) {
@@ -4443,7 +4447,7 @@ void matoclserv_fuse_setsclass(matoclserventry *eptr,const uint8_t *data,uint32_
 				eptr->mode = KILL;
 				return;
 			}
-			status = sessions_check_goal(eptr->sesdata,smode&SMODE_TMASK,setid);
+			status = sessions_check_sclass(eptr->sesdata,smode&SMODE_TMASK,setid);
 		}
 	}
 	if (status==MFS_STATUS_OK) {
@@ -5221,18 +5225,22 @@ void matoclserv_fuse_archctl(matoclserventry *eptr,const uint8_t *data,uint32_t 
 void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid;
 	uint8_t nleng;
+	uint8_t dleng;
 	uint8_t constleng;
 	uint8_t fver;
 	uint8_t i;
 	storagemode create,keep,arch,trash;
 	uint32_t old_labelmasks[9*MASKORGROUP];
 	uint8_t labels_mode;
+	uint8_t export_group;
+	uint32_t priority;
 	uint8_t arch_mode;
 	uint16_t arch_delay;
 	uint16_t min_trashretention;
 	uint64_t arch_min_size;
 	uint8_t admin_only;
 	const uint8_t *name;
+	const uint8_t *desc;
 	uint8_t *ptr;
 	uint8_t status;
 
@@ -5252,10 +5260,10 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 			return;
 		}
 		fver = get8bit(&data);
-		if (fver<=5) {
+		if (fver<=6) {
 			// fver==1 and fver==2 are the same
-			constleng = (fver>=5)?47:(fver>=4)?43:(fver>=3)?35:(fver>=1)?34:13;
-			if (length<constleng+nleng) {
+			constleng = (fver>=6)?53:(fver>=5)?47:(fver>=4)?43:(fver>=3)?35:(fver>=1)?34:13;
+			if (length<(uint32_t)(constleng+nleng)) {
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CREATE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8")",fver,length,nleng);
 				eptr->mode = KILL;
 				return;
@@ -5264,6 +5272,26 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 			memset(&keep,0,sizeof(storagemode));
 			memset(&arch,0,sizeof(storagemode));
 			memset(&trash,0,sizeof(storagemode));
+			if (fver>=6) {
+				dleng = get8bit(&data);
+			} else {
+				dleng = 0;
+			}
+			if (length<(uint32_t)(constleng+nleng+dleng)) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CREATE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":dleng=%"PRIu8")",fver,length,nleng,dleng);
+				eptr->mode = KILL;
+				return;
+			}
+			if (fver>=6) {
+				desc = data;
+				data += dleng;
+				priority = get32bit(&data);
+				export_group = get8bit(&data);
+			} else {
+				desc = name;
+				priority = 0;
+				export_group = 0;
+			}
 			admin_only = get8bit(&data);
 			labels_mode = get8bit(&data);
 			if (fver>=3) {
@@ -5304,8 +5332,8 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 			arch.labelscnt = get8bit(&data);
 			if (fver>=1) {
 				trash.labelscnt = get8bit(&data);
-				if (length!=(uint32_t)(constleng+nleng+(create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt)*SCLASS_EXPR_MAX_SIZE)) {
-					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CREATE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8";T=%"PRIu8")",fver,length,nleng,create.labelscnt,keep.labelscnt,arch.labelscnt,trash.labelscnt);
+				if (length!=(uint32_t)(constleng+nleng+dleng+(create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt)*SCLASS_EXPR_MAX_SIZE)) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CREATE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":dleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8";T=%"PRIu8")",fver,length,nleng,dleng,create.labelscnt,keep.labelscnt,arch.labelscnt,trash.labelscnt);
 					eptr->mode = KILL;
 					return;
 				}
@@ -5350,7 +5378,7 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"CLTOMA_SCLASS_CREATE - redundancy levels > 1 supported only in pro version");
 				status = MFS_ERROR_EINVAL;
 			} else {
-				status = sclass_create_entry(nleng,name,admin_only,labels_mode,arch_mode,arch_delay,arch_min_size,min_trashretention,&create,&keep,&arch,&trash);
+				status = sclass_create_entry(nleng,name,dleng,desc,priority,export_group,admin_only,labels_mode,arch_mode,arch_delay,arch_min_size,min_trashretention,&create,&keep,&arch,&trash);
 			}
 		} else {
 			status = MFS_ERROR_EINVAL;
@@ -5366,6 +5394,7 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid;
 	uint8_t nleng;
+	uint8_t dleng;
 	uint8_t constleng;
 	uint8_t fver;
 	uint8_t i;
@@ -5375,12 +5404,15 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 	uint32_t keep_labelmasks[9*MASKORGROUP];
 	uint32_t arch_labelmasks[9*MASKORGROUP];
 	uint8_t labels_mode;
+	uint8_t export_group;
+	uint32_t priority;
 	uint8_t arch_mode;
 	uint16_t arch_delay;
 	uint64_t arch_min_size;
 	uint16_t min_trashretention;
 	uint8_t admin_only;
 	const uint8_t *name;
+	uint8_t desc[MAXSCLASSDESCLENG];
 	uint8_t *ptr;
 	uint8_t status;
 
@@ -5390,6 +5422,9 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 	arch_min_size = 0;
 	min_trashretention = 0;
 	admin_only = 0;
+	export_group = 0;
+	dleng = 0;
+	priority = 0;
 	if (length<5U) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE - wrong size (%"PRIu32")",length);
 		eptr->mode = KILL;
@@ -5406,10 +5441,10 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 	}
 	fver = get8bit(&data);
 //	arch_delay = 0; // make clang static analyzer happy
-	if (fver<=5) {
+	if (fver<=6) {
 		// fver==1 and fver==2 are the same
-		constleng = (fver>=5)?49:(fver>=4)?45:(fver>=3)?37:(fver>=1)?36:15;
-		if (length<constleng+nleng) {
+		constleng = (fver>=6)?55:(fver>=5)?49:(fver>=4)?45:(fver>=3)?37:(fver>=1)?36:15;
+		if (length<(uint32_t)(constleng+nleng)) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8")",fver,length,nleng);
 			eptr->mode = KILL;
 			return;
@@ -5420,6 +5455,26 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 		memset(&trash,0,sizeof(storagemode));
 		chgmask = get16bit(&data);
 		if (sessions_get_sesflags(eptr->sesdata)&SESFLAG_ADMIN || chgmask==0) {
+			if (fver>=6) {
+				dleng = get8bit(&data);
+			} else {
+				dleng = 0;
+			}
+			if (length<(uint32_t)(constleng+nleng+dleng)) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":dleng=%"PRIu8")",fver,length,nleng,dleng);
+				eptr->mode = KILL;
+				return;
+			}
+			if (fver>=6) {
+				memcpy(desc,data,dleng);
+				data += dleng;
+				priority = get32bit(&data);
+				export_group = get8bit(&data);
+			} else {
+				dleng = 0;
+				priority = 0;
+				export_group = 0;
+			}
 			admin_only = get8bit(&data);
 			labels_mode = get8bit(&data);
 			if (fver>=3) {
@@ -5458,8 +5513,8 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 			arch.labelscnt = get8bit(&data);
 			if (fver>=1) {
 				trash.labelscnt = get8bit(&data);
-				if (length!=(uint32_t)(constleng+nleng+(create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt)*SCLASS_EXPR_MAX_SIZE)) {
-					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8";T=%"PRIu8")",fver,length,nleng,create.labelscnt,keep.labelscnt,arch.labelscnt,trash.labelscnt);
+				if (length!=(uint32_t)(constleng+nleng+dleng+(create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt)*SCLASS_EXPR_MAX_SIZE)) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":dleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8";T=%"PRIu8")",fver,length,nleng,dleng,create.labelscnt,keep.labelscnt,arch.labelscnt,trash.labelscnt);
 					eptr->mode = KILL;
 					return;
 				}
@@ -5503,7 +5558,7 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"CLTOMA_SCLASS_CHANGE - redundancy levels > 1 supported only in pro version");
 				status = MFS_ERROR_EINVAL;
 			} else {
-				status = sclass_change_entry(nleng,name,chgmask,&admin_only,&labels_mode,&arch_mode,&arch_delay,&arch_min_size,&min_trashretention,&create,&keep,&arch,&trash);
+				status = sclass_change_entry(nleng,name,chgmask,&dleng,desc,&priority,&export_group,&admin_only,&labels_mode,&arch_mode,&arch_delay,&arch_min_size,&min_trashretention,&create,&keep,&arch,&trash);
 			}
 		} else {
 			status = MFS_ERROR_EPERM_NOTADMIN;
@@ -5535,14 +5590,23 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 		constleng = 12;
 		ptr = matoclserv_create_packet(eptr,MATOCL_SCLASS_CHANGE,(status!=MFS_STATUS_OK)?5:(constleng+4U*MASKORGROUP*(create.labelscnt+keep.labelscnt+arch.labelscnt)));
 	} else {
-		constleng = (fver>=5)?46:(fver>=4)?42:(fver>=3)?34:33;
-		ptr = matoclserv_create_packet(eptr,MATOCL_SCLASS_CHANGE,(status!=MFS_STATUS_OK)?5:(constleng+SCLASS_EXPR_MAX_SIZE*(create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt)));
+		constleng = (fver>=6)?52:(fver>=5)?46:(fver>=4)?42:(fver>=3)?34:33;
+		ptr = matoclserv_create_packet(eptr,MATOCL_SCLASS_CHANGE,(status!=MFS_STATUS_OK)?5:(constleng+dleng+SCLASS_EXPR_MAX_SIZE*(create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt)));
 	}
 	put32bit(&ptr,msgid);
 	if (status!=MFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
 		put8bit(&ptr,fver);
+		if (fver>=6) {
+			put8bit(&ptr,dleng);
+			if (dleng>0) {
+				memcpy(ptr,desc,dleng);
+				ptr += dleng;
+			}
+			put32bit(&ptr,priority);
+			put8bit(&ptr,export_group);
+		}
 		put8bit(&ptr,admin_only);
 		put8bit(&ptr,labels_mode);
 		if (fver>=3) {

@@ -857,19 +857,21 @@ static uint32_t params_maprootuid = 0;
 static uint32_t params_maprootgid = 0;
 static uint32_t params_mapalluid = 0;
 static uint32_t params_mapallgid = 0;
+static int32_t params_sclassgroups = -1;
 static uint8_t params_mingoal = 0;
 static uint8_t params_maxgoal = 0;
 static uint32_t params_mintrashretention = 0;
 static uint32_t params_maxtrashretention = 0;
 static uint32_t params_disables = 0;
 
-void main_setparams(uint8_t sesflags,uint16_t umaskval,uint32_t maprootuid,uint32_t maprootgid,uint32_t mapalluid,uint32_t mapallgid,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashretention,uint32_t maxtrashretention,uint32_t disables) {
+void main_setparams(uint8_t sesflags,uint16_t umaskval,uint32_t maprootuid,uint32_t maprootgid,uint32_t mapalluid,uint32_t mapallgid,int32_t sclassgroups,uint8_t mingoal,uint8_t maxgoal,uint32_t mintrashretention,uint32_t maxtrashretention,uint32_t disables) {
 	params_sesflags = sesflags;
 	params_umaskval = umaskval;
 	params_maprootuid = maprootuid;
 	params_maprootgid = maprootgid;
 	params_mapalluid = mapalluid;
 	params_mapallgid = mapallgid;
+	params_sclassgroups = sclassgroups;
 	params_mingoal = mingoal;
 	params_maxgoal = maxgoal;
 	params_mintrashretention = mintrashretention;
@@ -979,9 +981,13 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	bprintf("master_umaskval: 0%03"PRIo16"\n",params_umaskval);
 	bprintf("master_maproot: %"PRIu32":%"PRIu32"\n",params_maprootuid,params_maprootgid);
 	bprintf("master_mapall: %"PRIu32":%"PRIu32"\n",params_mapalluid,params_mapallgid);
-	bprintf("master_goallimit: %"PRIu8":%"PRIu8"\n",params_mingoal,params_maxgoal);
+	if (params_sclassgroups>=0) {
+		bprintf("master_sclassgroups: 0x04%"PRIX16"\n",(uint16_t)params_sclassgroups);
+	} else {
+		bprintf("master_goallimit: %"PRIu8":%"PRIu8"\n",params_mingoal,params_maxgoal);
+	}
 	bprintf("master_trashlimit: %"PRIu32":%"PRIu32"\n",params_mintrashretention,params_maxtrashretention);
-	bprintf("master_disables: 0x%"PRIX32"\n",params_disables);
+	bprintf("master_disables: 0x08%"PRIX32"\n",params_disables);
 	{
 		uint32_t mver = master_version();
 		if (mver>0) {

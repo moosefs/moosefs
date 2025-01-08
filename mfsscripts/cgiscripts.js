@@ -182,16 +182,16 @@ function autoRefresh() {
     document.querySelector('#auto-refresh + .slider .slider-text').innerText='';
   }
   document.documentElement.style.setProperty('--progress-rotation', rotation + "deg");
-  if (countUp != 0) return;
-  if (checkbox && checkbox.checked) {
+  refreshRequired = doRefreshCountdowns();
+  if ((countUp == 0 && checkbox && checkbox.checked) || refreshRequired) {
     doRefresh();
   }
 }
 
-function doRefresh() {
+function doRefresh(scrollToGraphInfo=false) {
   // secondsSinceLastRefresh = (Date.now() - lastRefresh.getTime())/1000;
 
-  //refresh master charts if they exist, reload data but don't reload divs
+  //refresh master charts if they exist, reload data but don't reload div-s
   if (typeof ma_charttab !== 'undefined') {
     for (const chartWrapper of ma_charttab) {
       chartWrapper.reload(false);
@@ -202,7 +202,7 @@ function doRefresh() {
       chartWrapper.reload(false);
     }
   }  
-  //refresh cs charts if they exist, reload data but don't reload divs
+  //refresh cs charts if they exist, reload data but don't reload div-s
   if (typeof cs_charttab !== 'undefined') {
     for (const chartWrapper of cs_charttab) {
       chartWrapper.reload(false);
@@ -216,9 +216,14 @@ function doRefresh() {
   var xhttp = new XMLHttpRequest();
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
+      const graph_info_old = document.getElementById('mfsgraph-info');
       lastRefresh = new Date();
-      document.getElementById('container-ajax').innerHTML = this.responseText;
-      document.getElementById('refresh-timestamp').innerHTML = formattedDateTime(lastRefresh);
+      document.getElementById('container-ajax').innerHTML = this.responseText; //refresh the main container
+      graph_info_new = document.getElementById('mfsgraph-info');
+      if (graph_info_new && graph_info_old) graph_info_new.innerHTML = graph_info_old.innerHTML; //use old graph-info for a while to prevent blinking
+      document.getElementById('refresh-timestamp').innerHTML = formattedDateTime(lastRefresh); //refresh footer timestamp
+      graph_info_href = sessionStorage.getItem("mfsgraph-info-data-ajax-href");
+      if (graph_info_new && graph_info_href) refreshGraphInfo(graph_info_href, scrollToGraphInfo); //refresh graph info
       applyAcidTab(false, true); //update dynamic tables after reload (styling, #-numbering, sorting etc)
       initAllKnobs(); //re-init knobs positions
     }
@@ -235,6 +240,33 @@ function doRefresh() {
     xhttp.open("GET", href, true);
     xhttp.send();
   }
+}
+
+//auto refresh also takes care for refreshing countdowns, this function performs actual countdown
+//returns true if countdown finished to 0, so the general page refresh is required
+function doRefreshCountdowns() {
+  var refreshRequired = false;
+  var countdowns = document.querySelectorAll(".countdown"), i;
+  for (i = 0; i < countdowns.length; ++i) {
+    if (countdowns[i].innerText.includes(':')) {
+      const parts = countdowns[i].innerText.split(':'); // Split the string into minutes and seconds
+      var minutes = parseInt(parts[0], 10); // Parse the minutes part
+      var seconds = (minutes * 60) + parseInt(parts[1], 10); // Parse the seconds part
+      seconds = seconds - 1;
+      if (seconds>0) {
+        minutes = Math.floor(seconds / 60); // Calculate the number of complete minutes
+        seconds = seconds % 60; // Calculate the remaining seconds
+        // Format minutes and seconds to always show two digits
+        const formattedMinutes = String(minutes);
+        const formattedSeconds = String(seconds).padStart(2, '0');
+        countdowns[i].innerText = `${formattedMinutes}:${formattedSeconds}`;
+      } else {
+        countdowns[i].innerText = "0:00";
+        refreshRequired = true; //countdown completed, general refresh will be required
+      }
+    }
+  }
+  return refreshRequired;
 }
 // End of auto refreshing
 /////////////////////////////////////////
@@ -305,4 +337,100 @@ function storeKnobRotation(id, degrees) {
   }
 }
 // Knobs management
+/////////////////////////////////////////
+
+/////////////////////////////////////////
+// Graph support
+document.addEventListener('DOMContentLoaded', function() {
+  initGraphInfo();
+}, false);
+
+//Shows an additional table under the graph after a click on the graph element with more details on this element
+function showGraphInfo(section, subsection='', add_params='') {
+  const graphInfo=document.getElementById('mfsgraph-info');
+  if (!graphInfo) return;
+  const href = new URL(window.location.href);
+  const params = new URLSearchParams(href.search);
+  params.set('ajax', 'container');
+  params.set('sections', section);
+  params.set('subsections', subsection);
+  params.set('readonly','1');
+  params.set('selectable','0');
+  params.delete('HDdata'); //ajax-ed HDdata may interfere with the main HDdata (possibly included in the original URL)
+  href.search=params.toString()+'&'+add_params;
+  if (href) {
+    sessionStorage.setItem("mfsgraph-info-data-ajax-href", href);
+  }
+  //refresh the whole page and scroll to graph info
+  doRefresh(true);
+}
+
+function refreshGraphInfo(href, scrollTo=false) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById('mfsgraph-info').innerHTML = this.responseText;
+      // add scroll-up and close table buttons to the table
+      var tables = document.querySelectorAll('#mfsgraph-info .tab_title');
+      for (var i = 0; i < tables.length; i++) {
+        var span = document.createElement("span");
+        span.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;<svg height='12px' width='12px' class='pointer' onclick='scrollToGraph()'><use xlink:href='#icon-go-up'/></svg>&nbsp;&nbsp;<svg height='12px' width='12px' class='pointer' onclick='hideGraphInfo()'><use xlink:href='#icon-close'/></svg>";
+        tables[i].appendChild(span);
+      }
+      var tables = document.querySelectorAll('#mfsgraph-info table.acid_tab');
+      // Loop through all tables and make them as narrow as possible
+      tables.forEach(function(tbl) {
+        tbl.style.width = 'min-content';
+        tbl.style.minWidth = '500px';
+        tbl.style.marginLeft = '0';
+    });
+      applyAcidTab(false, true); //update dynamic tables after reload (styling, #-numbering, sorting etc)
+      initAllKnobs(); //re-init knobs positions
+      if (scrollTo) scrollToGraphInfo();
+    }
+  };
+  const graphInfo=document.getElementById('mfsgraph-info');
+  if (graphInfo){
+    if (href) {
+      xhttp.open("GET", href, true);
+      xhttp.send();
+      sessionStorage.setItem("mfsgraph-info-data-ajax-href", href);
+    }
+  }
+}
+
+//Hides additional graph information
+function hideGraphInfo() {
+  sessionStorage.setItem("mfsgraph-info-data-ajax-href", null);
+  const graphInfo=document.getElementById('mfsgraph-info');
+  if (graphInfo) {
+    graphInfo.innerHTML = '';
+    graphInfo.setAttribute('data-ajax-href','');
+    scrollToGraph();
+  }
+}
+
+//Scrolls screen to show graph's top
+function scrollToGraph() {
+  if (document.getElementById('mfsgraph-tile')) document.getElementById('mfsgraph-tile').scrollIntoView({ behavior: 'smooth' });
+}
+
+function scrollToGraphInfo() {
+  if (document.getElementById('mfsgraph-info')) document.getElementById('mfsgraph-info').scrollIntoView({ behavior: 'smooth' });
+}
+
+function initGraphInfo() {
+  //show graph info upon page reload if there is appropriate href stored in the session storage
+  const graphInfo=document.getElementById('mfsgraph-info');
+  if (graphInfo) {
+    var href=graphInfo.getAttribute('data-ajax-href');
+    if (!href) {
+      href = sessionStorage.getItem("mfsgraph-info-data-ajax-href");
+      if (href) {
+        refreshGraphInfo(href);
+      }
+    }
+  }
+}
+// Graph support
 /////////////////////////////////////////

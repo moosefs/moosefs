@@ -1325,6 +1325,7 @@ int meta_loadfile(const char *filename) {
 		fs_new();
 		chunk_newfs();
 		sessions_new();
+		sclass_new();
 		metaversion = 1;
 		metaid = 0;
 //		metaid = main_time();

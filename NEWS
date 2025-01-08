@@ -2,6 +2,10 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 4.57.0-1 (2024-12-09)
 
+  - (all) added storage class priority, description and export group
+  - (master) added storage class group allowance to exports.cfg (deprecates mingoal/maxgoal)
+  - (master) changed predefined storage classes in new MFS instances
+  - (all) removed support for python 2.7
   - (master) added info for changelog module
   - (daemons) warnings if a variable is defined more than once in a config file
   - (bdev) added test for posix compliant ioctl prototype

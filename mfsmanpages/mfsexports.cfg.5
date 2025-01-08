@@ -70,14 +70,18 @@ used. Names are resolved on \fBmfsmaster\fP side (see note below).
 like above but maps all non privileged users (uid!=0) accesses to given
 user and group (see notes below).
 .TP
+\fBumask=\fP\fI0###\fP
+this umask is added (OR) to user's umask and the resulting umask is used 
+in this mount point
+.TP
+\fBsclassgroups=\fP\fI-|N[:N[:...]]\fP
+if this option is not defined, any storage class can be set by user in this mount point, if it is defined, only storage classes belonging to listed groups can be set; to define no groups (user cannot set any storage class) use '-' (minus) sign; for explanation on how to add a storage class to a group see \fBmfsscadmin\fP(1); for more detailed explanation see \fBSTORAGE CLASS GROUPS\fP
+.TP
 \fBpassword=\fP\fIPASS\fP, \fBmd5pass=\fP\fIMD5\fP
 requires password authentication in order to access specified resource
 .TP
 \fBminversion=\fP\fIVER\fP
 rejects access from clients older than specified
-.TP
-\fBmingoal=\fP\fIN\fP, \fBmaxgoal=\fP\fIN\fP
-specify range in which goal can be set by users
 .TP
 \fBmintrashretention=\fP\fITIME\fP, \fBmaxtrashretention=\fP\fITIME\fP
 specify range in which trash retention can be set by users
@@ -88,7 +92,7 @@ deprectaed options (function similalry as above)
 \fBdisable=\fP\fIOPERATION[:OPERATION[:...]]\fP 
 do not allow the client to perform certain operations
 .PP
-Default options are: \fBro, maproot=999:999, mingoal=1, maxgoal=9, mintrashretention=0, maxtrashretention=4294967295\fP.
+Default options are: \fBro, maproot=999:999, mintrashretention=0, maxtrashretention=4294967295\fP.
 .PP
 Note! Default value for maxtrashretention is impossible to be set by user, so if the value is not set, then it can be considered close to infinity, but if it is set, then the maximum is 65535 hours (~390 weeks).
 .SH NOTES
@@ -143,6 +147,53 @@ seteattr     - don't allow the client to set mfs extra attributes
 setxattr     - don't allow the client to set XATTRs
 setfacl      - don't allow the client to set ACLs
 .fi
+.SH STORAGE CLASS GROUPS
+.PP
+A system admin may not want MooseFS users to be able to apply just any Storage Class
+to data, for security reasons. Therefore MooseFS provides a way to only allow 
+for certain Storage Classes to be used in a mountpoint.
+.PP
+First, selected Storage Classes must be assigned to one of 16 (numbered from 0 
+to 15) Storage Class Groups. This is done when creating or modyfing a Storage
+Class with \fBmfsscadmin\fP tool (see \fBmfsscadmin\fP(1)). Once a group is properly defined,
+when option \fBsclassgroups\fP is used in a definition of a mountpoint export, a user 
+using this mountpoint export can only apply (set) Storage Classes from the
+defined group, when they use the \fBmfssclass\fP tool.
+.PP
+Example: if there are four different Storage Classes defined in a cluster,
+two of them assigned to group 0, two to group 1, and a mountpoint export
+only allows to use Storage Classes from group 1, users will only be able to set
+the two Storage Classes that are assigned to group 1, an attempt to set a
+Storage Class assigned to group 0 will result in an error and the file's class will
+not be changed. This does NOT affect the Storage Class inheritance rule, that 
+is, if a user creates a new file in a directory belonging to a Storage Class
+in group 0, this file will belong to the same class in group 0. But if the user
+subsequently changes the file's Storage Class to one of the classes they are
+allowed to use (from group 1), they cannot change it back to its original 
+Storage Class, as that class belongs to "forbidden" group 0.
+.PP
+\fBImportant!\fP Default Storage Class group is 0, unless another is
+explicitly set when creating or modifying a Storage Class, so 
+for the purpose of limiting the availability of Storage Classes for users
+it's better to use group numbers greater than 0.
+.PP
+\fBLegacy systems\fP Up to MooseFS version 4.56.6 the mechanism of Storage
+Class Groups did not exist. Instead, there were two options \fBmingoal\fP
+and \fBmaxgoal\fP, inherited from previous versions of MooseFS. If any of
+them were set, a user would be allowed to use only legacy Storage Classes
+(classes with IDs 1 to 9, named "1" to "9", with KEEP definitions 1* to 9*) 
+with name not lower than \fBmingoal\fP and not higher than \fBmaxgoal\fP 
+plus any admin defined classes (ID>9). To simulate this behaviour, in case
+of an upgrade from a version that still had these classes and also used
+\fBmingoal\fP and \fBmaxgoal\fP in config, the system will assign those 
+legacy classes "1" to "9" to groups 1 to 9, respectively and will convert 
+any \fBmingoal\fP and \fBmaxgoal\fP to appropriate \fBsclassgroups\fP
+expression. Example: if \fBmingoal\fP is set to 3 and \fBmaxgoal\fP is
+set to 5, \fBsclassgroups\fP will be set to 0,3,4,5 - 0 to allow users
+to use admin-defined classes, 3,4,5 to allow the use of legacy classes
+"3","4" and "5". The old settings should not be used, system admins
+should instead define Storage Class Groups of their choice and use
+the \fBsclassgroups\fP option explicitly.
 .SH EXAMPLES
 .nf
 .ta +2i
@@ -177,4 +228,4 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmaster (8),
-.BR mfsmaster.cfg (5)
+.BR mfsmaster.cfg (5)

@@ -4,22 +4,27 @@ mfsscadmin \- \fBMooseFS\fP storage class administration tool
 .SH SYNOPSIS
 .B mfscreatesclass
 [\fB-?\fP] [\fB-M\fP \fIMOUNTPOINT\fP]
+\fB-K\fP \fIKEEP_LABELS\fP
+[\fB-c\fP \fIdescription\fP]
+[\fB-p\fP \fIpriority\fP]
+[\fB-g\fP \fIexport_group\fP]
 [\fB-a\fP \fIadmin_only\fP]
 [\fB-m\fP \fIlabels_mode\fP]
 [\fB-o\fP \fIarch_mode\fP]
-[\fB-C\fP \fICREATION_LABELS\fP]
-\fB-K\fP \fIKEEP_LABELS\fP
+[\fB-C\fP \fICREATE_LABELS\fP]
 [\fB-A\fP \fIARCH_LABELS\fP [\fB-d\fP \fIarch_delay\fP] [\fB-s\fP \fImin_file_length\fP]]
 [\fB-T\fP \fITRASH_LABELS\fP [\fB-t\fP \fImin_trashretention\fP]]
 \fISCLASS_NAME\fP...
 .PP
 .B mfsmodifysclass
 [\fB-?\fP] [\fB-M\fP \fIMOUNTPOINT\fP]
-[\fB-f\fP]
+[\fB-c\fP \fIdescription\fP]
+[\fB-p\fP \fIpriority\fP]
+[\fB-g\fP \fIexport_group\fP]
 [\fB-a\fP \fIadmin_only\fP]
 [\fB-m\fP \fIlabels_mode\fP]
 [\fB-o\fP \fIarch_mode\fP]
-[\fB-C\fP \fICREATION_LABELS\fP]
+[\fB-C\fP \fICREATE_LABELS\fP]
 [\fB-K\fP \fIKEEP_LABELS\fP]
 [\fB-A\fP \fIARCH_LABELS\fP]
 [\fB-d\fP \fIarch_delay\fP]
@@ -51,7 +56,7 @@ mfsscadmin \- \fBMooseFS\fP storage class administration tool
 [\fB-n\fP \fIfilename\fP]
 .SH DESCRIPTION
 This is a set of tools for creating and modifying storage classes, which can be later applied to
-MooseFS objects with \fBmfssclass\fP tools (see mfssclass(1)).
+MooseFS objects with \fBmfssclass\fP tools (see \fBmfssclass\fP(1)).
 Storage class is a set of labels expressions and options that indicates
 on which chunkservers the files in this class should be written and later kept.
 .PP
@@ -79,7 +84,7 @@ input format should be identical to \fBmfslistsclass -l\fP output.
 .SH OPTIONS
 .PP
 \fB-C\fP optional parameter, that tells the system to which chunkservers, defined by the
-\fICREATION_LABELS\fP expression, the chunk should be first written just after creation; if
+\fICREATE_LABELS\fP expression, the chunk should be first written just after creation; if
 this parameter is not provided for a class, the \fIKEEP_LABELS\fP chunkservers will be used
 .PP
 \fB-K\fP mandatory parameter,
@@ -108,10 +113,14 @@ default is \fBC\fP; see \fBARCHIVE BEHAVIOUR\fP section below for details
 \fB-t\fP optional parameter, that defines, how much time in Trash must be left for the system to actually
 use the schema defined in \fB-T\fP for a chunk; minimum unit is hours, default is 0, for value formating see TIME
 .PP
+\fB-c\fP optional parameter, that defines a class description, for user's convenience (a string, maximum length is 255 bytes) 
+.PP
+\fB-p\fP optional paremeter, that defines a class priority; default is 0, see \fBSTORAGE CLASSES PRIORITY\fP section
+.PP
+\fB-g\fP optional parameter, that defines a class export group; possible values are 0 to 15, default is 0; see \fBmfsexport.cfg\fP(5) for explanation
+.PP
 \fB-a\fP can be either 1 or 0 and indicates if the storage class is available to everyone (0)
 or admin only (1)
-.PP
-\fB-f\fP force the changes on a predefined storage class (see \fBPREDEFINED STORAGE CLASSES\fP section), use with caution!
 .PP
 \fB-m\fP label mode used; possible values are \fBl\fP (or \fBL\fP, \fBloose\fP, \fBLoose\fP, \fBLOOSE\fP) for LOOSE mode, \fBd\fP (or \fBD\fP, \fBstd\fP, \fBStd\fP, \fBSTD\fP) for DEFAULT mode and \fBs\fP (or \fBS\fP, \fBstrict\fP, \fBStrict\fP, \fBSTRICT\fP) for STRICT mode; if no mode is defined, DEFAULT mode is assumed; behaviour of label modes is described below in \fBLABEL MODES\fP section
 .PP
@@ -163,7 +172,7 @@ For EC labels expression starts with \fB@\fP sign, followed by a number of data 
 the chunk should have. Possible numbers of data parts are \fB4\fP or \fB8\fP. Possible numbers of parity parts are \fB1\fP (CE version) or \fB1\fP to \fB9\fP (PRO version).
 So, for example, \fB@4+1\fP means EC with 4 data parts and 1 parity part, \fB@8+3\fP means EC
 with 8 data parts and 3 parity parts. If number of data parts is omitted then the master uses the default value defined by DEFAULT_EC_DATA_PARTS - see
-\fBmfsmaster.cfg\fP\|(5). In this case \fB@2\fP means \fB@8+2\fP or \fB@4+2\fP. Then, maximum of two subexpressions can follow, separated by commas.
+\fBmfsmaster.cfg\fP (5). In this case \fB@2\fP means \fB@8+2\fP or \fB@4+2\fP. Then, maximum of two subexpressions can follow, separated by commas.
 If only one is present, it defines where all the parts should be kept. If both are
 present, the first subexpression defines where data parts should be kept, the second subexpression defines where
 parity parts should be kept.
@@ -177,7 +186,7 @@ Distinguish extension can be a list of labels or one of the following special st
 .PP
 [IP] or [I] - distinguish by IP number
 .PP
-[RACK] or [R] - distinguish by RACK, as defined in topology, see  \fBmfstopology.cfg\fP\|(5)
+[RACK] or [R] - distinguish by RACK, as defined in topology, see  \fBmfstopology.cfg\fP (5)
 .PP
 If present, the distinguish part lets the system know that it should try to distribute full copies
 so that each copy is either on a different label from the list or on a chunkserver with
@@ -185,7 +194,7 @@ different IP address or from a different rack. For EC the distinguish part is cu
 .PP
 \fBNOTICE!\fP If \fBCHUNKS_UNIQUE_MODE\fP is defined in \fBmfsmaster.cfg\fP to a value other than 0,
 it will override any distinguish setting in storage classes. For more informations about this parameter
-refer to \fBmfsmaster.cfg\fP\|(5) manual.
+refer to \fBmfsmaster.cfg\fP (5) manual.
 .PP
 Labels mode override extension can be one of three characters: \fBd\fP (alternatively \fBD\fP or in string form \fBstd\fP or \fBStd\fP or \fBSTD\fP), \fBs\fP (alternatively \fBS\fP or in string form \fBstrict\fP or \fBStrict\fP or \fBSTRICT\fP) or \fBl\fP (alternatively \fBL\fP or in string form \fBloose\fP or \fBLoose\fP or \fBLOOSE\fP) and they mean that the DEFAULT, STRICT or LOOSE label mode, respectively, should be applied only to this one labels expression. For explanation about label modes see the LABEL MODES section.
 .PP
@@ -321,16 +330,97 @@ F - fastmode, chunk has archive flag set to on as soon as possible, whatever is 
 .PP
 P - "per chunk" mode, use chunk's mtime to determine if archive flag should be set on
 .PP
-Archive flag can be modified manually. See \fBmfsarchive\fP\|(1)
+Archive flag can be modified manually. See \fBmfsarchive\fP (1)
+.SH STORAGE CLASSES PRIORITY
+.PP
+Storage classes are assigned to files, but one chunk (one fragment of a file) can belong to many files, courtesy of the snapshot
+mechanism (see \fBmfssnapshots\fP (1)). If one chunk belongs to many files with different storage classes, one storage class must
+be picked to specify, how this chunk's copies should be kept in the system. Up to MooseFS version 4.56.0 a predefined class was artificially asigned 
+to such chunk. Currently one of the files' classes will be used, according to priorities assigned by the user, to be exact: the system will pick the class
+with highest priority out of all the files' classes.
+.PP
+Example 1: there are 3 classes defined:
+.br
+ClassA, with priority 100,
+.br
+ClassB, with priority 206,
+.br
+ClassC, with priority 1001.
+.PP
+A chunk, that belongs to 2 files, one in ClassA, the other in ClassB, will be stored according to the definition provided by classB (higher priority than ClassA).
+.br
+A chunk, that belongs to 3 files, one in ClassA, one in ClassB, one in ClassC, will be stored according to the definition provided by classC (higher priority than both ClassA and ClassB).
+.PP
+If two or more classes have the same priority, then the following factors will be considered, in order of importance, to determine, which class will be picked:
+.br
+- a class with higher redundancy level (RL) will be picked (maximum from each class's KEEP and ARCHIVE redundancy levels will be considered as this class's redundancy level),
+.br
+- a class that has EC format in ARCHIVE state will be picked over a class without EC,
+.br
+- a class that uses labels for KEEP or ARCHIVE state will be picked over a class without labels,
+.br
+- a class that has EC format in TRASH state will be picked over a class without EC,
+.br
+- a class that uses labels for TRASH state will be picked over a class without labels,
+.br
+- if none of the above conditions are used, a class with higher class id will be used.
+.PP
+Example 2: there are 5 classes defined, all with the same priority (e.g. the default priority 0):
+.br
+ClassA (id=1) has 3 copies in KEEP state (RL=2),
+.br
+ClassB (id=2) has 2 copies in KEEP state and EC4+1 in ARCHIVE state (RL=1, has EC in ARCHIVE),
+.br
+ClassC (id=3) has 2 copies in KEEP state, stored on labels X (RL=1, no EC in ARCHIVE, has labels in KEEP),
+.br
+ClassD (id=4) has 2 copies in KEEP state, stored on labels Y (RL=1, no EC in ARCHIVE, has labels in KEEP),
+.br
+ClassE (id=5) has 2 copies in KEEP state (RL=1).
+.br
+There is also a class ClassF defined, which has a priority of 77 and 2 copies in KEEP state (RL=1).
+.PP
+A chunk, that belongs to files in classes: ClassA, ClassC and ClassE will be stored according to definition of ClassA (highest RL).
+.br
+A chunk, that belongs to files in classes: ClassB, ClassC will be stored according to definition of ClassB (same RL, but ClassB has EC).
+.br
+A chunk, that belongs to files in classes: ClassC and ClassE will be stored according to definition of ClassC (same RL, but ClassC has labels).
+.br
+A chunk, that belongs to files in classes: ClassC and ClassD will be stored according to definition of ClassD (same RL, no EC, both have labels, so higher class ID is picked).
+.br
+A chunk, that belongs to files in 6 classes, from ClassA to ClassF, will be stored according to definition of ClassF, because this one has higher priority than all the other classes (77>0).
+.br
+In a system with these 6 storage classes classE will never be used for a chunk belonging to multiple files, it has the lowest possible priority (0) and no extra conditions to justify its choice (lowest existing RL, no EC and no labels).
 .SH PREDEFINED STORAGE CLASSES
-For compatibility reasons, every fresh or freshly upgraded instance of MooseFS has 9 predefined
+.PP
+A new MooseFS instance will have the following classes predefined:
+.PP
+2CP - only KEEP state defined, keep 2 copies on any labels (default class for / directory)
+.PP
+3CP - only KEEP state defined, keep 3 copies on any labels
+.PP
+EC4+1 - in KEEP state, keep 2 copies on any labels, in ARCHIVE state, keep chunks in EC4+1 format on any labels, archive delay is 1 day and is calculated using file's ctime, files smaller than 512kiB will not be converted to EC format
+.PP
+EC4+2 - (pro only) in KEEP state, keep 3 copies on any labels, in ARCHIVE state, keep chunks in EC4+2 format on any labels, archive delay is 1 day and is calculated using file's ctime, files smaller than 512kiB will not be converted to EC format
+.PP
+EC8+1 - in KEEP state, keep 2 copies on any labels, in ARCHIVE state, keep chunks in EC8+1 format on any labels, archive delay is 1 day and is calculated using file's ctime, files smaller than 512kiB will not be converted to EC format
+.PP
+EC8+2 - (pro only) in KEEP state, keep 3 copies on any labels, in ARCHIVE state, keep chunks in EC8+2 format on any labels, archive delay is 1 day and is calculated using file's ctime, files smaller than 512kiB will not be converted to EC format
+.PP
+These classes are fully modifiable and deletable and can be replaced with user's choice of classes.
+.PP
+Up to version 4.56.0 of MooseFS the predefined classes were different. The following information 
+pertains to old MooseFS behaviour. In newer versions of MooseFS the classes mentioned below might 
+exist as a result of an upgrade, but will behave exactly as any user-defined classes. This information 
+is left here purely for informative reasons and will be removed from this manual page at some point:
+.PP
+(Behaviour up to version 4.56.0) "For compatibility reasons, every fresh or freshly upgraded instance of MooseFS has 9 predefined
 storage classes. Their names are single digits, from \fB1\fP to \fB9\fP, and their definitions
 are \fB*\fP to \fB9*\fP. They
 are equivalents of simple numeric goals from previous versions of the system. In case of an
 upgrade, all files that had goal \fIN\fP before upgrade, will now have \fIN\fP storage class.
 These classes can be modified only when option \fB-f\fP is specified. It is advised to create new
 storage classes in an upgraded system and migrate files with \fBmfsxchgsclass\fP tool, rather than
-modify the predefined classes. The predefined classes CANNOT be deleted.
+modify the predefined classes. The predefined classes CANNOT be deleted."
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

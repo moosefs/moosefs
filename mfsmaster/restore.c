@@ -1016,7 +1016,7 @@ int do_session(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootinode,sesflags,peerip,sessionid;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
-	uint32_t mingoal,maxgoal,mintrashretention,maxtrashretention;
+	uint32_t mingoal,maxgoal,sclassgroups,mintrashretention,maxtrashretention;
 	uint32_t disables;
 	uint16_t umaskval;
 	uint64_t exportscsum;
@@ -1056,9 +1056,23 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,',');
 	GETU32(mapallgid,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(mingoal,ptr);
-	EAT(ptr,filename,lv,',');
-	GETU32(maxgoal,ptr);
+	if (*ptr=='0' && ptr[1]=='x') {
+		ptr+=2;
+		GETX32(sclassgroups,ptr);
+		if (sclassgroups>0xFFFF) {
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"wrong sclassgroups (0x%"PRIX32")",sclassgroups);
+			return -1;
+		}
+	} else {
+		GETU32(mingoal,ptr);
+		EAT(ptr,filename,lv,',');
+		GETU32(maxgoal,ptr);
+		sclassgroups = 1;
+		while (mingoal<=maxgoal) {
+			sclassgroups |= (1<<mingoal);
+			mingoal++;
+		}
+	}
 	EAT(ptr,filename,lv,',');
 	GETU32(mintrashretention,ptr);
 	EAT(ptr,filename,lv,',');
@@ -1078,13 +1092,13 @@ int do_sesadd(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,':');
 	GETU32(sessionid,ptr);
 	(void)ptr; // silence cppcheck warnings
-	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashretention,maxtrashretention,disables,peerip,info,ileng,sessionid);
+	return sessions_mr_sesadd(exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,sclassgroups,mintrashretention,maxtrashretention,disables,peerip,info,ileng,sessionid);
 }
 
 int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint32_t rootinode,sesflags,peerip,sessionid;
 	uint32_t rootuid,rootgid,mapalluid,mapallgid;
-	uint32_t mingoal,maxgoal,mintrashretention,maxtrashretention;
+	uint32_t mingoal,maxgoal,sclassgroups,mintrashretention,maxtrashretention;
 	uint32_t disables;
 	uint16_t umaskval;
 	uint64_t exportscsum;
@@ -1126,9 +1140,23 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	EAT(ptr,filename,lv,',');
 	GETU32(mapallgid,ptr);
 	EAT(ptr,filename,lv,',');
-	GETU32(mingoal,ptr);
-	EAT(ptr,filename,lv,',');
-	GETU32(maxgoal,ptr);
+	if (*ptr=='0' && ptr[1]=='x') {
+		ptr+=2;
+		GETX32(sclassgroups,ptr);
+		if (sclassgroups>0xFFFF) {
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"wrong sclassgroups (0x%"PRIX32")",sclassgroups);
+			return -1;
+		}
+	} else {
+		GETU32(mingoal,ptr);
+		EAT(ptr,filename,lv,',');
+		GETU32(maxgoal,ptr);
+		sclassgroups = 1;
+		while (mingoal<=maxgoal) {
+			sclassgroups |= (1<<mingoal);
+			mingoal++;
+		}
+	}
 	EAT(ptr,filename,lv,',');
 	GETU32(mintrashretention,ptr);
 	EAT(ptr,filename,lv,',');
@@ -1146,7 +1174,7 @@ int do_seschanged(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) 
 	GETDATA(info,ileng,infosize,ptr,filename,lv,')');
 	EAT(ptr,filename,lv,')');
 	(void)ptr; // silence cppcheck warnings
-	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,mingoal,maxgoal,mintrashretention,maxtrashretention,disables,peerip,info,ileng);
+	return sessions_mr_seschanged(sessionid,exportscsum,rootinode,sesflags,umaskval,rootuid,rootgid,mapalluid,mapallgid,sclassgroups,mintrashretention,maxtrashretention,disables,peerip,info,ileng);
 }
 
 int do_sesdel(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
@@ -1554,10 +1582,13 @@ int do_scren(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 
 int do_scset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	uint8_t name[256];
+	uint8_t desc[256];
 	uint16_t spid;
 	uint16_t arch_delay,min_trashretention;
 	uint64_t arch_min_size;
-	uint8_t new_flag,adminonly,labels_mode,arch_mode,i;
+	uint8_t version;
+	uint8_t new_flag,export_group,adminonly,labels_mode,arch_mode,i;
+	uint32_t priority;
 	storagemode create,keep,arch,trash;
 //	uint8_t create_labelscnt,keep_labelscnt,arch_labelscnt;
 	uint32_t old_labelmasks[MAXLABELSCNT*MASKORGROUP];
@@ -1566,6 +1597,7 @@ int do_scset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	static uint32_t labelexpr_size = 0;
 
 	(void)ts;
+	version = 0;
 	memset(&create,0,sizeof(storagemode));
 	memset(&keep,0,sizeof(storagemode));
 	memset(&arch,0,sizeof(storagemode));
@@ -1618,10 +1650,28 @@ int do_scset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 			sclass_maskorgroup_to_labelexpr(arch.labelexpr,old_labelmasks,arch.labelscnt);
 			arch_delay *= 24;
 		}
+		desc[0] = 0;
+		priority = 0;
+		export_group = 0;
 		min_trashretention = 0;
 		arch_min_size = 0;
 		arch_mode = SCLASS_ARCH_MODE_CTIME;
-	} else if (*ptr=='C') { // MFS >= 4.0
+	} else if (*ptr=='C' || *ptr=='1') { // MFS >= 4.0
+		if (*ptr=='1') { // MFS >= 4.57.0
+			EAT(ptr,filename,lv,'1');
+			EAT(ptr,filename,lv,',');
+			GETNAME(desc,ptr,filename,lv,',');
+			EAT(ptr,filename,lv,',');
+			GETU32(priority,ptr);
+			EAT(ptr,filename,lv,',');
+			GETU8(export_group,ptr);
+			EAT(ptr,filename,lv,',');
+			version = 1;
+		} else {
+			desc[0] = 0;
+			priority = 0;
+			export_group = 0;
+		}
 		EAT(ptr,filename,lv,'C');
 		EAT(ptr,filename,lv,'(');
 		GETU8(create.labelscnt,ptr);
@@ -1740,8 +1790,13 @@ int do_scset(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {
 	EAT(ptr,filename,lv,')');
 	EAT(ptr,filename,lv,':');
 	GETU16(spid,ptr);
+	if (version==0) {
+		if (spid<10) {
+			export_group = spid;
+		}
+	}
 	(void)ptr; // silence cppcheck warnings
-	return sclass_mr_set_entry(strlen((char*)name),name,spid,new_flag,adminonly,labels_mode,arch_mode,arch_delay,arch_min_size,min_trashretention,&create,&keep,&arch,&trash);
+	return sclass_mr_set_entry(strlen((char*)name),name,spid,new_flag,strlen((char*)desc),desc,priority,export_group,adminonly,labels_mode,arch_mode,arch_delay,arch_min_size,min_trashretention,&create,&keep,&arch,&trash);
 }
 
 int do_trash_recover(const char *filename,uint64_t lv,uint32_t ts,const char *ptr) {

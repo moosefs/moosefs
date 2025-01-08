@@ -25,7 +25,7 @@
 
 #include "libmfstools.h"
 
-int get_sclass(const char *fname, uint8_t *goal, char storage_class_name[MAXSCLASSNLENG], uint8_t mode) {
+int get_sclass(const char *fname, uint8_t *goal, char storage_class_name[MAXSCLASSNAMELENG], uint8_t mode) {
 	uint32_t inode;
 	int32_t	leng;
 	uint8_t fn,dn,i;
@@ -128,7 +128,7 @@ error:
 }
 
 
-int set_sclass(const char *fname,uint8_t goal,const char src_storage_class_name[MAXSCLASSNLENG],const char storage_class_name[MAXSCLASSNLENG],uint8_t mode) {
+int set_sclass(const char *fname,uint8_t goal,const char src_storage_class_name[MAXSCLASSNAMELENG],const char storage_class_name[MAXSCLASSNAMELENG],uint8_t mode) {
 	uint8_t nleng,snleng;
 	uint32_t inode, uid;
 	int32_t leng;
@@ -292,7 +292,7 @@ int getsclassexe(int argc,char *argv[]) {
 	int ch;
 	int rflag = 0;
 	int status = 0;
-	char storage_class_name[MAXSCLASSNLENG];
+	char storage_class_name[MAXSCLASSNAMELENG];
 	uint8_t goal;
 
 	while ((ch=getopt(argc,argv,"?nhHkmgr"))!=-1) {
@@ -338,7 +338,7 @@ int setsclassexe(int argc,char *argv[]) {
 	int status = 0;
 	char *p;
 	int scl;
-	char storage_class_name[MAXSCLASSNLENG];
+	char storage_class_name[MAXSCLASSNAMELENG];
 
 	while ((ch=getopt(argc,argv,"?nhHkmgr"))!=-1) {
 		switch (ch) {
@@ -368,7 +368,7 @@ int setsclassexe(int argc,char *argv[]) {
 
 	p = argv[0];
 	scl = strlen(p);
-	if (scl>=MAXSCLASSNLENG) {
+	if (scl>=MAXSCLASSNAMELENG) {
 		printf("%s: storage class name too long\n", argv[0]);
 		setsclassusage();
 		return 1;
@@ -394,7 +394,7 @@ int copysclassexe(int argc,char *argv[]) {
 	int ch;
 	int rflag = 0;
 	int status = 0;
-	char storage_class_name[MAXSCLASSNLENG];
+	char storage_class_name[MAXSCLASSNAMELENG];
 	uint8_t goal;
 
 	while ((ch=getopt(argc,argv,"?nhHkmgr"))!=-1) {
@@ -446,8 +446,8 @@ int xchgsclassexe(int argc,char *argv[]) {
 	int status = 0;
 	char *p;
 	int scl;
-	char src_storage_class_name[MAXSCLASSNLENG];
-	char dst_storage_class_name[MAXSCLASSNLENG];
+	char src_storage_class_name[MAXSCLASSNAMELENG];
+	char dst_storage_class_name[MAXSCLASSNAMELENG];
 
 	while ((ch=getopt(argc,argv,"?nhHkmgr"))!=-1) {
 		switch (ch) {
@@ -477,7 +477,7 @@ int xchgsclassexe(int argc,char *argv[]) {
 
 	p = argv[0];
 	scl = strlen(p);
-	if (scl>=MAXSCLASSNLENG) {
+	if (scl>=MAXSCLASSNAMELENG) {
 		printf("%s: storage class name too long\n", p);
 		xchgsclassusage();
 		return 1;
@@ -491,7 +491,7 @@ int xchgsclassexe(int argc,char *argv[]) {
 	p = argv[0];
 
 	scl = strlen(p);
-	if (scl>=MAXSCLASSNLENG) {
+	if (scl>=MAXSCLASSNAMELENG) {
 		printf("%s: storage class name too long\n", p);
 		xchgsclassusage();
 		return 1;

@@ -117,6 +117,7 @@ int cfg_reload (void) {
 		}
 		for (tmp = paramhead ; tmp && found==0; tmp=tmp->next) {
 			if (strcmp(tmp->name,linebuff+nps)==0) {
+				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"variable '%s' defined more than once in the config file (previous value: %s, current value: %s)",tmp->name,tmp->value,linebuff+vps);
 				free(tmp->value);
 				tmp->value = (char*)malloc(vpe-vps+1);
 				memcpy(tmp->value,linebuff+vps,vpe-vps+1);

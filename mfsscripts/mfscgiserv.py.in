@@ -247,7 +247,7 @@ class HTTP(ClientHandler):
 		if (self.protocol == "HTTP/1.1" and close_conn.lower() == "keep-alive"):
 			self.close_when_done = False
 		# parse the url
-		_,_,path,params,query,fragment = urlparse(self.url)
+		_,_,path,params,query,fragment = urlparse('http://localhost'+self.url)
 		self.path,self.rest = path,(params,query,fragment)
 
 		if self.method == 'POST':
@@ -318,7 +318,10 @@ class HTTP(ClientHandler):
 
 	def translate_path(self):
 		"""Translate URL path into a path in the file system"""
-		return os.path.realpath(os.path.join(HTTP.root,*self.path.split('/')))
+		trpath = os.path.realpath(os.path.join(HTTP.root,*self.path.split('/')))
+		if self.path[-1]=='/':
+			trpath+='/'
+		return trpath
 
 	def managed(self):
 		"""Test if the request can be processed by a specific method

@@ -829,6 +829,8 @@ static void dirbuf_meta_fill(dirbuf *b, uint32_t ino) {
 	b->p = NULL;
 	b->size = 0;
 	msize = dir_metaentries_size(ino);
+	dbuff = NULL;
+	dsize = 0;
 	if (ino==META_TRASH_INODE && (master_version()<VERSION2INT(3,0,64) || flat_trash)) {
 		status = fs_gettrash(0xFFFFFFFF,&dbuff,&dsize);
 		if (status!=MFS_STATUS_OK) {

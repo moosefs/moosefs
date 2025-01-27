@@ -337,8 +337,7 @@ div.CHARTDYNAMIC {background-repeat: no-repeat; text-align: left; height: 120px;
 span.TOOLTIP {position: absolute; white-space: nowrap; display: none; background: var(--tooltip-bckgnd-clr); border-radius: 3px; border: 1px solid var(--c500); color: black; padding: 2px 4px; z-index: 1000;}
 span.HLINE {position: absolute; white-space: nowrap; display: none; background: #000000; border: 0px; color: black; padding: 0px 0px; z-index: 900; width: 1px; height: 100px;}
 span.CAPTION {position: relative; top: 6px; left: 42px ; height: 19px; border: 1px solid black; color: var(--text-clr); background: var(--caption-bckgnd-clr); padding: 0px 5px; display: inline-block; line-height: 19px}
-span.CAPTIONJS {position: relative; top: 1px; left: -1px ; height: 20px; border-bottom-right-radius: 4px; border: 1px solid var(--c500); font-size: 12px; color: var(--text-clr); background: var(--caption-bckgnd-clr); padding: 0px 5px; display: inline-block; line-height: 19px; text-align: left;}
-
+span.CAPTIONJS {position: relative; top: 4px; left: -1px ; height: 20px; border-bottom-right-radius: 4px; border-top-right-radius: 4px; border: 1px solid var(--c500); font-size: 12px; color: black; background: #cff8ff;/*color: var(--text-clr); background: var(--caption-bckgnd-clr);*/ padding: 0px 5px; display: inline-block; line-height: 19px; text-align: left;}
 
 
 table {border: 1px solid var(--tbl-brd-clr); border-spacing: 0; border-collapse: collapse;line-height: normal;}

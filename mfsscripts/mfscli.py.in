@@ -427,10 +427,10 @@ else: # CLI mode
 			('read_chunk',18,1,'Number of chunk_read operations'),
 			('write_chunk',19,1,'Number of chunk_write operations'),
 			('memoryrss',20,2,'Resident memory usage'),
-			('prcvd',21,1,'Received packets'),
-			('psent',22,1,'Sent packets'),
-			('brcvd',23,1,'Received bytes'),
-			('bsent',24,1,'Sent bytes'),
+			('prcvd',21,1,'Packets received by master'),
+			('psent',22,1,'Packets sent by master'),
+			('brcvd',23,5,'Bytes received by master'),
+			('bsent',24,5,'Bytes sent by master'),
 			('memoryvirt',25,2,'Virtual memory usage'),
 			('usedspace',26,2,'RAW disk space usage'),
 			('totalspace',27,2,'RAW disk space connected'),
@@ -455,8 +455,8 @@ else: # CLI mode
 			('chregunder',46,6,'Number of undergoal chunks (mark for removal excluded)'),
 			('challdanger',47,6,'Number of endangered chunks (mark for removal included)'),
 			('challunder',48,6,'Number of undergoal chunks (mark for removal included)'),
-			('bytesread',49,5,'Average number of bytes read per second by all clients'),
-			('byteswrite',50,5,'Average number of bytes written per second by all clients'),
+			('bytesread',49,5,'Traffic from cluster (data + overhead), bytes per second'),
+			('byteswrite',50,5,'Traffic to cluster (data + overhead), bytes per second'),
 			('read',51,1,'Number of read operations'),
 			('write',52,1,'Number of write operations'),
 			('fsync',53,1,'Number of fsync operations'),
@@ -473,6 +473,8 @@ else: # CLI mode
 			('mdservers',65,6,'Number of disconnected chunk servers that are in maintenance mode'),
 			('dservers',66,6,'Number of disconnected chunk servers that are not in maintenance mode'),
 			('udiff',67,8,'Difference in space usage percent between the most and least used chunk server'),
+			('mountbytrcvd',68,5,'Traffic from cluster (data only), bytes per second'),
+			('mountbytsent',69,5,'Traffic to cluster (data only), bytes per second'),
 			('cpu',100,0,'Cpu usage (total sys+user)')
 	]
 	mcchartsabr = {
@@ -10766,15 +10768,17 @@ if "MC" in sectionset and masterconn!=None and not ajax_request:
 				(110,0,'regunder','number of regular chunks in danger','<b>number of regular chunks</b>, endangered: BOXGR2A undergoal: BOXGR2B','endangered: BOXGR2A undergoal: BOXGR2B'),
 				(111,0,'allunder','number of all chunks in danger','<b>number of all chunks</b>, endangered: BOXGR2A undergoal: BOXGR2B ','endangered: BOXGR2A undergoal: BOXGR2B'),
 				(112,0,'cservers','number of chunk servers','<b>number of chunk servers</b>, disconnected: BOXGR3A disconnected in maintenance: BOXGR3B working: BOXGR3C','disconnected: BOXGR3A disconnected in maintenance: BOXGR3B working: BOXGR3C'),
-				(67,0,'udiff','space usage difference','difference in space usage between the most and the least used chunk server',''),
+				(67,0,'udiff','space usage difference','<b>difference in space usage between the most and the least used chunk server</b>',''),
 				(63,0,'delay','master max delay in seconds','<b>master max delay in seconds</b>',''),
 				(103,0,'dels','chunk deletions per minute','<b>chunk deletions</b> per minute, unsuccessful: BOXGR2A successful: BOXGR2B','unsuccessful: BOXGR2A successful: BOXGR2B'),
 				(104,0,'repl','chunk replications per minute','<b>chunk replications</b> per minute, unsuccessful: BOXGR2A successful: BOXGR2B','unsuccessful: BOXGR2A successful: BOXGR2B'),
 				(105,0,'creat','chunk creations per minute','<b>chunk creations</b> per minute, unsuccessful: BOXGR2A successful: BOXGR2B','unsuccessful: BOXGR2A successful: BOXGR2B'),
 				(106,0,'change','chunk internal operations per minute','<b>chunk internal operations</b> per minute, unsuccessful: BOXGR2A successful: BOXGR2B','unsuccessful: BOXGR2A successful: BOXGR2B'),
 				(107,0,'split','chunk local split operations per minute','<b>chunk local split operations</b> per minute, unsuccessful: BOXGR2A successful: BOXGR2B','unsuccessful: BOXGR2A successful: BOXGR2B'),
-				(49,0,'bread','total bytes read (per second)','',''),
-				(50,0,'bwrite','total bytes written (per second)','',''),
+				(68,0,'mountbytrcvd','traffic from cluster, data only (bytes per second)','',''),
+				(69,0,'mountbytsent','traffic to cluster, data only (bytes per second)','',''),
+				(49,0,'bread','traffic from cluster, data+overhead (bytes per second)','',''),
+				(50,0,'bwrite','traffic to cluster, data+overhead (bytes per second)','',''),
 				(21,0,'prcvd','packets received (per second)','',''),
 				(22,0,'psent','packets sent (per second)','',''),
 				(23,0,'brcvd','bits received (per second)','',''),
@@ -10812,7 +10816,7 @@ if "MC" in sectionset and masterconn!=None and not ajax_request:
 				if not masterconn.is_pro() and ( id==63 ):
 					continue
 				if fdesc=='':
-					fdesc = '<b>' + desc.replace(' (per', '</b> (per')
+					fdesc = '<b>' + desc.replace(' (per', '</b> (per').replace(' (bytes per', '</b> (bytes per')
 					if not '</b>' in fdesc:
 						fdesc = fdesc + '</b>'
 				fdeschtml = fdesc.replace('BOXGR1A','<span class="CBOX GR1A"></span>').replace('BOXGR2A','<span class="CBOX GR2A"></span>').replace('BOXGR2B','<span class="CBOX GR2B"></span>').replace('BOXGR3A','<span class="CBOX GR3A"></span>').replace('BOXGR3B','<span class="CBOX GR3B"></span>').replace('BOXGR3C','<span class="CBOX GR3C"></span>')

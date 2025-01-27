@@ -674,11 +674,19 @@ else: # CLI mode
 		elif opt=='-n':
 			donotresolve = 1
 		elif opt=='-f':
-			frameset = int(val)
+			try:
+				frameset = int(val)
+			except Exception:
+				print("-f: wrong value")
+				sys.exit(1)
 		elif opt=='-H':
 			masterhost = val
 		elif opt=='-P':
-			masterport = int(val)
+			try:
+				masterport = int(val)
+			except Exception:
+				print("-P: wrong value")
+				sys.exit(1)
 		elif opt=='-S':
 			lastsval = val
 			if 'IN' in val:
@@ -828,34 +836,39 @@ else: # CLI mode
 			lastrev = 0
 			lastmode = None
 		elif opt=='-o':
+			try:
+				ival = int(val)
+			except Exception:
+				print("-o: wrong value")
+				sys.exit(1)
 			if 'IM' in lastsval:
-				IMorder = int(val)
+				IMorder = ival
 			if 'MF' in lastsval:
-				MForder = int(val)
+				MForder = ival
 			if 'CS' in lastsval:
-				CSorder = int(val)
+				CSorder = ival
 			if 'MB' in lastsval:
-				MBorder = int(val)
+				MBorder = ival
 			if 'HD' in lastsval:
-				HDorder = int(val)
+				HDorder = ival
 			if 'EX' in lastsval:
-				EXorder = int(val)
+				EXorder = ival
 			if 'MS' in lastsval:
-				MSorder = int(val)
+				MSorder = ival
 			if 'MO' in lastsval:
-				MOorder = int(val)
+				MOorder = ival
 			if 'SC' in lastsval:
-				SCorder = int(val)
+				SCorder = ival
 			if 'PA' in lastsval:
-				PAorder = int(val)
+				PAorder = ival
 			if 'OF' in lastsval:
-				OForder = int(val)
+				OForder = ival
 			if 'AL' in lastsval:
-				ALorder = int(val)
+				ALorder = ival
 			if 'QU' in lastsval:
-				QUorder = int(val)
+				QUorder = ival
 			if lastsval=='':
-				lastorder = int(val)
+				lastorder = ival
 		elif opt=='-r':
 			if 'IM' in lastsval:
 				IMrev = 1
@@ -886,33 +899,49 @@ else: # CLI mode
 			if lastsval=='':
 				lastrev = 1
 		elif opt=='-m':
+			try:
+				ival = int(val)
+			except Exception:
+				print("-m: wrong value")
+				sys.exit(1)
 			if 'HD' in lastsval:
-				d = int(val)
-				if d>=0 and d<6:
-					HDperiod,HDtime = divmod(d,2)
+				if ival>=0 and ival<6:
+					HDperiod,HDtime = divmod(ival,2)
+				else:
+					print("-m: wrong value")
+					sys.exit(1)
 			if 'MO' in lastsval:
-				MOdata = int(val)
+				MOdata = ival
 			if 'IN' in lastsval or 'IC' in lastsval:
-				ICmatrix = int(val)
+				ICmatrix = ival
 			if 'MC' in lastsval:
-				MCrange = int(val)
+				MCrange = ival
 			if 'CC' in lastsval:
-				CCrange = int(val)
+				CCrange = ival
 			if 'SC' in lastsval:
-				SCdata = int(val)
+				SCdata = ival
 			if lastsval=='':
-				lastmode = int(val)
+				lastmode = ival
 		elif opt=='-i':
+			try:
+				ival = int(val)
+			except Exception:
+				print("-i: wrong value")
+				sys.exit(1)
 			if 'OF' in lastsval:
-				OFsessionid = int(val)
+				OFsessionid = ival
 			if 'AL' in lastsval:
-				ALinode = int(val)
+				ALinode = ival
 			if 'IN' in lastsval or 'IC' in lastsval:
-				ICsclassid = int(val)
+				ICsclassid = ival
 			if lastsval=='':
-				lastid = int(val)
+				lastid = ival
 		elif opt=='-a':
-			MCcount = int(val)
+			try:
+				MCcount = int(val)
+			except Exception:
+				print("-a: wrong value")
+				sys.exit(1)
 		elif opt=='-b':
 			for x in val.split(','):
 				x = x.strip()
@@ -924,7 +953,11 @@ else: # CLI mode
 						x = xs[1]
 					elif len(xs)==3:
 						chhost = xs[0]
-						chport = int(xs[1])
+						try:
+							chport = int(xs[1])
+						except Exception:
+							print("master port: wrong value")
+							sys.exit(1)
 						x = xs[2]
 					else:
 						print("Wrong chart definition: %s" % x)
@@ -932,7 +965,7 @@ else: # CLI mode
 				else:
 					chhost = None
 					chport = None
-				if x[0]=='+':
+				if x!='' and x[0]=='+':
 					x = x[1:]
 					rawmode = 1
 				else:
@@ -942,12 +975,16 @@ else: # CLI mode
 				elif x=='all':
 					for name,no,mode,desc in mcchartslist:
 						if (no<100):
-							MCchdata.append((chhost,chport,no,mode,desc,x,rawmode))
+							MCchdata.append((chhost,chport,no,mode,desc,name,rawmode))
 				else:
 					print("Unknown master chart name: %s" % x)
 					sys.exit(0)
 		elif opt=='-c':
-			CCcount = int(val)
+			try:
+				CCcount = int(val)
+			except Exception:
+				print("-c: wrong value")
+				sys.exit(1)
 		elif opt=='-d':
 			for x in val.split(','):
 				x = x.strip()
@@ -959,7 +996,11 @@ else: # CLI mode
 						x = xs[1]
 					elif len(xs)==3:
 						chhost = xs[0]
-						chport = int(xs[1])
+						try:
+							chport = int(xs[1])
+						except Exception:
+							print("chunkserver port: wrong value")
+							sys.exit(1)
 						x = xs[2]
 					else:
 						print("Unknown chart name: %s" % x)
@@ -967,7 +1008,7 @@ else: # CLI mode
 				else:
 					chhost = None
 					chport = None
-				if x[0]=='+':
+				if x!='' and x[0]=='+':
 					x = x[1:]
 					rawmode = 1
 				else:
@@ -980,7 +1021,7 @@ else: # CLI mode
 				elif x=='all':
 					for name,no,mode,desc in ccchartslist:
 						if (no<100):
-							CCchdata.append((chhost,chport,no,mode,desc,x,rawmode))
+							CCchdata.append((chhost,chport,no,mode,desc,name,rawmode))
 				else:
 					print("Unknown chunkserver chart name: %s" % x)
 					sys.exit(0)

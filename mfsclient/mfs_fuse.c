@@ -6061,7 +6061,13 @@ void mfs_getxattr (fuse_req_t req, fuse_ino_t ino, const char *name, size_t size
 void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 	const uint8_t *buff;
 	uint32_t leng;
+	const uint8_t *aclbuff;
+	uint32_t aclleng;
+	char *resbuff;
+	uint32_t resleng;
+	uint8_t hasaccacl,hasdefacl;
 	uint8_t attr[ATTR_RECORD_SIZE];
+	uint8_t vattr;
 	int status;
 	uint8_t mode;
 	struct fuse_ctx ctx;
@@ -6087,12 +6093,33 @@ void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 	} else {
 		mode = MFS_XATTR_GETA_DATA;
 	}
+	if (usedircache) {
+		vattr = dcache_getattr(&ctx,ino,attr);
+	} else {
+		vattr = 0;
+	}
+	hasdefacl = 0;
+	hasaccacl = 0;
 	// posix_acl_XXX are not added here - on purpose (on XFS getfattr doesn't list those ACL-like xattrs)
-	if (usedircache && dcache_getattr(&ctx,ino,attr) && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
+	if (vattr && (mfs_attr_get_mattr(attr)&MATTR_NOXATTR)) { // no xattr
 		status = MFS_STATUS_OK;
 		buff = NULL;
 		leng = 0;
 	} else {
+		if (vattr) {
+			if (mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
+				if (mfs_getfacl(req,ino,POSIX_ACL_DEFAULT,&aclbuff,&aclleng)==MFS_STATUS_OK) {
+					hasdefacl = 1;
+				}
+			}
+		} else {
+			if (mfs_getfacl(req,ino,POSIX_ACL_DEFAULT,&aclbuff,&aclleng)==MFS_STATUS_OK) {
+				hasdefacl = 1;
+			}
+		}
+		if (mfs_getfacl(req,ino,POSIX_ACL_ACCESS,&aclbuff,&aclleng)==MFS_STATUS_OK) {
+			hasaccacl = 1;
+		}
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);
 			status = fs_listxattr(ino,0,ctx.uid,gids->gidcnt,gids->gidtab,mode,&buff,&leng);
@@ -6101,6 +6128,20 @@ void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 			uint32_t gidtmp = ctx.gid;
 			status = fs_listxattr(ino,0,ctx.uid,1,&gidtmp,mode,&buff,&leng);
 		}
+/*
+		fprintf(stderr,"xattr leng: %u\n",leng);
+		{
+			uint8_t i;
+			for (i=0 ; i<leng ; i++) {
+				fprintf(stderr,"%02X ",(uint8_t)(buff[i]));
+			}
+			fprintf(stderr,"\n");
+			for (i=0 ; i<leng ; i++) {
+				fprintf(stderr," %c ",(buff[i]>=32 && buff[i]<127)?(char)buff[i]:'.');
+			}
+			fprintf(stderr,"\n");
+		}
+*/
 	}
 	status = mfs_errorconv(status);
 	if (status!=0) {
@@ -6108,13 +6149,41 @@ void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 		fuse_reply_err(req,status);
 		return;
 	}
+	resleng = leng + (hasdefacl?25:0) + (hasaccacl?24:0);
 	if (size==0) {
 		oplog_printf(&ctx,"listxattr (%lu,%llu): OK (%"PRIu32")",(unsigned long int)ino,(unsigned long long int)size,leng);
-		fuse_reply_xattr(req,leng);
+		fuse_reply_xattr(req,resleng);
 	} else {
-		if (leng>size) {
+		if (resleng>size) {
 			oplog_printf(&ctx,"listxattr (%lu,%llu): %s",(unsigned long int)ino,(unsigned long long int)size,strerr(ERANGE));
 			fuse_reply_err(req,ERANGE);
+		} else if (resleng>leng) {
+			resbuff = malloc(resleng);
+			memcpy(resbuff,buff,leng);
+			if (hasdefacl) {
+				memcpy(resbuff+leng,"system.posix_acl_default",25);
+				if (hasaccacl) {
+					memcpy(resbuff+leng+25,"system.posix_acl_access",24);
+				}
+			} else if (hasaccacl) {
+				memcpy(resbuff+leng,"system.posix_acl_access",24);
+			}
+			oplog_printf(&ctx,"listxattr (%lu,%llu): OK (%"PRIu32")",(unsigned long int)ino,(unsigned long long int)size,resleng);
+/*
+			{
+				uint8_t i;
+				for (i=0 ; i<resleng ; i++) {
+					fprintf(stderr,"%02X ",(uint8_t)(resbuff[i]));
+				}
+				fprintf(stderr,"\n");
+				for (i=0 ; i<resleng ; i++) {
+					fprintf(stderr," %c ",(resbuff[i]>=32 && resbuff[i]<127)?resbuff[i]:'.');
+				}
+				fprintf(stderr,"\n");
+			}
+*/
+			fuse_reply_buf(req,resbuff,resleng);
+			free(resbuff);
 		} else {
 			oplog_printf(&ctx,"listxattr (%lu,%llu): OK (%"PRIu32")",(unsigned long int)ino,(unsigned long long int)size,leng);
 			fuse_reply_buf(req,(const char*)buff,leng);

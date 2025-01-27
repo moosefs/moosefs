@@ -1,5 +1,14 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.57.2-1 (2025-01-27)
+
+  - (mount) added 'fake' system.posix_acl* xattrs to listxattr (previously not needed)
+  - (gui) added cluster traffic charts, updated names
+  - (cli) added checks for wrong integer values in options
+  - (freebsd) changed port base name in freebsd from moosefs4 to moosefs
+  - (master) added KEEP_LEADERSHIP option
+  - (gui) charts legend update
+
 * MooseFS 4.57.1-1 (2025-01-08)
 
   - (master) fixed bug in case of making space for ec parts marked for removal

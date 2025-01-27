@@ -1,3 +1,15 @@
+moosefs (4.57.2-1) unstable; urgency=medium
+
+  * (mount) added 'fake' system.posix_acl* xattrs to listxattr (previously not
+    needed)
+  * (gui) added cluster traffic charts, updated names
+  * (cli) added checks for wrong integer values in options
+  * (freebsd) changed port base name in freebsd from moosefs4 to moosefs
+  * (master) added KEEP_LEADERSHIP option
+  * (gui) charts legend update
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 27 Jan 2025 12:00:00 +0100
+
 moosefs (4.57.1-1) unstable; urgency=medium
 
   * (master) fixed bug in case of making space for ec parts marked for removal

@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: MooseFS
-Source: http://ppa.moosefs.com/src
+Source: https://respository.moosefs.com/src
 
 Files: *
 Copyright: Copyright 2005-2017 Jakub Kruszona-Zawadzki, Saglabs SA

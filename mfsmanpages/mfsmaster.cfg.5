@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "January 2025" "MooseFS 4.57.1-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "January 2025" "MooseFS 4.57.2-1" "This is part of MooseFS"
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
@@ -77,6 +77,9 @@ how often (in hours) master (single or follower) will store metadata (default is
 .TP
 .B DEPUTY_ELECTION_TIME
 (pro only) how many seconds until master-elect turns into master-deputy (a.k.a master-readonly) if there are not enough chunkservers connected to become master-leader (default is 0 - which means never)
+.TP
+.B KEEP_LEADERSHIP
+(pro only) if this option is set to 1, this master will try to assume leadership after it has lost it due to a restart or disconnection; it will not attempt this if a user has switched the leadership on purpose; for detailed explanation see NOTES (default is 0 - don't try to assume leadership)
 .TP
 .B BACK_META_KEEP_PREVIOUS
 number of previous metadata files to be kept (default is 1)
@@ -468,6 +471,10 @@ Setting:
 METADATA_SAVE_OFFSET = 0L
 .PP
 can be used to adjust saving times to local timezone without changing the default metadata saving schedule.
+.PP
+The \fBKEEP_LEADERSHIP\fP option can be used to select one master in a Pro installation, that will assume the role of LEADER whenever possible. If this master looses leadership for reasons related to some malfunction (a disconnection of too many chunkservers from the cluster, a disconnection of this master from the cluster - due to timeouts or other hardware problems) or due to a (intentional or not) process restart, it will try to assume back the LEADER role as soon as possible (as soon as it reaches a synced FOLLOWER state). If a user switches the leadership using the \fBmfssupervisor\fP tool, this master will not attempt to assume back leadership until such time, when it becomes LEADER again (this can happen for one of two reasons: deliberate switching of leadership by a user of when the current LEADER fails and this server happens to be elected as the new LEADER) or is restarted.
+.PP
+Setting \fBKEEP_LEADERSHIP\fP option to 1 for more than one master server in a cluster is NOT recommended and may lead to unexpected behaviour.
 .SH COPYRIGHT
 Copyright (C) 2025 Jakub Kruszona-Zawadzki, Saglabs SA
 

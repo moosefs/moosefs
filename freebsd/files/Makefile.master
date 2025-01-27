@@ -2,21 +2,21 @@
 
 PORTNAME=		moosefs
 DISTVERSION=		0.0.0
-DISTVERSIONSUFFIX=	0
+DISTVERSIONPREFIX=	v
 PORTREVISION=		0
 CATEGORIES=		filesystems sysutils
-MASTER_SITES=		http://ppa.moosefs.com/src/
 PKGNAMESUFFIX?=		-master
-DISTNAME=		moosefs-${DISTVERSION}-${DISTVERSIONSUFFIX}
 
 MAINTAINER=		freebsd@moosefs.com
 COMMENT?=		Fault-tolerant distributed filesystem
+
+USE_GITHUB=		yes
+GH_ACCOUNT=		moosefs
 
 LICENSE=		GPLv2
 
 USES=			python:build
 GNU_CONFIGURE=		yes
-WRKSRC=			${WRKDIR}/moosefs-${PORTVERSION}
 PLIST=			${.CURDIR}/pkg-plist
 DESCR=			${.CURDIR}/pkg-descr
 STRIP=

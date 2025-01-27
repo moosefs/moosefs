@@ -8,6 +8,6 @@ LICENSE=	GPLv2
 
 MFS_COMPONENT=	chunkserver
 
-MASTERDIR=	${.CURDIR}/../moosefs4-master
+MASTERDIR=	${.CURDIR}/../moosefs-master
 
 .include "${MASTERDIR}/Makefile"

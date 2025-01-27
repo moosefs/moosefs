@@ -1,6 +1,6 @@
 # Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
 
-PORTNAME=		moosefs4
+PORTNAME=		moosefs
 DISTVERSION=		0.0.0
 DISTVERSIONSUFFIX=	0
 PORTREVISION=		0
@@ -54,7 +54,7 @@ PKGMESSAGE=		${WRKDIR}/pkg-message-cgiserv
 PLIST_SUB+=		MFS_WORKDIR="${MFS_WORKDIR}"
 CONFIGURE_ARGS+=	--enable-mfscgiserv \
 			--with-mfscgiserv-dir=${MFS_CGISERVDIR}
-RUN_DEPENDS=		moosefs4-cgi>0:filesystems/moosefs4-cgi
+RUN_DEPENDS=		moosefs-cgi>0:filesystems/moosefs-cgi
 .else
 CONFIGURE_ARGS+=	--disable-mfscgiserv
 .endif

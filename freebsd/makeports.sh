@@ -49,7 +49,7 @@ else
 fi
 
 for portname in ${PORTNAMES}; do
-	portdir="${PORTBASE}/moosefs4-${portname}"
+	portdir="${PORTBASE}/moosefs-${portname}"
 	if [ -d "$portdir" ]; then
 		rm -rf "$portdir"
 	fi

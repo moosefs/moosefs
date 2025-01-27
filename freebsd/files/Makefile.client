@@ -10,6 +10,6 @@ MFS_COMPONENT=	client
 
 BROKEN_powerpc64=	fails to compile: mfs_fuse.c: internal compiler error: Segmentation fault
 
-MASTERDIR=	${.CURDIR}/../moosefs4-master
+MASTERDIR=	${.CURDIR}/../moosefs-master
 
 .include "${MASTERDIR}/Makefile"

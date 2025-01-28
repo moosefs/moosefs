@@ -5145,7 +5145,7 @@ if "IN" in sectionset:
 				elif jsonmode:
 					json_ic_dict = {}
 					json_ic_sum_dict = {}
-					matrixkeys = ['allchunks','regularchuks','allchunks_copies','regularchunks_copies','allchunks_ec8','regularchunks_ec8','allchunks_ec4', 'regularchunks_ec4']
+					matrixkeys = ['allchunks','regularchunks','allchunks_copies','regularchunks_copies','allchunks_ec8','regularchunks_ec8','allchunks_ec4', 'regularchunks_ec4']
 					sumkeys = ['missing','endangered','undergoal','stable','overgoal','pending_deletion','ready_to_remove']
 					#sumlist has to be clean for JSON mode
 					sumlist = []

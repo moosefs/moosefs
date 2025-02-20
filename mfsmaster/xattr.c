@@ -121,6 +121,17 @@ uint8_t xattr_setattr(uint32_t inode,uint8_t anleng,const uint8_t *attrname,uint
 	void *dictvalue;
 	uint32_t inode_anleng;
 
+	if (anleng==0 || mode>MFS_XATTR_REMOVE) {
+		return MFS_ERROR_EINVAL;
+	}
+#if MFS_XATTR_NAME_MAX<255
+	if (anleng>MFS_XATTR_NAME_MAX) {
+		return MFS_ERROR_ERANGE;
+	}
+#endif
+	if (avleng>MFS_XATTR_SIZE_MAX && mode!=MFS_XATTR_REMOVE) {
+		return MFS_ERROR_ERANGE;
+	}
 	if (anleng + 1 > MFS_XATTR_LIST_MAX) {
 		return MFS_ERROR_ERANGE;
 	}

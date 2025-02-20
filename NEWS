@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.57.3-1 (2025-02-04)
 
   - (master) added protection against setting too long xattr
+  - (master) fixed case when user changes only grace period in quota
 
 * MooseFS 4.57.2-1 (2025-01-27)
 

@@ -5116,7 +5116,7 @@ void matoclserv_fuse_quotacontrol(matoclserventry *eptr,const uint8_t *data,uint
 		hrealsize = get64bit(&data);
 		del=0;
 	} else {
-		graceperiod = 0; // makes gcc happy
+		graceperiod = QUOTA_PERIOD_DONT_CHANGE;
 		sinodes = 0;
 		slength = 0;
 		ssize = 0;
@@ -5125,7 +5125,7 @@ void matoclserv_fuse_quotacontrol(matoclserventry *eptr,const uint8_t *data,uint
 		hlength = 0;
 		hsize = 0;
 		hrealsize = 0;
-		del=1;
+		del = 1;
 	}
 	if (flags && sessions_is_root_remapped(eptr->sesdata)) {
 		status = MFS_ERROR_EACCES;

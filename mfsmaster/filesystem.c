@@ -8285,7 +8285,8 @@ uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 	statsrecord *psr;
 	uint8_t chg;
 
-	if (*flags) {
+	chg = ((*flags) || (*graceperiod)!=QUOTA_PERIOD_DONT_CHANGE)?1:0;
+	if (chg) {
 		if (sesflags&SESFLAG_READONLY) {
 			return MFS_ERROR_EROFS;
 		}
@@ -8303,8 +8304,7 @@ uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 		return MFS_ERROR_EPERM;
 	}
 	qn = p->data.ddata.quota;
-	chg = (*flags)?1:0;
-	if (delflag) {
+	if (delflag) { // with *flags==0 works as a get quota !!!
 		if (qn) {
 			qn->flags &= ~(*flags);
 			if (qn->flags==0) {
@@ -8313,8 +8313,8 @@ uint8_t fs_quotacontrol(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint8
 				qn=NULL;
 			}
 		}
-	} else {
-		if (qn==NULL && (*flags)!=0) {
+	} else if (chg) { // want to set anything in the quota
+		if (qn==NULL) {
 			qn = fsnodes_new_quotanode(p);
 		}
 		if (qn) {

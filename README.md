@@ -82,7 +82,11 @@ Recommended packages:
 * CentOS/RHEL: `sudo yum install fuse3`
 (if you don't have FUSE v. 3 in your system, use `sudo yum install fuse`)
 
-Building MooseFS on Linux can be easily done by running `./linux_build.sh`. Similarly, use `./freebsd_build.sh` in order to build MooseFS on FreeBSD and respectively `./macosx_build.sh` on macOS. Remember that these scripts do not install binaries (i.e. do not run `make install`) at the end. Run this command manually.
+### Building MooseFS:
+* Linux: Run ./linux\_build.sh.
+* FreeBSD: Run ./freebsd\_build.sh.
+* macOS: Run ./macosx\_build.sh (note: macFUSE must be installed beforehand).
+These scripts only build MooseFS and do not install binaries (i.e., they do not run `make install`). To install them, run `make install` (as root or `sudo make install`) manually.
 
 ### Minimal setup
 Just three steps to have MooseFS up and running:

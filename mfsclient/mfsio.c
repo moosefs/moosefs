@@ -1199,6 +1199,290 @@ int mfs_fcntl_locks(int fildes, int function, struct flock *fl) {
 	return 0;
 }
 
+ssize_t mfs_getxattr(const char *path, const char *name, void *value, size_t size) {
+	uint8_t status;
+	uint8_t mode;
+	const uint8_t *vbuff;
+	uint32_t vleng;
+	mfs_int_cred cr;
+
+	mode = (size==0)?MFS_XATTR_LENGTH_ONLY:MFS_XATTR_GETA_DATA;
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_getxattr(&cr,path,name,&vbuff,&vleng,mode);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	if (size>0) {
+		if (vleng>size) {
+			errno = ERANGE;
+			return -1;
+		}
+		if (vleng>0) {
+			memcpy(value,vbuff,vleng);
+		}
+	}
+	return vleng;
+}
+
+ssize_t mfs_fgetxattr(int fildes, const char *name, void *value, size_t size) {
+	uint8_t status;
+	uint8_t mode;
+	const uint8_t *vbuff;
+	uint32_t vleng;
+	mfs_int_cred cr;
+
+	mode = (size==0)?MFS_XATTR_LENGTH_ONLY:MFS_XATTR_GETA_DATA;
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_fgetxattr(&cr,fildes,name,&vbuff,&vleng,mode);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	if (size>0) {
+		if (vleng>size) {
+			errno = ERANGE;
+			return -1;
+		}
+		if (vleng>0) {
+			memcpy(value,vbuff,vleng);
+		}
+	}
+	return vleng;
+}
+
+int mfs_setxattr(const char *path, const char *name, const void *value, size_t size, int flags) {
+	uint8_t status;
+	uint8_t mode;
+	mfs_int_cred cr;
+
+	if (size>MFS_XATTR_SIZE_MAX) {
+		errno = ERANGE; // E2BIG
+		return -1;
+	}
+	mode = (flags==XATTR_CREATE)?MFS_XATTR_CREATE_ONLY:(flags==XATTR_REPLACE)?MFS_XATTR_REPLACE_ONLY:MFS_XATTR_CREATE_OR_REPLACE;
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_setxattr(&cr,path,name,value,size,mode);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	return 0;
+}
+
+int mfs_fsetxattr(int fildes, const char *name, const void *value, size_t size, int flags) {
+	uint8_t status;
+	uint8_t mode;
+	mfs_int_cred cr;
+
+	if (size>MFS_XATTR_SIZE_MAX) {
+		errno = ERANGE; // E2BIG
+		return -1;
+	}
+	mode = (flags==XATTR_CREATE)?MFS_XATTR_CREATE_ONLY:(flags==XATTR_REPLACE)?MFS_XATTR_REPLACE_ONLY:MFS_XATTR_CREATE_OR_REPLACE;
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_fsetxattr(&cr,fildes,name,value,size,mode);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	return 0;
+}
+
+ssize_t mfs_listxattr(const char *path, char *list, size_t size) {
+	uint8_t status;
+	int32_t rsize;
+	mfs_int_cred cr;
+
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_listxattr(&cr,path,&rsize,list,size);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	return rsize;
+}
+
+ssize_t mfs_flistxattr(int fildes, char *list, size_t size) {
+	uint8_t status;
+	int32_t rsize;
+	mfs_int_cred cr;
+
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_flistxattr(&cr,fildes,&rsize,list,size);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	return rsize;
+}
+
+int mfs_removexattr(const char *path, const char *name) {
+	uint8_t status;
+	mfs_int_cred cr;
+
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_removexattr(&cr,path,name);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	return 0;
+}
+
+int mfs_fremovexattr(int fildes, const char *name) {
+	uint8_t status;
+	mfs_int_cred cr;
+
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_fremovexattr(&cr,fildes,name);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	return 0;
+}
+
+mfsacl* mfs_acl_alloc(uint32_t namedaclscnt) {
+	if (namedaclscnt==0) {
+		return malloc(sizeof(mfsacl));
+	} else {
+		return malloc(sizeof(mfsacl)+sizeof(mfsaclid)*(namedaclscnt-1));
+	}
+	return NULL;
+}
+
+void mfs_acl_free(mfsacl *aclrec) {
+	free(aclrec);
+}
+
+int mfs_getfacl(const char *path, uint8_t acltype, mfsacl **aclrec) {
+	uint8_t status;
+	mfs_int_cred cr;
+	const uint8_t *namedacls;
+	uint32_t namedaclsize;
+	uint32_t i,namedaclscnt;
+	uint16_t userperm,groupperm,otherperm,maskperm;
+	uint16_t nuserscnt,ngroupscnt;
+
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_getfacl(&cr,path,acltype,&userperm,&groupperm,&otherperm,&maskperm,&nuserscnt,&ngroupscnt,&namedacls,&namedaclsize);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	namedaclscnt = (nuserscnt+ngroupscnt);
+	if (namedaclscnt*6!=namedaclsize) {
+		errno = EINVAL;
+		return -1;
+	}
+	*aclrec = mfs_acl_alloc(namedaclscnt);
+	if (*aclrec==NULL) {
+		return -1;
+	}
+	(*aclrec)->userperm = userperm;
+	(*aclrec)->groupperm = groupperm;
+	(*aclrec)->otherperm = otherperm;
+	(*aclrec)->maskperm = maskperm;
+	(*aclrec)->nuserscnt = nuserscnt;
+	(*aclrec)->ngroupscnt = ngroupscnt;
+	for (i=0 ; i<namedaclscnt ; i++) {
+		(*aclrec)->namedacls[i].id = get32bit(&namedacls);
+		(*aclrec)->namedacls[i].perm = get16bit(&namedacls);
+	}
+	return 0;
+}
+
+int mfs_fgetfacl(int filedes, uint8_t acltype, mfsacl **aclrec) {
+	uint8_t status;
+	mfs_int_cred cr;
+	const uint8_t *namedacls;
+	uint32_t namedaclsize;
+	uint32_t i,namedaclscnt;
+	uint16_t userperm,groupperm,otherperm,maskperm;
+	uint16_t nuserscnt,ngroupscnt;
+
+
+	mfs_get_credentials(&cr,CRED_BASIC);
+	status = mfs_int_fgetfacl(&cr,filedes,acltype,&userperm,&groupperm,&otherperm,&maskperm,&nuserscnt,&ngroupscnt,&namedacls,&namedaclsize);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	namedaclscnt = (nuserscnt+ngroupscnt);
+	if (namedaclscnt*6!=namedaclsize) {
+		errno = EINVAL;
+		return -1;
+	}
+	*aclrec = mfs_acl_alloc(namedaclscnt);
+	if (*aclrec==NULL) {
+		return -1;
+	}
+	(*aclrec)->userperm = userperm;
+	(*aclrec)->groupperm = groupperm;
+	(*aclrec)->otherperm = otherperm;
+	(*aclrec)->maskperm = maskperm;
+	(*aclrec)->nuserscnt = nuserscnt;
+	(*aclrec)->ngroupscnt = ngroupscnt;
+	for (i=0 ; i<namedaclscnt ; i++) {
+		(*aclrec)->namedacls[i].id = get32bit(&namedacls);
+		(*aclrec)->namedacls[i].perm = get16bit(&namedacls);
+	}
+	return 0;
+}
+
+int mfs_setfacl(const char *path, uint8_t acltype, mfsacl *aclrec) {
+	uint8_t status;
+	mfs_int_cred cr;
+	uint8_t *namedacls;
+	uint8_t *wptr;
+	uint32_t namedaclsize;
+	uint32_t i,namedaclscnt;
+
+	mfs_get_credentials(&cr,CRED_BASIC);
+	namedaclscnt = (aclrec->nuserscnt+aclrec->ngroupscnt);
+	namedaclsize = 6*namedaclscnt;
+	namedacls = malloc(namedaclsize);
+	wptr = namedacls;
+	for (i=0 ; i<namedaclscnt ; i++) {
+		put32bit(&wptr,aclrec->namedacls[i].id);
+		put16bit(&wptr,aclrec->namedacls[i].perm);
+	}
+	status = mfs_int_setfacl(&cr,path,acltype,aclrec->userperm,aclrec->groupperm,aclrec->otherperm,aclrec->maskperm,aclrec->nuserscnt,aclrec->ngroupscnt,namedacls,namedaclsize);
+	free(namedacls);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	return 0;
+}
+
+int mfs_fsetfacl(int filedes, uint8_t acltype, mfsacl *aclrec) {
+	uint8_t status;
+	mfs_int_cred cr;
+	uint8_t *namedacls;
+	uint8_t *wptr;
+	uint32_t namedaclsize;
+	uint32_t i,namedaclscnt;
+
+	mfs_get_credentials(&cr,CRED_BASIC);
+	namedaclscnt = (aclrec->nuserscnt+aclrec->ngroupscnt);
+	namedaclsize = 6*namedaclscnt;
+	namedacls = malloc(namedaclsize);
+	wptr = namedacls;
+	for (i=0 ; i<namedaclscnt ; i++) {
+		put32bit(&wptr,aclrec->namedacls[i].id);
+		put16bit(&wptr,aclrec->namedacls[i].perm);
+	}
+	status = mfs_int_fsetfacl(&cr,filedes,acltype,aclrec->userperm,aclrec->groupperm,aclrec->otherperm,aclrec->maskperm,aclrec->nuserscnt,aclrec->ngroupscnt,namedacls,namedaclsize);
+	free(namedacls);
+	if (status!=MFS_STATUS_OK) {
+		errno = mfs_errorconv(status);
+		return -1;
+	}
+	return 0;
+}
+
 void mfs_set_defaults(mfscfg *mcfg) {
 	memset(mcfg,0,sizeof(mfscfg));
 	mcfg->masterhost = strdup(DEFAULT_MASTERNAME);

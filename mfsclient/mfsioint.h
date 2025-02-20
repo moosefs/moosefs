@@ -171,6 +171,21 @@ uint8_t mfs_int_ftruncate(mfs_int_cred *cr, int fildes, int64_t size);
 uint8_t mfs_int_lseek(int fildes, int64_t *offset, uint8_t whence);
 uint8_t mfs_int_stat(mfs_int_cred *cr, const char *path, mfs_int_statrec *buf);
 uint8_t mfs_int_fstat(mfs_int_cred *cr, int fildes, mfs_int_statrec *buf);
+
+uint8_t mfs_int_getxattr(mfs_int_cred *cr, const char *path, const char *name, const uint8_t **vbuff, uint32_t *vleng, uint8_t mode);
+uint8_t mfs_int_fgetxattr(mfs_int_cred *cr, int fildes, const char *name, const uint8_t **vbuff, uint32_t *vleng, uint8_t mode);
+uint8_t mfs_int_setxattr(mfs_int_cred *cr, const char *path, const char *name, const uint8_t *value, uint32_t vsize, uint8_t mode);
+uint8_t mfs_int_fsetxattr(mfs_int_cred *cr, int fildes, const char *name, const uint8_t *value, uint32_t vsize, uint8_t mode);
+uint8_t mfs_int_removexattr(mfs_int_cred *cr, const char *path, const char *name);
+uint8_t mfs_int_fremovexattr(mfs_int_cred *cr, int fildes, const char *name);
+uint8_t mfs_int_listxattr(mfs_int_cred *cr, const char *path, int32_t *rsize, char *list, uint32_t size);
+uint8_t mfs_int_flistxattr(mfs_int_cred *cr, int fildes, int32_t *rsize, char *list, uint32_t size);
+
+uint8_t mfs_int_getfacl(mfs_int_cred *cr, const char *path, uint8_t acltype, uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *maskperm,uint16_t *namedusers,uint16_t *namedgroups,const uint8_t **namedacls,uint32_t *namedaclssize);
+uint8_t mfs_int_fgetfacl(mfs_int_cred *cr, int fildes, uint8_t acltype, uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *maskperm,uint16_t *namedusers,uint16_t *namedgroups,const uint8_t **namedacls,uint32_t *namedaclssize);
+uint8_t mfs_int_setfacl(mfs_int_cred *cr, const char *path, uint8_t acltype, uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t maskperm,uint16_t namedusers,uint16_t namedgroups,uint8_t *namedacls,uint32_t namedaclssize);
+uint8_t mfs_int_fsetfacl(mfs_int_cred *cr, int fildes, uint8_t acltype, uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t maskperm,uint16_t namedusers,uint16_t namedgroups,uint8_t *namedacls,uint32_t namedaclssize);
+
 uint8_t mfs_int_statfs(mfs_int_statfsrec *buf);
 uint8_t mfs_int_open(mfs_int_cred *cr, int *fildes, const char *path, int oflag, int mode);
 uint8_t mfs_int_pread(int fildes,int64_t *rsize,uint8_t *buf,uint64_t nbyte,uint64_t offset);

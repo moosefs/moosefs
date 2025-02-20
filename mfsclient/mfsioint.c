@@ -1019,6 +1019,309 @@ uint8_t mfs_int_fstat(mfs_int_cred *cr, int fildes, mfs_int_statrec *buf) {
 	return MFS_STATUS_OK;
 }
 
+uint8_t mfs_int_check_attrname(uint32_t *nleng,const char *name) {
+	*nleng = strlen(name);
+	if (*nleng>255) {
+		return MFS_ERROR_EINVAL;
+	}
+	if (*nleng<6) {
+		return MFS_ERROR_EINVAL;
+	}
+	if (memcmp(name,"user.",5)!=0) {
+		return MFS_ERROR_EPERM; // should be ENOTSUP;
+	}
+	return MFS_STATUS_OK;
+}
+
+uint8_t mfs_int_getxattr(mfs_int_cred *cr, const char *path, const char *name, const uint8_t **vbuff, uint32_t *vleng, uint8_t mode) {
+	uint32_t parent;
+	uint32_t inode;
+	uint8_t fname[256];
+	uint8_t nleng;
+	uint8_t attr[ATTR_RECORD_SIZE];
+	uint32_t xattrnameleng;
+	uint8_t status;
+
+	status = mfs_path_to_inodes(cr,path,&parent,&inode,fname,&nleng,PATH_TO_INODES_EXPECT_OBJECT,attr);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = mfs_int_check_attrname(&xattrnameleng,name);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = fs_getxattr(inode,0,cr->uid,cr->gidcnt,cr->gidtab,xattrnameleng,(const uint8_t*)name,mode,vbuff,vleng);
+	return status;
+}
+
+uint8_t mfs_int_fgetxattr(mfs_int_cred *cr, int fildes, const char *name, const uint8_t **vbuff, uint32_t *vleng, uint8_t mode) {
+	file_info *fileinfo;
+	uint32_t xattrnameleng;
+	uint8_t status;
+
+	fileinfo = mfs_get_fi(fildes);
+	if (fileinfo==NULL) {
+		return MFS_ERROR_EBADF;
+	}
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	if (fileinfo->mode==MFS_IO_FORBIDDEN) {
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		return MFS_ERROR_EACCES;
+	}
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+	status = mfs_int_check_attrname(&xattrnameleng,name);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = fs_getxattr(fileinfo->inode,1,cr->uid,cr->gidcnt,cr->gidtab,xattrnameleng,(const uint8_t*)name,mode,vbuff,vleng);
+	return status;
+}
+
+uint8_t mfs_int_setxattr(mfs_int_cred *cr, const char *path, const char *name, const uint8_t *value, uint32_t vsize, uint8_t mode) {
+	uint32_t parent;
+	uint32_t inode;
+	uint8_t fname[256];
+	uint8_t nleng;
+	uint8_t attr[ATTR_RECORD_SIZE];
+	uint32_t xattrnameleng;
+	uint8_t status;
+
+	status = mfs_path_to_inodes(cr,path,&parent,&inode,fname,&nleng,PATH_TO_INODES_EXPECT_OBJECT,attr);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = mfs_int_check_attrname(&xattrnameleng,name);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = fs_setxattr(inode,0,cr->uid,cr->gidcnt,cr->gidtab,xattrnameleng,(const uint8_t*)name,vsize,value,mode);
+	return status;
+}
+
+uint8_t mfs_int_fsetxattr(mfs_int_cred *cr, int fildes, const char *name, const uint8_t *value, uint32_t vsize, uint8_t mode) {
+	file_info *fileinfo;
+	uint32_t xattrnameleng;
+	uint8_t status;
+
+	fileinfo = mfs_get_fi(fildes);
+	if (fileinfo==NULL) {
+		return MFS_ERROR_EBADF;
+	}
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	if (fileinfo->mode==MFS_IO_FORBIDDEN) {
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		return MFS_ERROR_EACCES;
+	}
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+	status = mfs_int_check_attrname(&xattrnameleng,name);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = fs_setxattr(fileinfo->inode,1,cr->uid,cr->gidcnt,cr->gidtab,xattrnameleng,(const uint8_t*)name,vsize,value,mode);
+	return status;
+}
+
+uint8_t mfs_int_removexattr(mfs_int_cred *cr, const char *path, const char *name) {
+	uint32_t parent;
+	uint32_t inode;
+	uint8_t fname[256];
+	uint8_t nleng;
+	uint8_t attr[ATTR_RECORD_SIZE];
+	uint32_t xattrnameleng;
+	uint8_t status;
+
+	status = mfs_path_to_inodes(cr,path,&parent,&inode,fname,&nleng,PATH_TO_INODES_EXPECT_OBJECT,attr);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = mfs_int_check_attrname(&xattrnameleng,name);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = fs_removexattr(inode,0,cr->uid,cr->gidcnt,cr->gidtab,xattrnameleng,(const uint8_t*)name);
+	return status;
+}
+
+uint8_t mfs_int_fremovexattr(mfs_int_cred *cr, int fildes, const char *name) {
+	file_info *fileinfo;
+	uint32_t xattrnameleng;
+	uint8_t status;
+
+	fileinfo = mfs_get_fi(fildes);
+	if (fileinfo==NULL) {
+		return MFS_ERROR_EBADF;
+	}
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	if (fileinfo->mode==MFS_IO_FORBIDDEN) {
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		return MFS_ERROR_EACCES;
+	}
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+	status = mfs_int_check_attrname(&xattrnameleng,name);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	status = fs_removexattr(fileinfo->inode,1,cr->uid,cr->gidcnt,cr->gidtab,xattrnameleng,(const uint8_t*)name);
+	return status;
+}
+
+uint8_t mfs_int_listxattr(mfs_int_cred *cr, const char *path, int32_t *rsize, char *list, uint32_t size) {
+	uint32_t parent;
+	uint32_t inode;
+	uint8_t fname[256];
+	uint8_t nleng;
+	uint8_t attr[ATTR_RECORD_SIZE];
+	const uint8_t *vbuff;
+	uint32_t vleng;
+	uint8_t status;
+
+	status = mfs_path_to_inodes(cr,path,&parent,&inode,fname,&nleng,PATH_TO_INODES_EXPECT_OBJECT,attr);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+
+	if (size==0) {
+		status = fs_listxattr(inode,0,cr->uid,cr->gidcnt,cr->gidtab,MFS_XATTR_LENGTH_ONLY,&vbuff,&vleng);
+	} else {
+		status = fs_listxattr(inode,0,cr->uid,cr->gidcnt,cr->gidtab,MFS_XATTR_GETA_DATA,&vbuff,&vleng);
+	}
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	*rsize = vleng;
+	if (size>0) {
+		if (vleng<=size) {
+			memcpy(list,vbuff,vleng);
+			*rsize = vleng;
+		} else {
+			return MFS_ERROR_ERANGE;
+		}
+	}
+	return MFS_STATUS_OK;
+}
+
+uint8_t mfs_int_flistxattr(mfs_int_cred *cr, int fildes, int32_t *rsize, char *list, uint32_t size) {
+	file_info *fileinfo;
+	const uint8_t *vbuff;
+	uint32_t vleng;
+	uint8_t status;
+
+	fileinfo = mfs_get_fi(fildes);
+	if (fileinfo==NULL) {
+		return MFS_ERROR_EBADF;
+	}
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	if (fileinfo->mode==MFS_IO_FORBIDDEN) {
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		return MFS_ERROR_EACCES;
+	}
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+
+	if (size==0) {
+		status = fs_listxattr(fileinfo->inode,1,cr->uid,cr->gidcnt,cr->gidtab,MFS_XATTR_LENGTH_ONLY,&vbuff,&vleng);
+	} else {
+		status = fs_listxattr(fileinfo->inode,1,cr->uid,cr->gidcnt,cr->gidtab,MFS_XATTR_GETA_DATA,&vbuff,&vleng);
+	}
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	*rsize = vleng;
+	if (size>0) {
+		if (vleng<=size) {
+			memcpy(list,vbuff,vleng);
+			*rsize = vleng;
+		} else {
+			return MFS_ERROR_ERANGE;
+		}
+	}
+	return MFS_STATUS_OK;
+}
+
+uint8_t mfs_int_getfacl(mfs_int_cred *cr, const char *path, uint8_t acltype, uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *maskperm,uint16_t *namedusers,uint16_t *namedgroups,const uint8_t **namedacls,uint32_t *namedaclssize) {
+	uint32_t parent;
+	uint32_t inode;
+	uint8_t fname[256];
+	uint8_t nleng;
+	uint8_t attr[ATTR_RECORD_SIZE];
+	uint8_t status;
+
+	status = mfs_path_to_inodes(cr,path,&parent,&inode,fname,&nleng,PATH_TO_INODES_EXPECT_OBJECT,attr);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+
+	status = fs_getfacl(inode,acltype,userperm,groupperm,otherperm,maskperm,namedusers,namedgroups,namedacls,namedaclssize);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	return MFS_STATUS_OK;
+}
+
+uint8_t mfs_int_fgetfacl(mfs_int_cred *cr, int fildes, uint8_t acltype, uint16_t *userperm,uint16_t *groupperm,uint16_t *otherperm,uint16_t *maskperm,uint16_t *namedusers,uint16_t *namedgroups,const uint8_t **namedacls,uint32_t *namedaclssize) {
+	file_info *fileinfo;
+	uint8_t status;
+
+	(void)cr; // currently not used, but left for future
+	fileinfo = mfs_get_fi(fildes);
+	if (fileinfo==NULL) {
+		return MFS_ERROR_EBADF;
+	}
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	if (fileinfo->mode==MFS_IO_FORBIDDEN) {
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		return MFS_ERROR_EACCES;
+	}
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+
+	status = fs_getfacl(fileinfo->inode,acltype,userperm,groupperm,otherperm,maskperm,namedusers,namedgroups,namedacls,namedaclssize);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	return MFS_STATUS_OK;
+}
+
+uint8_t mfs_int_setfacl(mfs_int_cred *cr, const char *path, uint8_t acltype, uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t maskperm,uint16_t namedusers,uint16_t namedgroups,uint8_t *namedacls,uint32_t namedaclssize) {
+	uint32_t parent;
+	uint32_t inode;
+	uint8_t fname[256];
+	uint8_t nleng;
+	uint8_t attr[ATTR_RECORD_SIZE];
+	uint8_t status;
+
+	status = mfs_path_to_inodes(cr,path,&parent,&inode,fname,&nleng,PATH_TO_INODES_EXPECT_OBJECT,attr);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+
+	status = fs_setfacl(inode,cr->uid,acltype,userperm,groupperm,otherperm,maskperm,namedusers,namedgroups,namedacls,namedaclssize);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	return MFS_STATUS_OK;
+}
+
+uint8_t mfs_int_fsetfacl(mfs_int_cred *cr, int fildes, uint8_t acltype, uint16_t userperm,uint16_t groupperm,uint16_t otherperm,uint16_t maskperm,uint16_t namedusers,uint16_t namedgroups,uint8_t *namedacls,uint32_t namedaclssize) {
+	file_info *fileinfo;
+	uint8_t status;
+
+	fileinfo = mfs_get_fi(fildes);
+	if (fileinfo==NULL) {
+		return MFS_ERROR_EBADF;
+	}
+	zassert(pthread_mutex_lock(&(fileinfo->lock)));
+	if (fileinfo->mode==MFS_IO_FORBIDDEN) {
+		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+		return MFS_ERROR_EACCES;
+	}
+	zassert(pthread_mutex_unlock(&(fileinfo->lock)));
+
+	status = fs_setfacl(fileinfo->inode,cr->uid,acltype,userperm,groupperm,otherperm,maskperm,namedusers,namedgroups,namedacls,namedaclssize);
+	if (status!=MFS_STATUS_OK) {
+		return status;
+	}
+	return MFS_STATUS_OK;
+}
+
 uint8_t mfs_int_statfs(mfs_int_statfsrec *buf) {
 	memset(buf,0,sizeof(mfs_int_statfsrec));
 	fs_statfs(&(buf->totalspace),&(buf->availspace),&(buf->freespace),&(buf->trashspace),&(buf->sustainedspace),&(buf->inodes));

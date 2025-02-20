@@ -380,7 +380,7 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 				i = 0;
 				while (smode==0 && i<tbody.rows.length) {
 					var cell = tbody.rows[i].cells[hcell.acid_tab_colid];
-					var text = acid_tab.getcelltext(cell,level);
+					var text = acid_tab.getcelltext(cell,level).split(' ')[0].replace(',','.').replace(/[\s']/g,'');
 					var rowspan = acid_tab.calcrowspan(tbody,i);
 					if (text!='') {
 						if (text.match(/^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))(\s|%|$)/)) { // looks like a number
@@ -398,9 +398,15 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 					var text = acid_tab.getcelltext(cell,level);
 					var rowspan = acid_tab.calcrowspan(tbody,i);
 					if (smode==1) {
-						text = parseFloat(text);
-						if (isNaN(text)) {
-							text = 0;
+						text = text.split(' ')[0].replace(',','.').replace(/[\s']/g,'');
+						j = parseFloat(text);
+						if (isNaN(j)) {
+							text = parseFloat(text.replace(/[^\d.-]/g, ''));
+							if (isNaN(text)) {
+								text = 0;
+							}
+						} else {
+							text = j;
 						}
 					}
 					k = newrows.length;

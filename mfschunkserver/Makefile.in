@@ -150,7 +150,7 @@ mfschunkserver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(mfschunkserver_CFLAGS) $(CFLAGS) $(mfschunkserver_LDFLAGS) \
 	$(LDFLAGS) -o $@
 am_mfschunktool_OBJECTS = mfschunktool.$(OBJEXT) \
-	../mfscommon/crc.$(OBJEXT)
+	../mfscommon/crc.$(OBJEXT) ../mfscommon/clocks.$(OBJEXT)
 mfschunktool_OBJECTS = $(am_mfschunktool_OBJECTS)
 mfschunktool_LDADD = $(LDADD)
 am_mfscsstatsdump_OBJECTS =  \
@@ -180,7 +180,8 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ../mfscommon/$(DEPDIR)/crc.Po \
+am__depfiles_remade = ../mfscommon/$(DEPDIR)/clocks.Po \
+	../mfscommon/$(DEPDIR)/crc.Po \
 	../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Po \
 	../mfscommon/$(DEPDIR)/mfschunkserver-charts.Po \
 	../mfscommon/$(DEPDIR)/mfschunkserver-clocks.Po \
@@ -485,6 +486,7 @@ mfschunkserver_LDFLAGS = $(PTHREAD_LIBS) $(ZLIB_LIBS) $(MATH_LIBS)
 mfschunktool_SOURCES = \
 	mfschunktool.c \
 	../mfscommon/crc.c ../mfscommon/crc.h \
+	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/datapack.h \
 	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h
@@ -640,6 +642,8 @@ mfschunkserver$(EXEEXT): $(mfschunkserver_OBJECTS) $(mfschunkserver_DEPENDENCIES
 	$(AM_V_CCLD)$(mfschunkserver_LINK) $(mfschunkserver_OBJECTS) $(mfschunkserver_LDADD) $(LIBS)
 ../mfscommon/crc.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
 	../mfscommon/$(DEPDIR)/$(am__dirstamp)
+../mfscommon/clocks.$(OBJEXT): ../mfscommon/$(am__dirstamp) \
+	../mfscommon/$(DEPDIR)/$(am__dirstamp)
 
 mfschunktool$(EXEEXT): $(mfschunktool_OBJECTS) $(mfschunktool_DEPENDENCIES) $(EXTRA_mfschunktool_DEPENDENCIES) 
 	@rm -f mfschunktool$(EXEEXT)
@@ -671,6 +675,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/clocks.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/crc.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@../mfscommon/$(DEPDIR)/mfschunkserver-charts.Po@am__quote@ # am--include-marker
@@ -1305,6 +1310,7 @@ clean-am: clean-generic clean-libtool clean-sbinPROGRAMS \
 	mostlyclean-am
 
 distclean: distclean-am
+	-rm -f ../mfscommon/$(DEPDIR)/clocks.Po
 	-rm -f ../mfscommon/$(DEPDIR)/crc.Po
 	-rm -f ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Po
 	-rm -f ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Po
@@ -1384,6 +1390,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
+	-rm -f ../mfscommon/$(DEPDIR)/clocks.Po
 	-rm -f ../mfscommon/$(DEPDIR)/crc.Po
 	-rm -f ../mfscommon/$(DEPDIR)/mfschunkserver-cfg.Po
 	-rm -f ../mfscommon/$(DEPDIR)/mfschunkserver-charts.Po

@@ -64,6 +64,7 @@ mfschunkserver_LDFLAGS = $(PTHREAD_LIBS) $(ZLIB_LIBS) $(MATH_LIBS)
 mfschunktool_SOURCES = \
 	mfschunktool.c \
 	../mfscommon/crc.c ../mfscommon/crc.h \
+	../mfscommon/clocks.c ../mfscommon/clocks.h \
 	../mfscommon/datapack.h \
 	../mfscommon/idstr.h \
 	../mfscommon/MFSCommunication.h

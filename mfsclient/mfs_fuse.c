@@ -6106,19 +6106,21 @@ void mfs_listxattr (fuse_req_t req, fuse_ino_t ino, size_t size) {
 		buff = NULL;
 		leng = 0;
 	} else {
-		if (vattr) {
-			if (mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
+		if (xattr_acl_support) {
+			if (vattr) {
+				if (mfs_attr_get_type(attr)==TYPE_DIRECTORY) {
+					if (mfs_getfacl(req,ino,POSIX_ACL_DEFAULT,&aclbuff,&aclleng)==MFS_STATUS_OK) {
+						hasdefacl = 1;
+					}
+				}
+			} else {
 				if (mfs_getfacl(req,ino,POSIX_ACL_DEFAULT,&aclbuff,&aclleng)==MFS_STATUS_OK) {
 					hasdefacl = 1;
 				}
 			}
-		} else {
-			if (mfs_getfacl(req,ino,POSIX_ACL_DEFAULT,&aclbuff,&aclleng)==MFS_STATUS_OK) {
-				hasdefacl = 1;
+			if (mfs_getfacl(req,ino,POSIX_ACL_ACCESS,&aclbuff,&aclleng)==MFS_STATUS_OK) {
+				hasaccacl = 1;
 			}
-		}
-		if (mfs_getfacl(req,ino,POSIX_ACL_ACCESS,&aclbuff,&aclleng)==MFS_STATUS_OK) {
-			hasaccacl = 1;
 		}
 		if (full_permissions) {
 			gids = groups_get(ctx.pid,ctx.uid,ctx.gid);

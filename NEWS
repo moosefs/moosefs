@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.57.5-1 (2025-02-26)
 
   - (master) added the number of localsplit operations to the total split counter
+  - (master) fixed chunk copies and EC matrix counters when both copies and parts are present
 
 * MooseFS 4.57.4-1 (2025-02-17)
 

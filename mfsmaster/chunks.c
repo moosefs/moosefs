@@ -1490,7 +1490,21 @@ static inline void chunk_state_fix(chunk *c) {
 	}
 	regecge = chunk_calc_ecge(regmask8,regmask4,regec8uniqserv,regec4uniqserv,&storage_mode);
 	allecge = chunk_calc_ecge(allmask8,allmask4,allec8uniqserv,allec4uniqserv,&storage_mode);
-	if (allc>=allecge) {
+	if (allc==0 && allecge==0) {
+		if (allmask8>0 && allmask4>0) {
+			if (bitcount(allmask8)>bitcount(allmask4)) {
+				storage_mode = STORAGE_MODE_EC8;
+			} else {
+				storage_mode = STORAGE_MODE_EC4;
+			}
+		} else if (allmask8>0) {
+			storage_mode = STORAGE_MODE_EC8;
+		} else if (allmask4>0) {
+			storage_mode = STORAGE_MODE_EC4;
+		} else {
+			storage_mode = STORAGE_MODE_COPIES;
+		}
+	} else if (allc>=allecge) {
 		storage_mode = STORAGE_MODE_COPIES;
 	}
 	if (storage_mode==STORAGE_MODE_COPIES) {
@@ -1646,7 +1660,8 @@ void chunk_store_chunkcounters(uint8_t *buff,uint8_t matrixid,int16_t classid) {
 	if (matrixid==0) {
 		for (i=0 ; i<MAXSCLASS*4 ; i++) {
 			if (classid<0 || classid>255 || ((uint8_t)classid==(i%MAXSCLASS))) {
-				gequiv = sclass_calc_goal_equivalent(sclass_get_keeparch_storagemode(i%MAXSCLASS,i/MAXSCLASS));
+				sm = sclass_get_keeparch_storagemode(i%MAXSCLASS,i/MAXSCLASS);
+				gequiv = sclass_calc_goal_equivalent(sm);
 				if (gequiv>10) {
 					gequiv=10;
 				}
@@ -1658,7 +1673,8 @@ void chunk_store_chunkcounters(uint8_t *buff,uint8_t matrixid,int16_t classid) {
 	} else if (matrixid==1) {
 		for (i=0 ; i<MAXSCLASS*4 ; i++) {
 			if (classid<0 || classid>255 || ((uint8_t)classid==(i%MAXSCLASS))) {
-				gequiv = sclass_calc_goal_equivalent(sclass_get_keeparch_storagemode(i%MAXSCLASS,i/MAXSCLASS));
+				sm = sclass_get_keeparch_storagemode(i%MAXSCLASS,i/MAXSCLASS);
+				gequiv = sclass_calc_goal_equivalent(sm);
 				if (gequiv>10) {
 					gequiv=10;
 				}
@@ -1692,19 +1708,7 @@ void chunk_store_chunkcounters(uint8_t *buff,uint8_t matrixid,int16_t classid) {
 		for (i=0 ; i<MAXSCLASS*4 ; i++) {
 			if (classid<0 || classid>255 || ((uint8_t)classid==(i%MAXSCLASS))) {
 				sm = sclass_get_keeparch_storagemode(i%MAXSCLASS,i/MAXSCLASS);
-				if (matrixid>=4) { // EC
-					if (sm->ec_data_chksum_parts) {
-						gequiv = (sm->ec_data_chksum_parts&0xF)+1;
-					} else {
-						gequiv = 0;
-					}
-				} else {
-					if (sm->ec_data_chksum_parts) {
-						gequiv = 0;
-					} else{
-						gequiv = sm->labelscnt;
-					}
-				}
+				gequiv = sclass_calc_goal_equivalent(sm);
 				if (gequiv>10) {
 					gequiv=10;
 				}

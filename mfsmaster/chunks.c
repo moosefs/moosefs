@@ -7409,6 +7409,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 					}
 				}
 				job_exit_reasons[c->sclassid][CREATED_MISSING_PARTS_FROM_COPY]++;
+				inforec.split_copy_into_ecparts++;
 			}
 			return;
 		}

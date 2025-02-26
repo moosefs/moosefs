@@ -11163,9 +11163,12 @@ ma_create_charts();
 					if host==None or port==None:
 						perc,base,datadict = get_charts_multi_data(masterconn,no*10+chrange,MCcount)
 					else:
-						conn = MFSConn(host,port)
-						perc,base,datadict = get_charts_multi_data(conn,no*10+chrange,MCcount)
-						del conn
+						try:
+							conn = MFSConn(host,port)
+							perc,base,datadict = get_charts_multi_data(conn,no*10+chrange,MCcount)
+							del conn
+						except Exception:
+							perc,base,datadict = None,None,None
 					if perc!=None and base!=None and datadict!=None:
 						base -= 2
 						json_mc_dict["percent"] = bool(perc)
@@ -11245,9 +11248,12 @@ ma_create_charts();
 						if host==None or port==None:
 							data,length = masterconn.command(CLTOAN_CHART_DATA,ANTOCL_CHART_DATA,struct.pack(">LL",x*10+chrange,MCcount))
 						else:
-							conn = MFSConn(host,port)
-							data,length = conn.command(CLTOAN_CHART_DATA,ANTOCL_CHART_DATA,struct.pack(">LL",x*10+chrange,MCcount))
-							del conn
+							try:
+								conn = MFSConn(host,port)
+								data,length = conn.command(CLTOAN_CHART_DATA,ANTOCL_CHART_DATA,struct.pack(">LL",x*10+chrange,MCcount))
+								del conn
+							except Exception:
+								data,length = None,0
 						if length>=8:
 							ts,e = struct.unpack(">LL",data[:8])
 							if e*8+8==length and (entries==0 or entries==e):
@@ -11702,9 +11708,12 @@ cs_create_charts();
 					json_cc_dict["name"] = name
 					json_cc_dict["description"] = desc
 					json_cc_dict["raw_format"] = bool(raw)
-					conn = MFSConn(host,port)
-					perc,base,datadict = get_charts_multi_data(conn,no*10+chrange,CCcount)
-					del conn
+					try:
+						conn = MFSConn(host,port)
+						perc,base,datadict = get_charts_multi_data(conn,no*10+chrange,CCcount)
+						del conn
+					except Exception:
+						perc,base,datadict = None,None,None
 					if perc!=None and base!=None and datadict!=None:
 						base -= 2
 						json_cc_dict["percent"] = bool(perc)
@@ -11778,9 +11787,12 @@ cs_create_charts();
 					entries = 0
 					repeat = 0
 					for host,port,x in series:
-						conn = MFSConn(host,port)
-						data,length = conn.command(CLTOAN_CHART_DATA,ANTOCL_CHART_DATA,struct.pack(">LL",x*10+chrange,CCcount))
-						del conn
+						try:
+							conn = MFSConn(host,port)
+							data,length = conn.command(CLTOAN_CHART_DATA,ANTOCL_CHART_DATA,struct.pack(">LL",x*10+chrange,CCcount))
+							del conn
+						except Exception:
+							length = 0
 						if length>=8:
 							ts,e = struct.unpack(">LL",data[:8])
 							if e*8+8==length and (entries==0 or entries==e):

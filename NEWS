@@ -4,6 +4,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (master) added the number of localsplit operations to the total split counter
   - (master) fixed chunk copies and EC matrix counters when both copies and parts are present
+  - (master) fixed sending changelog rotate packet to metalogger (CE version only)
 
 * MooseFS 4.57.4-1 (2025-02-17)
 

@@ -265,9 +265,10 @@ void multilan_reload (void) {
 }
 
 int multilan_init(void) {
+	int err = csipmap_init();
 	multilan_reload();
 
 	main_reload_register(multilan_reload);
 	main_destruct_register(multilan_term);
-	return csipmap_init();
+	return err;
 }

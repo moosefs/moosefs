@@ -2194,17 +2194,17 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 void sclass_new(void) {
 	// sclass 1
 	sclasstab[1].nleng = snprintf((char*)(sclasstab[1].name),MAXSCLASSNAMELENG,"2CP");
-	sclasstab[1].dleng = snprintf((char*)(sclasstab[1].desc),MAXSCLASSDESCLENG,"two copies");
+	sclasstab[1].dleng = snprintf((char*)(sclasstab[1].desc),MAXSCLASSDESCLENG,"2 copies");
 	sclasstab[1].keep.labelscnt = 2;
 
 	// sclass 2
 	sclasstab[2].nleng = snprintf((char*)(sclasstab[2].name),MAXSCLASSNAMELENG,"3CP");
-	sclasstab[2].dleng = snprintf((char*)(sclasstab[2].desc),MAXSCLASSDESCLENG,"three copies");
+	sclasstab[2].dleng = snprintf((char*)(sclasstab[2].desc),MAXSCLASSDESCLENG,"3 copies");
 	sclasstab[2].keep.labelscnt = 3;
 
 	// sclass 3
 	sclasstab[3].nleng = snprintf((char*)(sclasstab[3].name),MAXSCLASSNAMELENG,"EC4+1");
-	sclasstab[3].dleng = snprintf((char*)(sclasstab[3].desc),MAXSCLASSDESCLENG,"two copies in keep mode, four data parts plus checksum part in archive mode");
+	sclasstab[3].dleng = snprintf((char*)(sclasstab[3].desc),MAXSCLASSDESCLENG,"2 copies in KEEP state, 4 data parts plus 1 checksum part in ARCHIVE state");
 	sclasstab[3].arch_delay = 24;
 	sclasstab[3].keep.labelscnt = 2;
 	sclasstab[3].arch.labelscnt = 1;
@@ -2213,7 +2213,7 @@ void sclass_new(void) {
 
 	// sclass 4
 	sclasstab[4].nleng = snprintf((char*)(sclasstab[4].name),MAXSCLASSNAMELENG,"EC8+1");
-	sclasstab[4].dleng = snprintf((char*)(sclasstab[4].desc),MAXSCLASSDESCLENG,"two copies in keep mode, eight data parts plus checksum part in archive mode");
+	sclasstab[4].dleng = snprintf((char*)(sclasstab[4].desc),MAXSCLASSDESCLENG,"2 copies in KEEP state, 8 data parts plus 1 checksum part in ARCHIVE state");
 	sclasstab[4].arch_delay = 24;
 	sclasstab[4].keep.labelscnt = 2;
 	sclasstab[4].arch.labelscnt = 1;

@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.57.6-1 (2025-03-25)
 
   - (master) fixed predefined storage classes
+  - (master) fixed csipmap initialization issue (no csmap after start/restart)
 
 * MooseFS 4.57.5-1 (2025-02-26)
 

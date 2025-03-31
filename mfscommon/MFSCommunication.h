@@ -404,6 +404,11 @@
 #define POSIX_LOCK_RDLCK                   1
 #define POSIX_LOCK_WRLCK                   2
 
+// MATOCL_LIST_ACQUIRED_LOCKS.ctype
+#define MFS_LOCK_TYPE_UNKNOWN              0
+#define MFS_LOCK_TYPE_SHARED               1
+#define MFS_LOCK_TYPE_EXCLUSIVE            2
+
 // dtypes:
 #define DTYPE_UNKNOWN                      0
 #define DTYPE_TRASH                        1
@@ -623,6 +628,12 @@
 #define LASTSTORE_DOWNLOADED               1
 #define LASTSTORE_META_STORED_FG           2
 #define LASTSTORE_CRC_STORED_BG            3
+
+// MATOCL_MISSING_CHUNKS.type
+#define MISSING_CHUNK_TYPE_NOCOPY          0
+#define MISSING_CHUNK_TYPE_INVALID         1
+#define MISSING_CHUNK_TYPE_WRONGVERSION    2
+#define MISSING_CHUNK_TYPE_PARTIALEC       3
 
 #define MFS_XATTR_CREATE_OR_REPLACE        0
 #define MFS_XATTR_CREATE_ONLY              1
@@ -2166,7 +2177,7 @@
 // loopstart:32 loopend:32 del_invalid:32 nodel_invalid:32 del_unused:32 nodel_unused:32 del_diskclean:32 nodel_diskclean:32 del_overgoal:32 nodel_overgoal:32 copy_undergoal:32 nocopy_undergoal:32 copy_rebalance:32
 // loopstart:32 loopend:32 del_invalid:32 nodel_invalid:32 del_unused:32 nodel_unused:32 del_diskclean:32 nodel_diskclean:32 del_overgoal:32 nodel_overgoal:32 copy_undergoal:32 nocopy_undergoal:32 copy_rebalance:32 locked_unused:32 locked_used:32
 // loopstart:32 loopend:32 del_invalid:32 nodel_invalid:32 del_unused:32 nodel_unused:32 del_diskclean:32 nodel_diskclean:32 del_overgoal:32 nodel_overgoal:32 copy_undergoal:32 nocopy_undergoal:32 copy_wronglabels:32 nocopy_wronglabels:32 copy_rebalance:32 labels_dont_match:32 locked_unused:32 locked_used:32 (version >= 2.1.4)
-
+// loopstart:32 loopend:32 fixed:32 forcekeep:32 delete_invalid:32 delete_no_longer_needed:32 delete_wrong_version:32 delete_duplicated_ecpart:32 delete_excess_ecpart:32 delete_excess_copy:32 delete_diskclean_ecpart:32 delete_diskclean_copy:32 replicate_dupserver_ecpart:32 replicate_needed_ecpart:32 replicate_needed_copy:32 replicate_wronglabels_ecpart:32 replicate_wronglabels_copy:32 split_copy_into_ecparts:32 join_ecparts_into_copy:32 recover_ecpart:32 calculate_ecchksum:32 locked_unused:32 locked_used:32 replicate_rebalance:32 (size = 96,version >= 4.4.0)
 
 // 0x0204
 #define CLTOMA_CHUNKS_MATRIX (PROTO_BASE+516)
@@ -2382,11 +2393,12 @@
 
 // 0x0220
 #define CLTOMA_MISSING_CHUNKS (PROTO_BASE+544)
-// -
+// [ mode:8 ] // use mode==0 when packet length is 0 , mode added in version 3.0.25
 
 // 0x0221
 #define MATOCL_MISSING_CHUNKS (PROTO_BASE+545)
-// N*[ chunkdid:64 inode:32 indx:32 ]
+// N*[ chunkdid:64 inode:32 indx:32 ] // mode == 0
+// N*[ chunkdid:64 inode:32 indx:32 type:8 ] // mode > 0 (and version >= 3.0.25)
 
 // 0x0222
 #define CLTOMA_NODE_INFO (PROTO_BASE+546)

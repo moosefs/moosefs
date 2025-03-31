@@ -606,13 +606,13 @@ uint32_t posix_lock_list(uint32_t inode,uint8_t *buff) {
 							put64bit(&buff,r->end);
 							switch (r->type) {
 								case POSIX_LOCK_RDLCK:
-									put8bit(&buff,1);
+									put8bit(&buff,MFS_LOCK_TYPE_SHARED);
 									break;
 								case POSIX_LOCK_WRLCK:
-									put8bit(&buff,2);
+									put8bit(&buff,MFS_LOCK_TYPE_EXCLUSIVE);
 									break;
 								default:
-									put8bit(&buff,0);
+									put8bit(&buff,MFS_LOCK_TYPE_UNKNOWN);
 							}
 						}
 					}
@@ -634,13 +634,13 @@ uint32_t posix_lock_list(uint32_t inode,uint8_t *buff) {
 						put64bit(&buff,r->end);
 						switch (r->type) {
 							case POSIX_LOCK_RDLCK:
-								put8bit(&buff,1);
+								put8bit(&buff,MFS_LOCK_TYPE_SHARED);
 								break;
 							case POSIX_LOCK_WRLCK:
-								put8bit(&buff,2);
+								put8bit(&buff,MFS_LOCK_TYPE_EXCLUSIVE);
 								break;
 							default:
-								put8bit(&buff,0);
+								put8bit(&buff,MFS_LOCK_TYPE_UNKNOWN);
 						}
 					}
 				}

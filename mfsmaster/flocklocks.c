@@ -574,13 +574,13 @@ uint32_t flock_list(uint32_t inode,uint8_t *buff) {
 						buff+=20;
 						switch (l->ltype) {
 							case LTYPE_READER:
-								put8bit(&buff,1);
+								put8bit(&buff,MFS_LOCK_TYPE_SHARED);
 								break;
 							case LTYPE_WRITER:
-								put8bit(&buff,2);
+								put8bit(&buff,MFS_LOCK_TYPE_EXCLUSIVE);
 								break;
 							default:
-								put8bit(&buff,0);
+								put8bit(&buff,MFS_LOCK_TYPE_UNKNOWN);
 						}
 					}
 				}
@@ -599,13 +599,13 @@ uint32_t flock_list(uint32_t inode,uint8_t *buff) {
 					buff+=20;
 					switch (l->ltype) {
 						case LTYPE_READER:
-							put8bit(&buff,1);
+							put8bit(&buff,MFS_LOCK_TYPE_SHARED);
 							break;
 						case LTYPE_WRITER:
-							put8bit(&buff,2);
+							put8bit(&buff,MFS_LOCK_TYPE_EXCLUSIVE);
 							break;
 						default:
-							put8bit(&buff,0);
+							put8bit(&buff,MFS_LOCK_TYPE_UNKNOWN);
 					}
 				}
 			}

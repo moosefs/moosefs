@@ -9077,22 +9077,22 @@ void fs_test_files(void) {
 								mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"inode: %"PRIu32" ; index: %"PRIu32" - removed not existing chunk exceeding file size (chunkid: %016"PRIX64")",f->inode,j,chunkid);
 								break;
 							case CHUNK_FLOOP_MISSING_NOCOPY:
-								missing_log_insert(chunkid,f->inode,j,0);
+								missing_log_insert(chunkid,f->inode,j,MISSING_CHUNK_TYPE_NOCOPY);
 								valid = 0;
 								mchunks++;
 								break;
 							case CHUNK_FLOOP_MISSING_INVALID:
-								missing_log_insert(chunkid,f->inode,j,1);
+								missing_log_insert(chunkid,f->inode,j,MISSING_CHUNK_TYPE_INVALID);
 								valid = 0;
 								mchunks++;
 								break;
 							case CHUNK_FLOOP_MISSING_WRONGVERSION:
-								missing_log_insert(chunkid,f->inode,j,2);
+								missing_log_insert(chunkid,f->inode,j,MISSING_CHUNK_TYPE_WRONGVERSION);
 								valid = 0;
 								mchunks++;
 								break;
 							case CHUNK_FLOOP_MISSING_PARTIALEC:
-								missing_log_insert(chunkid,f->inode,j,3);
+								missing_log_insert(chunkid,f->inode,j,MISSING_CHUNK_TYPE_PARTIALEC);
 								valid = 0;
 								mchunks++;
 								break;

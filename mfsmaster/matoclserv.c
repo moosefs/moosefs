@@ -400,7 +400,7 @@ static inline int matoclserv_fuse_read_chunk_common(matoclserventry *eptr,uint32
 	if (sessions_get_disables(eptr->sesdata)&DISABLE_READ) {
 		status = MFS_ERROR_EPERM;
 	} else {
-		status = fs_readchunk(inode,sessions_get_sesflags(eptr->sesdata),indx,chunkopflags,0,&chunkid,&fleng);
+		status = fs_readchunk(inode,sessions_get_sesflags(eptr->sesdata),indx,chunkopflags,1,&chunkid,&fleng);
 	}
 	if (status!=MFS_STATUS_OK) {
 		if (status==MFS_ERROR_LOCKED || status==MFS_ERROR_CHUNKBUSY) {
@@ -2593,7 +2593,7 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 	}
 	if (eptr->version>=VERSION2INT(3,0,40)) {
 		uint8_t sesflags = sessions_get_sesflags(eptr->sesdata);
-		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,&accmode,&filenode,&validchunk,&chunkid);
+		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sesflags,inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,1,&accmode,&filenode,&validchunk,&chunkid);
 		if (status==MFS_STATUS_OK) {
 			uint32_t version;
 			uint8_t split;
@@ -2678,7 +2678,7 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			}
 		}
 	} else {
-		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,NULL,NULL,NULL,NULL);
+		status = fs_lookup(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),inode,nleng,name,uid,gids,gid,auid,agid,&newinode,attr,0,NULL,NULL,NULL,NULL);
 		if (status==MFS_ERROR_ENOENT_NOCACHE && eptr->version<VERSION2INT(3,0,25)) {
 			status = MFS_ERROR_ENOENT;
 		}

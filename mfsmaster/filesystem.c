@@ -5438,7 +5438,7 @@ uint8_t fs_access(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t ui
 	return fsnodes_access_ext(p,uid,gids,gid,modemask,sesflags)?MFS_STATUS_OK:MFS_ERROR_EACCES;
 }
 
-uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE],uint16_t *accmode,uint8_t *filenode,uint8_t *validchunk,uint64_t *chunkid) {
+uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t nleng,const uint8_t *name,uint32_t uid,uint32_t gids,uint32_t *gid,uint32_t auid,uint32_t agid,uint32_t *inode,uint8_t attr[ATTR_RECORD_SIZE],uint8_t allow_recover,uint16_t *accmode,uint8_t *filenode,uint8_t *validchunk,uint64_t *chunkid) {
 	fsnode *wd,*rn,*p;
 	fsedge *e;
 
@@ -5523,7 +5523,7 @@ uint8_t fs_lookup(uint32_t rootinode,uint8_t sesflags,uint32_t parent,uint16_t n
 				*chunkid = p->data.fdata.chunktab[0];
 				if (*chunkid == 0) {
 					*validchunk = 1;
-				} else if (chunk_read_check(main_time(),*chunkid)==MFS_STATUS_OK) {
+				} else if (chunk_read_check(main_time(),*chunkid,allow_recover)==MFS_STATUS_OK) {
 					*validchunk = 1;
 				}
 			}
@@ -7343,7 +7343,7 @@ uint8_t fs_opencheck(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t
 	return MFS_STATUS_OK;
 }
 
-uint8_t fs_readchunk(uint32_t inode,uint32_t sesflags,uint32_t indx,uint8_t chunkopflags,uint8_t simplemode,uint64_t *chunkid,uint64_t *length) {
+uint8_t fs_readchunk(uint32_t inode,uint32_t sesflags,uint32_t indx,uint8_t chunkopflags,uint8_t allow_recover,uint64_t *chunkid,uint64_t *length) {
 	int status;
 	fsnode *p;
 	uint32_t ts = main_time();
@@ -7363,8 +7363,8 @@ uint8_t fs_readchunk(uint32_t inode,uint32_t sesflags,uint32_t indx,uint8_t chun
 	if (indx<p->data.fdata.chunks) {
 		*chunkid = p->data.fdata.chunktab[indx];
 	}
-	if (*chunkid>0 && simplemode!=0) {
-		status = chunk_read_check(ts,*chunkid);
+	if (*chunkid>0) {
+		status = chunk_read_check(ts,*chunkid,allow_recover);
 		if (status!=MFS_STATUS_OK) {
 			return status;
 		}

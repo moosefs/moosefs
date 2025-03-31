@@ -89,7 +89,7 @@ int chunk_set_autoarch(uint64_t chunkid,uint32_t archreftime,uint32_t *archflagc
 chunkfloop chunk_fileloop_task(uint64_t chunkid,uint8_t sclassid,uint8_t aftereof,uint32_t archreftime,uint32_t *archflagchanged,uint8_t intrash,uint32_t *trashflagchanged);
 uint8_t chunk_remove_from_missing_log(uint64_t chunkid);
 
-int chunk_read_check(uint32_t ts,uint64_t chunkid);
+int chunk_read_check(uint32_t ts,uint64_t chunkid,uint8_t allow_recover);
 int chunk_multi_modify(uint8_t continueop,uint64_t *nchunkid,uint64_t ochunkid,uint8_t sclassid,uint8_t *opflag,uint32_t clientip);
 int chunk_multi_truncate(uint64_t *nchunkid,uint64_t ochunkid,uint32_t length,uint8_t sclassid);
 //int chunk_multi_reinitialize(uint64_t chunkid);

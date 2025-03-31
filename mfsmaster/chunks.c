@@ -3330,7 +3330,7 @@ uint8_t chunk_remove_from_missing_log(uint64_t chunkid) {
 	return 1;
 }
 
-int chunk_read_check(uint32_t ts,uint64_t chunkid) {
+int chunk_read_check(uint32_t ts,uint64_t chunkid,uint8_t allow_recover) {
 	chunk *c;
 	uint32_t ecmask8,ecmask4;
 	slist *s;
@@ -3368,7 +3368,7 @@ int chunk_read_check(uint32_t ts,uint64_t chunkid) {
 	if (((ecmask8 & 0xFF) == 0xFF) || ((ecmask4 & 0x0F) == 0x0F)) { // we have all data parts - we can read data
 		return MFS_STATUS_OK;
 	}
-	if (bitcount(ecmask8)>=8 || bitcount(ecmask4)>=4) { // can be recovered
+	if (allow_recover && (bitcount(ecmask8)>=8 || bitcount(ecmask4)>=4)) { // can be recovered
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"chunk 0x%016"PRIX64": data parts missing for read operation - trying to recover",chunkid);
 		chunk_do_fast_job(c,ts,2);
 		if (c->operation!=NONE) {

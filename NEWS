@@ -7,6 +7,7 @@ This file lists noteworthy changes in MooseFS.
   - (master) fixed lock listing (case of posix_locks and flocks being in the same packet)
   - (master) fixed chunk recovery conditions during read and lookup
   - (master) changed description of default storage classes
+  - (man) added manpage for mfsmount.cfg file
   - (man) added subsections to all man pages and reworded some of them
 
 * MooseFS 4.57.5-1 (2025-02-26)

@@ -119,3 +119,4 @@ man/man1/mfsscadmin.1.gz
 man/man1/mfspatadmin.1.gz
 man/man1/mfstools.1.gz
 man/man8/mfsmount.8.gz
+man/man5/mfsmount.cfg.5.gz

@@ -1,0 +1,54 @@
+.TH mfsmount.cfg "5" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
+.SH NAME
+mfsmount.cfg \- \fBMooseFS\fP mount daemon config file
+.SH DESCRIPTION
+.PP
+This is the config file that will be read by the \fBmfsmount\fP daemon when it starts.
+It can be used to specify defaults for mfsmount.
+.SS FORMAT
+.PP
+Empty lines and lines that start hash (\fB#\fP) sign are ignored. Every other 
+line should be one of the following:
+.PP
+one mount option
+.PP
+several mount options, separated by commas
+.PP
+default mountpoint, which must begin with a slash ("/") sign and be a fully qualified path
+.PP
+For list of all available options, see \fBmfsmount\fP\|(8) 
+.SH EXAMPLES
+.PP
+Example config, which sets the nosuid and nodev parameters, specifies master host, master connection password and the mount point:
+.PP
+nosuid,nodev
+.br
+mfsmaster=mfsmaster
+.br
+mfspassword=secret
+.br
+/mnt/mfs
+.SH "REPORTING BUGS"
+Report bugs to <bugs@moosefs.com>.
+.SH COPYRIGHT
+Copyright (C) 2025 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsmount (8)
+

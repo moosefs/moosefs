@@ -533,6 +533,7 @@ exit 0
 %{_mandir}/man1/mfspatadmin.1*
 %{_mandir}/man1/mfstools.1*
 %{_mandir}/man8/mfsmount.8*
+%{_mandir}/man5/mfsmount.cfg.5*
 # %%{_mandir}/man8/mfsbdev.8* - moved to EXTRA_FILES
 # %%{_mandir}/man5/mfsbdev.cfg.5* - moved to EXTRA_FILES
 %{_mandir}/man8/mount.moosefs.8*

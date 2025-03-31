@@ -1,4 +1,5 @@
-.TH mfsbdev "8" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsbdev "8" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsbdev \- \fBMooseFS\fP block device daemon/management tool
 .SH SYNOPSIS
@@ -40,7 +41,7 @@ mfsbdev \- \fBMooseFS\fP block device daemon/management tool
 .SH DESCRIPTION
 This tool is used to manage block devices. This tool works in Linux ONLY. Kernel
 module nbd must be loaded for this tool to work properly.
-.SH COMMANDS
+.SS COMMANDS
 .PP
 .B start
 - starts the daemon; the daemon only listens on a socket at this point;
@@ -132,7 +133,7 @@ map (m parameter) or unmap (u parameter) command or with MooseFS mfsbdev.cfg fil
 for formatting of the config see \fBmfsbdev.cfg\fP\|(5)
 .PP
 .B -o
-- additional params, mfsmount-style, many params can be defined, separated by coma:
+- additional params, mfsmount-style, many params can be defined, separated by comma:
 .TP
 \fBmfswritecachesize=\fP\fIN\fP
 specify write cache size in MiB (in range: 16..2048 - default: 128)
@@ -181,6 +182,10 @@ specify preferred labels for choosing chunkservers during I/O
 .TP
 \fBmfsnbdtimeout=\fP\fIN\fP
 define maximum timeout in seconds before kernel gives up (default: 1800)
+.SH FILES
+.TP
+\fBmfsbdev.cfg\fP
+configuration file for MooseFS block device daemon; refer to \fBmfsbdev.cfg\fP\|(5) manual for details
 .SH EXAMPLES
 .PP
 .B mfsbdev start

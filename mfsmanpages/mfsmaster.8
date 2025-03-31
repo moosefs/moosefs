@@ -1,4 +1,5 @@
-.TH mfsmaster "8" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsmaster "8" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsmaster \- start, restart or stop MooseFS master process
 .SH SYNOPSIS
@@ -95,18 +96,34 @@ MooseFS access control file; refer to
 \fBmfstopology.cfg\fP
 Network topology definitions; refer to \fBmfstopology.cfg\fP\|(5) manual for details
 .TP
-.BR .mfsmaster.lock
+\fBmfsipmap.cfg\fP
+Chunkservers IP mapping definitions; refer to \fBmfsipmap.cfg\fP\|(5) manual for details
+.TP
+\fB.mfsmaster.lock\fP
 lock file of running MooseFS master process
+(created in data directory)
+.TP
+\fB.bgwriter.lock\fP
+lock file of running MooseFS master subprocess for storing metadata
 (created in data directory)
 .TP
 \fBmetadata.mfs\fP, \fBmetadata\.mfs\.back\fP
 MooseFS filesystem metadata image (created in data directory)
 .TP
-\fBchangelog.\fP*\fB.mfs\fP
-MooseFS filesystem metadata change logs (created in data directory; merged into \fBmetadata.mfs\fP once per hour)
+\fBmetadata.crc\fP
+CRC of \fBmetadata.mfs\fP file (created in data directory)
 .TP
-\fBdata.stats\fP
-MooseFS master charts state (created in data directory)
+\fBmetadata.mfs.empty\fP
+An empty metadata file, to be used when starting up a fresh MooseFS instance (created in data directory)
+.TP
+\fBchangelog.\fP*\fB.mfs\fP
+MooseFS filesystem metadata change logs (created in data directory)
+.TP
+\fBstats.mfs\fP
+master charts stats (created in data directory)
+.TP
+\fB.mfsmaster_info.txt\fP
+master info file, created by sending the process INFO signal, with work parameters that can be used for debugging/support purposes (created in data directory)
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

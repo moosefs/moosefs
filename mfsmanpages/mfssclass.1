@@ -1,4 +1,5 @@
-.TH mfssclass "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfssclass "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfssclass \- \fBMooseFS\fP storage classes management tools
 .SH SYNOPSIS
@@ -14,23 +15,25 @@ mfssclass \- \fBMooseFS\fP storage classes management tools
 .B mfsxchgsclass
 [\fB-?\fP] [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISRC_SCLASS_NAME\fP \fIDST_SCLASS_NAME\fP \fIOBJECT\fP...
 .SH DESCRIPTION
-These tools operate on object's \fIstorage class\fP name. This is an extended version of classic goal.
-There are predefined storage classes provided as equivalents of goals 1 to 9 (names are simply "1","2",...,"9"). Other classes 
-can be created/modified/deleted etc. by administrator using \fBmfsscadmin\fP tool.
+These tools operate on a filesystem object's (file, special file, or directory) \fIstorage class\fP name.
+This is an extended version of the older MooseFS's goal mechanism.
+There are several predefined storage classes in each fresh installation of MooseFS (see NOTES).
+Other classes can be created/modified/deleted etc., by an administrator using the \fBmfsscadmin\fP tool.
 .PP
 \fBmfsgetsclass\fP prints current \fIstorage class\fP of given object(s).
-\fB-r\fP option enables recursive mode, for files there is no difference,
-for directories it shows the number of objects in each \fIstorage class\fP
+\fB-r\fP option enables recursive mode:
+for directories, it shows the number of objects in each \fIstorage class\fP
 containded in the whole subtree of this directory.
+for files there is no difference.
 .PP
-\fBmfssetsclass\fP changes current \fIstorage class\fP of given object(s).
+\fBmfssetsclass\fP changes the current \fIstorage class\fP of given object(s).
 \fB-r\fP option enables recursive mode.
 .PP
 \fBmfscopysclass\fP copies \fIstorage class\fP from one object to given object(s).
 .PP
-\fBmfsxchgsclass\fP sets \fIstorage class\fP to \fIDST_SCLASS_NAME\fP of given objects(s) but only
+\fBmfsxchgsclass\fP sets \fIstorage class\fP of given objects(s) to \fIDST_SCLASS_NAME\fP, but only
 when current \fIstorage class\fP is set to \fISRC_SCLASS_NAME\fP.
-.SH GENERAL OPTIONS
+.SH OPTIONS
 Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
@@ -44,12 +47,42 @@ or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
 \fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
 numbers and SI prefixes). The default is to print just exact numbers.
 .PP
-Option \fB-?\fP displays short usage message.
-.SH INHERITANCE
-When a new object is created in MooseFS, storage class is inherited from the parent directory. A newly created
-object inherits always the current value of its parent's storage class. Changing a
-directory's storage class does not affect its already created children. To change
-storage class for a directory and all of its children use \fB-r\fP option.
+Option \fB-?\fP displays a short usage message.
+.SH NOTES
+.SS INHERITANCE
+When a new object is created in MooseFS, the storage class is inherited from the parent directory. 
+A newly created object inherits always the current value of its parent's storage class. 
+Changing a directory's storage class does not affect its already created children. 
+To change the storage class for a directory and all of its children, use the \fB-r\fP option.
+.SS PREDEFINED STORAGE CLASSES
+.PP
+A new MooseFS instance will have the following classes predefined:
+.PP
+2CP - only KEEP state defined, keep 2 copies on any labels (default class for / directory)
+.PP
+3CP - only KEEP state defined, keep 3 copies on any labels
+.PP
+EC4+1 - in KEEP state, keep 2 copies on any labels, in ARCHIVE state, keep chunks in EC4+1 format on any labels, archive delay is 1 day and is calculated using file's ctime, files smaller than 512kiB will not be converted to EC format
+.PP
+EC4+2 - (pro only) in KEEP state, keep 3 copies on any labels, in ARCHIVE state, keep chunks in EC4+2 format on any labels, archive delay is 1 day and is calculated using file's ctime, files smaller than 512kiB will not be converted to EC format
+.PP
+EC8+1 - in KEEP state, keep 2 copies on any labels, in ARCHIVE state, keep chunks in EC8+1 format on any labels, archive delay is 1 day and is calculated using file's ctime, files smaller than 512kiB will not be converted to EC format
+.PP
+EC8+2 - (pro only) in KEEP state, keep 3 copies on any labels, in ARCHIVE state, keep chunks in EC8+2 format on any labels, archive delay is 1 day and is calculated using file's ctime, files smaller than 512kiB will not be converted to EC format
+.PP
+Up to version 4.56.0 of MooseFS the predefined classes were different. The following information 
+pertains to old MooseFS behaviour. In newer versions of MooseFS the classes mentioned below might 
+exist as a result of an upgrade, but will behave exactly like any user-defined classes. This information 
+is left here purely for informative reasons and will be removed from this manual page at some point:
+.PP
+(Behaviour up to version 4.56.0) "For compatibility reasons, every fresh or freshly upgraded instance of MooseFS has 9 predefined
+storage classes. Their names are single digits, from \fB1\fP to \fB9\fP, and their definitions
+are \fB*\fP to \fB9*\fP. They
+are equivalents of simple numeric goals from previous versions of the system. In case of an
+upgrade, all files that had goal \fIN\fP before upgrade, will now have \fIN\fP storage class.
+These classes can be modified only when option \fB-f\fP is specified. It is advised to create new
+storage classes in an upgraded system and migrate files with \fBmfsxchgsclass\fP tool, rather than
+modify the predefined classes. The predefined classes CANNOT be deleted."
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

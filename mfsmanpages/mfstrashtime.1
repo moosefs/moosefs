@@ -1,4 +1,5 @@
-.TH mfstrashtime "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfstrashtime "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfstrashtime \- DEPRECATED \fBMooseFS\fP trash time management tools (use mfstrashretention tools instead)
 .SH SYNOPSIS
@@ -11,7 +12,7 @@ mfstrashtime \- DEPRECATED \fBMooseFS\fP trash time management tools (use mfstra
 .B mfscopytrashtime
 [\fB-?\fP] [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
 .SH DESCRIPTION
-These tools operate on object's
+These tools operate on a filesystem object's (file, special file, or directory)
 \fItrashtime\fP value, i.e. the number of seconds the file is preserved in
 special \fItrash\fP directory before it's finally removed from filesystem.
 \fITrashtime\fP must be non\-negative integer value.
@@ -31,10 +32,10 @@ recursive mode.
 These tools can be used on any file, directory or deleted (\fItrash\fP) file.
 .PP
 \fBmfscopytrashtime\fP tool can be used to copy \fItrashtime\fP value from one object to another.
-.SH PRECISION
+.SS PRECISION
 Since version 3.0 of MooseFS \fItrashtime\fP is stored in the system as number of \fBhours\fP
 the file is preserved in \fItrash\fP directory. Given value in seconds is rounded up to hours.
-.SH GENERAL OPTIONS
+.SH OPTIONS
 Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
@@ -49,7 +50,8 @@ or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
 numbers and SI prefixes). The default is to print just exact numbers.
 .PP
 Option \fB-?\fP displays short usage message.
-.SH INHERITANCE
+.SH NOTES
+.SS INHERITANCE
 When a new object is created in MooseFS, trashtime is inherited from the parent directory. A newly created
 object inherits always the current value of its parent's trashtime. Changing a
 directory's trashtime does not affect its already created children. To change

@@ -1,4 +1,5 @@
-.TH mfscli "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfscli "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfscli - CGI in TXT mode
 .SH SYNOPSIS
@@ -16,6 +17,7 @@ mfscli - CGI in TXT mode
 \fBmfscli\fP is a commandline counterpart to MooseFS's CGI interface. All the information available
 in CGI (except for graphs) can be obtained via CLI using different "monitoring options"
 .SH OPTIONS
+.SS GENERAL OPTIONS
 .TP
 \fB-h\fP
 print help message and exit
@@ -70,20 +72,20 @@ show data specified by 'mode id' (depends on data set)
 sessionid for \fB-SOF\fP or inode for \fB-SAL\fP
 .TP
 \fB-a\fP \fImaster_data_count\fP
-how many chart entries should be shown for master (-SMC)
+how many master data charts entries (-SMC) should be shown
 .TP
 \fB-b\fP \fImaster_data_desc\fP
-define chart columns for master; prefix with '+' for raw data, (pro only) prefix with 'ip:[port:]' for server choice (by default leader master will be used); use 'all' as a chart name for all available charts
+define master data charts (-SMC) columns; prefix with '+' for raw data, (pro only) prefix with 'ip:[port:]' for server choice (by default leader master will be used); use 'all' as a chart name for all available charts
 .TP
 \fB-c\fP \fIchunkserver_data_count\fP
-how many chart entries should be shown for chunkserver
+how many chunkserver data charts (-SCC) entries should be shown
 .TP
 \fB-d\fP \fIchunkserver_data_desc\fP
-define chart columns for chunkserver; prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice (by default all servers will be used); use 'all' as a chart name for all available charts
-.SH MONITORING OPTIONS
+define chunkserver data charts (-SCC) columns; prefix with '+' for raw data, prefix with 'ip:[port:]' for server choice (by default all servers will be used); use 'all' as a chart name for all available charts
+.SS MONITORING OPTIONS
 .TP
 \fB-SIN\fP
-show full master info
+show full master info (includes: SIM, SLI, SIG, SMU, SIC, SIL, SMF)
 .TP
 \fB-SIM\fP
 show only masters states
@@ -122,7 +124,7 @@ show exports
 show active mounts
 .TP
 \fB-SRS\fP
-show resources (storage classes,patterns,open files,acquired locks)
+show resources (includes: SSC, SPA, SOF, SAL)
 .TP
 \fB-SSC\fP
 show storage classes info
@@ -143,11 +145,11 @@ show operation counters
 show quota info
 .TP
 \fB-SMC\fP
-show master charts data
+show master charts data (use with -a and -b)
 .TP
 \fB-SCC\fP
-show chunkserver charts data
-.SH MASTER CHART DATA COLUMNS
+show chunkserver charts data (use with -c and -d)
+.SS AVAILABLE MASTER CHART DATA COLUMNS (-SMC)
 .TP 14
 ucpu
 User cpu usage
@@ -355,7 +357,7 @@ Difference in space usage percent between the most and least used chunk server
 .TP
 cpu
 Total cpu usage (scpu + ucpu)
-.SH CHUNKSERVER CHART DATA COLUMNS
+.SS AVAILABLE CHUNKSERVER CHART DATA COLUMNS (-SCC)
 .TP 14
 ucpu
 User cpu usage
@@ -500,7 +502,7 @@ Difference in usage percent between the most and least used disk
 .TP
 cpu
 Total cpu usage (scpu + ucpu)
-.SH COMMANDS
+.SS COMMANDS
 .TP
 \fB-CRC/\fP\fIip\fP\fB/\fP\fIport\fP
 remove selected chunkserver from list of active chunkservers

@@ -1,4 +1,5 @@
-.TH mfscsstatsdump "8" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfscsstatsdump "8" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfscsstatsdump \- dump usage data from chunkserver stats file in csv or png format
 .SH SYNOPSIS
@@ -12,6 +13,14 @@ or in graphical format (png). That means \fB-p\fP, \fB-x\fP and \fB-y\fP options
 .PP
 MooseFS chunkserver saves the stats file in the \fBDATA_PATH\fP directory - see 
 .BR mfschunkserver.cfg (5)
+.SS OUTPUT
+Text output - text (csv) file where first column is a timestamp (or date if \fB-d\fP option
+was specified), the following column are what was specified with the \fB-f\fP options, formatted
+according to used options (none, \fB-s\fP and \fB-h\fP or \fB-H\fP)
+.PP
+Graphical output - one png file with a chart is created for every
+field specified with the \fB-f\fP option, according to the naming scheme declared
+with the \fB-p\fP option. Size may be adjusted with \fB-x\fP and \fB-y\fP options.
 .SH OPTIONS
 .TP
 \fB-f\fP
@@ -47,7 +56,7 @@ PNG chart height (should be divisible by 20 - if not then it will be adjusted; d
 .TP
 \fB-d\fP
 show timestamps in YYYY-MM-DD HH:MM format
-.SH FIELDS
+.SS FIELDS
 .TP 14
 ucpu
 User cpu usage
@@ -228,14 +237,6 @@ Number of folders (hard drives) regardless of status, aka sum of hddok + hddmfr 
 .TP
 udiff
 Difference in usage percent between the most and least used disk
-.SH OUTPUT
-Text output - text (csv) file where first column is a timestamp (or date if \fB-d\fP option
-was specified), the following column are what was specified with the \fB-f\fP options, formatted
-according to used options (none, \fB-s\fP and \fB-h\fP or \fB-H\fP)
-.PP
-Graphical output - one png file with a chart is created for every
-field specified with the \fB-f\fP option, according to the naming scheme declared
-with the \fB-p\fP option. Size may be adjusted with \fB-x\fP and \fB-y\fP options.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

@@ -1,4 +1,5 @@
-.TH mfsfacl "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsfacl "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsfacl \- \fBMooseFS\fP file access control lists (extended attributes) management tools
 .SH SYNOPSIS
@@ -8,7 +9,7 @@ mfsfacl \- \fBMooseFS\fP file access control lists (extended attributes) managem
 .B mfssetfacl
 [\fB-?\fP] [\fB-bKknd\fP] [{\fB-s|-m|-x\fP} \fIACL_SPEC\fP] [{\fB-S|-M|-X\fP} \fIACL_FILE\fP] \fIOBJECT\fP [\fIOBJECT\fP ...]
 .SH DESCRIPTION
-These tools operate on object's \fIaccess control list\fP (\fIACL\fP) value. 
+These tools operate on a filesystem object's (file, special file, or directory) \fIaccess control list\fP (\fIACL\fP) value. 
 ACL's in \fBMooseFS\fP are compatible with Linux, so in Linux you may 
 use \fBsetfacl\fP and \fBgetfacl\fP commands.
 .PP
@@ -62,7 +63,7 @@ use \fBsetfacl\fP and \fBgetfacl\fP commands.
 common options:
 .PP
  \fB-?\fP - display short usage message
-.SH ACL SPECIFICATION
+.SS ACL SPECIFICATION
 For \fB-S\fP, \fB-M\fP and \fB-X\fP option the parameter \fIACL_FILE\fP should be a path to a file containing 
 ACL value specifications as described below (one definition per line, multiple lines possible, content after # sign
 is ignored, output from \fBmfsgetfacl\fP command is always a valid file content). 

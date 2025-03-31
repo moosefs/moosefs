@@ -1,4 +1,5 @@
-.TH mfsarchive "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsarchive "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsarchive \- \fBMooseFS\fP archive storage mode management tools
 .SH SYNOPSIS
@@ -11,13 +12,13 @@ mfsarchive \- \fBMooseFS\fP archive storage mode management tools
 .B mfssetarchive
 [\fB-?\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fIOBJECT\fP...
 .SH DESCRIPTION
-These tools operate on object's archive bit. This bit is usually set automatically according to storage class definition (\fBARCH_DELAY\fP). When this bit is set then \fBARCH_LABELS\fP from storage class definition are used, otherwise \fBKEEP_LABES\fP are used.
+These tools operate on a filesystem object's (file, special file, or directory) archive bit. This bit is usually set automatically according to storage class definition (\fBARCH_DELAY\fP). When this bit is set then \fBARCH_LABELS\fP from storage class definition are used, otherwise \fBKEEP_LABES\fP are used.
 .PP
 \fBmfschkarchive\fP prints current \fIarchive\fP bit value of given object(s). If given \fIOBJECT\fP is a \fIDIRECTORY\fP then it prints current
 \fIarchive\fP bit value of all contained files (recursively).
 .PP
 \fBmfsclrarchive\fP and \fBmfssetarchive\fP clears/sets current \fIarchive\fP bit of given object(s). As in \fBmfschkarchive\fP if \fIOBJECT\fP is a \fIDIRECTORY\fP then this tool works recursively.
-.SH GENERAL OPTIONS
+.SH OPTIONS
 Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP

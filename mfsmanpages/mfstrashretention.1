@@ -1,4 +1,5 @@
-.TH mfstrashretention "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfstrashretention "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfstrashretention \- \fBMooseFS\fP trash retention management tools
 .SH SYNOPSIS
@@ -11,7 +12,7 @@ mfstrashretention \- \fBMooseFS\fP trash retention management tools
 .B mfscopytrashretention
 [\fB-?\fP] [\fB-r\fP] [\fB-n\fP|\fB-h\fP|\fB-H\fP|\fB-k\fP|\fB-m\fP|\fB-g\fP] \fISOURCE_OBJECT\fP \fIOBJECT\fP...
 .SH DESCRIPTION
-These tools operate on object's
+These tools operate on a filesystem object's (file, special file, or directory)
 \fItrash retention\fP value, i.e. the time the file is preserved in
 special \fItrash\fP directory before it's finally removed from filesystem.
 \fITrash retention\fP must be a non\-negative integer value.
@@ -33,7 +34,23 @@ These tools can be used on any file, directory or deleted (\fItrash\fP) file.
 \fBmfscopytrashretention\fP tool can be used to copy \fItrash retention\fP value from one object to another.
 .PP
 \fITIME\fP parameter is specified as a general time type value, with minimum unit being hours and with an additional possibility of adding a + or - sign at the end; for details about time format see TIME
-.SH TIME
+.SH OPTIONS
+Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
+options to select
+format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
+uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
+prefixes (k, M, G as 10^3, 10^6 etc.). \fB-k\fP, \fB-m\fP and \fB-g\fP show plain numbers
+respectivaly in kibis (binary kilo - 1024), mebis (binary mega - 1024^2)
+and gibis (binary giga - 1024^3).
+The same can be achieved by setting
+\fBMFSHRFORMAT\fP environment variable to: \fB0\fP (exact numbers), \fB1\fP
+or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
+\fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
+numbers and SI prefixes). The default is to print just exact numbers. 
+.PP
+Option \fB-?\fP displays short usage message.
+.SH NOTES
+.SS TIME
 .PP
 For time variables their value can be defined as a number of seconds or hours (integer), depending on minimum unit of the variable, or as a time period in one of two possible formats:
 .PP
@@ -49,23 +66,7 @@ Examples:
 1.5d is the same as 1d12h, is the same as 36h
 .PP
 2.5w is the same as 2w3d12h, is the same as 420h; 2w84h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
-.SH GENERAL OPTIONS
-Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
-options to select
-format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
-uses binary prefixes (Ki, Mi, Gi as 2^10, 2^20 etc.) while \fB-H\fP uses SI
-prefixes (k, M, G as 10^3, 10^6 etc.). \fB-k\fP, \fB-m\fP and \fB-g\fP show plain numbers
-respectivaly in kibis (binary kilo - 1024), mebis (binary mega - 1024^2)
-and gibis (binary giga - 1024^3).
-The same can be achieved by setting
-\fBMFSHRFORMAT\fP environment variable to: \fB0\fP (exact numbers), \fB1\fP
-or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
-\fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
-numbers and SI prefixes). The default is to print just exact numbers. 
-.PP
-Option \fB-?\fP displays short usage message.
-
-.SH INHERITANCE
+.SS INHERITANCE
 When a new object is created in MooseFS, trash retention is inherited from the parent directory. A newly created
 object inherits always the current value of its parent's trash retention. Changing a
 directory's trash retention does not affect its already created children. To change

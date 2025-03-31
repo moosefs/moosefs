@@ -1,4 +1,5 @@
-.TH mfspatadmin "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfspatadmin "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfspatadmin \- \fBMooseFS\fP patterns administration tool
 .SH SYNOPSIS
@@ -61,7 +62,8 @@ mounted directory or \fBMooseFS\fP is mounted in /mnt/mfs/
 \fB-?\fP displays short usage message
 .PP
 At least one of the \fB-c\fP, \fB-t\fP, \fB-f\fP options must be defined for \fBadd\fP command.
-.SH TIME
+.SH NOTES
+.SS TIME
 .PP
 For variables that define time without requiring a single, specific unit, time can be defined as a number of seconds or hours (integer), depending on minimum unit for the variable, or as a time period in one of two possible formats:
 .PP
@@ -77,7 +79,7 @@ Examples:
 1.5d is the same as 1d12h, is the same as 36h
 .PP
 2.5w is the same as 2w3d12h, is the same as 420h; 2w84h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
-.SH PATTERN DEFINITION
+.SS PATTERN DEFINITION
 Pattern is a string with optional wildcards (similar to UNIX glob). Recognized wildcards:
 .PP
 \fB*\fP - matches any number of any characters including none

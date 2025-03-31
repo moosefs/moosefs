@@ -1,4 +1,5 @@
-.TH mfschunktool "8" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfschunktool "8" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfschunktool - checks chunk integrity offline
 .SH SYNOPSIS
@@ -17,8 +18,7 @@ written chunks after possible data corruption (power down etc.)
 If the supplied parameter is a file, the tool will check this file. If the supplied parameter is a directory, the tool will traverse this directory recursively and try to check all files that seem to be chunks (they are named like chunk files or, if \fB\-n\fP option is used, also have headers like chunk files, even when the name is wrong).
 .PP
 \fBNotice! This tool should never be used while the chunk server process is active!\fP If the tool is used on a chunk disk (aka path in mfshdd.cfg file) it will check if the chunk server is working and refuse to operate. But if it's used on a single file or subdirectory, such check is not possible and it's the reponsibility of the user to make sure the tool is not used on "working" chunks, as it could lead to data loss.
-.PP
-Options:
+.SH OPTIONS
 .TP
 \fB\-f\fP
 turn on fast mode (in this mode only last block is tested - usually this is enough to find corrupted chunks)

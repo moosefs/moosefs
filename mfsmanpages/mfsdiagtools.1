@@ -1,4 +1,5 @@
-.TH mfsdiagtools "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsdiagtools "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsdiagtools \- \fBMooseFS\fP diagnostic tools
 .SH SYNOPSIS
@@ -52,7 +53,8 @@ copies instead of goal/labels. System administrators might consider using \fBmfs
 in filesystem. It can also be used to find a file with given inode number. 
 In case of searching for inode number, the tool has to be run
 in mfs mounted directory.
-.SH GENERAL OPTIONS
+.SH OPTIONS
+.SS GENERAL OPTIONS
 Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
@@ -67,7 +69,7 @@ or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
 numbers and SI prefixes). The default is to print just exact numbers.
 .PP
 Option \fB-?\fP displays short usage message.
-.SH SHOW OPTIONS
+.SS SHOW OPTIONS
 .TP
 \fB-i\fP
 show number of inodes

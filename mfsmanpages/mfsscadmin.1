@@ -1,4 +1,5 @@
-.TH mfsscadmin "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsscadmin "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsscadmin \- \fBMooseFS\fP storage class administration tool
 .SH SYNOPSIS
@@ -54,11 +55,16 @@ mfsscadmin \- \fBMooseFS\fP storage class administration tool
 .B mfsimportsclass
 [\fB-?\fP] [\fB-M\fP \fIMOUNTPOINT\fP] [\fB-r\fP]
 [\fB-n\fP \fIfilename\fP]
+
 .SH DESCRIPTION
-This is a set of tools for creating and modifying storage classes, which can be later applied to
-MooseFS objects with \fBmfssclass\fP tools (see \fBmfssclass\fP(1)).
-Storage class is a set of labels expressions and options that indicates
-on which chunkservers the files in this class should be written and later kept.
+.PP
+This is a set of tools for managing MooseFS storage classes.
+Storage classes are used to define the redundancy policy within the cluster.
+They should be later applied to particular MooseFS objects (files or folders) with \fBmfssclass\fP tools (see \fBmfssclass\fP(1)).
+Storage class is a named set of labels expressions and some other options. Labels expression indicates the redundancy format, the desired redundancy level, and the desired storage policy.
+The redundancy format may be either copies or erasure-coding (EC).
+The redundancy level is either the number of copies (from 1 to 9) or the number of data plus parity parts (4+n or 8+n), depending on the indicated redundancy format.
+The storage policy specifies, through the use of labels, which chunkservers are to be used for the physical storage of data assigned to the particular storage class.
 .PP
 \fBmfscreatesclass\fP creates a new storage class with given options, described below, and names it
 \fISCLASS_NAME\fP; there can be more than one name provided, multiple storage classes with the
@@ -81,6 +87,7 @@ name provided with \fIDST_SCLASS_NAME\fP
 .PP
 \fBmfsimportsclass\fP imports storage classes definitions from stdin or a file and creates them; 
 input format should be identical to \fBmfslistsclass -l\fP output.
+
 .SH OPTIONS
 .PP
 \fB-C\fP optional parameter, that tells the system to which chunkservers, defined by the
@@ -122,7 +129,7 @@ use the schema defined in \fB-T\fP for a chunk; minimum unit is hours, default i
 \fB-a\fP can be either 1 or 0 and indicates if the storage class is available to everyone (0)
 or admin only (1)
 .PP
-\fB-m\fP label mode used; possible values are \fBl\fP (or \fBL\fP, \fBloose\fP, \fBLoose\fP, \fBLOOSE\fP) for LOOSE mode, \fBd\fP (or \fBD\fP, \fBstd\fP, \fBStd\fP, \fBSTD\fP) for DEFAULT mode and \fBs\fP (or \fBS\fP, \fBstrict\fP, \fBStrict\fP, \fBSTRICT\fP) for STRICT mode; if no mode is defined, DEFAULT mode is assumed; behaviour of label modes is described below in \fBLABEL MODES\fP section
+\fB-m\fP label mode used; possible values are \fBl\fP (or \fBL\fP, \fBloose\fP, \fBLoose\fP, \fBLOOSE\fP) for LOOSE mode, \fBd\fP (or \fBD\fP, \fBstd\fP, \fBStd\fP, \fBSTD\fP) for STANDARD mode and \fBs\fP (or \fBS\fP, \fBstrict\fP, \fBStrict\fP, \fBSTRICT\fP) for STRICT mode; if no mode is defined, STANDARD mode is assumed; behaviour of label modes is described below in \fBLABEL MODES\fP section
 .PP
 \fB-l\fP list also definitions, not only the names of existing storage classes
 .PP
@@ -137,24 +144,9 @@ mounted directory or \fBMooseFS\fP is mounted in /mnt/mfs/
 .PP
 \fB-?\fP displays short usage message
 
-.SH TIME
-.PP
-For time variables their value can be defined as a number of seconds or hours (integer), depending on minimum unit of the variable, or as a time period in one of two possible formats:
-.PP
-first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of minimum unit will be rounded to integer value
-.PP
-second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
-o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
-.PP
-If a minimum unit of a variable is larger than seconds, units below the minimum one will not be accepted. For example, a variable that has hours as a minimum unit will not accept s and m units.
-.PP
-Examples:
-.PP
-1.5d is the same as 1d12h, is the same as 36h
-.PP
-2.5w is the same as 2w3d12h, is the same as 420h; 2w84h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
+.SH NOTES
 
-.SH LABELS EXPRESSIONS
+.SS LABELS EXPRESSIONS
 
 Labels are letters (A-Z - 26 letters) that can be assigned to chunkservers. Each chunkserver can
 have multiple (up to 26) labels. Labels are defined in mfschunkserver.cfg file, for more information
@@ -196,7 +188,7 @@ different IP address or from a different rack. For EC the distinguish part is cu
 it will override any distinguish setting in storage classes. For more informations about this parameter
 refer to \fBmfsmaster.cfg\fP (5) manual.
 .PP
-Labels mode override extension can be one of three characters: \fBd\fP (alternatively \fBD\fP or in string form \fBstd\fP or \fBStd\fP or \fBSTD\fP), \fBs\fP (alternatively \fBS\fP or in string form \fBstrict\fP or \fBStrict\fP or \fBSTRICT\fP) or \fBl\fP (alternatively \fBL\fP or in string form \fBloose\fP or \fBLoose\fP or \fBLOOSE\fP) and they mean that the DEFAULT, STRICT or LOOSE label mode, respectively, should be applied only to this one labels expression. For explanation about label modes see the LABEL MODES section.
+Labels mode override extension can be one of three characters: \fBd\fP (alternatively \fBD\fP or in string form \fBstd\fP or \fBStd\fP or \fBSTD\fP), \fBs\fP (alternatively \fBS\fP or in string form \fBstrict\fP or \fBStrict\fP or \fBSTRICT\fP) or \fBl\fP (alternatively \fBL\fP or in string form \fBloose\fP or \fBLoose\fP or \fBLOOSE\fP) and they mean that the STANDARD, STRICT or LOOSE label mode, respectively, should be applied only to this one labels expression. For explanation about label modes see the LABEL MODES section.
 .PP
 One or both extensions can be present for each labels expression, each has to start with their separator and if both are present, the order has to be kept, i.e. the distinguish extension has to be first and the label mode extension needs to be second.
 .PP
@@ -261,16 +253,16 @@ with label \fBS\fP, 3 parity parts will be kept on chunkservers with label \fBH\
 \fB2A/[IP]:s\fP - files should be kept in 2 copies, both copies on servers with label A, but each server should have different IP, behaviour of this when accounting for labels should be \fBSTRICT\fP
 .PP
 
-.SH LABEL MODES
+.SS LABEL MODES
 It is important to specify what to do when it is not possible to meet
 the labels requirement of a storage class, i.e.: there is no space available on all servers with needed labels, there is not enough servers with needed labels or servers with needed labels are all busy.
 The question is if the system should create chunks on other servers (with non-matching labels) or not. This decision must be made by the user.
 .PP
-There are 3 modes of operation: DEFAULT, LOOSE and STRICT. The modes work a bit different depending on if a chunk is stored in copies or EC format, due to the different nature and algorithms that each of those format uses.
+There are 3 modes of operation: STANDARD, LOOSE and STRICT. The modes work a bit different depending on if a chunk is stored in copies or EC format, due to the different nature and algorithms that each of those format uses.
 .PP
 For copies format the 3 modes behave as follows:
 .PP
-In DEFAULT mode in case of overloaded servers the system will wait for them, but in case of no space available it will use other servers and will replicate data to correct servers when it becomes possible. This means if some servers are in busy state for a long time, it might not be possible to create new chunks with certain storage classes and endangered (undergoal) chunks from those classes are at higher risk of being completely lost due to delayed replications.
+In STANDARD mode in case of overloaded servers the system will wait for them, but in case of no space available it will use other servers and will replicate data to correct servers when it becomes possible. This means if some servers are in busy state for a long time, it might not be possible to create new chunks with certain storage classes and endangered (undergoal) chunks from those classes are at higher risk of being completely lost due to delayed replications.
 .PP
 In STRICT mode, during writing a new file, the system will return error (ENOSPC) in case of no space
 available on servers marked with labels specified for chunk creation. It will still wait for overloaded servers. Undergoal repliactions will not be performed if there is no space on servers with labels matching the storage class. This means high risk of losing data if servers with some labels are permamently filled up with data!
@@ -280,10 +272,10 @@ In LOOSE mode the system will immediately use other servers in case of overloade
 This table sums up the modes behaviour for chunks stored in copy format:
 .TS
 tab(@); llll.
-@DEFAULT@STRICT@LOOSE
-CREATE - BUSY@WAIT@WAIT@WRITE ANY
+@STANDARD@STRICT@LOOSE
+CREATE - OVERLOADED@WAIT@WAIT@WRITE ANY
 CREATE - NO SPACE@WRITE ANY@ENOSPC@WRITE ANY
-REPLICATE - BUSY@WAIT@WAIT@WRITE ANY
+REPLICATE - OVERLOADED@WAIT@WAIT@WRITE ANY
 REPLICATE - NO SPACE@WRITE ANY@NO COPY@WRITE ANY
 .TE
 .PP
@@ -304,10 +296,28 @@ It's important to remember that if not enough servers with "correct" labels are 
 In STRICT mode the system will only use the servers matching the label expression defined in the used storage class, so only available or short-term busy servers matching defined label expression will be used for
 calculation of N+2X and N+X when the system decides what format to use to keep a chunk. When one part of a chunk in EC format becomes unavailable or corrupted, restoration of such part can only be done to a server with "correct" label; if such a server is unavailable long term (i.e. is not available outright or only temporarily busy), this will automatically mean that the chunk needs to be reverted to keep format anyway (if the missing part is a parity/checksum part, the chunk will just revert to copy format using all available data parts, if a data part is missing, it will be restored to a chunk server hosting another part of the same chunk - which is not allowed under normal circumstances - and then the conversion to copy format will follow immediately).
 .PP
-In DEFAULT mode the system will behave like in STRICT mode when it needs to make a decision whether it will convert a new chunk from copy format to EC format, that is the N+2X in this step is calculated only from "correctly" labeled servers. But to make a decision whether existing chunks need to be converted back from EC format to copy format it will look at all available servers, regardless of labels, so the N+X in this step is calculated from all available servers, like in LOOSE mode. X. In case of missing parts, if it's not possible to restore them to chunk servers with "correct" labels, the system will also adapt the LOOSE mode behaviour and try to use any available servers.
+In STANDARD mode the system will behave like in STRICT mode when it needs to make a decision whether it will convert a new chunk from copy format to EC format, that is the N+2X in this step is calculated only from "correctly" labeled servers. But to make a decision whether existing chunks need to be converted back from EC format to copy format it will look at all available servers, regardless of labels, so the N+X in this step is calculated from all available servers, like in LOOSE mode. X. In case of missing parts, if it's not possible to restore them to chunk servers with "correct" labels, the system will also adapt the LOOSE mode behaviour and try to use any available servers.
 .PP
 \fBNotice!\fP When a chunk is converted from copy format to EC format, the system first performs a "local split" operation, that is it picks one copy of the chunk and calculates all EC parts necessary on the server occupied by this selected copy. Then these parts are moved to separate chunkservers, matching the labels in the storage class definition for used EC mode. But temporarily, between the split and the "moving out" of the parts, they can be recorded on a "wrong" chunk server even in STRICT mode. This is because of the mechanics of the "local split" operation.
-.SH ARCHIVE BEHAVIOUR
+
+.SS TIME
+.PP
+For time variables their value can be defined as a number of seconds or hours (integer), depending on minimum unit of the variable, or as a time period in one of two possible formats:
+.PP
+first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of minimum unit will be rounded to integer value
+.PP
+second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
+o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+.PP
+If a minimum unit of a variable is larger than seconds, units below the minimum one will not be accepted. For example, a variable that has hours as a minimum unit will not accept s and m units.
+.PP
+Examples:
+.PP
+1.5d is the same as 1d12h, is the same as 36h
+.PP
+2.5w is the same as 2w3d12h, is the same as 420h; 2w84h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
+
+.SS ARCHIVE BEHAVIOUR
 Chunks have archive flag set during file maintenance loop, which means that the time to archiving
 defined by \fB-d\fP option is the minimum time that has to pass before the flag is set,
 not the exact time.
@@ -331,7 +341,18 @@ F - fastmode, chunk has archive flag set to on as soon as possible, whatever is 
 P - "per chunk" mode, use chunk's mtime to determine if archive flag should be set on
 .PP
 Archive flag can be modified manually. See \fBmfsarchive\fP (1)
-.SH STORAGE CLASSES PRIORITY
+
+Note: the ARCHIVE state does not mean that chunks or files are somehow unavailable, blocked for writing, 
+etc. The ARCHIVE designation is only used to indicate that such data is already intended for 
+long-term storage. In contrast to the KEEP state, which means that the data is 'hot' and can be changed 
+frequently. The distinction between the KEEP and ARCHIVE states is therefore only to allow for an appropriate 
+definition of the physical way of storing this data. From the user's point of view, the file is equally accessible: 
+it has identical permissions, name, and is in the same directory. For example, due to the fact that writing 
+in EC mode may be slower, we suggest storing 'hot' data (KEEP) using a copy and changing it to EC format 
+(by assigning ARCHIVE mode) after some time. Another example is automatic transfer of 'cold' data to 
+older/slower/cheaper disks and chunkservers - using different labels.
+
+.SS STORAGE CLASSES PRIORITY
 .PP
 Storage classes are assigned to files, but one chunk (one fragment of a file) can belong to many files, courtesy of the snapshot
 mechanism (see \fBmfssnapshots\fP (1)). If one chunk belongs to many files with different storage classes, one storage class must
@@ -390,7 +411,8 @@ A chunk, that belongs to files in classes: ClassC and ClassD will be stored acco
 A chunk, that belongs to files in 6 classes, from ClassA to ClassF, will be stored according to definition of ClassF, because this one has higher priority than all the other classes (77>0).
 .br
 In a system with these 6 storage classes classE will never be used for a chunk belonging to multiple files, it has the lowest possible priority (0) and no extra conditions to justify its choice (lowest existing RL, no EC and no labels).
-.SH PREDEFINED STORAGE CLASSES
+
+.SS PREDEFINED STORAGE CLASSES
 .PP
 A new MooseFS instance will have the following classes predefined:
 .PP
@@ -410,7 +432,7 @@ These classes are fully modifiable and deletable and can be replaced with user's
 .PP
 Up to version 4.56.0 of MooseFS the predefined classes were different. The following information 
 pertains to old MooseFS behaviour. In newer versions of MooseFS the classes mentioned below might 
-exist as a result of an upgrade, but will behave exactly as any user-defined classes. This information 
+exist as a result of an upgrade, but will behave exactly like any user-defined classes. This information 
 is left here purely for informative reasons and will be removed from this manual page at some point:
 .PP
 (Behaviour up to version 4.56.0) "For compatibility reasons, every fresh or freshly upgraded instance of MooseFS has 9 predefined
@@ -421,6 +443,31 @@ upgrade, all files that had goal \fIN\fP before upgrade, will now have \fIN\fP s
 These classes can be modified only when option \fB-f\fP is specified. It is advised to create new
 storage classes in an upgraded system and migrate files with \fBmfsxchgsclass\fP tool, rather than
 modify the predefined classes. The predefined classes CANNOT be deleted."
+
+.SH EXAMPLES
+.PP
+Create a new storage class named "Class2Copies" with 2 copies. The first copy on one of chunkservers with label "A" and the second copy on one of chunkservers with label "B":
+.PP
+.B mfscreatesclass -K "A,B" Class2Copies
+.PP
+Create a new storage class named "Class3Copies". Freshly created chunks (-C) will be kept anywhere 
+with 2 copies (2*). Soon after creation they will be kept (-K) in 3 copies: the first copy on one of chunkservers with label "A", 
+the second copy on one of chunkservers with label "B" and the third on any chunkserver:
+.PP
+.B mfscreatesclass -C '2*' -K 'A,B,*' Class3Copies
+.PP
+Create a new storage class named "ClassEC4_1". Chunks will be created and kept (-K) anywhere
+in 2 copies (2*) for 24 hours from the file creation. Later they will be archived (-A) in EC4+1 format on any chunkserver:
+.PP
+.B mfscreatesclass -K '2*' -A '@4+1' ClassEC4_1
+.PP
+Modify the "ClassEC4_1" storage class to archive chunks after 48 hours from the file modification (not creation):
+.PP
+.B mfsmodifysclass -d 2d -o m ClassEC4_1
+.PP
+Modify the "Class3Copies" storage class to keep chunks on other chunkservers (LOOSE mode) if the ones with labels "A" and "B" are too busy (overloaded):
+.PP
+.B mfsmodifysclass -m l Class3Copies
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT

@@ -1,4 +1,5 @@
-.TH mfschunkserver.cfg "5" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfschunkserver.cfg "5" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfschunkserver.cfg \- main configuration file for \fBmfschunkserver\fP
 .SH DESCRIPTION
@@ -11,7 +12,7 @@ Syntax is:
 .IB OPTION " = " VALUE
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
-.SH STARTUP OPTIONS 
+.SS STARTUP OPTIONS 
 Changes in this section require process restart.
 .TP
 .B WORKING_USER
@@ -46,7 +47,7 @@ when set to one chunkserver will not abort start even when incorrect entries are
 .TP
 .B CAN_USE_MMAP
 using mmap for allocation can slightly reduce ram usage and give a silight performance boost, but on certain architectures/kernels can lead to problems - especially on architectures with more than one physical CPU; default is 0
-.SH RUNTIME OPTIONS 
+.SS RUNTIME OPTIONS 
 Changes in this section require only process reload.
 .TP
 .B HDD_CONF_FILENAME
@@ -95,7 +96,7 @@ minimum level of messages that will be reported by chunkserver; levels in order 
 .TP
 .B SYSLOG_ELEVATE_TO
 reported messages of level lower than set by this option will be elevated to this level (i.e. if \fBSYSLOG_MIN_LEVEL\fP is set to DEBUG and \fBSYSLOG_ELEVATE_TO\fP is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE ; default is NOTICE)
-.SH MASTER CONNECTION OPTIONS
+.SS MASTER CONNECTION OPTIONS
 Changes in this section require only process reload.
 .TP
 .B LABELS
@@ -124,7 +125,7 @@ authentication string (used only when master requires authorization)
 .TP
 .B CHUNKS_PER_REGISTER_PACKET
 maximum number of chunks system will try to put in a single register message (default is 1000, limits 100-10000)
-.SH CLIENTS CONNECTION OPTIONS
+.SS CLIENTS CONNECTION OPTIONS
 Changes in this section require only process reload.
 .TP
 .B CSSERV_LISTEN_HOST
@@ -132,7 +133,8 @@ IP address to listen on for client (mount) connections (\fB*\fP means any)
 .TP
 .B CSSERV_LISTEN_PORT
 port to listen on for client (mount) connections (default is 9422)
-.SH TIME
+.SH NOTES
+.SS TIME
 .PP
 For config variables that define time without requiring a single, specific unit, time can be defined as a number of seconds (integer) or a time period in one of two possible formats:
 .PP

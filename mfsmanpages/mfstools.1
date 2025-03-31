@@ -1,43 +1,44 @@
-.TH mfstools "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfstools "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfstools \- perform \fBMooseFS\fP\-specific operations
-.SH TRASH RETENTION MANAGEMENT TOOLS
+.SS TRASH RETENTION MANAGEMENT TOOLS
 .BR mfsgettrashretention ,
 .BR mfssettrashretention ,
 .B mfscopytrashretention
-.SH EXTRA ATTRIBUTES MANAGEMENT TOOLS
+.SS EXTRA ATTRIBUTES MANAGEMENT TOOLS
 .BR mfsgeteattr ,
 .BR mfsseteattr ,
 .BR mfsdeleattr ,
 .B mfscopyeattr
-.SH ARCHIVE BIT MANIPULATION TOOLS
+.SS ARCHIVE BIT MANIPULATION TOOLS
 .BR mfschkarchive ,
 .BR mfssetarchive ,
 .B mfsclrarchive
-.SH DIAGNOSTIC TOOLS
+.SS DIAGNOSTIC TOOLS
 .BR mfscheckfile ,
 .BR mfsfileinfo ,
 .BR mfsdirinfo ,
 .BR mfsfilepaths ,
 .B mfsfilerepair
-.SH QUOTA MANAGEMENT TOOLS
+.SS QUOTA MANAGEMENT TOOLS
 .BR mfsgetquota ,
 .BR mfssetquota ,
 .BR mfsdelquota ,
 .B mfscopyquota
-.SH SNAPSHOT TOOLS
+.SS SNAPSHOT TOOLS
 .BR mfsappendchunks ,
 .BR mfsmakesnapshot ,
 .B mfsrmsnapshot
-.SH STORAGE CLASSES MANAGEMENT TOOLS
+.SS STORAGE CLASSES MANAGEMENT TOOLS
 .BR mfsgetsclass ,
 .BR mfssetsclass ,
 .BR mfscopysclass ,
 .B mfsxchgsclass
-.SH ACL MANAGEMENT TOOLS
+.SS ACL MANAGEMENT TOOLS
 .BR mfsgetfacl ,
 .B mfssetfacl
-.SH STORAGE CLASSES ADMINISTRATION TOOLS
+.SS STORAGE CLASSES ADMINISTRATION TOOLS
 .BR mfscreatesclass ,
 .BR mfsmodifysclass ,
 .BR mfsdeletesclass ,
@@ -45,11 +46,12 @@ mfstools \- perform \fBMooseFS\fP\-specific operations
 .BR mfsrenamesclass ,
 .BR mfslistsclass ,
 .B mfsimportsclass
-.SH PATTERNS ADMINISTRATION TOOLS
+.SS PATTERNS ADMINISTRATION TOOLS
 .BR mfscreatepattern ,
 .BR mfsdeletepattern ,
 .B mfslistpattern
-.SH GENERAL OPTIONS
+.SH NOTES
+.SS GENERAL OPTIONS
 Most of \fBmfstools\fP use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
@@ -62,7 +64,7 @@ The same can be achieved by setting
 or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
 \fBh+\fP (exact numbers and binary prefixes), \fB4\fP or \fBH+\fP (exact
 numbers and SI prefixes). The default is to print just exact numbers.
-.SH INHERITANCE
+.SS INHERITANCE
 When new object is created in MooseFS, attributes such as storage class, trash retention and extra
 attributes are inherited from parent directory. So if you set i.e. "noowner"
 attribute and storage class to "important" in a directory then every new object created in
@@ -70,7 +72,7 @@ this directory will have storage class set to "important" and "noowner" flag set
 object inherits always the current set of its parent's attributes. Changing a
 directory attribute does not affect its already created children. To change
 an attribute for a directory and all of its children use \fB-r\fP option.
-.SH PATTERNS
+.SS PATTERNS
 Since version 4.2.0 above attributes (storage class, trash retention and extra attributes) can
 be overridden by defining specific name patterns.
 .SH "REPORTING BUGS"

@@ -1,4 +1,5 @@
-.TH mfseattr "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfseattr "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfseattr \- \fBMooseFS\fP extra attributes management tools
 .SH SYNOPSIS
@@ -30,7 +31,8 @@ If \fB-r\fP option is used, specified attributes will be deleted recursively.
 \fBmfscopyeattr\fP copies the current set of attributes of \fISOURCE_OBJECT\fP to \fIOBJECT\fP. 
 This is an exact copy, so any attributes that \fIOBJECT\fP has, but \fISOURCE_OBJECT\fP doesn't, will be cleared.
 If \fB-r\fP option is used, attributes will be copied recursively.
-.SH ATTRIBUTES
+.SH OPTIONS
+.SS ATTRIBUTES
 .PP
 \fBnoowner\fP This flag means,
 that particular object belongs to current user (\fIuid\fP and \fIgid\fP are equal
@@ -52,7 +54,7 @@ from being cached in kernel.
 \fBappendonly\fP Object with this flag can only be appended to, unlinking and other modifications are not allowed (admin only; not inherited)
 .PP
 \fBimmutable\fP This flag prevents any change to given object (admin only; not inherited)
-.SH GENERAL OPTIONS
+.SS GENERAL OPTIONS
 Most \fBMooseFS\fP tools use \fB-n\fP, \fB-h\fP, \fB-H\fP, \fB-k\fP, \fB-m\fP and \fB-g\fP
 options to select
 format of printed numbers. \fB-n\fP causes to print exact numbers, \fB-h\fP
@@ -67,7 +69,8 @@ or \fBh\fP (binary prefixes), \fB2\fP or \fBH\fP (SI prefixes), \fB3\fP or
 numbers and SI prefixes). The default is to print just exact numbers.
 .PP
 Option \fB-?\fP displays short usage message.
-.SH INHERITANCE
+.SH NOTES
+.SS INHERITANCE
 When a new object is created in MooseFS, extra attributes are inherited from the parent directory. A newly created
 object inherits always the current set of its parent's attributes. Changing a
 directory attribute does not affect its already created children. To change

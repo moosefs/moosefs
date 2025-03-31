@@ -1,4 +1,5 @@
-.TH mfssnapshots "1" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfssnapshots "1" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfssnapshots \- \fBMooseFS\fP snapshot tools
 .SH SYNOPSIS
@@ -38,7 +39,7 @@ whole directory; otherwise the command will not remove anything. This behavior
 can be overridden by \fB-f\fP option. With this option \fBmfsrmsnapshot\fP will
 remove only those files/directories that have \fBsnapshot\fP attribute set and
 will leave everything else untouched.
-.SH "SLICES"
+.SS "SLICES"
 \fIFROM\fP\fB:\fP\fITO\fP for source file with chunks 0,1,2,...,N-1,N:
 .PP
 2:4 = chunks 2 and 3
@@ -50,7 +51,7 @@ will leave everything else untouched.
 :-1 = chunks 0,1,2,3,...,N-1
 .PP
 -4:-2 = chunks N-3,N-2
-.SH GENERAL OPTIONS
+.SH OPTIONS
 Option \fB-?\fP displays short usage message.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.

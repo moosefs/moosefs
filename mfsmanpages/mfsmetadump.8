@@ -1,4 +1,5 @@
-.TH mfsmetadump "8" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsmetadump "8" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsmetadump - dump MooseFS metadata info in human readable format
 .SH SYNOPSIS
@@ -35,7 +36,11 @@ default behaviour in version < 3.0.110).
 .TP
 \fBmetadata_file\fP
 path to metadata.mfs file
-.SH SECTION HEADER (precedes each section except HEAD)
+.SH NOTES
+Each metadata section - with the exception of the HEAD section - consist of a constant set of HEADER fields and a variable set of this section specific fields.
+HEAD section contains only section specific fields.
+The HEADER fields and all the section fields are listed below:
+.SS SECTION HEADER
 .TP 20
 section header 
 section header (section type + version)
@@ -48,7 +53,7 @@ name of section
 .TP
 version
 hexadecimal representation of section version
-.SH FILE HEADER (HEAD)
+.SS FILE HEADER SECTION (HEAD)
 .TP 20
 header
 MooseFS version
@@ -58,7 +63,7 @@ metadata file version
 .TP
 fileid
 metadata file id
-.SH SESSIONS SECTION (SESS)
+.SS SESSIONS SECTION (SESS)
 .TP 20
 nextsessionid
 first free session id
@@ -85,7 +90,7 @@ c	current hour stats data
 l	last hour stats data
 i	session name (usually local mount point)
 .fi
-.SH STORAGE CLASS SECTION (SCLA), formerly LABELS SECTION (LABS)
+.SS STORAGE CLASS SECTION (SCLA), formerly LABELS SECTION (LABS)
 .TP 20
 LABELDESC
 line with label description (existed only in LABS)
@@ -130,7 +135,7 @@ SCLASSEXPR
 t	type ([C]reate,[K]eep,[A]rchive or [T]rash)
 e	expression
 .fi
-.SH PATTERNS SECTION (PATT)
+.SS PATTERNS SECTION (PATT)
 .TP 20
 PATTERN
 line with pattern definition
@@ -144,7 +149,7 @@ u	uid
 g	gid
 p	pattern
 .fi
-.SH NODES SECTION (NODE)
+.SS NODES SECTION (NODE)
 .TP 20
 maxinode
 maximum inode number used by system
@@ -181,7 +186,7 @@ l	file length (only files)
 c	chunk list (only files)
 r	sessions that have this file open (only files)
 .fi
-.SH EDGES SECTION (EDGE)
+.SS EDGES SECTION (EDGE)
 .TP 20
 nextedgeid
 next available edge id (descending)
@@ -195,7 +200,7 @@ c	child inode number
 i	edge id
 n	edge name
 .fi
-.SH FREE NODES SECTION (FREE)
+.SS FREE NODES SECTION (FREE)
 .TP 20
 free nodes
 number of free (reusable) nodes
@@ -207,7 +212,7 @@ line with free inode description
 i	inode number
 f	deletion timestamp
 .fi
-.SH QUOTA SECTION (QUOT)
+.SS QUOTA SECTION (QUOT)
 .TP 20
 quota nodes
 number of nodes with quota
@@ -230,7 +235,7 @@ hs	hard size quota
 sr	soft real size quota
 hr	hard real size quota
 .fi
-.SH XATTR SECTION (XATR)
+.SS XATTR SECTION (XATR)
 .TP 20
 XATTR
 line with xattr description
@@ -240,7 +245,7 @@ i	inode number
 n	xattr name
 v	xattr value
 .fi
-.SH POSIX ACL SECTION (PACL)
+.SS POSIX ACL SECTION (PACL)
 .TP 20
 POSIXACL
 line with acl description
@@ -256,7 +261,7 @@ n	named permissions - list of objects:
 u(U):P	permissions \fIP\fP for user with uid \fIU\fP
 g(G):P	permissions \fIP\fP for group with gid \fIG\fP
 .fi
-.SH OPEN FILES SECTION (OPEN)
+.SS OPEN FILES SECTION (OPEN)
 .TP 20
 OPENFILE
 line with open file description
@@ -265,7 +270,7 @@ line with open file description
 s	session id
 i	inode number
 .fi
-.SH FLOCK LOCK SECTION (FLCK)
+.SS FLOCK LOCK SECTION (FLCK)
 .TP 20
 FLOCK
 line with flock-lock description
@@ -276,7 +281,7 @@ s	session id
 o	lock owner (FUSE lock owner)
 t	lock type ('R' - shared lock, 'W' - exclusive lock)
 .fi
-.SH POSIX LOCK SECTION (PLCK)
+.SS POSIX LOCK SECTION (PLCK)
 .TP 20
 POSIXLOCK
 line with posix-lock description
@@ -289,7 +294,7 @@ p	local process id (owner pid)
 r	lock range in format <\fISTART\fP,\fIEND\fP)
 t	lock type ('R' - shared lock, 'W' - exclusive lock)
 .fi
-.SH CHUNKSERVERS SECTION (CSDB)
+.SS CHUNKSERVERS SECTION (CSDB)
 .TP 20
 chunk servers
 number of chunkservers
@@ -304,7 +309,7 @@ p	server port
 m	maintenance mode
 t	maintenance timeout timestamp
 .fi
-.SH CHUNKS SECTION (CHNK)
+.SS CHUNKS SECTION (CHNK)
 .TP 20
 nextchunkid
 first available chunk number

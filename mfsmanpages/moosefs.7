@@ -1,4 +1,5 @@
-.TH moosefs "7" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH moosefs "7" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 MooseFS \- fault tolerant, highly reliable, near indefinitely scalable, fast distributed file system in User Space
 
@@ -69,7 +70,7 @@ Linux only special client process \fBmfsbdev\fP that maps single MooseFS files i
 TOOLS
 various command line administrative tools
 
-.SH ARCHITECTURE
+.SS ARCHITECTURE
 .PP
 From the user’s point of view, MooseFS behaves like a regular, POSIX compliant file system with almost indefinitely expandable capacity. 
 To achieve this, the system was designed as a distributed network file system, where different processes run on different machines, perform specific tasks to assure proper performance of the whole file system.
@@ -87,7 +88,7 @@ In such a big system hardware failures will occur. MooseFS will automatically re
 .PP
 Failures of a client machine (that runs the \fBmfsmount\fP process) will have no influence on the coherence of the file system or on the other clients’ operations. In the worst case scenario the data that has not yet been sent from the failed client computer to the Master Server and/or Chunk Servers may be lost.
 
-.SH SUPPORTED PLATFORMS
+.SS SUPPORTED PLATFORMS
 
 \fBmfsmount\fP is based on the FUSE mechanism (Filesystem in USErspace), so MooseFS client is available on every Operating System with a working FUSE implementation.
 

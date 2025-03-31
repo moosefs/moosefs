@@ -1,16 +1,17 @@
-.TH mfsmaster.cfg "5" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
 .SH DESCRIPTION
 The file \fBmfsmaster.cfg\fP contains configuration of MooseFS master process.
-.SH SYNTAX
+.SS SYNTAX
 .PP
 Syntax is:
 .TP
 .IB OPTION " = " VALUE
 .PP
 Lines starting with \fB#\fP character are ignored as comments.
-.SH STARTUP OPTIONS
+.SS STARTUP OPTIONS
 Changes in this section require process restart.
 .TP
 .B WORKING_USER
@@ -39,7 +40,7 @@ set default umask for group and others (user always has 0); default is 027 - blo
 .TP
 .B DATA_PATH
 where to store metadata files and lock file
-.SH RUNTIME OPTIONS
+.SS RUNTIME OPTIONS
 Changes in this section require only process reload.
 .TP
 .B LICENCE_FILENAME
@@ -114,7 +115,7 @@ minimum level of messages that will be reported by master; levels in order of im
 .TP
 .B SYSLOG_ELEVATE_TO
 reported messages of level lower than set by this option will be elevated to this level (i.e. if \fBSYSLOG_MIN_LEVEL\fP is set to DEBUG and \fBSYSLOG_ELEVATE_TO\fP is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE ; default is NOTICE)
-.SH COMMAND CONNECTION OPTIONS
+.SS COMMAND CONNECTION OPTIONS
 Changes in this section require only process reload.
 .TP
 .B MATOML_LISTEN_HOST
@@ -128,7 +129,7 @@ default timeout in seconds for master-metalogger (or master follower, pro only) 
 .TP
 .B MATOML_FORCE_TIMEOUT
 forced timeout in seconds for master-metalogger (or master follower, pro only) connection (default is 0 - do not force timeouts)
-.SH MASTER-LEADER CONNECTION OPTIONS
+.SS MASTER-LEADER CONNECTION OPTIONS
 Changes in this section require only process reload.
 .TP
 .B MASTER_HOST
@@ -142,7 +143,7 @@ Changes in this section require only process reload.
 .TP
 .B BIND_HOST
 (pro only) local address to use for connecting with master-leader (default is *, i.e. default local address)
-.SH CHUNKSERVER CONNECTION OPTIONS
+.SS CHUNKSERVER CONNECTION OPTIONS
 Changes in this section require only process reload.
 .TP
 .B MATOCS_LISTEN_HOST
@@ -168,7 +169,7 @@ Optional LAN IP class remapping. Remap chunkservers IP addresses with first MULT
 .TP
 .BR MULTILAN_IPMAP_FILENAME
 alternate location/name of \fBmfsipmap.cfg\fP file. This file defines optional custom IP mapping.
-.SH CHUNKSERVER WORKING OPTIONS
+.SS CHUNKSERVER WORKING OPTIONS
 Changes in this section require only process reload.
 .TP
 .B REPLICATIONS_DELAY_INIT
@@ -247,7 +248,7 @@ Maximum time server can be in "temporary" maintenance mode (server is switched t
 .TP
 .B CS_DAYS_TO_REMOVE_UNUSED
 How many days unused (disconnected) chunkserver should be kept in master data structures (valid values: 0 - 365 ; 0 means indefinitely ; default value: 7)
-.SH CLIENTS CONNECTION OPTIONS
+.SS CLIENTS CONNECTION OPTIONS
 Changes in this section require only process reload.
 .TP
 .B MATOCL_LISTEN_HOST
@@ -264,12 +265,12 @@ forced timeout in seconds for master-client connection (default is 0 - do not fo
 .TP
 .B RESTRICT_INCOMPATIBLE_CLIENT_VERSIONS
 Whether MooseFS should prevent connections from clients that are unable to read all data (especially erasure encoded data). Default is 1 - prevent connections. If this option is set to 0, clients that try to read data in a format they do not understand will return read errors. Use with caution.
-.SH CLIENTS WORKING OPTIONS
+.SS CLIENTS WORKING OPTIONS
 Changes in this section require only process reload.
 .TP
 .B SESSION_SUSTAIN_TIME
 How long to sustain a disconnected client session (default is 1 day); for value formatting see TIME
-.SH FILE SYSTEM OPTIONS
+.SS FILE SYSTEM OPTIONS
 Changes in this section require only process reload.
 .TP
 .B QUOTA_DEFAULT_GRACE_PERIOD
@@ -294,7 +295,8 @@ Delay time after which inodes of deleted objects will be reused. BE AWARE if you
 TP
 .B DEFAULT_EC_DATA_PARTS
 How many data parts should the system use when old style EC definition is in use (@n instead of @8+n or @4+n; default is 8; possible values are 4 or 8)
-.SH TIME
+.SH NOTES
+.SS TIME
 .PP
 For config variables that define time without requiring a single, specific unit, time can be defined as a number of seconds (integer) or a time period in one of two possible formats:
 .PP
@@ -310,7 +312,7 @@ Examples:
 2.5d is the same as 2d12h, is the same as 60h; 1d36h is not a valid time period (h is not the first definition, so it is bound by range 0 to 23)
 .PP
 1.03m is the same as 62s (61.8 seconds will be rounded up to 62)
-.SH NOTES
+.SS GENERAL NOTES
 .PP
 Chunks in master are tested in a loop. Speed (or frequency) is regulated by two
 options: \fBCHUNKS_LOOP_MIN_TIME\fP and \fBCHUNKS_LOOP_MAX_CPS\fP. First

@@ -1,4 +1,5 @@
-.TH mfsmount "8" "February 2025" "MooseFS 4.57.5-1" "This is part of MooseFS"
+.TH mfsmount "8" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.ss 12 0
 .SH NAME
 mfsmount \- mount MooseFS
 .SH SYNOPSIS
@@ -22,16 +23,16 @@ Since 3.0.75 (Linux only):
 .SH DESCRIPTION
 .PP
 Mount MooseFS.
-.PP
-General options:
+.SH OPTIONS
+
+.SS GENERAL OPTIONS
 .TP
 \fB\-h\fP, \fB\-\-help
 display help and exit
 .TP
 \fB\-V\fP
 display version information and exit
-.PP
-FUSE options:
+.SS FUSE OPTIONS
 .TP
 \fB\-d\fP, \fB-o debug\fP
 enable debug mode (implies \fB\-f\fP)
@@ -42,7 +43,7 @@ foreground operation
 \fB\-s\fP
 disable multi-threaded operation
 .PP
-MooseFS options:
+.SS MOOSEFS OPTIONS
 .TP
 \fB\-c\fP \fICFGFILE\fP, \fB\-o mfscfgfile=\fP\fICFGFILE\fP
 loads file with additional mount options
@@ -183,6 +184,7 @@ turn off support for global posix locks (lockf + ioctl) - locks will work locall
 .TP
 \fB\-o mfsnobsdlocks\fP
 turn off support for global BSD locks (flock) - locks will work locally
+.SS MOUNT OPTIONS
 .PP
 General mount options (see \fBmount\fP\|(8) manual):
 .TP
@@ -197,7 +199,12 @@ Enable or disable character or block special device files interpretation.
 .TP
 \fB\-o exec\fP|\fB-o noexec\fP
 Allow or disallow execution of binaries.
-.SH SUGID CLEAR MODE
+.SH FILES
+.TP
+\fBmfsmount.cfg\fP
+configuration file for MooseFS mount daemon; refer to \fBmfsmount.cfg\fP\|(5) manual for details
+.SH NOTES
+.SS SUGID CLEAR MODE
 During attribute change file systems sometimes clear flags suid and/or sgid.
 Behavior is different on different file systems.
 MFS tries to mimic behavior of most popular file system on given operating systems.
@@ -219,7 +226,7 @@ standard behavior in most file systems on Linux (directories not changed, others
 .TP
 \fBXFS\fP
 standard behavior in XFS on Linux (like EXT but directories are changed by unprivileged users)
-.SH DATA CACHE MODES
+.SS DATA CACHE MODES
 There are four cache modes: \fBDIRECT\fP, \fBNO\fP, \fBYES\fP and \fBAUTO\fP. Default option
 is \fBAUTO\fP and you shuldn't change it unless you really know what you are
 doing. In \fBAUTO\fP mode data cache is managed automatically by mfsmaster.
@@ -235,7 +242,7 @@ always allow files data to be kept in cache (dangerous)
 .TP
 \fBAUTO\fP
 file cache is managed by mfsmaster automatically (should be very safe and efficient)
-.SH LABEL EXPRESSIONS
+.SS LABEL EXPRESSIONS
 \fBLABELEXPR\fP grammar:
 .TP 11
 \fILABELEXPR\fP
@@ -251,7 +258,7 @@ file cache is managed by mfsmaster automatically (should be very safe and effici
 -> \fBa\fP .. \fBz\fP | \fBA\fP .. \fBZ\fP | \fB(\fP \fIS\fP \fB)\fP | \fB[\fP \fIS\fP \fB]\fP
 .PP
 Subexpressions should be placed in priority order. Up to nine subexpressions (priorities) can be specified.
-.SH "FSTAB"
+.SS "FSTAB"
 On most Unix systems mfsmount can be invoked automatically from \fB/etc/fstab\fP. Be aware that \fBrw\fP or \fBro\fP option has to be specified in \fIoptions\fP. Also on many systems there should be option which informs the system that this mountpoint should be mounted after starting networking services (options such as \fB_netdev\fP or \fBlate\fP).
 .PP
 Linux:
@@ -295,4 +302,5 @@ or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmaster (8),
 .BR mfstools (1),
+.BR mfsmount.cfg (5),
 .BR mount (8)

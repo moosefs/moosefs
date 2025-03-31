@@ -349,7 +349,7 @@ uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t dleng,cons
 				return MFS_ERROR_INCOMPATVERSION;
 			}
 		}
-		if (arch->labelscnt>2 || (arch->ec_data_chksum_parts&0xF)>MaxECRedundancyLevel) {
+		if (arch->labelscnt==0 || arch->labelscnt>2 || (arch->ec_data_chksum_parts&0xF)>MaxECRedundancyLevel) {
 			return MFS_ERROR_EINVAL;
 		}
 	} else {
@@ -373,7 +373,7 @@ uint8_t sclass_create_entry(uint8_t nleng,const uint8_t *name,uint8_t dleng,cons
 				return MFS_ERROR_INCOMPATVERSION;
 			}
 		}
-		if (trash->labelscnt>2 || (trash->ec_data_chksum_parts&0xF)>MaxECRedundancyLevel) {
+		if (trash->labelscnt==0 || trash->labelscnt>2 || (trash->ec_data_chksum_parts&0xF)>MaxECRedundancyLevel) {
 			return MFS_ERROR_EINVAL;
 		}
 	} else {
@@ -444,7 +444,7 @@ uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,u
 					return MFS_ERROR_INCOMPATVERSION;
 				}
 			}
-			if (arch->labelscnt>2 || (arch->ec_data_chksum_parts&0xF)>MaxECRedundancyLevel) {
+			if (arch->labelscnt==0 || arch->labelscnt>2 || (arch->ec_data_chksum_parts&0xF)>MaxECRedundancyLevel) {
 				return MFS_ERROR_EINVAL;
 			}
 		} else {
@@ -470,7 +470,7 @@ uint8_t sclass_change_entry(uint8_t nleng,const uint8_t *name,uint16_t chgmask,u
 					return MFS_ERROR_INCOMPATVERSION;
 				}
 			}
-			if (trash->labelscnt>2 || (trash->ec_data_chksum_parts&0xF)>MaxECRedundancyLevel) {
+			if (trash->labelscnt==0 || trash->labelscnt>2 || (trash->ec_data_chksum_parts&0xF)>MaxECRedundancyLevel) {
 				return MFS_ERROR_EINVAL;
 			}
 		} else {
@@ -624,7 +624,7 @@ uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid
 		if ((arch->ec_data_chksum_parts>>4)==4 && ec_current_version<2) {
 			return MFS_ERROR_MISMATCH;
 		}
-		if (arch->labelscnt>2 || (arch->ec_data_chksum_parts&0xF)>MAX_EC_LEVEL) {
+		if (arch->labelscnt==0 || arch->labelscnt>2 || (arch->ec_data_chksum_parts&0xF)>MAX_EC_LEVEL) {
 			return MFS_ERROR_EINVAL;
 		}
 	} else {
@@ -646,7 +646,7 @@ uint8_t sclass_mr_set_entry(uint8_t nleng,const uint8_t *name,uint16_t esclassid
 		if ((trash->ec_data_chksum_parts>>4)==4 && ec_current_version<2) {
 			return MFS_ERROR_MISMATCH;
 		}
-		if (trash->labelscnt>2 || (trash->ec_data_chksum_parts&0xF)>MAX_EC_LEVEL) {
+		if (trash->labelscnt==0 || trash->labelscnt>2 || (trash->ec_data_chksum_parts&0xF)>MAX_EC_LEVEL) {
 			return MFS_ERROR_EINVAL;
 		}
 	} else {
@@ -1862,6 +1862,40 @@ int sclass_load(bio *fd,uint8_t mver,int ignoreflag) {
 					}
 				}
 			}
+			if (arch.ec_data_chksum_parts!=0) {
+				if (arch.labelscnt==0) { // import from previous version - defaults had labelscnt set to 0
+					arch.labelscnt=1;
+					arch.labelexpr[0][0]=0;
+				}
+				if (arch.labelscnt>2) {
+					if (ignoreflag) {
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading storage class data: sclassid: %"PRIu16" - bad labelscnt in archive definition (%u -> 2)",sclassid,arch.labelscnt);
+						arch.labelscnt=2;
+					} else {
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading storage class data: sclassid %"PRIu16" - bad labelscnt in archive definition (%u)",sclassid,arch.labelscnt);
+						free(databuff);
+						databuff = NULL;
+						return -1;
+					}
+				}
+			}
+			if (trash.ec_data_chksum_parts!=0) {
+				if (trash.labelscnt==0) { // import from previous version - defaults had labelscnt set to 0
+					trash.labelscnt=1;
+					trash.labelexpr[0][0]=0;
+				}
+				if (trash.labelscnt>2) {
+					if (ignoreflag) {
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading storage class data: sclassid: %"PRIu16" - bad labelscnt in trash definition (%u -> 2)",sclassid,trash.labelscnt);
+						trash.labelscnt=2;
+					} else {
+						mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_ERR,"loading storage class data: sclassid %"PRIu16" - bad labelscnt in trash definition (%u)",sclassid,trash.labelscnt);
+						free(databuff);
+						databuff = NULL;
+						return -1;
+					}
+				}
+			}
 			sclasstab[sclassid].nleng = nleng;
 			memcpy(sclasstab[sclassid].name,name,nleng);
 			sclasstab[sclassid].dleng = dleng;
@@ -2173,6 +2207,7 @@ void sclass_new(void) {
 	sclasstab[3].dleng = snprintf((char*)(sclasstab[3].desc),MAXSCLASSDESCLENG,"two copies in keep mode, four data parts plus checksum part in archive mode");
 	sclasstab[3].arch_delay = 24;
 	sclasstab[3].keep.labelscnt = 2;
+	sclasstab[3].arch.labelscnt = 1;
 	sclasstab[3].arch.ec_data_chksum_parts = 0x41;
 	sclasstab[3].arch_min_size = 512*1024;
 
@@ -2181,6 +2216,7 @@ void sclass_new(void) {
 	sclasstab[4].dleng = snprintf((char*)(sclasstab[4].desc),MAXSCLASSDESCLENG,"two copies in keep mode, eight data parts plus checksum part in archive mode");
 	sclasstab[4].arch_delay = 24;
 	sclasstab[4].keep.labelscnt = 2;
+	sclasstab[4].arch.labelscnt = 1;
 	sclasstab[4].arch.ec_data_chksum_parts = 0x81;
 	sclasstab[4].arch_min_size = 512*1024;
 

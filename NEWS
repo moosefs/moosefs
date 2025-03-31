@@ -4,6 +4,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (master) fixed predefined storage classes
   - (master) fixed csipmap initialization issue (no csmap after start/restart)
+  - (master) fixed lock listing (case of posix_locks and flocks being in the same packet)
 
 * MooseFS 4.57.5-1 (2025-02-26)
 

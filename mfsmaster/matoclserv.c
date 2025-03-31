@@ -1186,7 +1186,7 @@ void matoclserv_list_open_files(matoclserventry *eptr,const uint8_t *data,uint32
 void matoclserv_list_acquired_locks(matoclserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid = 0;
 	uint32_t inode;
-	uint32_t size;
+	uint32_t psize,fsize;
 	uint8_t *ptr;
 
 	if (length!=4 && length!=8) {
@@ -1198,15 +1198,16 @@ void matoclserv_list_acquired_locks(matoclserventry *eptr,const uint8_t *data,ui
 		msgid = get32bit(&data);
 	}
 	inode = get32bit(&data);
-	size = posix_lock_list(inode,NULL) + flock_list(inode,NULL);
+	psize = posix_lock_list(inode,NULL);
+	fsize = flock_list(inode,NULL);
 	if (length==8) {
-		ptr = matoclserv_create_packet(eptr,MATOCL_LIST_ACQUIRED_LOCKS,4+size);
+		ptr = matoclserv_create_packet(eptr,MATOCL_LIST_ACQUIRED_LOCKS,4+psize+fsize);
 		put32bit(&ptr,msgid);
 	} else {
-		ptr = matoclserv_create_packet(eptr,MATOCL_LIST_ACQUIRED_LOCKS,size);
+		ptr = matoclserv_create_packet(eptr,MATOCL_LIST_ACQUIRED_LOCKS,psize+fsize);
 	}
 	posix_lock_list(inode,ptr);
-	flock_list(inode,ptr);
+	flock_list(inode,ptr+psize);
 }
 
 void matoclserv_mass_resolve_paths(matoclserventry *eptr,const uint8_t *data,uint32_t length) {

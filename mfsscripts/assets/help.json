@@ -1,0 +1,1520 @@
+{
+	"gui_tt_onoff": {
+		"severity": "Info",
+		"title": "Turn on or off on-screen help tooltips"
+	},
+	"gui_refresh_failed": {
+		"severity": "Error",
+		"title": "Refresh failed",
+		"description": "Data you see on the screen may not be up to date. The GUI probably is not able to connect to the server.",
+		"solution": "Try to reload entire page. Check the network connection and the server status. If the problem persists, contact MooseFS support."
+	},
+	"unknown_severity": {
+		"severity": "Warning",
+		"title": "Unknown severity level.",
+		"description": "The severity level of this message is unknown.",
+		"solution": "It may be a bug in the monitoring system. Please report it to MooseFS support."
+	},
+	"ui_pro_ce": {
+		"severity": "Info",
+		"title": "In the cluster managed by GUI/CLI tools in the PRO version, there are servers running the community edition.",
+		"description": "Using PRO tools (GUI/CLI) to manage a community version cluster is possible; however, we advise using identical versions of all components in the cluster.",
+		"solution": "GUI and CLI tools should be used in a version identical to the servers used in the cluster. If possible, do not mix PRO and community components. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. "
+	},
+	"ui_ce_pro": {
+		"severity": "Error",
+		"title": "In the cluster managed by GUI/CLI tools in the community edition, there are servers running the PRO version.",
+		"description": "Using community tools (GUI/CLI) to manage a Pro version cluster should be avoided because these tools do not support all the functionalities offered by the PRO cluster. As a result, data in the cluster may become inconsistent or may be lost.",
+		"solution": "GUI and CLI tools should be used in a version identical to the servers used in the cluster. Use the PRO GUI/CLI components to manage PRO cluster components. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"ui_newer": {
+		"severity": "Info",
+		"title": "GUI/CLI version newer than other servers in a cluster",
+		"description": "GUI/CLI tools can be in newer versions than other servers in the cluster. However, the difference between different cluster components versions cannot be too large. Generally, GUI/CLI can support servers with a major version number at most one less than the major version number of the GUI/CLI. For example, GUI/CLI version 4.x.x can support servers in versions 3.x.x and 4.x.x. This, among other things, allows for upgrading the cluster to subsequent 'major' versions.",
+		"solution": "If the tools' version is too new, it is best to use a version that is as new as the newest server in the cluster. Usually, this will require using older installation packages. We recommend that all cluster components be in the same version. If possible, upgrade all cluster components to the same version using the latest available version."
+	},
+	"ui_older": {
+		"severity": "Error",
+		"title": "GUI/CLI version older than some servers in a cluster",
+		"description": "GUI servers should not be older than any server in the cluster because they may not support some of the packages exchanged by the servers, potentially leading to incorrect data being displayed.",
+		"solution": "If the GUI/CLI tools are too old, update them to a newer version, for example by installing the appropriate package. We recommend that all cluster components be in the same version. If possible, upgrade all cluster components to the same version using the latest available version. Contact MooseFS support if you need assistance."
+	},
+	"follower_older": {
+		"severity": "Error",
+		"title": "The Follower server version is older than the Leader Master server's.",
+		"description": "The Follower should not be in an older version than the Leader, as this may result in protocol incompatibility leading to incorrect metadata being written. As a result, data in the cluster may become inconsistent or may be lost.",
+		"solution": "This situation must be immediately addressed by upgrading the Follower to at least the version of the Leader (or a newer one). Alternatively, it is possible to replace this Follower it with another (newer) one. The number of Followers depends on the desired level of cluster redundancy. It is recommended that all cluster components be at the same version. Contact MooseFS support if you need assistance."
+	},
+	"follower_newer": {
+		"severity": "Info",
+		"title": "The Follower server version is newer than the Leader Master server's.",
+		"description": "The Follower is in a newer version than the Leader. This situation is permissible, especially during the cluster upgrade process. However, it is recommended that all cluster components eventually be at the same version. Generally, the difference in major version numbers between individual components should not be greater than 1. For example, components in version 4.x.x can work with components in version 3.x.x, but not with those in version 2.x.x. When mixing different versions of the cluster components, always pay attention to the guidelines concerning possible combinations of individual component types found in the documentation.",
+		"solution": "Upgrade all cluster components to the same version. If possible, use the latest available version."
+	},
+	"follower_ce_pro": {
+		"severity": "Error",
+		"title": "This Master is in the community edition (CE) version, while the Leader is in the PRO version.",
+		"description": "The community edition (CE) version of this server is installed, while the Leader (and perhaps other parts of the cluster) is installed in the PRO version.",
+		"solution": "Keep the cluster version consistent: all components (servers and client-side drivers) of a MooseFS cluster should be either PRO or community edition. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"follower_pro_ce": {
+		"severity": "Error",
+		"title": "This Follower is in the PRO version, while the other Master is in the community edition (CE) version.",
+		"description": "The PRO version of this server is installed, while the Leader (and perhaps other parts of the cluster) is installed in the community edition (CE).",
+		"solution": "Keep the cluster version consistent: all components (servers and client-side drivers) of a MooseFS cluster should be either PRO or community edition. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"ml_older": {
+		"severity": "Error",
+		"title": "The Metalogger version is older than the Leader (or Follower) Master server's.",
+		"description": "The Metalogger is older than the Leader (or one of the Followers). This situation should not occur, as this may result in protocol incompatibility leading to incorrect metadata being logged. As a result, data in the cluster may become inconsistent or may be lost.",
+		"solution": "This situation must be immediately addressed by upgrading the Metalogger to at least the version of the newest Master server (Followers or Leader). Alternatively, it is possible to replace this Metalogger it with another (newer) one. The number of Metaloggers depends on the desired level of cluster redundancy. It is recommended that all cluster components be at the same version. Contact MooseFS support if you need assistance."
+	},
+	"ml_newer": {
+		"severity": "Info",
+		"title": "The Metalogger version is newer than the Leader Master server's.",
+		"description": "The Metalogger is in a newer version than the Leader. This situation is permissible, especially during the cluster upgrade process. However, it is recommended that all cluster components eventually be at the same version. Generally, the difference in major version numbers between individual components should not be greater than 1. For example, components in version 4.x.x can work with components in version 3.x.x, but not with those in version 2.x.x. When mixing different versions of the cluster components, always pay attention to the guidelines concerning possible combinations of individual component types found in the documentation.",
+		"solution": "Upgrade all cluster components to the same version. If possible, use the latest available version."
+	},
+	"ml_ce_pro": {
+		"severity": "Error",
+		"title": "This Metalogger is in the community edition (CE) version, while the Leader is in the PRO version.",
+		"description": "The community edition (CE) version of this server is installed, while the Leader (and perhaps other parts of the cluster) is installed in the PRO version.",
+		"solution": "Keep the cluster version consistent: all components (servers and client-side drivers) of a MooseFS cluster should be either PRO or community edition. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"ml_pro_ce": {
+		"severity": "Error",
+		"title": "This Metalogger is in the PRO version, while the Master is in the community edition (CE) version.",
+		"description": "The PRO version of this server is installed, while the Leader (and perhaps other parts of the cluster) is installed in the community edition (CE).",
+		"solution": "Keep the cluster version consistent: all components (servers and client-side drivers) of a MooseFS cluster should be either PRO or community edition. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"cs_older": {
+		"severity": "Warning",
+		"title": "The Chunkserver version is older than the Leader Master server's.",
+		"description": "The Chunkserver is in an older version than the Leader. This situation is permissible, especially during the cluster upgrade process. However, it is recommended that all cluster components eventually be at the same version. Generally, the difference in major version numbers between individual components should not be greater than 1. For example, components in version 4.x.x can work with components in version 3.x.x, but not with those in version 2.x.x. When mixing different versions of the cluster components, always pay attention to the guidelines concerning possible combinations of individual component types found in the documentation.",
+		"solution": "Upgrade all cluster components to the same version. If possible, use the latest available version."
+	},
+	"cs_newer": {
+		"severity": "Error",
+		"title": "The Chunkserver version is newer than the Leader Master server's or one of other cluster components.",
+		"description": "The Chunkserver should not be in an newer version than the Leader (or any of cluster components), as this may result in protocol incompatibility leading to incorrect data being written. As a result, data in the cluster may become inconsistent or may be lost.",
+		"solution": "This situation must be immediately addressed by upgrading the Leader Master server or other cluster components. Chunkserver can not be downgraded. It is recommended that all cluster components be at the same version. Contact MooseFS support if you need assistance."
+	},
+	"cs_ce_pro": {
+		"severity": "Error",
+		"title": "This Chunkserver is in the community edition (CE) version, while the Leader is in the PRO version.",
+		"description": "The community edition (CE) version of this server is installed, while the Leader (and perhaps other parts of the cluster) is installed in the PRO version.",
+		"solution": "Keep the cluster version consistent: all components (servers and client-side drivers) of a MooseFS cluster should be either PRO or community edition. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"cs_pro_ce": {
+		"severity": "Error",
+		"title": "This Chunkserver is in the PRO version, while the Leader is in the community edition (CE) version.",
+		"description": "The PRO version of this server is installed, while the Leader (and perhaps other parts of the cluster) is installed in the community edition (CE).",
+		"solution": "Keep the cluster version consistent: all components (servers and client-side drivers) of a MooseFS cluster should be either PRO or community edition. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"mnt_older": {
+		"severity": "Info",
+		"title": "The Mount (client) version is older than the Leader Master server's.",
+		"description": "The Mount software (client side) is in an older version than the Leader. This situation is permissible, especially during the cluster upgrade process. However, it is recommended that all cluster components and its clients eventually be at the same version. Generally, the difference in major version numbers between individual components should not be greater than 1. For example, components in version 4.x.x can work with components in version 3.x.x, but not with those in version 2.x.x. When mixing different versions of the cluster components, always pay attention to the guidelines concerning possible combinations of individual component types found in the documentation.",
+		"solution": "Upgrade client-side mount software and all cluster components to the same version. If possible, use the latest available version."
+	},
+	"mnt_newer": {
+		"severity": "Error",
+		"title": "The Mount (client) version is newer than the Leader Master server's.",
+		"description": "The Mount software (client side) should not be in an newer version than the Leader (or any of cluster components), as this may result in protocol incompatibility leading to incorrect data being read or written. As a result, data in the cluster may become inconsistent or may be lost.",
+		"solution": "This situation must be immediately addressed either by downgrading client-side mount software or by upgrading older cluster components. It is recommended that all cluster components and client-side software be at the same version. Contact MooseFS support if troubled."
+	},
+	"mnt_ce_pro": {
+		"severity": "Error",
+		"title": "This client uses the community edition (CE) version MFS mount package, while the Leader is in the PRO version.",
+		"description": "The community edition (CE) version of client's side MooseFS software is used, while the Leader (and perhaps other parts of the cluster) is installed in the PRO version. It may lead to unpredicted behavior (including data loss) as the client software doesn't implement a part of the MFS network protocol.",
+		"solution": "Keep the cluster version consistent: all components (servers and client-side drivers) of a MooseFS cluster should be either PRO or community edition. Use appropriate install packages. Upgrade all cluster and client-side components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"mnt_pro_ce": {
+		"severity": "Warning",
+		"title": "This client uses the PRO version MFS mount package, while the Master is in the community edition (CE) version.",
+		"description": "The PRO version of client's side MooseFS software is installed, while the Leader (and perhaps other parts of the cluster) is installed in the community edition (CE). It should not lead to any unexpected behavior, however we insist on the cluster consistency.",
+		"solution": "Keep the cluster version consistent: all components (servers and client-side drivers) of a MooseFS cluster should be either PRO or community edition. Use appropriate install packages. Upgrade all cluster components to the same version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"ms_single_master_pro": {
+		"severity": "Error",
+		"title": "The PRO cluster has only one Master server, so no backup metadata server is available.",
+		"description": "The cluster has only one Master server. Additional Followers should be used to maintain additional metadata records. A single Master server is a single point of failure in the cluster. If it fails, the entire cluster becomes unavailable.",
+		"solution": "Install additional Followers. Follower can automatically become the new Leader Master server if the previous one fails. Always avoid having just a single Master server. Contact MooseFS support if you need assistance."
+	},
+	"ms_single": {
+		"severity": "Error",
+		"title": "The cluster has only one metadata server, so no backup metadata records are available.",
+		"description": "The cluster has only one metadata server. Additional Metaloggers or Followers (for the PRO version) should be used to maintain additional metadata records. A single metadata server is a single point of failure in the cluster. If it fails, the entire cluster becomes unavailable.",
+		"solution": "Install additional Metaloggers or install additional Followers if you use a PRO version. Follower's advantage is that it can automatically become the new Leader Master server if the previous one fails. Metalogger keeps track of metadata changes but needs to be upgraded to the leading Master server manually. Always avoid having just a single metadata Master server. Contact MooseFS support if you need assistance."
+	},
+	"ms_elect": {
+		"severity": "Info",
+		"title": "No Leader Master server in the cluster, election in process.",
+		"description": "There is currently no Leader Master server in the cluster. The process of electing a new leader is underway. One of the Follower Master servers is being elected and should become the Leader soon.",
+		"solution": "The process of electing a new leader is underway. It is started if the Leader is unavailable, e.g., after starting the cluster or after the failure of the previous Leader. There is no need for immediate action. The election process should soon end automatically, and the new Leader should be elected. However, if the election does not end within one minute, the reasons for this situation should be sought. If the election process started during regular cluster operations, why the old Leader became unavailable should be examined. It may turn out that it has permanently failed and should be repaired and connected back to the cluster to maintain the assumed level of resilience of the entire cluster. Electing a new leader is possible only when a quorum of Chunkservers is available. That is, half plus one Chunkservers are connected in the cluster. Contact MooseFS support if necessary."
+	},
+	"ms_usurper": {
+		"severity": "Info",
+		"title": "No Leader Master server in the cluster, leader switching (via usurper) in process.",
+		"description": "There is currently no Leader Master server in the cluster. The process of switching to a new leader is underway. One of the Follower Master servers is designated by user for leadership (usurper) and should become the Leader soon.",
+		"solution": "The process of switching to a new leader is underway. It is started because the user has demanded the switch with <code>mfssupervisor</code> tool. There is no need for immediate action. The process should soon end automatically, and the new Leader should be functional. However, if the switching process does not end within one minute, the reasons for this situation should be sought. Electing a new leader is possible only when a quorum of Chunkservers is available. That is, half plus one Chunkservers are connected in the cluster. Contact MooseFS support if necessary."
+	},
+	"ms_toomany": {
+		"severity": "Error",
+		"title": "There are too many leading Master servers",
+		"description": "There is more than one Leader (and/or Elect and/or Usurper) Master server in the cluster. This is a critical situation. The Leader Master server is the most important server in the cluster. It is responsible for managing metadata and ensuring the cluster's proper operation. Having more than one Leader Master server in the cluster may lead to data corruption, loss, or inconsistency. It is a serious error that should be immediately corrected.",
+		"solution": "If the Leader Master server is not available, it is necessary to pick a new Leader. If the Leader Master server is available, it is necessary to investigate why the second Leader (or Elect or Usurper) Master server appeared in the cluster. This is severe internall inconsistency that may lead to data loss. In case of manually picking a new Leader use the appropriate (usually the most recent) metadata records. Contact MooseFS support if necessary."
+	},
+	"ms_server_cpu_high": {
+		"severity": "Warning",
+		"title": "The server's CPU usage is high, which may lead to longer cluster response times.",
+		"description": "The server's CPU usage is high, which may lead to longer cluster response times and increased latency. High Leader Master server CPU usage doesn't necessarily mean user I/O requests freeze. It should eventually serve all requests - but slower. High CPU usage should not affect data throughput as the Master server doesn't take part in data exchange.",
+		"solution": "Make sure that the server is not loaded with other tasks. Check that the server has been selected appropriately for the expected cluster load. Details on choosing hardware for individual cluster components are described in the documentation - see Hardware guide. Check that the appropriate operating system hardware drivers are installed. In particular, it is often necessary to use the proper network card driver to offload network tasks from the CPU to the NIC. Using a faster CPU with fewer cores and optimizing the CPU configuration for working with single-threaded programs can also be helpful (e.g., CPU Affinity, no hyper-threading, power management, performance boost, etc.). Contact MooseFS support for more info."
+	},
+	"ms_hdd_nearly_full": {
+		"severity": "Warning",
+		"title": "Very little available disk space remaining on the Master server.",
+		"description": "There is very little space left on the hard drives, and it may run out soon. Once additional metadata is written (e.g., new objects are added to the cluster), the Master may become unable to write more metadata, even though data can still be written to Chunkservers. Over time, this could cause the Master to stop running, preventing it from recording metadata for recently written data. This may ultimately lead to data loss due to missing metadata.",
+		"solution": "It is necessary to add more disk space for metadata in the Master server, e.g. by adding a new drive. Additionally, data can be removed from the cluster, system trash may be emptied or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>). Unnecessary snapshots may be removed."
+	},
+	"ms_hdd_full": {
+		"severity": "Error",
+		"title": "No space left on the Master server hard disk drive.",
+		"description": "This is a critical situation. There is no space left on the Master server hard disk drive. If it is the Leader Master server no new data may be written to the cluster. Auto-healing may not work as expected. Data redundancy may be degraded. The cluster resiliency is seriously degraded.",
+		"solution": "It is necessary to add more disk space for metadata in the Master server, e.g. by adding a new drive. If there is no space on the Leader Master server, one may switch the Leader to another available server (see <code>mfssupervisor</code>). Additionally, data can be removed from the cluster, system trash may be emptied, or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>). Unnecessary snapshots may be removed."
+	},
+	"ms_no_ram_info": {
+		"severity": "Info",
+		"title": "No memory info available",
+		"description": "Obtaining memory usage is not supported by this OS or can't be obtained from the server."
+	},
+	"ms_no_cpu_info": {
+		"severity": "Info",
+		"title": "No CPU info available",
+		"description": "Obtaining CPU usage is not supported by this OS or can't be obtained from the server."
+	},
+	"ms_long_duration": {
+		"severity": "Warning",
+		"title": "The last Master server metadata save took more than 45 minutes.",
+		"description": "The last Master server metadata save took more than 45 minutes. Each Master server (leader or follower) 's metadata saving process helps keep a backup copy of cluster metadata. Basically, it is a metadata memory dump to a server's persistent storage. In case of server failure or restart, such a copy is read back to the server's memory and used for normal server operations. If the saving takes too long (an hour or longer), it may downgrade the cluster resiliency. Moreover, by default, the saving process on Followers is scheduled every hour, so it may be impossible to dump metadata fast enough between consequent requested dumps. Note that this period may be adjusted in the server configuration (see <code>METADATA_SAVE_FREQ</code>).",
+		"solution": "Saving time depends both on the metadata size (number of objects in the cluster and its additional attributes) and on the speed of internal server's hdd I/O. To shorten this time, use faster persistent storage to dump metadata, e.g., consider using NVMe or SSD. You may also consider limiting the size of the metadata by limiting global trash size, number of objects, number of additional attributes, or number of stored snapshots. Check if this time is not longer than <code>METADATA_SAVE_FREQ</code> config parameter. Contact MooseFS support if necessary."
+	},
+	"ms_last_store_background": {
+		"severity": "Info",
+		"title": "This server dumped a consistent metadata file in the background.",
+		"description": "This is the desired behavior. The server had enough resources to make a persistent copy of the metadata to its hard drive in the background."
+	},
+	"ms_last_store_downloaded": {
+		"severity": "Info",
+		"title": "This server lastly downloaded its copy of metadata from another Master server."
+	},
+	"ms_last_store_foreground": {
+		"severity": "Warning",
+		"title": "This server dumped a consistent metadata file in the foreground.",
+		"description": "This server dumped a consistent metadata file. However, it did it in the foreground instead of the background. This is not the ideal way for the Master server to work. The server probably did not have enough resources to make a persistent copy of the metadata to its hard drive in the background.",
+		"solution": "You should check the server configuration, load from other processes, RAM availability, and swap configuration. If you use Linux make sure that overcommit memory is turned on in your system (see if <code>/etc/sysctl.conf</code> contains this entry: <code>vm.overcommit_memory=1</code>). You can check the server logs and MooseFS logs on this server. If the situation does not repeat itself, there is probably no reason to worry, but you should check the status of this server more carefully for some time. Contact MooseFS support if necessary."
+	},
+	"ms_last_store_crc_background": {
+		"severity": "Info",
+		"title": "CRC background save"
+	},
+	"ms_last_store_unknown": {
+		"severity": "Warning",
+		"title": "Unknown status of the last metadata save operation.",
+		"description": "Unable to recognize the status code received from the server.",
+		"solution": "Check if the version of this GUI management console is up to date and compatible with this Master server version. Contact MooseFS support if necessary."
+	},
+	"ms_metadata_save_older": {
+		"severity": "Info",
+		"title": "The copy of metadata on disk is older than on other Master servers.",
+		"description": "This server has backed up its metadata to disk earlier than other servers. This is normal if this server is (or recently was) a Leader Master server. The Leader usually writes a copy of metadata to disk less often than the Followers. The difference in save times between Leader and Followers should never be longer than 24 hours. Its the Leader job to order Followers to save their metadata.",
+		"solution": "No action is required, but you should check whether the metadata was saved too long ago. In particular, earlier than the one set in the setup parameters. By default, the Leader's metadata is saved once a day at 12am UTC, and the Follower's metadata is saved every full hour. See the Master server configuration file parameters: <code>METADATA_SAVE_FREQ</code>, <code>METADATA_SAVE_OFFSET</code>, <code>METADATA_CRCCHECK_FREQ</code>, <code>METADATA_DOWNLOAD_FREQ</code>."
+	},
+	"ms_checksum_mismatch": {
+		"severity": "Error",
+		"title": "The last saved metadata checksum doesn't match other Master servers' metadata checksums.",
+		"description": "The checksum of the metadata written by this server is different from the checksum written by other metadata servers. This is critical and should not happen. This indicates a serious error in the synchronization of metadata between the individual servers. The cause of this behavior should be found and eliminated. Desynchronization of the servers will likely result in corruption or loss of metadata and/or data.",
+		"solution": "Review the server's log files, for both OS and MooseFS related messages. Contact support immediately."
+	},
+	"follower_id_mismatch": {
+		"severity": "Error",
+		"title": "The Follower's metadata id doesn't match the Leader Master server metadata id.",
+		"description": "The id of the metadata on this server doesn't match the Leader's metadata id. This is critical and should not happen. This indicates a serious error in the synchronization of metadata between the individual servers. It looks as if the Follower's metadata comes from another cluster, but the actual cause of this behavior should be immediately found and eliminated. Desynchronization of the servers will likely result in corruption or loss of metadata and/or data. Switching a Leader in such a situation will likely cause unexpected cluster behavior.",
+		"solution": "Check which id is the correct one. It is probably the one used by the Leader Master server. You may force downloading a completely new set of metadata by a Follower by stopping its <code>mfsmaster</code> process, removing metadata files stored on its hdd, and reloading fresh metadata from the Leader (see <code>mfsmaster -e</code>). Investigate why the ID is mismatched to avoid it in the future. However, this is a critical situation, and you should contact MooseFS support immediately. "
+	},
+	"follower_desync": {
+		"severity": "Warning",
+		"title": "The Follower's metadata is not synchronized with the Leader Master server's metadata.",
+		"description": "The Follower's metadata may not be synchronized with the Leader Master server's metadata for a while, especially right after the cluster restart or electing a new Leader. It should re-sync within a minute or so. Syncing Followers is a part of the MooseFS auto-rehealing routines. However, you should find a reason if it is not in sync for longer.",
+		"solution": "Check network configuration: ensure the Follower and the Leader are able to reach each other, and check firewalls. Check log files of both. Contact MooseFS support if the problem persists."
+	},
+	"follower_unreachable": {
+		"severity": "Error",
+		"title": "The Follower Master server is unreachable.",
+		"description": "The Follower Master server is unreachable, so the desired level of metadata protection is not fulfilled. All followers should be up and running in the cluster. It should be brought back online as soon as possible.",
+		"solution": "Check network configuration: ensure the Follower, the Leader, and management tools (GUI/CLI) are able to reach each other, and check firewalls. Check if the <code>mfsmaster</code> process is running on this server. Check log files on those servers. Contact MooseFS support if the problem persists."
+	},
+	"follower_version_mismatch": {
+		"severity": "Warning",
+		"title": "The Follower's metadata version differs by over 100.000 from the Leader Master server's version.",
+		"description": "The metadata version is an integer that grows monotonically with time. Roughly speaking, it is incremented by every metadata operation. Generally, it should be the same number across all metadata servers (the Leader and Followers). However, thanks to unavoidable network latency, some packets reaching management tools may be delayed and report different version numbers. Now, they differ by more than 100.000. It is quite a big difference, so it may indicate some problems with metadata synchronization rather than mere network latency. Metadata across different Master servers should be in sync to maintain cluster resiliency. Note that this version number (a single integer) should not be confused with the software component version number (three integers separated with dots, e.g., 4.60.5). They are different animals.",
+		"solution": "Check network configuration: latency, packet loss, etc. Check log files on both Leader and Follower servers: OS and MooseFS. This is just a warning, but this problem should not persist. Contact MooseFS support if necessary."
+	},
+	"follower_meta_delay_small": {
+		"severity": "Warning",
+		"title": "The Follower's metadata timestamp is slightly delayed from the Leader.",
+		"description": "The metadata timestamp differs from the Leader's by more than 1 second. This is a sign that metadata servers' synchronization is not entirely correct. Ideally, there should be no delay. Incorrect server clock settings may cause such delays. Or a general (Follower) server slowdown causing problems with handling requests in real-time by the metadata management process (<code>mfsmaster</code>). Out-of-sync metadata degrades cluster resilience and may lead to data loss or corruption, especially in case of other concurrent failures.",
+		"solution": "Check all server clock settings. They should be accurate and thus synchronized. If possible, use an NTP server to synchronize them with a centralized time source. Also, check the servers' performance and load, including RAM, swap, and I/O performance. If necessary, refer to the MooseFS Hardware Guide for hints on hardware requirements. Contact MooseFS support if the delay doesn't decrease.\t"
+	},
+	"follower_meta_delay": {
+		"severity": "Error",
+		"title": "The Follower's metadata timestamp is delayed from the Leader.",
+		"description": "The metadata timestamp differs from the Leader's by more than 6 seconds. This is a severe difference and should not be tolerated. It means that metadata is getting out-of-sync. Ideally, there should be no delay. Incorrect server clock settings may cause such delays. Or a general (Follower) server slowdown causing problems with handling requests in real-time by the metadata management process (<code>mfsmaster</code>). Out-of-sync metadata degrades cluster resilience and may lead to data loss or corruption, especially in case of other concurrent failures.",
+		"solution": "Check all server clock settings. They should be accurate and thus synchronized. If possible, use an NTP server to synchronize them with a centralized time source. Also, check the servers' performance and load, including RAM, swap, and I/O performance. If necessary, refer to the MooseFS Hardware Guide for hints on hardware requirements. Contact MooseFS support if the delay doesn't decrease immediately.\t"
+	},
+	"follower_time_diff_small": {
+		"severity": "Warning",
+		"title": "The follower's clock differs from the Leader Master server clock.",
+		"description": "The Follower's clock differs by more than 1 second from the Leader Master server clock. Ideally, there should be no difference. Incorrect server clock settings may cause severe metadata synchronization issues, degrading cluster resilience. All clocks in the cluster should be accurate and thus synchronized.",
+		"solution": "Check and adjust all clocks in the cluster. They should be accurate and thus synchronized. If possible, use an NTP server to synchronize them with a centralized time source. Contact MooseFS support if you need assistance."
+	},
+	"follower_time_diff": {
+		"severity": "Error",
+		"title": "The follower's clock differs too much from the Leader Master server clock.",
+		"description": "The Follower's clock differs by more than 2 seconds from the Leader Master server clock. This is a severe, intolerable difference. Ideally, there should be no difference. Incorrect server clock settings may cause severe metadata synchronization issues, degrading cluster resilience. Among others, auto-healing and data redundancy routines may not work correctly. All clocks in the cluster should be accurate and thus synchronized.",
+		"solution": "Check and adjust all clocks in the cluster. They should be accurate and thus synchronized. If possible, use an NTP server to synchronize them with a centralized time source. Contact MooseFS support if you need assistance."
+	},
+	"follower_checksum_mismatch": {
+		"severity": "Error",
+		"title": "The Follower's exports checksum does not match the Leader's exports checksum.",
+		"description": "Export checksums are one way to ensure exports configuration is the same across different Master servers.  A mismatch indicates a serious error, and the cause of the mismatch should be pinpointed and eliminated.",
+		"solution": "Review the content of <code>mfsexports.cfg</code> file on all Master servers and make sure the entries in this file on all servers are identical. Contact MooseFS support if you need assistance."
+	},
+	"cs_unreachable": {
+		"severity": "Error",
+		"title": "The Chunkserver is unreachable.",
+		"description": "The Chunkserver is unreachable, so the desired level of data protection is not fulfilled. All Chunkservers should be up and running in the cluster, and this server should be brought back online as soon as possible. It is either turned off, or there is a networking problem. If too many Chunkservers are unreachable, the cluster may lose the Chunkserver quorum required to elect the Leader Master server. If the server is undergoing planned maintenance, it should be put into maintenance mode.",
+		"solution": "Check network configuration: ensure the Master servers, management tools (GUI/CLI), and Chunkservers are able to reach each other. Check any firewalls in between. Check if the <code>mfschunkserver</code> process is running on the Chunkserver. Check log files on servers. All Chunkservers should be brought online as soon as possible. Contact MooseFS support if the problem persists."
+	},
+	"cs_maintain": {
+		"severity": "Warning",
+		"title": "The Chunkserver is in maintenance mode",
+		"description": "The Chunkserver is in maintenance mode while connected, meaning that the cluster avoids using it, however, the stored data can still be read or written. During this time, the cluster has reduced fault tolerance. The maintenance mode is designed to temporarily switch off the Chunkserver due to its scheduled service, such as upgrading software or replacing hardware. Cluster is not attempting to re-replicate data from the maintained Chunkserver because it assumes it will be back online soon with untouched data. Note, if you want to remove the Chunkserver's hdd during maintenance, mark it for removal first and wait until its data is replicated to other disks in the cluster (according to the desired redundancy level). Removing a disk without marking it for removal in the first place may lead to data loss.",
+		"solution": "Finish all maintenance work on this server. If necessary, restart it and its processes, bring it back online and switch off maintenance mode as soon as possible."
+	},
+	"cs_unreachable_maintain": {
+		"severity": "Warning",
+		"title": "The Chunkserver is unreachable but in maintenance mode",
+		"description": "The Chunkserver is unreachable but in maintenance mode. During this time, the cluster has reduced fault tolerance. The maintenance mode is designed to temporarily switch off the Chunkserver due to its scheduled service, such as upgrading software or replacing hardware. Despite the Chunkserver being unreachable, the cluster is not attempting to re-replicate data from it. It is assumed this server will be back online soon with untouched data. Note, if you want to remove the Chunkserver's hdd during maintenance, mark it for removal first and wait until its data is replicated to other disks in the cluster (according to the desired redundancy level). Removing a disk without marking it for removal in the first place may lead to data loss.",
+		"solution": "Finish all maintenance work on this server. If necessary, restart it and its processes, bring it back online and switch off maintenance mode as soon as possible."
+	},
+	"cs_maintain_tmp": {
+		"severity": "Warning",
+		"title": "The Chunkserver is temporarily in maintenance mode",
+		"description": "The Chunkserver is in \"temporary maintenance mode\", meaning that the cluster avoids using it, however, the stored data can still be read or written. During this time, the cluster has reduced fault tolerance. The maintenance mode is designed to temporarily switch off the Chunkserver due to its scheduled service, such as upgrading software or replacing hardware. Cluster is not attempting to re-replicate data from the maintained Chunkserver because it assumes it will be back online soon with untouched data. The \"temporary maintenance mode\" turns on automatically whenever the server is stopped gracefully (e.g., <code>mfschunkserver stop</code> or <code>systemctl stop moosefs-chunkserver.service</code>). After restarting and reconnection, the server is automatically switched back to normal mode. If you don't reconnect the server within the specified timeout (default 30m), the Chunkserver will be considered unreachable, and replication routines in the cluster will start re-healing its data. See <code>CS_TEMP_MAINTENANCE_MODE_TIMEOUT</code> for timeout definition. Note, if you want to remove the Chunkserver's hdd during maintenance, mark it for removal first and wait until its data is replicated to other disks in the cluster (according to the desired redundancy level). Removing a disk without marking it for removal in the first place may lead to data loss.",
+		"solution": "Finish all maintenance work on this server. If necessary, restart it and its processes, bring it back online. The temporary maintenance mode will turn off automatically upon server reconnection."
+	},
+	"cs_overload": {
+		"severity": "Warning",
+		"title": "The Chunkserver working queue is heavy loaded.",
+		"description": "The Chunkserver working queue is heavy loaded. It receives more requests (e.g. read, write, replication) than it can handle without delay. Overloading may be temporary, but if it persists, the overall performance of the server should be checked: memory availability, load from other processes, the status of the hard disks, etc. An overloaded server can cause delays in client access to data and in the operation of the cluster's self-healing processes.",
+		"solution": "It is necessary to check the server's status, system software updates, and load from other processes. It should be verified whether the server is not too old or significantly slower compared to other Chunkservers. A common cause is the occurrence of errors on disks or disproportionately long I/O operation times on disks - which, by the way, is often a symptom of (approaching) physical damage to the disk. Additionally, it should be generally assessed whether the cluster load and redundancy definitions are appropriately adjusted to the servers' throughput."
+	},
+	"cs_hdds_nearly_full": {
+		"severity": "Warning",
+		"title": "There is very little available disk space remaining",
+		"description": "There is very little space left on this Chunkserver. It may run out soon. Currently, some data redundancy and self-healing processes may be slowed down or at risk. Soon, after writing additional data or in the event of another simultaneous failure, the cluster's fault tolerance may decrease.",
+		"solution": "It is necessary to add new disks to the server or to add new Chunkservers to the cluster. It is also possible to reduce the level of data redundancy. If using the community version, consider upgrading to the PRO version and implementing redundancy with erasure coding. Erasure coding significantly reduces storage space requirements compared to standard data replication (copying) while maintaining the same level of redundancy. Additionally, data can be removed from the system trash or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>)."
+	},
+	"cs_hdds_full": {
+		"severity": "Error",
+		"title": "There is actually no space left on the disks",
+		"description": "All disks of the Chunkserver are full or 99% full. Actually, no new data can be written. Lack of space on the Chunkserver may block the achievement of the set data replication goals. This can lead to a reduction in the cluster's fault tolerance.",
+		"solution": "It is necessary to add new disks to the server or to add new Chunkservers to the cluster. It is also possible to reduce the level of data redundancy. If using the community version, consider upgrading to the PRO version and implementing redundancy with erasure coding. Erasure coding significantly reduces storage space requirements compared to standard data replication (copying) while maintaining the same level of redundancy. Additionally, data can be removed from the system trash or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>)."
+	},
+	"cs_mfr_validating": {
+		"severity": "Warning",
+		"title": "Marked for removal, but NOT ready yet",
+		"description": "There are disks 'Marked for removal' on this Chunkserver but they are NOT ready for removal yet. The cluster validates if they require any maintenance tasks (mainly copying data) before they can be safely removed from the Chunkserver's configuration, unmounted, and, subsequently, physically removed.",
+		"solution": "There is nothing you have to do now. Just wait until the disks are ready for removal. The cluster will secure their data automatically."
+	},
+	"cs_mfr_inprogress": {
+		"severity": "Warning",
+		"title": "Marked for removal, but NOT ready yet",
+		"description": "There are disks 'Marked for removal' on this Chunkserver but they are NOT ready for removal yet. They are being prepared for removal: Chunkservers are currently copying data among themselves to ensure those disks' data stays fully redundant after disk removal.",
+		"solution": "There is nothing you have to do now. Just wait until the disks are ready for removal. The cluster will secure their data automatically."
+	},
+	"cs_mfr_ready": {
+		"severity": "Info",
+		"title": "Ready for removal",
+		"description": "There are disks 'Marked for removal' on this Chunkserver and they are ready for removal. Their data is already safely stored elsewhere on the cluster. Those disks can be removed from the Chunkserver's configuration, unmounted, and, subsequently, physically removed."
+	},
+	"cs_mfr_unknown": {
+		"severity": "Warning",
+		"title": "'Marked for removal' but detailed status is unrecognized.",
+		"description": "It is not clear if the disk is ready for removal or not. Check the cluster integrity and versions of the software components (GUI and Chunkserver). If the situation persists, contact MooseFS support."
+	},
+	"hdd_cs_too_old": {
+		"severity": "Error",
+		"title": "The Chunkserver's software version is too old",
+		"description": "The Chunkserver's software version is too old to provide information on its disks. The Chunkserver should be updated to the latest version.",
+		"solution": "Update the Chunkserver to the latest version. Use the latest available MooseFS software version. Contact MooseFS support if you need assistance."
+	},
+	"hdd_cs_unreachable": {
+		"severity": "Error",
+		"title": "The Chunkserver is unreachable",
+		"description": "Can't get disk info because the Chunkserver is unreachable. It is either turned off, or there is a networking problem. If the server is undergoing planned maintenance, it should be put into maintenance mode.",
+		"solution": "Check network configuration: ensure the Master servers, management tools (GUI/CLI), and Chunkservers are able to reach each other. Check any firewalls in between. Check if the <code>mfschunkserver</code> process is running on the Chunkserver. Check log files on servers. All Chunkservers should be brought online as soon as possible. Contact MooseFS support if the problem persists."
+	},
+	"hdd_nearly_full": {
+		"severity": "Warning",
+		"title": "There is very little available disk space remaining on the Chunkserver",
+		"description": "There is very little space left on the hard disks. It may run out soon. Currently, some data redundancy and self-healing processes may be slowed down or at risk. Soon, after writing additional data or in the event of another simultaneous failure, the cluster's fault tolerance may decrease.",
+		"solution": "It is necessary to add new disks to the server or to add new chunkservers to the cluster. It is also possible to reduce the level of data redundancy. If using the community version, consider upgrading to the PRO version and implementing redundancy with erasure coding. Erasure coding significantly reduces storage space requirements compared to standard data replication (copying) while maintaining the same level of redundancy. Additionally, data can be removed from the system trash or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>)."
+	},
+	"hdd_full": {
+		"severity": "Error",
+		"title": "There is actually no space left on the disk",
+		"description": "The disk is 99% full or completely full. Actually, no new data can be written to this disk. Lack of space on the Chunkserver may block the achievement of the set data replication goals. This can lead to a reduction in the cluster's fault tolerance.",
+		"solution": "It is necessary to add new disks to the server or to add new Chunkservers to the cluster. It is also possible to reduce the level of data redundancy. If using the community version, consider upgrading to the PRO version and implementing redundancy with erasure coding. Erasure coding significantly reduces storage space requirements compared to standard data replication (copying) while maintaining the same level of redundancy. Additionally, data can be removed from the system trash or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>)."
+	},
+	"hdd_error": {
+		"severity": "Warning",
+		"title": "The disk is reporting read/write errors",
+		"description": "The Chunkserver's disk is reporting read/write errors. E.g., chunk is inconsistent or missing. A large number of errors may result in the disk being automatically taken out of use (and marked as <code>damaged</code>). A sudden increase in errors may lead to data loss on that disk (undergoal or missing chunks). Taking the disk out of use without replacing it may reduce the cluster's fault tolerance.",
+		"solution": "It is necessary to check how frequently errors occur on this disk. The disk should be checked with an appropriate tool for assessing disk quality and replaced if necessary. The error notification can be dismissed by clicking the appropriate link in the Disks tab of the GUI management console."
+	},
+	"hdd_damage": {
+		"severity": "Error",
+		"title": "The Chunkserver's disk is damaged.",
+		"description": "The Chunkserver's disk is damaged. Disk damage usually requires recovering the copies of data stored on it from other disks in the cluster. Recovery process is automatic. Data should not be lost, but during recovery, the cluster's fault tolerance and performance may be reduced. In particular, another simultaneous failure could exceed the assumed number of concurrent failures and lead to data loss. The number of allowable simultaneous failures depends on the cluster configuration, particularly the storage class settings.",
+		"solution": "It is possible to attempt to repair the disk, but a large number of errors that result in the disk being marked as <code>damaged</code> usually indicate that the disk should be replaced. The number of allowed disk errors before marking disk as <code>damaged</code> is configurable."
+	},
+	"hdd_invalid": {
+		"severity": "Error",
+		"title": "The Chunkserver's disk is invalid.",
+		"description": "A disk is invalid if it is present in the Chunkserver configuration but for some reason a Chunkserver cannot write to or read from it. For example, its path may be misspelled, the disk may be unmounted, it may be physically damaged, it may have incorrect access rights, etc.",
+		"solution": "Check if the disk is properly mounted, accessible for writing and reading from the operating system, if there is no spelling error in the path, if the disk is not damaged. You can use any system disk checking tools."
+	},
+	"hdd_scanning": {
+		"severity": "Warning",
+		"title": "The Chunkserver's disk is being scanned.",
+		"description": "The Chunkserver's disk is being scanned. The scanning process is used to restore any missing internal Chunkserver's data structures (about its chunks). E.g., to restore the <code>.chukdb</code> file. The scanning process may take some time, depending on the disk's size and speed. The server is still operational during the scanning process. It may read and write user data but rebalancing, replication and similar health related processes are suspended.",
+		"solution": "There is nothing you have to do now. Just wait until the Chunkserver is done with scannning. However, it is worth to investigate why Chunkserver lost its internal (cached) data. Check what happened to the <code>.chunkdb</code> file: is it present and r/w accessible? It should not happen under normal circumstances, this is an extraordinary procedure. Scanning should take place only when Chunkservers is starting."
+	},
+	"hdd_mfr_validating": {
+		"severity": "Warning",
+		"title": "Marked for removal, but NOT ready yet",
+		"description": "The disk is 'Marked for removal' but it is NOT ready for removal yet. The cluster validates if it requires any maintenance tasks (mainly copying data) before this disk can be safely removed from the Chunkserver's configuration, unmounted, and, subsequently, physically removed.",
+		"solution": "There is nothing you have to do now. Just wait until the disk is ready for removal. The cluster will secure its data automatically."
+	},
+	"hdd_mfr_inprogress": {
+		"severity": "Warning",
+		"title": "Marked for removal, but NOT ready yet",
+		"description": "The disk is 'Marked for removal' but it is NOT ready for removal yet. It is being prepared for removal: Chunkservers are currently copying data among themselves to ensure this disk's data stays fully redundant after disk removal.",
+		"solution": "There is nothing you have to do now. Just wait until the disk is ready for removal. The cluster will secure its data automatically."
+	},
+	"hdd_mfr_ready": {
+		"severity": "Info",
+		"title": "Ready for removal",
+		"description": "The disk is 'Marked for removal' and it is ready for removal. Its data is already safely stored elsewhere on the cluster. The disk can be removed from the Chunkserver's configuration, unmounted, and, subsequently, physically removed."
+	},
+	"hdd_mfr_unknown": {
+		"severity": "Warning",
+		"title": "'Marked for removal' but its status is unrecognized",
+		"description": "It is not clear if the disk is ready for removal or not. Check the cluster integrity and versions of the software components (GUI and Chunkserver). If the situation persists, contact MooseFS support."
+	},
+	"data_health_checking": {
+		"severity": "Warning",
+		"title": "It is unknown whether all data is stored with the desired redundancy, as the status check is still ongoing.",
+		"description": "It is unknown whether all data is stored with the desired redundancy, as the status check is still ongoing. Such a situation usually occurs after a Leader election or after a cluster restart. Please wait until the data check is complete.",
+		"solution": "Please wait until all Chunkservers reconnect and the data check is complete. Contact MooseFS support if the data check doesn't finish within a few minutes."
+	},
+	"data_health_missing": {
+		"severity": "Error",
+		"title": "Some data chunks are missing: either no copies or not enough parts can be found in the cluster.",
+		"description": "Missing refers to a situation where all copies of a chunk or too many chunk's data/parity parts are unavailable. This means that the data contained in that chunk cannot be accessed or recovered because there are no existing replicas to retrieve data from. This is a critical condition because it indicates permanent data loss for the affected chunks unless other backups or external recovery methods are available.",
+		"solution": "This is a serious situation. Try to recover the missing chunks, for example, by recovering damaged disks or servers from the cluster. Often, the chunks stored on the disks can be retrieved and reintroduced into the cluster. Additionally, you can locate the appropriate files in other places or use external backups. Tools such as <code>mfsfileinfo</code> and <code>mfsfilerepair</code> can help in partially recovering and/or supplementing the missing data. If possible, disconnect users from the cluster during the repair or at least limit write operations. Contact support for further assistance."
+	},
+	"data_health_endangered": {
+		"severity": "Error",
+		"title": "Some data chunks are endangered: there is no redundancy to them.",
+		"description": "Endangered indicates that there is only one replica available. The data is still accessible, but it's at risk because it does not meet the redundancy goal. If another chunk copy (disk or server) fails, data loss could occur. The system is attempting to create additional copies (or data/parity parts) to meet the specified redundancy goal.",
+		"solution": "The data is at immediate risk. Wait until the system automatically restores the desired level of data redundancy. Monitor the cluster for any further simultaneous failures. Refrain from performing any other maintenance tasks. If possible, limit the use of the system."
+	},
+	"data_health_undergoal": {
+		"severity": "Warning",
+		"title": "Some data chunks are undergoal: they are below the configured minimum redundancy level.",
+		"description": "Undergoal means that the number of replicas is below the desired redundancy goal set by the system's configuration, but not necessarily at a critical level. The system is attempting to create additional copies (or data/parity parts) to meet the specified redundancy goal. The data is not immediately at risk, but efforts are being made to ensure the number of replicas is brought up to the desired level.",
+		"solution": "The data is not immediately at risk, wait until the system automatically restores the desired level of data redundancy. Monitor the cluster for any further simultaneous failures. Refrain from performing any other maintenance tasks."
+	},
+	"data_missing_files": {
+		"severity": "Error",
+		"title": "Some files are missing due to missing chunks.",
+		"description": "Internally files are composed of chunks, which must be available for the system to reconstruct the entire file. If one or more chunks are missing, the system cannot access or retrieve the necessary data to reconstruct the file, resulting in the file being missing. Consequently, any attempt to open a file that has missing chunks will lead to errors, preventing users or applications from accessing the intended data.",
+		"solution": "This is a serious situation. Try to recover the missing chunks, for example, by recovering damaged disks or servers from the cluster. Often, the chunks stored on the disks can be retrieved and reintroduced into the cluster to fill in the missing parts of the files. Additionally, you can locate the appropriate files in other places or use external backups. Tools such as <code>mfsfileinfo</code> and <code>mfsfilerepair</code> can help in partially recovering and/or supplementing the missing data in the file. If possible, disconnect users from the cluster during the repair or at least limit write operations. <br/><strong>NOTE: The health-check loop is a long running operation that was started some time ago. It is possible that the data is healthy again since the loop was started. Check the current status of any missing chunks in the 'Chunk matrix table' above.</strong> Contact support for further assistance."
+	},
+	"data_missing_trash_files": {
+		"severity": "Error",
+		"title": "Some trash files are missing due to missing chunks.",
+		"description": "Internally files are composed of chunks, which must be available for the system to reconstruct the entire file. If one or more chunks are missing, the system cannot access or retrieve the necessary data to reconstruct the file, resulting in the file being missing. Consequently, any attempt to revert from the trash a file that has missing chunks will fail.",
+		"solution": "This is a serious situation. Try to recover the missing chunks, for example, by recovering damaged disks or servers from the cluster. Often, the chunks stored on the disks can be retrieved and reintroduced into the cluster to fill in the missing parts of the files. Additionally, you can locate the appropriate files in other places or use external backups. Tools such as <code>mfsfileinfo</code> and <code>mfsfilerepair</code> can help in partially recovering and/or supplementing the missing data in the file. If possible, disconnect users from the cluster during the repair or at least limit write operations. The situation may seem harmless, because there are missing files that are in the trash anyway and waiting to be finally deleted, but under normal circumstances this should not happen. It may be a symptom that there are some problems in the cluster. <br/><strong>NOTE: The health-check loop is a long running operation that was started some time ago. It is possible that the data is healthy again since the loop was started. Check the current status of any missing chunks in the 'Chunk matrix table' above.</strong> Contact support for further assistance."
+	},
+	"data_undergoal_files": {
+		"severity": "Warning",
+		"title": "Some files are below their expected redundancy level (undergoal)",
+		"description": "Undergoal means that the number of replicas is below the desired redundancy goal set by the system's configuration, but not necessarily at a critical level. The system is attempting to create additional copies (or data/parity parts) to meet the specified redundancy goal. The data is not immediately at risk, but efforts are being made to ensure the number of replicas is brought up to the desired level.",
+		"solution": "The data is not immediately at risk, wait until the system automatically restores the desired level of data redundancy. Monitor the cluster for any further simultaneous failures. Refrain from performing any other maintenance tasks. <br/><strong>NOTE: The health-check loop is a long running operation that was started some time ago. It is possible that the data is healthy again since the loop was started. Check the current status of any missing chunks in the 'Chunk matrix table' above.</strong>"
+	},
+	"data_mc_nocopy": {
+		"severity": "Info",
+		"title": "There is no single copy of the chunk in the cluster",
+		"description": "There is no single copy of this chunk on any disk in any of the connected Chunkservers. This is a critical condition because it indicates permanent data loss for the affected chunks unless other backups or external recovery methods are available. This can happen due to unexpected loss or disconnection of disks or entire Chunkservers.",
+		"solution": "Locate missing chunks (data) wherever possible. There is a way to bring chunks back to the cluster and restore missing files."
+	},
+	"data_mc_invalid": {
+		"severity": "Info",
+		"title": "There are copies of chunk but they are invalid",
+		"description": "Invalid means that the chunk is present in the cluster, but for some reason it is inconsistent or can't be read. The internal CRC or length does not match, or there is a read error on the disk.",
+		"solution": "Locate valid chunks (data) wherever possible. There is a way to bring chunks back to the cluster and restore missing files."
+	},
+	"data_mc_wrongver": {
+		"severity": "Info",
+		"title": "There are copies of chunk but they are in wrong version",
+		"description": "The chunk has an incorrect version, but it is internally consistent and readable (unlike an 'invalid' chunk). The chunk may come from some older backup, hard disk, etc.",
+		"solution": "Locate valid chunks (data) wherever possible. There is a way to bring chunks back to the cluster and restore missing files."
+	},
+	"data_mc_partialec": {
+		"severity": "Info",
+		"title": "Not all parts of the chunk are available",
+		"description": "The chunk is stored using erasure coding, but not all parts are available. The chunk can't be reconstructed.",
+		"solution": "Locate valid chunks (data) wherever possible. There is a way to bring chunks back to the cluster and restore missing files."
+	},
+	"mnt_inactive_list": {
+		"severity": "Help",
+		"title": "Inactive clients (mount points)",
+		"description": "This is a list of inactive mounts, namely a situation where a client was connecting to the cluster some time ago but for some reason lost the connection before ending it gracefully. This is not a dangerous situation from the cluster's point of view but such a client cannot use the cluster's resources. As a rule, clients should connect and disconnect from the cluster gracefully. If the client does not connect back to the cluster soon, this mount will be permanently abandoned.",
+		"solution": "From the cluster's perspective, there is no need to perform specific service actions. However, it is worth checking whether the client should not be connected and why the unexpected disconnection occurred. An inactive mount may indicate some network problems with client access to the cluster, e.g. packet loss, high latency, incorrect configuration, too restrictive firewalls, etc."
+	},
+	"mnt_inactive": {
+		"severity": "Info",
+		"title": "The client (mount point) is inactive.",
+		"description": "Inactive mount is a situation where a client was connecting to the cluster some time ago but for some reason lost the connection before ending it gracefully. This is not a dangerous situation from the cluster's point of view but such a client cannot use the cluster's resources. As a rule, clients should connect and disconnect from the cluster gracefully. If the client does not connect back to the cluster soon, this mount will be permanently abandoned.",
+		"solution": "From the cluster's perspective, there is no need to perform specific service actions. However, it is worth checking whether the client should not be connected and why the unexpected disconnection occurred. An inactive mount may indicate some network problems with client access to the cluster, e.g. packet loss, high latency, incorrect configuration, too restrictive firewalls, etc."
+	},
+	"lic_expiring": {
+		"severity": "Warning",
+		"title": "The license will expire soon.",
+		"description": "The license you are using is time-limited and will expire in less than a month. After the license expires, the cluster will shut down.",
+		"solution": "It is urgent to extend the license validity or replace it. The cluster will not work after the license expires. Alternatively, you can switch to the community version. In this case, you will lose some PRO functions. Contact support for further assistance."
+	},
+	"lic_expired": {
+		"severity": "Error",
+		"title": "The license expired.",
+		"description": "The license you are using is time-limited and has already expired. Cluster is shut down.",
+		"solution": "It is urgent to extend the license validity or replace it. The cluster doesn't work after the license expires. Alternatively, you can switch to the community version. In this case, you will lose some PRO functions. Contact support for further assistance."
+	},
+	"lic_exhausting": {
+		"severity": "Warning",
+		"title": "The amount of data in the cluster will soon exceed the available license. New data will not be able to be saved then.",
+		"description": "The license you are using is limited in size. The total size of data stored in the cluster now exceeds 90% of the granted license. This means that the available space in the cluster may be finished soon. As a result, some cluster functionality will become unavailable. In particular, it will not be possible to add new data, and the cluster resiliency may be degraded. Note that license size refers to so-called raw data size, i.e., data after required duplications. It is usually larger than the user data size as most of the data is redundant.",
+		"solution": "It is urgent to extend the license size or replace it. After the stored data size hits the license limit, the cluster will not work as intended: no new data may be written. It is also possible to remove unnecessary data (snapshots included) or reduce the level of data redundancy. Additionally, data can be removed from the system trash, or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>). Contact support for further assistance."
+	},
+	"lic_almost_exhausted": {
+		"severity": "Error",
+		"title": "The amount of data in the cluster may exceed the available license any moment. New data will not be able to be saved then.",
+		"description": "The license you are using is limited in size. The total size of data stored in the cluster now exceeds 95% of the granted license. This is a critical situation. This means that the available space in the cluster may be exhausted at any moment. As a result, some cluster functionality will become unavailable. In particular, it will not be possible to add new data, and the cluster resiliency may be degraded. Note that license size refers to so-called raw data size, i.e., data after required duplications. It is usually larger than the user data size as most of the data is redundant.",
+		"solution": "It is urgent to extend the license size or replace it. After the stored data size hits the license limit, the cluster will not work as intended: no new data may be written. It is also possible to remove unnecessary data (snapshots included) or reduce the level of data redundancy. Additionally, data can be removed from the system trash, or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>). Contact support for further assistance."
+	},
+	"lic_exhausted": {
+		"severity": "Error",
+		"title": "The amount of data in the cluster exceeds the allocated license. New data cannot be written to the cluster.",
+		"description": "The license you are using is limited in size. The total size of data stored in the cluster now exceeds the granted license. This is a critical situation. No new data may be written. The cluster resiliency is degraded as data management routines have no space to work with. Note that license size refers to so-called raw data size, i.e., data after required duplications. It is usually larger than the user data size as most of the data is redundant.",
+		"solution": "It is urgent to extend the license size or replace it. It is also possible to remove unnecessary data (snapshots included) or reduce the level of data redundancy. Additionally, data can be removed from the system trash, or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>). Contact support for further assistance."
+	},
+	"lic_max_version": {
+		"severity": "Error",
+		"title": "Licence doesn't allow using this version of software.",
+		"description": "Licence is granted for the previous version of the software. You are not entitled using this version of MooseFS any longer. Please downgrade or contact support."
+	},
+	"trash_large": {
+		"severity": "Warning",
+		"title": "The trash utilization seems to be too big.",
+		"description": "The trash utilization seems to be too big, as the total size of data kept in trash exceeds 1/3 of the cluster size. The cluster can handle any amount of data in trash, but the data stored in trash shares (disk and metadata) resources with regular data. As a result, this seriously limits the space available for user data.",
+		"solution": "Data can be removed from the system trash, or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>). Alternatively, the cluster may be expanded by adding new disks or Chunkservers. Contact support if you need further assistance."
+	},
+	"inod_limit_nearly_exhausted": {
+		"severity": "Warning",
+		"title": "The total number of objects may soon reach the limit of 2.14 billion inodes",
+		"description": "The cluster's total number of objects (inodes: files and folders) exceeds 95% of the maximum allowed number of objects. This is severe as soon users may be unable to create new files or folders. The maximum number of inodes is a POSIX file-system relevant value. Currently, it is 2^31 ~ 2.147 billion inodes. This is a metadata limit; it doesn't affect actual data: you may freely append data to existing files. Note that the redundancy level doesn't affect the number of used inodes.",
+		"solution": "Unnecessary data can be removed from the cluster and from the global trash, or the retention time for data in the trash can be shortened (see <code>mfssettrashretention</code>). Alternatively, you may decide to split a single namespace into multiple namespaces. Each namespace requires its own metadata Master server set, but it also has its own inode number limit. Refer to possible cluster setup scenarios. Contact MooseFS support for further assistance."
+	},
+	"st_card_cluster_space": {
+		"severity": "Help",
+		"title": "The total available HDD space and the remaining free space within a cluster.",
+		"description": "<ul><li>The <strong>total available space</strong> in a cluster is the sum of all hard disk drives in all Chunkservers connected to the cluster.</li></ul>\n<ul><li>The <strong>free space</strong> is the sum of the remaining free space of those disk drives.</li></ul>\nBoth are the so-called cluster \"raw space\". As the data is usually written redundantly in a cluster, the effective space available/remaining for users may be significantly smaller. The actual ratio depends on the defined redundancy level and replication means chosen (copies vs. erasure coding)."
+	},
+	"st_card_health": {
+		"severity": "Help",
+		"title": "Health status of hardware and data",
+		"description": "<ul><li><strong>Data</strong>: indicates stored data health status. It shows either <em>Normal</em> or percentage of missing, endangered, or undergoal chunks. Click it for details.</li></ul>\n<ul><li><strong>Servers</strong>: indicates the health status of the cluster servers. It shows either <em>Normal</em> or number of servers in abnormal state. Abnormal servers are marked below with an orange (warning) or red (error) dot. Click them for further details.</li></ul>"
+	},
+	"st_card_performance": {
+		"severity": "Help",
+		"title": "Performance of the cluster, the last 60 minutes.",
+		"description": "<ul><li><strong>Outbound</strong>: outgoing user data traffic from the cluster, average read throughput.</li></ul>\n<ul><li><strong>Inbound</strong>: incoming user data traffic to the cluster, average write throughput.</li></ul>\nOutbound and inbound refer to the raw user data traffic, excluding all data management overhead and internal cluster traffic.\n<ul><li><strong>R/W ops</strong>: the average number of all clients read and write operations per second.</li></ul>\n<ul><li><strong>All ops</strong>: the average number of all clients low level file operations (read, lookup, getattr, etc.) per second, see Mounts/Operations for details.</li></ul>"
+	},
+	"st_card_usage": {
+		"severity": "Help",
+		"title": "The cluster's usage statistics.",
+		"description": "<ul><li><strong>Files</strong>: the total number of files stored in the cluster.</li></ul>\n<ul><li><strong>Folders</strong>: the total number of folders stored in the cluster.</li></ul>\n<ul><li><strong>Mounts</strong>: the total number of active client connections to the cluster.</li></ul>\n<ul><li><strong>Trash size</strong>: the total size of data stored in the cluster global trash.</li></ul>"
+	},
+	"st_card_licence": {
+		"severity": "Help",
+		"title": "The license utilization.",
+		"description": "The total and left license size. The license size refers to the (used) raw data size, i.e., data after required duplications. It is usually larger than the user data size as most of the data is redundant."
+	},
+	"sc_mintrashretention_unnecessary": {
+		"severity": "Warning",
+		"title": "Unnecessary min trash retention time definition",
+		"description": "This parameter is a number that tells what the minimum trash retention time a file must have so that the system converts its chunks to TRASH state after deleting this file. Introduced to avoid unnecessary changing of chunk states (and therefore physical copying of data) that are to be kept in trash for a very short time. If the TRASH state is not defined, this parameter has no effect.",
+		"solution": "If you want to use this parameter, you should explicitly define the TRASH storage class. If you do not want to use the min trash retention parameter, we suggest to set it to 0."
+	},
+	"sc_mintrashretention_na": {
+		"severity": "Info",
+		"title": "This parameter is not applicable here because the TRASH state is not defined for this storage class."
+	},
+	"sc_mintrashretention0": {
+		"severity": "Info",
+		"title": "Transition to TRASH state will be performed regardless of the file's trash retention time"
+	},
+	"sc_arch_delay0": {
+		"severity": "Info",
+		"title": "Transition to ARCHIVE state doesn't depend on file (creation, modification or access) time"
+	},
+	"sc_arch_min_size0": {
+		"severity": "Info",
+		"title": "Transition to ARCHIVE state doesn't depend on file size"
+	},
+	"sc_achievable_overloaded": {
+		"severity": "Warning",
+		"title": "State is not fully achievable",
+		"description": "The cluster can keep chunks in this state provided that Chunkservers that are in maintenance mode or overloaded are used. The cluster will not normally create new chunks or rebalance on such servers."
+	},
+	"sc_achievable_nospace": {
+		"severity": "Warning",
+		"title": "State is not achievable",
+		"description": "The cluster cannot store data in this state because the disks of the Chunkservers (designated to store data in this state) are full.",
+		"solution": "You may change designated Chunkservers (labels) or remove some data from the cluster. Do not leave this warning unaddressed as your data integrity may be at risk."
+	},
+	"sc_achievable_keeponly": {
+		"severity": "Warning",
+		"title": "State is not fully achievable",
+		"description": "There are enough Chunkservers available (>x+n) to hold existing data in the specified format EC x+n, but not enough to store new data in this format. Creating new EC x+n chunks requires at least x+2*n available Chunkservers.",
+		"solution": "Add (or assign to appropriate labels) new Chunkservers or consider reducing the target redundancy level of this state. Do not leave this warning unaddressed as the copies will not be converted to EC format, leading to faster space utilization on the cluster."
+	},
+	"sc_achievable_no": {
+		"severity": "Error",
+		"title": "State is not achievable",
+		"description": "There are not enough Chunkservers available (or not enough Chunkservers have been assigned to the appropriate labels) to write data at the redundancy level indicated in this state. No data will be written to the desired redundancy level in this state.",
+		"solution": "Add (or assign to the appropriate labels) new Chunkservers or consider reducing the target redundancy level of this state."
+	},
+	"sc_deficient_chunks_same_format": {
+		"severity": "Info",
+		"title": "Redundancy level is lower than requested",
+		"description": "The redundancy level of the chunks is lower than the one requested in the storage class (state) definition. It may be normal behavior if chunks just changed their state (e.g., KEEP->ARCHIVE) and the latter state has a higher redundancy level: it takes some time to create additional redundant data. However, this may be due to the lack of available Chunkservers or the lack of Chunkservers assigned to the appropriate labels. Note: deficiency may be undergoal, endangered, or missing chunks. Check the data health status.",
+		"solution": "If this is not due to the ordinary state transition: add (or assign to the appropriate labels) new Chunkservers or consider reducing the target redundancy level of this state. Do not leave this warning unaddressed as the data may be at risk."
+	},
+	"sc_deficient_chunks_ec_as_copy": {
+		"severity": "Info",
+		"title": "Redundancy level is lower than requested and chunks requested in EC format are still stored as copies",
+		"description": "The redundancy level of the chunks is lower than the one requested in the storage class (state) definition. However, it may be normal behavior as the chunks requested in EC format are still stored as copies. This is because it takes some time to calculate chunks' parity parts (EC) from copies - where they were kept in the KEEP state. Under normal circumstances, this number should be relatively low. Large numbers may appear if there is a lot of data waiting to be converted from copy to EC, e.g. after adding new data or after changing the storage class definition. Wait until the system automatically converts the copies to EC format.",
+		"solution": "Wait for the system to calculate parity parts if it comes to simply moving copies to EC. However, we recommend checking the health of the data (see the Info tab)."
+	},
+	"sc_deficient_chunks_copy_as_ec": {
+		"severity": "Info",
+		"title": "Redundancy level is lower than requested and chunks requested to be stored as copies are still in EC format",
+		"description": "The redundancy level of the chunks is lower than the one requested in the storage class (state) definition. Usually, it should not take place unless this class is 'reversible'. The other reason may be: changing the storage class definition, possible Chunkserver failure or wrong label assignment.",
+		"solution": "Wait until the system automatically converts the EC to copy format. Regardless, we recommend checking the health of the data (see the Info tab)."
+	},
+	"sc_ec_as_copy": {
+		"severity": "Info",
+		"title": "Chunks requested in EC format are still stored as copies",
+		"description": "It takes some time to calculate chunks' parity parts (EC) from copies - where they were kept in the KEEP state. Under normal circumstances, this number should be relatively low. Large numbers may appear if there is a lot of data waiting to be converted from copy to EC, e.g. after adding new data or after changing the storage class definition. Wait until the system automatically converts the copies to EC format."
+	},
+	"sc_copy_as_ec": {
+		"severity": "Info",
+		"title": "Chunks requested to be stored as copies are still in EC format",
+		"description": "It takes some time to calculate chunks' copies from EC.  It should not take place unless this class is 'reversible' or the storage class definition changed. Wait until the system automatically converts the EC to copy format."
+	},
+	"info_general_misc": {
+		"severity": "Help",
+		"title": "Miscellaneous general information about the cluster and its master server",
+		"unit": "misc"
+	},
+	"info_general_pro": {
+		"severity": "Help",
+		"title": "Indicates if MooseFS instance is in PRO version",
+		"unit": "bool"
+	},
+	"info_general_memory_usage": {
+		"severity": "Help",
+		"title": "The leader master server memory usage",
+		"unit": "bytes"
+	},
+	"info_general_cpu_usage_percent": {
+		"severity": "Help",
+		"title": "Overall CPU usage percentage",
+		"unit": "percent"
+	},
+	"info_general_cpu_system_percent": {
+		"severity": "Help",
+		"title": "CPU usage percentage used by the system",
+		"unit": "percent"
+	},
+	"info_general_cpu_user_percent": {
+		"severity": "Help",
+		"title": "CPU usage percentage used by user processes",
+		"unit": "percent"
+	},
+	"info_general_total_space": {
+		"severity": "Help",
+		"title": "Total available storage space",
+		"unit": "bytes"
+	},
+	"info_general_avail_space": {
+		"severity": "Help",
+		"title": "Available storage space",
+		"unit": "bytes"
+	},
+	"info_general_free_space": {
+		"severity": "Help",
+		"title": "Free storage space",
+		"unit": "bytes"
+	},
+	"info_general_trash_space": {
+		"severity": "Help",
+		"title": "Space occupied by files in the trash",
+		"unit": "bytes"
+	},
+	"info_general_trash_files": {
+		"severity": "Help",
+		"title": "Number of files in the trash",
+		"unit": "qty"
+	},
+	"info_general_sustained_space": {
+		"severity": "Help",
+		"title": "Storage space occupied by sustained files (open files that were deleted)",
+		"unit": "bytes"
+	},
+	"info_general_sustained_files": {
+		"severity": "Help",
+		"title": "Number of sustained files (open files that were deleted)",
+		"unit": "bytes"
+	},
+	"info_general_filesystem_objects": {
+		"severity": "Help",
+		"title": "Total number of objects (files and directories)",
+		"unit": "qty"
+	},
+	"info_general_directories": {
+		"severity": "Help",
+		"title": "Number of directories",
+		"unit": "qty"
+	},
+	"info_general_files": {
+		"severity": "Help",
+		"title": "Number of files",
+		"unit": "qty"
+	},
+	"info_general_chunks": {
+		"severity": "Help",
+		"title": "Total number of data chunks",
+		"unit": "qty"
+	},
+	"info_general_copy_chunks": {
+		"severity": "Help",
+		"title": "Number of replicated (copy) chunks",
+		"unit": "qty"
+	},
+	"info_general_ec8_chunks": {
+		"severity": "Help",
+		"title": "Number of erasure-coded chunks using EC8",
+		"unit": "qty"
+	},
+	"info_general_ec4_chunks": {
+		"severity": "Help",
+		"title": "Number of erasure-coded chunks using EC4",
+		"unit": "qty"
+	},
+	"info_general_full_chunk_copies": {
+		"severity": "Help",
+		"title": "Number of full copies of chunks",
+		"unit": "qty"
+	},
+	"info_general_ec8_chunk_parts": {
+		"severity": "Help",
+		"title": "Number of parts of chunks using EC8",
+		"unit": "qty"
+	},
+	"info_general_ec4_chunk_parts": {
+		"severity": "Help",
+		"title": "Number of parts of chunks using EC4",
+		"unit": "qty"
+	},
+	"info_general_hypothetical_chunk_copies": {
+		"severity": "Help",
+		"title": "Estimated number of needed chunk copies",
+		"unit": "qty"
+	},
+	"info_general_ec_bytes_saved": {
+		"severity": "Help",
+		"title": "Number of bytes saved due to erasure coding",
+		"unit": "qty"
+	},
+	"info_general_redundancy_ratio": {
+		"severity": "Help",
+		"title": "The redundancy level of data storage",
+		"unit": "float"
+	},
+	"info_general_chunks_in_ec_percent": {
+		"severity": "Help",
+		"title": "Percentage of chunks stored using erasure coding",
+		"unit": "percent"
+	},
+	"info_general_last_metadata_save_time": {
+		"severity": "Help",
+		"title": "Timestamp of the last metadata save",
+		"unit": "timestamp"
+	},
+	"info_general_last_metadata_save_duration": {
+		"severity": "Help",
+		"title": "Duration of the last metadata save"
+	},
+	"info_general_last_metadata_save_status": {
+		"severity": "Help",
+		"title": "Status of the last metadata save operation"
+	},
+	"info_masters_misc": {
+		"severity": "Help",
+		"title": "Miscellaneous master server information",
+		"unit": "misc"
+	},
+	"info_masters_pro": {
+		"severity": "Help",
+		"title": "Indicates if master server is in PRO version",
+		"unit": "bool"
+	},
+	"info_masters_localtime": {
+		"severity": "Help",
+		"title": "Current local time on the master server",
+		"unit": "timestamp"
+	},
+	"info_masters_metadata_version": {
+		"severity": "Help",
+		"title": "Current metadata version on the master server",
+		"unit": "int"
+	},
+	"info_masters_metadata_id": {
+		"severity": "Help",
+		"title": "Unique metadata ID on the master server",
+		"unit": "int"
+	},
+	"info_masters_metadata_delay": {
+		"severity": "Help",
+		"title": "The delay of matadata on the FOLLOWER master server comparing to the LEADER"
+	},
+	"info_masters_memory_usage": {
+		"severity": "Help",
+		"title": "Memory usage of the master server",
+		"unit": "bytes"
+	},
+	"info_masters_cpu_usage_percent": {
+		"severity": "Help",
+		"title": "Total CPU usage percentage of the master server",
+		"unit": "percent"
+	},
+	"info_masters_cpu_system_percent": {
+		"severity": "Help",
+		"title": "CPU usage percentage used by the system",
+		"unit": "percent"
+	},
+	"info_masters_cpu_user_percent": {
+		"severity": "Help",
+		"title": "CPU usage percentage used by user processes",
+		"unit": "percent"
+	},
+	"info_masters_last_metadata_save_time": {
+		"severity": "Help",
+		"title": "Timestamp of the last metadata save operation",
+		"unit": "timestamp"
+	},
+	"info_masters_last_metadata_save_duration": {
+		"severity": "Help",
+		"title": "Duration of the last metadata save"
+	},
+	"info_masters_last_metadata_save_status": {
+		"severity": "Help",
+		"title": "Status of the last metadata save"
+	},
+	"info_masters_last_metadata_save_version": {
+		"severity": "Help",
+		"title": "Metadata version used in the last save",
+		"unit": "int"
+	},
+	"info_masters_exports_checksum": {
+		"severity": "Help",
+		"title": "Checksum of the server's <code>mfsexports.cfg</code> file",
+		"description": "All master servers should have the same configuration of exports. This configuration is kept in the <code>mfsexports.cfg</code> file - individually for each server. There is the checksum of this file presented, for you to check if those files are the same. Note: file comments are not accounted for calculating the checksum.",
+		"unit": "int"
+	},
+	"info_licence_misc": {
+		"severity": "Help",
+		"title": "Miscellaneous license-related information",
+		"unit": "misc"
+	},
+	"info_licence_max_raw_data_usage": {
+		"severity": "Help",
+		"title": "Maximum raw data usage allowed by the license",
+		"unit": "qty"
+	},
+	"info_licence_current_raw_data_usage": {
+		"severity": "Help",
+		"title": "Current raw data usage",
+		"unit": "qty"
+	},
+	"info_chunks_misc": {
+		"severity": "Help",
+		"title": "Miscellaneous chunk-related information",
+		"unit": "misc"
+	},
+	"info_chunks_summary_allchunks_missing": {
+		"severity": "Help",
+		"title": "Total number of missing chunks",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_endangered": {
+		"severity": "Help",
+		"title": "Chunks at risk of loss due to low redundancy",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_undergoal": {
+		"severity": "Help",
+		"title": "Chunks that do not meet the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_stable": {
+		"severity": "Help",
+		"title": "Chunks that meet the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_overgoal": {
+		"severity": "Help",
+		"title": "Chunks that exceed the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_pending_deletion": {
+		"severity": "Help",
+		"title": "Chunks awaiting deletion",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ready_to_remove": {
+		"severity": "Help",
+		"title": "Chunks ready for removal",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_missing": {
+		"severity": "Help",
+		"title": "Missing regular space chunks",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_endangered": {
+		"severity": "Help",
+		"title": "Regular space chunks at risk due to low redundancy",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_undergoal": {
+		"severity": "Help",
+		"title": "Regular space chunks below the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_stable": {
+		"severity": "Help",
+		"title": "Regular space chunks meeting the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_overgoal": {
+		"severity": "Help",
+		"title": "Regular space chunks exceeding the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_pending_deletion": {
+		"severity": "Help",
+		"title": "Regular space chunks awaiting deletion",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ready_to_remove": {
+		"severity": "Help",
+		"title": "Regular space chunks ready for removal",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_copies_missing": {
+		"severity": "Help",
+		"title": "Total number of missing chunk copies",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_copies_endangered": {
+		"severity": "Help",
+		"title": "Chunk copies that are at risk due to low redundancy",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_copies_undergoal": {
+		"severity": "Help",
+		"title": "Chunk copies below the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_copies_stable": {
+		"severity": "Help",
+		"title": "Chunk copies meeting the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_copies_overgoal": {
+		"severity": "Help",
+		"title": "Chunk copies exceeding the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_copies_pending_deletion": {
+		"severity": "Help",
+		"title": "Chunks copies scheduled for deletion",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_copies_ready_to_remove": {
+		"severity": "Help",
+		"title": "Chunk copies ready for removal",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_copies_missing": {
+		"severity": "Help",
+		"title": "Missing chunk copies in regular space",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_copies_endangered": {
+		"severity": "Help",
+		"title": "Chunk copies in regular space at risk due to low redundancy",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_copies_undergoal": {
+		"severity": "Help",
+		"title": "Chunk copies in regular space below the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_copies_stable": {
+		"severity": "Help",
+		"title": "Regular space chunk copies meeting the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_copies_overgoal": {
+		"severity": "Help",
+		"title": "Regular space chunk copies exceeding the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_copies_pending_deletion": {
+		"severity": "Help",
+		"title": "Regular space chunk copies marked for deletion",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_copies_ready_to_remove": {
+		"severity": "Help",
+		"title": "Regular space chunk copies ready for removal",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec8_missing": {
+		"severity": "Help",
+		"title": "Missing EC8-encoded chunks",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec8_endangered": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks at risk due to low redundancy",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec8_undergoal": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks below the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec8_stable": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks meeting the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec8_overgoal": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks exceeding the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec8_pending_deletion": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks marked for deletion",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec8_ready_to_remove": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks ready for removal",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec8_missing": {
+		"severity": "Help",
+		"title": "Missing EC8-encoded chunks in regular space",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec8_endangered": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks in regular space at risk due to low redundancy",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec8_undergoal": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks in regular space below the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec8_stable": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks in regular space meeting the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec8_overgoal": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks in regular space exceeding the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec8_pending_deletion": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks in regular space marked for deletion",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec8_ready_to_remove": {
+		"severity": "Help",
+		"title": "EC8-encoded chunks in regular space ready for removal",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec4_missing": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks that are missing",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec4_endangered": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks at risk due to low redundancy",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec4_undergoal": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks below the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec4_stable": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks meeting the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec4_overgoal": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks exceeding the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec4_pending_deletion": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks marked for deletion",
+		"unit": "qty"
+	},
+	"info_chunks_summary_allchunks_ec4_ready_to_remove": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks ready for removal",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec4_missing": {
+		"severity": "Help",
+		"title": "Missing EC4-encoded chunks in regular space",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec4_endangered": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks in regular space at risk due to low redundancy",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec4_undergoal": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks in regular space below the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec4_stable": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks in regular space meeting the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec4_overgoal": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks in regular space exceeding the required redundancy level",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec4_pending_deletion": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks in regular space marked for deletion",
+		"unit": "qty"
+	},
+	"info_chunks_summary_regularchunks_ec4_ready_to_remove": {
+		"severity": "Help",
+		"title": "EC4-encoded chunks in regular space ready for removal",
+		"unit": "qty"
+	},
+	"info_fs_loop_misc": {
+		"severity": "Help",
+		"title": "Miscellaneous file loop information",
+		"unit": "misc"
+	},
+	"info_fs_loop_start_time": {
+		"severity": "Help",
+		"title": "Start time of the file loop",
+		"unit": "timestamp"
+	},
+	"info_fs_loop_end_time": {
+		"severity": "Help",
+		"title": "End time of the file loop",
+		"unit": "timestamp"
+	},
+	"info_fs_loop_files": {
+		"severity": "Help",
+		"title": "Number of files scanned in file loop",
+		"unit": "qty"
+	},
+	"info_fs_loop_undergoal_files": {
+		"severity": "Help",
+		"title": "Number of files found in the file loop that do not meet the redundancy level",
+		"unit": "qty"
+	},
+	"info_fs_loop_missing_files": {
+		"severity": "Help",
+		"title": "Number of missing files found in the file loop",
+		"unit": "qty"
+	},
+	"info_fs_loop_missing_trash_files": {
+		"severity": "Help",
+		"title": "Number of missing files in the trash found in the file loop",
+		"unit": "qty"
+	},
+	"info_fs_loop_missing_sustained_files": {
+		"severity": "Help",
+		"title": "Number of missing open files marked for removal found in the file loop",
+		"unit": "qty"
+	},
+	"info_fs_loop_chunks": {
+		"severity": "Help",
+		"title": "Total number of chunks scanned during the file loop",
+		"unit": "qty"
+	},
+	"info_fs_loop_undergoal_chunks": {
+		"severity": "Help",
+		"title": "Chunks that are below the required redundancy level found in the file loop",
+		"unit": "qty"
+	},
+	"info_fs_loop_missing_chunks": {
+		"severity": "Help",
+		"title": "Chunks detected as missing during the file loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_start_time": {
+		"severity": "Help",
+		"title": "Start time of the chunk loop",
+		"unit": "timestamp"
+	},
+	"info_chunk_loop_end_time": {
+		"severity": "Help",
+		"title": "End time of the chunk loop",
+		"unit": "timestamp"
+	},
+	"info_chunk_loop_fixed_chunks": {
+		"severity": "Help",
+		"title": "Number of chunks that were repaired during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_forced_keep": {
+		"severity": "Help",
+		"title": "Number of chunks that were forced to be in KEEP state",
+		"unit": "qty"
+	},
+	"info_chunk_loop_locked_unused": {
+		"severity": "Help",
+		"title": "Chunks that are locked but currently not in use found during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_locked_used": {
+		"severity": "Help",
+		"title": "Chunks that are locked and actively used found during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_del_invalid_copies": {
+		"severity": "Help",
+		"title": "Chunk copies that were deleted because they were invalid found during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_del_no_longer_needed": {
+		"severity": "Help",
+		"title": "Chunks that were deleted during the chunk loop because they were no longer required",
+		"unit": "qty"
+	},
+	"info_chunk_loop_del_wrong_version": {
+		"severity": "Help",
+		"title": "Chunks deleted during the chunk loop due to version mismatch",
+		"unit": "qty"
+	},
+	"info_chunk_loop_del_duplicate_ecpart": {
+		"severity": "Help",
+		"title": "Erasure-coded chunk parts that were deleted during the chunk loop due to duplication",
+		"unit": "qty"
+	},
+	"info_chunk_loop_del_excess_ecpart": {
+		"severity": "Help",
+		"title": "Excess erasure-coded chunk parts that were deleted during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_del_excess_copy": {
+		"severity": "Help",
+		"title": "Excess chunk copies that were deleted during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_del_mfr_ecpart": {
+		"severity": "Help",
+		"title": "Erasure-coded chunk parts that were deleted during the chunk loop due to disk marked for removal",
+		"unit": "qty"
+	},
+	"info_chunk_loop_del_mfr_copy": {
+		"severity": "Help",
+		"title": "Chunk copies that were deleted during the chunk loop due to disk marked for removal",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_dupserver_ecpart": {
+		"severity": "Help",
+		"title": "Erasure-coded chunk parts replicated during the chunk loop due to duplicate servers",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_needed_ecpart": {
+		"severity": "Help",
+		"title": "Erasure-coded chunk parts replicated during the chunk loop to meet redundancy requirements",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_needed_copy": {
+		"severity": "Help",
+		"title": "Chunk copies replicated during the chunk loop to maintain replication goals",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_wronglabels_ecpart": {
+		"severity": "Help",
+		"title": "Erasure-coded chunk parts replicated during the chunk loop due to incorrect labeling",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_wronglabels_copy": {
+		"severity": "Help",
+		"title": "Chunk copies replicated during the chunk loop due to incorrect labeling",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_split_copy_into_ecparts": {
+		"severity": "Help",
+		"title": "Chunk copies split into erasure-coded parts during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_join_ecparts_into_copy": {
+		"severity": "Help",
+		"title": "Erasure-coded parts joined into chunk copies during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_recover_ecpart": {
+		"severity": "Help",
+		"title": "Erasure-coded parts recovered during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_calculate_ecchksum": {
+		"severity": "Help",
+		"title": "Erasure-coded checksums calculated during the chunk loop",
+		"unit": "qty"
+	},
+	"info_chunk_loop_rep_replicate_rebalance": {
+		"severity": "Help",
+		"title": "Chunk copies replicated for rebalancing purposes",
+		"unit": "qty"
+	},
+	"chunkservers_misc": {
+		"severity": "Help",
+		"title": "Miscellaneous information about connected chunkserver",
+		"unit": "misc"
+	},
+	"chunkservers_connected": {
+		"severity": "Help",
+		"title": "Indicates if the chunkserver is currently connected",
+		"unit": "bool"
+	},
+	"chunkservers_pro": {
+		"severity": "Help",
+		"title": "Indicates if the chunkserver is in PRO version",
+		"unit": "bool"
+	},
+	"chunkservers_flags": {
+		"severity": "Help",
+		"title": "Chunkserver flags",
+		"unit": "int"
+	},
+	"chunkservers_port": {
+		"severity": "Help",
+		"title": "Port used by the chunkserver",
+		"unit": "int"
+	},
+	"chunkservers_csid": {
+		"severity": "Help",
+		"title": "Unique identifier of the chunkserver",
+		"unit": "int"
+	},
+	"chunkservers_errors": {
+		"severity": "Help",
+		"title": "Number of reported errors for the chunkserver",
+		"unit": "qty"
+	},
+	"chunkservers_load": {
+		"severity": "Help",
+		"title": "Current load of the chunkserver"
+	},
+	"chunkservers_queue": {
+		"severity": "Help",
+		"title": "Number of tasks in the chunkserver's queue",
+		"unit": "qty"
+	},
+	"chunkservers_queue_state": {
+		"severity": "Help",
+		"title": "State of the chunkserver's queue",
+		"unit": "int"
+	},
+	"chunkservers_hdd_regular_used": {
+		"severity": "Help",
+		"title": "Used space on HDD regular space",
+		"unit": "bytes"
+	},
+	"chunkservers_hdd_regular_total": {
+		"severity": "Help",
+		"title": "Total capacity of HDD regular space",
+		"unit": "bytes"
+	},
+	"chunkservers_hdd_regular_free": {
+		"severity": "Help",
+		"title": "Available space on HDD regular space",
+		"unit": "bytes"
+	},
+	"chunkservers_hdd_regular_used_percent": {
+		"severity": "Help",
+		"title": "Percentage of used space on HDD regular space",
+		"unit": "percent"
+	},
+	"chunkservers_hdd_regular_chunks": {
+		"severity": "Help",
+		"title": "Number of chunks stored on HDD regular space",
+		"unit": "qty"
+	},
+	"chunkservers_hdd_removal_used": {
+		"severity": "Help",
+		"title": "Space used on HDDs designated for removal",
+		"unit": "bytes"
+	},
+	"chunkservers_hdd_removal_total": {
+		"severity": "Help",
+		"title": "Total capacity of HDDs marked for removal",
+		"unit": "bytes"
+	},
+	"chunkservers_hdd_removal_free": {
+		"severity": "Help",
+		"title": "Available space on HDDs marked for removal",
+		"unit": "bytes"
+	},
+	"chunkservers_hdd_removal_used_percent": {
+		"severity": "Help",
+		"title": "Percentage of used space on HDDs marked for removal",
+		"unit": "percent"
+	},
+	"chunkservers_hdd_removal_chunks": {
+		"severity": "Help",
+		"title": "Number of chunks stored on HDDs marked for removal",
+		"unit": "qty"
+	},
+	"disks_misc": {
+		"severity": "Help",
+		"title": "Miscellaneous disk-related information",
+		"unit": "misc"
+	},
+	"disks_port": {
+		"severity": "Help",
+		"title": "Network port used for disk communication",
+		"unit": "int"
+	},
+	"disks_chunks": {
+		"severity": "Help",
+		"title": "Number of chunks stored on the disk",
+		"unit": "qty"
+	},
+	"disks_flags": {
+		"severity": "Help",
+		"title": "Flags indicating the state of the disk",
+		"unit": "int"
+	},
+	"disks_mfrstatus": {
+		"severity": "Help",
+		"title": "Indicates if the disk is marked for removal",
+		"unit": "bool"
+	},
+	"disks_last_error_time": {
+		"severity": "Help",
+		"title": "Timestamp of the last disk error",
+		"unit": "timestamp"
+	},
+	"disks_last_error_chunkid": {
+		"severity": "Help",
+		"title": "ID of the last chunk that caused an error",
+		"unit": "int"
+	},
+	"disks_scan_progress": {
+		"severity": "Help",
+		"title": "Progress percentage of the disk scan",
+		"unit": "percent"
+	},
+	"disks_used": {
+		"severity": "Help",
+		"title": "Used disk space",
+		"unit": "bytes"
+	},
+	"disks_total": {
+		"severity": "Help",
+		"title": "Total disk capacity",
+		"unit": "bytes"
+	},
+	"disks_used_percent": {
+		"severity": "Help",
+		"title": "Percentage of disk space used",
+		"unit": "percent"
+	},
+	"gui_dark_mode": {
+		"severity": "Help",
+		"title": "Switch between light and dark mode"
+	},
+	"gui_refresh_switch": {
+		"severity": "Help",
+		"title": "Switch between auto and manual refresh"
+	},
+	"gui_refresh_manual": {
+		"severity": "Help",
+		"title": "Click 'Refresh' to refresh the page manually"
+	},
+	"gui_refresh_timestamp": {
+		"severity": "Help",
+		"title": "Time of the last refresh"
+	},
+	"gui_instance_name": {
+		"severity": "Help",
+		"title": "Name of the MooseFS cluster instance"
+	}
+}

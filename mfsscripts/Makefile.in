@@ -104,8 +104,7 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES = mfscli.py chart.cgi chartdata.cgi index.html \
-	mfscgiserv.py
+CONFIG_CLEAN_FILES = chart.cgi chartdata.cgi
 CONFIG_CLEAN_VPATH_FILES =
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -133,10 +132,9 @@ am__uninstall_files_from_dir = { \
   || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
        $(am__cd) "$$dir" && echo $$files | $(am__xargs_n) 40 $(am__rm_f); }; \
   }
-am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(cgibindir)" \
-	"$(DESTDIR)$(cgiservdir)" "$(DESTDIR)$(cgidatadir)"
-SCRIPTS = $(nodist_bin_SCRIPTS) $(nodist_cgibin_SCRIPTS) \
-	$(nodist_cgiserv_SCRIPTS)
+am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(cgidir)" \
+	"$(DESTDIR)$(cgidir)"
+SCRIPTS = $(nodist_bin_SCRIPTS) $(nodist_cgi_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -156,11 +154,10 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-DATA = $(cgidata_DATA)
+DATA = $(cgi_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/chart.cgi.in \
-	$(srcdir)/chartdata.cgi.in $(srcdir)/index.html.in \
-	$(srcdir)/mfscgiserv.py.in $(srcdir)/mfscli.py.in
+	$(srcdir)/chartdata.cgi.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -175,15 +172,15 @@ CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CGIDIR = @CGIDIR@
-CGISERVDIR = @CGISERVDIR@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
 CTAGS = @CTAGS@
 CYGPATH_W = @CYGPATH_W@
 DATA_PATH = @DATA_PATH@
-DEFAULT_CGISERV_HTTP_PORT = @DEFAULT_CGISERV_HTTP_PORT@
+DEFAULT_CGIDIR = @DEFAULT_CGIDIR@
 DEFAULT_CS_DATA_PORT = @DEFAULT_CS_DATA_PORT@
 DEFAULT_GROUP = @DEFAULT_GROUP@
+DEFAULT_GUI_HTTP_PORT = @DEFAULT_GUI_HTTP_PORT@
 DEFAULT_MASTERNAME = @DEFAULT_MASTERNAME@
 DEFAULT_MASTER_CLIENT_PORT = @DEFAULT_MASTER_CLIENT_PORT@
 DEFAULT_MASTER_CONTROL_PORT = @DEFAULT_MASTER_CONTROL_PORT@
@@ -325,32 +322,17 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-cgibindir = $(CGIDIR)
-cgidatadir = $(CGIDIR)
-cgiservdir = $(CGISERVDIR)
-@INSTALL_CGI_TRUE@nodist_cgibin_SCRIPTS = \
-@INSTALL_CGI_TRUE@	chart.cgi \
-@INSTALL_CGI_TRUE@	chartdata.cgi
+cgidir = $(CGIDIR)
+@INSTALL_CGI_TRUE@nodist_cgi_SCRIPTS = chart.cgi chartdata.cgi
+@INSTALL_CGI_TRUE@cgi_DATA = requests.cfg
 
-@INSTALL_CGI_TRUE@cgidata_DATA = \
-@INSTALL_CGI_TRUE@	err.gif \
-@INSTALL_CGI_TRUE@	index.html \
-@INSTALL_CGI_TRUE@	logo.svg \
-@INSTALL_CGI_TRUE@	logopro.svg \
-@INSTALL_CGI_TRUE@	favicon.ico \
-@INSTALL_CGI_TRUE@	cgiscripts.js \
-@INSTALL_CGI_TRUE@	acidtab.js \
-@INSTALL_CGI_TRUE@	acidchart.js \
-@INSTALL_CGI_TRUE@	mfsgraph.py \
-@INSTALL_CGI_TRUE@	mfs.css
+# List of cgi subdirectories to be deployed
+@INSTALL_CGI_TRUE@cgisubdirs = common views assets
+EXTRA_DIST = mfscli.py mfsgui.py chart.cgi.in chartdata.cgi.in \
+	requests.cfg \
+	common views assets
 
-EXTRA_DIST = mfscli.py.in mfsgraph.py chart.cgi.in chartdata.cgi.in mfscgiserv.py.in index.html.in err.gif logo.svg logopro.svg favicon.ico cgiscripts.js acidtab.js acidchart.js mfs.css
-@INSTALL_CLI_TRUE@nodist_bin_SCRIPTS = \
-@INSTALL_CLI_TRUE@	mfscli
-
-@INSTALL_CGISERV_TRUE@nodist_cgiserv_SCRIPTS = \
-@INSTALL_CGISERV_TRUE@	mfscgiserv
-
+@INSTALL_CLI_TRUE@nodist_bin_SCRIPTS = mfscli
 all: all-am
 
 .SUFFIXES:
@@ -383,15 +365,9 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-mfscli.py: $(top_builddir)/config.status $(srcdir)/mfscli.py.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 chart.cgi: $(top_builddir)/config.status $(srcdir)/chart.cgi.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 chartdata.cgi: $(top_builddir)/config.status $(srcdir)/chartdata.cgi.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-index.html: $(top_builddir)/config.status $(srcdir)/index.html.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
-mfscgiserv.py: $(top_builddir)/config.status $(srcdir)/mfscgiserv.py.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 install-nodist_binSCRIPTS: $(nodist_bin_SCRIPTS)
 	@$(NORMAL_INSTALL)
@@ -428,12 +404,12 @@ uninstall-nodist_binSCRIPTS:
 	files=`for p in $$list; do echo "$$p"; done | \
 	       sed -e 's,.*/,,;$(transform)'`; \
 	dir='$(DESTDIR)$(bindir)'; $(am__uninstall_files_from_dir)
-install-nodist_cgibinSCRIPTS: $(nodist_cgibin_SCRIPTS)
+install-nodist_cgiSCRIPTS: $(nodist_cgi_SCRIPTS)
 	@$(NORMAL_INSTALL)
-	@list='$(nodist_cgibin_SCRIPTS)'; test -n "$(cgibindir)" || list=; \
+	@list='$(nodist_cgi_SCRIPTS)'; test -n "$(cgidir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(cgibindir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(cgibindir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(cgidir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(cgidir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
@@ -452,79 +428,44 @@ install-nodist_cgibinSCRIPTS: $(nodist_cgibin_SCRIPTS)
 	while read type dir files; do \
 	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
 	     test -z "$$files" || { \
-	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(cgibindir)$$dir'"; \
-	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(cgibindir)$$dir" || exit $$?; \
+	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(cgidir)$$dir'"; \
+	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(cgidir)$$dir" || exit $$?; \
 	     } \
 	; done
 
-uninstall-nodist_cgibinSCRIPTS:
+uninstall-nodist_cgiSCRIPTS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(nodist_cgibin_SCRIPTS)'; test -n "$(cgibindir)" || exit 0; \
+	@list='$(nodist_cgi_SCRIPTS)'; test -n "$(cgidir)" || exit 0; \
 	files=`for p in $$list; do echo "$$p"; done | \
 	       sed -e 's,.*/,,;$(transform)'`; \
-	dir='$(DESTDIR)$(cgibindir)'; $(am__uninstall_files_from_dir)
-install-nodist_cgiservSCRIPTS: $(nodist_cgiserv_SCRIPTS)
-	@$(NORMAL_INSTALL)
-	@list='$(nodist_cgiserv_SCRIPTS)'; test -n "$(cgiservdir)" || list=; \
-	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(cgiservdir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(cgiservdir)" || exit 1; \
-	fi; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  if test -f "$$d$$p"; then echo "$$d$$p"; echo "$$p"; else :; fi; \
-	done | \
-	sed -e 'p;s,.*/,,;n' \
-	    -e 'h;s|.*|.|' \
-	    -e 'p;x;s,.*/,,;$(transform)' | sed 'N;N;N;s,\n, ,g' | \
-	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1; } \
-	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
-	    if ($$2 == $$4) { files[d] = files[d] " " $$1; \
-	      if (++n[d] == $(am__install_max)) { \
-		print "f", d, files[d]; n[d] = 0; files[d] = "" } } \
-	    else { print "f", d "/" $$4, $$1 } } \
-	  END { for (d in files) print "f", d, files[d] }' | \
-	while read type dir files; do \
-	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
-	     test -z "$$files" || { \
-	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(cgiservdir)$$dir'"; \
-	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(cgiservdir)$$dir" || exit $$?; \
-	     } \
-	; done
-
-uninstall-nodist_cgiservSCRIPTS:
-	@$(NORMAL_UNINSTALL)
-	@list='$(nodist_cgiserv_SCRIPTS)'; test -n "$(cgiservdir)" || exit 0; \
-	files=`for p in $$list; do echo "$$p"; done | \
-	       sed -e 's,.*/,,;$(transform)'`; \
-	dir='$(DESTDIR)$(cgiservdir)'; $(am__uninstall_files_from_dir)
+	dir='$(DESTDIR)$(cgidir)'; $(am__uninstall_files_from_dir)
 
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
-install-cgidataDATA: $(cgidata_DATA)
+install-cgiDATA: $(cgi_DATA)
 	@$(NORMAL_INSTALL)
-	@list='$(cgidata_DATA)'; test -n "$(cgidatadir)" || list=; \
+	@list='$(cgi_DATA)'; test -n "$(cgidir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(cgidatadir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(cgidatadir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(cgidir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(cgidir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(cgidatadir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(cgidatadir)" || exit $$?; \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(cgidir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(cgidir)" || exit $$?; \
 	done
 
-uninstall-cgidataDATA:
+uninstall-cgiDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(cgidata_DATA)'; test -n "$(cgidatadir)" || list=; \
+	@list='$(cgi_DATA)'; test -n "$(cgidir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(cgidatadir)'; $(am__uninstall_files_from_dir)
+	dir='$(DESTDIR)$(cgidir)'; $(am__uninstall_files_from_dir)
 tags TAGS:
 
 ctags CTAGS:
@@ -568,7 +509,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(SCRIPTS) $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(cgibindir)" "$(DESTDIR)$(cgiservdir)" "$(DESTDIR)$(cgidatadir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(cgidir)" "$(DESTDIR)$(cgidir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -622,8 +563,7 @@ info: info-am
 
 info-am:
 
-install-data-am: install-cgidataDATA install-nodist_cgibinSCRIPTS \
-	install-nodist_cgiservSCRIPTS
+install-data-am: install-cgiDATA install-nodist_cgiSCRIPTS
 
 install-dvi: install-dvi-am
 
@@ -668,48 +608,82 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-cgidataDATA uninstall-nodist_binSCRIPTS \
-	uninstall-nodist_cgibinSCRIPTS uninstall-nodist_cgiservSCRIPTS
+uninstall-am: uninstall-cgiDATA uninstall-nodist_binSCRIPTS \
+	uninstall-nodist_cgiSCRIPTS
 
 .MAKE: install-am install-exec-am install-strip
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	clean-local cscopelist-am ctags-am distclean distclean-generic \
 	distclean-libtool distdir dvi dvi-am html html-am info info-am \
-	install install-am install-cgidataDATA install-data \
+	install install-am install-cgiDATA install-data \
 	install-data-am install-dvi install-dvi-am install-exec \
 	install-exec-am install-exec-hook install-html install-html-am \
 	install-info install-info-am install-man \
-	install-nodist_binSCRIPTS install-nodist_cgibinSCRIPTS \
-	install-nodist_cgiservSCRIPTS install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
-	uninstall-am uninstall-cgidataDATA uninstall-nodist_binSCRIPTS \
-	uninstall-nodist_cgibinSCRIPTS uninstall-nodist_cgiservSCRIPTS
+	install-nodist_binSCRIPTS install-nodist_cgiSCRIPTS \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags-am uninstall uninstall-am uninstall-cgiDATA \
+	uninstall-nodist_binSCRIPTS uninstall-nodist_cgiSCRIPTS
 
 .PRECIOUS: Makefile
 
 
-@INSTALL_CGI_TRUE@install-exec-hook: mfscli
-@INSTALL_CGI_TRUE@	if [ ! -d $(DESTDIR)$(cgibindir) ]; then \
-@INSTALL_CGI_TRUE@		$(MKDIR_P) $(DESTDIR)$(cgibindir) ; \
+@INSTALL_CGI_TRUE@install-exec-hook: mfsgui.py
+@INSTALL_CGI_TRUE@	@if [ ! -d $(DESTDIR)$(cgidir) ]; then \
+@INSTALL_CGI_TRUE@		$(MKDIR_P) $(DESTDIR)$(cgidir) ; \
 @INSTALL_CGI_TRUE@	fi
-@INSTALL_CGI_TRUE@	$(INSTALL_SCRIPT) mfscli $(DESTDIR)$(cgibindir)/mfs.cgi
+@INSTALL_CGI_TRUE@	@for dir in $(cgisubdirs); do \
+@INSTALL_CGI_TRUE@		INSTALL_DIR=$(cgidir)/$$dir; \
+@INSTALL_CGI_TRUE@		$(MKDIR_P) $(DESTDIR)$$INSTALL_DIR; \
+@INSTALL_CGI_TRUE@		$(INSTALL) -m 444 $$dir/* $(DESTDIR)$$INSTALL_DIR/; \
+@INSTALL_CGI_TRUE@	done
+@INSTALL_CGI_TRUE@	@rm -f $(DESTDIR)$(cgidir)/common/constants_ac.py.in
+@INSTALL_CGI_TRUE@	$(INSTALL) mfsgui.py $(DESTDIR)$(cgidir)/mfs.cgi
+@INSTALL_CGI_TRUE@	@sed -e "s|#!/usr/bin/env python3|#!/usr/bin/env @PYTHON@|" < $(DESTDIR)$(cgidir)/mfs.cgi > shebang_me.tmp && mv shebang_me.tmp $(DESTDIR)$(cgidir)/mfs.cgi
+@INSTALL_CGI_TRUE@	@chmod a+x $(DESTDIR)$(cgidir)/mfs.cgi
 
-@INSTALL_CGISERV_TRUE@mfscgiserv: mfscgiserv.py
-@INSTALL_CGISERV_TRUE@	@echo "  CONV     mfscgiserv"
-@INSTALL_CGISERV_TRUE@	@sed -e "s#\%\%""CGIDIR""\%\%#$(CGIDIR)#" -e "s#\%\%""DATAPATH""\%\%#$(DATA_PATH)#" < mfscgiserv.py > mfscgiserv
-@INSTALL_CGISERV_TRUE@	@chmod a+x mfscgiserv
-
-mfscli: mfscli.py
+mfscli: mfscli.py common/*.py
 	@echo "  CONV     mfscli"
-	@sed -e "s#\%\%""SBINDIR""\%\%#$(sbindir)#" < mfscli.py > mfscli
+# Create a single mfscli file with all the code in one place:
+#  Read the mfscli.py file and replace the "from folder.filename import *" statements marked with comment #MFS_INLINE_IMPORT
+#  with the content of the corresponding files
+# NOTE: inline import is allowed only for the NON-INTENDED 'from ... import *' statements
+#   Check if the line matches the pattern "from folder.filename import * # MFS_INLINE_IMPORT"
+#   Extract the filename from the matched pattern and replace dots with slashes to treat it as a path and append .py extension
+#   Append the content of the file if the corresponding file exists
+#   Or If the file does not exist, put the original line and echo a warning
+#   If the line does not match the pattern, put the original line 
+	@sh -c 'input_file="mfscli.py"; out_file="mfscli"; \
+	: > "$$out_file"; \
+	while IFS= read -r line; do \
+		case "$$line" in \
+			from\ *\ import\ *\#\ MFS_INLINE_IMPORT) \
+				module=$$(printf "%s" "$$line" | sed -E "s/from (common\\.[a-z_]+).*/\\1/"); \
+				if test -n "$$module"; then \
+					file_path=$$(printf "%s.py" "$$(echo "$$module" | tr "." "/")"); \
+					if [ -f "$$file_path" ]; then \
+						echo "### $$line - inlined below:" >> "$$out_file"; \
+						echo "### Imported inline from $$file_path:" >> "$$out_file"; \
+						cat "$$file_path" >> "$$out_file"; \
+						echo "" >> "$$out_file"; echo "### End of inline import from $$file_path" >> "$$out_file"; echo "" >> "$$out_file"; \
+					else \
+						printf "%s\n" "$$line" >> "$$out_file"; \
+						echo "  Warning: File $$file_path does not exist, keeping the original import line"; \
+					fi; \
+				else \
+					printf "%s\n" "$$line" >> "$$out_file"; \
+				fi ;; \
+			*) printf "%s\n" "$$line" >> "$$out_file" ;; \
+		esac; \
+	done < "$$input_file"'
+	@sed -e "s|#!/usr/bin/env python3|#!/usr/bin/env @PYTHON@|" < mfscli > shebang_me.tmp && mv shebang_me.tmp mfscli
 	@chmod a+x mfscli
 
 clean-local:
-	-rm -f mfscgiserv mfscli
+	-rm -f mfscli
 
 # make python constants from MFSCommunication.h
 #   ./remccoms3.sed < ../mfscommon/MFSCommunication.h | grep -v '\\$' | grep -E '^#define (ERROR|STATUS|CLTOMA|MATOCL)' | awk '{ printf "%s = %s\n",$2,$3 ; }' > const.py

@@ -87,10 +87,7 @@ def mysend(socket,msg):
 		totalsent = totalsent + sent
 
 def myrecv(socket,leng):
-	if sys.version<'3':
-		msg = ''
-	else:
-		msg = bytes(0)
+	msg = bytes(0)
 	while len(msg) < leng:
 		chunk = socket.recv(leng-len(msg))
 		if len(chunk) == 0:
@@ -99,14 +96,14 @@ def myrecv(socket,leng):
 	return msg
 
 def senderr():
-	print("Content-Type: image/gif")
-	print("")
+	print("Content-Type: image/gif\r\n\r")
 	sys.stdout.flush()
-	f = open('err.gif','rb')
-	if sys.version >= '3':
-		sys.stdout.buffer.write(f.read())
+	if "DOCUMENT_ROOT" in os.environ:
+		filename=os.environ["DOCUMENT_ROOT"] + "/assets/err.gif"
 	else:
-		sys.stdout.write(f.read())
+		filename="err.gif"
+	f = open(filename,'rb')
+	sys.stdout.buffer.write(f.read())
 	f.close()
 
 if host=='' or port==0 or chartid<0:
@@ -123,32 +120,16 @@ else:
 		cmd,length = struct.unpack(">LL",header)
 		if cmd==ANTOCU_CHART and length>0:
 			data = myrecv(s,length)
-			if sys.version < '3':
-				if data[:3]=="GIF":
-					print("Content-Type: image/gif")
-					print("")
-					sys.stdout.flush()
-					sys.stdout.write(data)
-				elif data[:8]=="\x89PNG\x0d\x0a\x1a\x0a":
-					print("Content-Type: image/png")
-					print("")
-					sys.stdout.flush()
-					sys.stdout.write(data)
-				else:
-					senderr()
+			if data[:3]=="GIF".encode("latin-1"):
+				print("Content-Type: image/gif\r\n\r")
+				sys.stdout.flush()
+				sys.stdout.buffer.write(data)
+			elif data[:8]=="\x89PNG\x0d\x0a\x1a\x0a".encode("latin-1"):
+				print("Content-Type: image/png\r\n\r")
+				sys.stdout.flush()
+				sys.stdout.buffer.write(data)
 			else:
-				if data[:3]=="GIF".encode("latin-1"):
-					print("Content-Type: image/gif")
-					print("")
-					sys.stdout.flush()
-					sys.stdout.buffer.write(data)
-				elif data[:8]=="\x89PNG\x0d\x0a\x1a\x0a".encode("latin-1"):
-					print("Content-Type: image/png")
-					print("")
-					sys.stdout.flush()
-					sys.stdout.buffer.write(data)
-				else:
-					senderr()
+				senderr()
 		else:
 			senderr()
 		s.close()

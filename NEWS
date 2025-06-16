@@ -3,6 +3,9 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.57.7-1 (WIP)
 
   - (gui) added dedicated GUI server
+  - (gui) gui refactor
+  - (cli) cli refactor
+  - (gui) added support for Prometheus metrics
   - (master) fixed freeing waiting locks from data structures
   - (daemons) added condition to skip socket routines when poll returned zero
   - (daemons) fixed disabling OOM killer

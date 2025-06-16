@@ -263,7 +263,7 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 								} else if (cell.attachEvent) {
 									cell.attachEvent("onclick",acid_tab.clickhandler);
 								}
-								cell.acid_tab_myid = k;
+								cell.acid_tab_sortid = k;
 								if (z==k) {
 									table.acid_tab_sortedby = cell;
 									table.acid_tab_reversed = r;
@@ -276,10 +276,19 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 					}
 				}
 				if (table.acid_tab_sortedby!=null && table.acid_tab_indicator) {
-					table.acid_tab_indicator = document.createElement('span');
-					dir = (table.acid_tab_reversed)?'up':'down';
-					table.acid_tab_indicator.innerHTML = '&#8205;<svg class="sort"><use xlink:href="#icon-sort-'+dir+'"/></svg>';				
-					table.acid_tab_sortedby.appendChild(table.acid_tab_indicator);
+					// check if acid_tab_indicator already contains svg.sort element in any of its child nodes
+					var sort = table.acid_tab_sortedby.getElementsByClassName('sort');
+					if (sort.length) {
+						table.acid_tab_indicator = sort[0];
+					}
+					else
+					{
+						// add svg.sort element to acid_tab_indicator
+						table.acid_tab_indicator = document.createElement('span');
+						dir = (table.acid_tab_reversed)?'up':'down';
+						table.acid_tab_indicator.innerHTML = '&#8205;<svg class="sort"><use xlink:href="#icon-sort-'+dir+'"/></svg>';				
+						table.acid_tab_sortedby.appendChild(table.acid_tab_indicator);
+					}
 				}
 				acid_tab.resort(table);
 			},
@@ -303,12 +312,19 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 				}
 			},
 
-			getcelltext: function(cell,level) {
+			getcellsorttext: function(cell,level) {
 				var ret,i,visible;
 				if (!cell) {
 					return "";
 				}
 				if (level==0) {
+					// find if any of cell's children is <span class='sortkey'>
+					for (i=0 ; i<cell.childNodes.length ; i++) {
+						if (cell.childNodes[i].nodeName=="SPAN" && cell.childNodes[i].className=="sortkey") {
+							console.log("returning: "+cell.childNodes[i].innerHTML);
+							return cell.childNodes[i].innerHTML; // return content of <span class='sortkey'> if found
+						}
+					}
 					visible = cell.offsetWidth > 0 || cell.offsetHeight > 0;
 					if (!visible) {
 						return "";
@@ -323,7 +339,7 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 				}
 				ret = '';
 				for (i=0 ; i<cell.childNodes.length ; i++) {
-					ret += acid_tab.getcelltext(cell.childNodes[i],(level>0)?level-1:0);
+					ret += acid_tab.getcellsorttext(cell.childNodes[i],(level>0)?level-1:0);
 				}
 				return ret;
 			},
@@ -380,7 +396,7 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 				i = 0;
 				while (smode==0 && i<tbody.rows.length) {
 					var cell = tbody.rows[i].cells[hcell.acid_tab_colid];
-					var text = acid_tab.getcelltext(cell,level).split(' ')[0].replace(',','.').replace(/[\s']/g,'');
+					var text = acid_tab.getcellsorttext(cell,level).split(' ')[0].replace(',','.').replace(/[\s']/g,'');
 					var rowspan = acid_tab.calcrowspan(tbody,i);
 					if (text!='') {
 						if (text.match(/^\s*(\+|-)?((\d+(\.\d+)?)|(\.\d+))(\s|%|$)/)) { // looks like a number
@@ -395,7 +411,7 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 				i = 0;
 				while (i<tbody.rows.length) {
 					var cell = tbody.rows[i].cells[hcell.acid_tab_colid];
-					var text = acid_tab.getcelltext(cell,level);
+					var text = acid_tab.getcellsorttext(cell,level);
 					var rowspan = acid_tab.calcrowspan(tbody,i);
 					if (smode==1) {
 						text = text.split(' ')[0].replace(',','.').replace(/[\s']/g,'');
@@ -412,29 +428,31 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 					k = newrows.length;
 					newrows[k] = new Array();
 					newrows[k][0] = text;
+					newrows[k][1] = i; // save original row number to preserve order of equal rows
 					for (j=0 ; j<rowspan ; j++) {
-						newrows[k][j+1] = tbody.rows[i];
+						newrows[k][j+2] = tbody.rows[i];
 						i++;
 					}
 				}
 				if (smode==1) {
-					newrows.sort(function(a,b){return a[0]-b[0];});
+					newrows.sort(function(a,b){ return (a[0]==b[0])?a[1]-b[1]:a[0]-b[0];});
 				} else {
-					newrows.sort(function(a,b){ return (a[0]==b[0])?0:(a[0]<b[0])?-1:1; });
+					newrows.sort(function(a,b){ return (a[0]==b[0])?a[1]-b[1]:(a[0]<b[0])?-1:1; });
 				}
 				if (newbody==0) {
-					table.acid_tab_reversed = 0;
+					//check if this column was previously sorted (look for sortedby_..._prevdir_... in sessionStorage)	
+					table.acid_tab_reversed = acid_tab.initsortdir(table, hcell.acid_tab_sortid);
 				}
 				if (table.acid_tab_reversed) {
 					for (i=newrows.length-1 ; i>=0 ; i--) {
-						for (j=0 ; j<newrows[i].length-1 ; j++) {
-							tbody.appendChild(newrows[i][j+1]);
+						for (j=0 ; j<newrows[i].length-2 ; j++) {
+							tbody.appendChild(newrows[i][j+2]);
 						}
 					}
 				} else {
 					for (i=0 ; i<newrows.length ; i++) {
-						for (j=0 ; j<newrows[i].length-1 ; j++) {
-							tbody.appendChild(newrows[i][j+1]);
+						for (j=0 ; j<newrows[i].length-2 ; j++) {
+							tbody.appendChild(newrows[i][j+2]);
 						}
 					}
 				}
@@ -455,10 +473,21 @@ function applyAcidTab(force_init_acid_ready=false, force_init_acid_tab=false) {
 
 			remember: function(table) {
 				if (table.acid_tab_storageid!="" && typeof sessionStorage != "undefined") {
-					var i;
-					i = ""+table.acid_tab_sortedby.acid_tab_myid+"_"+(table.acid_tab_reversed?'R':'F');
-					sessionStorage.setItem("sortedby_"+table.acid_tab_storageid,i);
+					const rf = (table.acid_tab_reversed?'R':'F');
+					const val = ""+table.acid_tab_sortedby.acid_tab_sortid+"_"+rf;
+					sessionStorage.setItem("sortedby_"+table.acid_tab_storageid,val);
+					sessionStorage.setItem("sortedby_"+table.acid_tab_storageid+"_lastdir"+"_"+table.acid_tab_sortedby.acid_tab_sortid,rf);
 				}
+			},
+
+			//check if this column was previously sorted (look for sortedby_..._prevdir_... in sessionStorage)	
+			initsortdir: function(table, colid) {
+				try {
+					const key = "sortedby_"+table.acid_tab_storageid+"_lastdir"+"_"+colid;
+					const rf = sessionStorage.getItem(key)
+					return (rf=='R')?1:0;
+				} catch {}
+				return 0; //default sort direction (not reversed)
 			},
 
 			clickhandler: function(ev) {

@@ -374,8 +374,7 @@ def joinarr(arr1,arr2):
 	return res
 
 def senderr():
-	print("Content-Type: text/json")
-	print("")
+	print("Content-Type: text/json\r\n\r")
 	print("{")
 	print("}")
 
@@ -430,8 +429,7 @@ else:
 							ch3data = joinarr(ch2data,ch3data)
 						ch2data = joinarr(ch1data,ch2data)
 				datadict[chrange] = (ch1data,ch2data,ch3data,ts,mul,div*rdiv)
-		print('Content-Type: text/json')
-		print('')
+		print('Content-Type: text/json\r\n\r')
 		print('{')
 		for chrange in datadict:
 			print('"%u":{' % chrange)

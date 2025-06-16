@@ -1,5 +1,13 @@
-# -*- coding: utf-8 -*-
 import math
+
+from common.constants import *
+from common.utils import *
+from common.utilsgui import *
+from common.models import *
+
+# Capacity etc. Warning/Error thresholds
+trsh_wrn = TRESHOLD_WARNING
+trsh_err = TRESHOLD_ERROR
 
 padding = 0       # graph padding (all borders)
 tile_padding = 10 # tile padding  
@@ -17,18 +25,14 @@ mls_height = 30         # metaloggers icon height
 mls_margin_top = 30     # metaloggers vertical spacing
 
 cs_top = ms_top    # chunk servers column top position
-cs_left_1st = 530  # chunk servers 1st column left position
-cs_left_2nd = 860  # chunk servers 2nd column left position
+cs_left_1st = 490  # chunk servers 1st column left position
+cs_left_2nd = 800  # chunk servers 2nd column left position
 cs_width = ms_width     # chunk server icon width
 cs_height = 50     # chunk server icon height
 cs_margin_top = 40 # chunk servers vertical spacing 
 
 net_backbone_hmargin = 12
-net_backbone_x = ms_width+150
-
-# Thresholds
-trsh_wrn = 0.8
-trsh_err = 0.95
+net_backbone_x = ms_width+130
 
 green =  'fill: var(--ok-clr);'
 orange = 'fill: var(--warning-clr);'
@@ -38,16 +42,14 @@ left =   'text-anchor:start;'
 middle = 'text-anchor:middle;'
 right =  'text-anchor:end;'
 em08 =  'font-size:0.8em;'
+em09 =  'font-size:0.9em;'
+em11 =  'font-size:1.1em;'
 em12 =  'font-size:1.2em;'
 em14 =  'font-size:1.4em;'
 
 # def defs():
   # out = []
   # out.append('<defs>')
-  # # out.append('<g id="circle-check"><path d="M 5.714 7.964 C 5.459 8.22 5.041 8.22 4.786 7.964 L 3.286 6.464 C 3.03 6.209 3.03 5.791 3.286 5.536 C 3.541 5.28 3.959 5.28 4.214 5.536 L 5.25 6.572 L 7.786 4.036 C 8.041 3.78 8.459 3.78 8.714 4.036 C 8.97 4.291 8.97 4.709 8.714 4.964 L 5.714 7.964 Z M 12 6 C 12 9.314 9.314 12 6 12 C 2.686 12 0 9.314 0 6 C 0 2.686 2.686 0 6 0 C 9.314 0 12 2.686 12 6 Z M 6 1.125 C 3.307 1.125 1.125 3.307 1.125 6 C 1.125 8.693 3.307 10.875 6 10.875 C 8.693 10.875 10.875 8.693 10.875 6 C 10.875 3.307 8.693 1.125 6 1.125 Z"></path></g>')  
-  # #out.append('<g id="triangle-exclamation" transform="scale(0.03)"><path d="M506.3 417l-213.3-364C284.8 39 270.4 32 256 32C241.6 32 227.2 39 218.1 53l-213.2 364C-10.59 444.9 9.851 480 42.74 480h426.6C502.1 480 522.6 445 506.3 417zM52.58 432L255.1 84.8L459.4 432H52.58zM256 337.1c-17.36 0-31.44 14.08-31.44 31.44c0 17.36 14.11 31.44 31.48 31.44s31.4-14.08 31.4-31.44C287.4 351.2 273.4 337.1 256 337.1zM232 184v96C232 293.3 242.8 304 256 304s24-10.75 24-24v-96C280 170.8 269.3 160 256 160S232 170.8 232 184z"></path></g>')  
-  # #out.append('<g id="octagon-exclamation-light" transform="scale(0.03)"><path d="M256 127.1C269.3 127.1 280 138.7 280 151.1V263.1C280 277.3 269.3 287.1 256 287.1C242.7 287.1 232 277.3 232 263.1V151.1C232 138.7 242.7 127.1 256 127.1V127.1zM288 351.1C288 369.7 273.7 383.1 256 383.1C238.3 383.1 224 369.7 224 351.1C224 334.3 238.3 319.1 256 319.1C273.7 319.1 288 334.3 288 351.1zM.0669 191.5C.0669 172.4 7.652 154.1 21.16 140.6L140.6 21.15C154.1 7.648 172.4 .0625 191.5 .0625H320.5C339.6 .0625 357.9 7.648 371.4 21.15L490.8 140.6C504.3 154.1 511.9 172.4 511.9 191.5V320.5C511.9 339.6 504.3 357.9 490.8 371.4L371.4 490.8C357.9 504.3 339.6 511.9 320.5 511.9H191.5C172.4 511.9 154.1 504.3 140.6 490.8L21.15 371.4C7.652 357.9 .0666 339.6 .0666 320.5L.0669 191.5zM55.1 174.5C50.6 179 48.07 185.2 48.07 191.5V320.5C48.07 326.8 50.6 332.9 55.1 337.4L174.5 456.9C179 461.4 185.2 463.9 191.5 463.9H320.5C326.8 463.9 332.1 461.4 337.5 456.9L456.9 337.4C461.4 332.9 463.9 326.8 463.9 320.5V191.5C463.9 185.2 461.4 179 456.9 174.5L337.5 55.09C332.1 50.59 326.8 48.06 320.5 48.06H191.5C185.2 48.06 179 50.59 174.5 55.09L55.1 174.5zM21.15 371.4L55.1 337.4z"></path></g>')  
-  # #out.append('<g id="octagon-exclamation" transform="scale(0.03)"><path d="M140.6 21.15C154.1 7.648 172.4 .0625 191.5 .0625H320.5C339.6 .0625 357.9 7.648 371.4 21.15L490.8 140.6C504.3 154.1 511.9 172.4 511.9 191.5V320.5C511.9 339.6 504.3 357.9 490.8 371.4L371.4 490.8C357.9 504.3 339.6 511.9 320.5 511.9H191.5C172.4 511.9 154.1 504.3 140.6 490.8L21.15 371.4C7.652 357.9 .0666 339.6 .0666 320.5V191.5C.0666 172.4 7.652 154.1 21.15 140.6L140.6 21.15zM232 151.1V263.1C232 277.3 242.7 287.1 256 287.1C269.3 287.1 280 277.3 280 263.1V151.1C280 138.7 269.3 127.1 256 127.1C242.7 127.1 232 138.7 232 151.1V151.1zM256 319.1C238.3 319.1 224 334.3 224 351.1C224 369.7 238.3 383.1 256 383.1C273.7 383.1 288 369.7 288 351.1C288 334.3 273.7 319.1 256 319.1z"></path></g>')  
   # out.append('</defs>')
   # return "\n".join(out)
 
@@ -76,7 +78,10 @@ def humanize(number, thousand=1000, suff=''):
     nstr = "%u.%u" % divmod(b,10)
   else:
     b = (number+50)//100
-    nstr = "%u" % b
+    if number>0 and b==0:
+      nstr = "<&#8239;1" # number is small but not zero
+    else:
+      nstr = "%u" % b
   if scale>0:
     if (suff=='iB' or suff=='iB/s'):
       slist="-kMGTPEZY"
@@ -123,14 +128,19 @@ def translate(tag, x, y, onclick=''):
   else:
     return '<g transform="matrix(1,0,0,1,%s,%s)">\n %s\n</g>' % (x, y, tag)
 
-# Generate text with class cls at position x, y
-def text(msg, x, y, cls, maxLength=0, style=''):
+# Generate text with class clz at position x, y
+def text(msg, x, y, clz, maxLength=0, style=''):
   if maxLength>0:
-    msg = (msg[:maxLength-1] + '…') if len(msg) > maxLength else msg
-  return '<text class="%s" style="%s" x="%s" y="%s">%s</text>' % (cls, style, x, y, msg)
+    if len(msg) > maxLength:
+      if msg[maxLength-2] == '.':
+        msg = (msg[:maxLength-2])
+      else:
+        msg = (msg[:maxLength-1])
+      msg += '...' #'…'
+  return '<text class="%s" style="%s" x="%s" y="%s">%s</text>' % (clz, style, x, y, msg)
 
 # Generates arc at x, y (left-upper corner of a surrounding box) with given radius starting and ending at given angles: <path fill="none" stroke="#446688" stroke-width="3" d="M 184.64101615137756 170 A 40 40 0 1 0 115.35898384862246 170"></path>
-def arc(x, y, radius, startAngle, endAngle, strokeWidth=8, cls=''):
+def arc(x, y, radius, startAngle, endAngle, strokeWidth=8, clz=''):
   def  polarToCartesian(x, y, radius, angleInDegrees):
     angleInRadians = (angleInDegrees-90) * 0.0174532 #math.pi / 180.0
     return (x + (radius * math.cos(angleInRadians)),y + (radius * math.sin(angleInRadians)))
@@ -140,7 +150,7 @@ def arc(x, y, radius, startAngle, endAngle, strokeWidth=8, cls=''):
   (endx, endy) = polarToCartesian(x, y, radius, startAngle)
   largeArcFlag = '0' if endAngle - startAngle <= 180 else '1';
   points = 'M %f %f A %f %f 0 %s 0 %f %f' % (startx, starty, radius, radius, largeArcFlag, endx, endy)
-  return'<path class="%s" style="stroke-width: %fpx" d="%s"/>' % (cls,strokeWidth,points)
+  return'<path class="%s" style="stroke-width: %fpx" d="%s"/>' % (clz,strokeWidth,points)
 
 # Generate arc gauge with name, green, orange or red depending on val threshold (75%/90%) 
 def arc_gauge(x, y, name, label, val, label_style='', r=12, arcTo=120, strokeWidth=8): 
@@ -150,12 +160,16 @@ def arc_gauge(x, y, name, label, val, label_style='', r=12, arcTo=120, strokeWid
   out.append(arc(x, y+strokeWidth/2.0, r, -arcTo, arcTo, strokeWidth, 'arc-gauge-bckgrd'))
   val = min(val, 1.0)
   val = max(val, 0.0)
-  cls = 'arc-gauge-green' if val < trsh_wrn else ('arc-gauge-orange' if val < trsh_err else 'arc-gauge-red')
+  clz = 'arc-gauge-green' if val < trsh_wrn else ('arc-gauge-orange' if val < trsh_err else 'arc-gauge-red')
   endAngle = val*2.0*arcTo - arcTo
   endAngle = max(endAngle, -arcTo+1)
-  out.append(arc(x, y+strokeWidth/2.0, r, -arcTo, endAngle, strokeWidth, cls))
+  out.append(arc(x, y+strokeWidth/2.0, r, -arcTo, endAngle, strokeWidth, clz))
   if label:
-    out.append(text(label, x, y+13, 'arc-gauge-label'))
+    if (type(label) is tuple):
+      out.append(text(label[0], x+r+strokeWidth/2, y+r+strokeWidth+2, 'val-label-value',0,middle+em11))
+      out.append(text(label[1], x+r+strokeWidth/2, y+r+strokeWidth+12, 'val-label-units',0,middle+em08))
+    else:
+      out.append(text(label, x, y+13, 'arc-gauge-label'))
   return "\n".join(out)
 
 # # Generate horizontal linear % gauge with name, green, orange or red depending on val threshold (75%/90%) 
@@ -167,10 +181,10 @@ def arc_gauge(x, y, name, label, val, label_style='', r=12, arcTo=120, strokeWid
 #   out.append('<rect x="%f" y="%f" width="%f" height="%f" rx="1" ry="1" class="gauge-bckgrd"/>' % (x+3, y-h, w, h))
 #   val = min(val, 1)
 #   val = max(val, 0)
-#   cls = 'gauge-green' if val < trsh_wrn else ('gauge-orange' if val < trsh_err else 'gauge-red')
+#   clz = 'gauge-green' if val < trsh_wrn else ('gauge-orange' if val < trsh_err else 'gauge-red')
 #   w = val*w
 #   w = max(w, 0.5)
-#   out.append('<rect x="%f" y="%f" width="%f" height="%f" rx="1" ry="1" class="%s"/>' % (x+3, y-h, w, h, cls))
+#   out.append('<rect x="%f" y="%f" width="%f" height="%f" rx="1" ry="1" class="%s"/>' % (x+3, y-h, w, h, clz))
 #   return "\n".join(out)
 
 # Generates svg text memory gauge
@@ -209,10 +223,10 @@ def html_cluster_state(info):
   out.append('<div class="info-cards">')
   if 'totalspace' in info and 'availspace' in info and info['totalspace']!=0:
     # Total and available size
-    out.append('<div class="card pointer" onclick="showGraphInfo(\'IN\', \'IG\')">')
+    out.append('<div class="card pointer" onclick="showGraphInfo(\'IG\')" data-tt="st_card_cluster_space">')
     out.append('<table class="info-table">')
     out.append('<tr class="low"><td class="bold">Total space</td><td>Free</td></tr>')
-    out.append('<tr><td>%s</td>' % svg_tag(2*18+10,2*18+10,arc_gauge(0,0, '', '', float(info['totalspace']-info['availspace'])/float(info['totalspace']), bold, 18, 120, 10))) 
+    out.append('<tr><td>%s</td>' % svg_tag(2*20+8,2*20+8, arc_gauge(0,0, '', humanize_bytes(info['totalspace']), float(info['totalspace']-info['availspace'])/float(info['totalspace']), bold, 20, 120, 8))) 
     out.append('<td>%s</td></tr>' % html_mem_gauge('', info['availspace']))
     out.append('</table>')
     out.append('</div>') #card Total and available size
@@ -237,19 +251,19 @@ def html_cluster_state(info):
   else:
     servers_health='<td class="label-value">Normal</td></tr>'
   if severity==2:
-    icon=html_icon('icon-error', 1.3)
+    icon=html_icon('icon-error', 1.2)
   elif severity==1:
-    icon=html_icon('icon-warning', 1.3)
+    icon=html_icon('icon-warning', 1.2)
   else:
-    icon=html_icon('icon-ok-circle', 1.3)
+    icon=html_icon('icon-ok-circle', 1.2)
   out.append('<div class="card">')
   out.append('<table class="info-table">')
-  out.append('<tr><td colspan="2" class="card-title"><div class="text-icon">Health %s</div></td></tr>' % icon)
+  out.append('<tr><td colspan="2" class="card-title"><div class="text-icon" data-tt="st_card_health">Health %s</div></td></tr>' % icon)
   if 'leaderfound' in info and info['leaderfound']==1:
-    out.append('<tr class="pointer" onclick="showGraphInfo(\'IN\',\'IC\',\'ICsclassid=-1\')"><td class="label-name">Data:</td>')
+    out.append('<tr class="pointer" onclick="showGraphInfo(\'IC\',\'ICsclassid=-1\')"><td class="label-name">Data:</td>')
     out.append(data_health)
   else:
-    out.append('<tr class="pointer" onclick="showGraphInfo(\'IN\',\'IG\')"><td class="label-name">Leader:</td>')
+    out.append('<tr class="pointer" onclick="showGraphInfo(\'IG\')"><td class="label-name">Leader:</td>')
     out.append('<td class="label-value"><span class="error-txt">missing</span></td></tr>')
   out.append('<tr><td class="label-name">Servers:</td>')
   out.append(servers_health)
@@ -260,13 +274,13 @@ def html_cluster_state(info):
   #Usage
   out.append('<div class="card">')
   out.append('<table class="info-table">')
-  out.append('<tr><td colspan="4" class="card-title">Usage</td></tr>') 
+  out.append('<tr><td colspan="4" class="card-title" data-tt="st_card_usage">Usage</td></tr>') 
   out.append('<tr class="pointer"">')
-  out.append('<td class="label-name" onclick="showGraphInfo(\'IN\', \'IG\')">Files:</td>')
+  out.append('<td class="label-name" onclick="showGraphInfo(\'IG\')">Files:</td>')
   if 'files' in info and 'trfiles' in info:
-    out.append('<td class="label-value" onclick="showGraphInfo(\'IN\', \'IG\')">%s</td>' % humanize_str(info['files']-info['trfiles']))
+    out.append('<td class="label-value" onclick="showGraphInfo( \'IG\')">%s</td>' % humanize_str(info['files']-info['trfiles']))
   else:
-    out.append('<td class="label-value" onclick="showGraphInfo(\'IN\', \'IG\')">Unknown</td>')
+    out.append('<td class="label-value" onclick="showGraphInfo( \'IG\')">Unknown</td>')
   out.append('<td class="label-name" onclick="showGraphInfo(\'MS\')">Mounts:</td>')
   if 'mounts' in info:
     out.append('<td class="label-value" onclick="showGraphInfo(\'MS\')">%s</td>' % humanize_str(info['mounts']))
@@ -274,16 +288,16 @@ def html_cluster_state(info):
     out.append('<td class="label-value" onclick="showGraphInfo(\'MS\')">Unknown</td>')
   out.append('</tr>')
   out.append('<tr class="pointer"">')
-  out.append('<td class="label-name" onclick="showGraphInfo(\'IN\', \'IG\')">Folders:</td>')
+  out.append('<td class="label-name" onclick="showGraphInfo( \'IG\')">Folders:</td>')
   if 'dirs' in info:
-    out.append('<td class="label-value" onclick="showGraphInfo(\'IN\', \'IG\')">%s</td>' % humanize_str(info['dirs']))
+    out.append('<td class="label-value" onclick="showGraphInfo( \'IG\')">%s</td>' % humanize_str(info['dirs']))
   else:
-    out.append('<td class="label-value" onclick="showGraphInfo(\'IN\', \'IG\'")>Unknown</td>')
-  out.append('<td class="label-name" onclick="showGraphInfo(\'IN\', \'IG\')">Trash size:</td>')
+    out.append('<td class="label-value" onclick="showGraphInfo( \'IG\'")>Unknown</td>')
+  out.append('<td class="label-name" onclick="showGraphInfo( \'IG\')">Trash size:</td>')
   if 'trspace' in info :
-    out.append('<td class="label-value" onclick="showGraphInfo(\'IN\', \'IG\')">%s</td>' % humanize_bytes_str(info['trspace']))
+    out.append('<td class="label-value" onclick="showGraphInfo( \'IG\')">%s</td>' % humanize_bytes_str(info['trspace']))
   else:
-    out.append('<td class="label-value" onclick="showGraphInfo(\'IN\', \'IG\')">Unknown</td>')
+    out.append('<td class="label-value" onclick="showGraphInfo( \'IG\')">Unknown</td>')
   out.append('</tr>')
   out.append('</table>')
   out.append('</div>') #card usage
@@ -291,44 +305,44 @@ def html_cluster_state(info):
   out.append('<div class="card-divider"></div>')
 
   #Performance
-  # out.append('<div class="card">')
-  # out.append('<table class="info-table pointer" onclick="showGraphInfo(\'MO\')">')
-  # out.append('<tr><td colspan="4" class="card-title">Performance</td></tr>') 
-  # out.append('<tr>')
-  # if 'bread_ext' in info:
-  #   out.append('<td class="label-name"">Read:</td>')
-  #   out.append('<td class="label-value">%s</td>' % humanize_bytes_str(info['bread_ext'],'iB/s'))
-  # else:
-  #   out.append('<td></td>')
-  #   out.append('<td></td>')
-  # out.append('<td class="label-name">R/W ops:</td>')
-  # if 'rops' in info and 'wops' in info and info['rops']!=None and info['wops']!=None:
-  #   out.append('<td class="label-value">%s/s</td>' % humanize_str(info['rops']+info['wops']))
-  # else:
-  #   out.append('<td class="label-value">n/a</td>')
-  # out.append('</tr>')
-  # out.append('<tr>')
-  # if 'bwrite_ext' in info:
-  #   out.append('<td class="label-name">Write:</td>')
-  #   out.append('<td class="label-value">%s</td>' % humanize_bytes_str(info['bwrite_ext'],'iB/s'))
-  # else:
-  #   out.append('<td></td>')
-  #   out.append('<td></td>')
-  # out.append('<td class="label-name">All ops:</td>')
-  # if 'ops' in info and info['ops']!=None:
-  #   out.append('<td class="label-value">%s/s</td>' % humanize_str(info['ops']))
-  # else:
-  #   out.append('<td class="label-value">n/a</td>')
-  # out.append('</tr>')
-  # out.append('</table>')
-  # out.append('</div>') #card performance
+  out.append('<div class="card" data-tt="st_card_performance">')
+  out.append('<table class="info-table pointer" onclick="showGraphInfo(\'MO\')">')
+  out.append('<tr><td colspan="4" class="card-title">Performance</td></tr>') 
+  out.append('<tr>')
+  if 'bread_ext' in info and info['bread_ext']!=None:
+    out.append('<td class="label-name"">Outbound:</td>')
+    out.append('<td class="label-value">%s</td>' % humanize_bytes_str(info['bread_ext'],'iB/s'))
+  else:
+    out.append('<td></td>')
+    out.append('<td></td>')
+  out.append('<td class="label-name">R/W ops:</td>')
+  if 'rops' in info and 'wops' in info and info['rops']!=None and info['wops']!=None:
+    out.append('<td class="label-value">%s/s</td>' % humanize_str(info['rops']+info['wops']))
+  else:
+    out.append('<td class="label-value">n/a</td>')
+  out.append('</tr>')
+  out.append('<tr>')
+  if 'bwrite_ext' in info and info['bwrite_ext']!=None:
+    out.append('<td class="label-name">Inbound:</td>')
+    out.append('<td class="label-value">%s</td>' % humanize_bytes_str(info['bwrite_ext'],'iB/s'))
+  else:
+    out.append('<td></td>')
+    out.append('<td></td>')
+  out.append('<td class="label-name">All ops:</td>')
+  if 'ops' in info and info['ops']!=None:
+    out.append('<td class="label-value">%s/s</td>' % humanize_str(info['ops']))
+  else:
+    out.append('<td class="label-value">n/a</td>')
+  out.append('</tr>')
+  out.append('</table>')
+  out.append('</div>') #card performance
 
 
   #Licence (if applicable)
   if 'licmaxsize' in info and 'currentsize' in info and info['licmaxsize']!=0  and info['currentsize']!=None and info['licmaxsize']!=None:
     licleft=info['licmaxsize']-info['currentsize']
     out.append('<div class="card-divider"></div>')
-    out.append('<div class="card pointer" onclick="showGraphInfo(\'IN\', \'LI\')">')
+    out.append('<div class="card pointer" onclick="showGraphInfo(\'LI\')" data-tt="st_card_licence">')
     out.append('<table class="info-table">')
     if licleft < 0:
       liclefttxt = 'Over'
@@ -337,7 +351,7 @@ def html_cluster_state(info):
       liclefttxt = 'Left'
       licleftclass = ''
     out.append('<tr class="low"><td class="bold">Licence</td><td>%s</td></tr>' % liclefttxt)
-    out.append('<tr><td>%s</td>' % svg_tag(2*18+10,2*18+10,arc_gauge(0,0, '', '', (float(info['currentsize'])/float(info['licmaxsize'])), bold, 18, 120, 10))) 
+    out.append('<tr><td>%s</td>' % svg_tag(2*20+8,2*20+8,arc_gauge(0,0, '', humanize_bytes(info['licmaxsize']), (float(info['currentsize'])/float(info['licmaxsize'])), bold, 20, 120, 8))) 
     out.append('<td>%s</td></tr>' % html_mem_gauge('', abs(licleft), licleftclass))
     out.append('</table>')
     out.append('</div>') #card Licence
@@ -348,16 +362,18 @@ def html_cluster_state(info):
   return "\n".join(out)
 
 ##############################################
-# Generate master server icon
+# Generate master server icon 
 def mserver(srv, net_offset_y, leader_strver):
   #TODO: add metadata in-sync / out-of-sync warnings
   live = 'live' in srv and srv['live']==1
   led_cls = 'led-normal'
+  srv_tt = []
   out = []
   out.append('<rect width="%d" height="%d" rx="4" ry="4" class="srv-rect-bckgrnd"/>' % (ms_width, ms_height))
-  out.append(text(srv['name'], 21, 20, "srv-name", 18))
+  out.append(text(srv['name'], 21, 20, "srv-name", 17))
   if not live:
     led_cls = 'led-error'
+    srv_tt.append('follower_unreachable')
     out.append(text('UNREACHABLE', 7, 35, 'state-error'))
   if live:
     if 'strver' in srv and srv['strver'] != '0.0.0':
@@ -399,16 +415,19 @@ def mserver(srv, net_offset_y, leader_strver):
     out.append(text(':'+str(srv['port']), ms_width+5, net_offset_y+12, 'ip-port-ms'))
   out.append('<circle cx="12" cy="14" r="5" class="%s"/>' % led_cls)
   out.append('<rect width="%d" height="%d" rx="4" ry="4" class="srv-rect"/>' % (ms_width, ms_height))
+  if srv_tt:
+    # wrap with <g> to display tooltip over entire rect area
+    out.append('</g>')
+    out.insert(0, '<g data-tt="%s">' % ",".join(srv_tt))
   return "\n".join(out)
 
 ##############################################
 # Generate metalogger server icon
 def mlserver(srv, net_offset_y, leader_strver):
-  live = 'live' in srv and srv['live']==1
   led_cls = 'led-normal'
   out = []
   out.append('<rect width="%d" height="%d" rx="4" ry="4" class="srv-rect-bckgrnd"/>' % (mls_width, mls_height))
-  out.append(text(srv['name'], 21, 20, "srv-name", 18))
+  out.append(text(srv['name'], 21, 20, "srv-name", 24))
   if 'strver' in srv and srv['strver'] != '0.0.0':
     ver_cls = "text-version"
     if leader_strver!='' and leader_strver!=srv['strver']:
@@ -428,17 +447,26 @@ def cserver(srv, net_offset_y, leader_strver):
   live = 'live' in srv and srv['live']==1
   maintenance = 'maintenance' in srv and srv['maintenance']==1
   led_cls = 'led-normal'
+  srv_tt = []
   out = []
   out.append('<rect width="%d" height="%d" rx="4" ry="4" class="srv-rect-bckgrnd"/>' % (ms_width, ms_height))
   out.append(text(srv['name'], 21, 20, "srv-name", 12))
   if not live:
-    led_cls = 'led-error'
-    text_x = 94 if maintenance else 7
-    out.append(text('UNREACHABLE', text_x, 35, "state-error"))
-  if maintenance:
-    led_cls = 'led-maintenance'
-    out.append(text('MAINTENANCE', 7, 35, "state-maintenance"))
+    if maintenance:
+      led_cls = 'led-maintenance'
+      srv_tt.append('cs_unreachable_maintain')
+      out.append(text('MAINTENANCE', 7, 35, "state-maintenance"))
+      out.append(text('UNREACHABLE', 94, 35, "state-error"))
+    else:
+      led_cls = 'led-error'
+      srv_tt.append('cs_unreachable')
+      out.append(text('UNREACHABLE', 7, 35, "state-error"))
+  
   if live:
+    if maintenance:
+      led_cls = 'led-maintenance'
+      srv_tt.append('cs_maintain')
+      out.append(text('MAINTENANCE', 7, 35, "state-maintenance"))
     if 'strver' in srv and srv['strver'] != '0.0.0':
       ver_cls = "text-version"
       if leader_strver!='' and leader_strver!=srv['strver']:
@@ -448,14 +476,14 @@ def cserver(srv, net_offset_y, leader_strver):
       out.append('<g transform="translate(%f,%f) rotate(90)">' % (cs_width-13, cs_height/2))
       out.append(text(version_number(srv['strver']), 0, 0, ver_cls))
       out.append('</g>')
-    if not maintenance and 'load_state_msg' in srv:
+    if not maintenance and 'queue_state_msg' in srv:
       out.append(text('Queue:', 7, 33, 'label',0,left))
-      if srv['load_state'] == 'OVLD':
+      if srv['queue_state_str'] == 'Overloaded': #FIXME: use queue_state and a numeric constant
         state_cls = 'state-error'
         led_cls = 'led-warning'
       else:
         state_cls = 'state-normal'
-      out.append(text(srv['load_state_msg'], 7, 44, state_cls))
+      out.append(text(srv['queue_state_msg'], 7, 44, state_cls))
 
     if 'hdd_reg_total' in srv and 'hdd_reg_used' in srv:
       x=cs_width-132
@@ -476,13 +504,13 @@ def cserver(srv, net_offset_y, leader_strver):
       out.append(text('Health', x+20, 14, 'val-label-name'))
       if 'hdds_status' in srv:
         if srv['hdds_status'].startswith('error'):
+          srv_tt.append('hdd_damage');
           out.append('<use xlink:href="#icon-error" x="%f" y="19" style="%s"/>' % (x+13, red))
-          # out.append('<use xlink:href="#octagon-exclamation" x="%f" y="17" style="%s"/>' % (x+13, red))
           out.append(text('Errors', x+20, 42, 'value',0,middle+red+em08))
           led_cls = 'led-warning'
         elif srv['hdds_status'].startswith('warning'):
+          srv_tt.append('hdd_error');
           out.append('<use xlink:href="#icon-warning" x="%f" y="19" style="%s"/>' % (x+13, orange))
-          # out.append('<use xlink:href="#triangle-exclamation" x="%f" y="17" style="%s"/>' % (x+13, orange))
           out.append(text('Warnings', x+20, 42, 'value',0,middle+orange+em08))
           led_cls = 'led-warning'
         elif srv['hdds_status'].startswith('ok'):
@@ -498,6 +526,11 @@ def cserver(srv, net_offset_y, leader_strver):
 
   out.append('<circle cx="12" cy="14" r="5" class="%s"/>' % led_cls)
   out.append('<rect width="%d" height="%d" rx="4" ry="4" class="srv-rect"/>' % (ms_width, ms_height))
+  out.append('<rect width="%d" height="%d" rx="4" ry="4" class="srv-rect"/>' % (ms_width, ms_height))
+  if srv_tt:
+    # wrap with <g> to display tooltip over entire rect area
+    out.append('</g>')
+    out.insert(0, '<g data-tt="%s">' % ",".join(srv_tt))
   return "\n".join(out)
 
 ##############################################
@@ -527,7 +560,7 @@ def svg_mfs_graph( masterservers, metaloggers, chunkservers, leader_strver):
     
     for ms in masterservers:
       out.append('<line class="network-line" x1="%f" y1="%f" x2="%f" y2="%f"/>' % (x+ms_width, y+net_offset_y, net_backbone_x, y+net_offset_y))
-      out.append(translate(mserver(ms,net_offset_y,leader_strver), x, y, "showGraphInfo('IN', 'IM')"))
+      out.append(translate(mserver(ms,net_offset_y,leader_strver), x, y, "showGraphInfo('IM')"))
       net_end_y = y+net_offset_y
       y+=ms_height+ms_margin_top
     y=ms_top+tile_height
@@ -547,7 +580,7 @@ def svg_mfs_graph( masterservers, metaloggers, chunkservers, leader_strver):
 
     for mls in metaloggers:
       out.append('<line class="network-line" x1="%f" y1="%f" x2="%f" y2="%f"/>' % (x+ms_width, y+net_offset_y, net_backbone_x, y+net_offset_y))
-      out.append(translate(mlserver(mls,net_offset_y,leader_strver), x, y, "showGraphInfo('CS', 'MB')"))
+      out.append(translate(mlserver(mls,net_offset_y,leader_strver), x, y, "showGraphInfo('IM')"))
       net_end_y = y+net_offset_y
       y+=mls_height+mls_margin_top
     y-=mls_margin_top
@@ -583,7 +616,7 @@ def svg_mfs_graph( masterservers, metaloggers, chunkservers, leader_strver):
         cy_2nd += cs_height+cs_margin_top
       net_end_y = max(net_end_y,y+net_offset_y)
       out.append('<line class="network-line" x1="%f" y1="%f" x2="%f" y2="%f"/>' % (x, y+net_offset_y, net_backbone_x, y+net_offset_y))
-      out.append(translate(cserver(cs,net_offset_y,leader_strver), x, y, "showGraphInfo('CS|HD', 'CS', 'CScsid=%s&HDdata=%s')" % (cs['id'],cs['id'])))
+      out.append(translate(cserver(cs,net_offset_y,leader_strver), x, y, "showGraphInfo('CS-HD', 'CScsid=%s&HDdata=%s')" % (cs['id'],cs['id'])))
       odd = not odd
     cy_1st-=cs_margin_top
     cy_2nd-=cs_margin_top
@@ -605,3 +638,175 @@ def svg_mfs_graph( masterservers, metaloggers, chunkservers, leader_strver):
   out.append('</g>')
   out.append('</svg>')
   return "\n".join(out)
+
+
+
+###################################################
+### Prepare data for rendering and order render ###
+###################################################
+
+def render(dp, fields, vld):
+  servers_warnings = []
+
+  ci=dp.get_clusterinfo()
+  
+  # Prepare master servers info
+  masterservers = []
+  for ms in dp.get_masterservers(0): # sort by ip/port
+    server = {
+      "name": dp.cluster.masterhost,
+      "ip": ms.strip,
+      "port": ms.port,
+      "strver": ms.strver,
+      "statestr": ms.statestr,
+      "cpuload": (ms.syscpu+ms.usercpu)/100.0,
+      "memory": ms.memusage,
+      "live": 1 if ms.is_active() else 0
+    }
+    if server['live']!=1 or ci.strver!=ms.strver or (not ms.statestr in ['LEADER', 'FOLLOWER', 'MASTER', '-']) or server['cpuload'] > trsh_wrn:
+      servers_warnings.append(ms.strip)
+    masterservers.append(server)
+
+  metaloggers = []
+  for ml in dp.get_metaloggers(2): # sort by ip/port
+    server = {
+      "name": ml.host,
+      "ip": ml.strip,
+      "strver": ml.strver,
+    }
+    if ci.strver!=ml.strver:
+      servers_warnings.append(ml.strip)
+    metaloggers.append(server)
+  
+  chunkservers = []
+  (hdds_all, scanhdds)=dp.get_hdds("ALL")
+  for cs in dp.get_chunkservers(): # default sort by ip/port
+    (hdds_status, hdds)=dp.cs_hdds_status(cs, hdds_all+scanhdds)
+    if cs.is_maintenance_off() or not dp.cluster.leaderfound():
+      maintenance = 0
+    else:
+      maintenance = 1
+    srv = {
+      "id": "%s:%s" % (cs.strip,cs.port),
+      "name": cs.host,
+      "strver": cs.strver,
+      "ip": cs.strip,
+      "port": cs.port,
+      "live": 1 if cs.is_connected() else 0,     # if (cs.flags&1)!=0: <- dead server
+      "maintenance": maintenance, # 1 - server in maintenance mode
+      "queue": cs.queue,
+      "queue_state": cs.queue_state,
+      "queue_state_str": cs.queue_state_str,
+      "queue_state_msg": cs.queue_state_msg,
+      "flags": cs.flags,
+      "hdd_reg_total": cs.total,
+      "hdd_reg_used": cs.used,
+      "hdd_rem_total": cs.tdtotal,
+      "hdd_rem_used": cs.tdused,
+      "hdds_status": hdds_status,
+      "hdds": None #unused: hdds
+      }
+    chunkservers.append(srv)
+
+    if srv['live']!=1 or srv['maintenance']!=0 or ci.strver!=cs.strver or srv['queue_state'] == CS_LOAD_OVERLOADED or (srv['hdd_reg_total']!=0 and srv['hdd_reg_used']/srv['hdd_reg_total'] > trsh_wrn) or hdds_status!='ok':
+      servers_warnings.append(cs.strip)
+  
+  # Prepare general cluster info 
+  # Gather IOPS and W/R IOPS 
+  sessions=dp.get_sessions(None) # don't sort
+  rops_c_total = 0
+  rops_l_total = 0
+  wops_c_total = 0
+  wops_l_total = 0
+  ops_c_total = 0
+  ops_l_total = 0
+  for ses in sessions: #summing both last and current hour operations
+    ops_c_total += sum(ses.stats_c)
+    ops_l_total += sum(ses.stats_l)
+    if (dp.stats_to_show>16):
+      rops_c_total=ses.stats_c[16] # 17: read current hour
+      wops_c_total=ses.stats_c[17] # 18: write current hour
+      rops_l_total=ses.stats_l[16] # 17: read last hour
+      wops_l_total=ses.stats_l[17] # 18: write last hour
+  #if more than half of the minute passed (of current hour), calculate ops per second based on current hour stats
+  if seconds_since_beginning_of_hour()>30.0: 
+    ops = float(ops_c_total)/float(seconds_since_beginning_of_hour())
+    rops = float(rops_c_total)/float(seconds_since_beginning_of_hour())
+    wops = float(wops_c_total)/float(seconds_since_beginning_of_hour())
+  else: # take last (previous) hour stats
+    ops = float(ops_l_total)/3600.0
+    rops = float(rops_l_total)/3600.0
+    wops = float(wops_l_total)/3600.0
+  if (dp.stats_to_show<=16):
+    wops = None # this master doesn't support W/R stats
+    ops = None
+
+  # Gather throughput stats
+  bread_ext = None
+  bwrite_ext = None
+  if dp.cluster.master().version_at_least(4,57,0): # mountbytrcvd, mountbytsent available from v.4.57.0
+    # Get 60 minutes average of given (single row) master server chart data
+    def get_mschart_60min_avg(no):
+      raw = 0
+      chrange = 0   # 1 minute ticks
+      mccount = 60  # take 60 minutes (or less if 60 minutes not available)
+      _,base,datadict = get_charts_multi_data(dp.cluster.master(), no*10+chrange, mccount)
+      if datadict!=None and len(datadict)>0:
+        val = 0
+        count = 0
+        ch1data,_,_,_,mul,div = datadict[0] # ch1data,ch2data,ch3data,ts,mul,div
+        mul,div = adjust_muldiv(mul,div,base)
+        chdata = charts_convert_data(ch1data,mul,div,raw)
+        for chval in chdata:
+          if chval!=None:
+            val += chval
+            count += 1
+        if count>0:
+          return val / count
+        else:
+          return None
+        
+    bread_ext = get_mschart_60min_avg(68) # 68 mountbytrcvd
+    bwrite_ext = get_mschart_60min_avg(69) # 69 mountbytsent
+
+
+  licence=dp.get_licence()
+  licmaxsize = licence.licmaxsize if licence != None else None
+  currentsize = licence.currentsize if licence != None else None
+  # Get sums of missing, undergoal and endangered  (for all sclasses)
+  (mx_summary,progressstatus)=dp.get_matrix_summary()
+  clusterinfo = {
+    "leaderfound" : 1 if dp.cluster.leaderfound() else 0,
+    "strver": ci.strver,
+    "totalspace": ci.totalspace,
+    "availspace": ci.availspace,
+    "freespace": ci.freespace,
+    "dirs": ci.dirs,
+    "files": ci.files,
+    "trfiles": ci.trfiles,
+    "trspace": ci.trspace,
+    "chunks_progress": progressstatus,
+    "chunks_total": mx_summary[MX_COL_TOTAL],
+    "chunks_missing": mx_summary[MX_COL_MISSING],
+    "chunks_undergoal": mx_summary[MX_COL_UNDERGOAL],
+    "chunks_endangered": mx_summary[MX_COL_ENDANGERED],
+    "servers_warnings": servers_warnings,
+    "mounts": len(sessions),
+    "ops": ops,	  #all (metadata and read and write) operations per second
+    "rops": rops, #read operations per second
+    "wops": wops, #write operations per second
+    "bread_ext": bread_ext,   #traffic read by all CS - only from clients (ext)
+    "bwrite_ext": bwrite_ext, #traffic write to all CS - only from clients (ext)
+    "licmaxsize": licmaxsize, 
+    "currentsize": currentsize
+  }
+
+  out = []
+  out.append('<div id="mfsgraph-tile">')
+  out.append(html_cluster_state(clusterinfo))
+  out.append('<div id="mfsgraph">')
+  out.append(svg_mfs_graph(masterservers, metaloggers, chunkservers, ci.strver))
+  out.append('</div><!-- mfsgraph -->')
+  out.append('<div id="mfsgraph-info"></div>')
+  out.append('</div>')
+  return out

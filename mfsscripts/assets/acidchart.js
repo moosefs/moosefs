@@ -115,7 +115,7 @@ function AcidChart(idprefix,chartgroup) {
 	this.elemc.acid_chart = this;
 	this.eleml.acid_chart = this;
 	if (document.addEventListener) {
-		this.elemc.addEventListener('mousedown',this.mouse_down_handler,false);
+		this.elemc.addEventListener('pointerdown',this.mouse_down_handler,false);
 		this.elemc.addEventListener('dblclick',this.click_handler,false);
 		this.eleml.addEventListener('click',this.click_handler,false);
 	} else if (document.attachEvent) {
@@ -726,10 +726,8 @@ AcidChart.prototype.get_tooltip_data = function(offset) {
 	var nodata;
 
 	if (this.chartdata) {
-		chartindx = offset + this.position;
-
+		chartindx = Math.floor(offset + this.position);
 		ret = this.get_tooltip_date(chartindx) + ": ";
-
 		color1 = "red";
 		color2 = "red";
 		color3 = "red";
@@ -958,8 +956,8 @@ AcidChart.prototype.mouse_up_handler = function(ev) {
 		var ac = document.current_acid_chart;
 		ac.handle_move_by(ev.clientX - ac.mousex,1);
 		if (document.removeEventListener) {
-			ac.elemc.removeEventListener('mousemove',ac.mouse_move_handler,false);
-			document.removeEventListener('mouseup',ac.mouse_up_handler,false);
+			ac.elemc.removeEventListener('pointermove',ac.mouse_move_handler,false);
+			document.removeEventListener('pointerup',ac.mouse_up_handler,false);
 		} else if (document.detachEvent) {
 			ac.elemc.detachEvent('onmousemove',ac.mouse_move_handler);
 			document.detachEvent('onmouseup',ac.mouse_up_handler);
@@ -990,8 +988,8 @@ AcidChart.prototype.mouse_down_handler = function(ev) {
 		ac.maxposition = ac.chartxdata - this.clientWidth;
 		document.current_acid_chart = ac;
 		if (document.addEventListener) {
-			ac.elemc.addEventListener('mousemove',ac.mouse_move_handler,false);
-			document.addEventListener('mouseup',ac.mouse_up_handler,false);
+			ac.elemc.addEventListener('pointermove',ac.mouse_move_handler,false);
+			document.addEventListener('pointerup',ac.mouse_up_handler,false);
 		} else if (document.attachEvent) {
 			ac.elemc.attachEvent('onmousemove',ac.mouse_move_handler);
 			document.attachEvent('onmouseup',ac.mouse_up_handler);
@@ -1161,4 +1159,92 @@ function AcidChartSetCommonScale(chartgroup,setflag) {
 	for (i=0 ; i<chartlist.length ; i++) {
 		chartlist[i].redraw();
 	}
+}
+
+function showChartToolTip(e) {
+	var t = document.getElementById('charttooltip');
+	var hu = document.getElementById('charthlineup');
+	var hd = document.getElementById('charthlinedown');
+	var ac = e.target.acid_chart;
+	var bodyrect,elemrect,offset;
+	var uh,dh,eltop;
+	var tdata;
+
+	if (e.targetTouches && e.targetTouches.length>1) { //don't handle multi-touch
+		hideChartToolTip();
+		return;
+	}
+	if (e.target.classList.contains('CHARTJSC') && typeof(ac)=='object') {
+		t.style.display = "block";
+		hu.style.display = "block";
+		hd.style.display = "block";
+	} else {
+		hideChartToolTip();
+		return;
+	}
+	bodyrect = document.body.getBoundingClientRect();
+	elemrect = e.target.getBoundingClientRect();
+	if (e.targetTouches) { //handle touch
+		offset = e.target.clientWidth - (e.targetTouches[0].clientX - elemrect.left) - 1;
+	} else { //handle mouse
+		offset = e.target.clientWidth - (e.clientX - elemrect.left) - 1;
+	}
+	tdata = ac.get_tooltip_data(offset);
+	t.innerHTML = tdata;
+
+	if (tdata=="") {
+		hideChartToolTip();
+		return;
+	}
+
+	eltop = (elemrect.top - bodyrect.top);
+	uh = (e.pageY - eltop - 1);
+	dh = (e.target.clientHeight - uh - 2);
+	hu.style.left = e.pageX + "px";
+	hu.style.top = eltop + "px";
+	hu.style.height = uh + "px";
+	hd.style.left = e.pageX + "px";
+	hd.style.top = (e.pageY + 2) + "px";
+	hd.style.height = dh + "px";
+
+	if (e.clientX < bodyrect.width/2) {
+		t.style.left = e.pageX + 12 + "px";
+		t.style.top = e.pageY + 0 + "px";
+	} else {
+		t.style.left = e.pageX - 16 - t.clientWidth + "px";
+		t.style.top = e.pageY + 0 + "px";
+	}
+}
+
+function hideChartToolTip() {
+	var t = document.getElementById('charttooltip');
+	var hu = document.getElementById('charthlineup');
+	var hd = document.getElementById('charthlinedown');
+
+	t.style.display = "none";
+	hu.style.display = "none";
+	hd.style.display = "none";
+	return;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+	// Call the function with the path to your tooltips JSON file
+	initializeChartTooltips();
+}, false);
+
+function initializeChartTooltips()
+{
+	document.querySelectorAll('.CHART').forEach(element => {
+		element.addEventListener('mousemove', (event) => showChartToolTip(event), { passive: false });
+		element.addEventListener('mousedown', (event) => hideChartToolTip());
+		element.addEventListener('click',     (event) => hideChartToolTip());
+		element.addEventListener('dblclick',  (event) => hideChartToolTip());
+
+		// element.addEventListener('touchmove', (event) => showToolTip(event));
+		// element.addEventListener('touchend',  (event) => hideToolTip());
+	});
+	// document.body.addEventListener('mousemove',showToolTip,false);
+	// document.body.addEventListener('mousedown',hideToolTip,false);
+	// document.body.addEventListener('click',hideToolTip,false);
+	// document.body.addEventListener('dblclick',hideToolTip,false);
 }

@@ -24,14 +24,17 @@
 /* Data directory */
 #undef DATA_PATH
 
-/* Default cgiserver http port */
-#undef DEFAULT_CGISERV_HTTP_PORT
+/* Default cgi folder */
+#undef DEFAULT_CGIDIR
 
 /* Default chunkserver data port */
 #undef DEFAULT_CS_DATA_PORT
 
 /* Default working group */
 #undef DEFAULT_GROUP
+
+/* Default gui server http port */
+#undef DEFAULT_GUI_HTTP_PORT
 
 /* Default master name */
 #undef DEFAULT_MASTERNAME

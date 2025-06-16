@@ -1,3 +1,0 @@
-dpkg-maintscript-helper rm_conffile /etc/init.d/moosefs-cgiserv -- "$@"
-dpkg-maintscript-helper rm_conffile /etc/default/moosefs-cgiserv -- "$@"
-

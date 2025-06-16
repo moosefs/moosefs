@@ -1,0 +1,60 @@
+@sample etc/mfs/mfsgui.cfg.sample
+sbin/mfsgui
+sbin/mfscgiserv
+man/man5/mfsgui.cfg.5.gz
+man/man8/mfsgui.8.gz
+@owner mfs
+@group mfs
+@dir %%MFS_WORKDIR%%/mfs
+share/mfscgi/requests.cfg
+share/mfscgi/mfs.cgi
+share/mfscgi/chart.cgi
+share/mfscgi/chartdata.cgi
+@comment -- generated files below --
+share/mfscgi/views/opatterns.py
+share/mfscgi/views/footer.py
+share/mfscgi/views/metrics.py
+share/mfscgi/views/graph.py
+share/mfscgi/views/matrix.py
+share/mfscgi/views/licence.py
+share/mfscgi/views/disks.py
+share/mfscgi/views/quotas.py
+share/mfscgi/views/sclasses.py
+share/mfscgi/views/clusterinfo.py
+share/mfscgi/views/metaservers.py
+share/mfscgi/views/mountsoperations.py
+share/mfscgi/views/exports.py
+share/mfscgi/views/missingfiles.py
+share/mfscgi/views/mountsparameters.py
+share/mfscgi/views/openfiles.py
+share/mfscgi/views/chartscc.py
+share/mfscgi/views/memory.py
+share/mfscgi/views/chunkservers.py
+share/mfscgi/views/header.py
+share/mfscgi/views/chunksloop.py
+share/mfscgi/views/healthselfcheck.py
+share/mfscgi/views/metaloggers.py
+share/mfscgi/views/commands.py
+share/mfscgi/views/chartsmc.py
+share/mfscgi/views/missingleader.py
+share/mfscgi/assets/acidchart.js
+share/mfscgi/assets/logomini.svg
+share/mfscgi/assets/mfs.css
+share/mfscgi/assets/acidtab.js
+share/mfscgi/assets/logo.svg
+share/mfscgi/assets/logopro.svg
+share/mfscgi/assets/err.gif
+share/mfscgi/assets/help.json
+share/mfscgi/assets/favicon.ico
+share/mfscgi/assets/guiscripts.js
+share/mfscgi/common/models.py
+share/mfscgi/common/constants_ac.py
+share/mfscgi/common/utils.py
+share/mfscgi/common/constants.py
+share/mfscgi/common/dataprovider.py
+share/mfscgi/common/utilsgui.py
+share/mfscgi/common/errors.py
+share/mfscgi/common/organization.py
+share/mfscgi/common/validator.py
+share/mfscgi/common/conn.py
+share/mfscgi/common/cluster.py

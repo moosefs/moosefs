@@ -3,12 +3,12 @@
   message: <<EOM
 A startup script has been installed as:
 
-%%PREFIX%%/etc/rc.d/mfscgiserv
+%%PREFIX%%/etc/rc.d/mfsgui
 
-Use it to start/stop the mfscgiserv service after you have added
+Use it to start/stop the mfsgui service after you have added
 the following line to your rc.conf file:
 
-mfscgiserv_enable="YES"
+mfsgui_enable="YES"
 EOM
 }
 ]

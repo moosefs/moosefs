@@ -1,0 +1,8 @@
+filesystems/moosefs-master
+filesystems/moosefs-chunkserver
+filesystems/moosefs-client
+filesystems/moosefs-metalogger
+filesystems/moosefs-cgi
+filesystems/moosefs-gui
+filesystems/moosefs-cli
+filesystems/moosefs-netdump

@@ -1,4 +1,4 @@
-.TH mfsmaster.cfg "5" "March 2025" "MooseFS 4.57.6-1" "This is part of MooseFS"
+.TH mfsmaster.cfg "5" "June 2025" "MooseFS 4.57.7-1" "This is part of MooseFS"
 .ss 12 0
 .SH NAME
 mfsmaster.cfg \- main configuration file for \fBmfsmaster\fP
@@ -26,9 +26,6 @@ name of process to place in syslog messages; default is mfsmaster
 .B LOCK_MEMORY
 whether to perform mlockall() to avoid swapping out mfsmaster process; default is 0, i.e. no
 .TP
-.B LIMIT_GLIBC_MALLOC_ARENAS
-limit malloc arenas to given value - prevents server from using huge amount of virtual memory (Linux only, default is 4)
-.TP
 .B DISABLE_OOM_KILLER
 disable out of memory killer (Linux only, default is 1)
 .TP
@@ -53,7 +50,7 @@ alternate location/name of \fBmfsexports.cfg\fP file
 alternate location/name of \fBmfstopology.cfg\fP file
 .TP
 .B INSTANCE_NAME
-optional name of MooseFS instance (cluster) that will be displayed in CGI interface (default is empty string)
+optional name of MooseFS instance (cluster) that will be displayed in GUI interface (default is empty string)
 .TP
 .B BACK_LOGS
 number of metadata change log files (default is 50)

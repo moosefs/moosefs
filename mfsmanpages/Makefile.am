@@ -1,7 +1,7 @@
 chunkserver_mans = mfschunkserver.8 mfschunktool.8 mfschunkdbdump.8 mfscsstatsdump.8 mfschunkserver.cfg.5 mfshdd.cfg.5
 master_mans = mfsmaster.8 mfsmetarestore.8 mfsstatsdump.8 mfsmetadump.8 mfsmetadirinfo.8 mfsmetasearch.8 mfsmaster.cfg.5 mfsexports.cfg.5 mfstopology.cfg.5 mfsipmap.cfg.5 mfssupervisor.8 moosefs.7
+gui_mans = mfsgui.8 mfsgui.cfg.5
 cli_mans = mfscli.1
-cgiserv_mans = mfscgiserv.8
 metalogger_mans = mfsmetalogger.8 mfsmetalogger.cfg.5
 netdump_mans = mfsnetdump.8
 mount_mans = mfsmount.8 mfsmount.cfg.5
@@ -25,7 +25,7 @@ tools_mans = \
 #	mfstrashtools.1 mfstrashlist.1 mfstrashrecover.1 mfstrashpurge.1 mfssustainedlist.1
 pro_mans = $(supervisor_mans) $(tools_pro_mans)
 
-all_mans = $(chunkserver_mans) $(master_mans) $(cli_mans) $(mount_mans) $(tools_mans) $(metalogger_mans) $(cgiserv_mans) $(netdump_mans) $(mount_extra_man) $(bdev_mans) 
+all_mans = $(chunkserver_mans) $(master_mans) $(gui_mans) $(cli_mans) $(mount_mans) $(tools_mans) $(metalogger_mans) $(netdump_mans) $(mount_extra_man) $(bdev_mans) 
 
 EXTRA_DIST = $(all_mans)
 
@@ -37,6 +37,10 @@ endif
 
 if BUILD_CHUNKSERVER
 man_MANS += $(chunkserver_mans)
+endif
+
+if BUILD_GUI
+man_MANS += $(gui_mans)
 endif
 
 if BUILD_CLIENT
@@ -58,10 +62,6 @@ endif
 
 if BUILD_NETDUMP
 man_MANS += $(netdump_mans)
-endif
-
-if INSTALL_CGISERV
-man_MANS += $(cgiserv_mans)
 endif
 
 if INSTALL_CLI

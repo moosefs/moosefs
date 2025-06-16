@@ -1,0 +1,31 @@
+#!/bin/sh
+# $FreeBSD$
+
+# PROVIDE: mfsgui
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf.local or /etc/rc.conf to enable mfsgui:
+#
+# mfsgui="YES"
+#
+
+. /etc/rc.subr
+
+name=mfsgui
+rcvar=mfsgui_enable
+
+config_file=%%PREFIX%%/etc/mfs/${name}.cfg
+
+required_files=${config_file}
+
+command=%%PREFIX%%/sbin/${name}
+pid_file=%%MFS_WORKDIR%%/mfs/.${name}.lock
+command_args="-c $config_file"
+
+load_rc_config $name
+
+# set defaults
+: ${mfsgui_enable="NO"}
+
+run_rc_command "$1"

@@ -31,21 +31,27 @@ if [ ! \( -f "$DISTFILEBASE" -o -d "$DISTFILEBASE" \) ]; then
 fi
 FILEBASEDIR=`dirname "$0"`
 
-PORTNAMES="master chunkserver client metalogger cgi cgiserv cli netdump"
+PORTNAMES="master chunkserver client metalogger gui cli netdump cgi"
 
-PORTFILES="Makefile pkg-descr pkg-plist files"
+PORTFILES="Makefile pkg-descr pkg-plist distinfo files"
 
-VERSION=4.57.6
+VERSION=4.57.7
 RELEASE=1
 
 cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^DISTVERSION=.*$/DISTVERSION=		${VERSION}/" | sed "s/^DISTVERSIONSUFFIX=.*$/DISTVERSIONSUFFIX=	${RELEASE}/" | uniq > .tmp
 mv .tmp "${FILEBASEDIR}/files/Makefile.master"
+cat "${FILEBASEDIR}/files/Makefile.cgi" | sed "s/^PORTVERSION=.*$/PORTVERSION=		${VERSION}/" | sed "s/^PKGNAME=.*$/PKGNAME=		moosefs-cgi-${VERSION}/" | uniq > .tmp
+mv .tmp "${FILEBASEDIR}/files/Makefile.cgi"
 if [ `uname -r | cut -d '.' -f1` -ge 14 ]; then
 	cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/sysutils/filesystems/g" | sed "s/^CATEGORIES=.*$/CATEGORIES=		filesystems sysutils/" > .tmp
 	mv .tmp "${FILEBASEDIR}/files/Makefile.master"
+	cat "${FILEBASEDIR}/files/Makefile.cgi" | sed "s/sysutils/filesystems/g" | sed "s/^CATEGORIES=.*$/CATEGORIES=		filesystems sysutils/" > .tmp
+	mv .tmp "${FILEBASEDIR}/files/Makefile.cgi"
 else
 	cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^CATEGORIES=.*$/CATEGORIES=		sysutils/" | sed "s/filesystems/sysutils/g" > .tmp
 	mv .tmp "${FILEBASEDIR}/files/Makefile.master"
+	cat "${FILEBASEDIR}/files/Makefile.cgi" | sed "s/^CATEGORIES=.*$/CATEGORIES=		sysutils/" | sed "s/filesystems/sysutils/g" > .tmp
+	mv .tmp "${FILEBASEDIR}/files/Makefile.cgi"
 fi
 
 for portname in ${PORTNAMES}; do
@@ -61,7 +67,7 @@ for portname in ${PORTNAMES}; do
 		if [ -d "${FILEBASEDIR}/files/${portfile}.${portname}" ]; then
 			cp -R "${FILEBASEDIR}/files/${portfile}.${portname}" "${portdir}/${portfile}"
 		fi
-		if [ `uname -r | cut -d '.' -f1` -ge 14 -a "x${portfile}" == "xpkg-plist" ]; then
+		if [ `uname -r | cut -d '.' -f1` -ge 14 -a "x${portfile}" == "xpkg-plist" -a -f "${portdir}/${portfile}" ]; then
 			cat "${portdir}/${portfile}" | sed 's/^man\(.*\)$/share\/man\1/' > .tmp
 			mv .tmp "${portdir}/${portfile}"
 		fi

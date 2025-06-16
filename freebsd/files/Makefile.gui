@@ -1,12 +1,12 @@
 # Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
 
-PKGNAMESUFFIX=	-cgiserv
+PKGNAMESUFFIX=	-gui
 
-COMMENT=	MooseFS CGI webserver
+COMMENT=	MooseFS web-based GUI
 
 LICENSE=	GPLv2
 
-MFS_COMPONENT=	cgiserv
+MFS_COMPONENT=	gui
 
 MASTERDIR=	${.CURDIR}/../moosefs-master
 

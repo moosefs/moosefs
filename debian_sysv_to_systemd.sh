@@ -24,10 +24,11 @@ cp debian/systemd_extra/* debian/
 
 systemdunitdir=`pkg-config --variable=systemdsystemunitdir systemd`
 
+echo "${systemdunitdir}/moosefs-gui@.service" >> debian/moosefs-gui.install
 echo "${systemdunitdir}/moosefs-master@.service" >> debian/moosefs-master.install
 echo "${systemdunitdir}/moosefs-chunkserver@.service" >> debian/moosefs-chunkserver.install
 echo "${systemdunitdir}/moosefs-metalogger@.service" >> debian/moosefs-metalogger.install
-echo "${systemdunitdir}/moosefs-cgiserv.service" >> debian/moosefs-cgiserv.install
+echo "${systemdunitdir}/moosefs-gui.service" >> debian/moosefs-gui.install
 echo "${systemdunitdir}/moosefs-master.service" >> debian/moosefs-master.install
 echo "${systemdunitdir}/moosefs-chunkserver.service" >> debian/moosefs-chunkserver.install
 echo "${systemdunitdir}/moosefs-metalogger.service" >> debian/moosefs-metalogger.install

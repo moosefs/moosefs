@@ -14,9 +14,6 @@
 # whether to perform mlockall() to avoid swapping out mfsmaster process (default is 0, i.e. no)
 # LOCK_MEMORY = 0
 
-# Linux only: limit malloc arenas to given value - prevents server from using huge amount of virtual memory (default is 4)
-# LIMIT_GLIBC_MALLOC_ARENAS = 4
-
 # Linux only: disable out of memory killer (default is 1)
 # DISABLE_OOM_KILLER = 1
 
@@ -39,7 +36,7 @@
 # alternate location/name of mfstopology.cfg file (default is @ETC_PATH@/mfs/mfstopology.cfg); this file will be re-read on each process reload, regardless if the path was changed
 # TOPOLOGY_FILENAME = @ETC_PATH@/mfs/mfstopology.cfg
 
-# optional name of MooseFS instance (cluster) that will be displayed in CGI interface (default is empty string)
+# optional name of MooseFS instance (cluster) that will be displayed in GUI interface (default is empty string)
 # INSTANCE_NAME = 
 
 # offset used for options: METADATA_SAVE_FREQ (minutes - default is 0)

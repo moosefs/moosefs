@@ -1,4 +1,4 @@
-EXTRA_DIST = metadata.mfs mfschunkserver.cfg.in mfsexports.cfg mfstopology.cfg mfsipmap.cfg mfsmount.cfg.in mfsmaster.cfg.in mfshdd.cfg mfsmetalogger.cfg.in
+EXTRA_DIST = metadata.mfs mfschunkserver.cfg.in mfsgui.cfg.in mfsexports.cfg mfstopology.cfg mfsipmap.cfg mfsmount.cfg.in mfsmaster.cfg.in mfshdd.cfg mfsmetalogger.cfg.in
 
 install-data-hook:
 if CREATE_ETC_MFS
@@ -21,6 +21,9 @@ endif
 if BUILD_CHUNKSERVER
 	$(INSTALL_DATA) $(builddir)/mfschunkserver.cfg $(DESTDIR)$(sysconfdir)/mfs/mfschunkserver.cfg.sample
 	$(INSTALL_DATA) $(srcdir)/mfshdd.cfg $(DESTDIR)$(sysconfdir)/mfs/mfshdd.cfg.sample
+endif
+if BUILD_GUI
+	$(INSTALL_DATA) $(builddir)/mfsgui.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsgui.cfg.sample
 endif
 if BUILD_MASTER
 	$(INSTALL_DATA) $(builddir)/mfsmaster.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmaster.cfg.sample

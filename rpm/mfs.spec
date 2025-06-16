@@ -34,7 +34,7 @@
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	4.57.6
+Version:	4.57.7
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -49,9 +49,9 @@ BuildRequires:	pkgconfig
 BuildRequires:	zlib-devel
 BuildRequires:	libpcap-devel
 %if %{rpm_has_bool_ops}
-BuildRequires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
+BuildRequires:	(python3 or /usr/bin/python3 or /usr/bin/python)
 %else
-BuildRequires:	python
+BuildRequires:	python3 >= 3.4
 %endif
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Requires(pre):	shadow-utils
@@ -113,9 +113,9 @@ MooseFS client: mfsmount and mfstools.
 Summary:	MooseFS CLI Utility
 Group:		System Environment/Daemons
 #%%if %%{rpm_has_bool_ops}
-#Requires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
+#Requires:	(python3 or /usr/bin/python3 or /usr/bin/python)
 #%%else
-#Requires:	python >= 2.5
+#Requires:	python >= 3.4
 #%%endif
 
 %description cli
@@ -124,28 +124,24 @@ MooseFS CLI utilities.
 
 
 
-%package cgi
+%package gui
 Summary:	MooseFS CGI Monitor
 Group:		System Environment/Daemons
+Obsoletes:	%{name}-cgiserv
+Obsoletes:	%{name}-cgi
+Provides:	%{name}-cgiserv
+Provides:	%{name}-cgi
+Requires:	%{name}-cli
 #%%if %%{rpm_has_bool_ops}
-#Requires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
+#Requires:	(python3 or /usr/bin/python3 or /usr/bin/python)
 #%%else
-#Requires:	python >= 2.5
+#Requires:	python >= 3.4
 #%%endif
 
-%description cgi
-MooseFS CGI monitor.
+%description gui
+MooseFS web-based GUI.
 
 
-
-
-%package cgiserv
-Summary:	Simple CGI-capable HTTP server to run MooseFS CGI Monitor
-Group:		System Environment/Daemons
-Requires:	%{name}-cgi
-
-%description cgiserv
-Simple CGI-capable HTTP server to run MooseFS CGI monitor.
 
 
 
@@ -293,19 +289,25 @@ exit 0
 
 
 
-
-%pre cgiserv
+%pre gui
 getent group %{_groupname} >/dev/null || groupadd -r %{_groupname}
 getent passwd %{_username} >/dev/null || \
     useradd -r -g %{_groupname} -d %{_localstatedir}/mfs -s /sbin/nologin \
     -c "MooseFS" %{_username}
 exit 0
 
-%post cgiserv
+%post gui
+for fname in mfsgui; do
+	if [ -f %{mfsconfdir}/${fname}.cfg.dist ]; then
+		rm -f %{mfsconfdir}/${fname}.cfg.dist
+	fi
+	if [ -f %{mfsconfdir}/${fname}.cfg.sample -a ! -f %{mfsconfdir}/${fname}.cfg ]; then
+		cp %{mfsconfdir}/${fname}.cfg.sample %{mfsconfdir}/${fname}.cfg
+	fi
+done
 chown -R %{_username}:%{_groupname} %{_localstatedir}/mfs
 chmod -R u+rwx %{_localstatedir}/mfs
 exit 0
-
 
 
 
@@ -397,47 +399,37 @@ exit 0
 %files client -f %{EXTRA_FILES}
 %defattr(644,root,root,755)
 %doc NEWS README
-%{_bindir}/mfsdiagtools
 %{_bindir}/mfscheckfile
 %{_bindir}/mfsdirinfo
 %{_bindir}/mfsfileinfo
 %{_bindir}/mfsfilerepair
 %{_bindir}/mfsfilepaths
-%{_bindir}/mfssnapshots
 %{_bindir}/mfsmakesnapshot
 %{_bindir}/mfsrmsnapshot
 %{_bindir}/mfsappendchunks
-%{_bindir}/mfsfacl
 %{_bindir}/mfsgetfacl
 %{_bindir}/mfssetfacl
-%{_bindir}/mfssclass
 %{_bindir}/mfsgetsclass
 %{_bindir}/mfssetsclass
 %{_bindir}/mfscopysclass
 %{_bindir}/mfsxchgsclass
-%{_bindir}/mfstrashtime
 %{_bindir}/mfsgettrashtime
 %{_bindir}/mfssettrashtime
 %{_bindir}/mfscopytrashtime
-%{_bindir}/mfstrashretention
 %{_bindir}/mfsgettrashretention
 %{_bindir}/mfssettrashretention
 %{_bindir}/mfscopytrashretention
-%{_bindir}/mfseattr
 %{_bindir}/mfsgeteattr
 %{_bindir}/mfsseteattr
 %{_bindir}/mfsdeleattr
 %{_bindir}/mfscopyeattr
-%{_bindir}/mfsquota
 %{_bindir}/mfsgetquota
 %{_bindir}/mfssetquota
 %{_bindir}/mfsdelquota
 %{_bindir}/mfscopyquota
-%{_bindir}/mfsarchive
 %{_bindir}/mfschkarchive
 %{_bindir}/mfsclrarchive
 %{_bindir}/mfssetarchive
-%{_bindir}/mfsscadmin
 %{_bindir}/mfscreatesclass
 %{_bindir}/mfsmodifysclass
 %{_bindir}/mfsdeletesclass
@@ -445,11 +437,9 @@ exit 0
 %{_bindir}/mfsrenamesclass
 %{_bindir}/mfslistsclass
 %{_bindir}/mfsimportsclass
-%{_bindir}/mfspatadmin
 %{_bindir}/mfscreatepattern
 %{_bindir}/mfsdeletepattern
 %{_bindir}/mfslistpattern
-%{_bindir}/mfstrashtool
 %{_bindir}/mfsgetgoal
 %{_bindir}/mfssetgoal
 %{_bindir}/mfscopygoal
@@ -551,35 +541,30 @@ exit 0
 
 
 
-%files cgi
-%defattr(644,root,root,755)
-%doc NEWS README
-%dir %{_datadir}/mfscgi
-%attr(755,root,root) %{_datadir}/mfscgi/*.cgi
-%{_datadir}/mfscgi/*.css
-%{_datadir}/mfscgi/*.gif
-%{_datadir}/mfscgi/*.html
-%{_datadir}/mfscgi/*.ico
-%{_datadir}/mfscgi/*.js
-%{_datadir}/mfscgi/*.py
-# %{_datadir}/mfscgi/*.png
-%{_datadir}/mfscgi/*.svg
-
-
-
-
-%files cgiserv
+%files gui
 %defattr(644,root,root,755)
 %doc NEWS README
 %attr(755,root,root) %{_sbindir}/mfscgiserv
-%{_mandir}/man8/mfscgiserv.8*
+%attr(755,root,root) %{_sbindir}/mfsgui
+%{_mandir}/man5/mfsgui.cfg.5*
+%{_mandir}/man8/mfsgui.8*
+%{mfsconfdir}/mfsgui.cfg.sample
 %dir %{_localstatedir}/mfs
 %if %{_with_sysv}
-%attr(754,root,root) %{_initrddir}/moosefs-cgiserv
+%attr(754,root,root) %{_initrddir}/moosefs-gui
 %endif
 %if %{_with_systemd}
-%{systemdunitdir}/moosefs-cgiserv.service
+%{systemdunitdir}/moosefs-gui.service
+%{systemdunitdir}/moosefs-gui@.service
 %endif
+%dir %{_datadir}/mfscgi
+%attr(755,root,root) %{_datadir}/mfscgi/*.cgi
+%{_datadir}/mfscgi/requests.cfg
+%{_datadir}/mfscgi/assets/*
+%{_datadir}/mfscgi/common/*
+%{_datadir}/mfscgi/views/*
+
+
 
 
 
@@ -594,6 +579,9 @@ exit 0
 
 
 %changelog
+* Thu Jun 05 2025 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 4.56.7-1
+- new package gui (replaces cgi and deprecates cgiserv), removed cgiserv
+
 * Fri Nov 03 2023 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 4.52.0-1
 - mfssupervisor moved back to master package
 

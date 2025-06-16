@@ -2,7 +2,7 @@ Source: moosefs
 Section: admin
 Priority: extra
 Maintainer: MooseFS Team <contact@moosefs.com>
-Build-Depends: debhelper (>= 9.0), autotools-dev, libc6-dev, libfuse-dev (>= 2.6) | libfuse3-dev (>=3.4), pkg-config, zlib1g-dev, libpcap0.8-dev, python (>= 2.5) | python3
+Build-Depends: debhelper (>= 9.0), autotools-dev, libc6-dev, libfuse-dev (>= 2.6) | libfuse3-dev (>=3.4), pkg-config, zlib1g-dev, libpcap0.8-dev, python3 (>= 3.4)
 Standards-Version: 3.7.3
 Homepage: http://moosefs.com/
 
@@ -37,34 +37,29 @@ Description: MooseFS client tools
 
 Package: moosefs-cli
 Architecture: any
-Depends: ${misc:Depends}, python (>= 2.5) | python3
-Description: MooseFS CLI Utility
+Depends: ${misc:Depends}, python3 (>= 3.4)
+Description: MooseFS CLI utility
  This package will install MooseFS component responsible
- for monitoring. This is simple command line utility which
+ for monitoring. This is a simple command line utility which
  can be used for showing list of connected chunkservers,
  clients, health of the system, some stats etc.
 
-Package: moosefs-cgi
+Package: moosefs-gui
+Provides: moosefs-cgi, moosefs-cgiserv
+Replaces: moosefs-cgi, moosefs-cgiserv
+Conflicts: moosefs-cgi, moosefs-cgiserv
 Architecture: any
-Depends: ${misc:Depends}, python (>= 2.5) | python3
-Description: MooseFS CGI Monitor
+Depends: ${shlibs:Depends}, ${misc:Depends}, moosefs-cli, adduser, python3 (>= 3.4)
+Description: MooseFS web-based GUI
  This package will install MooseFS component responsible
- for monitoring. This is simple CGI utility which
+ for monitoring. This is a simple web-based utility, which
  can be used for showing list of connected chunkservers,
  clients, health of the system, some stats etc.
-
-Package: moosefs-cgiserv
-Architecture: any
-Depends: ${misc:Depends}, moosefs-cgi, adduser, python (>= 2.5) | python3
-Description: Simple CGI-capable HTTP server to run MooseFS CGI Monitor
- This package will install MooseFS component responsible
- for monitoring. This is simple CGI web server that can be
- used with MooseFS cgi script.
 
 Package: moosefs-netdump
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: MooseFS network packet dump utility
  This package will install MooseFS monitoring tool
- This is simple netdump utility which can interpret
+ This is a simple netdump utility which can interpret
  MooseFS network traffic and show it in colorful form.

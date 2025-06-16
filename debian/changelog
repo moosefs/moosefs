@@ -1,3 +1,17 @@
+moosefs (4.57.7-1) unstable; urgency=medium
+
+  * (all) joined packages cgi and cgiserv to a new gui package
+  * (gui) added dedicated GUI server
+  * (gui) gui refactor
+  * (cli) cli refactor
+  * (gui) added support for Prometheus metrics
+  * (master) fixed freeing waiting locks from data structures
+  * (daemons) added condition to skip socket routines when poll returned zero
+  * (daemons) fixed disabling OOM killer
+  * (client) removed using potentially dangerous sprintf function
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 16 Jun 2025 13:00:00 +0200
+
 moosefs (4.57.6-1) unstable; urgency=medium
 
   * (master) fixed predefined storage classes

@@ -1,0 +1,60 @@
+######################################################################
+# STARTUP OPTIONS - changes in this section require process restart. #
+######################################################################
+
+# user to run daemon as (default is @DEFAULT_USER@)
+# WORKING_USER = @DEFAULT_USER@
+
+# group to run daemon as (optional - if empty then default user group will be used)
+# WORKING_GROUP = @DEFAULT_GROUP@
+
+# name of process to place in syslog messages (default is mfsgui)
+# SYSLOG_IDENT = mfsgui
+
+# whether to perform mlockall() to avoid swapping out mfsgui process (default is 0, i.e. no)
+# LOCK_MEMORY = 0
+
+# Linux only: disable out of memory killer (default is 1)
+# DISABLE_OOM_KILLER = 1
+
+# nice level to run daemon with (default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with)
+# NICE_LEVEL = -19
+
+# set default umask for group and others (user has always 0, default is 027 - block write for group and block all for others)
+# FILE_UMASK = 027
+
+# where to store daemon lock file (default is @DATA_PATH@)
+# DATA_PATH = @DATA_PATH@
+
+##########################################################################
+# RUNTIME OPTIONS - changes in this section require only process reload. #
+##########################################################################
+
+# minimum level of messages that will be reported by gui server; levels in order of importance: ERROR, WARNING, NOTICE, INFO, DEBUG
+# SYSLOG_MIN_LEVEL = INFO
+
+# reported messages of level lower than set here will be elevated to this level (i.e. if SYSLOG_MIN_LEVEL is set to DEBUG and SYSLOG_ELEVATE_TO is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE)
+# SYSLOG_ELEVATE_TO = NOTICE
+
+#############################################################################
+# CONNECTION OPTIONS - changes in this section require only process reload. #
+#############################################################################
+
+# IP address to listen for web browsers connections (* means any)
+# GUISERV_LISTEN_HOST = *
+
+# port to listen for web browsers connections (default is @DEFAULT_GUI_HTTP_PORT@)
+# GUISERV_LISTEN_PORT = @DEFAULT_GUI_HTTP_PORT@
+
+# http connection timeout, in seconds (default is 300)
+# GUISERV_TIMEOUT = 300
+
+##############################################################################
+# HTTP SERVER OPTIONS - changes in this section require only process reload. #
+##############################################################################
+
+# document root
+# ROOT_DIR = @CGIDIR@
+
+# requests configuration file (absolute path or path relative to the ROOT_DIR); the content of this file should NEVER be modified by the user
+# REQUESTS_FILE = requests.cfg

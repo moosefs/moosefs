@@ -1,0 +1,6 @@
+etc/mfs/mfsgui.cfg.sample
+usr/sbin/mfsgui
+usr/sbin/mfscgiserv
+usr/share/man/man5/mfsgui.cfg.5
+usr/share/man/man8/mfsgui.8
+usr/share/mfscgi

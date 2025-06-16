@@ -1,5 +1,0 @@
-sbin/mfscgiserv
-man/man8/mfscgiserv.8.gz
-@owner mfs
-@group mfs
-@dir %%MFS_WORKDIR%%/mfs

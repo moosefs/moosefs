@@ -1,13 +1,17 @@
-# Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
+PORTNAME= 		moosefs-cgi
+PORTVERSION=		0.0.0
+CATEGORIES= 		filesystems
+MAINTAINER=		freebsd@moosefs.com
+COMMENT=		Meta package to redirect old -cgi package to new -gui package
+MASTER_SITES=
 
-PKGNAMESUFFIX=	-cgi
+RUN_DEPENDS=		moosefs-gui>0:filesystems/moosefs-gui
 
-COMMENT=	MooseFS CGI interface
+NO_BUILD= 		yes
+NO_ARCH= 		yes
+USES=			metaport
 
-LICENSE=	GPLv2
+DEPRECATED=		Renamed to moosefs-gui
+EXPIRATION_DATE=	2026-12-31
 
-MFS_COMPONENT=	cgi
-
-MASTERDIR=	${.CURDIR}/../moosefs-master
-
-.include "${MASTERDIR}/Makefile"
+.include <bsd.port.mk>

@@ -36,27 +36,19 @@ CONFIGURE_ARGS+=	--localstatedir=${MFS_WORKDIR} \
 CONFLICTS=		moosefs2-${MFS_COMPONENT}-*
 CONFLICTS+=		moosefs3-${MFS_COMPONENT}-*
 
-.if ${MFS_COMPONENT} == cgi
+.if ${MFS_COMPONENT} == gui
 MFS_CGIDIR=		${PREFIX}/share/mfscgi
 USES=			python
-CONFIGURE_ARGS+=	--enable-mfscgi \
-			--with-mfscgi-dir=${MFS_CGIDIR}
-.else
-CONFIGURE_ARGS+=	--disable-mfscgi
-.endif
-
-.if ${MFS_COMPONENT} == cgiserv
-MFS_CGISERVDIR=		${PREFIX}/sbin
-USES=			python
-USE_RC_SUBR=		mfscgiserv
-SUB_FILES+=		pkg-message-cgiserv
-PKGMESSAGE=		${WRKDIR}/pkg-message-cgiserv
+USE_RC_SUBR=		mfsgui
+SUB_FILES+=		pkg-message-gui
+PKGMESSAGE=		${WRKDIR}/pkg-message-gui
 PLIST_SUB+=		MFS_WORKDIR="${MFS_WORKDIR}"
-CONFIGURE_ARGS+=	--enable-mfscgiserv \
-			--with-mfscgiserv-dir=${MFS_CGISERVDIR}
-RUN_DEPENDS=		moosefs-cgi>0:filesystems/moosefs-cgi
+CONFIGURE_ARGS+=	--enable-mfscgi --enable-mfsgui \
+			--with-mfscgi-dir=${MFS_CGIDIR}
+RUN_DEPENDS=		moosefs-cli>0:filesystems/moosefs-cli
+CONFLICTS+=		moosefs-cgiserv
 .else
-CONFIGURE_ARGS+=	--disable-mfscgiserv
+CONFIGURE_ARGS+=	--disable-mfscgi --disable-mfsgui
 .endif
 
 .if ${MFS_COMPONENT} == chunkserver

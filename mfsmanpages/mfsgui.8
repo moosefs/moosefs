@@ -1,9 +1,8 @@
-.TH mfsmetalogger "8" "June 2025" "MooseFS 4.57.7-1" "This is part of MooseFS"
-.ss 12 0
+.TH mfsgui "8" "June 2025" "MooseFS 4.57.7-1" "This is part of MooseFS"
 .SH NAME
-mfsmetalogger \- start, restart or stop MooseFS metalogger process
+mfsgui \- start, restart or stop MooseFS GUI server
 .SH SYNOPSIS
-.B mfsmetalogger
+.B mfsgui
 [\fB\-c\fP \fICFGFILE\fP]
 [\fB\-f\fP]
 [\fB\-d\fP]
@@ -12,12 +11,12 @@ mfsmetalogger \- start, restart or stop MooseFS metalogger process
 [\fB\-t\fP \fILOCKTIMEOUT\fP]
 [\fIACTION\fP]
 .PP
-.B mfsmetalogger \-v
+.B mfsgui \-v
 .PP
-.B mfsmetalogger \-h
+.B mfsgui \-h
 .SH DESCRIPTION
 .PP
-\fBmfsmetalogger\fP is the metadata replication server of MooseFS.
+\fBmfsgui\fP is the MooseFS GUI server. It consist of a HTTP server and scripts that make up the GUI interface to MooseFS. The user can access the GUI via any web browser, using the IP (or appropriate domain name) and port defined in \fBmfsgui.cfg\fP.
 .SH OPTIONS
 .TP
 \fB\-v\fP
@@ -28,7 +27,7 @@ print usage information and exit
 .TP
 \fB\-c\fP \fICFGFILE\fP
 specify alternative path of configuration file (default is
-\fBmfsmetalogger.cfg\fP in system configuration directory)
+\fBmfsgui.cfg\fP in system configuration directory)
 .TP
 \fB\-f\fP
 run in foreground, don't daemonize
@@ -46,43 +45,37 @@ do not attempt to increase limit of core dump size
 how long to wait for lockfile (in seconds; default is 60 seconds)
 .TP
 \fIACTION\fP
-tells metalogger to perform one of the following actions:
+tells MooseFS GUI server to perform one of the following actions:
 .RS 
 .IP start 9
-Start metalogger process if the process is not already running, otherwise display error message.
+Start MooseFS GUI server process if the process is not already running, otherwise display error message.
 .IP stop 
-Stop metalogger process if the process is running, otherwise display error message.
+Stop MooseFS GUI server process if the process is running, otherwise display error message.
 .IP restart 
-(default action) If the metalogger process is running, restart it, if it's not running, start it. 
+(default action) If the MooseFS GUI server process is running, restart it, if it's not running, start it. 
 .IP reload
-Send a signal to metalogger process to reload config files.
+Send a signal to MooseFS GUI server process to reload config files.
 .IP info
-Send a singal to metalogger process to dump debug information file in working directory.
+Send a singal to MooseFS GUI server process to dump debug information file in working directory.
 .IP test
-Displays "mfsmetalogger pid: PID" if the metalogger is running (and return 0) or  "mfsmetalogger is not running" otherwise (and return 1).
+Displays "mfsgui pid: PID" if the MooseFS GUI server is running (and return 0) or  "mfsgui is not running" otherwise (and return 1).
 .IP kill
-Send termination signal to metalogger process.
+Send termination signal to MooseFS GUI server process.
 .IP restore
 Not implemented.
 .RE
 .SH FILES
 .TP
-\fBmfsmetalogger.cfg\fP
-configuration file for MooseFS metalogger process; refer to
-\fBmfsmetalogger.cfg\fP\|(5) manual for details
+.BR mfsgui.cfg
+configuration file for MooseFS GUI server process; refer to
+\fBmfsgui.cfg\fP\|(5) manual for details
 .TP
-.BR .mfsmetalogger.lock
-lock file of running MooseFS metalogger process
+.BR .mfsgui.lock
+lock file of running MooseFS GUI server process
 (created in data directory)
 .TP
-\fBchangelog_ml.\fP*\fB.mfs\fP
-MooseFS filesystem metadata change logs (backup of master change log files, created in data directory)
-.TP
-\fBmetadata.ml.mfs.back\fP
-Latest copy of complete metadata.mfs.back file from MooseFS master (created in data directory)
-.TP
-\fB.mfsmetalogger_info.txt\fP
-metalogger info file, created by sending the process INFO signal, with work parameters that can be used for debugging/support purposes (created in data directory)
+\fIscripts\fP
+various python, javascript, and other (static) files used to serve the GUI interface via HTTP; these files are installed in whatever directory is the default at installation time for \fBROOT_DIR\fP in \fBmfsgui.cfg\fP
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.
 .SH COPYRIGHT
@@ -105,4 +98,4 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
 or visit http://www.gnu.org/licenses/gpl-2.0.html
 .SH "SEE ALSO"
 .BR mfsmaster (8),
-.BR mfsmetalogger.cfg (5)
+.BR mfsgui.cfg (5)

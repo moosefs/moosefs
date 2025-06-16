@@ -1,0 +1,15 @@
+[Unit]
+Description=MooseFS GUI Server
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Type=forking
+ExecStart=@SBIN_PATH@/mfsgui start
+ExecStop=@SBIN_PATH@/mfsgui stop
+ExecReload=@SBIN_PATH@/mfsgui reload
+PIDFile=@DATA_PATH@/.mfsgui.lock
+Restart=on-abnormal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,99 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:		moosefs-gui
+# Required-Start:	$network $remote_fs
+# Required-Stop:	$remote_fs
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	Start moosefs-gui http server at boot time
+# Description:		moosefs-gui provide MooseFS GUI management.
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/sbin/mfsgui
+NAME=moosefs-gui
+DEFAULT_USER=mfs
+DEFAULT_GROUP=mfs
+DEFAULT_DATADIR=/var/lib/mfs
+DEFAULT_CFG=/etc/mfs/mfsgui.cfg
+COMPAT_CFG=/etc/mfsgui.cfg
+
+test -e $DAEMON || exit 0
+
+# Include moosefs-gui defaults if available
+. /lib/lsb/init-functions
+MFSGUI_ENABLE=false
+MFSGUI_DEFAULTS_FILE=/etc/default/moosefs-gui
+MFSGUI_CONFIG_FILE=
+if [ -s "$MFSGUI_DEFAULTS_FILE" ]; then
+	. "$MFSGUI_DEFAULTS_FILE"
+	case "x$MFSGUI_ENABLE" in
+		xtrue) ;;
+		xfalse)
+			log_warning_msg "$NAME not enabled in \"$MFSGUI_DEFAULTS_FILE\", exiting..."
+			exit 0
+			;;
+		*)
+			log_failure_msg "value of MFSGUI_ENABLE must be either 'true' or 'false';"
+			log_failure_msg "not starting ${NAME}."
+			exit 1
+			;;
+	esac
+fi
+
+set -e
+
+if [ -n "$MFSGUI_CONFIG_FILE" ]; then
+	CFGFILE="$MFSGUI_CONFIG_FILE"
+elif [ -f "$DEFAULT_CFG" -o ! -f "$COMPAT_CFG" ]; then
+	CFGFILE="$DEFAULT_CFG"
+else
+	CFGFILE="$COMPAT_CFG"
+fi
+if [ -s "$CFGFILE" ]; then
+	DATADIR=$(sed -e 's/[ 	]#.*$//' -n -e 's/^DATA_PATH[ 	]*=[ 	]*\([^ 	]*\)[ 	]*$/\1/p' "$CFGFILE")
+	MFSUSER=$(sed -e 's/[ 	]#.*$//' -n -e 's/^WORKING_USER[ 	]*=[ 	]*\([^ 	]*\)[ 	]*$/\1/p' "$CFGFILE")
+	MFSGROUP=$(sed -e 's/[ 	]#.*$//' -n -e 's/^WORKING_GROUP[ 	]*=[ 	]*\([^ 	]*\)[ 	]*$/\1/p' "$CFGFILE")
+else
+	DATADIR=
+	MFSUSER=
+	MFSGROUP=
+fi
+: ${DATADIR:=$DEFAULT_DATADIR}
+: ${MFSUSER:=$DEFAULT_USER}
+: ${MFSGROUP:=$DEFAULT_GROUP}
+
+case "$1" in
+	start)
+		echo "Starting ${NAME}:"
+		$DAEMON ${MFSGUI_CONFIG_FILE:+-c $MFSGUI_CONFIG_FILE} start
+		;;
+
+	stop)
+		echo "Stopping ${NAME}:"
+		$DAEMON ${MFSGUI_CONFIG_FILE:+-c $MFSGUI_CONFIG_FILE} stop
+		;;
+
+	reload|force-reload)
+		echo "Reloading ${NAME}:"
+		$DAEMON ${MFSGUI_CONFIG_FILE:+-c $MFSGUI_CONFIG_FILE} reload
+		;;
+
+	restart)
+		echo "Restarting ${NAME}:"
+		$DAEMON ${MFSGUI_CONFIG_FILE:+-c $MFSGUI_CONFIG_FILE} restart
+		;;
+	
+	status)
+		$DAEMON ${MFSGUI_CONFIG_FILE:+-c $MFSGUI_CONFIG_FILE} test 2> /dev/null
+		;;
+
+	*)
+		N=/etc/init.d/$NAME
+		echo "Usage: $N {start|stop|restart|reload|force-reload|status}" >&2
+		exit 1
+		;;
+esac
+
+exit 0

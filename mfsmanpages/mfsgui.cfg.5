@@ -1,0 +1,85 @@
+.TH mfsgui.cfg "5" "June 2025" "MooseFS 4.57.7-1" "This is part of MooseFS"
+.SH NAME
+mfsgui.cfg \- main configuration file for \fBmfsgui\fP
+.SH DESCRIPTION
+The file \fBmfsgui.cfg\fP contains configuration of MooseFS GUI server process.
+.SH SYNTAX
+.PP
+Syntax is:
+.TP
+.IB OPTION " = " VALUE
+.PP
+Lines starting with \fB#\fP character are ignored as comments.
+.SS STARTUP OPTIONS 
+Changes in this section require process restart.
+.TP
+.B WORKING_USER
+user to run daemon as
+.TP
+.B WORKING_GROUP
+group to run daemon as; optional value - if empty then default user group will be used
+.TP
+.B SYSLOG_IDENT
+name of process to place in syslog messages; default is mfsgui
+.TP
+.B LOCK_MEMORY
+whether to perform mlockall() to avoid swapping out mfsgui process; default is 0, i.e. no
+.TP
+.B DISABLE_OOM_KILLER
+disable out of memory killer (Linux only, default is 1)
+.TP
+.B NICE_LEVEL
+nice level to run daemon with; default is -19; note: process must be started as root to increase priority, if setting of priority fails, process retains the nice level it started with
+.TP
+.B FILE_UMASK
+set default umask for group and others (user has always 0); default is 027 - block write for group and block all for others
+.TP
+.B DATA_PATH
+where to store daemon lock file
+.SS RUNTIME OPTIONS 
+Changes in this section require only process reload.
+.TP
+.B SYSLOG_MIN_LEVEL
+minimum level of messages that will be reported by chunkserver; levels in order of importance: ERROR, WARNING, NOTICE, INFO, DEBUG (default is INFO)
+.TP
+.B SYSLOG_ELEVATE_TO
+reported messages of level lower than set by this option will be elevated to this level (i.e. if \fBSYSLOG_MIN_LEVEL\fP is set to DEBUG and \fBSYSLOG_ELEVATE_TO\fP is set to NOTICE, all INFO and DEBUG messages will be sent to syslog as NOTICE ; default is NOTICE)
+.SS CONNECTION OPTIONS
+Changes in this section require only process reload.
+.TP
+.B GUISERV_LISTEN_HOST
+IP address to listen on for incoming http connections (\fB*\fP means any)
+.TP
+.B GUISERV_LISTEN_PORT
+port to listen on for incoming http connections
+.TP
+.B GUISERV_TIMEOUT
+http connection timeout, in seconds (default is 300)
+.SS HTTP SERVER OPTIONS
+Changes in this section require only process reload.
+.TP
+.B ROOT_DIR
+document root for http server
+.TP
+.B REQUESTS_FILE
+requests configuration file, absolute path or path relative to the \fBROOT_DIR\fP; the content of this file should NEVER be modified by the user
+.SH COPYRIGHT
+Copyright (C) 2025 Jakub Kruszona-Zawadzki, Saglabs SA
+
+This file is part of MooseFS.
+
+MooseFS is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2 (only).
+
+MooseFS is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MooseFS; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02111-1301, USA
+or visit http://www.gnu.org/licenses/gpl-2.0.html
+.SH "SEE ALSO"
+.BR mfsgui (8)

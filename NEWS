@@ -2,6 +2,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 4.57.7-1 (WIP)
 
+  - (all) joined packages cgi and cgiserv to a new gui package
   - (gui) added dedicated GUI server
   - (gui) gui refactor
   - (cli) cli refactor

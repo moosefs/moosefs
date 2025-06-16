@@ -16,6 +16,12 @@ else
 CHUNKSERVERDIR =
 endif
 
+if BUILD_GUI
+GUIDIR = mfsgui
+else
+GUIDIR =
+endif
+
 if BUILD_CLIENT
 CLIENTDIR = mfsclient
 else
@@ -47,7 +53,7 @@ BUILDNO = @buildno@
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = mfstests mfsdata mfsmanpages $(MASTERDIR) $(METALOGGERDIR) $(CHUNKSERVERDIR) $(CLIENTDIR) $(SCRIPTSDIR) $(NETDUMPDIR) $(SYSTEMDDIR)
+SUBDIRS = mfstests mfsdata mfsmanpages $(MASTERDIR) $(METALOGGERDIR) $(CHUNKSERVERDIR) $(GUIDIR) $(CLIENTDIR) $(SCRIPTSDIR) $(NETDUMPDIR) $(SYSTEMDDIR)
 
 EXTRA_DIST = m4/ax_pthread.m4 m4/ax_check_compile_flag.m4 debian rpm macosx freebsd debian_sysv_to_systemd.sh cross_enable.sh linux_build.sh macosx_build.sh freebsd_build.sh sanitize_build.sh README.md buildno.txt
 
@@ -55,11 +61,17 @@ distclean-local:
 	-rm -rf mfscommon/$(DEPDIR)
 
 dist-hook:
-	TODAY=`date "+%B %Y"` ; \
+	@echo "Preprocessing files for distribution:"
+
+	@echo "  - manpages: fixing dates and versions"
+	@TODAY=`date "+%B %Y"` ; \
 	for f in $(distdir)/mfsmanpages/*.[1-8] ; do \
 		mv $$f tmp ; sed -e "1s#MooseFS [1-9]\{1,5\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}-[0-9]\{1,2\}#MooseFS $(VERSION)-$(RELEASE)#" -e "1s#[A-Z][a-z]* [0-9][0-9][0-9][0-9]#$$TODAY#" < tmp > $$f ; \
-	done ; \
-	rm -f tmp
+	done
+	@echo "  - freebsd pkg-plist.gui: appending mfsscripts subfolders"
+	@find $(distdir)/mfsscripts -mindepth 2 -type f ! -name "*.in" | sed 's|^$(distdir)/mfsscripts/|share/mfscgi/|' >> $(distdir)/freebsd/files/pkg-plist.gui
+
+	@rm -f tmp
 
 mfsdist: dist
 	mv $(distdir).tar.gz ../moosefs-dist/$(distdir)-b$(BUILDNO).tar.gz ; \

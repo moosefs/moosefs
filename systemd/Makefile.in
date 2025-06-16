@@ -91,13 +91,14 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-@INSTALL_CGISERV_TRUE@am__append_1 = moosefs-cgiserv.service
-@BUILD_CHUNKSERVER_TRUE@am__append_2 = moosefs-chunkserver.service \
+@BUILD_CHUNKSERVER_TRUE@am__append_1 = moosefs-chunkserver.service \
 @BUILD_CHUNKSERVER_TRUE@	moosefs-chunkserver@.service
-@BUILD_MASTER_TRUE@am__append_3 = moosefs-master.service \
+@BUILD_MASTER_TRUE@am__append_2 = moosefs-master.service \
 @BUILD_MASTER_TRUE@	moosefs-master@.service
-@BUILD_METALOGGER_TRUE@am__append_4 = moosefs-metalogger.service \
+@BUILD_METALOGGER_TRUE@am__append_3 = moosefs-metalogger.service \
 @BUILD_METALOGGER_TRUE@	moosefs-metalogger@.service
+@BUILD_GUI_TRUE@am__append_4 = moosefs-gui.service \
+@BUILD_GUI_TRUE@	moosefs-gui@.service
 subdir = systemd
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_compile_flag.m4 \
@@ -110,10 +111,11 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES = moosefs-cgiserv.service \
-	moosefs-chunkserver.service moosefs-chunkserver@.service \
-	moosefs-master.service moosefs-master@.service \
-	moosefs-metalogger.service moosefs-metalogger@.service
+CONFIG_CLEAN_FILES = moosefs-chunkserver.service \
+	moosefs-chunkserver@.service moosefs-master.service \
+	moosefs-master@.service moosefs-metalogger.service \
+	moosefs-metalogger@.service moosefs-gui.service \
+	moosefs-gui@.service
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -164,9 +166,10 @@ am__installdirs = "$(DESTDIR)$(systemdunitdir)"
 DATA = $(systemdunit_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 am__DIST_COMMON = $(srcdir)/Makefile.in \
-	$(srcdir)/moosefs-cgiserv.service.in \
 	$(srcdir)/moosefs-chunkserver.service.in \
 	$(srcdir)/moosefs-chunkserver@.service.in \
+	$(srcdir)/moosefs-gui.service.in \
+	$(srcdir)/moosefs-gui@.service.in \
 	$(srcdir)/moosefs-master.service.in \
 	$(srcdir)/moosefs-master@.service.in \
 	$(srcdir)/moosefs-metalogger.service.in \
@@ -185,15 +188,15 @@ CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CGIDIR = @CGIDIR@
-CGISERVDIR = @CGISERVDIR@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
 CTAGS = @CTAGS@
 CYGPATH_W = @CYGPATH_W@
 DATA_PATH = @DATA_PATH@
-DEFAULT_CGISERV_HTTP_PORT = @DEFAULT_CGISERV_HTTP_PORT@
+DEFAULT_CGIDIR = @DEFAULT_CGIDIR@
 DEFAULT_CS_DATA_PORT = @DEFAULT_CS_DATA_PORT@
 DEFAULT_GROUP = @DEFAULT_GROUP@
+DEFAULT_GUI_HTTP_PORT = @DEFAULT_GUI_HTTP_PORT@
 DEFAULT_MASTERNAME = @DEFAULT_MASTERNAME@
 DEFAULT_MASTER_CLIENT_PORT = @DEFAULT_MASTER_CLIENT_PORT@
 DEFAULT_MASTER_CONTROL_PORT = @DEFAULT_MASTER_CONTROL_PORT@
@@ -369,8 +372,6 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-moosefs-cgiserv.service: $(top_builddir)/config.status $(srcdir)/moosefs-cgiserv.service.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 moosefs-chunkserver.service: $(top_builddir)/config.status $(srcdir)/moosefs-chunkserver.service.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 moosefs-chunkserver@.service: $(top_builddir)/config.status $(srcdir)/moosefs-chunkserver@.service.in
@@ -382,6 +383,10 @@ moosefs-master@.service: $(top_builddir)/config.status $(srcdir)/moosefs-master@
 moosefs-metalogger.service: $(top_builddir)/config.status $(srcdir)/moosefs-metalogger.service.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 moosefs-metalogger@.service: $(top_builddir)/config.status $(srcdir)/moosefs-metalogger@.service.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+moosefs-gui.service: $(top_builddir)/config.status $(srcdir)/moosefs-gui.service.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+moosefs-gui@.service: $(top_builddir)/config.status $(srcdir)/moosefs-gui@.service.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
 mostlyclean-libtool:

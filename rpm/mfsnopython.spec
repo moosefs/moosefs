@@ -18,13 +18,23 @@
 %define _groupname	mfs
 %define _username	mfs
 
+# Turn off debug packages
+%global _enable_debug_package 0
+%global debug_package %{nil}
+
+# Turn off strip'ng of binaries
+%global __os_install_post %{nil}
+
+# Turn off strip'ng of binaries
+%global __strip /bin/true
+
 %define rpm_maj_v %(eval "rpm --version | cut -d' ' -f3 | cut -d'.' -f1")
 %define rpm_min_v %(eval "rpm --version | cut -d' ' -f3 | cut -d'.' -f2")
 %define rpm_has_bool_ops %(eval "if [ %{rpm_maj_v} -ge 5 -o %{rpm_maj_v} -ge 4 -a %{rpm_min_v} -ge 13 ]; then echo 1; else echo 0; fi")
 
 Summary:	MooseFS - distributed, fault tolerant file system
 Name:		moosefs
-Version:	4.23.2
+Version:	4.57.7
 Release:	1%{?_relname}
 License:	commercial
 Group:		System Environment/Daemons
@@ -38,11 +48,6 @@ BuildRequires:	fuse-devel
 BuildRequires:	pkgconfig
 BuildRequires:	zlib-devel
 BuildRequires:	libpcap-devel
-%if %{rpm_has_bool_ops}
-BuildRequires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
-%else
-BuildRequires:	python
-%endif
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Requires(pre):	shadow-utils
 
@@ -79,16 +84,6 @@ MooseFS metalogger (metadata replication) server.
 
 
 
-%package supervisor
-Summary:	MooseFS supervisor tool
-Group:		System Environment/Daemons
-
-%description supervisor
-MooseFS supervisor tool (master HA management).
-
-
-
-
 %package chunkserver
 Summary:	MooseFS data server
 Group:		System Environment/Daemons
@@ -109,48 +104,6 @@ MooseFS client: mfsmount and mfstools.
 
 
 
-%package cli
-Summary:	MooseFS CLI Utility
-Group:		System Environment/Daemons
-#%if %{rpm_has_bool_ops}
-#Requires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
-#%else
-#Requires:	python >= 2.5
-#%endif
-Requires:	%{name}-supervisor >= 1.7.25-1
-
-%description cli
-MooseFS CLI utilities.
-
-
-
-
-%package cgi
-Summary:	MooseFS CGI Monitor
-Group:		System Environment/Daemons
-#%if %{rpm_has_bool_ops}
-#Requires:	(python3 or python2 or /usr/bin/python3 or /usr/bin/python2 or /usr/bin/python)
-#%else
-#Requires:	python >= 2.5
-#%endif
-Requires:	%{name}-supervisor >= 1.7.25-1
-
-%description cgi
-MooseFS CGI monitor.
-
-
-
-
-%package cgiserv
-Summary:	Simple CGI-capable HTTP server to run MooseFS CGI Monitor
-Group:		System Environment/Daemons
-Requires:	%{name}-cgi
-
-%description cgiserv
-Simple CGI-capable HTTP server to run MooseFS CGI monitor.
-
-
-
 
 %package netdump
 Summary:	MooseFS network packet dump utility
@@ -167,7 +120,7 @@ MooseFS network packet dump utility
 %setup -q
 
 %build
-%configure --with-default-user=%{_username} --with-default-group=%{_groupname} \
+%configure --with-default-user=%{_username} --with-default-group=%{_groupname} --disable-mfscgi --disable-mfsgui --disable-mfscli \
 %if %{_with_systemd}
 	--with-systemdsystemunitdir=%{systemdunitdir}
 %endif
@@ -196,7 +149,7 @@ fi
 
 %if "%{distro}" == "rhsysv"
 install -d $RPM_BUILD_ROOT%{_initrddir}
-for f in rpm/rh/*.init ; do
+for f in rpm/rh/moosefs-chunkserver.init rpm/rh/moosefs-master.init rpm/rh/moosefs-metalogger.init ; do
 	sed -e 's,@sysconfdir@,%{_sysconfdir},g;
 		s,@sbindir@,%{_sbindir},g;
 		s,@initddir@,%{_initrddir},g' $f > $RPM_BUILD_ROOT%{_initrddir}/$(basename $f .init)
@@ -217,7 +170,7 @@ getent passwd %{_username} >/dev/null || \
 exit 0
 
 %post master
-for fname in mfsexports mfstopology mfsmaster; do
+for fname in mfsexports mfstopology mfsipmap mfsmaster; do
 	if [ -f %{mfsconfdir}/${fname}.cfg.dist ]; then
 		rm -f %{mfsconfdir}/${fname}.cfg.dist
 	fi
@@ -296,20 +249,6 @@ exit 0
 
 
 
-%pre cgiserv
-getent group %{_groupname} >/dev/null || groupadd -r %{_groupname}
-getent passwd %{_username} >/dev/null || \
-    useradd -r -g %{_groupname} -d %{_localstatedir}/mfs -s /sbin/nologin \
-    -c "MooseFS" %{_username}
-exit 0
-
-%post cgiserv
-chown -R %{_username}:%{_groupname} %{_localstatedir}/mfs
-chmod -R u+rwx %{_localstatedir}/mfs
-exit 0
-
-
-
 
 %files master
 %defattr(644,root,root,755)
@@ -317,18 +256,25 @@ exit 0
 %attr(755,root,root) %{_sbindir}/mfsmaster
 %attr(755,root,root) %{_sbindir}/mfsmetadump
 %attr(755,root,root) %{_sbindir}/mfsmetadirinfo
+%attr(755,root,root) %{_sbindir}/mfsmetasearch
 %attr(755,root,root) %{_sbindir}/mfsmetarestore
 %attr(755,root,root) %{_sbindir}/mfsstatsdump
+%attr(755,root,root) %{_sbindir}/mfssupervisor
 %{_mandir}/man5/mfsexports.cfg.5*
 %{_mandir}/man5/mfstopology.cfg.5*
+%{_mandir}/man5/mfsipmap.cfg.5*
 %{_mandir}/man5/mfsmaster.cfg.5*
+%{_mandir}/man7/moosefs.7*
 %{_mandir}/man8/mfsmaster.8*
 %{_mandir}/man8/mfsmetarestore.8*
 %{_mandir}/man8/mfsmetadump.8*
 %{_mandir}/man8/mfsmetadirinfo.8*
+%{_mandir}/man8/mfsmetasearch.8*
 %{_mandir}/man8/mfsstatsdump.8*
+%{_mandir}/man8/mfssupervisor.8*
 %{mfsconfdir}/mfsexports.cfg.sample
 %{mfsconfdir}/mfstopology.cfg.sample
+%{mfsconfdir}/mfsipmap.cfg.sample
 %{mfsconfdir}/mfsmaster.cfg.sample
 %dir %{_localstatedir}/mfs
 %{_localstatedir}/mfs/metadata.mfs.empty
@@ -362,25 +308,18 @@ exit 0
 
 
 
-%files supervisor
-%defattr(644,root,root,755)
-%doc NEWS README
-%attr(755,root,root) %{_sbindir}/mfssupervisor
-%{_mandir}/man8/mfssupervisor.8*
-
-
-
-
 %files chunkserver
 %defattr(644,root,root,755)
 %doc NEWS README
 %attr(755,root,root) %{_sbindir}/mfschunkserver
 %attr(755,root,root) %{_sbindir}/mfschunktool
+%attr(755,root,root) %{_sbindir}/mfschunkdbdump
 %attr(755,root,root) %{_sbindir}/mfscsstatsdump
 %{_mandir}/man5/mfschunkserver.cfg.5*
 %{_mandir}/man5/mfshdd.cfg.5*
 %{_mandir}/man8/mfschunkserver.8*
 %{_mandir}/man8/mfschunktool.8*
+%{_mandir}/man8/mfschunkdbdump.8*
 %{_mandir}/man8/mfscsstatsdump.8*
 %{mfsconfdir}/mfschunkserver.cfg.sample
 %{mfsconfdir}/mfshdd.cfg.sample
@@ -399,24 +338,20 @@ exit 0
 %files client -f %{EXTRA_FILES}
 %defattr(644,root,root,755)
 %doc NEWS README
-%{_bindir}/mfsappendchunks
 %{_bindir}/mfscheckfile
 %{_bindir}/mfsdirinfo
 %{_bindir}/mfsfileinfo
 %{_bindir}/mfsfilerepair
+%{_bindir}/mfsfilepaths
 %{_bindir}/mfsmakesnapshot
 %{_bindir}/mfsrmsnapshot
+%{_bindir}/mfsappendchunks
 %{_bindir}/mfsgetfacl
 %{_bindir}/mfssetfacl
-%{_bindir}/mfscopyfacl
-%{_bindir}/mfsgetgoal
-%{_bindir}/mfssetgoal
-%{_bindir}/mfscopygoal
 %{_bindir}/mfsgetsclass
 %{_bindir}/mfssetsclass
 %{_bindir}/mfscopysclass
 %{_bindir}/mfsxchgsclass
-%{_bindir}/mfslistsclass
 %{_bindir}/mfsgettrashtime
 %{_bindir}/mfssettrashtime
 %{_bindir}/mfscopytrashtime
@@ -434,16 +369,33 @@ exit 0
 %{_bindir}/mfschkarchive
 %{_bindir}/mfsclrarchive
 %{_bindir}/mfssetarchive
-%{_bindir}/mfsfilepaths
-%{_bindir}/mfsscadmin
-%{_bindir}/mfspatadmin
-%{_bindir}/mfstrashlist
-%{_bindir}/mfstrashrecover
-%{_bindir}/mfstrashpurge
-%{_bindir}/mfssustainedlist
-%attr(755,root,root) %{_bindir}/mfstools
+%{_bindir}/mfscreatesclass
+%{_bindir}/mfsmodifysclass
+%{_bindir}/mfsdeletesclass
+%{_bindir}/mfsclonesclass
+%{_bindir}/mfsrenamesclass
+%{_bindir}/mfslistsclass
+%{_bindir}/mfsimportsclass
+%{_bindir}/mfscreatepattern
+%{_bindir}/mfsdeletepattern
+%{_bindir}/mfslistpattern
+%{_bindir}/mfsgetgoal
+%{_bindir}/mfssetgoal
+%{_bindir}/mfscopygoal
+%attr(755,root,root) %{_bindir}/mfsdiagtools
+%attr(755,root,root) %{_bindir}/mfssnapshots
+%attr(755,root,root) %{_bindir}/mfsfacl
+%attr(755,root,root) %{_bindir}/mfssclass
+%attr(755,root,root) %{_bindir}/mfstrashtime
+%attr(755,root,root) %{_bindir}/mfstrashretention
+%attr(755,root,root) %{_bindir}/mfseattr
+%attr(755,root,root) %{_bindir}/mfsquota
+%attr(755,root,root) %{_bindir}/mfsarchive
+%attr(755,root,root) %{_bindir}/mfsscadmin
+%attr(755,root,root) %{_bindir}/mfspatadmin
+%attr(755,root,root) %{_bindir}/mfstrashtool
 %attr(755,root,root) %{_bindir}/mfsmount
-# %attr(755,root,root) %{_sbindir}/mfsbdev - moved to EXTRA_FILES
+# %%attr(755,root,root) %%{_sbindir}/mfsbdev - moved to EXTRA_FILES
 /sbin/mount.moosefs
 %{_includedir}/mfsio.h
 %{_libdir}/libmfsio.a
@@ -451,16 +403,17 @@ exit 0
 %{_libdir}/libmfsio.so
 %{_libdir}/libmfsio.so.1
 %{_libdir}/libmfsio.so.1.0.0
-%{_mandir}/man1/mfsappendchunks.1*
 %{_mandir}/man1/mfscheckfile.1*
 %{_mandir}/man1/mfsdirinfo.1*
 %{_mandir}/man1/mfsfileinfo.1*
+%{_mandir}/man1/mfsfilepaths.1*
 %{_mandir}/man1/mfsfilerepair.1*
+%{_mandir}/man1/mfsappendchunks.1*
 %{_mandir}/man1/mfsmakesnapshot.1*
 %{_mandir}/man1/mfsrmsnapshot.1*
 %{_mandir}/man1/mfsgetfacl.1*
 %{_mandir}/man1/mfssetfacl.1*
-%{_mandir}/man1/mfscopyfacl.1*
+# %%{_mandir}/man1/mfscopyfacl.1*
 %{_mandir}/man1/mfsgetgoal.1*
 %{_mandir}/man1/mfssetgoal.1*
 %{_mandir}/man1/mfscopygoal.1*
@@ -468,7 +421,16 @@ exit 0
 %{_mandir}/man1/mfssetsclass.1*
 %{_mandir}/man1/mfscopysclass.1*
 %{_mandir}/man1/mfsxchgsclass.1*
+%{_mandir}/man1/mfscreatesclass.1*
+%{_mandir}/man1/mfsmodifysclass.1*
+%{_mandir}/man1/mfsdeletesclass.1*
+%{_mandir}/man1/mfsclonesclass.1*
+%{_mandir}/man1/mfsrenamesclass.1*
+%{_mandir}/man1/mfsimportsclass.1*
 %{_mandir}/man1/mfslistsclass.1*
+%{_mandir}/man1/mfscreatepattern.1*
+%{_mandir}/man1/mfsdeletepattern.1*
+%{_mandir}/man1/mfslistpattern.1*
 %{_mandir}/man1/mfsgettrashtime.1*
 %{_mandir}/man1/mfssettrashtime.1*
 %{_mandir}/man1/mfscopytrashtime.1*
@@ -486,7 +448,6 @@ exit 0
 %{_mandir}/man1/mfschkarchive.1*
 %{_mandir}/man1/mfsclrarchive.1*
 %{_mandir}/man1/mfssetarchive.1*
-%{_mandir}/man1/mfsfilepaths.1*
 %{_mandir}/man1/mfsfacl.1*
 %{_mandir}/man1/mfsgoal.1*
 %{_mandir}/man1/mfstrashtime.1*
@@ -499,57 +460,15 @@ exit 0
 %{_mandir}/man1/mfssclass.1*
 %{_mandir}/man1/mfsscadmin.1*
 %{_mandir}/man1/mfspatadmin.1*
-%{_mandir}/man1/mfstrashtools.1*
-%{_mandir}/man1/mfstrashlist.1*
-%{_mandir}/man1/mfstrashrecover.1*
-%{_mandir}/man1/mfstrashpurge.1*
-%{_mandir}/man1/mfssustainedlist.1*
 %{_mandir}/man1/mfstools.1*
 %{_mandir}/man8/mfsmount.8*
-# %{_mandir}/man8/mfsbdev.8* - moved to EXTRA_FILES
-# %{_mandir}/man5/mfsbdev.cfg.5* - moved to EXTRA_FILES
+%{_mandir}/man5/mfsmount.cfg.5*
+# %%{_mandir}/man8/mfsbdev.8* - moved to EXTRA_FILES
+# %%{_mandir}/man5/mfsbdev.cfg.5* - moved to EXTRA_FILES
 %{_mandir}/man8/mount.moosefs.8*
 %{mfsconfdir}/mfsmount.cfg.sample
 
 
-
-
-%files cli
-%defattr(644,root,root,755)
-%doc NEWS README
-%attr(755,root,root) %{_bindir}/mfscli
-%{_mandir}/man1/mfscli.1*
-
-
-
-
-%files cgi
-%defattr(644,root,root,755)
-%doc NEWS README
-%dir %{_datadir}/mfscgi
-%attr(755,root,root) %{_datadir}/mfscgi/*.cgi
-%{_datadir}/mfscgi/*.css
-%{_datadir}/mfscgi/*.gif
-%{_datadir}/mfscgi/*.html
-%{_datadir}/mfscgi/*.ico
-%{_datadir}/mfscgi/*.js
-%{_datadir}/mfscgi/*.png
-
-
-
-
-%files cgiserv
-%defattr(644,root,root,755)
-%doc NEWS README
-%attr(755,root,root) %{_sbindir}/mfscgiserv
-%{_mandir}/man8/mfscgiserv.8*
-%dir %{_localstatedir}/mfs
-%if %{_with_sysv}
-%attr(754,root,root) %{_initrddir}/moosefs-cgiserv
-%endif
-%if %{_with_systemd}
-%{systemdunitdir}/moosefs-cgiserv.service
-%endif
 
 
 
@@ -564,6 +483,12 @@ exit 0
 
 
 %changelog
+* Thu Jun 05 2025 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 4.56.7-1
+- new package gui (replaces cgi and deprecates cgiserv), removed cgiserv
+
+* Fri Nov 03 2023 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 4.52.0-1
+- mfssupervisor moved back to master package
+
 * Fri Jun 19 2015 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 3.0.30-1
 - added mfsstatsdumps and some man pages
 

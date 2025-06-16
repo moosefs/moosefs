@@ -103,7 +103,7 @@ DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES = mfschunkserver.cfg mfsmaster.cfg \
-	mfsmetalogger.cfg mfsmount.cfg
+	mfsmetalogger.cfg mfsmount.cfg mfsgui.cfg
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -126,8 +126,9 @@ am__can_run_installinfo = \
   esac
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 am__DIST_COMMON = $(srcdir)/Makefile.in \
-	$(srcdir)/mfschunkserver.cfg.in $(srcdir)/mfsmaster.cfg.in \
-	$(srcdir)/mfsmetalogger.cfg.in $(srcdir)/mfsmount.cfg.in
+	$(srcdir)/mfschunkserver.cfg.in $(srcdir)/mfsgui.cfg.in \
+	$(srcdir)/mfsmaster.cfg.in $(srcdir)/mfsmetalogger.cfg.in \
+	$(srcdir)/mfsmount.cfg.in
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -142,15 +143,15 @@ CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CGIDIR = @CGIDIR@
-CGISERVDIR = @CGISERVDIR@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
 CTAGS = @CTAGS@
 CYGPATH_W = @CYGPATH_W@
 DATA_PATH = @DATA_PATH@
-DEFAULT_CGISERV_HTTP_PORT = @DEFAULT_CGISERV_HTTP_PORT@
+DEFAULT_CGIDIR = @DEFAULT_CGIDIR@
 DEFAULT_CS_DATA_PORT = @DEFAULT_CS_DATA_PORT@
 DEFAULT_GROUP = @DEFAULT_GROUP@
+DEFAULT_GUI_HTTP_PORT = @DEFAULT_GUI_HTTP_PORT@
 DEFAULT_MASTERNAME = @DEFAULT_MASTERNAME@
 DEFAULT_MASTER_CLIENT_PORT = @DEFAULT_MASTER_CLIENT_PORT@
 DEFAULT_MASTER_CONTROL_PORT = @DEFAULT_MASTER_CONTROL_PORT@
@@ -292,7 +293,7 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-EXTRA_DIST = metadata.mfs mfschunkserver.cfg.in mfsexports.cfg mfstopology.cfg mfsipmap.cfg mfsmount.cfg.in mfsmaster.cfg.in mfshdd.cfg mfsmetalogger.cfg.in
+EXTRA_DIST = metadata.mfs mfschunkserver.cfg.in mfsgui.cfg.in mfsexports.cfg mfstopology.cfg mfsipmap.cfg mfsmount.cfg.in mfsmaster.cfg.in mfshdd.cfg mfsmetalogger.cfg.in
 all: all-am
 
 .SUFFIXES:
@@ -332,6 +333,8 @@ mfsmaster.cfg: $(top_builddir)/config.status $(srcdir)/mfsmaster.cfg.in
 mfsmetalogger.cfg: $(top_builddir)/config.status $(srcdir)/mfsmetalogger.cfg.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 mfsmount.cfg: $(top_builddir)/config.status $(srcdir)/mfsmount.cfg.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+mfsgui.cfg: $(top_builddir)/config.status $(srcdir)/mfsgui.cfg.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
 mostlyclean-libtool:
@@ -513,6 +516,7 @@ install-data-hook:
 @CREATE_DATA_DIR_TRUE@	fi
 @BUILD_CHUNKSERVER_TRUE@	$(INSTALL_DATA) $(builddir)/mfschunkserver.cfg $(DESTDIR)$(sysconfdir)/mfs/mfschunkserver.cfg.sample
 @BUILD_CHUNKSERVER_TRUE@	$(INSTALL_DATA) $(srcdir)/mfshdd.cfg $(DESTDIR)$(sysconfdir)/mfs/mfshdd.cfg.sample
+@BUILD_GUI_TRUE@	$(INSTALL_DATA) $(builddir)/mfsgui.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsgui.cfg.sample
 @BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsmaster.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsmaster.cfg.sample
 @BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfsexports.cfg $(DESTDIR)$(sysconfdir)/mfs/mfsexports.cfg.sample
 @BUILD_MASTER_TRUE@	$(INSTALL_DATA) $(builddir)/mfstopology.cfg $(DESTDIR)$(sysconfdir)/mfs/mfstopology.cfg.sample

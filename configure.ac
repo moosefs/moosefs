@@ -498,6 +498,10 @@ AC_ARG_ENABLE([mfschunkserver],
 	[AS_HELP_STRING([--disable-mfschunkserver], [Do not build mfschunkserver])],
 	[],
 	[enable_mfschunkserver="$enable_all"])
+AC_ARG_ENABLE([mfsgui],
+	[AS_HELP_STRING([--disable-mfsgui], [Do not build mfsgui])],
+	[],
+	[enable_mfsgui="$enable_all"])
 AC_ARG_ENABLE([mfsmount],
 	[AS_HELP_STRING([--disable-mfsmount], [Do not build mfsmount])],
 	[],
@@ -514,10 +518,6 @@ AC_ARG_ENABLE([mfscli],
 	[AS_HELP_STRING([--disable-mfscli], [Do not install CLI script])],
 	[],
 	[enable_mfscli="$enable_all"])
-AC_ARG_ENABLE([mfscgiserv],
-	[AS_HELP_STRING([--disable-mfscgiserv], [Do not install CGI server])],
-	[],
-	[enable_mfscgiserv="$enable_all"])
 AC_ARG_ENABLE([mfsnetdump],
 	[AS_HELP_STRING([--disable-mfsnetdump], [Do not build mfsnetdump])],
 	[],
@@ -526,10 +526,6 @@ AC_ARG_WITH([mfscgi-dir],
 	[AS_HELP_STRING([--with-mfscgi-dir=CGIDIR], [Choose CGI directory (default=DATADIR/mfscgi)])],
 	[CGIDIR="${withval}"],
 	[eval eval CGIDIR="${datadir}/mfscgi"])
-AC_ARG_WITH([mfscgiserv-dir],
-	[AS_HELP_STRING([--with-mfscgiserv-dir=CGISERVDIR], [Choose CGI directory (default=SBINDIR)])],
-	[CGISERVDIR="${withval}"],
-	[eval CGISERVDIR="${sbindir}"])
 AC_ARG_WITH([zlib],
 	[AS_HELP_STRING([--without-zlib], [Do not use zlib for PNG compression])],
 	[use_zlib="${withval}"],
@@ -540,12 +536,9 @@ AC_ARG_WITH([systemdsystemunitdir],
 
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 
-if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"; then
+if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no"; then
 	dnl AM_PATH_PYTHON([3.4],,[:])
-	dnl if test "$PYTHON" = :; then
-	dnl 	AM_PATH_PYTHON([2.7],,[:])
-	dnl fi
-	AC_CHECK_PROGS(PYTHON, [python3 python2 python python3.13 pytnon3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4 python2.7], [:])
+	AC_CHECK_PROGS(PYTHON, [python3 python python3.13 pytnon3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4], [:])
 	if test "$PYTHON" = :; then
 		PYTHON="python"
 		AC_MSG_RESULT([Python binary not found !!! - using default in shebangs])
@@ -554,23 +547,18 @@ if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgis
 	fi
 fi
 
-dnl AX_PYTHON
-dnl if test "$enable_mfscgi" = "no"; then
-dnl	enable_mfscgiserv=no
-dnl fi
-AM_CONDITIONAL([WITH_PYTHON], [test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"])
-AM_CONDITIONAL([BUILD_SCRIPTS], [test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no" -o "$enable_mfscgiserv" != "no"])
+AM_CONDITIONAL([WITH_PYTHON], [test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no"])
+AM_CONDITIONAL([BUILD_SCRIPTS], [test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no"])
 AM_CONDITIONAL([INSTALL_CGI], [test "$enable_mfscgi" != "no"])
 AM_CONDITIONAL([INSTALL_CLI], [test "$enable_mfscli" != "no"])
-AM_CONDITIONAL([INSTALL_CGISERV], [test "$enable_mfscgiserv" != "no"])
 AM_CONDITIONAL([INSTALL_MOOSEFS_MOUNT], [test "$root_sbindir" != "xxx"])
 AC_SUBST([CGIDIR])
-AC_SUBST([CGISERVDIR])
 AC_SUBST([PYTHON])
 
 AM_CONDITIONAL([BUILD_MASTER], [test "$enable_mfsmaster" != "no"])
 AM_CONDITIONAL([BUILD_METALOGGER], [test "$enable_mfsmetalogger" != "no"])
 AM_CONDITIONAL([BUILD_CHUNKSERVER], [test "$enable_mfschunkserver" != "no"])
+AM_CONDITIONAL([BUILD_GUI], [test "$enable_mfsgui" != "no"])
 
 pcap=no
 AC_CHECK_LIB([pcap],[pcap_lib_version],[ AC_CHECK_HEADERS([pcap.h],[pcap=yes]) ])
@@ -648,8 +636,8 @@ AM_CONDITIONAL([WITH_MOUNT], [test "$fuse" != "no" -a "$enable_mfsmount" != "no"
 
 AM_CONDITIONAL([BUILD_CLIENT], [test \( "$fuse" != "no" -a "$enable_mfsmount" != "no" \) -o \( "$bdev" != "no" -a "$enable_mfsbdev" != "no" \)])
 
-AM_CONDITIONAL([CREATE_ETC_MFS], [test "$enable_mfsmaster" != "no" -o "$enable_mfsmetalogger" != "no" -o "$enable_mfschunkserver" != "no" -o "$enable_mfsmount" != "no"])
-AM_CONDITIONAL([CREATE_DATA_DIR], [test "$enable_mfsmaster" != "no" -o "$enable_mfsmetalogger" != "no" -o "$enable_mfschunkserver" != "no" -o "$enable_mfscgiserv" != "no"])
+AM_CONDITIONAL([CREATE_ETC_MFS], [test "$enable_mfsmaster" != "no" -o "$enable_mfsmetalogger" != "no" -o "$enable_mfschunkserver" != "no" -o "$enable_mfsgui" != "no" -o "$enable_mfsmount" != "no"])
+AM_CONDITIONAL([CREATE_DATA_DIR], [test "$enable_mfsmaster" != "no" -o "$enable_mfsmetalogger" != "no" -o "$enable_mfschunkserver" != "no" -o "$enable_mfsgui" != "no"])
 
 if test "$use_zlib" = "yes"; then
 
@@ -692,20 +680,23 @@ DEFAULT_MASTER_CONTROL_PORT=$((DEFAULT_PORTBASE+19))
 DEFAULT_MASTER_CS_PORT=$((DEFAULT_PORTBASE+20))
 DEFAULT_MASTER_CLIENT_PORT=$((DEFAULT_PORTBASE+21))
 DEFAULT_CS_DATA_PORT=$((DEFAULT_PORTBASE+22))
-DEFAULT_CGISERV_HTTP_PORT=$((DEFAULT_PORTBASE+25))
+DEFAULT_GUI_HTTP_PORT=$((DEFAULT_PORTBASE+25))
+DEFAULT_CGIDIR=$CGIDIR
 AC_DEFINE_UNQUOTED([DEFAULT_PORTBASE], [$DEFAULT_PORTBASE], [Default port base])
 AC_DEFINE_UNQUOTED([DEFAULT_MASTER_CONTROL_PORT], ["$DEFAULT_MASTER_CONTROL_PORT"], [Default master command port])
 AC_DEFINE_UNQUOTED([DEFAULT_MASTER_CS_PORT], ["$DEFAULT_MASTER_CS_PORT"], [Default master chunkserver port])
 AC_DEFINE_UNQUOTED([DEFAULT_MASTER_CLIENT_PORT], ["$DEFAULT_MASTER_CLIENT_PORT"], [Default master client port])
 AC_DEFINE_UNQUOTED([DEFAULT_CS_DATA_PORT], ["$DEFAULT_CS_DATA_PORT"], [Default chunkserver data port])
-AC_DEFINE_UNQUOTED([DEFAULT_CGISERV_HTTP_PORT], ["$DEFAULT_CGISERV_HTTP_PORT"], [Default cgiserver http port])
+AC_DEFINE_UNQUOTED([DEFAULT_CGIDIR], ["$DEFAULT_CGIDIR"], [Default cgi folder])
+AC_DEFINE_UNQUOTED([DEFAULT_GUI_HTTP_PORT], ["$DEFAULT_GUI_HTTP_PORT"], [Default gui server http port])
 AC_DEFINE_UNQUOTED([DEFAULT_MASTERNAME], ["$DEFAULT_MASTERNAME"], [Default master name])
 AC_SUBST([DEFAULT_PORTBASE])
 AC_SUBST([DEFAULT_MASTER_CONTROL_PORT])
 AC_SUBST([DEFAULT_MASTER_CS_PORT])
 AC_SUBST([DEFAULT_MASTER_CLIENT_PORT])
 AC_SUBST([DEFAULT_CS_DATA_PORT])
-AC_SUBST([DEFAULT_CGISERV_HTTP_PORT])
+AC_SUBST([DEFAULT_CGIDIR])
+AC_SUBST([DEFAULT_GUI_HTTP_PORT])
 AC_SUBST([DEFAULT_MASTERNAME])
 
 if test "$enable_lightmfs" = "yes"; then
@@ -732,25 +723,26 @@ AC_CONFIG_FILES([Makefile
 		mfsmetatools/Makefile
 		mfsmetalogger/Makefile
 		mfsclient/Makefile
+		mfsgui/Makefile
 		mfsnetdump/Makefile
 		mfstests/Makefile
 		systemd/Makefile
-		mfsscripts/mfscli.py
+		mfsscripts/common/constants_ac.py
 		mfsscripts/chart.cgi
 		mfsscripts/chartdata.cgi
-		mfsscripts/index.html
-		mfsscripts/mfscgiserv.py
 		mfsdata/mfschunkserver.cfg
 		mfsdata/mfsmaster.cfg
 		mfsdata/mfsmetalogger.cfg
 		mfsdata/mfsmount.cfg
-		systemd/moosefs-cgiserv.service
+		mfsdata/mfsgui.cfg
 		systemd/moosefs-chunkserver.service
 		systemd/moosefs-chunkserver@.service
 		systemd/moosefs-master.service
 		systemd/moosefs-master@.service
 		systemd/moosefs-metalogger.service
 		systemd/moosefs-metalogger@.service
+		systemd/moosefs-gui.service
+		systemd/moosefs-gui@.service
 ])
 AC_OUTPUT
 echo
@@ -770,11 +762,10 @@ echo "ETC_PATH ............................ $ETC_PATH"
 echo "BIN_PATH ............................ $BIN_PATH"
 echo "SBIN_PATH ........................... $SBIN_PATH"
 echo "CGI_PATH ............................ $CGIDIR"
-echo "CGISERV_PATH ........................ $CGISERVDIR"
 echo
 echo "DEFAULT_USER:DEFAULT_GROUP .......... ${DEFAULT_USER}:${DEFAULT_GROUP}"
 echo "MASTER DNS NAME ..................... ${DEFAULT_MASTERNAME}"
-echo "PORTS ............................... ${DEFAULT_MASTER_CONTROL_PORT}:${DEFAULT_MASTER_CS_PORT}:${DEFAULT_MASTER_CLIENT_PORT}:${DEFAULT_CS_DATA_PORT}:${DEFAULT_CGISERV_HTTP_PORT}"
+echo "PORTS ............................... ${DEFAULT_MASTER_CONTROL_PORT}:${DEFAULT_MASTER_CS_PORT}:${DEFAULT_MASTER_CLIENT_PORT}:${DEFAULT_CS_DATA_PORT}:${DEFAULT_GUI_HTTP_PORT}"
 echo
 if test "$BUILD_MASTER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "BUILD_MASTER ........................ $RESULT"
@@ -782,6 +773,8 @@ if test "$BUILD_METALOGGER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "BUILD_METALOGGER .................... $RESULT"
 if test "$BUILD_CHUNKSERVER_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "BUILD_CHUNKSERVER ................... $RESULT"
+if test "$BUILD_GUI_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
+echo "BUILD_GUI ........................... $RESULT"
 if test "$BUILD_NETDUMP_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "BUILD_NETDUMP ....................... $RESULT"
 if test "$BUILD_SCRIPTS_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
@@ -790,8 +783,6 @@ if test "$INSTALL_CGI_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "    CGI ............................. $RESULT"
 if test "$INSTALL_CLI_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "    CLI ............................. $RESULT"
-if test "$INSTALL_CGISERV_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
-echo "    CGISERV ......................... $RESULT"
 if test "$BUILD_CLIENT_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi
 echo "BUILD_CLIENT ........................ $RESULT"
 if test "$WITH_MOUNT_TRUE" = ""; then RESULT="yes"; else RESULT="no"; fi

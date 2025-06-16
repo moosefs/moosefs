@@ -4,6 +4,6 @@ servers, which are visible to the user as one resource.
 
 For standard file operations MooseFS acts like any other Unix-like file system.
 
-This port provides: Simple CGI-capable HTTP server to run MooseFS CGI monitor.
+This port provides: MooseFS web-based GUI.
 
 WWW: https://moosefs.com/

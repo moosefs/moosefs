@@ -1612,6 +1612,46 @@ int main(int argc,char **argv) {
 #endif
 		nicelevel = cfg_getint32("NICE_LEVEL",-19);
 		setpriority(PRIO_PROCESS,getpid(),nicelevel);
+
+#if defined(__linux__) && defined(OOM_ADJUSTABLE)
+		if (cfg_getuint8("DISABLE_OOM_KILLER",1)==1) {
+			FILE *oomfd;
+			int oomdis;
+			oomdis = 0;
+#  if defined(OOM_SCORE_ADJ_MIN)
+			oomfd = fopen("/proc/self/oom_score_adj","w");
+			if (oomfd!=NULL) {
+				fprintf(oomfd,"%d\n",OOM_SCORE_ADJ_MIN);
+				if (fclose(oomfd)>=0) {
+					oomdis = 1;
+				}
+#    if defined(OOM_DISABLE)
+			} else {
+				oomfd = fopen("/proc/self/oom_adj","w");
+				if (oomfd!=NULL) {
+					fprintf(oomfd,"%d\n",OOM_DISABLE);
+					if (fclose(oomfd)>=0) {
+						oomdis = 1;
+					}
+				}
+#    endif
+			}
+#  elif defined(OOM_DISABLE)
+			oomfd = fopen("/proc/self/oom_adj","w");
+			if (oomfd!=NULL) {
+				fprintf(oomfd,"%d\n",OOM_DISABLE);
+				if (fclose(oomfd)>=0) {
+					oomdis = 1;
+				}
+			}
+#  endif
+			if (oomdis) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"out of memory killer disabled");
+			} else {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't disable out of memory killer");
+			}
+		}
+#endif
 	}
 
 #ifdef USE_IONICE
@@ -1741,42 +1781,6 @@ int main(int argc,char **argv) {
 	}
 #endif /* glibc malloc tuning */
 
-#if defined(__linux__) && defined(OOM_ADJUSTABLE)
-	if (cfg_getuint8("DISABLE_OOM_KILLER",1)==1) {
-		FILE *oomfd;
-		int oomdis;
-		oomdis = 0;
-#  if defined(OOM_SCORE_ADJ_MIN)
-		oomfd = fopen("/proc/self/oom_score_adj","w");
-		if (oomfd!=NULL) {
-			fprintf(oomfd,"%d\n",OOM_SCORE_ADJ_MIN);
-			fclose(oomfd);
-			oomdis = 1;
-#    if defined(OOM_DISABLE)
-		} else {
-			oomfd = fopen("/proc/self/oom_adj","w");
-			if (oomfd!=NULL) {
-				fprintf(oomfd,"%d\n",OOM_DISABLE);
-				fclose(oomfd);
-				oomdis = 1;
-			}
-#    endif
-		}
-#  elif defined(OOM_DISABLE)
-		oomfd = fopen("/proc/self/oom_adj","w");
-		if (oomfd!=NULL) {
-			fprintf(oomfd,"%d\n",OOM_DISABLE);
-			fclose(oomfd);
-			oomdis = 1;
-		}
-#  endif
-		if (oomdis) {
-			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"out of memory killer disabled");
-		} else {
-			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't disable out of memory killer");
-		}
-	}
-#endif
 
 	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"monotonic clock function: %s",monotonic_method());
 	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"monotonic clock speed: %"PRIu32" ops / 10 mili seconds",monotonic_speed());

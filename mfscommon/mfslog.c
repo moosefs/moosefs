@@ -306,6 +306,24 @@ void mfs_log_detach_stderr(void) {
 	stderr_active = 0;
 }
 
+void mfs_log_detach_syslog(void) {
+#ifdef WIN32
+	if (ehandler!=NULL) {
+		DeregisterEventSource(ehandler);
+	}
+	if (lstrings[0]!=NULL) {
+		free(lstrings[0]);
+	}
+	ehandler = NULL;
+	lstrings[0] = NULL;
+#else
+	if (syslog_open) {
+		closelog();
+	}
+	syslog_open = 0;
+#endif
+}
+
 void mfs_log_term(void) {
 #ifdef WIN32
 	if (ehandler!=NULL) {

@@ -47,6 +47,7 @@ void mfs_log_set_elevate_to(int elevateto);
 void mfs_log_set_sink_function(void(*s)(const char *str));
 
 void mfs_log_detach_stderr(void);
+void mfs_log_detach_syslog(void);
 void mfs_log_term(void);
 int mfs_log_init(const char *ident,int daemon);
 

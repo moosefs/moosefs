@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.57.7-1 (WIP)
+
+  - (client) removed using potentially dangerous sprintf function
+
 * MooseFS 4.57.6-1 (2025-03-25)
 
   - (master) fixed predefined storage classes

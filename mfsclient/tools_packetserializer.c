@@ -422,7 +422,7 @@ void ps_putbytes(const uint8_t *src, uint32_t leng) {
 	ps_data.wptr += leng;
 }
 
-uint8_t ps_putstr(const char *str) {	//returns writed bytes count or zero if error
+uint8_t ps_putstr(const char *str) {	//returns number of written bytes or zero if error
 	uint32_t len;
 
 	if (str==NULL || (len=strlen(str)) > 255) {// || len==0)

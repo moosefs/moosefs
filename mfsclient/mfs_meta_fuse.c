@@ -782,6 +782,14 @@ static uint32_t dir_dataentries_size(const uint8_t *dbuff,uint32_t dsize) {
 	return eleng;
 }
 
+static void dir_hexgen(uint8_t *buff,uint32_t hex) {
+	uint8_t i;
+	for (i=0 ; i<8 ; i++) {
+		buff[7-i] = (hex&0xF)["0123456789ABCDEF"];
+		hex>>=4;
+	}
+}
+
 static void dir_dataentries_convert(uint8_t *buff,const uint8_t *dbuff,uint32_t dsize) {
 	const char *name;
 	uint32_t inode;
@@ -802,7 +810,8 @@ static void dir_dataentries_convert(uint8_t *buff,const uint8_t *dbuff,uint32_t 
 			name = (const char*)dbuff;
 			dbuff+=nleng;
 			inode = get32bit(&dbuff);
-			sprintf((char*)buff,"%08"PRIX32"|",inode);
+			dir_hexgen(buff,inode);
+			buff[8]='|';
 			if (nleng>255-9) {
 				memcpy(buff+9,name,255-9);
 				buff+=255;

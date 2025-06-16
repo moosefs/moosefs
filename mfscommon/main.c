@@ -651,7 +651,7 @@ int mainloop(void) {
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"poll error: %s",strerr(errno));
 				break;
 			}
-		} else {
+		} else if (i>0) {
 			if ((pdesc[0].revents)&POLLIN) {
 				uint8_t sigid;
 				if (read(signalpipe[0],&sigid,1)==1) {
@@ -662,7 +662,9 @@ int mainloop(void) {
 						mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"reloading config files");
 						r = 1;
 					} else if (sigid=='\003') {
+#ifndef SILENT_SIGCHLD
 						mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"child finished");
+#endif
 						r = 2;
 					} else if (sigid=='\004') {
 						mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"log extra info");

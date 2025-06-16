@@ -369,14 +369,14 @@ static inline void flock_lock_unlock(inodelocks *il,lock *l) {
 void flock_disconnected(void *connptr) {
 	uint32_t h;
 	inodelocks *il;
-	lock *l,*nl;
+	lock *l,**lptr;
 	instance *i,*ni;
 	for (h=0 ; h<FLOCK_INODE_HASHSIZE ; h++) {
 		for (il = inodehash[h] ; il!=NULL ; il=il->next) {
-			l = il->waiting_head;
-			while (l!=NULL) {
-				nl = l->next;
+			lptr = &(il->waiting_head);
+			while ((l=*lptr)!=NULL) {
 				if (l->connptr==connptr) {
+					*lptr = l->next;
 					i = l->lock_instances;
 					while (i) {
 						ni = i->next;
@@ -384,8 +384,9 @@ void flock_disconnected(void *connptr) {
 						i = ni;
 					}
 					free(l);
+				} else {
+					lptr = &(l->next);
 				}
-				l = nl;
 			}
 		}
 	}

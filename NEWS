@@ -2,6 +2,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 4.57.7-1 (WIP)
 
+  - (master) fixed freeing waiting locks from data structures
   - (daemons) added condition to skip socket routines when poll returned zero
   - (daemons) fixed disabling OOM killer
   - (client) removed using potentially dangerous sprintf function

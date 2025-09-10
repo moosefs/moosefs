@@ -1746,6 +1746,7 @@
 // msgid:32 12*[ chunks:32 ] - 0 copies, 1 copy, 2 copies, ..., 10+ copies, 'empty' copies (version >= 3.0.30 and no chunkindx)
 // msgid:32 chunkid:64 version:32 N*[ ip:32 port:16 type:8 ] (version >= 3.0.26 and chunkindx present)
 // msgid:32 chunkid:64 version:32 N*[ ip:32 port:16 type:8 ecid:8 ] (version >= 4.0.0 and mode is equal to 1)
+// msgid:32 chunkid:64 version:32 mtime:32 N*[ ip:32 port:16 type:8 ecid:8 ] (version >= 4.47.0 and mode is equal to 4)
 // msgid:32 N * [ storage_index:8 chunks:32 ] ; storage_index: 0 - chunk not found, 1 - 'empty' chunk, 2 + fullcopies + 11 * ec_parts (version >= 4.0.0 and mode is equal to 2)
 // msgid:32 N * [ storage_index:16 chunks:32 ] ; storage_index: 0 - chunk not found, 1 - 'empty' chunk, 2 + fullcopies + 11 * ec8_parts + 198 * ec4_parts (version >= 4.36.0 and mode is equal to 3)
 
@@ -2154,6 +2155,9 @@
 // version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 (size = 121,version >= 2.0.0)
 // version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 chunkcopies:32 tdcopies:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 (size = 129,version >= 3.0.32)
 // version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 copy_chunks:32 ec_chunks:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 metadata_id:64 last_store_meta_version:64 last_store_meta_checksum:32 all_chunk_copies:64 all_chunk_parts:64 all_chunk_hypothetical_copies:64 (size = 173,version >= 4.4.0)
+// version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 freespace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 copychunks:32 ec_chunks:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 metadata_id:64 last_store_meta_version:64 last_store_meta_checksum:32 all_chunk_copies:64 all_chunk_parts:64 all_chunk_hypothetical_copies:64 (size = 181,version >= 4.10.0)
+// version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 freespace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 copychunks:32 ec_chunks:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 metadata_id:64 last_store_meta_version:64 last_store_meta_checksum:32 all_chunk_copies:64 all_chunk_parts:64 all_chunk_hypothetical_copies:64 microseconds_timestamp:64 last_chglog_time:32 (size = 193,version >= 4.17.0)
+// version:32 memusage:64 syscpu:64 usercpu:64 totalspace:64 availspace:64 freespace:64 trashspace:64 trashnodes:32 sustainedspace:64 sustainednodes:32 allnodes:32 dirnodes:32 filenodes:32 chunks:32 copychunks:32 ec8chunks:32 ec4chunks:32 laststore_ts:32 laststore_duration:32 laststore_status:8 state:8 nstate:8 stable:8 sync:8 leaderip:32 state_chg_time:32 meta_version:64 exports_checksum:64 metadata_id:64 last_store_meta_version:64 last_store_meta_checksum:32 all_chunk_copies:64 all_chunk_ec8_parts:64 all_chunk_ec4_parts:64 all_chunk_hypothetical_copies:64 microseconds_timestamp:64 last_chglog_time:32 (size = 205,version >= 4.26.0)
 
 // 0x0200
 #define CLTOMA_FSTEST_INFO (PROTO_BASE+512)
@@ -2308,7 +2312,8 @@
 
 // 0x021E
 #define CLTOMA_SCLASS_INFO (PROTO_BASE+542)
-// [ fver:8 ] ( if not present then fver==0 - versions < 4.2.0 )
+// - (version < 4.2.0 : fver:=0)
+// fver:8 (version >= 4.2.0)
 
 // 0x021F
 #define MATOCL_SCLASS_INFO (PROTO_BASE+543)

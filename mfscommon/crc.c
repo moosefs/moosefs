@@ -78,7 +78,7 @@ static inline uint32_t swap(uint32_t x) {
 // #define CRC_PREFETCH 1
 
 uint32_t mycrc32(uint32_t crc,const void* data,uint32_t leng) {
-	const uint32_t *data4 = (const uint32_t*)data;
+	const uint32_t *data4;
 	const uint8_t *data1;
 	uint32_t d0,d1,d2,d3;
 
@@ -131,6 +131,12 @@ uint32_t mycrc32(uint32_t crc,const void* data,uint32_t leng) {
 #endif
 
 	crc = ~crc;
+	data1 = (const uint8_t*)data;
+	while (((unsigned long)data1&0x3) && leng!=0) {
+		crc = (crc >> 8) ^ crc_table[0][(crc & 0xFF) ^ *data1++];
+		leng--;
+	}
+	data4 = (const uint32_t*)data1;
 #ifdef __clang__
 	while (leng >= 16) {
 		CRC_BLOCK
@@ -149,8 +155,9 @@ uint32_t mycrc32(uint32_t crc,const void* data,uint32_t leng) {
 	}
 #endif
 	data1 = (const uint8_t*)data4;
-	while (leng-- != 0) {
+	while (leng!=0) {
 		crc = (crc >> 8) ^ crc_table[0][(crc & 0xFF) ^ *data1++];
+		leng--;
 	}
 	return ~crc;
 }

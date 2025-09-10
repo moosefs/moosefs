@@ -26,18 +26,18 @@ def safe_int(val, default=0):
 		return int(val)
 	except Exception:
 		return default
-	
+
 def resolve(strip, donotresolve=0, default=None):
-    if donotresolve:
-        return strip
-    try:
-        return (socket.gethostbyaddr(strip))[0]
-    except Exception:
-        if default is not None:
-            return default
-        else:
-            return strip
-	
+	if donotresolve:
+		return strip
+	try:
+		return (socket.gethostbyaddr(strip))[0]
+	except Exception:
+		if default is not None:
+			return default
+		else:
+			return strip
+
 def decimal_number(number,sep=' '):
 	parts = []
 	while number>=1000:

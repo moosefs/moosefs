@@ -345,10 +345,10 @@ class ChunkServer:
 			self.labelstr = ",".join(labelstab)		
 
 	def is_maintenance_off(self):
-		return (self.flags&2)==0
+		return (self.flags&6)==0
 
 	def is_maintenance_on(self):
-		return (self.flags&4)==0
+		return (self.flags&6)==2
 
 	def is_connected(self):
 		return (self.flags&1)==0

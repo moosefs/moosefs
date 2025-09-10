@@ -215,7 +215,7 @@ class DataProvider:
 		elif MForder==2:  key=lambda mc: (mc.inode)
 		elif MForder==3:  key=lambda mc: (mc.indx)
 		elif MForder==4:  key=lambda mc: (mc.chunkid)
-		elif MForder==4:  key=lambda mc: (mc.mtype)
+		elif MForder==5:  key=lambda mc: (mc.mtype)
 		else:             key=lambda mc: (mc.paths)
 
 		self.missing_chunks.sort(key=key)
@@ -319,7 +319,7 @@ class DataProvider:
 
 		if CSorder is None:
 			return self.chunkservers
-		
+
 		if   CSorder==0:  key=lambda cs: (cs.sortip,cs.port)
 		elif CSorder==1:  key=lambda cs: (cs.host)
 		elif CSorder==2:  key=lambda cs: (cs.sortip,cs.port)

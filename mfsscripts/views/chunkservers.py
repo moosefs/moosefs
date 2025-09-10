@@ -45,7 +45,6 @@ def render(dp, fields, vld, readonly, selectable):
 			entrystr.append("ANY")
 			srv_count = len(servers)
 			entrydesc["ANY"] =  "Any (%u server%s)" % (srv_count, "s" if srv_count>1 else "")
-			servers=dp.get_chunkservers()
 			labels_dict = {key: labels_dict[key] for key in sorted(labels_dict)}
 			select_any = True
 			for label in labels_dict:

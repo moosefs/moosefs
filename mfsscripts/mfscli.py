@@ -291,7 +291,7 @@ for opt,val in opts:
 		val=""
 	if opt=='-h':
 		print("usage:")
-		print("\t%s [-hjpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IM|IG|MU|IC|IL|MF|CS|MB|HD|EX|MD|MS|OF|AL|MO|RS|SC|PA|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-a master_data_count] [-b master_data_desc] [-c chunkserver_data_count] [-d chunkserver_data_desc]" % sys.argv[0])
+		print("\t%s [-hjpn28] [-H master_host] [-P master_port] [-f 0..3] -S(IN|IG|IM|IC|IL|MF|MU|CS|MB|HD|EX|MD|MS|MO|OF|AL|RP|SC|PA|QU|MC|CC) [-s separator] [-o order_id [-r]] [-m mode_id] [i id] [-a master_data_count] [-b master_data_desc] [-c chunkserver_data_count] [-d chunkserver_data_desc]" % sys.argv[0])
 		print("\t%s [-hjpn28] [-H master_host] [-P master_port] [-f 0..3] -C(RC/ip/port|TR/ip/port|BW/ip/port|M[01]/ip/port|RS/sessionid)" % sys.argv[0])
 		print("\t%s -v" % sys.argv[0])
 		print("\ncommon:\n")
@@ -317,8 +317,7 @@ for opt,val in opts:
 			print("\t\t-f3 : use utf-8 frames (double - default for utf-8 encodings)")
 		print("\nmonitoring:\n")
 		print("\t-S data set : defines data set to be displayed")
-		sin_includes = "SIM, SIG, SMU, SIC, SIL, SMF"
-		print("\t\t-SIN : show full master info (includes: %s)" % sin_includes)
+		print("\t\t-SIN : show full master info (includes: SIG, SIM, SLI, SIC, SIL, SMF, SMU")
 		print("\t\t-SIG : show only general cluster summary")
 		print("\t\t-SIM : show only masters states")
 		print("\t\t-SIC : show only chunks info (target/current redundancy level matrices)")
@@ -329,11 +328,11 @@ for opt,val in opts:
 		print("\t\t-SMB : show connected metadata backup servers")
 		print("\t\t-SHD : show hdd data")
 		print("\t\t-SEX : show exports")
-		print("\t\t-SMD : show mounts details (includes: SMS, SOF, SAL, SMO)")
+		print("\t\t-SMD : show mounts details (includes: SMS, SMO, SOF, SAL)")
 		print("\t\t-SMS : show only active mounts")
+		print("\t\t-SMO : show only operations counters")
 		print("\t\t-SOF : show only open files")
 		print("\t\t-SAL : show only acquired locks")
-		print("\t\t-SMO : show only operations counters")
 		print("\t\t-SRP : show redundancy policy (includes: SSC, SPA)")
 		print("\t\t-SSC : show storage classes")
 		print("\t\t-SPA : show patterns overrides")

@@ -1,5 +1,14 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.57.8-1 (2025-08-05)
+
+  - (crc) fixed crc calc for CPU's that can't access memory on non even addresses (i.e. arm-hf)
+  - (cs) less disk ops for idle servers
+  - (debian) updated postinstall scripts
+  - (nbd) fixed restoring nbd devices after sleep/hibernate
+  - (cli) fixed displaying master's and chunkserver's charts data
+  - (systemd) added start/stop timeouts to chunkserver systemd parameters
+
 * MooseFS 4.57.7-1 (2025-06-16)
 
   - (all) joined packages cgi and cgiserv to a new gui package

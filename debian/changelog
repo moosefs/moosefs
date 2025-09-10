@@ -1,3 +1,15 @@
+moosefs (4.57.8-1) unstable; urgency=medium
+
+  * (crc) fixed crc calc for CPU's that can't access memory on non even
+    addresses (i.e. arm-hf)
+  * (cs) less disk ops for idle servers
+  * (debian) updated postinstall scripts
+  * (nbd) fixed restoring nbd devices after sleep/hibernate
+  * (cli) fixed displaying master's and chunkserver's charts data
+  * (systemd) added start/stop timeouts to chunkserver systemd parameters
+
+ -- MooseFS Team <contact@moosefs.com>  Tue, 05 Aug 2025 13:00:00 +0200
+
 moosefs (4.57.7-1) unstable; urgency=medium
 
   * (all) joined packages cgi and cgiserv to a new gui package

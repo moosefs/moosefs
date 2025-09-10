@@ -3503,10 +3503,15 @@ void matoclserv_fuse_readdir(matoclserventry *eptr,const uint8_t *data,uint32_t 
 	if (status!=MFS_STATUS_OK) {
 		put8bit(&ptr,status);
 	} else {
+		uint8_t *nedgeidptr;
+		nedgeidptr = ptr;
 		if (length>=29) {
-			put64bit(&ptr,nedgeid);
+			ptr += 8;
 		}
 		fs_readdir_data(sessions_get_rootinode(eptr->sesdata),sessions_get_sesflags(eptr->sesdata),uid,gid[0],auid,agid,flags,maxentries,&nedgeid,c1,c2,ptr,attrmode);
+		if (length>=29) {
+			put64bit(&nedgeidptr,nedgeid);
+		}
 	}
 	sessions_inc_stats(eptr->sesdata,SES_OP_READDIR);
 }

@@ -153,7 +153,7 @@ static inline xattr_cache_entry* xattr_cache_find(uint32_t node,uint32_t uid,uin
 
 	hash = xattr_cache_hash(node,nleng,name);
 	for (xce = hashtab[hash%HASHSIZE] ; xce!=NULL ; xce=xce->hashnext) {
-		if (xce->hash == hash && xce->node == node && xce->uid == uid && xce->gid == gid && xce->nleng == nleng && memcmp(xce->name,name,nleng)==0) {
+		if (xce->hash == hash && xce->node == node && xce->uid == uid && xce->gid == gid && xce->nleng == nleng && (nleng==0 || (nleng>0 && memcmp(xce->name,name,nleng)==0))) {
 			return xce;
 		}
 	}
@@ -167,7 +167,7 @@ static inline void xattr_cache_delete(uint32_t node,uint32_t nleng,const uint8_t
 	xce = hashtab[hash%HASHSIZE];
 	while (xce) {
 		nxce = xce->hashnext;
-		if (xce->hash == hash && xce->node == node && xce->nleng == nleng && memcmp(xce->name,name,nleng)==0) {
+		if (xce->hash == hash && xce->node == node && xce->nleng == nleng && (nleng==0 || (nleng>0 && memcmp(xce->name,name,nleng)==0))) {
 			xattr_cache_remove_entry(xce);
 		}
 		xce = nxce;

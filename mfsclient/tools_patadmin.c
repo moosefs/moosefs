@@ -344,6 +344,7 @@ static const char *createpattxt[] = {
 	"create new pattern",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] -n pattern [-u uid] [-g gid] [-p priority] [-c class] [-t trash_retention] [-f eattr]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	" -n pattern - pattern that has to match (new or renamed) file name",
@@ -365,6 +366,7 @@ static const char *deletepattxt[] = {
 	"delete specified pattern",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] -n pattern [-u uid] [-g gid]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	" -n pattern - defined pattern to be removed",
@@ -377,6 +379,7 @@ static const char *listpattxt[] = {
 	"list all defined patterns",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	NULL

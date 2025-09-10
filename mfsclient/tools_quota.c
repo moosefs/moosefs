@@ -239,6 +239,7 @@ static const char *getquotatxt[] = {
 	"get quota for given directory (directories)",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] directory [directory ...]",
+	"",
 	_QMARKDESC_,
 	_NUMBERDESC_,
 	NULL
@@ -248,6 +249,7 @@ static const char *setquotatxt[] = {
 	"set quota for given directory (directories)",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] [-p grace_period|-P] [-iI inodes] [-lL length] [-sS size] [-rR realsize] directory [directory ...]",
+	"",
 	_QMARKDESC_,
 	_NUMBERDESC_,
 	" -p - set grace period for soft quota",
@@ -272,6 +274,7 @@ static const char *delquotatxt[] = {
 	"delete quota for given directory (directories)",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] [-iIlLsSrRaA] directory [directory ...]",
+	"",
 	_QMARKDESC_,
 	_NUMBERDESC_,
 	" -i/-I - delete inodes soft/hard quota",
@@ -286,6 +289,7 @@ static const char *copyquotatxt[] = {
 	"copy quota settings from one directory to another directory (directories)",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] source_directory destination_directory [destination_directory ...]",
+	"",
 	_QMARKDESC_,
 	_NUMBERDESC_,
 	NULL

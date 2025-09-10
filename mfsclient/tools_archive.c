@@ -106,6 +106,7 @@ static const char *checkarchivetxt[] = {
 	"checks if archive flag is set or not (when directory is specified then command will check it recursivelly)",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] object [object ...]",
+	"",
 	_QMARKDESC_,
 	_NUMBERDESC_,
 	NULL
@@ -115,6 +116,7 @@ static const char *setarchivetxt[] = {
 	"set archive flags in chunks (recursivelly for directories) - moves files to archive (use 'archive' goal/labels instead of 'keep' goal/labels)",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] object [object ...]",
+	"",
 	_QMARKDESC_,
 	_NUMBERDESC_,
 	NULL
@@ -124,6 +126,7 @@ static const char *clrarchivetxt[] = {
 	"clear archive flags in chunks (recursivelly for directories) - moves files from archive (use 'keep' goal/labels instead of 'archive' goal/labels) - it also changes ctime, so files will move back to archive after time specified in mfssetgoal",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] object [object ...]"
+	"",
 	_QMARKDESC_,
 	_NUMBERDESC_,
 	NULL

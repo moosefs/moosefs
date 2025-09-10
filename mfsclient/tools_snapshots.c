@@ -391,6 +391,7 @@ static const char *appendchunkstxt[] = {
 	"append file chunks to another file. If destination file doesn't exist then it's created as empty file and then chunks are appended",
 	"",
 	"usage: "_EXENAME_" [-s slice_from:slice_to] snapshot_file file [file ...]",
+	"",
 	_QMARKDESC_,
 	" -s - append only fragment of source file from chunk 'slice_from' to chunk 'slice_to'",
 	NULL
@@ -400,6 +401,7 @@ static const char *makesnapshottxt[] = {
 	"make snapshot (lazy copy)",
 	"",
 	"usage: "_EXENAME_" [-?] [-ocp] source_object [source_object ...] destination",
+	"",
 	_QMARKDESC_,
 	" -o - allow to overwrite existing objects",
 	" -c - 'cp' mode for attributes (create objects using current uid,gid,umask etc.)",
@@ -411,6 +413,7 @@ static const char *rmsnapshottxt[] = {
 	"remove snapshot (quick rm -r)",
 	"",
 	"usage: "_EXENAME_" [-?] [-f] object [object ...]",
+	"",
 	_QMARKDESC_,
 	" -f - remove as much as possible (according to access rights and snapshot flags)",
 	NULL

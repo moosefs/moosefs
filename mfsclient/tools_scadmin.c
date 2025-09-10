@@ -1098,6 +1098,7 @@ static const char *createsctxt[] = {
 	"create new storage class",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] -K keep_labels [-c description] [-p priority] [-g export_group] [-a admin_only] [-m labels_mode] [-o arch_mode] [-C create_labels] [-A archive_labels] [-d archive_delay] [-s archive_minimum_file_length] [-T trash_labels] [-t min_trashretention] sclass_name [sclass_name ...]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	NULL
@@ -1107,6 +1108,7 @@ static const char *modifysctxt[] = {
 	"modify existing storage class",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] [-c description] [-p priority] [-g export_group] [-a admin_only] [-m labels_mode] [-o arch_mode] [-C create_labels] [-K keep_labels] [-A archive_labels] [-d archive_delay] [-s archive_minimum_file_length] [-T trash_labels] [-t min_trashretention] sclass_name [sclass_name ...]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	NULL
@@ -1116,6 +1118,7 @@ static const char *deletesctxt[] = {
 	"delete storage class",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] sclass_name [sclass_name ...]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	NULL
@@ -1125,6 +1128,7 @@ static const char *clonesctxt[] = {
 	"clone storage class",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] src_sclass_name dst_sclass_name [dst_sclass_name ...]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	NULL
@@ -1134,6 +1138,7 @@ static const char *renamesctxt[] = {
 	"rename storage class",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] src_sclass_name dst_sclass_name",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	NULL
@@ -1143,6 +1148,7 @@ static const char *listsctxt[] = {
 	"list available storage classes",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] [-li] [sclass_name_glob_pattern ...]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	" -l - lists storage classes with definitions (long format)",
@@ -1154,6 +1160,7 @@ static const char *importsctxt[] = {
 	"import storage classes from file",
 	"",
 	"usage: "_EXENAME_" [-?] [-M mount_point] [-r] [-n filename]",
+	"",
 	_QMARKDESC_,
 	_MOUNTPOINTDESC_,
 	" -r - replace (overwrite) existing storage classes (by default existing classes are skipped)",

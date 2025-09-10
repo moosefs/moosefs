@@ -637,6 +637,7 @@ static struct fuse_chan *fuse_comm = NULL;
 static int debug_mode = 0;
 static int usedircache = 1;
 static int keep_cache = 0;
+static double readdirplus_cache_min_timeout = 0.0001;
 static double direntry_cache_timeout = 0.1;
 static double entry_cache_timeout = 0.0;
 static double attr_cache_timeout = 0.1;
@@ -3352,6 +3353,12 @@ void mfs_readdirplus(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, str
 		mattr = mfs_attr_get_mattr(ptr);
 		e.attr_timeout = (mattr&MATTR_NOACACHE)?0.0:attr_cache_timeout;
 		e.entry_timeout = (mattr&MATTR_NOECACHE)?0.0:((type==TYPE_DIRECTORY)?direntry_cache_timeout:entry_cache_timeout);
+		if (e.attr_timeout==0.0) {
+			e.attr_timeout=readdirplus_cache_min_timeout;
+		}
+		if (e.entry_timeout==0.0) {
+			e.entry_timeout=readdirplus_cache_min_timeout;
+		}
 #ifdef DENTRY_INVALIDATOR
 		if (dinval && (mattr&MATTR_UNDELETABLE)==0 && type==TYPE_DIRECTORY) {
 			dinval_add(ino,nleng,(const uint8_t *)name,inode);
@@ -6408,7 +6415,7 @@ void mfs_setchan(struct fuse_chan *ch) {
 }
 #endif
 
-void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
+void mfs_init (int debug_mode_in,int keep_cache_in,double readdirplus_cache_min_timeout_in,double direntry_cache_timeout_in,double entry_cache_timeout_in,double attr_cache_timeout_in,double xattr_cache_timeout_in,double groups_cache_timeout,int mkdir_copy_sgid_in,int sugid_clear_mode_in,int xattr_acl_support_in,double fsync_before_close_min_time_in,int no_xattrs_in,int no_posix_locks_in,int no_bsd_locks_in) {
 #ifdef FREEBSD_DELAYED_RELEASE
 	pthread_t th;
 #endif
@@ -6418,6 +6425,7 @@ void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout
 	kver = main_kernelversion();
 	debug_mode = debug_mode_in;
 	keep_cache = keep_cache_in;
+	readdirplus_cache_min_timeout = readdirplus_cache_min_timeout_in;
 	direntry_cache_timeout = direntry_cache_timeout_in;
 	entry_cache_timeout = entry_cache_timeout_in;
 	attr_cache_timeout = attr_cache_timeout_in;
@@ -6440,7 +6448,7 @@ void mfs_init (int debug_mode_in,int keep_cache_in,double direntry_cache_timeout
 	mfs_aclstorage_init();
 	if (debug_mode) {
 		fprintf(stderr,"kernel version: %u.%u\n",kver>>16,kver&0xFFFF);
-		fprintf(stderr,"cache parameters: file_keep_cache=%s direntry_cache_timeout=%.2lf entry_cache_timeout=%.2lf attr_cache_timeout=%.2lf xattr_cache_timeout_in=%.2lf (%s)\n",(keep_cache==1)?"always":(keep_cache==2)?"never":(keep_cache==3)?"direct":(keep_cache==4)?"fbsdauto":"auto",direntry_cache_timeout,entry_cache_timeout,attr_cache_timeout,xattr_cache_timeout_in,xattr_cache_on?"on":"off");
+		fprintf(stderr,"cache parameters: file_keep_cache=%s direntry_cache_timeout=%.2lf entry_cache_timeout=%.2lf attr_cache_timeout=%.2lf readdirplus_cache_min_timeout=%.6lf xattr_cache_timeout_in=%.2lf (%s)\n",(keep_cache==1)?"always":(keep_cache==2)?"never":(keep_cache==3)?"direct":(keep_cache==4)?"fbsdauto":"auto",direntry_cache_timeout,entry_cache_timeout,attr_cache_timeout,readdirplus_cache_min_timeout,xattr_cache_timeout_in,xattr_cache_on?"on":"off");
 		fprintf(stderr,"mkdir copy sgid=%d\nsugid clear mode=%s\n",mkdir_copy_sgid_in,(sugid_clear_mode_in<SUGID_CLEAR_MODE_OPTIONS)?sugid_clear_mode_strings[sugid_clear_mode_in]:"???");
 	}
 	mfs_statsptr_init();

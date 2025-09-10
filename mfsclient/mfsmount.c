@@ -236,6 +236,7 @@ struct mfsopts {
 	unsigned ioretries;
 	unsigned timeout;
 	unsigned logretry;
+	double readdirplusminto;
 	double attrcacheto;
 	double xattrcacheto;
 	double entrycacheto;
@@ -327,6 +328,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfscachemode=%s", cachemode, 0),
 	MFS_OPT("mfsmkdircopysgid=%u", mkdircopysgid, 0),
 	MFS_OPT("mfssugidclearmode=%s", sugidclearmodestr, 0),
+	MFS_OPT("mfsreaddirplusminto=%lf", readdirplusminto, 0),
 	MFS_OPT("mfsattrcacheto=%lf", attrcacheto, 0),
 	MFS_OPT("mfsxattrcacheto=%lf", xattrcacheto, 0),
 	MFS_OPT("mfsentrycacheto=%lf", entrycacheto, 0),
@@ -415,6 +417,7 @@ static void usage(const char *progname) {
 	fprintf(fd,"    -o mfscachemode=CMODE       set cache mode (see below ; default: AUTO)\n");
 #endif
 	fprintf(fd,"    -o mfscachefiles            (deprecated) equivalent to '-o mfscachemode=YES'\n");
+	fprintf(fd,"    -o mfsreaddirplusminto=SEC  set minimal entry/attributes cache timeout for readdirplus in seconds (default: 0.0001)\n");
 	fprintf(fd,"    -o mfsattrcacheto=SEC       set attributes cache timeout in seconds (default: 1.0)\n");
 	fprintf(fd,"    -o mfsxattrcacheto=SEC      set extended attributes (xattr) cache timeout in seconds (default: 30.0)\n");
 	fprintf(fd,"    -o mfsentrycacheto=SEC      set file entry cache timeout in seconds (default: 0.0)\n");
@@ -950,6 +953,7 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	BOOLOPT("mfsnoposixlocks",noposixlocks);
 	BOOLOPT("mfsnobsdlocks",nobsdlocks);
 	NUMOPT("mfsmkdircopysgid","u",mkdircopysgid);
+	NUMOPT("mfsreaddirplusminto",".3lf",readdirplusminto);
 	NUMOPT("mfsattrcacheto",".3lf",attrcacheto);
 	NUMOPT("mfsxattrcacheto",".3lf",xattrcacheto);
 	NUMOPT("mfsentrycacheto",".3lf",entrycacheto);
@@ -1311,11 +1315,11 @@ int mainloop(struct fuse_args *args,const char* mp,int mt,int fg) {
 		read_data_init(mfsopts.readaheadsize*1024*1024,mfsopts.readaheadleng,mfsopts.readaheadtrigger,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry,mfsopts.erroronlostchunk,mfsopts.erroronnospace);
 		write_data_init(mfsopts.writecachesize*1024*1024,mfsopts.ioretries,mfsopts.timeout,mfsopts.logretry,mfsopts.erroronlostchunk,mfsopts.erroronnospace);
 #if FUSE_VERSION >= 30
-		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
+		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.readdirplusminto,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
 		se = fuse_session_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
 		mfs_setsession(se);
 #else /* FUSE2 */
-		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
+		mfs_init(mfsopts.debug,mfsopts.keepcache,mfsopts.readdirplusminto,mfsopts.direntrycacheto,mfsopts.entrycacheto,mfsopts.attrcacheto,mfsopts.xattrcacheto,mfsopts.groupscacheto,mfsopts.mkdircopysgid,mfsopts.sugidclearmode,1,mfsopts.fsyncmintime,mfsopts.noxattrs,mfsopts.noposixlocks,mfsopts.nobsdlocks); //mfsopts.xattraclsupport);
 		se = fuse_lowlevel_new(args, &mfs_oper, sizeof(mfs_oper), (void*)piped);
 #endif
 	}
@@ -1790,6 +1794,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.timeout = 0;
 	mfsopts.logretry = 5;
 	mfsopts.passwordask = 0;
+	mfsopts.readdirplusminto = 0.0001;
 	mfsopts.attrcacheto = 1.0;
 	mfsopts.xattrcacheto = 30.0;
 	mfsopts.entrycacheto = 0.0;
@@ -2078,6 +2083,7 @@ int main(int argc, char *argv[]) {
 	TIMEOUT_CLAMP(mfsopts.attrcacheto,"attribute",86400.0);
 	TIMEOUT_CLAMP(mfsopts.xattrcacheto,"xattr",86400.0);
 	TIMEOUT_CLAMP(mfsopts.entrycacheto,"entry",86400.0);
+	TIMEOUT_CLAMP(mfsopts.readdirplusminto,"readdir plus",60.0);
 	TIMEOUT_CLAMP(mfsopts.direntrycacheto,"directory entry",86400.0);
 	TIMEOUT_CLAMP(mfsopts.negentrycacheto,"non existing entry",86400.0);
 	TIMEOUT_CLAMP(mfsopts.symlinkcacheto,"symbolic link",86400.0);

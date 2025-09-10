@@ -20,6 +20,8 @@ mfsmount_CPPFLAGS = $(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
 
 mfsmount_SOURCES = \
 	dirattrcache.c dirattrcache.h \
+	dirblob_name_index.c dirblob_name_index.h \
+	dirblob_node_index.c dirblob_node_index.h \
 	symlinkcache.c symlinkcache.h \
 	negentrycache.c negentrycache.h \
 	xattrcache.c xattrcache.h \

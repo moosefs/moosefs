@@ -3776,41 +3776,34 @@ uint8_t fs_getdir(uint32_t inode,uint32_t uid,uint32_t gid,const uint8_t **dbuff
 }
 */
 
-uint8_t fs_readdir(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *edgeid,uint8_t wantattr,uint8_t addtocache,const uint8_t **dbuff,uint32_t *dbuffsize) {
+uint8_t fs_readdir(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint64_t *edgeid,uint32_t edgelimit,uint8_t wantattr,uint8_t addtocache,const uint8_t **dbuff,uint32_t *dbuffsize) {
 	uint8_t *wptr;
 	const uint8_t *rptr;
 	uint32_t i;
 	uint8_t ret;
-	uint8_t packetver;
 	uint8_t flags;
 	threc *rec = fs_get_my_threc();
+
 	if (master_version()<VERSION2INT(2,0,0)) {
-		wptr = fs_createpacket(rec,CLTOMA_FUSE_READDIR,13);
-		packetver = 0;
-	} else {
-		wptr = fs_createpacket(rec,CLTOMA_FUSE_READDIR,25+4*gids);
-		packetver = 1;
+		return MFS_ERROR_ENOTSUP;
 	}
+	if (master_version()<VERSION2INT(4,58,0)) {
+		*edgeid = 0;
+		edgelimit = 0xFFFFFFFFU;
+	}
+	wptr = fs_createpacket(rec,CLTOMA_FUSE_READDIR,25+4*gids);
 	if (wptr==NULL) {
 		return MFS_ERROR_IO;
 	}
 	put32bit(&wptr,inode);
 	put32bit(&wptr,uid);
-	if (packetver==0) {
-		if (gids>0) {
-			put32bit(&wptr,gid[0]);
-		} else {
-			put32bit(&wptr,0xFFFFFFFF);
+	if (gids>0) {
+		put32bit(&wptr,gids);
+		for (i=0 ; i<gids ; i++) {
+			put32bit(&wptr,gid[i]);
 		}
 	} else {
-		if (gids>0) {
-			put32bit(&wptr,gids);
-			for (i=0 ; i<gids ; i++) {
-				put32bit(&wptr,gid[i]);
-			}
-		} else {
-			put32bit(&wptr,0xFFFFFFFF);
-		}
+		put32bit(&wptr,0xFFFFFFFF);
 	}
 	flags = 0;
 	if (wantattr) {
@@ -3820,13 +3813,11 @@ uint8_t fs_readdir(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint6
 		flags |= GETDIR_FLAG_ADDTOCACHE;
 	}
 	put8bit(&wptr,flags);
-	if (packetver>=1) {
-		put32bit(&wptr,0xFFFFFFFFU);
-		if (edgeid!=NULL) {
-			put64bit(&wptr,*edgeid);
-		} else {
-			put64bit(&wptr,0);
-		}
+	put32bit(&wptr,edgelimit);
+	if (edgeid!=NULL) {
+		put64bit(&wptr,*edgeid);
+	} else {
+		put64bit(&wptr,0);
 	}
 	rptr = fs_sendandreceive(rec,MATOCL_FUSE_READDIR,&i);
 	if (rptr==NULL) {
@@ -3834,14 +3825,13 @@ uint8_t fs_readdir(uint32_t inode,uint32_t uid,uint32_t gids,uint32_t *gid,uint6
 	} else if (i==1) {
 		ret = rptr[0];
 	} else {
-		if (packetver>=1) {
-			if (edgeid!=NULL) {
-				*edgeid = get64bit(&rptr);
-			} else {
-				rptr+=8;
+		if (edgeid!=NULL) {
+			*edgeid = get64bit(&rptr);
+			if (master_version()<VERSION2INT(4,58,0)) {
+				*edgeid = EDGEID_MAX;
 			}
-			i-=8;
 		}
+		i-=8;
 		*dbuff = rptr;
 		*dbuffsize = i;
 		ret = MFS_STATUS_OK;

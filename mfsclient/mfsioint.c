@@ -2077,9 +2077,12 @@ uint8_t mfs_int_opendir(mfs_int_cred *cr, int *dirdes, const char *path) {
 
 uint8_t mfs_int_readdir(mfs_int_cred *cr, int dirdes, mfs_int_direntry *de) {
 	file_info *fileinfo;
+	uint8_t *tmpdbuff;
 	const uint8_t *dbuff;
 	const uint8_t *ptr,*eptr;
 	uint8_t nleng;
+	uint64_t newsize;
+	uint64_t edgeid;
 	uint32_t dsize;
 	uint32_t rsize;
 	uint8_t status;
@@ -2100,20 +2103,44 @@ uint8_t mfs_int_readdir(mfs_int_cred *cr, int dirdes, mfs_int_direntry *de) {
 	if (fileinfo->wasread==0 || fileinfo->offset==0) {
 		fileinfo->reading = 1;
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-		status = fs_readdir(fileinfo->inode,cr->uid,cr->gidcnt,cr->gidtab,NULL,0,0,&dbuff,&dsize);
 		if (fileinfo->dbuff!=NULL) {
 			free(fileinfo->dbuff);
 		}
-		if (status==MFS_STATUS_OK) {
-			fileinfo->dbuff = malloc(dsize);
-			memcpy(fileinfo->dbuff,dbuff,dsize);
-			fileinfo->dbuffsize = dsize;
-			fileinfo->dataformat = 0;
-		} else {
-			fileinfo->dbuff = NULL;
-			fileinfo->dbuffsize = 0;
-		}
+		fileinfo->dbuff = NULL;
+		fileinfo->dbuffsize = 0;
+		edgeid = 0;
+		do {
+			status = fs_readdir(fileinfo->inode,cr->uid,cr->gidcnt,cr->gidtab,&edgeid,10000,0,0,&dbuff,&dsize);
+			if (status==MFS_STATUS_OK) {
+				newsize = fileinfo->dbuffsize + dsize;
+				if (fileinfo->dbuff==NULL) {
+					fileinfo->dbuff = malloc(dsize);
+				} else {
+					tmpdbuff = fileinfo->dbuff;
+					fileinfo->dbuff = realloc(fileinfo->dbuff,newsize);
+					if (fileinfo->dbuff==NULL) {
+						free(tmpdbuff);
+					}
+				}
+				if (fileinfo->dbuff==NULL) {
+					fileinfo->dbuffsize = 0;
+					status = MFS_ERROR_OUTOFMEMORY;
+					edgeid = EDGEID_MAX;
+				} else {
+					memcpy(fileinfo->dbuff+fileinfo->dbuffsize,dbuff,dsize);
+					fileinfo->dbuffsize = newsize;
+				}
+			} else {
+				if (fileinfo->dbuff!=NULL) {
+					free(fileinfo->dbuff);
+				}
+				fileinfo->dbuff = NULL;
+				fileinfo->dbuffsize = 0;
+				edgeid = EDGEID_MAX;
+			}
+		} while (edgeid!=EDGEID_MAX);
 		zassert(pthread_mutex_lock(&(fileinfo->lock)));
+		fileinfo->dataformat = 0;
 		fileinfo->reading = 0;
 		fileinfo->wasread = 1;
 		zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));
@@ -2155,10 +2182,13 @@ uint8_t mfs_int_readdir(mfs_int_cred *cr, int dirdes, mfs_int_direntry *de) {
 
 uint8_t mfs_int_readdirplus(mfs_int_cred *cr, int dirdes, mfs_int_direntryplus *de) {
 	file_info *fileinfo;
+	uint8_t *tmpdbuff;
 	const uint8_t *dbuff;
 	const uint8_t *ptr,*eptr;
 	uint8_t nleng;
 	uint32_t inode;
+	uint64_t newsize;
+	uint64_t edgeid;
 	uint32_t dsize;
 	uint32_t rsize;
 	uint8_t status;
@@ -2179,20 +2209,44 @@ uint8_t mfs_int_readdirplus(mfs_int_cred *cr, int dirdes, mfs_int_direntryplus *
 	if (fileinfo->wasread==0 || fileinfo->offset==0 || fileinfo->dataformat==0) {
 		fileinfo->reading = 1;
 		zassert(pthread_mutex_unlock(&(fileinfo->lock)));
-		status = fs_readdir(fileinfo->inode,cr->uid,cr->gidcnt,cr->gidtab,NULL,1,0,&dbuff,&dsize);
 		if (fileinfo->dbuff!=NULL) {
 			free(fileinfo->dbuff);
 		}
-		if (status==MFS_STATUS_OK) {
-			fileinfo->dbuff = malloc(dsize);
-			memcpy(fileinfo->dbuff,dbuff,dsize);
-			fileinfo->dbuffsize = dsize;
-			fileinfo->dataformat = 1;
-		} else {
-			fileinfo->dbuff = NULL;
-			fileinfo->dbuffsize = 0;
-		}
+		fileinfo->dbuff = NULL;
+		fileinfo->dbuffsize = 0;
+		edgeid = 0;
+		do {
+			status = fs_readdir(fileinfo->inode,cr->uid,cr->gidcnt,cr->gidtab,&edgeid,10000,1,0,&dbuff,&dsize);
+			if (status==MFS_STATUS_OK) {
+				newsize = fileinfo->dbuffsize + dsize;
+				if (fileinfo->dbuff==NULL) {
+					fileinfo->dbuff = malloc(dsize);
+				} else {
+					tmpdbuff = fileinfo->dbuff;
+					fileinfo->dbuff = realloc(fileinfo->dbuff,newsize);
+					if (fileinfo->dbuff==NULL) {
+						free(tmpdbuff);
+					}
+				}
+				if (fileinfo->dbuff==NULL) {
+					fileinfo->dbuffsize = 0;
+					status = MFS_ERROR_OUTOFMEMORY;
+					edgeid = EDGEID_MAX;
+				} else {
+					memcpy(fileinfo->dbuff+fileinfo->dbuffsize,dbuff,dsize);
+					fileinfo->dbuffsize = newsize;
+				}
+			} else {
+				if (fileinfo->dbuff!=NULL) {
+					free(fileinfo->dbuff);
+				}
+				fileinfo->dbuff = NULL;
+				fileinfo->dbuffsize = 0;
+				edgeid = EDGEID_MAX;
+			}
+		} while (edgeid!=EDGEID_MAX);
 		zassert(pthread_mutex_lock(&(fileinfo->lock)));
+		fileinfo->dataformat = 1;
 		fileinfo->reading = 0;
 		fileinfo->wasread = 1;
 		zassert(pthread_cond_broadcast(&(fileinfo->rwcond)));

@@ -233,6 +233,8 @@ mfsfacl_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(mfsfacl_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_mfsmount_OBJECTS = mfsmount-dirattrcache.$(OBJEXT) \
+	mfsmount-dirblob_name_index.$(OBJEXT) \
+	mfsmount-dirblob_node_index.$(OBJEXT) \
 	mfsmount-symlinkcache.$(OBJEXT) \
 	mfsmount-negentrycache.$(OBJEXT) mfsmount-xattrcache.$(OBJEXT) \
 	mfsmount-fdcache.$(OBJEXT) \
@@ -411,6 +413,8 @@ am__depfiles_remade = ../mfscommon/$(DEPDIR)/clocks.Po \
 	./$(DEPDIR)/mfsmount-csdb.Po ./$(DEPDIR)/mfsmount-csorder.Po \
 	./$(DEPDIR)/mfsmount-dentry_invalidator.Po \
 	./$(DEPDIR)/mfsmount-dirattrcache.Po \
+	./$(DEPDIR)/mfsmount-dirblob_name_index.Po \
+	./$(DEPDIR)/mfsmount-dirblob_node_index.Po \
 	./$(DEPDIR)/mfsmount-extrapackets.Po \
 	./$(DEPDIR)/mfsmount-fdcache.Po \
 	./$(DEPDIR)/mfsmount-getgroups.Po \
@@ -677,6 +681,8 @@ mfsmount_CFLAGS = $(PTHREAD_CFLAGS) -D_USE_PTHREADS $(FUSE_CFLAGS) -DAPPNAME=mfs
 mfsmount_CPPFLAGS = $(PTHREAD_CPPFLAGS) -I$(top_srcdir)/mfscommon
 mfsmount_SOURCES = \
 	dirattrcache.c dirattrcache.h \
+	dirblob_name_index.c dirblob_name_index.h \
+	dirblob_node_index.c dirblob_node_index.h \
 	symlinkcache.c symlinkcache.h \
 	negentrycache.c negentrycache.h \
 	xattrcache.c xattrcache.h \
@@ -1324,6 +1330,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-csorder.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dentry_invalidator.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirattrcache.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirblob_name_index.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-dirblob_node_index.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-extrapackets.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-fdcache.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mfsmount-getgroups.Po@am__quote@ # am--include-marker
@@ -1737,6 +1745,34 @@ mfsmount-dirattrcache.obj: dirattrcache.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dirattrcache.c' object='mfsmount-dirattrcache.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-dirattrcache.obj `if test -f 'dirattrcache.c'; then $(CYGPATH_W) 'dirattrcache.c'; else $(CYGPATH_W) '$(srcdir)/dirattrcache.c'; fi`
+
+mfsmount-dirblob_name_index.o: dirblob_name_index.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-dirblob_name_index.o -MD -MP -MF $(DEPDIR)/mfsmount-dirblob_name_index.Tpo -c -o mfsmount-dirblob_name_index.o `test -f 'dirblob_name_index.c' || echo '$(srcdir)/'`dirblob_name_index.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-dirblob_name_index.Tpo $(DEPDIR)/mfsmount-dirblob_name_index.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dirblob_name_index.c' object='mfsmount-dirblob_name_index.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-dirblob_name_index.o `test -f 'dirblob_name_index.c' || echo '$(srcdir)/'`dirblob_name_index.c
+
+mfsmount-dirblob_name_index.obj: dirblob_name_index.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-dirblob_name_index.obj -MD -MP -MF $(DEPDIR)/mfsmount-dirblob_name_index.Tpo -c -o mfsmount-dirblob_name_index.obj `if test -f 'dirblob_name_index.c'; then $(CYGPATH_W) 'dirblob_name_index.c'; else $(CYGPATH_W) '$(srcdir)/dirblob_name_index.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-dirblob_name_index.Tpo $(DEPDIR)/mfsmount-dirblob_name_index.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dirblob_name_index.c' object='mfsmount-dirblob_name_index.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-dirblob_name_index.obj `if test -f 'dirblob_name_index.c'; then $(CYGPATH_W) 'dirblob_name_index.c'; else $(CYGPATH_W) '$(srcdir)/dirblob_name_index.c'; fi`
+
+mfsmount-dirblob_node_index.o: dirblob_node_index.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-dirblob_node_index.o -MD -MP -MF $(DEPDIR)/mfsmount-dirblob_node_index.Tpo -c -o mfsmount-dirblob_node_index.o `test -f 'dirblob_node_index.c' || echo '$(srcdir)/'`dirblob_node_index.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-dirblob_node_index.Tpo $(DEPDIR)/mfsmount-dirblob_node_index.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dirblob_node_index.c' object='mfsmount-dirblob_node_index.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-dirblob_node_index.o `test -f 'dirblob_node_index.c' || echo '$(srcdir)/'`dirblob_node_index.c
+
+mfsmount-dirblob_node_index.obj: dirblob_node_index.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-dirblob_node_index.obj -MD -MP -MF $(DEPDIR)/mfsmount-dirblob_node_index.Tpo -c -o mfsmount-dirblob_node_index.obj `if test -f 'dirblob_node_index.c'; then $(CYGPATH_W) 'dirblob_node_index.c'; else $(CYGPATH_W) '$(srcdir)/dirblob_node_index.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/mfsmount-dirblob_node_index.Tpo $(DEPDIR)/mfsmount-dirblob_node_index.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dirblob_node_index.c' object='mfsmount-dirblob_node_index.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -c -o mfsmount-dirblob_node_index.obj `if test -f 'dirblob_node_index.c'; then $(CYGPATH_W) 'dirblob_node_index.c'; else $(CYGPATH_W) '$(srcdir)/dirblob_node_index.c'; fi`
 
 mfsmount-symlinkcache.o: symlinkcache.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(mfsmount_CPPFLAGS) $(CPPFLAGS) $(mfsmount_CFLAGS) $(CFLAGS) -MT mfsmount-symlinkcache.o -MD -MP -MF $(DEPDIR)/mfsmount-symlinkcache.Tpo -c -o mfsmount-symlinkcache.o `test -f 'symlinkcache.c' || echo '$(srcdir)/'`symlinkcache.c
@@ -2587,6 +2623,7 @@ cscopelist-am: $(am__tagged_files)
 
 distclean-tags:
 	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
+
 distdir: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) distdir-am
 
@@ -2741,6 +2778,8 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/mfsmount-csorder.Po
 	-rm -f ./$(DEPDIR)/mfsmount-dentry_invalidator.Po
 	-rm -f ./$(DEPDIR)/mfsmount-dirattrcache.Po
+	-rm -f ./$(DEPDIR)/mfsmount-dirblob_name_index.Po
+	-rm -f ./$(DEPDIR)/mfsmount-dirblob_node_index.Po
 	-rm -f ./$(DEPDIR)/mfsmount-extrapackets.Po
 	-rm -f ./$(DEPDIR)/mfsmount-fdcache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-getgroups.Po
@@ -2891,6 +2930,8 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/mfsmount-csorder.Po
 	-rm -f ./$(DEPDIR)/mfsmount-dentry_invalidator.Po
 	-rm -f ./$(DEPDIR)/mfsmount-dirattrcache.Po
+	-rm -f ./$(DEPDIR)/mfsmount-dirblob_name_index.Po
+	-rm -f ./$(DEPDIR)/mfsmount-dirblob_node_index.Po
 	-rm -f ./$(DEPDIR)/mfsmount-extrapackets.Po
 	-rm -f ./$(DEPDIR)/mfsmount-fdcache.Po
 	-rm -f ./$(DEPDIR)/mfsmount-getgroups.Po

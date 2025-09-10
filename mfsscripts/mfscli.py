@@ -1387,7 +1387,7 @@ if org.shall_render("IG"):
 
 #Metadata servers subsection
 if org.shall_render("IM"):
-	try:		
+	try:
 		if jsonmode:
 			json_im_array = []
 		elif ttymode:
@@ -3926,8 +3926,6 @@ if org.shall_render("MC"):
 						if raw: dline.append("%.8f%%" % (diff))
 						else: dline.append("%.2f%%" % (diff))
 				tab.append(*dline)
-			else:
-				tab = Table("Master chart data is not supported in your version of MFS - please upgrade! Minimal required version is 2.0.15.",1,"r")
 		if jsonmode:
 			jcollect["dataset"]["mastercharts"] = json_mc_array
 		else:
@@ -4131,8 +4129,6 @@ if org.shall_render("CC"):
 							if raw: dline.append("%.8f%%" % (diff))
 							else: dline.append("%.2f%%" % (diff))
 					tab.append(*dline)
-				else:
-					tab = Table("Chunkserver chart data are not supported in your version of MFS - please upgrade. Minimal required version is 2.0.15.",1,"r")
 			if jsonmode:
 				jcollect["dataset"]["cscharts"] = json_cc_array
 			else:

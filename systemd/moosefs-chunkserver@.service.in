@@ -9,6 +9,8 @@ ExecStart=@SBIN_PATH@/mfschunkserver -c @ETC_PATH@/mfs-%I/mfschunkserver.cfg sta
 ExecStop=@SBIN_PATH@/mfschunkserver -c @ETC_PATH@/mfs-%I/mfschunkserver.cfg stop
 ExecReload=@SBIN_PATH@/mfschunkserver -c @ETC_PATH@/mfs-%I/mfschunkserver.cfg reload
 PIDFile=@DATA_PATH@-%I/.mfschunkserver.lock
+TimeoutStopSec=600
+TimeoutStartSec=60
 Restart=on-abnormal
 
 [Install]

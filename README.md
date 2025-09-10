@@ -153,10 +153,10 @@ There are more configuration parameters available but most of them may stay with
 MooseFS, for testing purposes, can even be installed on a single machine!
 
 #### Additional tools
-Setting up `moosefs-cli` or `moosefs-cgi` with `moosefs-cgiserv` is also recommended – it gives you a possibility to monitor the cluster online:
+Setting up `moosefs-cli` or `moosefs-gui` is also recommended – it gives you a possibility to monitor the cluster online:
 
-1. Install `moosefs-cli moosefs-cgi moosefs-cgiserv` packages (they are typically set up on the Master Server)
-2. Run MooseFS CGI Server (as `root`): `mfscgiserv start`
+1. Install `moosefs-cli moosefs-gui` packages (they are typically set up on the Master Server)
+2. Run MooseFS CGI Server (as `root`): `mfsgui start`
 3. Open http://mfsmaster:9425 in your web browser
 
 It is also **strongly** recommended to set up at least one Metalogger on a different machine than Master Server (e.g. on one of Chunkservers). Metalogger constantly synchronizes and backups the metadata:

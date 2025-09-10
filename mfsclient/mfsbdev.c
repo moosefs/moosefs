@@ -151,8 +151,7 @@ typedef struct nbdcommon {
 	int mfsfd;
 	int nbdfd;
 	pthread_t ctrl_thread;
-	pthread_t recv_thread;
-	pthread_t send_thread;
+	int active;
 	void *aqueue; // per bdev answer queues
 } nbdcommon;
 
@@ -360,6 +359,7 @@ void* receive_thread(void *arg) {
 //		nbd_worker_fn(r,0);
 		workers_newjob(workers_set,r);
 		if (cmd==NBD_CMD_DISC) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"receive thread for %s ending (cmd:DISC)",nbdcp->nbddevice);
 			return NULL;
 		}
 	}
@@ -398,33 +398,165 @@ void* send_thread(void *arg) {
 	}
 }
 
-void* nbd_controller_thread(void *arg) {
-	nbdcommon *nbdcp = ((nbdcommon*)(arg));
+int nbd_open_device(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
+	uint64_t size;
 	int err;
 
-	err = ioctl(nbdcp->nbdfd, NBD_SET_SOCK, nbdcp->sp[1]);
-	if (err<0) {
-		ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
-		ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
-//		exit(1);
-		return NULL;
+#define nbd_opendev_err_msg(format, ...) {\
+	mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,(format), __VA_ARGS__); \
+	if (errmsg!=NULL) { \
+		snprintf(errmsg,NBD_ERR_SIZE,(format), __VA_ARGS__); \
+	} \
+}
+
+	nbdcp->nbdfd = open(nbdcp->nbddevice,O_RDWR);
+	if (nbdcp->nbdfd<0) {
+		nbd_opendev_err_msg("error opening %s: %s",nbdcp->nbddevice,strerror(errno));
+		return -1;
 	}
+
+#ifdef IOCTL_INTOP
+	err = ioctl(nbdcp->nbdfd,(int)BLKGETSIZE64,&size);
+#else
+	err = ioctl(nbdcp->nbdfd,BLKGETSIZE64,&size);
+#endif
+	if (err<0) {
+		nbd_opendev_err_msg("can't obtain size of block device (%s): %s",nbdcp->nbddevice,strerror(errno));
+		close(nbdcp->nbdfd);
+		return -1;
+	}
+	if (size>0) {
+		nbd_opendev_err_msg("it seems that block device (%s) is already mapped",nbdcp->nbddevice);
+		close(nbdcp->nbdfd);
+		return -1;
+	}
+
+	err = ioctl(nbdcp->nbdfd, NBD_SET_BLKSIZE, nbdcp->bsize);
+	if (err<0) {
+		nbd_opendev_err_msg("error setting block device block size (%s): %s",nbdcp->nbddevice,strerror(errno));
+		close(nbdcp->nbdfd);
+		return -1;
+	}
+
+	err = ioctl(nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, nbdcp->fsize / nbdcp->bsize);
+	if (err<0) {
+		nbd_opendev_err_msg("error setting block device number of blocks (%s): %s",nbdcp->nbddevice,strerror(errno));
+		close(nbdcp->nbdfd);
+		return -1;
+	}
+
+	err = ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
+	if (err<0) {
+		nbd_opendev_err_msg("error clearing socket for NBD device (%s): %s",nbdcp->nbddevice,strerror(errno));
+		close(nbdcp->nbdfd);
+		return -1;
+	}
+
+	err = ioctl(nbdcp->nbdfd, NBD_SET_TIMEOUT, NbdTimeout);
+	if (err<0) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"error setting timeout for NBD device (%s): %s",nbdcp->nbddevice,strerror(errno));
+	}
+
+	err = socketpair(AF_UNIX, SOCK_STREAM, 0, nbdcp->sp);
+
+	if (err<0) {
+		nbd_opendev_err_msg("can't create socket pair: %s",strerror(errno));
+		close(nbdcp->nbdfd);
+		return -1;
+	}
+
+	err = ioctl(nbdcp->nbdfd, NBD_SET_SOCK, nbdcp->sp[1]);
+
+	if (err<0) {
+		nbd_opendev_err_msg("can't connect socket pair to nbd (%s): %s",nbdcp->nbddevice,strerror(errno));
+		close(nbdcp->nbdfd);
+		close(nbdcp->sp[0]);
+		close(nbdcp->sp[1]);
+		return -1;
+	}
+
 #if defined NBD_SET_FLAGS && defined NBD_FLAG_SEND_FLUSH && defined NBD_CMD_FLUSH
 	err = ioctl(nbdcp->nbdfd, NBD_SET_FLAGS, NBD_FLAG_SEND_FLUSH);
+
 	if (err<0) {
-		ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
-		ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
-//		exit(1);
-		return NULL;
+		nbd_opendev_err_msg("can't set SEND_FLUSH flag in nbd (%s): %s",nbdcp->nbddevice,strerror(errno));
+		close(nbdcp->nbdfd);
+		close(nbdcp->sp[0]);
+		close(nbdcp->sp[1]);
+		return -1;
 	}
 #endif
-//	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"controller thread for %s performs DO_IT ioctl",nbdcp->nbddevice);
-//	fprintf(stderr,"waiting for peer to finish ...\n");
-	ioctl(nbdcp->nbdfd, NBD_DO_IT); // this will wait
-	mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"controller thread for %s finished",nbdcp->nbddevice);
-//	fprintf(stderr,"... finished\n");
-	ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
-	ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
+
+	return 0;
+}
+
+void* nbd_controller_thread(void *arg) {
+	nbdcommon *nbdcp = ((nbdcommon*)(arg));
+	pthread_t recv_th;
+	pthread_t send_th;
+	uint8_t thflags;
+
+	thflags = 0;
+
+	while (nbdcp->active) {
+		// run send thread
+		while (nbdcp->active) {
+			if (lwt_minthread_create(&send_th,0,send_thread,nbdcp)<0) {
+				sleep(1);
+			} else {
+				thflags |= 1;
+				break;
+			}
+		}
+		// run receive thread
+		while (nbdcp->active) {
+			if (lwt_minthread_create(&recv_th,0,receive_thread,nbdcp)<0) {
+				sleep(1);
+			} else {
+				thflags |= 2;
+				break;
+			}
+		}
+		// start working loop
+		if (nbdcp->active) {
+			ioctl(nbdcp->nbdfd, NBD_DO_IT); // this will wait
+			if (nbdcp->active) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"controller thread for %s: disconnected",nbdcp->nbddevice);
+			}
+		}
+
+		ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
+		ioctl(nbdcp->nbdfd, NBD_DISCONNECT); // just in case send disconnect to make sure that send/receive threads will finish
+		ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
+		close(nbdcp->sp[0]);
+		close(nbdcp->sp[1]);
+
+		if (thflags&2) {
+			pthread_join(recv_th,NULL);
+		}
+		if (thflags&1) {
+			pthread_join(send_th,NULL);
+		}
+		thflags = 0;
+		close(nbdcp->nbdfd);
+
+		while (nbdcp->active) {
+			if (nbd_open_device(nbdcp,NULL)<0) {
+				sleep(1);
+			} else {
+				thflags |= 4;
+				break;
+			}
+		}
+	}
+
+	if (thflags&4) {
+		ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
+		ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
+		close(nbdcp->sp[0]);
+		close(nbdcp->sp[1]);
+		close(nbdcp->nbdfd);
+	}
 	return NULL;
 }
 
@@ -573,7 +705,7 @@ char* find_free_nbddevice(void) {
 		devicename[49] = 0;
 		nbdfd = open(devicename,O_RDWR);
 		if (nbdfd<0) {
-			if (errno==ENOENT) {
+			if (errno==ENOENT || errno==EACCES) {
 				return NULL;
 			}
 		} else {
@@ -646,7 +778,6 @@ void nbd_force_partition_reread(nbdcommon *nbdcp) {
 }
 
 int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
-	uint64_t size;
 	int omode,lmode;
 	int err;
 	struct stat stbuf;
@@ -657,12 +788,6 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 }
 
 	errmsg[0] = 0;
-	err = socketpair(AF_UNIX, SOCK_STREAM, 0, nbdcp->sp);
-
-	if (err<0) {
-		nbd_start_err_msg("can't create socket pair: %s",strerror(errno));
-		goto err1;
-	}
 
 	if (nbdcp->nbddevice==NULL) {
 		nbdcp->nbddevice = find_free_nbddevice();
@@ -670,27 +795,7 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 
 	if (nbdcp->nbddevice==NULL) {
 		nbd_start_err_msg("%s","can't find free NBD device");
-		goto err2;
-	}
-
-	nbdcp->nbdfd = open(nbdcp->nbddevice,O_RDWR);
-	if (nbdcp->nbdfd<0) {
-		nbd_start_err_msg("error opening %s: %s",nbdcp->nbddevice,strerror(errno));
-		goto err2;
-	}
-
-#ifdef IOCTL_INTOP
-	err = ioctl(nbdcp->nbdfd,(int)BLKGETSIZE64,&size);
-#else
-	err = ioctl(nbdcp->nbdfd,BLKGETSIZE64,&size);
-#endif
-	if (err<0) {
-		nbd_start_err_msg("can't obtain size of block device (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err3;
-	}
-	if (size>0) {
-		nbd_start_err_msg("it seems that block device (%s) is already mapped",nbdcp->nbddevice);
-		goto err3;
+		goto err1;
 	}
 
 	if (nbdcp->flags & FLAG_READONLY) {
@@ -706,9 +811,9 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	nbdcp->mfsfd = mfs_open(nbdcp->mfsfile,omode,0666);
 	if (nbdcp->mfsfd<0) {
 		nbd_start_err_msg("error opening MFS file %s: %s",nbdcp->mfsfile,strerror(errno));
-		goto err3;
+		goto err1;
 	}
-
+	// mfsfd opened
 	if (mfs_flock(nbdcp->mfsfd,lmode|LOCK_NB)<0) {
 		if ((nbdcp->flags & FLAG_IGNORELOCK) == 0) {
 			if (errno==EROFS) {
@@ -716,14 +821,15 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 			} else {
 				nbd_start_err_msg("MFS file %s is locked (likely mapped elsewhere)",nbdcp->mfsfile);
 			}
-			goto err4;
+			goto err2;
 		}
 	}
 
+	// mfs locked
 	if (nbdcp->fsize==0) {
 		if (mfs_fstat(nbdcp->mfsfd,&stbuf)<0) {
 			nbd_start_err_msg("can't stat MFS file '%s': %s",nbdcp->mfsfile,strerror(errno));
-			goto err5;
+			goto err3;
 		}
 		nbdcp->fsize = stbuf.st_size;
 	}
@@ -732,54 +838,25 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 
 	if (nbdcp->fsize==0) {
 		nbd_start_err_msg("%s","file size too low (less than one 4k block)");
-		goto err5;
+		goto err3;
 	}
 
-	err = ioctl(nbdcp->nbdfd, NBD_SET_BLKSIZE, nbdcp->bsize);
-	if (err<0) {
-		nbd_start_err_msg("error setting block device block size (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err5;
-	}
-
-	err = ioctl(nbdcp->nbdfd, NBD_SET_SIZE_BLOCKS, nbdcp->fsize / nbdcp->bsize);
-	if (err<0) {
-		nbd_start_err_msg("error setting block device number of blocks (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err5;
-	}
-
-	err = ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
-	if (err<0) {
-		nbd_start_err_msg("error clearing socket for NBD device (%s): %s",nbdcp->nbddevice,strerror(errno));
-		goto err5;
-	}
-
-	err = ioctl(nbdcp->nbdfd, NBD_SET_TIMEOUT, NbdTimeout);
-	if (err<0) {
-		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"error setting timeout for NBD device (%s): %s",nbdcp->nbddevice,strerror(errno));
+	if (nbd_open_device(nbdcp,errmsg)<0) {
+		goto err3;
 	}
 
 	nbdcp->aqueue = squeue_new(0);
 	if (nbdcp->aqueue==NULL) {
 		nbd_start_err_msg("%s","can't create queue");
-		goto err5;
+		goto err4;
 	}
+
+	nbdcp->active = 1;
 
 	err = lwt_minthread_create(&(nbdcp->ctrl_thread),0,nbd_controller_thread,nbdcp);
 	if (err<0) {
 		nbd_start_err_msg("can't create controller thread: %s",strerror(errno));
-		goto err6;
-	}
-
-	err = lwt_minthread_create(&(nbdcp->send_thread),0,send_thread,nbdcp);
-	if (err<0) {
-		nbd_start_err_msg("can't create send thread: %s",strerror(errno));
-		goto err7;
-	}
-
-	err = lwt_minthread_create(&(nbdcp->recv_thread),0,receive_thread,nbdcp);
-	if (err<0) {
-		nbd_start_err_msg("can't create receive thread: %s",strerror(errno));
-		goto err8;
+		goto err5;
 	}
 
 	err = mkdir(NBD_LINK_PREFIX,0777); // ignore status
@@ -790,31 +867,26 @@ int nbd_start(nbdcommon *nbdcp,char errmsg[NBD_ERR_SIZE]) {
 	}
 	return 0;
 
-err8:
-	squeue_close(nbdcp->aqueue);
-	pthread_join(nbdcp->send_thread,NULL);
-err7:
-	ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
-	ioctl(nbdcp->nbdfd, NBD_DISCONNECT);
-	ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
-	pthread_join(nbdcp->ctrl_thread,NULL);
-err6:
-	squeue_delete(nbdcp->aqueue);
 err5:
-	mfs_flock(nbdcp->mfsfd,LOCK_UN); // just in case
+	squeue_delete(nbdcp->aqueue);
 err4:
-	mfs_close(nbdcp->mfsfd);
-err3:
-	close(nbdcp->nbdfd);
-err2:
+	ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
+	ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
 	close(nbdcp->sp[0]);
 	close(nbdcp->sp[1]);
+	close(nbdcp->nbdfd);
+err3:
+	mfs_flock(nbdcp->mfsfd,LOCK_UN); // just in case
+err2:
+	mfs_close(nbdcp->mfsfd);
 err1:
 	return -1;
 }
 
 void nbd_stop(nbdcommon *nbdcp) {
 	int err;
+
+	nbdcp->active = 0;
 
 	err = ioctl(nbdcp->nbdfd, NBD_CLEAR_QUE);
 	if (err<0) {
@@ -824,13 +896,12 @@ void nbd_stop(nbdcommon *nbdcp) {
 	if (err<0) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"%s: ioctl (NBD_DISCONNECT) failed: %s",nbdcp->nbddevice,strerror(errno));
 	}
-	err = ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
-	if (err<0) {
-		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"%s: ioctl (NBD_CLEAR_SOCK) failed: %s",nbdcp->nbddevice,strerror(errno));
-	}
 
-	pthread_join(nbdcp->recv_thread,NULL);
-	pthread_join(nbdcp->send_thread,NULL);
+//	err = ioctl(nbdcp->nbdfd, NBD_CLEAR_SOCK);
+//	if (err<0) {
+//		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"%s: ioctl (NBD_CLEAR_SOCK) failed: %s",nbdcp->nbddevice,strerror(errno));
+//	}
+
 	pthread_join(nbdcp->ctrl_thread,NULL);
 
 	squeue_delete(nbdcp->aqueue);
@@ -842,7 +913,6 @@ void nbd_stop(nbdcommon *nbdcp) {
 	if (err<0) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"can't remove nbd device symlink %s->%s: %s",nbdcp->linkname,nbdcp->nbddevice,strerror(errno));
 	}
-	close(nbdcp->nbdfd);
 }
 
 void nbd_free(nbdcommon *nbdcp) {
@@ -1754,6 +1824,17 @@ int nbd_start_daemon(const char *appname,int argc,char *argv[]) {
 				usage(appname);
 				return 0;
 		}
+	}
+
+	if (find_free_nbddevice()==NULL) {
+		if (errno==ENOENT) {
+			fprintf(stderr,"no /dev/nbdX devices present - likely nbd kernel module should be loaded (try: modprobe nbd)\n");
+		} else if (errno==EACCES) {
+			fprintf(stderr,"permission denied accessing /dev/nbdX - try to start with root privileges\n");
+		} else {
+			fprintf(stderr,"can't find free NBD device\n");
+		}
+		return 1;
 	}
 
 	if (passfile!=NULL) {

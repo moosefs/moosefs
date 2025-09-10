@@ -4426,15 +4426,15 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version,uint16_t *blocks) {
 		return MFS_ERROR_WRONGVERSION;
 	}
 	lasttesttime = c->testtime;
-	status = hdd_io_begin(c,MODE_EXISTING);
-	if (status!=MFS_STATUS_OK) {
-		hdd_error_occured(c,1);	// uses and preserves errno !!!
-		hdd_chunk_release(c);
-		return status;
-	}
-	hdd_sequential_mode_int(c);
 	now = main_time();
-	if (lasttesttime+MinTimeBetweenTests<=now) {
+	if (blocks==NULL || lasttesttime+MinTimeBetweenTests<=now) {
+		status = hdd_io_begin(c,MODE_EXISTING);
+		if (status!=MFS_STATUS_OK) {
+			hdd_error_occured(c,1);	// uses and preserves errno !!!
+			hdd_chunk_release(c);
+			return status;
+		}
+		hdd_sequential_mode_int(c);
 		lseek(c->fd,c->hdrsize+CHUNKCRCSIZE,SEEK_SET);
 		ptr = c->crc;
 		for (block=0 ; block<c->blocks ; block++) {
@@ -4489,15 +4489,15 @@ static int hdd_int_test(uint64_t chunkid,uint32_t version,uint16_t *blocks) {
 		if (MinFlushCacheTime>=0 && lasttesttime+MinFlushCacheTime<=now) {
 			hdd_drop_caches_int(c);
 		}
-	}
-	status = hdd_io_end(c);
-	if (status!=MFS_STATUS_OK) {
-		hdd_error_occured(c,1);	// uses and preserves errno !!!
-		hdd_chunk_release(c);
-		return status;
-	}
-	if (blocks) {
-		*blocks = c->blocks;
+		status = hdd_io_end(c);
+		if (status!=MFS_STATUS_OK) {
+			hdd_error_occured(c,1);	// uses and preserves errno !!!
+			hdd_chunk_release(c);
+			return status;
+		}
+		if (blocks) {
+			*blocks = c->blocks;
+		}
 	}
 	hdd_chunk_release(c);
 	return MFS_STATUS_OK;
@@ -7160,7 +7160,7 @@ void* hdd_tester_thread(void* arg) {
 				nextdelay *= UINT64_C(65536000000);
 				nextdelay /= testbps;
 			} else {
-				nextdelay = 10000;
+				nextdelay = 1000;
 			}
 #ifdef HDD_TESTER_DEBUG
 			if (fd) {
@@ -7193,7 +7193,7 @@ void* hdd_tester_thread(void* arg) {
 				fprintf(fd,"%"PRIu64".%06u: loop end\n",en/1000000,(unsigned int)(en%1000000));
 			}
 #endif
-			if (en+10000 < nextevent) {
+			if (en+1000 < nextevent) {
 				nextevent -= en;
 #ifdef HDD_TESTER_DEBUG
 				if (fd) {
@@ -7204,7 +7204,7 @@ void* hdd_tester_thread(void* arg) {
 					nextevent = 500000;
 				}
 			} else {
-				nextevent = 10000;
+				nextevent = 1000;
 			}
 #ifdef HDD_TESTER_DEBUG
 			if (fd) {

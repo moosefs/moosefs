@@ -6594,6 +6594,8 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 	// check REBALANCE_FORCE_SRC and REBALANCE_FORCE_DST
 	abovecnt = 0;
 	belowcnt = 0;
+	abovesum = 0;
+	belowsum = 0;
 	avgcount = 0;
 	*changed = 0;
 	for (f=folderhead ; f ; f=f->next) {

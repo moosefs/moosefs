@@ -619,7 +619,7 @@ int faclparsestr(acl_command ***tail,uint8_t aclcmd,const char *permstr) {
 			if (state==3 || (!ACLCMD_HAS_PERM(aclcmd) && state==2)) {
 				faclnewcmd(tail,aclcmd_toadd,acltype,ugid,perm);
 			} else {
-				fprintf(stderr,"incomplete ACL definition");
+				fprintf(stderr,"incomplete ACL definition (encountered before: %s)\n",permstr);
 				return -1;
 			}
 			permstr++;
@@ -772,7 +772,7 @@ int faclparsestr(acl_command ***tail,uint8_t aclcmd,const char *permstr) {
 	if (state==3 || (!ACLCMD_HAS_PERM(aclcmd) && state==2)) {
 		faclnewcmd(tail,aclcmd_toadd,acltype,ugid,perm);
 	} else if (state>0) {
-		fprintf(stderr,"incomplete ACL definition\n");
+		fprintf(stderr,"incomplete ACL definition (at the end of string)\n");
 		return -1;
 	}
 	return 0;

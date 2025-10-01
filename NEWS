@@ -2,6 +2,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 4.58.1-1 (2025-09-29)
 
+  - (tools) improved error messages in mfssetfacl
   - (tools) fixed parsing numerical groups in mfssetfacl
 
 * MooseFS 4.58.0-1 (2025-09-15)

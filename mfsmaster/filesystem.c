@@ -9013,7 +9013,9 @@ void fs_test_files(void) {
 				arch_mode = sclass_get_arch_mode(f->sclassid);
 				arch_delay = sclass_get_arch_delay(f->sclassid);
 				arch_min_size = sclass_get_arch_min_size(f->sclassid);
-				if (f->data.fdata.length<arch_min_size) {
+				if (f->type!=TYPE_FILE) {
+					archreftime = ARCHREFTIME_NEVER;
+				} else if (f->data.fdata.length<arch_min_size) {
 					archreftime = ARCHREFTIME_NEVER;
 				} else if (arch_mode & SCLASS_ARCH_MODE_CHUNK) {
 					if (arch_delay==0) {

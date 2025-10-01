@@ -36,6 +36,7 @@ MooseFS can be installed on any POSIX compliant operating system including vario
 * Debian
 * RHEL / CentOS
 * OpenSUSE
+* Arch Linux
 * FreeBSD
 * macOS
 
@@ -46,15 +47,32 @@ There is a separate MooseFS Client for Microsoft Windows available, built on top
 ## Getting started
 You can install MooseFS using your favourite package manager on one of the following platforms using [officially supported repositories](https://moosefs.com/download):
 
+**i386**:
+
+* Ubuntu 16 
+* Debian 9 / 10 
+* FreeBSD 11 / 12 / 13 / 14
+
+**amd64**:
+
 * Ubuntu 16 / 18 / 20 / 22 / 24
 * Debian 9 / 10 / 11 / 12 / 13
-* RHEL / CentOS 7 / 8 / 9
+* RHEL / CentOS 7 / 8 / 9 / 10
 * FreeBSD 11 / 12 / 13 / 14
 * macOS 10.12+
-* Ubuntu 20 / 22 – Raspberry Pi
-* Debian 11 / 12 – Raspberry Pi
 
-Packages for CentOS 6 are also available, but no longer supported.
+**armhf**:
+
+* Ubuntu 20 / 22 / 24
+* Debian 11 / 12 / 13
+
+**arm64**:
+
+* Ubuntu 20 / 22 / 24
+* Debian 11 / 12 / 13
+* RHEL / CentOS 9 / 10
+
+Packages for CentOS 6 (i386, amd64) are also available, but no longer supported.
 
 Debian packages are compatible with Proxmox.
 CentOS packages are compatible with Rocky Linux, AlmaLinux and openSUSE Leap.
@@ -185,7 +203,7 @@ Refer to [installation guides](https://moosefs.com/support/#documentation) for m
 
 
 ## Copyright
-Copyright (c) 2008-2024 Jakub Kruszona-Zawadzki, Saglabs SA
+Copyright (c) 2008-2025 Jakub Kruszona-Zawadzki, Saglabs SA
 
 This file is part of MooseFS.
 

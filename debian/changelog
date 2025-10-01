@@ -1,3 +1,14 @@
+moosefs (4.58.1-1) unstable; urgency=medium
+
+  * (master) fix for segfault in flocklocks.c
+  * (cli) fixed handling disconnected chunkservers
+  * (cli) import fixes in cli mode
+  * (tools) improved error messages in mfssetfacl
+  * (tools) fixed parsing numerical groups in mfssetfacl
+  * (master) prevent setting archive flag for files that are already in trash
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 29 Sep 2025 13:00:00 +0200
+
 moosefs (4.58.0-1) unstable; urgency=medium
 
   * (master) fixed support for partial readdir

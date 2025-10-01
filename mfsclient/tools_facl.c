@@ -575,7 +575,7 @@ int parse_gid(uint32_t *ugid,const char *name) {
 	if (getgrnam_r(gname, &grp, ugidbuff, UGID_BUFF_SIZE, &result) != 0 || !result) {
 		if (onlydigits) {
 			*ugid = strtoul(gname,NULL,10);
-			return 0;
+			return i;
 		}
 		fprintf(stderr,"can't find group: %s\n",gname);
 		return -1;

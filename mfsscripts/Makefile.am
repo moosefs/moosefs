@@ -9,6 +9,7 @@ cgi_DATA = requests.cfg
 cgisubdirs = common views assets
 
 install-exec-hook: mfsgui.py
+	@echo "INSTALLING mfsgui.cgi"
 	@if [ ! -d $(DESTDIR)$(cgidir) ]; then \
 		$(MKDIR_P) $(DESTDIR)$(cgidir) ; \
 	fi
@@ -53,7 +54,7 @@ mfscli: mfscli.py common/*.py
 					if [ -f "$$file_path" ]; then \
 						echo "### $$line - inlined below:" >> "$$out_file"; \
 						echo "### Imported inline from $$file_path:" >> "$$out_file"; \
-						cat "$$file_path" >> "$$out_file"; \
+						cat "$$file_path" | grep -v "^from common" >> "$$out_file"; \
 						echo "" >> "$$out_file"; echo "### End of inline import from $$file_path" >> "$$out_file"; echo "" >> "$$out_file"; \
 					else \
 						printf "%s\n" "$$line" >> "$$out_file"; \

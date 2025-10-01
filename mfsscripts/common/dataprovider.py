@@ -1,14 +1,11 @@
 import struct
 from typing import List
 
-try:
-	from common.constants import *
-	from common.errors import *
-	from common.utils import *
-	from common.models import *
-	from common.conn import *
-except:
-	pass # imports may be unaccessible in a single mfscli file but they should be already inlined instead
+from common.constants import *
+from common.errors import *
+from common.utils import *
+from common.models import *
+from common.conn import *
 
 class DataProvider:
 	def __init__(self, cluster, donotresolve):

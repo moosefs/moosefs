@@ -1,10 +1,7 @@
 import json
 
-try:
-	from common.constants import *
-	from common.utils import *
-except:
-	pass # imports may be unaccessible in a single mfscli file but they should be already inlined instead
+from common.constants import *
+from common.utils import *
 
 #######################################
 # A set of classes representing data models for particluar entities in a cluster (servers, disks, sessions, storage classes etc.)

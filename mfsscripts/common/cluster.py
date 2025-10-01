@@ -1,10 +1,7 @@
-try:
-	from common.constants import *
-	from common.utils import *
-	from common.conn import *
-	from common.models import *
-except:
-	pass # imports may be unaccessible in a single mfscli file but they should be already inlined instead
+from common.constants import *
+from common.utils import *
+from common.conn import *
+from common.models import *
 
 # # called asynchronously after receiving the answer to the info command from each master server
 # # it should decode the answer and built the master server object

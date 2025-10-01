@@ -1,5 +1,6 @@
 import os
 import json
+
 from common.constants import *
 
 # Contains 0, 1 or many issues (errors and/or warnings and/or infos) found by Validator's check_* routine

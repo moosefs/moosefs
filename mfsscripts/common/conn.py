@@ -2,11 +2,8 @@ import asyncio
 import sys
 import struct
 
-try:
-	from common.constants import *
-	from common.utils import *
-except:
-	pass # imports may be unaccessible in a single mfscli file but they should be already inlined instead
+from common.constants import *
+from common.utils import *
 
 # Handles multiple, concurrent commands to many servers at once
 class MFSMultiConn:

@@ -3,11 +3,8 @@ import struct
 import time
 from datetime import datetime
 
-try:
-	from common.constants import *
-	from common.errors import *
-except:
-	pass # imports may be unaccessible in a single mfscli file but they should be already inlined instead
+from common.constants import *
+from common.errors import *
 
 UNIQ_MASK_IP = 1 << (1+ord('Z')-ord('A'))
 UNIQ_MASK_RACK = 1 << (2+ord('Z')-ord('A'))

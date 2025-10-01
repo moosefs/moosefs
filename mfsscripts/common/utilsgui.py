@@ -4,10 +4,7 @@ import traceback
 
 nnbsp = "&#8239;" # narrow non-breaking space
 
-try:
-	from common.utils import *
-except:
-	pass # imports may be unaccessible in a single mfscli file but they should be already inlined instead
+from common.utils import *
 
 class MFSFieldStorage:
 	def __init__(self):

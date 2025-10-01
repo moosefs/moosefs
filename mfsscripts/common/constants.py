@@ -1,7 +1,4 @@
-try:
-    from common.constants_ac import *
-except:
-	pass # imports may be unaccessible in a single mfscli file but they should be already inlined instead
+from common.constants_ac import *
 
 # some constants from MFSCommunication.h
 ANTOAN_NOP = 0

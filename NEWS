@@ -3,6 +3,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.58.1-1 (2025-09-29)
 
   - (master) fix for segfault in flocklocks.c
+  - (cli) fixed handling disconnected chunkservers
   - (cli) import fixes in cli mode
   - (tools) improved error messages in mfssetfacl
   - (tools) fixed parsing numerical groups in mfssetfacl

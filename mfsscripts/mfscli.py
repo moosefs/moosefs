@@ -2120,190 +2120,200 @@ if org.shall_render("CS"):
 		servers,dservers = dataprovider.get_chunkservers_by_state(CSorder,CSrev)
 
 		out = []
-		if len(servers)>0:
-			if jsonmode:
-				json_cs_array = []
-			elif ttymode:
+		if jsonmode:
+			json_cs_array = []
+		elif ttymode:
+			if (len(servers)==0 and len(dservers)==0) or len(servers)>0:
 				if cl.master().version_at_least(3,0,38):
-					tab = Table("Chunk Servers",17,"r")
+					tab = Table("Chunkservers",17,"r")
 					tab.header("","","","","","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",5))
 					tab.header("ip/host","port","id","labels","version","queue","queue state","maintenance",("---","",9))
 					tab.header("","","","","","","","","chunks","used","total","% used","status","chunks","used","total","% used")
 				else: #if cl.master().version_at_least(2,1,0):
-					tab = Table("Chunk Servers",15,"r")
+					tab = Table("Chunkservers",15,"r")
 					tab.header("","","","","","","",("'regular' hdd space","",4),("'marked for removal' hdd space","",4))
 					tab.header("ip/host","port","id","labels","version","queue","maintenance",("---","",8))
 					tab.header("","","","","","","","chunks","used","total","% used","chunks","used","total","% used")
-			else:
-				if cl.master().version_at_least(3,0,38):
-					tab = Table("chunk servers",15)
-				else: #if cl.master().version_at_least(2,1,0):
-					tab = Table("chunk servers",13)
+		else:
+			if cl.master().version_at_least(3,0,38):
+				tab = Table("chunkservers",15)
+			else: #if cl.master().version_at_least(2,1,0):
+				tab = Table("chunkservers",13)
 			
-			# iterate all connected servers
-			for cs in servers:
-				if cs.strip!=cs.stroip:
-					cs.strip = "%s -> %s" % (cs.stroip,cs.strip)
+		# iterate all connected servers
+		for cs in servers:
+			if cs.strip!=cs.stroip:
+				cs.strip = "%s -> %s" % (cs.stroip,cs.strip)
 
-				if jsonmode:
-					#Connected chunk servers
-					json_cs_dict = {}
-					json_cs_dict["connected"] = True
-					json_cs_dict["strver"] = cs.strver
-					if cs.strver.endswith(" PRO"):
-						json_cs_dict["version"] = cs.strver[:-4]
-						json_cs_dict["pro"] = True
-					else:
-						json_cs_dict["version"] = cs.strver
-						json_cs_dict["pro"] = False
-					json_cs_dict["flags"] = cs.flags
-					json_cs_dict["maintenance_mode_timeout"] =cs.mmto
-					if cl.leaderfound()==0:
-						json_cs_dict["maintenance_mode"] = "not available"
-					elif cs.is_maintenance_off():
-						json_cs_dict["maintenance_mode"] = "off"
-					elif cs.is_maintenance_on():
-						json_cs_dict["maintenance_mode"] = "on"
-					else:
-						json_cs_dict["maintenance_mode"] = "on (temp)"
-					json_cs_dict["hostname"] = cs.host
-					json_cs_dict["ip"] = cs.strip
-					json_cs_dict["port"] = cs.port
-					json_cs_dict["csid"] = cs.csid
-					json_cs_dict["errors"] = cs.errcnt
-					json_cs_dict["gracetime"] = cs.gracetime
-					json_cs_dict["load"] = cs.queue
-					json_cs_dict["queue"] = cs.queue
-					json_cs_dict["queue_state"] = cs.queue_state
-					json_cs_dict["queue_state_msg"] = cs.queue_state_msg.lower()
-					if cs.labels==0xFFFFFFFF or cs.labels==0:
-						labelstab = []
-					else:
-						labelstab = []
-						for bit,char in enumerate(map(chr,range(ord('A'),ord('Z')+1))):
-							if cs.labels & (1<<bit):
-								labelstab.append(char)
-					json_cs_dict["labels"] = labelstab
-					json_cs_dict["labels_str"] = ",".join(labelstab)
-					json_cs_dict["hdd_regular_used"] = cs.used
-					json_cs_dict["hdd_regular_used_human"] = humanize_number(cs.used," ")
-					json_cs_dict["hdd_regular_total"] = cs.total
-					json_cs_dict["hdd_regular_total_human"] = humanize_number(cs.total," ")
-					json_cs_dict["hdd_regular_free"] = cs.total-cs.used
-					json_cs_dict["hdd_regular_free_human"] = humanize_number(cs.total-cs.used," ")
-					if cs.total>0:
-						json_cs_dict["hdd_regular_used_percent"] = (cs.used*100.0)/cs.total
-					else:
-						json_cs_dict["hdd_regular_used_percent"] = 0.0
-					json_cs_dict["hdd_regular_chunks"] = cs.chunks
-					json_cs_dict["hdd_removal_used"] = cs.tdused
-					json_cs_dict["hdd_removal_used_human"] = humanize_number(cs.tdused," ")
-					json_cs_dict["hdd_removal_total"] = cs.tdtotal
-					json_cs_dict["hdd_removal_total_human"] = humanize_number(cs.tdtotal," ")
-					json_cs_dict["hdd_removal_free"] = cs.tdtotal-cs.tdused
-					json_cs_dict["hdd_removal_free_human"] = humanize_number(cs.tdtotal-cs.tdused," ")
-					if cs.tdtotal>0:
-						json_cs_dict["hdd_removal_used_percent"] = (cs.tdused*100.0)/cs.tdtotal
-					else:
-						json_cs_dict["hdd_removal_used_percent"] = 0.0
-					json_cs_dict["hdd_removal_chunks"] = cs.tdchunks
-					if cl.master().version_at_least(3,0,38):
-						if cs.tdchunks==0 or cl.leaderfound()==0:
-							json_cs_dict["hdd_removal_stat"] = "-"
-						elif cs.mfrstatus==MFRSTATUS_INPROGRESS:
-							json_cs_dict["hdd_removal_stat"] = "NOT READY (IN PROGRESS)"
-						elif cs.mfrstatus==MFRSTATUS_READY:
-							json_cs_dict["hdd_removal_stat"] = "READY"
-						else: #MFRSTATUS_VALIDATING
-							json_cs_dict["hdd_removal_stat"] = "NOT READY (VALIDATING)"
-					else:
-						json_cs_dict["hdd_removal_stat"] = None
-					json_cs_array.append(json_cs_dict)
-				elif ttymode:
-					if cs.total>0:
-						regperc = "%.2f%%" % ((cs.used*100.0)/cs.total)
-					else:
-						regperc = "-"
-					if cs.tdtotal>0:
-						tdperc = "%.2f%%" % ((cs.tdused*100.0)/cs.tdtotal)
-					else:
-						tdperc = "-"
-					data = [cs.host,cs.port]
-					data.append(cs.csid)
-					data.append(cs.labelstr)
-					data.append(cs.strver)
-					if cl.master().version_at_least(3,0,38):
-						data.append(cs.queue)
-						data.append(cs.queue_state_str)
-					else:
-						data.append(cs.queue_cgi)
-					if cl.leaderfound()==0:
-						data.append("not available")
-					elif cs.is_maintenance_off():
-						data.append("off")
-					elif cs.is_maintenance_on():
-						data.append("on (%s)" % cs.mmto)
-					else:
-						data.append("on (temp ; %s)" % cs.mmto)
-					data.extend([cs.chunks,humanize_number(cs.used," "),humanize_number(cs.total," "),regperc])
-					if cl.master().version_at_least(3,0,38):
-						if cs.tdchunks==0 or cl.leaderfound()==0:
-							data.append("-")
-						elif cs.mfrstatus==MFRSTATUS_INPROGRESS:
-							data.append(("NOT READY",'3'))
-						elif cs.mfrstatus==MFRSTATUS_READY:
-							data.append(("READY",'4'))
-						else:
-							data.append("NOT READY")
-					data.extend([cs.tdchunks,humanize_number(cs.tdused," "),humanize_number(cs.tdtotal," "),tdperc])
-					tab.append(*data)
+			if jsonmode:
+				#Connected chunk servers
+				json_cs_dict = {}
+				json_cs_dict["connected"] = True
+				json_cs_dict["strver"] = cs.strver
+				if cs.strver.endswith(" PRO"):
+					json_cs_dict["version"] = cs.strver[:-4]
+					json_cs_dict["pro"] = True
 				else:
-					data = [cs.host,cs.port]
-					data.append(cs.csid)
-					data.append(cs.labelstr)
-					data.append(cs.strver)
-					if cl.master().version_at_least(3,0,38):
-						data.append(cs.queue)
-						data.append(cs.queue_state_str)
-					else:
-						data.append(cs.queue_cgi)
-					if cl.leaderfound()==0:
+					json_cs_dict["version"] = cs.strver
+					json_cs_dict["pro"] = False
+				json_cs_dict["flags"] = cs.flags
+				json_cs_dict["maintenance_mode_timeout"] =cs.mmto
+				if cl.leaderfound()==0:
+					json_cs_dict["maintenance_mode"] = "not available"
+				elif cs.is_maintenance_off():
+					json_cs_dict["maintenance_mode"] = "off"
+				elif cs.is_maintenance_on():
+					json_cs_dict["maintenance_mode"] = "on"
+				else:
+					json_cs_dict["maintenance_mode"] = "on (temp)"
+				json_cs_dict["hostname"] = cs.host
+				json_cs_dict["ip"] = cs.strip
+				json_cs_dict["port"] = cs.port
+				json_cs_dict["csid"] = cs.csid
+				json_cs_dict["errors"] = cs.errcnt
+				json_cs_dict["gracetime"] = cs.gracetime
+				json_cs_dict["load"] = cs.queue
+				json_cs_dict["queue"] = cs.queue
+				json_cs_dict["queue_state"] = cs.queue_state
+				json_cs_dict["queue_state_msg"] = cs.queue_state_msg.lower()
+				if cs.labels==0xFFFFFFFF or cs.labels==0:
+					labelstab = []
+				else:
+					labelstab = []
+					for bit,char in enumerate(map(chr,range(ord('A'),ord('Z')+1))):
+						if cs.labels & (1<<bit):
+							labelstab.append(char)
+				json_cs_dict["labels"] = labelstab
+				json_cs_dict["labels_str"] = ",".join(labelstab)
+				json_cs_dict["hdd_regular_used"] = cs.used
+				json_cs_dict["hdd_regular_used_human"] = humanize_number(cs.used," ")
+				json_cs_dict["hdd_regular_total"] = cs.total
+				json_cs_dict["hdd_regular_total_human"] = humanize_number(cs.total," ")
+				json_cs_dict["hdd_regular_free"] = cs.total-cs.used
+				json_cs_dict["hdd_regular_free_human"] = humanize_number(cs.total-cs.used," ")
+				if cs.total>0:
+					json_cs_dict["hdd_regular_used_percent"] = (cs.used*100.0)/cs.total
+				else:
+					json_cs_dict["hdd_regular_used_percent"] = 0.0
+				json_cs_dict["hdd_regular_chunks"] = cs.chunks
+				json_cs_dict["hdd_removal_used"] = cs.tdused
+				json_cs_dict["hdd_removal_used_human"] = humanize_number(cs.tdused," ")
+				json_cs_dict["hdd_removal_total"] = cs.tdtotal
+				json_cs_dict["hdd_removal_total_human"] = humanize_number(cs.tdtotal," ")
+				json_cs_dict["hdd_removal_free"] = cs.tdtotal-cs.tdused
+				json_cs_dict["hdd_removal_free_human"] = humanize_number(cs.tdtotal-cs.tdused," ")
+				if cs.tdtotal>0:
+					json_cs_dict["hdd_removal_used_percent"] = (cs.tdused*100.0)/cs.tdtotal
+				else:
+					json_cs_dict["hdd_removal_used_percent"] = 0.0
+				json_cs_dict["hdd_removal_chunks"] = cs.tdchunks
+				if cl.master().version_at_least(3,0,38):
+					if cs.tdchunks==0 or cl.leaderfound()==0:
+						json_cs_dict["hdd_removal_stat"] = "-"
+					elif cs.mfrstatus==MFRSTATUS_INPROGRESS:
+						json_cs_dict["hdd_removal_stat"] = "NOT READY (IN PROGRESS)"
+					elif cs.mfrstatus==MFRSTATUS_READY:
+						json_cs_dict["hdd_removal_stat"] = "READY"
+					else: #MFRSTATUS_VALIDATING
+						json_cs_dict["hdd_removal_stat"] = "NOT READY (VALIDATING)"
+				else:
+					json_cs_dict["hdd_removal_stat"] = None
+				json_cs_array.append(json_cs_dict)
+			elif ttymode:
+				if cs.total>0:
+					regperc = "%.2f%%" % ((cs.used*100.0)/cs.total)
+				else:
+					regperc = "-"
+				if cs.tdtotal>0:
+					tdperc = "%.2f%%" % ((cs.tdused*100.0)/cs.tdtotal)
+				else:
+					tdperc = "-"
+				data = [cs.host,cs.port]
+				data.append(cs.csid)
+				data.append(cs.labelstr)
+				data.append(cs.strver)
+				if cl.master().version_at_least(3,0,38):
+					data.append(cs.queue)
+					data.append(cs.queue_state_str)
+				else:
+					data.append(cs.queue_cgi)
+				if cl.leaderfound()==0:
+					data.append("not available")
+				elif cs.is_maintenance_off():
+					data.append("off")
+				elif cs.is_maintenance_on():
+					data.append("on (%s)" % cs.mmto)
+				else:
+					data.append("on (temp ; %s)" % cs.mmto)
+				data.extend([cs.chunks,humanize_number(cs.used," "),humanize_number(cs.total," "),regperc])
+				if cl.master().version_at_least(3,0,38):
+					if cs.tdchunks==0 or cl.leaderfound()==0:
 						data.append("-")
-					elif cs.is_maintenance_off():
-						data.append("maintenance_off")
-					elif cs.is_maintenance_on():
-						data.append("maintenance_on")
+					elif cs.mfrstatus==MFRSTATUS_INPROGRESS:
+						data.append(("NOT READY",'3'))
+					elif cs.mfrstatus==MFRSTATUS_READY:
+						data.append(("READY",'4'))
 					else:
-						data.append("maintenance_tmp_on")
-					data.extend([cs.chunks,cs.used,cs.total])
-					if cl.master().version_at_least(3,0,38):
-						if cs.tdchunks==0 or cl.leaderfound()==0:
-							data.append("-")
-						elif cs.mfrstatus==MFRSTATUS_INPROGRESS:
-							data.append("NOT READY")
-						elif cs.mfrstatus==MFRSTATUS_READY:
-							data.append("READY")
-						else: #MFRSTATUS_VALIDATING
-							data.append("NOT READY")
-					data.extend([cs.tdchunks,cs.tdused,cs.tdtotal])
-					tab.append(*data)
+						data.append("NOT READY")
+				data.extend([cs.tdchunks,humanize_number(cs.tdused," "),humanize_number(cs.tdtotal," "),tdperc])
+				tab.append(*data)
+			else:
+				data = [cs.host,cs.port]
+				data.append(cs.csid)
+				data.append(cs.labelstr)
+				data.append(cs.strver)
+				if cl.master().version_at_least(3,0,38):
+					data.append(cs.queue)
+					data.append(cs.queue_state_str)
+				else:
+					data.append(cs.queue_cgi)
+				if cl.leaderfound()==0:
+					data.append("-")
+				elif cs.is_maintenance_off():
+					data.append("maintenance_off")
+				elif cs.is_maintenance_on():
+					data.append("maintenance_on")
+				else:
+					data.append("maintenance_tmp_on")
+				data.extend([cs.chunks,cs.used,cs.total])
+				if cl.master().version_at_least(3,0,38):
+					if cs.tdchunks==0 or cl.leaderfound()==0:
+						data.append("-")
+					elif cs.mfrstatus==MFRSTATUS_INPROGRESS:
+						data.append("NOT READY")
+					elif cs.mfrstatus==MFRSTATUS_READY:
+						data.append("READY")
+					else: #MFRSTATUS_VALIDATING
+						data.append("NOT READY")
+				data.extend([cs.tdchunks,cs.tdused,cs.tdtotal])
+				tab.append(*data)
 
 		if len(dservers)>0:
 			if jsonmode:
 				pass
 			elif ttymode:
-				if cl.master().version_at_least(3,0,38):
-					tab.append(("---","",17))
-					tab.append(("disconnected servers","1c",17))
-					tab.append(("---","",17))
-					tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c",2),("change maintenance command","c",6),("remove command","c",6))
-					tab.append(("---","",17))
-				else: #if cl.master().version_at_least(2,1,0):
-					tab.append(("---","",15))
-					tab.append(("disconnected servers","1c",15))
-					tab.append(("---","",15))
-					tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c"),("change maintenance command","c",5),("remove command","c",6))
-					tab.append(("---","",15))
+				if len(servers)>0:
+					if cl.master().version_at_least(3,0,38):
+						tab.append(("---","",17))
+						tab.append(("Disconnected chunkservers","c",17))
+						tab.append(("---","",17))
+						tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c",2),("change maintenance command","c",6),("remove command","c",6))
+						tab.append(("---","",17))
+					else: #if cl.master().version_at_least(2,1,0):
+						tab.append(("---","",15))
+						tab.append(("Disconnected chunkservers","c",15))
+						tab.append(("---","",15))
+						tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c"),("change maintenance command","c",5),("remove command","c",6))
+						tab.append(("---","",15))
+				else:
+					if cl.master().version_at_least(3,0,38):
+						tab = Table("Disconnected chunkservers",17,"r")
+						tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c",2),("change maintenance command","c",6),("remove command","c",6))
+						tab.append(("---","",17))
+					else: #if cl.master().version_at_least(2,1,0):
+						tab = Table("Disconnected chunkservers",15,"r")
+						tab.append(("ip/host","c"),("port","c"),("id","r"),("maintenance","c"),("change maintenance command","c",5),("remove command","c",6))
+						tab.append(("---","",15))
 			else:
 				try:
 					print(myunicode(tab))

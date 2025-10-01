@@ -6761,29 +6761,29 @@ static inline int hdd_rebalance_find_servers(folder **fsrc,folder **fdst,uint8_t
 				}
 			}
 		}
-	}
-	if (*fsrc!=NULL && *fdst!=NULL) {
-		f = *fsrc;
-		if (f->read_first) {
-			f->read_first = 0;
-		} else {
-			expdist = abovesum;
-			expdist /= f->total;
-			f->read_corr += expdist - f->read_dist;
-		}
-		f->read_dist = 0;
-		if (!hsmode) {
-			f = *fdst;
-			if (f->write_first) {
-				f->write_first = 0;
+		if (*fsrc!=NULL && *fdst!=NULL) {
+			f = *fsrc;
+			if (f->read_first) {
+				f->read_first = 0;
 			} else {
-				expdist = belowsum;
+				expdist = abovesum;
 				expdist /= f->total;
-				f->write_corr += expdist - f->write_dist;
+				f->read_corr += expdist - f->read_dist;
 			}
-			f->write_dist = 0;
+			f->read_dist = 0;
+			if (!hsmode) {
+				f = *fdst;
+				if (f->write_first) {
+					f->write_first = 0;
+				} else {
+					expdist = belowsum;
+					expdist /= f->total;
+					f->write_corr += expdist - f->write_dist;
+				}
+				f->write_dist = 0;
+			}
+			return 1;
 		}
-		return 1;
 	}
 	return 0;
 }

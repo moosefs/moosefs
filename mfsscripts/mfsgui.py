@@ -110,7 +110,7 @@ if errmsg:
 	print("""<head>""")
 	print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
 	print("""<title>MooseFS GUI %s</title>""" % (htmlentities(mastername)))
-	# leave this script a the begining to prevent screen blinking when using dark mode
+	# leave this script a the beginning to prevent screen blinking when using dark mode
 	print("""<script type="text/javascript"><!--//--><![CDATA[//><!--
 		if (localStorage.getItem('theme')===null || localStorage.getItem('theme')==='dark') { document.documentElement.setAttribute('data-theme', 'dark');}	
 		//--><!]]></script>""")		

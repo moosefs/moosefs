@@ -348,7 +348,7 @@ int settrashtimeexe(int argc,char *argv[]) {
 			smode=SMODE_INCREASE;
 		}
 	} else {
-		fprintf(stderr,"trashtime should be given as number of seconds optionally folowed by '-' or '+'\n");
+		fprintf(stderr,"trashtime should be given as number of seconds optionally followed by '-' or '+'\n");
 		settrashtimeusage();
 		return 1;
 	}

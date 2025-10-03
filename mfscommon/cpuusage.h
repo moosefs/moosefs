@@ -25,7 +25,7 @@
 
 void cpu_init (void);
 
-/* returns average number of nano seconds in every cpu ore spent in system / user space in every second */
+/* returns average number of nano seconds in every cpu core spent in system / user space in every second */
 /* return values should be between 0 and 1000000000*(number of cores) */
 /* notice, that both zeros usually means that function was unable to obtain cpu usage */
 void cpu_used (uint64_t *scpu,uint64_t *ucpu);

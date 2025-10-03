@@ -140,7 +140,7 @@ static inline uint64_t hashstr_murmur64(const char *key,uint64_t hash) {
 /* fast integer hash functions by Thomas Wang */
 /* all of them pass the avalanche test */
 
-/* They are not mutch better in standard collision test than stupid "X*prime"
+/* They are not much better in standard collision test than stupid "X*prime"
  * functions, but calculation times are similar, so it should be safer to use
  * this functions */
 

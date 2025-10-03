@@ -45,7 +45,7 @@ Distance is used for the following purposes:
 .br
 Copies of chunks are sent to the client(mount) sorted by the distance from this client when a chunk is needed for I/O operations. Notice that
 the client may alter that order based on internal settings (preferred labels or internal congestion preventing algorithms; for
-more informations about preferred labels refer to \fBmfsmount\fP\|(8) manual).
+more information about preferred labels refer to \fBmfsmount\fP\|(8) manual).
 .br
 In the master the distance and racks information is used when \fBCREATIONS_RESPECT_TOPOLOGY\fP 
 and/or \fBREPLICATIONS_RESPECT_TOPOLOGY\fP are set to value greater than 0. 

@@ -3614,7 +3614,7 @@ static inline uint8_t fsnodes_undel(uint32_t ts,fsnode *node) {
 			}
 		}
 	}
-	if (partleng==0) {	// last part canot be empty - it's the name of undeleted file
+	if (partleng==0) {	// last part cannot be empty - it's the name of undeleted file
 		return MFS_ERROR_CANTCREATEPATH;
 	}
 	if (partleng==dots && partleng<=2) {	// '.' or '..' in path
@@ -9660,7 +9660,7 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 					fsedge_free(e,nleng);
 					return -1;
 				}
-				// genrate unique filename ???
+				// generate unique filename ???
 				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading edge: %"PRIu32",%s->%"PRIu32" attaching node to root dir",parent_id,changelog_escape_name(e->nleng,e->name),child_id);
 				parent_id = MFS_ROOT_ID;
 			} else {
@@ -9682,7 +9682,7 @@ static inline int fs_loadedge(bio *fd,uint8_t mver,int ignoreflag) {
 					fsedge_free(e,nleng);
 					return -1;
 				}
-				// genrate unique filename ???
+				// generate unique filename ???
 				mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"loading edge: %"PRIu32",%s->%"PRIu32" attaching node to root dir",parent_id,changelog_escape_name(e->nleng,e->name),child_id);
 				parent_id = MFS_ROOT_ID;
 			} else {

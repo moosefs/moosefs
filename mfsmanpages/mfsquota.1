@@ -61,7 +61,7 @@ For variables that define time without requiring a single, specific unit, time c
 .PP
 first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of minimum unit will be rounded
 .PP
-second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
+second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
 o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 .PP
 If a minimum unit of a variable is larger than seconds, units below the minimum one will not be accepted. For example, a variable that has hours as a minimum unit will not accept s and m units.
@@ -85,9 +85,9 @@ Sets a soft and a hard quota for the number of inodes in /users/bob directory on
 .PP
 mfssetquota -l 2GiB /mnt/mfs/users/bob
 .br
-If there was never any previous quota on /users/bob directory, this directory will now have a soft quota of total files lenght (sum of files' lengths) in the whole subtree set to 2 GiB. Since this is a new quota and no -p and -P options were explicitely specified, -P will be assumed and default grace period from mfsmaster.cfg will be used.
+If there was never any previous quota on /users/bob directory, this directory will now have a soft quota of total files length (sum of files' lengths) in the whole subtree set to 2 GiB. Since this is a new quota and no -p and -P options were explicitly specified, -P will be assumed and default grace period from mfsmaster.cfg will be used.
 .br
-If there was already a previous quota on /users/bob directory, let's say like the one in the first example, then this directory will have both soft quota for number of inodes and soft quota for total files lenght set and the grace period will be the one set with the previous command (so 24 hours in this example).
+If there was already a previous quota on /users/bob directory, let's say like the one in the first example, then this directory will have both soft quota for number of inodes and soft quota for total files length set and the grace period will be the one set with the previous command (so 24 hours in this example).
 .PP
 mfssetquota -p 3d /mnt/mfs/users/bob
 .br
@@ -99,7 +99,7 @@ If /users/bob has any soft quotas set, grace period of these quotas will now be 
 .PP
 mfsdelquota -i /mnt/mfs/users/bob
 .br
-Soft quota for the number of inodes in /users/bob directory will be deleted. If there was also a hard quota or any other kind of quota (legnth, size, etc), those will remain unchanged.
+Soft quota for the number of inodes in /users/bob directory will be deleted. If there was also a hard quota or any other kind of quota (length, size, etc), those will remain unchanged.
 .PP
 mfsdelquota -a -A /mnt/mfs/users/bob
 .br

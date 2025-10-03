@@ -1055,7 +1055,7 @@ uint8_t hdd_sendingchunks(void) {
 		if (f->scanstate==SCST_SCANJOBINPROGRESS || f->scanstate==SCST_SCANNEEDED) {
 			result |= TRANSFERING_NEW_CHUNKS;
 		}
-// maybe in the future the master server will want to know that, but currently I don't see what the master can do with such infomration
+// maybe in the future the master server will want to know that, but currently I don't see what the master can do with such information
 //		if (f->scanstate==SCST_ATTRJOBINPROGRESS || f->scanstate==SCST_ATTRNEEDED) {
 //			result |= SCANNING_ATTRIBUTES;
 //		}

@@ -49,13 +49,13 @@
 # do not test a chunk's integrity when last I/O (including test) on this chunk was performed less than HDD_MIN_TEST_INTERVAL ago (default is 1 day)
 # time can be defined as a number of seconds (integer) or a time period in one of two possible formats: 
 # first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
-# second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+# second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 # HDD_MIN_TEST_INTERVAL = 1d
 
 # if possible, use posix_fadvise(POSIX_DONTNEED) after each chunk test (but only if last I/O operation was performed more than HDD_FADVISE_MIN_TIME ago; default is 1 day). Using zero will always perform posix_fadvise (flush cache) and using negative value will never flush cache after tests. This setting is valid only for systems that support posix_fadivise.
 # time can be defined as a number of seconds (integer) or a time period in one of two possible formats: 
 # first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
-# second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+# second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 # HDD_FADVISE_MIN_TIME = 1d
 
 # how much space should be left unused on each hard drive (default: 256MiB)
@@ -85,7 +85,7 @@
 # how long duplicate chunks should be kept before deleting (default is 1 week)
 # time can be defined as a number of hours (integer) or a time period in one of two possible formats: 
 # first format: #.#T where T is one of: h-hours, d-days or w-weeks; fractions of hours will be rounded to full hours
-# second format: #w#d#h, any number of definitions can be ommited, but the remaining definitions must be in order (so #w#h is still a valid definition, but #h#w is not); ranges: h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h d will be unlimited)
+# second format: #w#d#h, any number of definitions can be omitted, but the remaining definitions must be in order (so #w#h is still a valid definition, but #h#w is not); ranges: h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h d will be unlimited)
 # HDD_KEEP_DUPLICATES_HOURS = 1w
 
 # Maximum number of active workers and maximum number of idle workers

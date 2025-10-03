@@ -323,7 +323,7 @@ void chash_erase(void *h) {
 	ht->rehashpos = ht->size;
 }
 
-/* delete elemnts and structure */
+/* delete elements and structure */
 void chash_free(void *h) {
 	htab *ht = (htab*)h;
 	uint32_t i;

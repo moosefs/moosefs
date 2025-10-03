@@ -58,7 +58,7 @@ def render(dp, fields, vld):
 					["Locked chunks", decimal_number_html(ci.locked_used)],
 					["Fixed chunks", decimal_number_html(ci.fixed)],
 					["Forced keep mode", decimal_number_html(ci.forcekeep)]]
-			out.append(html_table_vertical("Housekeeping loop statictics", tdata))
+			out.append(html_table_vertical("Housekeeping loop statistics", tdata))
 			out.append(""" </td><td>""")
 			tdata=[["Invalid", decimal_number_html(ci.delete_invalid)], 
 					["Removed", decimal_number_html(ci.delete_no_longer_needed)], 

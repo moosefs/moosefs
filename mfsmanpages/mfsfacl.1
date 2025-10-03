@@ -79,11 +79,11 @@ is ignored, output from \fBmfsgetfacl\fP command is always a valid file content)
 [d[efault]:]o[ther][:][:perms]
 .PP
 \fBd\fP means work on default ACL values instead of access values. Next part indicates whether \fBuser\fP's, 
-\fBgroup\fP's or \fBother\fP's permissions or \fBmask\fP should be set. If that part is ommited and only 
-identifier is provided, it is assumed to be user indentifier.
+\fBgroup\fP's or \fBother\fP's permissions or \fBmask\fP should be set. If that part is omitted and only 
+identifier is provided, it is assumed to be user identifier.
 If user or group is indicated, if there is no identifier, default user's or group's permissions are modified.
 Identifier can be a string or a number. Permissions can be in the form of letters, any subset of rwx or number. 
-Zero, empty string or dash means no permissions for \fB-s\fP and \fB-m\fP. For \fB-x\fP, permissions must be ommited.
+Zero, empty string or dash means no permissions for \fB-s\fP and \fB-m\fP. For \fB-x\fP, permissions must be omitted.
 Multiple specification can be supplied, divided by comma.
 .SH "REPORTING BUGS"
 Report bugs to <bugs@moosefs.com>.

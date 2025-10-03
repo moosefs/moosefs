@@ -51,7 +51,7 @@ def render(dp, fields, vld, readonly, selectable):
 	if len(hdds)==0 and len(scanhdds)==0:
 		return out
 	
-	# preapare headers
+	# prepare headers
 	out.append("""<table class="acid_tab acid_tab_zebra_C1_C2 acid_tab_storageid_mfshdd" id="mfshdd">""")
 	out.append("""	<tr>""")
 	out.append("""		<th colspan="5" rowspan="2" class="knob-cell">""")
@@ -132,14 +132,14 @@ def render(dp, fields, vld, readonly, selectable):
 				lerror = '<span data-tt-warning="Error at %s <br/>on chunk #%016X">%s</span>' % (errtimelong,hdd.errchunkid,errtimeshort)
 			else:
 				if hdd.flags&CS_HDD_DAMAGED:
-					lerror = """<span data-tt-warning="Error occured at %s<br/>on chunk #%016X<br/>You can't dismiss it because this disk<br/>is marked as damaged.">%s</span>""" % (errtimelong,hdd.errchunkid,errtimeshort)
+					lerror = """<span data-tt-warning="Error occurred at %s<br/>on chunk #%016X<br/>You can't dismiss it because this disk<br/>is marked as damaged.">%s</span>""" % (errtimelong,hdd.errchunkid,errtimeshort)
 				else:
 					found_cs = list(filter(lambda cs: cs.hostkey == hdd.hostkey, dp.get_chunkservers(None)))
 					cs = found_cs[0] if len(found_cs)==1 else None
 					if cs and cs.version>=(4,33,0):
-						lerror = """<a href="%s" data-tt-warning="Click, to dissmiss error that occured<br/>at %s <br/>on chunk #%016X">%s</a>""" % (fields.createhtmllink({"CSclearerrors":hdd.clearerrorarg}),errtimelong,hdd.errchunkid,errtimeshort)
+						lerror = """<a href="%s" data-tt-warning="Click, to dismiss error that occurred<br/>at %s <br/>on chunk #%016X">%s</a>""" % (fields.createhtmllink({"CSclearerrors":hdd.clearerrorarg}),errtimelong,hdd.errchunkid,errtimeshort)
 					else:
-						lerror = """<span data-tt-warning="Error occured at %s<br/>on chunk #%016X<br/>You can't dismiss it because this chunkserver<br/>is too old (min. v.4.33 is required).<br/>It is recommended to upgrade chunkserver.">%s</span>""" % (errtimelong,hdd.errchunkid,errtimeshort)
+						lerror = """<span data-tt-warning="Error occurred at %s<br/>on chunk #%016X<br/>You can't dismiss it because this chunkserver<br/>is too old (min. v.4.33 is required).<br/>It is recommended to upgrade chunkserver.">%s</span>""" % (errtimelong,hdd.errchunkid,errtimeshort)
 
 		if hdd.is_valid():
 			chunkscnttxt=decimal_number_html(hdd.chunkscnt)

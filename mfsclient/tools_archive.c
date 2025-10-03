@@ -103,7 +103,7 @@ error:
 //----------------------------------------------------------------------
 
 static const char *checkarchivetxt[] = {
-	"checks if archive flag is set or not (when directory is specified then command will check it recursivelly)",
+	"checks if archive flag is set or not (when directory is specified then command will check it recursively)",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] object [object ...]",
 	"",
@@ -113,7 +113,7 @@ static const char *checkarchivetxt[] = {
 };
 
 static const char *setarchivetxt[] = {
-	"set archive flags in chunks (recursivelly for directories) - moves files to archive (use 'archive' goal/labels instead of 'keep' goal/labels)",
+	"set archive flags in chunks (recursively for directories) - moves files to archive (use 'archive' goal/labels instead of 'keep' goal/labels)",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] object [object ...]",
 	"",
@@ -123,7 +123,7 @@ static const char *setarchivetxt[] = {
 };
 
 static const char *clrarchivetxt[] = {
-	"clear archive flags in chunks (recursivelly for directories) - moves files from archive (use 'keep' goal/labels instead of 'archive' goal/labels) - it also changes ctime, so files will move back to archive after time specified in mfssetgoal",
+	"clear archive flags in chunks (recursively for directories) - moves files from archive (use 'keep' goal/labels instead of 'archive' goal/labels) - it also changes ctime, so files will move back to archive after time specified in mfssetgoal",
 	"",
 	"usage: "_EXENAME_" [-?] [-nhHkmg] object [object ...]"
 	"",

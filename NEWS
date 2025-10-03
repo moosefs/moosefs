@@ -247,7 +247,7 @@ This file lists noteworthy changes in MooseFS.
 
 * MooseFS 4.48.1-1 (2023-07-21)
 
-  - (master) fixed trashflag handling for snapshoted chunks (bug intr. in 4.46.0)
+  - (master) fixed trashflag handling for snapshotted chunks (bug intr. in 4.46.0)
 
 * MooseFS 4.48.0-1 (2023-05-29)
 
@@ -541,7 +541,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.34.0-1 (2021-08-27)
 
   - (master) made chunks always readable after 'mfsfilerepair' (will return zeros when chunks are missing)
-  - (master) fixed logical error (master without metadata could become ELECT and then LEADER which leaded to segfault)
+  - (master) fixed logical error (master without metadata could become ELECT and then LEADER which led to segfault)
   - (all) new feature: minimum file length needed for being moved from KEEP to ARCH mode in storage class
 
 * MooseFS 4.33.2-1 (2021-08-20)
@@ -728,7 +728,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.26.7-1 (2020-11-13)
 
   - (master) added option for restricting incompatible clients
-  - (master) added simple fulfilment calculation for EC classes
+  - (master) added simple fulfillment calculation for EC classes
 
 * MooseFS 4.26.6-1 (2020-11-10)
 
@@ -1418,7 +1418,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.0.0-1 (2017-02-23)
 
   - (all) added erasure codes
-  - (tools) added new commands 'mfsXXXtrashretention' (deperecate mfsXXXtrashtime commands)
+  - (tools) added new commands 'mfsXXXtrashretention' (deprecate mfsXXXtrashtime commands)
   - (tools) added new commands 'mfsXXXfacl' for managing ACL's on non-Linux OS'es
   - (master) added new storage mode (trash) in storage classes
 

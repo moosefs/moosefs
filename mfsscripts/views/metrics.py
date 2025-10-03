@@ -93,7 +93,7 @@ class MFSMetrics:
 	# 	-SHD : show hdd data
 	# 	-SEX : show exports                 - NOT allowed because not much interesting numeric data here
 	# 	-SMS : show active mounts           - NOT allowed because not much interesting numeric data here
-	# 	-SRS : show resources               - NOT allowed becauase possibly too long list of open files and locks
+	# 	-SRS : show resources               - NOT allowed because possibly too long list of open files and locks
 	# 	-SSC : show storage classes
 	# 	-SPA : show patterns override data  - NOT allowed because not much interesting numeric data here
 	# 	-SOF : show only open files         - NOT allowed because possibly too long list of open files

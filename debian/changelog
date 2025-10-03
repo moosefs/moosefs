@@ -345,7 +345,7 @@ moosefs (4.49.0-1) unstable; urgency=medium
 
 moosefs (4.48.1-1) unstable; urgency=medium
 
-  * (master) fixed trashflag handling for snapshoted chunks (bug intr. in
+  * (master) fixed trashflag handling for snapshotted chunks (bug intr. in
     4.46.0)
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 21 Jul 2023 13:00:00 +0200
@@ -799,7 +799,7 @@ moosefs (4.34.0-1) unstable; urgency=medium
   * (master) made chunks always readable after 'mfsfilerepair' (will return
     zeros when chunks are missing)
   * (master) fixed logical error (master without metadata could become ELECT
-    and then LEADER which leaded to segfault)
+    and then LEADER which led to segfault)
   * (all) new feature: minimum file length needed for being moved from KEEP to
     ARCH mode in storage class
 
@@ -1076,7 +1076,7 @@ moosefs (4.26.8-1) unstable; urgency=medium
 moosefs (4.26.7-1) unstable; urgency=medium
 
   * (master) added option for restricting incompatible clients
-  * (master) added simple fulfilment calculation for EC classes
+  * (master) added simple fulfillment calculation for EC classes
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 13 Nov 2020 12:00:00 +0100
 
@@ -2119,7 +2119,7 @@ moosefs (4.0.1-1) unstable; urgency=medium
 moosefs (4.0.0-1) unstable; urgency=medium
 
   * (all) added erasure codes
-  * (tools) added new commands 'mfsXXXtrashretention' (deperecate
+  * (tools) added new commands 'mfsXXXtrashretention' (deprecate
     mfsXXXtrashtime commands)
   * (tools) added new commands 'mfsXXXfacl' for managing ACL's on non-Linux
     OS'es

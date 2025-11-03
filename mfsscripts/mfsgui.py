@@ -97,7 +97,7 @@ if len(mastername)>0: html_title += " (%s)" % htmlentities(mastername)
 
 errmsg = None
 if cl.master()==None:
-	errmsg = """Can't connect to the MooseFS Master server (%s)""" % (masterhost)
+	errmsg = cl.errormsg()
 if (cl.leaderfound() or cl.electfound() or cl.usurperfound() or cl.followerfound()):
 	if cl.master().version_unknown():
 		errmsg = """Can't detect the MooseFS Master server version (%s)""" % (masterhost)
@@ -118,6 +118,8 @@ if errmsg:
 	print("""</head>""")
 	print("""<body>""")
 	print("""<h1 class="center">%s</h1>""" % htmlentities(errmsg))
+	vstr = VERSION
+	print("""<h4 class="center">GUI&nbsp;v.%s&nbsp;&nbsp;Python v.%u.%u</h4>""" % (vstr, sys.version_info[0], sys.version_info[1]))
 	print("""</body>""")
 	print("""</html>""")
 	sys.exit(1)

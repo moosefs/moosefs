@@ -1020,7 +1020,7 @@ cl = Cluster(masterhost, masterport)
 
 errmsg = None
 if cl.master()==None:
-	errmsg = """Can't connect to the MooseFS Master server (%s)""" % (masterhost)
+	errmsg = cl.errormsg()
 if (cl.leaderfound() or cl.electfound() or cl.usurperfound() or cl.followerfound()):
 	if cl.master().version_unknown():
 		errmsg = """Can't detect the MooseFS Master server version (%s)""" % (masterhost)

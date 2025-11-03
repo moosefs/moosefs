@@ -85,6 +85,8 @@ class Cluster:
 		self._master_metaid = 0
 		self._leader_usectime = None
 
+		self._errormsg = "Unknown error"
+
 		self._leaderfound = 0
 		self._electfound = 0
 		self._usurperfound = 0
@@ -101,6 +103,13 @@ class Cluster:
 						# print("Master address: %s:%u" % i[4])
 			except Exception:
 				pass
+
+		if len(self.addresses)==0:
+			self._errormsg = """Can't resolve the MooseFS Master hostname (%s)""" % (masterhost)
+		elif len(self.addresses)==1:
+			self._errormsg = """Can't connect to the MooseFS Master server (%s)""" % (masterhost)
+		else:
+			self._errormsg = """Can't connect to MooseFS Master servers (%s)""" % (masterhost)
 
 		# self.find_all_masters()
 		
@@ -122,6 +131,9 @@ class Cluster:
 	# Return the current leading master server (connection)
 	def master(self):
 		return self._masterconn
+
+	def errormsg(self):
+		return self._errormsg
 
 	def leaderfound(self):
 		return self._leaderfound
@@ -317,6 +329,13 @@ class Cluster:
 								leader_exportschecksum = exportschecksum
 								leader_metaid = metaid
 								self._leader_usectime = usectime
+					else:
+						if len(self.addresses)==1:
+							self._errormsg = """Got wrong answer from the MooseFS Master server (%s) - likely the master version is too new""" % (self.masterhost)
+						else:
+							self._errormsg = """Got wrong answer from MooseFS Master servers (%s) - likely the masters version is too new""" % (self.masterhost)
+						statestr = STATE_STR_WRONGANSWER
+						statecolor = 1
 				except Exception:
 					statestr = STATE_STR_BUSY
 					statecolor = 7

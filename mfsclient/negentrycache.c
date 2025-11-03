@@ -36,9 +36,9 @@
 #define HASH_BUCKETS 6257
 
 // entries in cache = HASH_FUNCTIONS*HASH_BUCKET_SIZE*HASH_BUCKETS
-// // 4 * 16 * 6257 = 400448
-// // Symlink cache capacity can be easily changed by altering HASH_BUCKETS value.
-// // Any number should work but it is better to use prime numbers here.
+// 4 * 16 * 6257 = 400448
+// Symlink cache capacity can be easily changed by altering HASH_BUCKETS value.
+// Any number should work but it is better to use prime numbers here.
 
 typedef struct _hashbucket {
 	uint32_t inode[HASH_BUCKET_SIZE];

@@ -226,7 +226,7 @@ int my_get_number(const char *str,uint64_t *ret,uint64_t max,uint8_t bytesflag) 
 			return -2;
 		}
 		val = (uint64_t)(drval + 0.5);
-		if (val < drval-1.0) { // arithmetic overflow - practically we need this mainly because of valuse close to 2**64 that can pass previous value
+		if (val < drval-1.0) { // arithmetic overflow - practically we need this mainly because of value close to 2**64 that can pass previous value
 			return -2;
 		}
 		if (val > max) {

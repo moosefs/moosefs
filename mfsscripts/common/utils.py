@@ -363,7 +363,7 @@ def version_str_sort_pro(versionxyzp):
 		strver = ''
 	return (strver,sortver,pro)
 
-# converts reduncancy goal and actual to class and column number
+# converts redundancy goal and actual to class and column number
 # 0: missing, 1: endangered, 2: undergoal, 3: normal, 4: overgoal, 5: delete pending, 6: delete ready
 def redundancy2colclass(goal,actual):
 	if goal==0:

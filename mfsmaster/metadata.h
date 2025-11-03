@@ -31,8 +31,6 @@ void meta_setignoreflag(void);
 void meta_allowautorestore(void);
 void meta_emptystart(void);
 void meta_incverboselevel(void);
-void meta_sendall(int socket);
-int meta_downloadall(int socket);
 void meta_do_store_metadata(void);
 
 uint64_t meta_get_id(void);

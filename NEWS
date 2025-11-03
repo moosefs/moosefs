@@ -728,7 +728,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.26.7-1 (2020-11-13)
 
   - (master) added option for restricting incompatible clients
-  - (master) added simple fulfillment calculation for EC classes
+  - (master) added simple fulfilment calculation for EC classes
 
 * MooseFS 4.26.6-1 (2020-11-10)
 
@@ -1142,7 +1142,7 @@ This file lists noteworthy changes in MooseFS.
 * MooseFS 4.12.2-1 (2019-01-30)
 
   - (client) added ignoring '_netdev' option - sometimes needed in case of mounting from fstab
-  - (master) added defining rackid as string paths in mfstopology.cfg (introdiced optional higher distances between servers)
+  - (master) added defining rackid as string paths in mfstopology.cfg (introduced optional higher distances between servers)
   - (master) fixed desync on adding damaged chunk
   - (master) added changelog save mode (in background,asynchronous and synchronous)
 

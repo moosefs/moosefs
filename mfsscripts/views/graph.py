@@ -6,8 +6,8 @@ from common.utilsgui import *
 from common.models import *
 
 # Capacity etc. Warning/Error thresholds
-trsh_wrn = TRESHOLD_WARNING
-trsh_err = TRESHOLD_ERROR
+thrsh_wrn = THRESHOLD_WARNING
+thrsh_err = THRESHOLD_ERROR
 
 padding = 0       # graph padding (all borders)
 tile_padding = 10 # tile padding  
@@ -160,7 +160,7 @@ def arc_gauge(x, y, name, label, val, label_style='', r=12, arcTo=120, strokeWid
   out.append(arc(x, y+strokeWidth/2.0, r, -arcTo, arcTo, strokeWidth, 'arc-gauge-bckgrd'))
   val = min(val, 1.0)
   val = max(val, 0.0)
-  clz = 'arc-gauge-green' if val < trsh_wrn else ('arc-gauge-orange' if val < trsh_err else 'arc-gauge-red')
+  clz = 'arc-gauge-green' if val < thrsh_wrn else ('arc-gauge-orange' if val < thrsh_err else 'arc-gauge-red')
   endAngle = val*2.0*arcTo - arcTo
   endAngle = max(endAngle, -arcTo+1)
   out.append(arc(x, y+strokeWidth/2.0, r, -arcTo, endAngle, strokeWidth, clz))
@@ -181,7 +181,7 @@ def arc_gauge(x, y, name, label, val, label_style='', r=12, arcTo=120, strokeWid
 #   out.append('<rect x="%f" y="%f" width="%f" height="%f" rx="1" ry="1" class="gauge-bckgrd"/>' % (x+3, y-h, w, h))
 #   val = min(val, 1)
 #   val = max(val, 0)
-#   clz = 'gauge-green' if val < trsh_wrn else ('gauge-orange' if val < trsh_err else 'gauge-red')
+#   clz = 'gauge-green' if val < thrsh_wrn else ('gauge-orange' if val < thrsh_err else 'gauge-red')
 #   w = val*w
 #   w = max(w, 0.5)
 #   out.append('<rect x="%f" y="%f" width="%f" height="%f" rx="1" ry="1" class="%s"/>' % (x+3, y-h, w, h, clz))
@@ -401,7 +401,7 @@ def mserver(srv, net_offset_y, leader_strver):
       x=cs_width-100
       out.append('<line class="srv-line" x1="%f" y1="%f" x2="%f" y2="%f"/>' % (x, 7, x, ms_height-7))
       out.append(arc_gauge(x+5, 14, 'CPU', '', srv['cpuload']))
-      if srv['cpuload'] > trsh_wrn:
+      if srv['cpuload'] > thrsh_wrn:
         led_cls = 'led-warning'
     if 'memory' in srv:
       x=ms_width-58
@@ -490,7 +490,7 @@ def cserver(srv, net_offset_y, leader_strver):
       out.append('<line class="srv-line" x1="%f" y1="%f" x2="%f" y2="%f"/>' % (x, 7, x, cs_height-7))
       if srv['hdd_reg_total']!=0:
         out.append(arc_gauge(x+6, 14, 'HDD', '', float(srv['hdd_reg_used'])/float(srv['hdd_reg_total']), bold))
-        if srv['hdd_reg_used']/srv['hdd_reg_total'] > trsh_wrn:
+        if srv['hdd_reg_used']/srv['hdd_reg_total'] > thrsh_wrn:
           led_cls = 'led-warning'
       else:
         out.append(text('HDD', x+22, 14, 'arc-gauge-name', 0, bold+middle))
@@ -663,7 +663,7 @@ def render(dp, fields, vld):
       "memory": ms.memusage,
       "live": 1 if ms.is_active() else 0
     }
-    if server['live']!=1 or ci.strver!=ms.strver or (not ms.statestr in ['LEADER', 'FOLLOWER', 'MASTER', '-']) or server['cpuload'] > trsh_wrn:
+    if server['live']!=1 or ci.strver!=ms.strver or (not ms.statestr in ['LEADER', 'FOLLOWER', 'MASTER', '-']) or server['cpuload'] > thrsh_wrn:
       servers_warnings.append(ms.strip)
     masterservers.append(server)
 
@@ -708,7 +708,7 @@ def render(dp, fields, vld):
       }
     chunkservers.append(srv)
 
-    if srv['live']!=1 or srv['maintenance']!=0 or ci.strver!=cs.strver or srv['queue_state'] == CS_LOAD_OVERLOADED or (srv['hdd_reg_total']!=0 and srv['hdd_reg_used']/srv['hdd_reg_total'] > trsh_wrn) or hdds_status!='ok':
+    if srv['live']!=1 or srv['maintenance']!=0 or ci.strver!=cs.strver or srv['queue_state'] == CS_LOAD_OVERLOADED or (srv['hdd_reg_total']!=0 and srv['hdd_reg_used']/srv['hdd_reg_total'] > thrsh_wrn) or hdds_status!='ok':
       servers_warnings.append(cs.strip)
   
   # Prepare general cluster info 

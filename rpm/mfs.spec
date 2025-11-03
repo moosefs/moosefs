@@ -591,7 +591,7 @@ exit 0
 * Wed Oct 15 2014 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 2.0.40-1
 - fixed paths in systemd/*.service files
 
-* Tue Jun  3 2014 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 2.0.10-1
+* Tue Jun 03 2014 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 2.0.10-1
 - added new package: mfsnetdump
 
 * Thu Feb 20 2014 Jakub Kruszona-Zawadzki <contact@moosefs.com> - 1.7.25-1
@@ -624,7 +624,7 @@ exit 0
 * Fri Nov 19 2010 Jakub Bogusz <contact@moosefs.com> - 1.6.19-1
 - separated metalogger subpackage (following Debian packaging)
 
-* Fri Oct  8 2010 Jakub Bogusz <contact@moosefs.com> - 1.6.17-1
+* Fri Oct 08 2010 Jakub Bogusz <contact@moosefs.com> - 1.6.17-1
 - added init scripts based on work of Steve Huff (Dag Apt Repository)
   (included in RPMs when building with --define "distro rh")
 

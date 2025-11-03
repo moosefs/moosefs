@@ -19,7 +19,7 @@
 
 #endif
 
-#define MAX_RECONECTION	3
+#define MAX_RECONNECTION 3
 
 #define INIT_BUFF_SIZE (64*1024)
 
@@ -130,7 +130,7 @@ int32_t ps_send_and_receive(uint32_t cmdid, uint32_t reqansid, const char *error
 		put32bit(&wptr, cmdid);
 		put32bit(&wptr, (ps_data.wptr-ps_data.wbuff)-QUERY_HEADCONST);
 		if (tcpwrite(master_socket(), ps_data.wbuff, ps_data.wptr-ps_data.wbuff) != (ps_data.wptr-ps_data.wbuff)) {
-			if (reconn_cnt < MAX_RECONECTION) {
+			if (reconn_cnt < MAX_RECONNECTION) {
 				if (master_reconnect()<0) {
 					ps_data.status = 1;
 					return -1;
@@ -151,7 +151,7 @@ int32_t ps_send_and_receive(uint32_t cmdid, uint32_t reqansid, const char *error
 		do {
 			//header of received answer
 			if (tcpread(master_socket(), ps_data.auxbuff, QUERY_HEADCONST) != QUERY_HEADCONST) {
-				if (reconn_cnt < MAX_RECONECTION) {
+				if (reconn_cnt < MAX_RECONNECTION) {
 					if (master_reconnect()<0) {
 						ps_data.status = 1;
 						return -1;
@@ -192,7 +192,7 @@ int32_t ps_send_and_receive(uint32_t cmdid, uint32_t reqansid, const char *error
 //		printf("errno: %d\n",errno);
 
 		if (tcpread(master_socket(), ps_data.rbuff, ps_data.recdatasize) != (int32_t)ps_data.recdatasize) {
-			if (reconn_cnt < MAX_RECONECTION) {
+			if (reconn_cnt < MAX_RECONNECTION) {
 				if (master_reconnect()<0) {
 					ps_data.status = 1;
 					return -1;

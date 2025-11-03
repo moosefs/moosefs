@@ -122,10 +122,10 @@ IP address to listen on for metalogger, (pro only) masters and supervisors conne
 port to listen on for metalogger, (pro only) masters and supervisors connections
 .TP
 .B MATOML_TIMEOUT
-default timeout in seconds for master-metalogger (or master follower, pro only) connection (default is 10)
+default timeout in seconds for master-metalogger connection (default is 10)
 .TP
 .B MATOML_FORCE_TIMEOUT
-forced timeout in seconds for master-metalogger (or master follower, pro only) connection (default is 0 - do not force timeouts)
+forced timeout in seconds for master-metalogger connection (default is 0 - do not force timeouts)
 .SS MASTER-LEADER CONNECTION OPTIONS
 Changes in this section require only process reload.
 .TP
@@ -135,7 +135,7 @@ Changes in this section require only process reload.
 .B MASTER_RECONNECTION_DELAY
 (pro only) delay in seconds before next try to reconnect to master-leader if not connected (default is 5)
 .TP
-.B MASTER_TIMEOUT
+.B MATOMA_TIMEOUT
 (pro only) timeout in seconds for master-leader connections (default is 10)
 .TP
 .B BIND_HOST

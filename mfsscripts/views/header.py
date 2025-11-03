@@ -89,7 +89,7 @@ def render(dp, fields, vld, html_title, org, sectionset):
 	out.append("""</div>""") #id="header"
 
 	# hamburger menu content in a separate div
-	out.append("""<div id="hamburger-menu-conent" class="">""")
+	out.append("""<div id="hamburger-menu-content" class="">""")
 	out.append("""<ul class="hamburger-menu">""")
 	for menu_item in org.menu_tree:
 		id = menu_item[0]

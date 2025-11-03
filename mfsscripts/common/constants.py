@@ -135,8 +135,8 @@ FSTEST_INFO_STR_LIMIT = 100000 # 100k limit of datastr in MATOCL_FSTEST_INFO
 
 UNRESOLVED = "(unresolved)"
 
-TRESHOLD_WARNING = 0.90
-TRESHOLD_ERROR   = 0.95
+THRESHOLD_WARNING = 0.90
+THRESHOLD_ERROR   = 0.95
 
 LICVER_CE = -1 # Community Edition licver value
 

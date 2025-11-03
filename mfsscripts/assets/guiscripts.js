@@ -662,7 +662,7 @@ function positionTooltip(event, element) {
 // Hamburger menu
 function toggleHamburger()
 {
-  const menu = document.getElementById("hamburger-menu-conent");
+  const menu = document.getElementById("hamburger-menu-content");
   menu.classList.toggle("active");
 }
 // Hamburger menu

@@ -1076,7 +1076,7 @@ moosefs (4.26.8-1) unstable; urgency=medium
 moosefs (4.26.7-1) unstable; urgency=medium
 
   * (master) added option for restricting incompatible clients
-  * (master) added simple fulfillment calculation for EC classes
+  * (master) added simple fulfilment calculation for EC classes
 
  -- MooseFS Team <contact@moosefs.com>  Fri, 13 Nov 2020 12:00:00 +0100
 
@@ -1701,7 +1701,7 @@ moosefs (4.12.2-1) unstable; urgency=medium
   * (client) added ignoring '_netdev' option - sometimes needed in case of
     mounting from fstab
   * (master) added defining rackid as string paths in mfstopology.cfg
-    (introdiced optional higher distances between servers)
+    (introduced optional higher distances between servers)
   * (master) fixed desync on adding damaged chunk
   * (master) added changelog save mode (in background,asynchronous and
     synchronous)

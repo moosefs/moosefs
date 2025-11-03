@@ -159,7 +159,7 @@ static inline char expr_locase(const char c) {
 	return c;
 }
 
-static inline void expr_print_error_posistion(expr *e) {
+static inline void expr_print_error_position(expr *e) {
 	uint32_t i;
 	printf("%s\n",e->str);
 	for (i=0 ; i<e->ppos ; i++) {
@@ -196,7 +196,7 @@ static inline node* expr_num(expr *e) {
 			printf("parse error: closing round bracket expected\n");
 			expr_rfree(a);
 			e->parseerror = 1;
-			expr_print_error_posistion(e);
+			expr_print_error_position(e);
 			return NULL;
 		}
 	}
@@ -488,7 +488,7 @@ static inline node* expr_num(expr *e) {
 			printf("parse error: unknown identifier\n");
 			e->parseerror = 1;
 			expr_rfree(a);
-			expr_print_error_posistion(e);
+			expr_print_error_position(e);
 			return NULL;
 		}
 		EATSPACE;
@@ -496,7 +496,7 @@ static inline node* expr_num(expr *e) {
 	}
 	printf("parse error: unexpected symbol\n");
 	e->parseerror = 1;
-	expr_print_error_posistion(e);
+	expr_print_error_position(e);
 	return NULL;
 }
 
@@ -1151,7 +1151,7 @@ void* expr_new(const char *str) {
 	if (e->parseerror==0 && CSYMBOL!='\0' && CSYMBOL!='\r' && CSYMBOL!='\n') {
 		printf("parse error: garbage at the end of expression\n");
 		e->parseerror = 1;
-		expr_print_error_posistion(e);
+		expr_print_error_position(e);
 	}
 	if (e->parseerror) {
 		expr_rfree(e->root);

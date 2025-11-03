@@ -393,7 +393,7 @@ uint8_t topology_distance(uint32_t ip1,uint32_t ip2) {
 
 
 // format (3.0.104+)
-// network	rack_path_sparated_by_vertical_bar
+// network	rack_path_separated_by_vertical_bar
 
 int topology_parseline(char *line,uint32_t lineno,uint32_t *fip,uint32_t *tip,uint32_t *rid) {
 	char c,*net,*rackname;

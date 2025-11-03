@@ -451,7 +451,7 @@ table.menu td:first-child {border-top-left-radius: 5px;}
 table.header-table td.menu-hamburger { padding: 0; vertical-align: bottom; border-bottom: 1px solid var(--u-brd-btm-clr); width: 100%; text-align: right;}
 table.header-table td.menu-hamburger svg {height: 34px; width: 36px; vertical-align:bottom; fill: var(--u-brd-btm-clr);}
 
-#hamburger-menu-conent {
+#hamburger-menu-content {
 	position: absolute;
 	opacity: 0;
 	visibility: hidden;
@@ -465,10 +465,10 @@ table.header-table td.menu-hamburger svg {height: 34px; width: 36px; vertical-al
 	border-bottom: 2px solid var(--footer-bckgnd-clr);
 	overflow: scroll;
 }
-#hamburger-menu-conent.active {opacity: 1 !important; visibility: visible !important; }
-#hamburger-menu-conent ul {list-style-type: none; padding: 0; margin: 0;}
-#hamburger-menu-conent li {border-bottom: 1px solid var(--u-brd-clr); background-color: var(--u-bckgnd-clr); margin: 0; padding: 10px 20px 9px 16px; text-align: right;}
-#hamburger-menu-conent li.S {background-color: var(--s-bckgnd-clr);}
+#hamburger-menu-content.active {opacity: 1 !important; visibility: visible !important; }
+#hamburger-menu-content ul {list-style-type: none; padding: 0; margin: 0;}
+#hamburger-menu-content li {border-bottom: 1px solid var(--u-brd-clr); background-color: var(--u-bckgnd-clr); margin: 0; padding: 10px 20px 9px 16px; text-align: right;}
+#hamburger-menu-content li.S {background-color: var(--s-bckgnd-clr);}
 .thumbtack {height: 12px; width: 12px; margin-left: 6px; fill: var(--hdr-text-clr); vertical-align:bottom; transform: translate(0,-5px) rotate(30deg); transition: 0.5s;}
 .thumbtack.active {transform: translate(0,0) rotate(0deg);}
 

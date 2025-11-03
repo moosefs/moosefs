@@ -1385,7 +1385,7 @@ void createpath(const char *filename) {
 
 void usage(const char *appname) {
 	printf(
-"usage: %s [-vhfdun] [-t locktimeout] [-c cfgfile] " MODULE_OPTIONS_SYNOPIS "[start|stop|restart|reload|info|test|kill|restore]\n"
+"usage: %s [-vhfdun] [-t locktimeout] [-c cfgfile] " MODULE_OPTIONS_SYNOPSIS "[start|stop|restart|reload|info|test|kill|restore]\n"
 "\n"
 "-v : print version number and exit\n"
 "-h : print this info and exit\n"

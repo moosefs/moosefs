@@ -73,8 +73,6 @@
 #include "cfg.h"
 #include "main.h"
 
-#define META_SOCKET_MSECTO 10000
-#define META_SOCKET_BUFFER_SIZE 0x10000
 #define META_FILE_BUFFER_SIZE 0x1000000
 
 #define MAXIDHOLE 10000
@@ -116,6 +114,7 @@ static uint32_t MetaDownloadFreq;
 static uint32_t MetaSaveOffset;
 static uint8_t MetaSaveOffsetLocal;
 
+
 static pid_t metasaverpid = -1;
 static uint8_t metasavermode = 0;
 static int metasaverkilled = 0;
@@ -129,26 +128,6 @@ typedef struct _chlog_keep {
 
 static chlog_keep *chlog_keep_head = NULL;
 
-static void meta_send_start(pid_t saverpid) {
-	chlog_keep *ck;
-
-	ck = malloc(sizeof(chlog_keep));
-	ck->version = metaversion;
-	ck->validtime = main_time()+CHLOG_KEEP_SEND;
-	ck->saverpid = saverpid;
-	ck->next = chlog_keep_head;
-	chlog_keep_head = ck;
-}
-
-static void meta_send_stop(pid_t saverpid,uint8_t ok) {
-	chlog_keep *ck;
-
-	for (ck=chlog_keep_head ; ck!=NULL ; ck=ck->next) {
-		if (ck->saverpid==saverpid) {
-			ck->validtime = main_time() + (ok?CHLOG_KEEP_ATEND:0);
-		}
-	}
-}
 
 uint64_t meta_chlog_keep_version(void) {
 	chlog_keep *ck,**ckp;
@@ -811,19 +790,6 @@ void meta_process_crcdata(void) {
 	free(crcdata);
 }
 
-void meta_sendended(pid_t pid,int status) {
-	uint8_t ok;
-
-	ok = 0;
-
-	if (WIFEXITED(status)) {
-		if (WEXITSTATUS(status)==0) {
-			ok = 1;
-		}
-	}
-
-	meta_send_stop(pid,ok);
-}
 
 void meta_storeended(pid_t pid,int status) {
 	int chstatus;
@@ -841,7 +807,7 @@ void meta_storeended(pid_t pid,int status) {
 	} else {
 		if (storestarttime>0) {
 			laststoretime = monotonic_seconds()-storestarttime;
-			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"store process has finished - store time: %.3lf",laststoretime);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"store process has finished - store time: %.3lf seconds",laststoretime);
 		} else {
 			laststoretime = 0.0;
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"store process has finished - unknown store time");
@@ -1197,108 +1163,16 @@ void meta_term(void) {
 				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"can't rename metadata.mfs.back -> metadata.mfs");
 			}
 			meta_cleanup();
+			meta_chlog_keep_free();
 			return;
 		} else if (status==2) {
 			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"no metadata to store");
+			meta_chlog_keep_free();
 			return;
 		}
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_ERR,"can't store metadata - try to make more space on your hdd or change privileges - retrying after 10 seconds");
 		sleep(10);
 	}
-	meta_chlog_keep_free();
-}
-
-void meta_sendall(int socket) {
-	int i;
-	bio *fd;
-	i = fork();
-	if (i==0) {
-		fd = bio_socket_open(socket,BIO_WRITE,META_SOCKET_BUFFER_SIZE,META_SOCKET_MSECTO);
-		if (bio_write(fd,MFSSIGNATURE "M 2.0",8)!=(size_t)8) {
-			mfs_log(MFSLOG_SYSLOG,MFSLOG_NOTICE,"error sending metadata signature");
-		} else {
-			meta_store(fd,NULL);
-		}
-		bio_shutdown(fd); // send 'EOF' to the peer
-		if (bio_error(fd)!=0) {
-			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"error sending metadata");
-		} else {
-			bio_wait(fd); // wait for close on the other side
-		}
-		bio_close(fd);
-		exit(0);
-	} else if (i<0) {
-#if defined(__linux__)
-		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"fork error - can't send metadata - check /proc/sys/vm/overcommit_memory and if necessary set to 1");
-#else
-		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"fork error - can't send metadata");
-#endif
-	} else {
-		main_chld_register(i,meta_sendended);
-		meta_send_start(i);
-	}
-}
-
-int meta_downloadall(int socket) {
-	bio *fd;
-	uint8_t fver;
-	uint8_t al;
-	uint8_t hdr[8];
-
-	al = 0;
-
-	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"metadata download start");
-	if (socket<0) {
-		return -1;
-	}
-	if (metaversion!=0) {
-		meta_cleanup();
-	}
-	fd = bio_socket_open(socket,BIO_READ,META_SOCKET_BUFFER_SIZE,META_SOCKET_MSECTO);
-	if (bio_read(fd,hdr,8)!=8) {
-		if (bio_error(fd)) {
-			errno=bio_lasterrno(fd);
-			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error downloading metadata");
-		}
-		bio_close(fd);
-		return -1;
-	}
-	if (memcmp(hdr,MFSSIGNATURE "M ",5)==0 && hdr[5]>='1' && hdr[5]<='9' && hdr[6]=='.' && hdr[7]>='0' && hdr[7]<='9') {
-		fver = ((hdr[5]-'0')<<4)+(hdr[7]-'0');
-		if (meta_load(fd,fver,&al)<0) {
-			if (bio_error(fd)) {
-				errno=bio_lasterrno(fd);
-				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error downloading metadata");
-			}
-			meta_cleanup();
-			bio_close(fd);
-			return -1;
-		}
-	} else {
-		if (bio_error(fd)) {
-			errno=bio_lasterrno(fd);
-			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error downloading metadata");
-		} else {
-			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"wrong metadata header");
-		}
-		bio_close(fd);
-		return -1;
-	}
-	if (bio_error(fd)!=0) {
-		errno=bio_lasterrno(fd);
-		mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"error downloading metadata");
-		meta_cleanup();
-		bio_close(fd);
-		return -1;
-	}
-	bio_close(fd);
-	if (al>0) {
-		fs_afterload();
-	} else {
-		fs_printinfo();
-	}
-	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_INFO,"metadata download ok");
-	return 1;
 }
 
 int meta_loadfile(const char *filename) {

@@ -164,7 +164,7 @@ uint8_t sessions_store(bio *fd) {
 	}
 	ptr = fsesrecord;
 	put32bit(&ptr,nextsessionid);
-	put16bit(&ptr,0); // do not store stats - statisitcs shouldn't be a part of metadata
+	put16bit(&ptr,0); // do not store stats - statistics shouldn't be a part of metadata
 	if (bio_write(fd,fsesrecord,6)!=6) {
 		return 0xFF;
 	}

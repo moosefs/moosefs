@@ -50,7 +50,7 @@
 	case 'x': \
 		meta_incverboselevel(); \
 		break;
-#define MODULE_OPTIONS_SYNOPIS "[-i] [-a] [-x [-x]] "
+#define MODULE_OPTIONS_SYNOPSIS "[-i] [-a] [-x [-x]] "
 #define MODULE_OPTIONS_DESC "-i : ignore some metadata structure errors (attach orphans to root, ignore names without inode, etc.). DO NOT USE unless you are absoluttely sure that there are no other options to restore your metadata.\n-a : automatically restore metadata from change logs\n-x : produce more verbose output\n-xx : even more verbose output\n"
 
 /* Run Tab */

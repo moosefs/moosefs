@@ -747,7 +747,7 @@ typedef struct _io_ready_chunk {
 
 static io_ready_chunk* io_ready_chunk_hash[256];
 
-static uint32_t JobsTimerMiliSeconds;
+static uint32_t JobsTimerMilliSeconds;
 static uint32_t TicksPerSecond;
 static uint32_t MaxFailsPerClass;
 static uint32_t FailClassCounterResetCalls;
@@ -1642,7 +1642,7 @@ void chunk_chart_data(uint64_t *copychunks,uint64_t *ec8chunks,uint64_t *ec4chun
 
 uint8_t chunk_counters_in_progress(void) {
 //	mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"discservers: %p , discservers_next: %p , csregisterinprogress: %"PRIu16,discservers,discservers_next,csregisterinprogress);
-	return ((discservers!=NULL || discservers_next!=NULL)?CHUNKSERVERS_DISCONNECTING:0)|((csregisterinprogress>0)?CHUNKSERVERS_CONNECTING:0)|(matocsserv_receiving_chunks_state()&(TRANSFERING_LOST_CHUNKS|TRANSFERING_NEW_CHUNKS));
+	return ((discservers!=NULL || discservers_next!=NULL)?CHUNKSERVERS_DISCONNECTING:0)|((csregisterinprogress>0)?CHUNKSERVERS_CONNECTING:0)|(matocsserv_receiving_chunks_state()&(TRANSFERRING_LOST_CHUNKS|TRANSFERRING_NEW_CHUNKS));
 }
 
 void chunk_store_chunkcounters(uint8_t *buff,uint8_t matrixid,int16_t classid) {
@@ -3564,7 +3564,7 @@ int chunk_univ_multi_modify(uint32_t ts,uint8_t mr,uint8_t continueop,uint64_t *
 		csstable = 0;
 	}
 
-	cschanges = (csstable==0 || (matocsserv_receiving_chunks_state()&TRANSFERING_NEW_CHUNKS))?1:0;
+	cschanges = (csstable==0 || (matocsserv_receiving_chunks_state()&TRANSFERRING_NEW_CHUNKS))?1:0;
 
 	if (chunk_counters_in_progress()==0 && csdb_have_all_servers()) {
 		csalldata = 1;
@@ -3788,7 +3788,7 @@ int chunk_univ_multi_truncate(uint32_t ts,uint8_t mr,uint64_t *nchunkid,uint64_t
 		csstable = 0;
 	}
 
-	cschanges = (csstable==0 || (matocsserv_receiving_chunks_state()&TRANSFERING_NEW_CHUNKS))?1:0;
+	cschanges = (csstable==0 || (matocsserv_receiving_chunks_state()&TRANSFERRING_NEW_CHUNKS))?1:0;
 
 	if (chunk_counters_in_progress()==0 && csdb_have_all_servers()) {
 		csalldata = 1;
@@ -4717,7 +4717,7 @@ void chunk_server_disconnection_loop(void) {
 	if (discservers) {
 		startutime = monotonic_useconds();
 		currutime = startutime;
-		while (startutime+(JobsTimerMiliSeconds*200)>currutime) {
+		while (startutime+(JobsTimerMilliSeconds*200)>currutime) {
 			for (i=0 ; i<100 ; i++) {
 				if (discserverspos<chunkrehashpos) {
 					for (c=chunkhashtab[discserverspos>>HASHTAB_LOBITS][discserverspos&HASHTAB_MASK] ; c ; c=cn ) {
@@ -9258,14 +9258,14 @@ void chunk_load_cfg_common(void) {
 
 	DangerMinLeng = DangerMaxLeng/100;
 
-	JobsTimerMiliSeconds = cfg_getuint32("JOBS_TIMER_MILISECONDS",5); // debug option
-	if (JobsTimerMiliSeconds<1) {
-		JobsTimerMiliSeconds=1;
+	JobsTimerMilliSeconds = cfg_getuint32("JOBS_TIMER_MILLISECONDS",5); // debug option
+	if (JobsTimerMilliSeconds<1) {
+		JobsTimerMilliSeconds=1;
 	}
-	if (JobsTimerMiliSeconds>50) {
-		JobsTimerMiliSeconds=50;
+	if (JobsTimerMilliSeconds>50) {
+		JobsTimerMilliSeconds=50;
 	}
-	TicksPerSecond = 1000/JobsTimerMiliSeconds;
+	TicksPerSecond = 1000/JobsTimerMilliSeconds;
 
 	MaxFailsPerClass = cfg_getuint32("MAX_FAILS_PER_CLASS",5); // debug option
 
@@ -9365,17 +9365,17 @@ void chunk_loginfo(FILE *fd) {
 void chunk_reload(void) {
 	uint32_t oldMaxDelSoftLimit,oldMaxDelHardLimit;
 	uint32_t cps;
-	uint32_t oldJobsTimerMiliSeconds;
+	uint32_t oldJobsTimerMilliSeconds;
 	char *repstr;
 
 	oldMaxDelSoftLimit = MaxDelSoftLimit;
 	oldMaxDelHardLimit = MaxDelHardLimit;
-	oldJobsTimerMiliSeconds = JobsTimerMiliSeconds;
+	oldJobsTimerMilliSeconds = JobsTimerMilliSeconds;
 
 	chunk_load_cfg_common();
 
-	if (oldJobsTimerMiliSeconds!=JobsTimerMiliSeconds) {
-		main_msectime_change(jobs_timer,JobsTimerMiliSeconds,0);
+	if (oldJobsTimerMilliSeconds!=JobsTimerMilliSeconds) {
+		main_msectime_change(jobs_timer,JobsTimerMilliSeconds,0);
 	}
 
 	MaxDelSoftLimit = cfg_getuint32("CHUNKS_SOFT_DEL_LIMIT",10);
@@ -9642,7 +9642,7 @@ int chunk_strinit(void) {
 	main_reload_register(chunk_reload);
 	// main_time_register(1,0,chunk_jobs_main);
 	main_info_register(chunk_loginfo);
-	jobs_timer = main_msectime_register(JobsTimerMiliSeconds,0,chunk_jobs_main);
+	jobs_timer = main_msectime_register(JobsTimerMilliSeconds,0,chunk_jobs_main);
 	main_time_register(60,0,chunk_queue_counters_shift);
 	main_time_register(60,0,chunk_job_exit_counters_shift);
 	main_time_register(60,0,chunk_job_call_counters_shift);

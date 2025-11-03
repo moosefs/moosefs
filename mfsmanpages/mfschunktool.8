@@ -41,7 +41,7 @@ move damaged chunks to a specified directory \fIdamaged_dir\fP; see NOTES
 .PP
 The option to move damaged chunks to a specified directory is most useful when whole directories (disks) with chunks are scanned, and can be employed in different ways, depending on what other options are used at the same time.
 .PP
-If \fB\-r\fP option is used together with \fB\-m\fP option, then only chunks that are unrepairable will be moved. This is a fast approach to chunk reparing, that repairs and cleans the chunk directory (disk) in one go.
+If \fB\-r\fP option is used together with \fB\-m\fP option, then only chunks that are unrepairable will be moved. This is a fast approach to chunk repairing, that repairs and cleans the chunk directory (disk) in one go.
 .PP
 If only option \fB\-m\fP is used, then all damaged chunks will be moved to a specified directory. The user can then use the \fBmfschunktool\fP again in this directory, this time with the \fB\-r\fP option, to repair all chunks that can be repaired, but only introduce the repaired chunks back into the system if there is no other copy available from another chunkserver (a copy that did not need a repair operation in the first place). This is a more time consuming, but safer approach to repairing multiple chunks, e.g. after a power failure.
 .SH "REPORTING BUGS"

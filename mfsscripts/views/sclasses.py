@@ -146,15 +146,15 @@ def render(dp, fields, vld):
 		issues = vld.check_sc_mintrashretention(sc)
 		out.append("""		<td rowspan="%u" align="center"><span class="sortkey">%u </span>%s</td>""" % (rowcnt,sc.min_trashretention,issues.span_noicon(mintrashretention2html(sc))))
 		# labels match mode
-		overrided = False
+		overridden = False
 		clrcls = ""
 		border = ""
 		if show_labelmode_overrides:
 			for st in sc.states:
 				if st.defined and st.labelsmodeover>=0 and st.labelsmodeover<=2:
-					overrided = True
+					overridden = True
 					break
-			if overrided: clrcls = "GRAY"
+			if overridden: clrcls = "GRAY"
 			border = """ style="border-right: none;" """
 		out.append("""		<td rowspan="%u" align="center" %s><span class="%s">%s</span></td>""" % (rowcnt,border,clrcls,scfitmode2html(sc)))
 		
@@ -174,7 +174,7 @@ def render(dp, fields, vld):
 			ecolorclass = "ERROR" if st.defined or group_states else "GRAY"
 			if show_line:
 				if show_labelmode_overrides:
-					clrcls = "" if overrided else "GRAY"
+					clrcls = "" if overridden else "GRAY"
 					arrow = "&rarr;" if (not (st.labelsmodeover>=0 and st.labelsmodeover<=2 and st.defined)) else "&nbsp;"
 					out.append("""		<td rowspan="%u" align="left" style="border-left: none;"><span style="margin-left:-5px;" class="GRAY monospace">%s</span>&#8239;<span class="%s">%s</span></td>""" % (rowspan,arrow,clrcls,stfitmode2html(st,sc)))
 			# state name

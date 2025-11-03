@@ -146,6 +146,7 @@ static uint32_t DefaultTimeout;
 static uint32_t ForceTimeout;
 
 
+
 static uint32_t BackMetaCopies;
 
 
@@ -539,11 +540,7 @@ void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t leng
 			if (eptr->version>=VERSION2INT(4,23,5) && eptr->version<VERSION2INT(4,48,0)) {
 				eptr->version |= 1;
 			}
-			if (ForceTimeout>0) {
-				data += 2;
-			} else {
-				eptr->timeout = get16bit(&data);
-			}
+			eptr->timeout = get16bit(&data);
 			if (eptr->version < VERSION2INT(3,0,0)) {
 				mode = (eptr->version>=VERSION2INT(2,0,82))?1:0;
 			} else if (eptr->version < VERSION2INT(4,0,0)) {
@@ -1287,6 +1284,7 @@ const char* matomlserv_getportstr(void) {
 	return ListenPort;
 }
 
+
 void matomlserv_reload_common(void) {
 	DefaultTimeout = cfg_getuint32("MATOML_TIMEOUT",10);
 	if (DefaultTimeout>65535) {
@@ -1302,7 +1300,6 @@ void matomlserv_reload_common(void) {
 	if (ForceTimeout>65535) {
 		ForceTimeout=65535;
 	}
-
 	BackMetaCopies = cfg_getuint32("BACK_META_KEEP_PREVIOUS",1);
 	if (BackMetaCopies>99) {
 		BackMetaCopies=99;

@@ -2273,7 +2273,7 @@ char* path_from_inode(uint32_t inode) {
 		goto error;
 	}
 	if (leng == 1) {
-		fprintf(stderr, "cound't get path for inode %u: %s\n", inode, mfsstrerr(ps_get8()));
+		fprintf(stderr, "couldn't get path for inode %u: %s\n", inode, mfsstrerr(ps_get8()));
 		goto error;
 	}
 
@@ -2321,7 +2321,7 @@ trashfile_t* get_one_el_from_inode(uint32_t inode) {
 		goto error;
 	}
 	if (leng == 1) {
-		fprintf(stderr, "cound't get attributes for inode %u: %s\n", inode, mfsstrerr(ps_get8()));
+		fprintf(stderr, "couldn't get attributes for inode %u: %s\n", inode, mfsstrerr(ps_get8()));
 		goto error;
 	}
 	ps_dummyget(1);

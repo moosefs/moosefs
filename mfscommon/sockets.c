@@ -215,7 +215,7 @@ static inline int sockgetstatus(int sock) {
 	return rc;
 }
 
-/* ----------- STRAM UNIVERSAL ----------- */
+/* ----------- STREAM UNIVERSAL ----------- */
 
 static inline int streamtowait(int sock,uint32_t msectoall) {
 	struct pollfd pfd;

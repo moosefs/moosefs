@@ -4,7 +4,7 @@ from common.constants import *
 from common.utils import *
 
 #######################################
-# A set of classes representing data models for particluar entities in a cluster (servers, disks, sessions, storage classes etc.)
+# A set of classes representing data models for particular entities in a cluster (servers, disks, sessions, storage classes etc.)
 class MasterServer:
 	def __init__(self,host,port,versionxyzp,workingstate,sync,statestr,statecolor,metaversion,memusage,syscpu,usercpu,lastsuccessfulstore,lastsaveseconds,lastsavestatus,exportschecksum,metaid,lastsavemetaversion,lastsavemetachecksum,usectime,chlogtime):
 		self.host = host

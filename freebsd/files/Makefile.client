@@ -6,9 +6,9 @@ COMMENT=	MooseFS client tools
 
 LICENSE=	GPLv2
 
-MFS_COMPONENT=	client
-
 BROKEN_powerpc64=	fails to compile: mfs_fuse.c: internal compiler error: Segmentation fault
+
+MFS_COMPONENT=	client
 
 MASTERDIR=	${.CURDIR}/../moosefs-master
 

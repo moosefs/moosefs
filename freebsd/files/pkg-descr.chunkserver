@@ -5,5 +5,3 @@ servers, which are visible to the user as one resource.
 For standard file operations MooseFS acts like any other Unix-like file system.
 
 This port provides: MooseFS data server.
-
-WWW: https://moosefs.com/

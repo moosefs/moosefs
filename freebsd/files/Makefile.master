@@ -1,17 +1,13 @@
-# Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
-
 PORTNAME=		moosefs
-DISTVERSION=		0.0.0
 DISTVERSIONPREFIX=	v
+DISTVERSION=		0.0.0
 PORTREVISION=		0
 CATEGORIES=		filesystems sysutils
 PKGNAMESUFFIX?=		-master
 
 MAINTAINER=		freebsd@moosefs.com
 COMMENT?=		Fault-tolerant distributed filesystem
-
-USE_GITHUB=		yes
-GH_ACCOUNT=		moosefs
+WWW=			https://moosefs.com/
 
 LICENSE=		GPLv2
 
@@ -20,6 +16,9 @@ GNU_CONFIGURE=		yes
 PLIST=			${.CURDIR}/pkg-plist
 DESCR=			${.CURDIR}/pkg-descr
 STRIP=
+
+USE_GITHUB=		yes
+GH_ACCOUNT=		moosefs
 
 MFS_COMPONENT?=		master
 MFS_USER=		mfs

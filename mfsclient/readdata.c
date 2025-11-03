@@ -2402,8 +2402,8 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 								sassert(blockend>blockstart);
 								raok = 1;
 								for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
-									if (!STATE_NOT_NEEDED(rreq->mode)) {
-										if (!(blockend <= rreq->offset || blockstart >= rreq->offset+rreq->leng)) {
+									if (!STATE_NOT_NEEDED(rreqn->mode)) {
+										if (!(blockend <= rreqn->offset || blockstart >= rreqn->offset+rreqn->leng)) {
 											raok = 0;
 										}
 									}
@@ -2426,8 +2426,8 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 										sassert(blockend>blockstart);
 										raok = 1;
 										for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
-											if (!STATE_NOT_NEEDED(rreq->mode)) {
-												if (!(blockend <= rreq->offset || blockstart >= rreq->offset+rreq->leng)) {
+											if (!STATE_NOT_NEEDED(rreqn->mode)) {
+												if (!(blockend <= rreqn->offset || blockstart >= rreqn->offset+rreqn->leng)) {
 													raok = 0;
 												}
 											}
@@ -2471,8 +2471,8 @@ int read_data(void *vid, uint64_t offset, uint32_t *size, void **vrhead,struct i
 						sassert(blockend>blockstart);
 						raok = 1;
 						for (rreqn = ind->reqhead ; rreqn && raok ; rreqn=rreqn->next) {
-							if (!STATE_NOT_NEEDED(rreq->mode)) {
-								if (!(blockend <= rreq->offset || blockstart >= rreq->offset+rreq->leng)) {
+							if (!STATE_NOT_NEEDED(rreqn->mode)) {
+								if (!(blockend <= rreqn->offset || blockstart >= rreqn->offset+rreqn->leng)) {
 									raok = 0;
 								}
 							}

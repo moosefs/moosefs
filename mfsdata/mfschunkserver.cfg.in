@@ -59,7 +59,7 @@
 # HDD_FADVISE_MIN_TIME = 1d
 
 # how much space should be left unused on each hard drive (default: 256MiB)
-# number format: [0-9]*(.[0-9]*)?([kMGTPE]|[KMGTPE]i)?B?
+# number format: [0-9]*([.][0-9]*)?([kMGTPE]|[KMGTPE]i)?B?
 # examples: 0.5GB ; .5G ; 2.56GiB ; 1256M etc.
 # HDD_LEAVE_SPACE_DEFAULT = 256MiB
 

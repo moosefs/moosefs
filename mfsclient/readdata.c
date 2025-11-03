@@ -806,7 +806,7 @@ void* read_worker(void *arg) {
 // MFS_ERROR_ENOENT - internal error (wrong inode - can't be repaired)
 // MFS_ERROR_EPERM - internal error (wrong inode - can't be repaired)
 // MFS_ERROR_INDEXTOOBIG - requested file position is too big
-// MFS_ERROR_CHUNKLOST - according to master chunk is definitelly lost (all chunkservers are connected and chunk is not there)
+// MFS_ERROR_CHUNKLOST - according to master chunk is definitely lost (all chunkservers are connected and chunk is not there)
 // statuses that are here just in case:
 // MFS_ERROR_QUOTA (used in write only)
 // MFS_ERROR_NOSPACE (used in write only)

@@ -56,7 +56,7 @@
 # due to logs being kept in 5k blocks; zero disables extra logs storage)
 # CHANGELOG_PRESERVE_SECONDS = 5000
 
-# how much RAM can be used to preserve change logs in memory in megabytes (deafult is 500; this sets the minimum, actual number may be a bit bigger
+# how much RAM can be used to preserve change logs in memory in megabytes (default is 500; this sets the minimum, actual number may be a bit bigger
 # due to logs being kept in 5k blocks; zero disables extra logs storage)
 # master will always preserve the lower number of 5k blocks defined by CHANGELOG_PRESERVE_SECONDS and CHANGELOG_PRESERVE_MB, so be sure to set them appropriately
 # CHANGELOG_PRESERVE_MB = 500
@@ -150,7 +150,7 @@
 # 0 - ignore ip and rackid (standard behaviour)
 # 1 - avoid storing more than one copy on chunkservers using same IP number
 # 2 - avoid storing more than one copy on chunkservers using IP number from the same rack id
-# NOTICE! This parameter is available for backward compatibility purposes and should not be set to a value other than 0. Instead, distinguish feature from storage classes should be used. However, if it is set to a value other than 0, it will override any distinguish definintion in storage classes. For more informations about storage classes and distinguish feature refer to mfsscadmin manual.
+# NOTICE! This parameter is available for backward compatibility purposes and should not be set to a value other than 0. Instead, distinguish feature from storage classes should be used. However, if it is set to a value other than 0, it will override any distinguish definition in storage classes. For more information about storage classes and distinguish feature refer to mfsscadmin manual.
 # CHUNKS_UNIQUE_MODE = 0
 
 # chunks loop shouldn't check more chunks per seconds than given number (default is 100000)
@@ -202,7 +202,7 @@
 # maximum time server can be in "temporary" maintenance mode (server is switched to this mode whenever is stopped gracefully, after reconnection server is switched back to normal mode automatically ; default value: 30m); 
 # time can be defined as a number of seconds (integer) or a time period in one of two possible formats: 
 # first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
-# second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+# second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 # CS_TEMP_MAINTENANCE_MODE_TIMEOUT = 30m
 
 # how many days unused (disconnected) chunkserver should be kept in master data structures (valid values: 0 - 365 ; 0 means indefinitely ; default value is 7)
@@ -234,7 +234,7 @@
 # how long to sustain a disconnected client session (default is 1d)
 # time can be defined as a number of seconds (integer) or a time period in one of two possible formats: 
 # first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
-# second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+# second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 # SESSION_SUSTAIN_TIME = 1d
 
 ###############################################################################
@@ -244,7 +244,7 @@
 # default grace period for soft quota (default is 1 week)
 # time can be defined as a number of seconds (integer) or a time period in one of two possible formats: 
 # first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
-# second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+# second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 # deprecates: QUOTA_TIME_LIMIT
 # QUOTA_DEFAULT_GRACE_PERIOD = 1w
 
@@ -274,7 +274,7 @@
 # delay time after which inodes of deleted objects will be reused (default: 1d)
 # time can be defined as a number of seconds (integer) or a time period in one of two possible formats: 
 # first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
-# second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
+# second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 # BE AWARE if you change this value below 1 day you MUST ensure that this value is higher than any of the following timeouts in all clients:
 # mfsattrcacheto,mfsxattrcacheto,mfsentrycacheto,mfsdirentrycacheto,mfsnegentrycacheto,mfssymlinkcacheto
 # INODE_REUSE_DELAY = 1d

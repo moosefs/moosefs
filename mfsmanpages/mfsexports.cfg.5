@@ -88,7 +88,7 @@ rejects access from clients older than specified
 specify range in which trash retention can be set by users
 .TP
 \fBmintrashtime=\fP\fITDUR\fP, \fBmaxtrashtime=\fP\fITDUR\fP
-deprectaed options (function similalry as above)
+deprecated options (function similalry as above)
 .TP
 \fBdisable=\fP\fIOPERATION[:OPERATION[:...]]\fP 
 do not allow the client to perform certain operations
@@ -105,7 +105,7 @@ combination of numbers with time units. Time units are:
 \fBW\fP,\fBD\fP,\fBH\fP,\fBM\fP,\fBS\fP. Order is important - less
 significant time units can't be defined before more significant time units.
 .PP
-TIME can be specified as a number of hours (integer) or as a time period in one of two possible formats: first format: #.#T where T is one of: h-hours, d-days or w-weeks; fractions of minimum unit will be rounded to integer value; second format: #w#d#h, any number of definitions can be ommited, but the remaining definitions must be in order (so #w#h is still a valid definition, but #h#w is not); ranges: h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h d will be unlimited)
+TIME can be specified as a number of hours (integer) or as a time period in one of two possible formats: first format: #.#T where T is one of: h-hours, d-days or w-weeks; fractions of minimum unit will be rounded to integer value; second format: #w#d#h, any number of definitions can be omitted, but the remaining definitions must be in order (so #w#h is still a valid definition, but #h#w is not); ranges: h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h d will be unlimited)
 .PP
 Time units/periods are case insensitive.
 .PP

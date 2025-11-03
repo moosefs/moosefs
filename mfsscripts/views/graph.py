@@ -12,13 +12,13 @@ trsh_err = TRESHOLD_ERROR
 padding = 0       # graph padding (all borders)
 tile_padding = 10 # tile padding  
 
-ms_top = 10            # master servers colum top position
+ms_top = 10            # master servers column top position
 ms_left = tile_padding # master servers column left position
 ms_width = 260         # master server icon width
 ms_height = 50         # master server icon height
 ms_margin_top = 30     # master servers vertical spacing 
 
-mls_tile_margin_top = 20 # metaloggers colum top margin
+mls_tile_margin_top = 20 # metaloggers column top margin
 mls_left = tile_padding # metaloggers column left position
 mls_width = ms_width    # metaloggers icon width
 mls_height = 30         # metaloggers icon height

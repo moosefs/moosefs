@@ -1100,7 +1100,7 @@ void meta_store_task(void) {
 		changelog_rotate(ROTATE_FLAG_BROADCAST);
 	}
 	if ((htime % MetaSaveFreq) == 0) {
-		if (metasaverpid>=0 && last_store_htime + STORE_TIMEOUT > rhtime) { // previus save still in progress - silently ignore this request
+		if (metasaverpid>=0 && last_store_htime + STORE_TIMEOUT > rhtime) { // previous save still in progress - silently ignore this request
 			return;
 		}
 		last_store_htime = rhtime;
@@ -1998,7 +1998,7 @@ void meta_log_extra_info(FILE *fd) {
 		fprintf(fd,"last metadata store mode: %s\n",meta_store_status_str());
 	}
 	if (metasaverpid>=0) {
-		fprintf(fd,"background sotre in progress; process pid: %d\n",(int)metasaverpid);
+		fprintf(fd,"background store in progress; process pid: %d\n",(int)metasaverpid);
 	}
 	if (storestarttime>0) {
 		fprintf(fd,"store started %.2lf seconds ego\n",monotonic_seconds()-storestarttime);

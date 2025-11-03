@@ -2458,7 +2458,7 @@ if org.shall_render("MB"):
 if org.shall_render("HD"):
 	try:
 		(hdds, scanhdds) = dataprovider.get_hdds("ALL", HDperiod, HDtime, HDorder, HDrev)
-		# preapare headers
+		# prepare headers
 		if len(hdds)>0 or len(scanhdds)>0:
 			if jsonmode:
 				json_hd_array = []

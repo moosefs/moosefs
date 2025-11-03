@@ -361,7 +361,7 @@ typeof(ioctl) prototest;
 int prototest(int x,int y ,...) { return x+y; }
 	])],[
 		AC_MSG_RESULT([yes])
-		AC_DEFINE([IOCTL_INTOP], [1], [ioclt operation argument is of type int])
+		AC_DEFINE([IOCTL_INTOP], [1], [ioctl operation argument is of type int])
 	],[
 		AC_MSG_RESULT([no])
 	])

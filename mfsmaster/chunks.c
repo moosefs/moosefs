@@ -984,7 +984,7 @@ int32_t* do_advanced_match(const storagemode *sm,uint32_t servcnt,const uint16_t
 							}
 						}
 					}
-				} else if (imatching[x] >= 0) { // R to L - use exisitng connection
+				} else if (imatching[x] >= 0) { // R to L - use existing connection
 					augment[imatching[x]] = x;
 					visited[imatching[x]] = 1;
 					QUEUE_INSERT(imatching[x]); // q.push
@@ -1985,7 +1985,7 @@ static inline uint8_t chunk_get_labels_mode_for_ec(storagemode *sm,uint8_t sclas
 // DEFAULT + EC + 1 label
 //	VA < N+X -> KEEP
 //	RLA >= N+X -> ec_strict_mode = 1
-// DEFUALT + EC + 2 labels
+// DEFAULT + EC + 2 labels
 //	VA < N+X -> KEEP
 //	RLA >= N+X && RLD+RLB >= N && RLC+RLB >= X -> ec_strict_mode = 1
 // STRICT + copy + 1 label
@@ -3060,7 +3060,7 @@ static inline int chunk_add_file_int(chunk *c,uint8_t sclassid) {
 			fl = flist_get(findx = flist_alloc());
 			fl->nexti = c->fhead;
 			c->fhead = findx;
-/* code that adds new element at the end - not used - see coments in 'chunk_change_file'
+/* code that adds new element at the end - not used - see comments in 'chunk_change_file'
 			fl = flist_get(*findxptr = flist_alloc());
 			fl->nexti = FLISTNULLINDX;
 */
@@ -6266,7 +6266,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 //	- all servers (ec_strict_mode == 0)
 // * COPY -> EC condition
 //	- STRICT (RLA >= N+2X)
-//	- DEFULT (RLA >= N+2X)
+//	- DEFAULT (RLA >= N+2X)
 //	- LOOSE (RA >= N+2X)
 // * EC -> COPY condition
 //	- STRICT (VLA < N+X)
@@ -6295,7 +6295,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 // - (VLD + VLB - (N+X)) - UX for checksum parts (chksumec_both_labels_limit)
 // * COPY -> EC condition:
 //	- STRICT (RLA >= N+2X && RLD+RLB >= N+X && RLC+RLB >= 2X)
-//	- DEFULT (RLA >= N+2X && RLD+RLB >= N+X && RLC+RLB >= 2X)
+//	- DEFAULT (RLA >= N+2X && RLD+RLB >= N+X && RLC+RLB >= 2X)
 //	- LOOSE (RA >= N+2X)
 // * EC -> COPY condition:
 //	- STRICT (VLA < N+X || VLD+VLB < N || VLC+VLB < X)
@@ -7293,7 +7293,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 		// generate missing EC parts from existing EC parts
 		for (i=0,mask=1 ; i<8 && j<servcnt ; i++,mask<<=1) {
 			if ((mask & vcmask8) == 0) {
-				if ((mask & survivorsmask8)) { // hipothetical mark for removal copy
+				if ((mask & survivorsmask8)) { // hypothetical mark for removal copy
 					if (chunk_replicate(SIMPLE,now,c,8,i+0x20,eccsid8[i],servers[j],NULL,NULL,NULL,(extrajob==2)?RECOVER_IO:(regularecgoalequiv==1)?REPL_EC_ENDANGERED:REPL_EC_UNDERGOAL)!=0) {
 						job_exit_reasons[c->sclassid][ERROR_REPLICATING_MISSING_EC8_DATA_PART_FROM_MFR]++;
 						return;
@@ -7335,7 +7335,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 		// generate missing EC parts from existing EC parts
 		for (i=0,mask=1 ; i<4 && j<servcnt ; i++,mask<<=1) {
 			if ((mask & vcmask4) == 0) {
-				if ((mask & survivorsmask4)) { // hipothetical mark for removal copy
+				if ((mask & survivorsmask4)) { // hypothetical mark for removal copy
 					if (chunk_replicate(SIMPLE,now,c,4,i+0x10,eccsid4[i],servers[j],NULL,NULL,NULL,(extrajob==2)?RECOVER_IO:(regularecgoalequiv==1)?REPL_EC_ENDANGERED:REPL_EC_UNDERGOAL)!=0) {
 						job_exit_reasons[c->sclassid][ERROR_REPLICATING_MISSING_EC4_DATA_PART_FROM_MFR]++;
 						return;
@@ -7431,7 +7431,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 		for (i=ec_data_parts,mask=(UINT32_C(1)<<ec_data_parts) ; i<(ec_data_parts-1)+goal && j<servcnt ; i++,mask<<=1) {
 			if (ec_data_parts==8) {
 				if ((mask & vcmask8) == 0) {
-					if ((mask & survivorsmask8)) { // hipothetical mark for removal copy
+					if ((mask & survivorsmask8)) { // hypothetical mark for removal copy
 						if (chunk_replicate(SIMPLE,now,c,ec_data_parts,i+0x20,eccsid8[i],servers[j],NULL,NULL,NULL,(regularecgoalequiv==1)?REPL_EC_ENDANGERED:REPL_EC_UNDERGOAL)!=0) {
 							job_exit_reasons[c->sclassid][ERROR_REPLICATING_MISSING_EC8_CHKSUM_PART_FROM_MFR]++;
 							return;
@@ -7450,7 +7450,7 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 				}
 			} else { // ec_data_parts==4
 				if ((mask & vcmask4) == 0) {
-					if ((mask & survivorsmask4)) { // hipothetical mark for removal copy
+					if ((mask & survivorsmask4)) { // hypothetical mark for removal copy
 						if (chunk_replicate(SIMPLE,now,c,ec_data_parts,i+0x10,eccsid4[i],servers[j],NULL,NULL,NULL,(regularecgoalequiv==1)?REPL_EC_ENDANGERED:REPL_EC_UNDERGOAL)!=0) {
 							job_exit_reasons[c->sclassid][ERROR_REPLICATING_MISSING_EC4_CHKSUM_PART_FROM_MFR]++;
 							return;

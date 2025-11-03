@@ -30,7 +30,7 @@
 #include "labelparser.h"
 #include "MFSCommunication.h"
 
-/* simple version - just compare expressions byte by byte, in the future it can be smarter and retrns true for example for A&B and B&A */
+/* simple version - just compare expressions byte by byte, in the future it can be smarter and returns true for example for A&B and B&A */
 static inline uint8_t labelexpr_diff(const uint8_t *labelexpr1,const uint8_t *labelexpr2) {
 	uint8_t n1,n2;
 	while (1) {

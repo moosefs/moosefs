@@ -184,7 +184,7 @@ static const char *settrashretentiontxt[] = {
 	"",
 	"Trash retention (TIME) can be defined as a number of hours (integer) or a time period in one of two possible formats:",
 	"first format: #.#T where T is one of: h-hours, d-days or w-weeks; fractions of hours will be rounded to full hours",
-	"second format: #w#d#h, any number of definitions can be ommited, but the remaining definitions must be in order (so #w#h is still a valid definition, but #d#w is not);",
+	"second format: #w#d#h, any number of definitions can be omitted, but the remaining definitions must be in order (so #w#h is still a valid definition, but #d#w is not);",
 	"ranges: h: 0 to 23, d: 0 to 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h d will be unlimited)",
 	NULL
 };

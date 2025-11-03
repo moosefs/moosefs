@@ -40,7 +40,7 @@ the size of the file indicated by the first parameter is used
 .PP
 \fIflags\fP information is optional, can contain the following flags 
 (separated by comma if more than one is listed) \fBro\fP - read only device, \fBrw\fP read/write device, 
-\fBlock\fP - device requires an appropriate type of lock (shared for \fBro\fP, exlusive for \fBrw\fP), \fBnolock\fP
+\fBlock\fP - device requires an appropriate type of lock (shared for \fBro\fP, exclusive for \fBrw\fP), \fBnolock\fP
 - device does not require a lock (will try to obtain it, but will ignore failure); 
 if nothing is supplied, the default of \fBrw\fP, \fBlock\fP is assumed; 
 if two conflicting flags are supplied (i.e. \fBro\fP and \fBrw\fP or \fBlock\fP and \fBnolock\fP) the last one wins

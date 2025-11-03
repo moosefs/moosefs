@@ -34,7 +34,7 @@ uint8_t hdd_clear_errors(uint32_t pleng,const uint8_t *path);
 
 uint8_t hdd_sendingchunks(void);
 
-/* lock/unlock - allways has to be called twice */
+/* lock/unlock - always has to be called twice */
 uint32_t hdd_chunk_status(uint64_t chunkid,uint8_t *buff);
 
 /* lock/unlock pair */

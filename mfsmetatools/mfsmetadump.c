@@ -1730,7 +1730,7 @@ int fs_loadall(const char *fname,const char section[4]) {
 		fver = ((hdr[5]-'0')<<4)+(hdr[7]-'0');
 		if (fver<0x17) {
 			if (section[0]!=0) {
-				printf("old format detected - can't dump sections separatelly");
+				printf("old format detected - can't dump sections separately");
 				fclose(fd);
 				return -1;
 			}

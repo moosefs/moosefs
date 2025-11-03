@@ -126,7 +126,7 @@ def process_commands(cl,fields,html_title):
 		print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
 		print("""<meta http-equiv="Refresh" content="0; url=%s" />""" % url.replace('&','&amp;'))
 		print("""<title>%s</title>""" % html_title)
-		# leave this script a the begining to prevent screen blinking when using dark mode
+		# leave this script a the beginning to prevent screen blinking when using dark mode
 		print("""<script type="text/javascript"><!--//--><![CDATA[//><!--
 			if (localStorage.getItem('theme')===null || localStorage.getItem('theme')==='dark') { document.documentElement.setAttribute('data-theme', 'dark');}	
 			//--><!]]></script>""")		
@@ -145,7 +145,7 @@ def process_commands(cl,fields,html_title):
 		print("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
 		print("""<meta http-equiv="Refresh" content="5; url=%s" />""" % url.replace('&','&amp;'))
 		print("""<title>%s</title>""" % html_title)
-		# leave this script a the begining to prevent screen blinking when using dark mode
+		# leave this script a the beginning to prevent screen blinking when using dark mode
 		print("""<script type="text/javascript"><!--//--><![CDATA[//><!--
 			if (localStorage.getItem('theme')===null || localStorage.getItem('theme')==='dark') { document.documentElement.setAttribute('data-theme', 'dark');}	
 			//--><!]]></script>""")		

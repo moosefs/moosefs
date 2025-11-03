@@ -163,7 +163,7 @@
 		"severity": "Error",
 		"title": "There are too many leading Master servers",
 		"description": "There is more than one Leader (and/or Elect and/or Usurper) Master server in the cluster. This is a critical situation. The Leader Master server is the most important server in the cluster. It is responsible for managing metadata and ensuring the cluster's proper operation. Having more than one Leader Master server in the cluster may lead to data corruption, loss, or inconsistency. It is a serious error that should be immediately corrected.",
-		"solution": "If the Leader Master server is not available, it is necessary to pick a new Leader. If the Leader Master server is available, it is necessary to investigate why the second Leader (or Elect or Usurper) Master server appeared in the cluster. This is severe internall inconsistency that may lead to data loss. In case of manually picking a new Leader use the appropriate (usually the most recent) metadata records. Contact MooseFS support if necessary."
+		"solution": "If the Leader Master server is not available, it is necessary to pick a new Leader. If the Leader Master server is available, it is necessary to investigate why the second Leader (or Elect or Usurper) Master server appeared in the cluster. This is severe internal inconsistency that may lead to data loss. In case of manually picking a new Leader use the appropriate (usually the most recent) metadata records. Contact MooseFS support if necessary."
 	},
 	"ms_server_cpu_high": {
 		"severity": "Warning",
@@ -400,7 +400,7 @@
 		"severity": "Warning",
 		"title": "The Chunkserver's disk is being scanned.",
 		"description": "The Chunkserver's disk is being scanned. The scanning process is used to restore any missing internal Chunkserver's data structures (about its chunks). E.g., to restore the <code>.chukdb</code> file. The scanning process may take some time, depending on the disk's size and speed. The server is still operational during the scanning process. It may read and write user data but rebalancing, replication and similar health related processes are suspended.",
-		"solution": "There is nothing you have to do now. Just wait until the Chunkserver is done with scannning. However, it is worth to investigate why Chunkserver lost its internal (cached) data. Check what happened to the <code>.chunkdb</code> file: is it present and r/w accessible? It should not happen under normal circumstances, this is an extraordinary procedure. Scanning should take place only when Chunkservers is starting."
+		"solution": "There is nothing you have to do now. Just wait until the Chunkserver is done with scanning. However, it is worth to investigate why Chunkserver lost its internal (cached) data. Check what happened to the <code>.chunkdb</code> file: is it present and r/w accessible? It should not happen under normal circumstances, this is an extraordinary procedure. Scanning should take place only when Chunkservers is starting."
 	},
 	"hdd_mfr_validating": {
 		"severity": "Warning",
@@ -822,7 +822,7 @@
 	},
 	"info_masters_metadata_delay": {
 		"severity": "Help",
-		"title": "The delay of matadata on the FOLLOWER master server comparing to the LEADER"
+		"title": "The delay of metadata on the FOLLOWER master server comparing to the LEADER"
 	},
 	"info_masters_memory_usage": {
 		"severity": "Help",

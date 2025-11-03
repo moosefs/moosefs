@@ -30,7 +30,7 @@ means that significant (more than 10% in less than a minute) change of total blo
 .PP
 \fISPACE OPTIONS\fP allow to define limits in used space and alter disk usage reporting. A \fISPACE OPTION\fP can be:
 .IP
-a positive space limit, indicating a space limit deifinition (i.e. only this amount of space on the indicated path should be used for chunk storage)
+a positive space limit, indicating a space limit definition (i.e. only this amount of space on the indicated path should be used for chunk storage)
 .IP
 a negative space limit, indicating a reserved space definition (i.e. at least this amount of space should always be left free on the indicated path)
 .IP
@@ -40,7 +40,7 @@ Space limit can be either a defined amount of space (format: [0-9]*(.[0-9]*)?([k
 .PP
 An equals sign indicates, that a disk is "shared" with another process 
 (either another chunk server process or an unrelated process) and the amount of space used on the 
-disk is not necessarily indicative of the amount of space used by chunks. Additionaly, an indicator of a space limit can be defined. 
+disk is not necessarily indicative of the amount of space used by chunks. Additionally, an indicator of a space limit can be defined. 
 Percent says how many percent of the available disk space should be considered as available for the chunkserver. 
 Size says how much exact space should be considered available for the chunkserver. If the percent or space are negative,
 then we define the unavailable amount of space instead.

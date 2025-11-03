@@ -339,7 +339,7 @@
 //
 // SET_CURRENTTIME_FLAG - version > 2.1.12
 
-// lookup.lflags (acl's must be checked separatelly - A:r,B:w doesn't give user belonging to A and B both r and w rights)
+// lookup.lflags (acl's must be checked separately - A:r,B:w doesn't give user belonging to A and B both r and w rights)
 #define LOOKUP_ACCESS_MODE_0               0x0001
 #define LOOKUP_ACCESS_MODE_X               0x0002
 #define LOOKUP_ACCESS_MODE_W               0x0004

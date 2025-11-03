@@ -7,7 +7,7 @@ def render(dp, fields, vld, html_title, org, sectionset):
 	out.append("""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />""")
 	out.append("""<meta name="viewport" content="width=device-width, user-scalable=yes">""")
 	out.append("""<title>%s</title>""" % html_title)
-	# leave this script a the begining to prevent screen blinking when using dark mode
+	# leave this script a the beginning to prevent screen blinking when using dark mode
 	out.append("""<script type="text/javascript"><!--//--><![CDATA[//><!--
 		if (localStorage.getItem('theme')===null || localStorage.getItem('theme')==='dark') { document.documentElement.setAttribute('data-theme', 'dark');}	
 		//--><!]]></script>""")

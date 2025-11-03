@@ -23,7 +23,7 @@ class MFSMultiConn:
 	# Sends a given command asynchrously to all (previously) registered servers and applies the global timeout on all of them.
 	# It is ensured that this function completes within give timeout
 	# returns a dictionary hostkey->(datain, length) where hostkey is 'ip:port' (eg. '10.10.10.12:9422), 
-	# if a given server can't be reached or gives no valid answer its hostkey will be absent from the dictionary, thus dictinary may be empty if no command completed successfuly 
+	# if a given server can't be reached or gives no valid answer its hostkey will be absent from the dictionary, thus dictionary may be empty if no command completed successfully 
 	# postprocess is a function (lambda) that will be applied to each datain before storing it in the dictionary
 	def command(self,cmdout,cmdin,dataout=None,postprocess=None):
 		if (sys.version_info[0]==3 and sys.version_info[1]<7):
@@ -62,7 +62,7 @@ class MFSMultiConn:
 				await task
 			except asyncio.CancelledError:
 				pass #do nothing about it
-		return dict(results) # Convert list of tuples (successfull task results) to dictionary
+		return dict(results) # Convert list of tuples (successful task results) to dictionary
 	
 	# Internal: perform a single mfs i/o command 
 	async def single_command(self,host,port,cmdout,cmdin,dataout,postprocess):

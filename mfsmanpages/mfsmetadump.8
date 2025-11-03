@@ -323,7 +323,7 @@ v	chunk version
 t	timestamp, if in the future, means lock timestamp, if in the past, last modification timestamp
 a	archive flag
 (s,#)	list of entries, s is storage class id, # is number of files in this storage class containing this chunk
-c	calculated storage class id (effecitvely used class id, if a chunk has more than one)
+c	calculated storage class id (effectively used class id, if a chunk has more than one)
 .fi
 .PP
 NOTICE! If a chunk's timestamp equals 0, it means the chunk was created by MooseFS version older than 4.45.0 and has not been locked or modified since.

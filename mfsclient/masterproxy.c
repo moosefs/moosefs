@@ -208,7 +208,7 @@ static void* masterproxy_server(void *args) {
 			put32bit(&wptr,asize+4);
 			put32bit(&wptr,msgid);
 
-			// stupid active wait - shuld be replaced by cond, but since it is highly improbable we can leave it
+			// stupid active wait - should be replaced by cond, but since it is highly improbable we can leave it
 			pthread_mutex_lock(&(cd->lock));
 			while (cd->sendnops==2) { // we don't want to send answer when nop packet is being sent
 				pthread_mutex_unlock(&(cd->lock));

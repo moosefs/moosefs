@@ -143,7 +143,7 @@ AJAX_NONE      = None
 AJAX_CONTAINER = 1
 AJAX_METRICS   = 2
 
-# Chunk matrix summary colums
+# Chunk matrix summary columns
 MX_COL_MISSING       = 0
 MX_COL_ENDANGERED    = 1
 MX_COL_UNDERGOAL     = 2

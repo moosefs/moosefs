@@ -461,9 +461,9 @@ void mfscgiserv_rescan(void) {
 			}
 		} else {
 			if (req_head) {
-				mfs_log(MFSLOG_ERRNO_SYSLOG,MFSLOG_WARNING,"guiserv: can't open mfsgui requests file (%s) - reqests not changed, error",RequestsFile);
+				mfs_log(MFSLOG_ERRNO_SYSLOG,MFSLOG_WARNING,"guiserv: can't open mfsgui requests file (%s) - requests not changed, error",RequestsFile);
 			} else {
-				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"guiserv: can't open mfsgui reqests file (%s) - no requests !!!, error",RequestsFile);
+				mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_WARNING,"guiserv: can't open mfsgui requests file (%s) - no requests !!!, error",RequestsFile);
 			}
 		}
 		return;
@@ -486,7 +486,7 @@ void mfscgiserv_rescan(void) {
 	}
 	fclose(fd);
 	free(linebuff);
-	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"guiserv: requests have beed reloaded");
+	mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"guiserv: requests have been reloaded");
 }
 
 void mfscgiserv_quick_rescan(void) {

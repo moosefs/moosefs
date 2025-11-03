@@ -106,7 +106,7 @@ the file it belongs to is older than the number of hours specified with \fB-d\fP
 \fBARCHIVE BEHAVIOUR\fP section below
 .PP
 \fB-d\fP optional parameter that defines after how much time from atime/mtime/ctime (as set by \fB-o\fP) a file (and its chunks) are
-treated as archive; minimum unit is hours, default is 24, for value formating see TIME
+treated as archive; minimum unit is hours, default is 24, for value formatting see TIME
 .PP
 \fB-o\fP optional parameter that defines archive flags.
 \fBC\fP - ctime, \fBM\fP - mtime, \fBA\fP - atime, \fBR\fP - reversible, \fBF\fP - fastmode, \fBP\fP - per chunk ;
@@ -118,11 +118,11 @@ default is \fBC\fP; see \fBARCHIVE BEHAVIOUR\fP section below for details
 \fITRASH_LABELS\fP expression, the chunk(s) of files in Trash should be kept; see also \fB-t\fP
 .PP
 \fB-t\fP optional parameter, that defines, how much time in Trash must be left for the system to actually
-use the schema defined in \fB-T\fP for a chunk; minimum unit is hours, default is 0, for value formating see TIME
+use the schema defined in \fB-T\fP for a chunk; minimum unit is hours, default is 0, for value formatting see TIME
 .PP
 \fB-c\fP optional parameter, that defines a class description, for user's convenience (a string, maximum length is 255 bytes) 
 .PP
-\fB-p\fP optional paremeter, that defines a class priority; default is 0, see \fBSTORAGE CLASSES PRIORITY\fP section
+\fB-p\fP optional parameter, that defines a class priority; default is 0, see \fBSTORAGE CLASSES PRIORITY\fP section
 .PP
 \fB-g\fP optional parameter, that defines a class export group; possible values are 0 to 15, default is 0; see \fBmfsexport.cfg\fP(5) for explanation
 .PP
@@ -172,7 +172,7 @@ parity parts should be kept.
 Labels expression can be either a regular labels expression or EC labels expression (i.e. EC labels expression cannot be a subexpression). 
 EC labels expression can only be used in place of \fBARCHIVE_LABELS\fP or \fBTRASH_LABELS\fP in the storage class definition, regular labels expression can be use in any place.
 .PP
-At the end of each label expression one or two extending informations, divided with a special separator, can be added. The first possible extension, is the distinguish extension and the separator is the slash (/) sign. Second is labels mode override and this extenstion is separated by colon (:) sign.
+At the end of each label expression one or two extending information, divided with a special separator, can be added. The first possible extension, is the distinguish extension and the separator is the slash (/) sign. Second is labels mode override and this extension is separated by colon (:) sign.
 .PP
 Distinguish extension can be a list of labels or one of the following special strings:
 .PP
@@ -185,7 +185,7 @@ so that each copy is either on a different label from the list or on a chunkserv
 different IP address or from a different rack. For EC the distinguish part is currently ignored.
 .PP
 \fBNOTICE!\fP If \fBCHUNKS_UNIQUE_MODE\fP is defined in \fBmfsmaster.cfg\fP to a value other than 0,
-it will override any distinguish setting in storage classes. For more informations about this parameter
+it will override any distinguish setting in storage classes. For more information about this parameter
 refer to \fBmfsmaster.cfg\fP (5) manual.
 .PP
 Labels mode override extension can be one of three characters: \fBd\fP (alternatively \fBD\fP or in string form \fBstd\fP or \fBStd\fP or \fBSTD\fP), \fBs\fP (alternatively \fBS\fP or in string form \fBstrict\fP or \fBStrict\fP or \fBSTRICT\fP) or \fBl\fP (alternatively \fBL\fP or in string form \fBloose\fP or \fBLoose\fP or \fBLOOSE\fP) and they mean that the STANDARD, STRICT or LOOSE label mode, respectively, should be applied only to this one labels expression. For explanation about label modes see the LABEL MODES section.
@@ -265,7 +265,7 @@ For copies format the 3 modes behave as follows:
 In STANDARD mode in case of overloaded servers the system will wait for them, but in case of no space available it will use other servers and will replicate data to correct servers when it becomes possible. This means if some servers are in busy state for a long time, it might not be possible to create new chunks with certain storage classes and endangered (undergoal) chunks from those classes are at higher risk of being completely lost due to delayed replications.
 .PP
 In STRICT mode, during writing a new file, the system will return error (ENOSPC) in case of no space
-available on servers marked with labels specified for chunk creation. It will still wait for overloaded servers. Undergoal repliactions will not be performed if there is no space on servers with labels matching the storage class. This means high risk of losing data if servers with some labels are permamently filled up with data!
+available on servers marked with labels specified for chunk creation. It will still wait for overloaded servers. Undergoal repliactions will not be performed if there is no space on servers with labels matching the storage class. This means high risk of losing data if servers with some labels are permanently filled up with data!
 .PP
 In LOOSE mode the system will immediately use other servers in case of overloaded servers or no space on servers and will replicate data to correct servers when it becomes possible. There is no delay or error on file creation and undergoal replications are always done as soon as possible.
 .PP
@@ -306,7 +306,7 @@ For time variables their value can be defined as a number of seconds or hours (i
 .PP
 first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of minimum unit will be rounded to integer value
 .PP
-second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
+second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
 o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 .PP
 If a minimum unit of a variable is larger than seconds, units below the minimum one will not be accepted. For example, a variable that has hours as a minimum unit will not accept s and m units.
@@ -356,7 +356,7 @@ older/slower/cheaper disks and chunkservers - using different labels.
 .PP
 Storage classes are assigned to files, but one chunk (one fragment of a file) can belong to many files, courtesy of the snapshot
 mechanism (see \fBmfssnapshots\fP (1)). If one chunk belongs to many files with different storage classes, one storage class must
-be picked to specify, how this chunk's copies should be kept in the system. Up to MooseFS version 4.56.0 a predefined class was artificially asigned 
+be picked to specify, how this chunk's copies should be kept in the system. Up to MooseFS version 4.56.0 a predefined class was artificially assigned 
 to such chunk. Currently one of the files' classes will be used, according to priorities assigned by the user, to be exact: the system will pick the class
 with highest priority out of all the files' classes.
 .PP

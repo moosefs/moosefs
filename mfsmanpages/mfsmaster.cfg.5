@@ -88,7 +88,7 @@ this sets the minimum, actual number may be a bit bigger due to logs being kept
 in 5k blocks; zero disables extra logs storage)
 .TP
 .B CHANGELOG_PRESERVE_MB
-how much RAM can be used to preserve change logs in memory in megabytes (deafult is 500; this sets the minimum, actual number may be a bit bigger 
+how much RAM can be used to preserve change logs in memory in megabytes (default is 500; this sets the minimum, actual number may be a bit bigger 
 due to logs being kept in 5k blocks; zero disables extra logs storage);
 master will always preserve the lower number of 5k blocks defined by \fBCHANGELOG_PRESERVE_SECONDS\fP and \fBCHANGELOG_PRESERVE_MB\fP, so be sure to set both appropriately
 .TP
@@ -200,8 +200,8 @@ avoid using same ip/rack for different chunk copies (default is 0)
 .br
 \fbNOTICE!\fP This parameter is available for backward compatibility purposes and should not be set 
 to a value other than 0. Instead, distinguish feature from storage classes should be used. 
-However, if it is set to a value other than 0, it will override any distinguish definintion in 
-storage classes. For more informations about storage classes and distinguish feature refer to
+However, if it is set to a value other than 0, it will override any distinguish definition in 
+storage classes. For more information about storage classes and distinguish feature refer to
 \fBmfsscadmin\fP\|(1) manual.
 .TP
 .B CHUNKS_LOOP_MAX_CPS
@@ -299,7 +299,7 @@ For config variables that define time without requiring a single, specific unit,
 .PP
 first format: #.#T where T is one of: s-seconds, m-minutes, h-hours, d-days or w-weeks; fractions of seconds will be rounded to full seconds
 .PP
-second format: #w#d#h#m#s, any number of definitions can be ommited, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
+second format: #w#d#h#m#s, any number of definitions can be omitted, but the remaining definitions must be in order (so #d#m is still a valid definition, but #m#d is not); ranges: s,m: 0 to 59, h: 0 to 23, d: 0 t
 o 6, w is unlimited and the first definition is also always unlimited (i.e. for #d#h#m d will be unlimited)
 .PP
 Examples:
@@ -376,7 +376,7 @@ Each time a client connects, the master will check whether the connection came f
 Proper DNS configuration is also required: clients in each LAN must either get different IP when querying DNS about master host or must use different master host names that are resolved to IPs in their class.
 See \fBmfsmount\fP\|(8), \fBmfsbdev\fP\|(8) for more info about master host name.
 .PP
-The two above sets of options can be used together. One purpose would be to create a separate network for replication of data between chunkservers while also maintaning several separate networks (LANs) for separate sets of clients.
+The two above sets of options can be used together. One purpose would be to create a separate network for replication of data between chunkservers while also maintaining several separate networks (LANs) for separate sets of clients.
 For example, with the following configuration:
 .PP
 REMAP_BITS = 24

@@ -1403,6 +1403,10 @@ int check_arch_mode(uint8_t arch_mode) {
 		fprintf(stderr,"Fast arch mode ('F') is mutually exclusive with all other arch modes\n");
 		return -1;
 	}
+	if ((arch_mode & SCLASS_ARCH_MODE_REVERSIBLE) && (arch_mode & (SCLASS_ARCH_MODE_CTIME|SCLASS_ARCH_MODE_MTIME|SCLASS_ARCH_MODE_ATIME))==0) {
+		fprintf(stderr,"Reversible arch mode ('R') needs at least one time flag ('A','M' or 'C')\n");
+		return -1;
+	}
 	return 0;
 }
 
@@ -1556,7 +1560,6 @@ int modifyscexe(int argc,char *argv[]) {
 		modifyscusage();
 		return 1;
 	}
-
 
 	if (argc==0) {
 		modifyscusage();

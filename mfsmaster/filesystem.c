@@ -2381,7 +2381,7 @@ static inline uint32_t fsnodes_checkarchmode(fsnode *obj,uint32_t ts,uint8_t fie
 			arch_delay = sclass_get_arch_delay(obj->sclassid);
 			arch_min_size = sclass_get_arch_min_size(obj->sclassid);
 //			mfs_log(MFSLOG_SYSLOG,MFSLOG_DEBUG,"inode: %"PRIu32" ; classid: %"PRIu8" ; arch_delay: %"PRIu16" ; keepmode: %u ; arch_mode: 0x%02"PRIX8" ; to_check: 0x%02"PRIX8,obj->inode,obj->sclassid,arch_delay,obj->keepmode,arch_mode,fields_to_check);
-			if ((arch_mode & SCLASS_ARCH_MODE_REVERSIBLE) && ((arch_delay>0 && (arch_mode & fields_to_check)) || arch_min_size>0)) {
+			if ((arch_mode & SCLASS_ARCH_MODE_REVERSIBLE) && ((arch_delay>0 || arch_min_size>0) && (arch_mode & fields_to_check))) {
 				if (obj->data.fdata.length<arch_min_size) {
 					aflag = 0;
 				} else {

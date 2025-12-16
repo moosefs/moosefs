@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # linux gcc with thread sanitizer
 CC=gcc CFLAGS='-O1 -g -fsanitize=thread -fno-omit-frame-pointer' LDFLAGS='-O1 -g -fsanitize=thread -fno-omit-frame-pointer' LIBS='-ltsan' ./configure --prefix=/usr --mandir=/share/man --sysconfdir=/etc --localstatedir=/var/lib --with-default-user=mfs --with-default-group=mfs --enable-externalcflags

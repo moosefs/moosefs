@@ -1,3 +1,2 @@
-#!/usr/bin/env bash
+#!/bin/sh
 echo "mfsgetgoal is deprecated, use mfsgetsclass instead"
-mfsgetsclass "$@"

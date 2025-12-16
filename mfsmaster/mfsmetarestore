@@ -1,2 +1,2 @@
-#!/usr/bin/env bash
+#!/bin/sh
 echo "mfsmetarestore has been removed in version 1.7, use mfsmaster -a instead"

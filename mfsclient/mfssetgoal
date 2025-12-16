@@ -1,3 +1,2 @@
-#!/usr/bin/env bash
+#!/bin/sh
 echo "mfssetgoal is deprecated, use mfssetsclass instead"
-mfssetsclass "$@"

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # to make ports simply:
 #  - copy distfile "moosefs-*.tar.gz" to /usr/ports/distfiles

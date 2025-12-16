@@ -1,2 +1,2 @@
-#!/usr/bin/env sh
+#!/bin/sh
 echo "This binary no longer exists. Please use 'mfsgui' instead."

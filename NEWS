@@ -4,6 +4,7 @@ This file lists noteworthy changes in MooseFS.
 
   - (master+tools) fixed conditions for reversible storage class
   - (daemons) fixed small security issue (clearing auxiliary groups before setuid)
+  - (libmfsio) fixed descriptor resize function
 
 * MooseFS 4.58.2-1 (2025-11-03)
 

@@ -1,3 +1,12 @@
+moosefs (4.58.3-1) unstable; urgency=medium
+
+  * (master+tools) fixed conditions for reversible storage class
+  * (daemons) fixed small security issue (clearing auxiliary groups before
+    setuid)
+  * (libmfsio) fixed descriptor resize function
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 15 Dec 2025 12:00:00 +0100
+
 moosefs (4.58.2-1) unstable; urgency=medium
 
   * (master) changed timeouts used in master to master connections (pro only)

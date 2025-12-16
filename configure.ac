@@ -537,14 +537,14 @@ AC_ARG_WITH([systemdsystemunitdir],
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 
 if test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no"; then
-	dnl AM_PATH_PYTHON([3.4],,[:])
-	AC_CHECK_PROGS(PYTHON, [python3 python python3.14 python3.13 python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3.5 python3.4], [:])
-	if test "$PYTHON" = :; then
-		PYTHON="python"
-		AC_MSG_RESULT([Python binary not found !!! - using default in shebangs])
-	else
-		AC_MSG_RESULT([Python binary for script shebangs: $PYTHON])
-	fi
+	AM_PATH_PYTHON([3.4],,[
+		echo "****** mfscli and gui disabled ******"
+		echo "* mfscli and gui need python >= 3.4 *"
+		echo "*************************************"
+		enable_mfsgui=no
+		enable_mfscgi=no
+		enable_mfscli=no
+	])
 fi
 
 AM_CONDITIONAL([WITH_PYTHON], [test "$enable_mfscgi" != "no" -o "$enable_mfscli" != "no"])

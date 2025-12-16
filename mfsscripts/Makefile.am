@@ -20,7 +20,7 @@ install-exec-hook: mfsgui.py
 	done
 	@rm -f $(DESTDIR)$(cgidir)/common/constants_ac.py.in
 	$(INSTALL) mfsgui.py $(DESTDIR)$(cgidir)/mfs.cgi
-	@sed -e "s|#!/usr/bin/env python3|#!/usr/bin/env @PYTHON@|" < $(DESTDIR)$(cgidir)/mfs.cgi > shebang_me.tmp && mv shebang_me.tmp $(DESTDIR)$(cgidir)/mfs.cgi
+	@sed -e "s|#!/usr/bin/env python3|#!@PYTHON@|" < $(DESTDIR)$(cgidir)/mfs.cgi > shebang_me.tmp && mv shebang_me.tmp $(DESTDIR)$(cgidir)/mfs.cgi
 	@chmod a+x $(DESTDIR)$(cgidir)/mfs.cgi
 endif
 
@@ -66,7 +66,7 @@ mfscli: mfscli.py common/*.py
 			*) printf "%s\n" "$$line" >> "$$out_file" ;; \
 		esac; \
 	done < "$$input_file"'
-	@sed -e "s|#!/usr/bin/env python3|#!/usr/bin/env @PYTHON@|" < mfscli > shebang_me.tmp && mv shebang_me.tmp mfscli
+	@sed -e "s|#!/usr/bin/env python3|#!@PYTHON@|" < mfscli > shebang_me.tmp && mv shebang_me.tmp mfscli
 	@chmod a+x mfscli
 
 clean-local:

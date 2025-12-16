@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.58.3-1 (2025-12-15)
+
+  - (daemons) fixed small security issue (clearing auxiliary groups before setuid)
+
 * MooseFS 4.58.2-1 (2025-11-03)
 
   - (master) changed timeouts used in master to master connections (pro only)

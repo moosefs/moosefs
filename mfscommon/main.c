@@ -1102,6 +1102,12 @@ void changeugid(void) {
 		} else {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"set gid to %d",(int)wrk_gid);
 		}
+		if (setgroups(0, NULL)<0) {
+			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't clear auxiliary groups");
+			exit(1);
+		} else {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_INFO,"cleared auxiliary groups");
+		}
 		if (setuid(wrk_uid)<0) {
 			mfs_log(MFSLOG_ERRNO_SYSLOG_STDERR,MFSLOG_ERR,"can't set uid to %d",(int)wrk_uid);
 			exit(1);

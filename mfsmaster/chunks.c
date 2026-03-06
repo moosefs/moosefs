@@ -6507,9 +6507,9 @@ void chunk_do_jobs(chunk *c,uint8_t mode,uint32_t now,uint8_t extrajob) {
 
 		if (tdc+vc+tdb+bc+allecgoalequiv==0 && (wvc|tdw|ivc|wvcmask8|tdwmask8|ivcmask8|wvcmask4|tdwmask4|ivcmask4)!=0 && c->fhead>FLISTNULLINDX) {
 			if ((wvc|tdw|wvcmask8|tdwmask8|wvcmask4|tdwmask4)==0) {
-				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"chunk %016"PRIX64" has only invalid copies (%"PRIu32") - please repair it manually",c->chunkid,ivc);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32" has only invalid copies (%"PRIu32") - please repair it manually",c->chunkid,c->version,ivc);
 			} else {
-				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"chunk %016"PRIX64" has only copies with wrong versions (%"PRIu32") - please repair it manually",c->chunkid,wvc+tdw);
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"chunk %016"PRIX64"_%08"PRIX32" has only copies with wrong versions (%"PRIu32") - please repair it manually",c->chunkid,c->version,wvc+tdw);
 			}
 			for (s=c->slisthead ; s ; s=s->next) {
 				if (s->valid==INVALID) {

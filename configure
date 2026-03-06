@@ -6268,8 +6268,8 @@ esac
 
 
 
-macro_version='2.5.4.62-6389d'
-macro_revision='2.5.4.62'
+macro_version='2.6.0'
+macro_revision='2.6.0'
 
 
 
@@ -11008,7 +11008,7 @@ lt_prog_compiler_static=
         ;;
       # icc used to be incompatible with GCC.
       # ICC 10 doesn't accept -KPIC any more.
-      icc* | ifort*)
+      icc* | ifort* | icx* | ifx*)
 	lt_prog_compiler_wl='-Wl,'
 	lt_prog_compiler_pic='-fPIC'
 	lt_prog_compiler_static='-static'
@@ -11699,7 +11699,7 @@ _LT_EOF
 	  tmp_addflag=' -i_dynamic' ;;
 	efc*,ia64* | ifort*,ia64*)	# Intel Fortran compiler on ia64
 	  tmp_addflag=' -i_dynamic -nofor_main' ;;
-	ifc* | ifort*)			# Intel Fortran compiler
+	ifc* | ifort* | ifx*)		# Intel Fortran compiler
 	  tmp_addflag=' -nofor_main' ;;
 	lf95*)				# Lahey Fortran 8.1
 	  whole_archive_flag_spec=
@@ -12152,8 +12152,8 @@ fi
       # hardcode_libdir_flag_spec is actually meaningless, as there is
       # no search path for DLLs.
       case $cc_basename in
-      cl* | icl*)
-	# Native MSVC or ICC
+      cl* | icl* | icx* | icpx*)
+	# Native MSVC and Intel compilers
 	hardcode_libdir_flag_spec=' '
 	allow_undefined_flag=unsupported
 	always_export_symbols=yes
@@ -13261,8 +13261,8 @@ cygwin* | mingw* | windows* | pw32* | cegcc*)
     dynamic_linker='Win32 ld.exe'
     ;;
 
-  *,cl* | *,icl*)
-    # Native MSVC or ICC
+  *,cl* | *,icl* | *,icx*)
+    # Native MSVC and Intel compilers
     libname_spec='$name'
     soname_spec='$libname`echo $release | $SED -e 's/[.]/-/g'`$versuffix$shared_ext'
     library_names_spec='$libname.dll.lib'
@@ -14066,7 +14066,7 @@ lt_prog_compiler_static=
         ;;
       # icc used to be incompatible with GCC.
       # ICC 10 doesn't accept -KPIC any more.
-      icc* | ifort*)
+      icc* | ifort* | icx* | ifx*)
 	lt_prog_compiler_wl='-Wl,'
 	lt_prog_compiler_pic='-fPIC'
 	lt_prog_compiler_static='-static'
@@ -15205,6 +15205,9 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 CC=$lt_save_CC
+
+
+
 
 
 

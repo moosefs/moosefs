@@ -2,7 +2,7 @@
 ## DO NOT EDIT - This file generated from ./build-aux/ltmain.in
 ##               by inline-source v2019-02-19.15
 
-# libtool (GNU libtool) 2.5.4.62-6389d
+# libtool (GNU libtool) 2.6.0
 # Provide generalized library-building support services.
 # Written by Gordon Matzigkeit <gord@gnu.ai.mit.edu>, 1996
 
@@ -31,8 +31,8 @@
 
 PROGRAM=libtool
 PACKAGE=libtool
-VERSION=2.5.4.62-6389d
-package_revision=2.5.4.62
+VERSION=2.6.0
+package_revision=2.6.0
 
 
 ## ------ ##
@@ -2215,7 +2215,7 @@ func_version ()
 # End:
 
 # Set a version string.
-scriptversion='(GNU libtool) 2.5.4.62-6389d'
+scriptversion='(GNU libtool) 2.6.0'
 
 # func_version
 # ------------
@@ -7814,7 +7814,7 @@ func_mode_link ()
       # --unwindlib=*        select unwinder library with clang
       # -f{file|debug|macro|profile}-prefix-map=* needed for lto linking
       # -Wa,*                Pass flags directly to the assembler
-      # -Werror, -Werror=*   Report (specified) warnings as errors
+      # -W*                  Warnings, needed for lto
       -64|-mips[0-9]|-r[0-9][0-9]*|-xarch=*|-xtarget=*|+DA*|+DD*|-q*|-m*| \
       -t[45]*|-txscale*|-p|-pg|--coverage|-fprofile-*|-F*|@*|-tp=*|--sysroot=*|--target=*| \
       -O*|-g*|-flto*|-fwhopr*|-fuse-linker-plugin|-fstack-protector*|-no-canonical-prefixes| \
@@ -7822,7 +7822,7 @@ func_mode_link ()
       -specs=*|-fsanitize=*|-fno-sanitize*|-shared-libsan|-static-libsan| \
       -ffile-prefix-map=*|-fdebug-prefix-map=*|-fmacro-prefix-map=*|-fprofile-prefix-map=*| \
       -fdiagnostics-color*|-frecord-gcc-switches| \
-      -fuse-ld=*|-static-*|-fcilkplus|-Wa,*|-Werror|-Werror=*)
+      -fuse-ld=*|-static-*|-fcilkplus|-W*)
         func_quote_arg pretty "$arg"
 	arg=$func_quote_arg_result
         func_append compile_command " $arg"

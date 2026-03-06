@@ -537,6 +537,26 @@ m4_defun([_LT_OBJECTIVE_C], [
     [Check for compiling Objective C and C++ code])
 ])
 
+m4_defun([_LT_ML64], [
+  AC_CACHE_CHECK([for ML64 compilation],
+    [lt_cv_ml64_compiles],
+    [ save_CFLAGS=$CFLAGS
+      CFLAGS=$ML64FLAGS
+      AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM([ret
+],[])],
+        lt_cv_ml64_compiles=yes,
+        lt_cv_ml64_compiles=no
+      )
+      CFLAGS=$save_CFLAGS
+    ]
+  )
+  objc_compiles=$lt_cv_objc_compiles
+  _LT_DECL([], [ml64_compiles], [1],
+    [Check for compiling ml64 code])
+])
+
+
 # _LT_CONFIG_COMMANDS
 # -------------------
 # Send accumulated output to $CONFIG_STATUS.  Thanks to the lists of
@@ -858,6 +878,7 @@ m4_case([$1],
   [C++],		[_LT_LANG(CXX)],
   [Objective-C],		[_LT_LANG(OBJC)],
   [Objective-C++],	[_LT_LANG(OBJCXX)],
+  [Microsoft Macro Assembler],  [_LT_LANG(ML64)],
   [Go],			[_LT_LANG(GO)],
   [Java],		[_LT_LANG(GCJ)],
   [Fortran 77],		[_LT_LANG(F77)],
@@ -878,6 +899,26 @@ m4_defun([_LT_LANG],
   m4_define([_LT_LANG_]$1[_enabled], [])dnl
   _LT_LANG_$1_CONFIG($1)])dnl
 ])# _LT_LANG
+
+
+m4_ifndef([AC_PROG_ML64], [
+m4_defun([AC_PROG_ML64],
+[AC_LANG_PUSH(ML64)dnl
+AC_ARG_VAR([ML64],     [ml64 compiler command])dnl
+AC_ARG_VAR([ML64FLAGS], [ml64 compiler flags])dnl
+_AC_ARG_VAR_LDFLAGS()dnl
+AC_CHECK_TOOL(ML64, ml64)
+if test -z "$ML64"; then
+  if test -n "$ac_tool_prefix"; then
+    AC_CHECK_PROG(ML64, [${ac_tool_prefix}ml64], [${ac_tool_prefix}ml64])
+  fi
+fi
+if test -z "$ML64"; then
+  AC_CHECK_PROG(ML64, ml64, ml64, false)
+fi
+])#m4_defun
+])#m4_ifndef
+
 
 
 m4_ifndef([AC_PROG_GO], [
@@ -930,11 +971,11 @@ AC_PROVIDE_IFELSE([AC_PROG_GCJ],
       [LT_LANG(GCJ)],
       [m4_ifdef([AC_PROG_GCJ],
 	[m4_define([AC_PROG_GCJ], defn([AC_PROG_GCJ])[LT_LANG(GCJ)])])
+
        m4_ifdef([A][M_PROG_GCJ],
 	[m4_define([A][M_PROG_GCJ], defn([A][M_PROG_GCJ])[LT_LANG(GCJ)])])
        m4_ifdef([LT_PROG_GCJ],
 	[m4_define([LT_PROG_GCJ], defn([LT_PROG_GCJ])[LT_LANG(GCJ)])])])])])
-
 AC_PROVIDE_IFELSE([AC_PROG_GO],
   [LT_LANG(GO)],
   [m4_define([AC_PROG_GO], defn([AC_PROG_GO])[LT_LANG(GO)])])
@@ -947,10 +988,17 @@ AC_PROVIDE_IFELSE([AC_PROG_OBJCXX],
   [LT_LANG(OBJCXX)],
   [m4_define([AC_PROG_OBJCXX], defn([AC_PROG_OBJCXX])[LT_LANG(OBJCXX)])])
 
+AC_PROVIDE_IFELSE([AC_PROG_ML64],
+  [LT_LANG(ML64)],
+  [m4_define([AC_PROG_ML64], defn([AC_PROG_ML64])[LT_LANG(ML64)])])
 AC_PROVIDE_IFELSE([LT_PROG_RC],
   [LT_LANG(RC)],
   [m4_define([LT_PROG_RC], defn([LT_PROG_RC])[LT_LANG(RC)])])
-])# _LT_LANG_DEFAULT_CONFIG
+
+
+])
+
+# _LT_LANG_DEFAULT_CONFIG
 
 # Obsolete macros:
 AU_DEFUN([AC_LIBTOOL_CXX], [LT_LANG(C++)])
@@ -2668,8 +2716,8 @@ m4_if([$1], [],[
     dynamic_linker='Win32 ld.exe'
     ;;
 
-  *,cl* | *,icl*)
-    # Native MSVC or ICC
+  *,cl* | *,icl* | *,icx*)
+    # Native MSVC and Intel compilers
     libname_spec='$name'
     soname_spec='$libname`echo $release | $SED -e 's/[[.]]/-/g'`$versuffix$shared_ext'
     library_names_spec='$libname.dll.lib'
@@ -4558,7 +4606,7 @@ m4_if([$1], [CXX], [
 	    _LT_TAGVAR(lt_prog_compiler_pic, $1)='-KPIC'
 	    _LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
 	    ;;
-	  icpc* )
+	  icpc* | icpx*)
 	    # Intel C++, used to be incompatible with GCC.
 	    # ICC 10 doesn't accept -KPIC any more.
 	    _LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
@@ -4893,7 +4941,7 @@ m4_if([$1], [CXX], [
         ;;
       # icc used to be incompatible with GCC.
       # ICC 10 doesn't accept -KPIC any more.
-      icc* | ifort*)
+      icc* | ifort* | icx* | ifx*)
 	_LT_TAGVAR(lt_prog_compiler_wl, $1)='-Wl,'
 	_LT_TAGVAR(lt_prog_compiler_pic, $1)='-fPIC'
 	_LT_TAGVAR(lt_prog_compiler_static, $1)='-static'
@@ -5129,7 +5177,8 @@ m4_if([$1], [CXX], [
     ;;
   cygwin* | mingw* | windows* | cegcc*)
     case $cc_basename in
-    cl* | icl*)
+    cl* | icl* | icx* | icpx*)
+      # Native MSVC and Intel compilers
       _LT_TAGVAR(exclude_expsyms, $1)='_NULL_IMPORT_DESCRIPTOR|_IMPORT_DESCRIPTOR_.*'
       ;;
     *)
@@ -5404,7 +5453,7 @@ _LT_EOF
 	  tmp_addflag=' -i_dynamic' ;;
 	efc*,ia64* | ifort*,ia64*)	# Intel Fortran compiler on ia64
 	  tmp_addflag=' -i_dynamic -nofor_main' ;;
-	ifc* | ifort*)			# Intel Fortran compiler
+	ifc* | ifort* | ifx*)		# Intel Fortran compiler
 	  tmp_addflag=' -nofor_main' ;;
 	lf95*)				# Lahey Fortran 8.1
 	  _LT_TAGVAR(whole_archive_flag_spec, $1)=
@@ -5767,8 +5816,8 @@ _LT_EOF
       # hardcode_libdir_flag_spec is actually meaningless, as there is
       # no search path for DLLs.
       case $cc_basename in
-      cl* | icl*)
-	# Native MSVC or ICC
+      cl* | icl* | icx* | icpx*)
+	# Native MSVC and Intel compilers
 	_LT_TAGVAR(hardcode_libdir_flag_spec, $1)=' '
 	_LT_TAGVAR(allow_undefined_flag, $1)=unsupported
 	_LT_TAGVAR(always_export_symbols, $1)=yes
@@ -6851,8 +6900,8 @@ if test yes != "$_lt_caught_CXX_error"; then
 
       cygwin* | mingw* | windows* | pw32* | cegcc*)
 	case $GXX,$cc_basename in
-	,cl* | no,cl* | ,icl* | no,icl*)
-	  # Native MSVC or ICC
+	,cl* | no,cl* | ,icl* | no,icl* | ,icx* | no,icx* | ,icpx* | no,icpx*)
+	  # Native MSVC and Intel compilers
 	  # hardcode_libdir_flag_spec is actually meaningless, as there is
 	  # no search path for DLLs.
 	  _LT_TAGVAR(hardcode_libdir_flag_spec, $1)=' '
@@ -7186,7 +7235,7 @@ if test yes != "$_lt_caught_CXX_error"; then
 	    # "CC -Bstatic", where "CC" is the KAI C++ compiler.
 	    _LT_TAGVAR(old_archive_cmds, $1)='$CC -Bstatic -o $oldlib $oldobjs'
 	    ;;
-	  icpc* | ecpc* )
+	  icpc* | ecpc* | icpx*)
 	    # Intel C++
 	    with_gnu_ld=yes
 	    # version 8.0 and above of icpc choke on multiply defined symbols
@@ -8235,6 +8284,76 @@ CFLAGS=$lt_save_CFLAGS
 ])# _LT_LANG_GCJ_CONFIG
 
 
+# _LT_LANG_ML64_CONFIG([TAG])
+# --------------------------
+# Ensure that the configuration variables for the ML64 assembler
+# are suitably defined.  These variables are subsequently used by _LT_CONFIG
+# to write the compiler configuration to 'libtool'.
+m4_defun([_LT_LANG_ML64_CONFIG],
+[AC_REQUIRE([LT_PROG_ML64])dnl
+AC_LANG_SAVE
+
+# Source file extension for ML64 test sources.
+ac_ext=asm
+
+#Object file extension for compile ML64 test sources.
+objext=o
+_LT_TAGVAR(objext, $1)=$objext
+
+# Code to be used in simple compile tests
+lt_simple_compile_test_code="main PROC ret main ENDP"
+
+# Code to be used in simple link tests
+lt_simple_link_test_code="main PROC ret main ENDP"
+
+# ltmain only uses $CC for tagged configurations so make sure $CC is set.
+_LT_TAG_COMPILER
+
+# save warnings/boilerplate of simple test code
+_LT_COMPILER_BOILERPLATE
+_LT_LINKER_BOILERPLATE
+
+# TODO? Check for compilation issues with ML64 flags.
+
+# Allow CC to be a program name with arguments.
+lt_save_CC=$CC
+lt_save_CFLAGS=$CFLAGS
+lt_save_GCC=$GCC
+GCC=yes
+CC=${ML64-"gcc"}
+CFLAGS=$ML64FLAGS
+compiler=$CC
+_LT_TAGVAR(compiler, $1)=$CC
+_LT_TAGVAR(LD, $1)=$LD
+_LT_CC_BASENAME([$compiler])
+
+_LT_TAGVAR(old_archive_cmds, $1)=$old_archive_cmds
+_LT_TAGVAR(reload_flag, $1)=$reload_flag
+_LT_TAGVAR(reload_cmds, $1)=$reload_cmds
+
+## CAVEAT EMPTOR:
+## There is no encapsulation within the following macros, do not change
+## the running order or otherwise move them around unless you know exactly
+## what you are doing...
+if test -n "$compiler"; then
+  _LT_COMPILER_NO_RTTI($1)
+  _LT_COMPILER_PIC($1)
+  _LT_COMPILER_C_O($1)
+  _LT_COMPILER_FILE_LOCKS($1)
+  _LT_LINKER_SHLIBS($1)
+  _LT_LINKER_HARDCODE_LIBPATH($1)
+
+  _LT_CONFIG($1)
+fi
+
+AC_LANG_RESTORE
+
+GCC=$lt_save_GCC
+CC=$lt_save_CC
+CFLAGS=$lt_save_CFLAGS
+])# _LT_LANG_ML64_CONFIG
+
+
 # _LT_LANG_GO_CONFIG([TAG])
 # --------------------------
 # Ensure that the configuration variables for the GNU Go compiler
@@ -8502,6 +8621,12 @@ AC_LANG_RESTORE
 CC=$lt_save_CC
 CFLAGS=$lt_save_CFLAGS
 ])# _LT_LANG_RC_CONFIG
+
+# LT_PROG_ML64
+# -----------
+AC_DEFUN([LT_PROG_ML64],
+[AC_CHECK_TOOL(ML64, ml64,)
+])
 
 
 # LT_PROG_OBJC

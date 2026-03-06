@@ -26,10 +26,17 @@
 #include <string.h>
 #include <inttypes.h>
 
+#ifndef HAVE_SETPROCTITLE
 static char *argv_start;
 static uint32_t argv_leng;
+static char **myenvcpy;
+#endif
 
 void processname_init(int argc,char *argv[]) {
+#ifdef HAVE_SETPROCTITLE
+	(void)argc;
+	(void)argv;
+#else
 	extern char **environ;
 	char **argp;
 	char *lastpos;
@@ -46,6 +53,8 @@ void processname_init(int argc,char *argv[]) {
 	argp = environ;
 	for (i=0 ; argp[i]!=NULL ; i++) {}
 	environ = malloc((i+1) * sizeof(char*));
+	myenvcpy = environ;
+
 	if (environ==NULL) {
 		environ = argp;
 		return;
@@ -77,6 +86,7 @@ void processname_init(int argc,char *argv[]) {
 
 	argv_start = argv[0];
 	argv_leng = (lastpos - argv_start) - 1;
+#endif
 }
 
 void processname_set(char *name) {
@@ -95,6 +105,16 @@ void processname_set(char *name) {
 //		if (l<argv_leng) { // always true - so ignore this condition
 		memset(argv_start+l,0,argv_leng-l);
 //		}
+	}
+#endif
+}
+
+// DO NOT CALL THIS FUNCTION !!!
+// THIS IS ONLY PROVIDED TO PREVENT STUPID WARNINGS FROM ADDRESS SANITIZER !!!
+void processname_term(void) {
+#ifndef HAVE_SETPROCTITLE
+	if (myenvcpy!=NULL) {
+		free(myenvcpy);
 	}
 #endif
 }

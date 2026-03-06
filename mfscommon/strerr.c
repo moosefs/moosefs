@@ -544,6 +544,10 @@ void strerr_init(void) {
 	uint32_t n;
 	uint32_t hash,disp;
 
+	if (errhash!=NULL) {
+		return;
+	}
+
 	for (n=0 ; errtab[n].str ; n++) {}
 
 	n = (n*3)/2;
@@ -603,4 +607,5 @@ void strerr_term(void) {
 #ifndef USE_PTHREADS
 	strerr_storage_free();
 #endif
+	errhash = NULL;
 }

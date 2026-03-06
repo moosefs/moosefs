@@ -243,7 +243,7 @@ Refer to [installation guides](https://moosefs.com/support/#documentation) for m
 
 ## Copyright
 
-Copyright © 2008-2025 Jakub Kruszona-Zawadzki, Saglabs SA
+Copyright © 2008-2026 Jakub Kruszona-Zawadzki, Saglabs SA
 
 This file is part of MooseFS.
 

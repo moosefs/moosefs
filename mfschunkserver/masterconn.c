@@ -1023,7 +1023,7 @@ void masterconn_localsplit(masterconn *eptr,const uint8_t *data,uint32_t length)
 		parts = 8;
 	}
 	if (parts!=8 && parts!=4) {
-		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOCS_LOCALSPLIT - unsupported parts number (%"PRIu8"/4|8)",length,parts);
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"MATOCS_LOCALSPLIT - unsupported parts number (%"PRIu8"/4|8)",parts);
 		eptr->mode = KILL;
 		return;
 	}

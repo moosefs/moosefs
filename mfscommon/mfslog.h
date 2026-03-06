@@ -23,6 +23,14 @@
 // MFSLOG_xxx are defined here:
 #include "MFSCommunication.h"
 
+#if defined(__printflike)
+#	define PRINTF_LIKE(fmt, args) __printflike(fmt, args)
+#elif defined(__GNUC__) || defined(__clang__)
+#	define PRINTF_LIKE(fmt, args) __attribute__((format(printf, fmt, args)))
+#else
+#	define PRINTF_LIKE(fmt, args)
+#endif
+
 // mode
 // syslog only
 #define MFSLOG_SYSLOG 0
@@ -35,11 +43,11 @@
 
 int mfs_log_str_to_pri(const char *pristr);
 
-void mfs_file_log(const char *file,int line,const char *func,int bt,const char *fmt,...);
+void mfs_file_log(const char *file,int line,const char *func,int bt,const char *fmt,...) PRINTF_LIKE(5,6);
 #define mfs_dbg(...) mfs_file_log(__FILE__,__LINE__,__func__,0,__VA_ARGS__)
 #define mfs_dbg_bt(...) mfs_file_log(__FILE__,__LINE__,__func__,1,__VA_ARGS__)
 
-void mfs_log(int mode,int priority,const char *fmt,...);
+void mfs_log(int mode,int priority,const char *fmt,...) PRINTF_LIKE(3,4);
 
 void mfs_log_set_min_level(int minlevel);
 void mfs_log_set_elevate_to(int elevateto);

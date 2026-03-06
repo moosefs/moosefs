@@ -24,16 +24,16 @@
 
 #include <inttypes.h>
 
-#ifndef __printflike
-#ifdef __GNUC__
-#define __printflike(fmt,va1) __attribute__((__format__(printf, fmt, va1)))
+#if defined(__printflike)
+#	define PRINTF_LIKE(fmt, args) __printflike(fmt, args)
+#elif defined(__GNUC__) || defined(__clang__)
+#	define PRINTF_LIKE(fmt, args) __attribute__((format(printf, fmt, args)))
 #else
-#define __printflike(fmt, va1)
+#	define PRINTF_LIKE(fmt, args)
 #endif
-#endif /* __printflike */
 
-void oplog_printf(const struct fuse_ctx *ctx,const char *format,...) __printflike(2, 3);
-void oplog_msg(const char *format,...) __printflike(1, 2);
+void oplog_printf(const struct fuse_ctx *ctx,const char *format,...) PRINTF_LIKE(2, 3);
+void oplog_msg(const char *format,...) PRINTF_LIKE(1, 2);
 unsigned long oplog_newhandle(int hflag);
 void oplog_releasehandle(unsigned long fh);
 void oplog_getdata(unsigned long fh,uint8_t **buff,uint32_t *leng,uint32_t maxleng);

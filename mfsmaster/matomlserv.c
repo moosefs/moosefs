@@ -451,7 +451,7 @@ void matomlserv_register(matomlserventry *eptr,const uint8_t *data,uint32_t leng
 	} else {
 		rversion = get8bit(&data);
 		if (rversion==3) {
-			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_REGISTER - protocol not supported",length);
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_REGISTER - protocol not supported");
 			eptr->mode = KILL;
 			return;
 		}

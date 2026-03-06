@@ -354,7 +354,7 @@ static inline type str_to_##fname (char *x) { \
 	type r; \
 	r = convfn(x,&e,0); \
 	if (*e && *e!='\t' && *e!=' ') { \
-		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"config: number expected, got '%s'"); \
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"config: number expected, got '%s'",x); \
 	} \
 	return r; \
 }
@@ -370,7 +370,7 @@ static inline double str_to_double (char *x) {
 	double r;
 	r = strtod(x,&e);
 	if (*e && *e!='\t' && *e!=' ') { \
-		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"config: number expected, got '%s'");
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"config: number expected, got '%s'",x);
 	}
 	return r;
 }

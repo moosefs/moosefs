@@ -22,6 +22,14 @@
 
 #include <inttypes.h>
 
+#if defined(__printflike)
+#	define PRINTF_LIKE(fmt, args) __printflike(fmt, args)
+#elif defined(__GNUC__) || defined(__clang__)
+#	define PRINTF_LIKE(fmt, args) __attribute__((format(printf, fmt, args)))
+#else
+#	define PRINTF_LIKE(fmt, args)
+#endif
+
 uint32_t changelog_get_old_changes(uint64_t version,void (*sendfn)(void *,uint64_t,uint8_t *,uint32_t),void *userdata,uint32_t limit);
 uint64_t changelog_get_minversion(void);
 
@@ -31,11 +39,7 @@ uint64_t changelog_get_minversion(void);
 void changelog_rotate(uint8_t rotate_flags);
 void changelog_mr(uint64_t version,const char *data);
 
-#ifdef __printflike
-void changelog(const char *format,...) __printflike(1, 2);
-#else
-void changelog(const char *format,...);
-#endif
+void changelog(const char *format,...) PRINTF_LIKE(1, 2);
 
 char* changelog_generate_gids(uint32_t gids,uint32_t *gid);
 char* changelog_escape_name(uint32_t nleng,const uint8_t *name);

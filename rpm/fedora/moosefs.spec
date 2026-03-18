@@ -1,19 +1,9 @@
 %define _groupname	mfs
 %define _username	mfs
 
-# Turn off debug packages
-%global _enable_debug_package 0
-%global debug_package %{nil}
-
 # Turn off lto
 %global _lto_cflags %{nil}
 %global _lto_ldflags %{nil}
-
-# Turn off strip'ng of binaries
-%global __os_install_post %{nil}
-
-# Turn off strip'ng of binaries
-%global __strip /bin/true
 
 %define rpm_maj_v %(eval "rpm --version | cut -d' ' -f3 | cut -d'.' -f1")
 %define rpm_min_v %(eval "rpm --version | cut -d' ' -f3 | cut -d'.' -f2")
@@ -24,7 +14,6 @@ Name:		moosefs
 Version:	4.58.3
 Release:	%autorelease
 License:	GPL-2.0-only
-Group:		System Environment/Daemons
 URL:		http://www.moosefs.com/
 Source:		https://repository.moosefs.com/src/moosefs-%{version}-1.tar.gz
 Source1:	moosefs.sysusers
@@ -37,7 +26,6 @@ BuildRequires:	libpcap-devel
 BuildRequires:	python3 >= 3.4
 BuildRequires:	systemd-rpm-macros
 %{?sysusers_requires_compat}
-BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Requires(pre):	shadow-utils
 
 
@@ -92,7 +80,7 @@ MooseFS client: mounting tool, block device manager and various utilities.
 
 
 %package libmfsio-devel
-Summary:	mfsIO library
+Summary:	MFSio library
 Group:		Development/C
 
 %description libmfsio-devel
@@ -137,24 +125,22 @@ MooseFS network packet dump utility
 
 %build
 %configure --with-default-user=%{_username} --with-default-group=%{_groupname} \
-	--with-systemdsystemunitdir=%{systemdunitdir}
+	--with-systemdsystemunitdir=%{systemdunitdir} --with-rootsbindir=%{_bindir} \
+	--disable-static
 
-make %{?_smp_mflags}
+%make_build
 
 %install
 
-rm -rf $RPM_BUILD_ROOT
-
 install -Dpm0644 %{SOURCE1} %{buildroot}%{_sysusersdir}/%{name}.conf
 
-make install \
-	DESTDIR=$RPM_BUILD_ROOT
+%make_install
 
 EXTRA_FILES=$RPM_BUILD_ROOT/ExtraFiles.list
 touch %{EXTRA_FILES}
 
-if [ -x %{buildroot}/%{_sbindir}/mfsbdev ]; then
-	echo '%attr(755,root,root) %{_sbindir}/mfsbdev' > %{EXTRA_FILES}
+if [ -x %{buildroot}/%{_bindir}/mfsbdev ]; then
+	echo '%attr(755,root,root) %{_bindir}/mfsbdev' > %{EXTRA_FILES}
 	echo '%{_mandir}/man8/mfsbdev.8*' >> %{EXTRA_FILES}
 	echo '%{_mandir}/man5/mfsbdev.cfg.5*' >> %{EXTRA_FILES}
 fi
@@ -244,15 +230,14 @@ exit 0
 
 %files master
 %{_sysusersdir}/%{name}.conf
-%defattr(644,root,root,755)
 %doc NEWS README
-%attr(755,root,root) %{_sbindir}/mfsmaster
-%attr(755,root,root) %{_sbindir}/mfsmetadump
-%attr(755,root,root) %{_sbindir}/mfsmetadirinfo
-%attr(755,root,root) %{_sbindir}/mfsmetasearch
-%attr(755,root,root) %{_sbindir}/mfsmetarestore
-%attr(755,root,root) %{_sbindir}/mfsstatsdump
-%attr(755,root,root) %{_sbindir}/mfssupervisor
+%{_bindir}/mfsmaster
+%{_bindir}/mfsmetadump
+%{_bindir}/mfsmetadirinfo
+%{_bindir}/mfsmetasearch
+%{_bindir}/mfsmetarestore
+%{_bindir}/mfsstatsdump
+%{_bindir}/mfssupervisor
 %{_mandir}/man5/mfsexports.cfg.5*
 %{_mandir}/man5/mfstopology.cfg.5*
 %{_mandir}/man5/mfsipmap.cfg.5*
@@ -279,9 +264,8 @@ exit 0
 
 %files metalogger
 %{_sysusersdir}/%{name}.conf
-%defattr(644,root,root,755)
 %doc NEWS README
-%attr(755,root,root) %{_sbindir}/mfsmetalogger
+%{_bindir}/mfsmetalogger
 %{_mandir}/man5/mfsmetalogger.cfg.5*
 %{_mandir}/man8/mfsmetalogger.8*
 %{mfsconfdir}/mfsmetalogger.cfg.sample
@@ -294,12 +278,11 @@ exit 0
 
 %files chunkserver
 %{_sysusersdir}/%{name}.conf
-%defattr(644,root,root,755)
 %doc NEWS README
-%attr(755,root,root) %{_sbindir}/mfschunkserver
-%attr(755,root,root) %{_sbindir}/mfschunktool
-%attr(755,root,root) %{_sbindir}/mfschunkdbdump
-%attr(755,root,root) %{_sbindir}/mfscsstatsdump
+%{_bindir}/mfschunkserver
+%{_bindir}/mfschunktool
+%{_bindir}/mfschunkdbdump
+%{_bindir}/mfscsstatsdump
 %{_mandir}/man5/mfschunkserver.cfg.5*
 %{_mandir}/man5/mfshdd.cfg.5*
 %{_mandir}/man8/mfschunkserver.8*
@@ -316,7 +299,6 @@ exit 0
 
 
 %files client -f %{EXTRA_FILES}
-%defattr(644,root,root,755)
 %doc NEWS README
 %{_bindir}/mfscheckfile
 %{_bindir}/mfsdirinfo
@@ -359,26 +341,23 @@ exit 0
 %{_bindir}/mfscreatepattern
 %{_bindir}/mfsdeletepattern
 %{_bindir}/mfslistpattern
-%attr(755,root,root) %{_bindir}/mfsgetgoal
-%attr(755,root,root) %{_bindir}/mfssetgoal
-%attr(755,root,root) %{_bindir}/mfscopygoal
-%attr(755,root,root) %{_bindir}/mfsdiagtools
-%attr(755,root,root) %{_bindir}/mfssnapshots
-%attr(755,root,root) %{_bindir}/mfsfacl
-%attr(755,root,root) %{_bindir}/mfssclass
-%attr(755,root,root) %{_bindir}/mfstrashtime
-%attr(755,root,root) %{_bindir}/mfstrashretention
-%attr(755,root,root) %{_bindir}/mfseattr
-%attr(755,root,root) %{_bindir}/mfsquota
-%attr(755,root,root) %{_bindir}/mfsarchive
-%attr(755,root,root) %{_bindir}/mfsscadmin
-%attr(755,root,root) %{_bindir}/mfspatadmin
-%attr(755,root,root) %{_bindir}/mfstrashtool
-%attr(755,root,root) %{_bindir}/mfsmount
-# %%attr(755,root,root) %%{_sbindir}/mfsbdev - moved to EXTRA_FILES
-/sbin/mount.moosefs
-%{_libdir}/libmfsio.a
-%{_libdir}/libmfsio.la
+%{_bindir}/mfsgetgoal
+%{_bindir}/mfssetgoal
+%{_bindir}/mfscopygoal
+%{_bindir}/mfsdiagtools
+%{_bindir}/mfssnapshots
+%{_bindir}/mfsfacl
+%{_bindir}/mfssclass
+%{_bindir}/mfstrashtime
+%{_bindir}/mfstrashretention
+%{_bindir}/mfseattr
+%{_bindir}/mfsquota
+%{_bindir}/mfsarchive
+%{_bindir}/mfsscadmin
+%{_bindir}/mfspatadmin
+%{_bindir}/mfstrashtool
+%{_bindir}/mfsmount
+%{_bindir}/mount.moosefs
 %{_libdir}/libmfsio.so
 %{_libdir}/libmfsio.so.1
 %attr(755,root,root) %{_libdir}/libmfsio.so.1.0.0
@@ -392,7 +371,6 @@ exit 0
 %{_mandir}/man1/mfsrmsnapshot.1*
 %{_mandir}/man1/mfsgetfacl.1*
 %{_mandir}/man1/mfssetfacl.1*
-# %%{_mandir}/man1/mfscopyfacl.1*
 %{_mandir}/man1/mfsgetgoal.1*
 %{_mandir}/man1/mfssetgoal.1*
 %{_mandir}/man1/mfscopygoal.1*
@@ -442,8 +420,6 @@ exit 0
 %{_mandir}/man1/mfstools.1*
 %{_mandir}/man8/mfsmount.8*
 %{_mandir}/man5/mfsmount.cfg.5*
-# %%{_mandir}/man8/mfsbdev.8* - moved to EXTRA_FILES
-# %%{_mandir}/man5/mfsbdev.cfg.5* - moved to EXTRA_FILES
 %{_mandir}/man8/mount.moosefs.8*
 %{mfsconfdir}/mfsmount.cfg.sample
 
@@ -451,7 +427,6 @@ exit 0
 
 
 %files libmfsio-devel
-%defattr(644,root,root,755)
 %doc NEWS README
 %{_includedir}/mfsio.h
 
@@ -459,9 +434,8 @@ exit 0
 
 
 %files cli
-%defattr(644,root,root,755)
 %doc NEWS README
-%attr(755,root,root) %{_bindir}/mfscli
+%{_bindir}/mfscli
 %{_mandir}/man1/mfscli.1*
 
 
@@ -469,10 +443,9 @@ exit 0
 
 %files gui
 %{_sysusersdir}/%{name}.conf
-%defattr(644,root,root,755)
 %doc NEWS README
-%attr(755,root,root) %{_sbindir}/mfscgiserv
-%attr(755,root,root) %{_sbindir}/mfsgui
+%{_bindir}/mfscgiserv
+%{_bindir}/mfsgui
 %{_mandir}/man5/mfsgui.cfg.5*
 %{_mandir}/man8/mfsgui.8*
 %{mfsconfdir}/mfsgui.cfg.sample
@@ -492,9 +465,8 @@ exit 0
 
 
 %files netdump
-%defattr(644,root,root,755)
 %doc NEWS README
-%attr(755,root,root) %{_sbindir}/mfsnetdump
+%{_bindir}/mfsnetdump
 %{_mandir}/man8/mfsnetdump.8*
 
 

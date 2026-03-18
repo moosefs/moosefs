@@ -145,6 +145,10 @@ case $target_os in
 	;;
 esac
 
+AC_ARG_WITH([rootsbindir],
+	[AS_HELP_STRING([--with-rootsbindir=PATH], [Path to install mount.moosefs])],
+	[root_sbindir="${withval}"])
+
 AC_SUBST([root_sbindir])
 
 AX_PTHREAD(, [AC_MSG_ERROR([Posix threads not found])])
@@ -475,6 +479,11 @@ else
 	echo "no pkg-config - can't check systemd systemunitdir"
 	systemdunitdir=
 fi
+
+AC_ARG_WITH([systemdsystemunitdir],
+	[AS_HELP_STRING([--with-systemdsystemunitdir=PATH], [Path to install systemd units (no=omit)])],
+	[systemdunitdir="${withval}"])
+
 AC_SUBST([systemdunitdir])
 
 dnl this is work in progress
@@ -530,9 +539,6 @@ AC_ARG_WITH([zlib],
 	[AS_HELP_STRING([--without-zlib], [Do not use zlib for PNG compression])],
 	[use_zlib="${withval}"],
 	[use_zlib=yes])
-AC_ARG_WITH([systemdsystemunitdir],
-	[AS_HELP_STRING([--with-systemdsystemunitdir=PATH], [Path to install systemd units (no=omit)])],
-	[systemdunitdir="${withval}"])
 
 AM_CONDITIONAL([WITH_SYSTEMD], [test "$systemdunitdir" != "no"])
 

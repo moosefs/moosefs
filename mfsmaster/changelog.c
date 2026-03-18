@@ -375,7 +375,7 @@ void changelog_reload(void) {
 	}
 	ChangelogSecondsToRemember = cfg_getuint16("CHANGELOG_PRESERVE_SECONDS",5000);
 	if (ChangelogSecondsToRemember>100000) {
-		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu16") - decreasing to 100000 seconds",ChangelogSecondsToRemember);
+		mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"Number of seconds of change logs to be preserved in master is too big (%"PRIu32") - decreasing to 100000 seconds",ChangelogSecondsToRemember);
 		ChangelogSecondsToRemember=100000;
 	}
 	changelog_preserve_mb = cfg_getuint16("CHANGELOG_PRESERVE_MB",500);

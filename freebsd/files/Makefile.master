@@ -1,8 +1,9 @@
 PORTNAME=		moosefs
-DISTVERSIONPREFIX=	v
 DISTVERSION=		0.0.0
-PORTREVISION=		0
+DISTVERSIONSUFFIX=	-1
+PORTREVISION?=		0
 CATEGORIES=		filesystems sysutils
+MASTER_SITES=		http://repository.moosefs.com/src/
 PKGNAMESUFFIX?=		-master
 
 MAINTAINER=		freebsd@moosefs.com
@@ -13,12 +14,10 @@ LICENSE=		GPLv2
 
 USES=			python:build
 GNU_CONFIGURE=		yes
+WRKSRC=			${WRKDIR}/${PORTNAME}-${DISTVERSION}
 PLIST=			${.CURDIR}/pkg-plist
 DESCR=			${.CURDIR}/pkg-descr
 STRIP=
-
-USE_GITHUB=		yes
-GH_ACCOUNT=		moosefs
 
 MFS_COMPONENT?=		master
 MFS_USER=		mfs
@@ -32,8 +31,11 @@ CONFIGURE_ARGS+=	--localstatedir=${MFS_WORKDIR} \
 			--with-default-user=${MFS_USER} \
 			--with-default-group=${MFS_GROUP}
 
-CONFLICTS=		moosefs2-${MFS_COMPONENT}-*
-CONFLICTS+=		moosefs3-${MFS_COMPONENT}-*
+CONFLICTS=		moosefs2-* \
+			moosefs3-*
+
+PLIST_SUB=		USER=${MFS_USER} \
+			GROUP=${MFS_GROUP}
 
 .if ${MFS_COMPONENT} == gui
 MFS_CGIDIR=		${PREFIX}/share/mfscgi
@@ -63,6 +65,7 @@ CONFIGURE_ARGS+=	--disable-mfschunkserver
 .if ${MFS_COMPONENT} == cli
 USES=			python
 CONFIGURE_ARGS+=	--enable-mfscli
+NO_ARCH=		yes
 .else
 CONFIGURE_ARGS+=	--disable-mfscli
 .endif

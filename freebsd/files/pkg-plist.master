@@ -21,7 +21,7 @@ man/man8/mfsmetadirinfo.8.gz
 man/man8/mfsmetasearch.8.gz
 man/man8/mfsstatsdump.8.gz
 man/man8/mfssupervisor.8.gz
-@owner mfs
-@group mfs
+@owner %%USER%%
+@group %%GROUP%%
 @dir %%MFS_WORKDIR%%/mfs
 %%MFS_WORKDIR%%/mfs/metadata.mfs.empty

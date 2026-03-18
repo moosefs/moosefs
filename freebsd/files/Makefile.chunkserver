@@ -1,10 +1,7 @@
-# Created by: Jakub Kruszona-Zawadzki <acid@moosefs.com> ; Based on port created by: Chifeng Qu <chifeng@gmail.com>
-
-PKGNAMESUFFIX=	-chunkserver
+PORTREVISION=	0
+PKGNAMESUFFIX=	-${MFS_COMPONENT}
 
 COMMENT=	MooseFS data storage and synchronization component
-
-LICENSE=	GPLv2
 
 MFS_COMPONENT=	chunkserver
 

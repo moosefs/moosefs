@@ -1,5 +1,5 @@
 PORTNAME=		moosefs-cgi
-PORTVERSION=		0.0.0
+DISTVERSION=		0.0.0
 CATEGORIES=		filesystems
 
 MAINTAINER=		freebsd@moosefs.com
@@ -12,9 +12,8 @@ DEPRECATED=		Renamed to moosefs-gui
 EXPIRATION_DATE=	2026-12-31
 
 RUN_DEPENDS=		moosefs-gui>0:filesystems/moosefs-gui
-
-NO_BUILD=		yes
-NO_ARCH=		yes
 USES=			metaport
+NO_ARCH=		yes
+NO_BUILD=		yes
 
 .include <bsd.port.mk>

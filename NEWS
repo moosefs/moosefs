@@ -1,5 +1,14 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.58.4-1 (2026-03-18)
+
+  - (all) added spec files for Fedora, changed autogen.sh to bootstrap.sh
+  - (all) added 'printflike' macro to mfslog, fixed all printflike macros, fixed some syslog args
+  - (common) silenced address sanitizer unnecessary warning
+  - (common) fixed masterresolver (potential segfault when the last name was empty - pro only)
+  - (common) added protection against double initialization of strerr
+  - (master) added expected chunk versions to syslog messages
+
 * MooseFS 4.58.3-1 (2025-12-15)
 
   - (master+tools) fixed conditions for reversible storage class

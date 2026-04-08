@@ -41,7 +41,6 @@ fault tolerant file system for POSIX compliant OSes.
 
 %package master
 Summary:	Master (metadata) server
-Group:		System Environment/Daemons
 
 %description master
 MooseFS master (metadata) server together with mfssupervisor utility.
@@ -51,7 +50,6 @@ MooseFS master (metadata) server together with mfssupervisor utility.
 
 %package metalogger
 Summary:	Metalogger (backup) server
-Group:		System Environment/Daemons
 
 %description metalogger
 MooseFS metalogger (metadata replication) server.
@@ -61,7 +59,6 @@ MooseFS metalogger (metadata replication) server.
 
 %package chunkserver
 Summary:	Chunk (data) server
-Group:		System Environment/Daemons
 
 %description chunkserver
 MooseFS data server.
@@ -71,7 +68,7 @@ MooseFS data server.
 
 %package client
 Summary:	Client (mount + block device)
-Group:		System Environment/Daemons
+Requires:	%{name}-libmfsio
 
 %description client
 MooseFS client: mounting tool, block device manager and various utilities.
@@ -79,12 +76,21 @@ MooseFS client: mounting tool, block device manager and various utilities.
 
 
 
-%package libmfsio-devel
+%package libmfsio
 Summary:	MFSio library
-Group:		Development/C
+
+%description libmfsio
+MooseFS I/O library.
+
+
+
+
+%package libmfsio-devel
+Summary:	MFSio library development
+Requires:	%{name}-libmfsio%{?_isa} = %{version}-%{release}
 
 %description libmfsio-devel
-MooseFS I/O library source.
+MooseFS I/O library C header.
 
 
 
@@ -92,7 +98,6 @@ MooseFS I/O library source.
 %package cli
 Summary:	CLI Utility
 BuildArch:	noarch
-Group:		System Environment/Daemons
 
 %description cli
 MooseFS CLI utilities.
@@ -102,7 +107,7 @@ MooseFS CLI utilities.
 
 %package gui
 Summary:	GUI Monitor
-Group:		System Environment/Daemons
+Requires:	%{name}-cli
 
 %description gui
 MooseFS web-based GUI.
@@ -112,7 +117,6 @@ MooseFS web-based GUI.
 
 %package netdump
 Summary:	Network packet dump utility
-Group:		System Environment/Daemons
 
 %description netdump
 MooseFS network packet dump utility
@@ -136,7 +140,7 @@ install -Dpm0644 %{SOURCE1} %{buildroot}%{_sysusersdir}/%{name}.conf
 
 %make_install
 
-EXTRA_FILES=$RPM_BUILD_ROOT/ExtraFiles.list
+EXTRA_FILES=%{buildroot}/ExtraFiles.list
 touch %{EXTRA_FILES}
 
 if [ -x %{buildroot}/%{_bindir}/mfsbdev ]; then
@@ -163,8 +167,17 @@ fi
 chown -R %{_username}:%{_groupname} %{_localstatedir}/mfs
 chmod -R u+rw %{_localstatedir}/mfs
 chmod u+x %{_localstatedir}/mfs
+%systemd_post moosefs-master.service
+%systemd_post moosefs-master@.service
 exit 0
 
+%preun master
+%systemd_preun moosefs-master.service
+%systemd_preun moosefs-master@.service
+
+%postun master
+%systemd_postun moosefs-master.service
+%systemd_postun moosefs-master@.service
 
 
 
@@ -180,7 +193,17 @@ for fname in mfsmetalogger; do
 done
 chown -R %{_username}:%{_groupname} %{_localstatedir}/mfs
 chmod -R u+rwx %{_localstatedir}/mfs
+%systemd_post moosefs-metalogger.service
+%systemd_post moosefs-metalogger@.service
 exit 0
+
+%preun metalogger
+%systemd_preun moosefs-metalogger.service
+%systemd_preun moosefs-metalogger@.service
+
+%postun metalogger
+%systemd_postun moosefs-metalogger.service
+%systemd_postun moosefs-metalogger@.service
 
 
 
@@ -197,7 +220,17 @@ for fname in mfschunkserver mfshdd; do
 done
 chown -R %{_username}:%{_groupname} %{_localstatedir}/mfs
 chmod -R u+rwx %{_localstatedir}/mfs
+%systemd_post moosefs-chunkserver.service
+%systemd_post moosefs-chunkserver@.service
 exit 0
+
+%preun chunkserver
+%systemd_preun moosefs-chunkserver.service
+%systemd_preun moosefs-chunkserver@.service
+
+%postun chunkserver
+%systemd_postun moosefs-chunkserver.service
+%systemd_postun moosefs-chunkserver@.service
 
 
 
@@ -224,7 +257,17 @@ for fname in mfsgui; do
 done
 chown -R %{_username}:%{_groupname} %{_localstatedir}/mfs
 chmod -R u+rwx %{_localstatedir}/mfs
+%systemd_post moosefs-gui.service
+%systemd_post moosefs-gui@.service
 exit 0
+
+%preun gui
+%systemd_preun moosefs-gui.service
+%systemd_preun moosefs-gui@.service
+
+%postun gui
+%systemd_postun moosefs-gui.service
+%systemd_postun moosefs-gui@.service
 
 
 
@@ -358,9 +401,6 @@ exit 0
 %{_bindir}/mfstrashtool
 %{_bindir}/mfsmount
 %{_bindir}/mount.moosefs
-%{_libdir}/libmfsio.so
-%{_libdir}/libmfsio.so.1
-%attr(755,root,root) %{_libdir}/libmfsio.so.1.0.0
 %{_mandir}/man1/mfscheckfile.1*
 %{_mandir}/man1/mfsdirinfo.1*
 %{_mandir}/man1/mfsfileinfo.1*
@@ -426,9 +466,18 @@ exit 0
 
 
 
+%files libmfsio
+%doc NEWS README
+%{_libdir}/libmfsio.so.1
+%attr(755,root,root) %{_libdir}/libmfsio.so.1.0.0
+
+
+
+
 %files libmfsio-devel
 %doc NEWS README
 %{_includedir}/mfsio.h
+%{_libdir}/libmfsio.so
 
 
 

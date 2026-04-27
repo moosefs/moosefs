@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.58.5-1 (2026-04-01)
+
+  - (cs) removed aggresive fadvise calls
+
 * MooseFS 4.58.4-1 (2026-03-18)
 
   - (all) added spec files for Fedora, changed autogen.sh to bootstrap.sh

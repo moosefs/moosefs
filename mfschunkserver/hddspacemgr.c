@@ -3663,15 +3663,15 @@ static void hdd_sequential_mode_int(chunk *c) {
 }
 
 static void hdd_drop_caches_int(chunk *c) {
-#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
-	posix_fadvise(c->fd,0,0,POSIX_FADV_DONTNEED);
-#else
+//#if defined(HAVE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
+//	posix_fadvise(c->fd,0,0,POSIX_FADV_DONTNEED);
+//#else
 	(void)c;
-#endif
+//#endif
 }
 
 void hdd_precache_data(uint64_t chunkid,uint32_t offset,uint32_t size) {
-#if defined(HAVE_POSIX_FADVISE)	&& (defined(POSIX_FADV_WILLNEED) || defined(POSIX_FADV_SEQUENTIAL))
+#if defined(HAVE_POSIX_FADVISE)	&& defined(POSIX_FADV_SEQUENTIAL)
 	chunk *c;
 	if (hdd_chunk_find(chunkid,&c)==2) {
 		return;
@@ -3679,12 +3679,12 @@ void hdd_precache_data(uint64_t chunkid,uint32_t offset,uint32_t size) {
 	if (c==NULL) {
 		return;
 	}
-#  ifdef POSIX_FADV_SEQUENTIAL
+//#  ifdef POSIX_FADV_SEQUENTIAL
 	posix_fadvise(c->fd,c->hdrsize+CHUNKCRCSIZE+offset,size,POSIX_FADV_SEQUENTIAL);
-#  endif
-#  ifdef POSIX_FADV_WILLNEED
-	posix_fadvise(c->fd,c->hdrsize+CHUNKCRCSIZE+offset,size,POSIX_FADV_WILLNEED);
-#  endif
+//#  endif
+//#  ifdef POSIX_FADV_WILLNEED
+//	posix_fadvise(c->fd,c->hdrsize+CHUNKCRCSIZE+offset,size,POSIX_FADV_WILLNEED);
+//#  endif
 	hdd_chunk_release(c);
 #else
 	(void)chunkid;

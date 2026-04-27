@@ -1,5 +1,10 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.59.0-1 (2026-04-23)
+
+  - (all) changed licence handling (pro only)
+  - (all) fixed some security issues
+
 * MooseFS 4.58.5-1 (2026-04-01)
 
   - (cs) removed aggresive fadvise calls

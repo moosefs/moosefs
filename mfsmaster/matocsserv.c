@@ -2458,7 +2458,15 @@ void matocsserv_get_config(matocsserventry *eptr,const uint8_t *data,uint32_t le
 	}
 	memcpy(name,data,nleng);
 	name[nleng] = 0;
-	val = cfg_getdefaultstr(name);
+	if (strcmp(name,"AUTH_CODE")==0) {
+		if (cfg_isdefined(name)) {
+			val = strdup("[DEFINED]");
+		} else {
+			val = NULL;
+		}
+	} else {
+		val = cfg_getdefaultstr(name);
+	}
 	if (val!=NULL) {
 		vleng = strlen(val);
 		if (vleng>255) {
@@ -2509,7 +2517,11 @@ void matocsserv_get_config_file(matocsserventry *eptr,const uint8_t *data,uint32
 	}
 	memcpy(name,data,nleng);
 	name[nleng] = 0;
-	fdata = cfg_getdefaultfile(name,65535);
+	if (strcmp(name,"LICENCE_FILENAME")==0) {
+		fdata = cfg_getdefaultfile(name,65535);
+	} else {
+		fdata = NULL;
+	}
 	if (fdata==NULL) {
 		ptr = matocsserv_create_packet(eptr,ANTOAN_CONFIG_FILE_CONTENT,5);
 		put32bit(&ptr,msgid);
@@ -2527,7 +2539,7 @@ void matocsserv_syslog(matocsserventry *eptr,const uint8_t *data,uint32_t length
 	uint8_t priority;
 	uint32_t timestamp;
 	uint16_t msgsize;
-	if (length<3) {
+	if (length<7) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_SYSLOG - wrong size (%"PRIu32"/>=7)",length);
 		eptr->mode = KILL;
 		return;
@@ -2535,7 +2547,7 @@ void matocsserv_syslog(matocsserventry *eptr,const uint8_t *data,uint32_t length
 	priority = get8bit(&data);
 	timestamp = get32bit(&data);
 	msgsize = get16bit(&data);
-	if (length!=3U+msgsize) {
+	if (length!=7U+msgsize) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_SYSLOG - wrong size (%"PRIu32"/7+msgsize(%"PRIu16"))",length,msgsize);
 		eptr->mode = KILL;
 		return;
@@ -3045,9 +3057,9 @@ void matocsserv_gotpacket(matocsserventry *eptr,uint32_t type,const uint8_t *dat
 		case ANTOAN_GET_CONFIG:
 			matocsserv_get_config(eptr,data,length);
 			break;
-		case ANTOAN_GET_CONFIG_FILE:
-			matocsserv_get_config_file(eptr,data,length);
-			break;
+//		case ANTOAN_GET_CONFIG_FILE:
+//			matocsserv_get_config_file(eptr,data,length);
+//			break;
 		case ANTOMA_SYSLOG:
 			matocsserv_syslog(eptr,data,length);
 			break;

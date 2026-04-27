@@ -6046,7 +6046,7 @@ uint8_t fs_univ_set_additional_attributes(uint32_t ts,uint32_t rootinode,uint8_t
 				curracl->namedusers = get16bit(&data);
 				curracl->namedgroups = get16bit(&data);
 				leng -= 12;
-				naclleng = (curracl->namedusers+curracl->namedgroups)*6U;
+				naclleng = ((uint32_t)(curracl->namedusers)+(uint32_t)(curracl->namedgroups))*6U;
 				if (leng<naclleng) {
 					return MFS_ERROR_EINVAL;
 				}
@@ -8196,6 +8196,9 @@ uint8_t fs_setfacl(uint32_t rootinode,uint8_t sesflags,uint32_t inode,uint32_t u
 			p->acldefflag = 0;
 		}
 	} else {
+		if (acltype==POSIX_ACL_DEFAULT && p->type!=TYPE_DIRECTORY) {
+			return MFS_ERROR_EACCES;
+		}
 		if (userperm==0xFFFF) {
 			userperm = (p->mode >> 6) & 7;
 		}

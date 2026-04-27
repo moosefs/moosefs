@@ -1654,6 +1654,14 @@ void* read_worker(void *arg) {
 										status = EIO;
 										resetpos = 1; // start again from beginning
 										break;
+									} else if (datasrc[part].recleng>20+MFSCHUNKSIZE) {
+										mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"readworker: got too long data packet from chunkserver (leng:%"PRIu32")",datasrc[part].recleng);
+#ifdef RDEBUG
+										RDEBUG_READWORKER("got too long data packet from chunkserver (leng:%"PRIu32")",datasrc[part].recleng)
+#endif
+										status = EIO;
+										resetpos = 1; // start again from beginning
+										break;
 									} else if ((datasrc[part].recleng-20) + datasrc[part].currpos > datasrc[part].endpos) {
 										mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"readworker: got too long data packet from chunkserver (leng:%"PRIu32")",datasrc[part].recleng);
 #ifdef RDEBUG

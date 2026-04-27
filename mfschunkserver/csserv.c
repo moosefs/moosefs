@@ -192,7 +192,15 @@ void csserv_get_config(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	}
 	memcpy(name,data,nleng);
 	name[nleng] = 0;
-	val = cfg_getdefaultstr(name);
+	if (strcmp(name,"AUTH_CODE")==0) {
+		if (cfg_isdefined(name)) {
+			val = strdup("[DEFINED]");
+		} else {
+			val = NULL;
+		}
+	} else {
+		val = cfg_getdefaultstr(name);
+	}
 	if (val!=NULL) {
 		vleng = strlen(val);
 		if (vleng>255) {
@@ -209,6 +217,8 @@ void csserv_get_config(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	}
 }
 
+/* for future use */
+#if 0
 void csserv_get_config_file(csserventry *eptr,const uint8_t *data,uint32_t length) {
 	uint32_t msgid;
 	char name[256];
@@ -243,6 +253,7 @@ void csserv_get_config_file(csserventry *eptr,const uint8_t *data,uint32_t lengt
 		free(fdata);
 	}
 }
+#endif
 
 void csserv_iothread_finished(uint8_t status,void *e) {
 	csserventry *eptr = (csserventry*)e;
@@ -676,9 +687,9 @@ void csserv_gotpacket(csserventry *eptr,uint32_t type,const uint8_t *data,uint32
 		case ANTOAN_GET_CONFIG:
 			csserv_get_config(eptr,data,length);
 			break;
-		case ANTOAN_GET_CONFIG_FILE:
-			csserv_get_config_file(eptr,data,length);
-			break;
+//		case ANTOAN_GET_CONFIG_FILE:
+//			csserv_get_config_file(eptr,data,length);
+//			break;
 		case CLTOCS_READ:
 			csserv_read_init(eptr,data,length);
 			break;

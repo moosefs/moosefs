@@ -1044,7 +1044,15 @@ void matoclserv_get_config(matoclserventry *eptr,const uint8_t *data,uint32_t le
 	}
 	memcpy(name,data,nleng);
 	name[nleng] = 0;
-	val = cfg_getdefaultstr(name);
+	if (strcmp(name,"AUTH_CODE")==0) {
+		if (cfg_isdefined(name)) {
+			val = strdup("[DEFINED]");
+		} else {
+			val = NULL;
+		}
+	} else {
+		val = cfg_getdefaultstr(name);
+	}
 	if (val!=NULL) {
 		vleng = strlen(val);
 		if (vleng>255) {
@@ -1095,7 +1103,11 @@ void matoclserv_get_config_file(matoclserventry *eptr,const uint8_t *data,uint32
 	}
 	memcpy(name,data,nleng);
 	name[nleng] = 0;
-	fdata = cfg_getdefaultfile(name,65535);
+	if (strcmp(name,"LICENCE_FILENAME")==0) {
+		fdata = cfg_getdefaultfile(name,65535);
+	} else {
+		fdata = NULL;
+	}
 	if (fdata==NULL) {
 		ptr = matoclserv_create_packet(eptr,ANTOAN_CONFIG_FILE_CONTENT,5);
 		put32bit(&ptr,msgid);
@@ -1113,7 +1125,7 @@ void matoclserv_syslog(matoclserventry *eptr,const uint8_t *data,uint32_t length
 	uint8_t priority;
 	uint32_t timestamp;
 	uint16_t msgsize;
-	if (length<3) {
+	if (length<7) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_SYSLOG - wrong size (%"PRIu32"/>=7)",length);
 		eptr->mode = KILL;
 		return;
@@ -1121,7 +1133,7 @@ void matoclserv_syslog(matoclserventry *eptr,const uint8_t *data,uint32_t length
 	priority = get8bit(&data);
 	timestamp = get32bit(&data);
 	msgsize = get16bit(&data);
-	if (length!=3U+msgsize) {
+	if (length!=7U+msgsize) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"ANTOMA_SYSLOG - wrong size (%"PRIu32"/7+msgsize(%"PRIu16"))",length,msgsize);
 		eptr->mode = KILL;
 		return;
@@ -1739,6 +1751,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 
 			ileng = get32bit(&rptr);
+			if (ileng>MFS_PATH_MAX) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_REGISTER/ACL.2 - info too long (%"PRIu32")",ileng);
+				eptr->mode = KILL;
+				return;
+			}
 			if (length<77+ileng) {
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_REGISTER/ACL.2 - wrong size (%"PRIu32"/>=77+ileng(%"PRIu32"))",length,ileng);
 				eptr->mode = KILL;
@@ -1754,6 +1771,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			rptr+=ileng;
 
 			pleng = get32bit(&rptr);
+			if (pleng>MFS_PATH_MAX) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_REGISTER/ACL.2 - path too long (%"PRIu32")",pleng);
+				eptr->mode = KILL;
+				return;
+			}
 			if (length!=77+ileng+pleng && length!=77+16+ileng+pleng && length!=77+4+ileng+pleng && length!=77+4+16+ileng+pleng && length!=77+12+ileng+pleng && length!=77+12+16+ileng+pleng) {
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_REGISTER/ACL.2 - wrong size (%"PRIu32"/77+ileng(%"PRIu32")+pleng(%"PRIu32")+[0|4|12]+[0|16])",length,ileng,pleng);
 				eptr->mode = KILL;
@@ -1930,6 +1952,11 @@ void matoclserv_fuse_register(matoclserventry *eptr,const uint8_t *data,uint32_t
 			}
 
 			ileng = get32bit(&rptr);
+			if (ileng>MFS_PATH_MAX) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_REGISTER/ACL.5 - info too long (%"PRIu32")",ileng);
+				eptr->mode = KILL;
+				return;
+			}
 			if (length!=73+ileng && length!=73+16+ileng && length!=73+4+ileng && length!=73+4+16+ileng && length!=73+12+ileng && length!=73+12+16+ileng) {
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_REGISTER/ACL.5 - wrong size (%"PRIu32"/73+ileng(%"PRIu32")+[0|4|12]+[0|16])",length,ileng);
 				eptr->mode = KILL;
@@ -2421,6 +2448,11 @@ void matoclserv_path_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		eptr->mode = KILL;
 		return;
 	}
+	if (gids>MFS_GIDS_MAX) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_PATH_LOOKUP - too many group ids");
+		eptr->mode = KILL;
+		return;
+	}
 	if (length!=20U+pleng+4*gids) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_PATH_LOOKUP - wrong size (%"PRIu32":pleng=%"PRIu32":gids=%"PRIu32")",length,pleng,gids);
 		eptr->mode = KILL;
@@ -2516,6 +2548,11 @@ void matoclserv_fuse_access(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_ACCESS - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=18+gids*4) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_ACCESS - wrong size (%"PRIu32"/18+4*N)",length);
 			eptr->mode = KILL;
@@ -2575,6 +2612,11 @@ void matoclserv_fuse_lookup(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		gids = get32bit(&data);
 		if (gids==0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_LOOKUP - group ids missing");
+			eptr->mode = KILL;
+			return;
+		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_LOOKUP - too many group ids");
 			eptr->mode = KILL;
 			return;
 		}
@@ -2775,6 +2817,11 @@ void matoclserv_fuse_setattr(matoclserventry *eptr,const uint8_t *data,uint32_t 
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SETATTR - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=basesize+4*gids) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SETATTR - wrong size (%"PRIu32":gids=%"PRIu32")",length,gids);
 			eptr->mode = KILL;
@@ -2854,6 +2901,11 @@ void matoclserv_fuse_truncate(matoclserventry *eptr,const uint8_t *data,uint32_t
 		gids = get32bit(&data);
 		if (gids==0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_TRUNCATE - group ids missing");
+			eptr->mode = KILL;
+			return;
+		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_TRUNCATE - too many group ids");
 			eptr->mode = KILL;
 			return;
 		}
@@ -2950,6 +3002,11 @@ void matoclserv_fuse_symlink(matoclserventry *eptr,const uint8_t *data,uint32_t 
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SYMLINK - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=21U+nleng+pleng+4*gids) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SYMLINK - wrong size (%"PRIu32":nleng=%"PRIu8":pleng=%"PRIu32":gids=%"PRIu32")",length,nleng,pleng,gids);
 			eptr->mode = KILL;
@@ -3030,6 +3087,11 @@ void matoclserv_fuse_mknod(matoclserventry *eptr,const uint8_t *data,uint32_t le
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_MKNOD - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=26U+nleng+4*gids) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_MKNOD - wrong size (%"PRIu32":nleng=%"PRIu8":gids=%"PRIu32")",length,nleng,gids);
 			eptr->mode = KILL;
@@ -3107,6 +3169,11 @@ void matoclserv_fuse_mkdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_MKDIR - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=22U+nleng+4*gids) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_MKDIR - wrong size (%"PRIu32":nleng=%"PRIu8":gids=%"PRIu32")",length,nleng,gids);
 			eptr->mode = KILL;
@@ -3176,6 +3243,11 @@ void matoclserv_fuse_unlink(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_UNLINK - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=17U+nleng+4*gids) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_UNLINK - wrong size (%"PRIu32":nleng=%"PRIu8":gids=%"PRIu32")",length,nleng,gids);
 			eptr->mode = KILL;
@@ -3237,6 +3309,11 @@ void matoclserv_fuse_rmdir(matoclserventry *eptr,const uint8_t *data,uint32_t le
 		gids = get32bit(&data);
 		if (gids==0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_RMDIR - group ids missing");
+			eptr->mode = KILL;
+			return;
+		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_RMDIR - too many group ids");
 			eptr->mode = KILL;
 			return;
 		}
@@ -3318,6 +3395,11 @@ void matoclserv_fuse_rename(matoclserventry *eptr,const uint8_t *data,uint32_t l
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_RENAME - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=22U+nleng_src+nleng_dst+4*gids && length!=23U+nleng_src+nleng_dst+4*gids) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_RENAME - wrong size (%"PRIu32":nleng_src=%"PRIu8":nleng_dst=%"PRIu8":gids=%"PRIu32")",length,nleng_src,nleng_dst,gids);
 			eptr->mode = KILL;
@@ -3392,6 +3474,11 @@ void matoclserv_fuse_link(matoclserventry *eptr,const uint8_t *data,uint32_t len
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_LINK - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=21U+nleng_dst+4*gids) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_LINK - wrong size (%"PRIu32":nleng_dst=%"PRIu8":gids=%"PRIu32")",length,nleng_dst,gids);
 			eptr->mode = KILL;
@@ -3459,6 +3546,11 @@ void matoclserv_fuse_readdir(matoclserventry *eptr,const uint8_t *data,uint32_t 
 		gids = get32bit(&data);
 		if (gids==0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_READDIR - group ids missing");
+			eptr->mode = KILL;
+			return;
+		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_READDIR - too many group ids");
 			eptr->mode = KILL;
 			return;
 		}
@@ -3545,6 +3637,11 @@ void matoclserv_fuse_open(matoclserventry *eptr,const uint8_t *data,uint32_t len
 		gids = get32bit(&data);
 		if (gids==0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_OPEN - group ids missing");
+			eptr->mode = KILL;
+			return;
+		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_OPEN - too many group ids");
 			eptr->mode = KILL;
 			return;
 		}
@@ -3663,6 +3760,11 @@ void matoclserv_fuse_create(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		gids = get32bit(&data);
 		if (gids==0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_CREATE - group ids missing");
+			eptr->mode = KILL;
+			return;
+		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_CREATE - too many group ids");
 			eptr->mode = KILL;
 			return;
 		}
@@ -4048,6 +4150,11 @@ void matoclserv_fuse_repair(matoclserventry *eptr,const uint8_t *data,uint32_t l
 		gids = get32bit(&data);
 		if (gids==0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_REPAIR - group ids missing");
+			eptr->mode = KILL;
+			return;
+		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_REPAIR - too many group ids");
 			eptr->mode = KILL;
 			return;
 		}
@@ -4678,6 +4785,11 @@ void matoclserv_fuse_getxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 				eptr->mode = KILL;
 				return;
 			}
+			if (gids>MFS_GIDS_MAX) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_GETXATTR - too many group ids");
+				eptr->mode = KILL;
+				return;
+			}
 			if (length!=19U+anleng+4*gids) {
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_GETXATTR - wrong size (%"PRIu32":anleng=%"PRIu8":gids=%"PRIu32")",length,anleng,gids);
 				eptr->mode = KILL;
@@ -4764,6 +4876,11 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 	attrname = data;
 	data += anleng;
 	avleng = get32bit(&data);
+	if (avleng>MFS_XATTR_SIZE_MAX) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SETXATTR - xattr value too long");
+		eptr->mode = KILL;
+		return;
+	}
 	if (length<23U+anleng+avleng) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SETXATTR - wrong size (%"PRIu32":anleng=%"PRIu8":avleng=%"PRIu32")",length,anleng,avleng);
 		eptr->mode = KILL;
@@ -4783,6 +4900,11 @@ void matoclserv_fuse_setxattr(matoclserventry *eptr,const uint8_t *data,uint32_t
 			gids = get32bit(&data);
 			if (gids==0) {
 				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SETXATTR - group ids missing");
+				eptr->mode = KILL;
+				return;
+			}
+			if (gids>MFS_GIDS_MAX) {
+				mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SETXATTR - too many group ids");
 				eptr->mode = KILL;
 				return;
 			}
@@ -4986,6 +5108,11 @@ void matoclserv_fuse_append_slice(matoclserventry *eptr,const uint8_t *data,uint
 			eptr->mode = KILL;
 			return;
 		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_APPEND_SLICE - too many group ids");
+			eptr->mode = KILL;
+			return;
+		}
 		if (length!=20+4*gids && length!=29+4*gids) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_APPEND_SLICE - wrong size (%"PRIu32":gids=%"PRIu32")",length,gids);
 			eptr->mode = KILL;
@@ -5048,6 +5175,11 @@ void matoclserv_fuse_snapshot(matoclserventry *eptr,const uint8_t *data,uint32_t
 		gids = get32bit(&data);
 		if (gids==0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SNAPSHOT - group ids missing");
+			eptr->mode = KILL;
+			return;
+		}
+		if (gids>MFS_GIDS_MAX) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_FUSE_SNAPSHOT - too many group ids");
 			eptr->mode = KILL;
 			return;
 		}
@@ -5337,6 +5469,11 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 			arch.labelscnt = get8bit(&data);
 			if (fver>=1) {
 				trash.labelscnt = get8bit(&data);
+				if (create.labelscnt>MAXLABELSCNT || keep.labelscnt>MAXLABELSCNT || arch.labelscnt>MAXLABELSCNT || trash.labelscnt>MAXLABELSCNT) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CREATE/%"PRIu8" - wrong label count C=%"PRIu8";K=%"PRIu8";A=%"PRIu8";T=%"PRIu8,fver,create.labelscnt,keep.labelscnt,arch.labelscnt,trash.labelscnt);
+					eptr->mode = KILL;
+					return;
+				}
 				if (length!=(uint32_t)(constleng+nleng+dleng+(create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt)*SCLASS_EXPR_MAX_SIZE)) {
 					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CREATE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":dleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8";T=%"PRIu8")",fver,length,nleng,dleng,create.labelscnt,keep.labelscnt,arch.labelscnt,trash.labelscnt);
 					eptr->mode = KILL;
@@ -5359,6 +5496,11 @@ void matoclserv_sclass_create(matoclserventry *eptr,const uint8_t *data,uint32_t
 					data+=SCLASS_EXPR_MAX_SIZE;
 				}
 			} else {
+				if (create.labelscnt>9 || keep.labelscnt>9 || arch.labelscnt>9) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CREATE/%"PRIu8" - wrong label count C=%"PRIu8";K=%"PRIu8";A=%"PRIu8,fver,create.labelscnt,keep.labelscnt,arch.labelscnt);
+					eptr->mode = KILL;
+					return;
+				}
 				arch_delay *= 24;
 				trash.labelscnt = 0;
 				if (length!=constleng+nleng+(create.labelscnt+keep.labelscnt+arch.labelscnt)*4U*MASKORGROUP) {
@@ -5518,6 +5660,11 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 			arch.labelscnt = get8bit(&data);
 			if (fver>=1) {
 				trash.labelscnt = get8bit(&data);
+				if (create.labelscnt>MAXLABELSCNT || keep.labelscnt>MAXLABELSCNT || arch.labelscnt>MAXLABELSCNT || trash.labelscnt>MAXLABELSCNT) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE/%"PRIu8" - wrong label count C=%"PRIu8";K=%"PRIu8";A=%"PRIu8";T=%"PRIu8,fver,create.labelscnt,keep.labelscnt,arch.labelscnt,trash.labelscnt);
+					eptr->mode = KILL;
+					return;
+				}
 				if (length!=(uint32_t)(constleng+nleng+dleng+(create.labelscnt+keep.labelscnt+arch.labelscnt+trash.labelscnt)*SCLASS_EXPR_MAX_SIZE)) {
 					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":dleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8";T=%"PRIu8")",fver,length,nleng,dleng,create.labelscnt,keep.labelscnt,arch.labelscnt,trash.labelscnt);
 					eptr->mode = KILL;
@@ -5540,6 +5687,11 @@ void matoclserv_sclass_change(matoclserventry *eptr,const uint8_t *data,uint32_t
 					data+=SCLASS_EXPR_MAX_SIZE;
 				}
 			} else {
+				if (create.labelscnt>9 || keep.labelscnt>9 || arch.labelscnt>9) {
+					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE/%"PRIu8" - wrong label count C=%"PRIu8";K=%"PRIu8";A=%"PRIu8,fver,create.labelscnt,keep.labelscnt,arch.labelscnt);
+					eptr->mode = KILL;
+					return;
+				}
 				arch_delay *= 24;
 				if (length!=constleng+nleng+(create.labelscnt+keep.labelscnt+arch.labelscnt)*4U*MASKORGROUP) {
 					mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_SCLASS_CHANGE/%"PRIu8" - wrong size (%"PRIu32":nleng=%"PRIu8":labels C=%"PRIu8";K=%"PRIu8";A=%"PRIu8")",fver,length,nleng,create.labelscnt,keep.labelscnt,arch.labelscnt);
@@ -6032,6 +6184,11 @@ void matoclserv_trash_recover(matoclserventry *eptr,const uint8_t *data,uint32_t
 		eptr->mode = KILL;
 		return;
 	}
+	if (gids>MFS_GIDS_MAX) {
+		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_TRASH_RECOVER - too many group ids");
+		eptr->mode = KILL;
+		return;
+	}
 	if (length!=27U+pleng+4*gids) {
 		mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOMA_TRASH_RECOVER - wrong size (%"PRIu32":pleng=%"PRIu32":gids=%"PRIu32")",length,pleng,gids);
 		eptr->mode = KILL;
@@ -6457,15 +6614,15 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case ANTOAN_GET_VERSION:
 				matoclserv_get_version(eptr,data,length);
 				break;
-			case ANTOAN_GET_CONFIG:
-				matoclserv_get_config(eptr,data,length);
-				break;
-			case ANTOAN_GET_CONFIG_FILE:
-				matoclserv_get_config_file(eptr,data,length);
-				break;
-			case ANTOMA_SYSLOG:
-				matoclserv_syslog(eptr,data,length);
-				break;
+//			case ANTOAN_GET_CONFIG:
+//				matoclserv_get_config(eptr,data,length);
+//				break;
+//			case ANTOAN_GET_CONFIG_FILE:
+//				matoclserv_get_config_file(eptr,data,length);
+//				break;
+//			case ANTOMA_SYSLOG:
+//				matoclserv_syslog(eptr,data,length);
+//				break;
 			case CLTOMA_FUSE_REGISTER:
 //				printf("REGISTER\n");
 				matoclserv_fuse_register(eptr,data,length);
@@ -6536,9 +6693,9 @@ void matoclserv_gotpacket(matoclserventry *eptr,uint32_t type,const uint8_t *dat
 			case CLTOMA_MISSING_CHUNKS:
 				matoclserv_missing_chunks(eptr,data,length);
 				break;
-			case CLTOMA_NODE_INFO:
-				matoclserv_node_info(eptr,data,length);
-				break;
+//			case CLTOMA_NODE_INFO:
+//				matoclserv_node_info(eptr,data,length);
+//				break;
 			case CLTOMA_INSTANCE_NAME:
 				matoclserv_instance_name(eptr,data,length);
 				break;

@@ -35,7 +35,7 @@ PORTNAMES="master chunkserver client metalogger gui cli netdump cgi"
 
 PORTFILES="Makefile pkg-descr pkg-plist files"
 
-VERSION=4.58.4
+VERSION=4.59.0
 RELEASE=1
 
 cat "${FILEBASEDIR}/files/Makefile.master" | sed "s/^DISTVERSION=.*$/DISTVERSION=		${VERSION}/" | sed "s/^DISTVERSIONSUFFIX=.*$/DISTVERSIONSUFFIX=	-${RELEASE}/" | uniq > .tmp

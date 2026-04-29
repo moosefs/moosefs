@@ -1,3 +1,16 @@
+moosefs (4.59.0-1) unstable; urgency=medium
+
+  * (all) changed licence handling (pro only)
+  * (all) fixed some security issues
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 23 Apr 2026 13:00:00 +0200
+
+moosefs (4.58.5-1) unstable; urgency=medium
+
+  * (cs) removed aggresive fadvise calls
+
+ -- MooseFS Team <contact@moosefs.com>  Wed, 01 Apr 2026 13:00:00 +0200
+
 moosefs (4.58.4-1) unstable; urgency=medium
 
   * (all) added spec files for Fedora, changed autogen.sh to bootstrap.sh

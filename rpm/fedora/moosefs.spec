@@ -11,7 +11,7 @@
 
 Summary:	Distributed, scalable, fault tolerant file system
 Name:		moosefs
-Version:	4.58.4
+Version:	4.59.0
 Release:	%autorelease
 License:	GPL-2.0-only
 URL:		http://www.moosefs.com/
@@ -41,6 +41,7 @@ fault tolerant file system for POSIX compliant OSes.
 
 %package master
 Summary:	Master (metadata) server
+Requires:	%{name}-doc
 
 %description master
 MooseFS master (metadata) server together with mfssupervisor utility.
@@ -50,6 +51,7 @@ MooseFS master (metadata) server together with mfssupervisor utility.
 
 %package metalogger
 Summary:	Metalogger (backup) server
+Requires:	%{name}-doc
 
 %description metalogger
 MooseFS metalogger (metadata replication) server.
@@ -59,6 +61,7 @@ MooseFS metalogger (metadata replication) server.
 
 %package chunkserver
 Summary:	Chunk (data) server
+Requires:	%{name}-doc
 
 %description chunkserver
 MooseFS data server.
@@ -69,6 +72,7 @@ MooseFS data server.
 %package client
 Summary:	Client (mount + block device)
 Requires:	%{name}-libmfsio
+Requires:	%{name}-doc
 
 %description client
 MooseFS client: mounting tool, block device manager and various utilities.
@@ -78,6 +82,7 @@ MooseFS client: mounting tool, block device manager and various utilities.
 
 %package libmfsio
 Summary:	MFSio library
+Requires:	%{name}-doc
 
 %description libmfsio
 MooseFS I/O library.
@@ -88,6 +93,7 @@ MooseFS I/O library.
 %package libmfsio-devel
 Summary:	MFSio library development
 Requires:	%{name}-libmfsio%{?_isa} = %{version}-%{release}
+Requires:	%{name}-doc
 
 %description libmfsio-devel
 MooseFS I/O library C header.
@@ -98,6 +104,7 @@ MooseFS I/O library C header.
 %package cli
 Summary:	CLI Utility
 BuildArch:	noarch
+Requires:	%{name}-doc
 
 %description cli
 MooseFS CLI utilities.
@@ -108,6 +115,7 @@ MooseFS CLI utilities.
 %package gui
 Summary:	GUI Monitor
 Requires:	%{name}-cli
+Requires:	%{name}-doc
 
 %description gui
 MooseFS web-based GUI.
@@ -117,11 +125,19 @@ MooseFS web-based GUI.
 
 %package netdump
 Summary:	Network packet dump utility
+Requires:	%{name}-doc
 
 %description netdump
 MooseFS network packet dump utility
 
 
+
+%package doc
+Summary:	Common doc files
+BuildArch:	noarch
+
+%description doc
+MooseFS doc files package
 
 
 %prep
@@ -273,7 +289,6 @@ exit 0
 
 %files master
 %{_sysusersdir}/%{name}.conf
-%doc NEWS README
 %{_bindir}/mfsmaster
 %{_bindir}/mfsmetadump
 %{_bindir}/mfsmetadirinfo
@@ -307,7 +322,6 @@ exit 0
 
 %files metalogger
 %{_sysusersdir}/%{name}.conf
-%doc NEWS README
 %{_bindir}/mfsmetalogger
 %{_mandir}/man5/mfsmetalogger.cfg.5*
 %{_mandir}/man8/mfsmetalogger.8*
@@ -321,7 +335,6 @@ exit 0
 
 %files chunkserver
 %{_sysusersdir}/%{name}.conf
-%doc NEWS README
 %{_bindir}/mfschunkserver
 %{_bindir}/mfschunktool
 %{_bindir}/mfschunkdbdump
@@ -342,7 +355,6 @@ exit 0
 
 
 %files client -f %{EXTRA_FILES}
-%doc NEWS README
 %{_bindir}/mfscheckfile
 %{_bindir}/mfsdirinfo
 %{_bindir}/mfsfileinfo
@@ -467,7 +479,6 @@ exit 0
 
 
 %files libmfsio
-%doc NEWS README
 %{_libdir}/libmfsio.so.1
 %attr(755,root,root) %{_libdir}/libmfsio.so.1.0.0
 
@@ -475,7 +486,6 @@ exit 0
 
 
 %files libmfsio-devel
-%doc NEWS README
 %{_includedir}/mfsio.h
 %{_libdir}/libmfsio.so
 
@@ -483,7 +493,6 @@ exit 0
 
 
 %files cli
-%doc NEWS README
 %{_bindir}/mfscli
 %{_mandir}/man1/mfscli.1*
 
@@ -492,7 +501,6 @@ exit 0
 
 %files gui
 %{_sysusersdir}/%{name}.conf
-%doc NEWS README
 %{_bindir}/mfscgiserv
 %{_bindir}/mfsgui
 %{_mandir}/man5/mfsgui.cfg.5*
@@ -511,16 +519,20 @@ exit 0
 
 
 
-
-
 %files netdump
-%doc NEWS README
 %{_bindir}/mfsnetdump
 %{_mandir}/man8/mfsnetdump.8*
 
 
 
 
+%files doc
+%doc NEWS README
+%license COPYING
+
+
+
+
 %changelog
-* Wed Nov 19 2025 Agata Kruszona-Zawadzka <fedora@moosefs.com> - 4.58.3-1
+* Fri Apr 10 2026 Agata Kruszona-Zawadzka <fedora@moosefs.com> - 4.58.4-1
 - initial spec file for Fedora, based on MooseFS's universal spec file

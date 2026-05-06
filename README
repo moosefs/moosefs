@@ -85,9 +85,10 @@ i386:
 
 amd64:
   * Debian 9 / 10 / 11 / 12 / 13
-  * Ubuntu 16 / 18 / 20 / 22 / 24
+  * Ubuntu 16 / 18 / 20 / 22 / 24 / 26
   * RHEL / CentOS 7 / 8 / 9 / 10
   * Rocky Linux / AlmaLinux 8 / 9 / 10
+  * Fedora 44
   * FreeBSD 11 / 12 / 13 / 14
   * macOS 10.12+
 

@@ -1,3 +1,9 @@
+moosefs (4.59.1-1) unstable; urgency=medium
+
+  * (cs) fixed potential OOB read
+
+ -- MooseFS Team <contact@moosefs.com>  Mon, 04 May 2026 13:00:00 +0200
+
 moosefs (4.59.0-1) unstable; urgency=medium
 
   * (all) changed licence handling (pro only)

@@ -1137,11 +1137,15 @@ uint8_t mainserv_write(int sock,const uint8_t *data,uint32_t length) {
 	fwdport = 0; // make old compilers happy
 	fwdip = 0; // make old compilers happy
 	if (length&1) {
+		protover = get8bit(&data);
+		if (protover!=1) {
+			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE - wrong protover (%"PRIu8")",protover);
+			return 0;
+		}
 		if (length<13 || ((length-13)%6)!=0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE - wrong size (%"PRIu32"/13+N*6)",length);
 			return 0;
 		}
-		protover = get8bit(&data);
 	} else {
 		if (length<12 || ((length-12)%6)!=0) {
 			mfs_log(MFSLOG_SYSLOG,MFSLOG_WARNING,"CLTOCS_WRITE - wrong size (%"PRIu32"/12+N*6)",length);

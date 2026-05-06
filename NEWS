@@ -1,5 +1,9 @@
 This file lists noteworthy changes in MooseFS.
 
+* MooseFS 4.59.1-1 (2026-05-04)
+
+  - (cs) fixed potential OOB read
+
 * MooseFS 4.59.0-1 (2026-04-23)
 
   - (all) changed licence handling (pro only)

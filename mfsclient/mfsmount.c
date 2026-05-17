@@ -224,6 +224,7 @@ struct mfsopts {
 	int noxattrs;
 	int noposixlocks;
 	int nobsdlocks;
+	int nouring;
 	int donotrememberpassword;
 //	int xattraclsupport;
 	unsigned writecachesize;
@@ -324,6 +325,7 @@ static struct fuse_opt mfs_opts_stage2[] = {
 	MFS_OPT("mfsnoposixlocks", noposixlocks, 1),
 	MFS_OPT("mfsnobsdlock", nobsdlocks, 1),
 	MFS_OPT("mfsnobsdlocks", nobsdlocks, 1),
+	MFS_OPT("mfsnouring", nouring, 1),
 	MFS_OPT("mfscachemode=%s", cachemode, 0),
 	MFS_OPT("mfsmkdircopysgid=%u", mkdircopysgid, 0),
 	MFS_OPT("mfssugidclearmode=%s", sugidclearmodestr, 0),
@@ -463,6 +465,9 @@ static void usage(const char *progname) {
 #endif
 #if FUSE_VERSION >= 29
 	fprintf(fd,"    -o mfsnobsdlocks            turn off support for global BSD locks (flock) - locks will work locally\n");
+#endif
+#ifdef HAVE_FUSE3_URING
+	fprintf(fd,"    -o mfsnouring               turn off FUSE-over-io_uring even when libfuse and kernel both support it\n");
 #endif
 	fprintf(fd,"\n");
 	fprintf(fd,"CMODE can be set to:\n");
@@ -779,6 +784,18 @@ static void mfs_fsinit (void *userdata, struct fuse_conn_info *conn) {
 		conn->want &= ~FUSE_CAP_POSIX_LOCKS;
 	}
 #endif
+// FUSE-over-io_uring (libfuse >= 3.18 + Linux >= 6.7 with CONFIG_FUSE_IO_URING=y)
+// libfuse defaults this capability on, but we state it explicitly to match the
+// negotiation pattern used for the other capabilities in this block, and to give
+// the -o mfsnouring escape hatch a single place to clear. If a future libfuse
+// renames the cap or relocates the activation point, search for FUSE_CAP_OVER_IO_URING.
+#if defined(HAVE_FUSE3_URING) && defined(FUSE_CAP_OVER_IO_URING)
+	if (mfsopts.nouring==0) {
+		conn->want |= FUSE_CAP_OVER_IO_URING;
+	} else {
+		conn->want &= ~FUSE_CAP_OVER_IO_URING;
+	}
+#endif
 	conn->want &= conn->capable; // we don't want to request things that kernel can't do
 //	conn->max_background - leave default
 //	conn->congestion_threshold - leave default
@@ -951,6 +968,7 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 	BOOLOPT("mfsnoxattrs",noxattrs);
 	BOOLOPT("mfsnoposixlocks",noposixlocks);
 	BOOLOPT("mfsnobsdlocks",nobsdlocks);
+	BOOLOPT("mfsnouring",nouring);
 	NUMOPT("mfsmkdircopysgid","u",mkdircopysgid);
 	NUMOPT("mfsreaddirplusminto",".3lf",readdirplusminto);
 	NUMOPT("mfsattrcacheto",".3lf",attrcacheto);
@@ -1012,6 +1030,9 @@ uint32_t main_snprint_parameters(char *buff,uint32_t size) {
 		bprintf("kernel_capability_mask: 0x%"PRIX32"\n",fuse_capable);
 		bprintf("kernel_defaults_mask: 0x%"PRIX32"\n",fuse_defaults);
 		bprintf("kernel_working_mask: 0x%"PRIX32"\n",fuse_want);
+#if defined(HAVE_FUSE3_URING) && defined(FUSE_CAP_OVER_IO_URING)
+		bprintf("io_uring: %s\n",(fuse_want & FUSE_CAP_OVER_IO_URING)?"yes":"no");
+#endif
 #endif
 	}
 	return leng;
@@ -1782,6 +1803,7 @@ int main(int argc, char *argv[]) {
 	mfsopts.noxattrs = 0;
 	mfsopts.noposixlocks = 0;
 	mfsopts.nobsdlocks = 0;
+	mfsopts.nouring = 0;
 	mfsopts.cachemode = NULL;
 	mfsopts.writecachesize = 0;
 	mfsopts.readaheadsize = 0;

@@ -593,9 +593,24 @@ fi
 
 AM_CONDITIONAL([WITH_BDEV], [test "$bdev" != "no" -a "$enable_mfsbdev" != "no"])
 
+AC_ARG_ENABLE([io-uring],
+	AS_HELP_STRING([--disable-io-uring],
+		[disable FUSE-over-io_uring support even when libfuse >= 3.18 is present]),
+	[],
+	[enable_io_uring=yes])
+
 if test "$fuse" != "no" -a "enable_mfsmount" != "no"; then
 	if test -n "$PKG_CONFIG"; then
 		PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.2.1], [AC_DEFINE([HAVE_FUSE3],[1],[libfuse3 detected])] , [ PKG_CHECK_MODULES([FUSE], [fuse >= 2.6], , [fuse=no]) ])
+		# FUSE-over-io_uring requires libfuse >= 3.18.0 at build time
+		# and Linux >= 6.7 with CONFIG_FUSE_IO_URING=y at run time. The
+		# capability is negotiated automatically by libfuse; HAVE_FUSE3_URING
+		# just gates the explicit conn->want |= FUSE_CAP_OVER_IO_URING in
+		# mfs_fsinit and the -o mfsnouring escape hatch.
+		if test "$enable_io_uring" != "no"; then
+			PKG_CHECK_EXISTS([fuse3 >= 3.18.0],
+				[AC_DEFINE([HAVE_FUSE3_URING],[1],[libfuse >= 3.18 with FUSE-over-io_uring support])])
+		fi
 	else
 		echo "no pkg-config - can't check FUSE version"
 		fuse=no

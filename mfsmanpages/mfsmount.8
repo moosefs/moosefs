@@ -187,6 +187,9 @@ turn off support for global posix locks (lockf + ioctl) - locks will work locall
 .TP
 \fB\-o mfsnobsdlocks\fP
 turn off support for global BSD locks (flock) - locks will work locally
+.TP
+\fB\-o mfsnouring\fP
+turn off FUSE-over-io_uring even when libfuse and kernel both support it. FUSE-over-io_uring is auto-enabled when built against libfuse >= 3.18 and running on Linux >= 6.7 with CONFIG_FUSE_IO_URING=y; use this option to force-disable at run time without rebuilding or downgrading libfuse.
 .SS MOUNT OPTIONS
 .PP
 General mount options (see \fBmount\fP\|(8) manual):

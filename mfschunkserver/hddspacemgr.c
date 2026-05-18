@@ -1912,7 +1912,7 @@ static void hdd_int_chunk_testmove(chunk *c) {
 	c->testprev = f->testedtail;
 	f->testedtail = &(c->testnext);
 	*(c->testprev) = c;
-	c->testtime = main_time();
+//	c->testtime = main_time();
 }
 
 static void hdd_int_testloop(folder *f) {
@@ -9179,13 +9179,7 @@ static inline void hdd_options_common(uint8_t initflag) {
 	HDDKeepDuplicatesHours = tmp;
 	zassert(pthread_mutex_unlock(&folderlock));
 	zassert(pthread_mutex_lock(&testlock));
-	if (cfg_isdefined("HDD_TEST_SPEED")) {
-		HDDTestMBPS = cfg_getdouble("HDD_TEST_SPEED",1.0);
-		if (HDDTestMBPS<0.0) {
-			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"hdd space manager: setting HDD_TEST_SPEED to negative value doesn't make sense - changed to 0.0");
-			HDDTestMBPS=0.0;
-		}
-	} else {
+	if (cfg_isdefined("HDD_TEST_FREQ") && !cfg_isdefined("HDD_TEST_SPEED")) {
 		double testfreq;
 		testfreq = cfg_getuint32("HDD_TEST_FREQ",10); // deprecated option
 		if (testfreq>0) {
@@ -9193,6 +9187,12 @@ static inline void hdd_options_common(uint8_t initflag) {
 		} else {
 			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_NOTICE,"hdd space manager: regular chunk tests are disabled - this is not recommended setting");
 			HDDTestMBPS = 0.0;
+		}
+	} else {
+		HDDTestMBPS = cfg_getdouble("HDD_TEST_SPEED",1.0);
+		if (HDDTestMBPS<0.0) {
+			mfs_log(MFSLOG_SYSLOG_STDERR,MFSLOG_WARNING,"hdd space manager: setting HDD_TEST_SPEED to negative value doesn't make sense - changed to 0.0");
+			HDDTestMBPS=0.0;
 		}
 	}
 	if (HDDTestMBPS==0.0) {

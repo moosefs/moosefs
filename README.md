@@ -80,7 +80,7 @@ You can install MooseFS using your favourite package manager on one of the follo
 **`arm64`**:
 
 * Debian 11 / 12 / 13
-* Ubuntu 20 / 22 / 24
+* Ubuntu 20 / 22 / 24 / 26
 * RHEL / CentOS 9 / 10
 * Rocky Linux / AlmaLinux 9 / 10
 

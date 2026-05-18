@@ -31,8 +31,7 @@ CONFIGURE_ARGS+=	--localstatedir=${MFS_WORKDIR} \
 			--with-default-user=${MFS_USER} \
 			--with-default-group=${MFS_GROUP}
 
-CONFLICTS=		moosefs2-* \
-			moosefs3-*
+CONFLICTS=		moosefs3-*
 
 PLIST_SUB=		USER=${MFS_USER} \
 			GROUP=${MFS_GROUP}

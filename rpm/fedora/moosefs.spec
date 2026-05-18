@@ -11,7 +11,7 @@
 
 Summary:	Distributed, scalable, fault tolerant file system
 Name:		moosefs
-Version:	4.59.1
+Version:	4.59.2
 Release:	%autorelease
 License:	GPL-2.0-only
 URL:		http://www.moosefs.com/

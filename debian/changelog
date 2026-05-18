@@ -1,3 +1,9 @@
+moosefs (4.59.2-1) unstable; urgency=medium
+
+  * (cs) fixed bug preventing background chunk testing
+
+ -- MooseFS Team <contact@moosefs.com>  Thu, 14 May 2026 13:00:00 +0200
+
 moosefs (4.59.1-1) unstable; urgency=medium
 
   * (cs) fixed potential OOB read

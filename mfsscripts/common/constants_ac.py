@@ -1,4 +1,4 @@
-VERSION = "4.59.1"
+VERSION = "4.59.2"
 
 PROTO_BASE = 0
 
